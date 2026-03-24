@@ -199,11 +199,31 @@ structure Checker :> CHECKER = struct
     | Ast.StmtItem _ =>
         raise Fail "E0405: nested items are not supported in type checker slice"
 
-  fun checkContract (env : venv) (c : Ast.contract) : unit =
+  fun exprReferencesResult (e : Ast.expr) : bool =
+    case e of
+      Ast.ExprPath (["result"], _) => true
+    | Ast.ExprBinop (_, l, r, _) =>
+        exprReferencesResult l orelse exprReferencesResult r
+    | Ast.ExprUnop (_, e1, _) => exprReferencesResult e1
+    | Ast.ExprCall (f, args, _) =>
+        exprReferencesResult f orelse List.exists exprReferencesResult args
+    | Ast.ExprIf (c, th, el, _) =>
+        exprReferencesResult c orelse exprReferencesResult th
+        orelse (case el of SOME z => exprReferencesResult z | NONE => false)
+    | _ => false
+
+  fun checkContract (env : venv) (retTy : Types.ty) (c : Ast.contract) : unit =
     case c of
       Ast.Requires (e, _) => expect (synth Types.TyUnit env e, Types.TyBool)
-    | Ast.Ensures _ =>
-        raise Fail "E0501: ensures contracts are not type-checked in this slice"
+    | Ast.Ensures (e, _) =>
+        let
+          val envR = extend env "result" retTy
+        in
+          if Unify.unify (retTy, Types.TyUnit) andalso exprReferencesResult e then
+            raise Fail "E0520: ensures cannot use result when return type is unit"
+          else
+            expect (synth retTy envR e, Types.TyBool)
+        end
     | Ast.LoopInvariant _ =>
         raise Fail "E0502: loop_invariant not type-checked in this slice"
 
@@ -283,7 +303,7 @@ structure Checker :> CHECKER = struct
                   | NONE => raise Fail "E0406: unknown parameter type")
              | _ => raise Fail "E0410: parameters must be simple bindings here")
           modEnv (#params r)
-      val () = app (checkContract env1) (#contracts r)
+      val () = app (checkContract env1 retTy) (#contracts r)
     in
       checkExprAsBody env1 retTy (#body r)
     end
