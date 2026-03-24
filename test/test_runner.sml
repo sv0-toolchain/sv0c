@@ -247,6 +247,87 @@ structure TestRunner = struct
                  (ts4 = [Token.IDENT "x", Token.PLUS, Token.IDENT "y",
                          Token.STAR, Token.IDENT "z", Token.EOF])
 
+      (* --- parser --- *)
+      val () = print "\n[parser]\n"
+      fun parseSrc s = Parser.parse (Lexer.tokenize "<test>" s)
+      val pMain = parseSrc "fn main() -> i32 { return 0; }"
+      val () = check "parse single top-level fn" (length pMain = 1)
+      val () = check "parse fn name main"
+                 (case pMain of
+                    Ast.ItemFn {name, ...} :: _ => name = "main"
+                  | _ => false)
+      val (_, restExpr) = Parser.parseExpr (Lexer.tokenize "<e>" "1 + 2")
+      val () = check "parseExpr leaves EOF"
+                 (case restExpr of
+                    (Token.EOF, _) :: _ => true
+                  | _ => false)
+
+      (* --- name resolution --- *)
+      val () = print "\n[resolver]\n"
+      fun resolveCatch s =
+        (Resolver.resolve (parseSrc s); NONE)
+        handle Fail msg => SOME msg
+      val () = check "resolve trivial main"
+                 (resolveCatch "fn main() -> i32 { return 0; }" = NONE)
+      val () = check "resolve let binds return"
+                 (resolveCatch
+                    "fn main() -> i32 { let x = 0; return x; }" = NONE)
+      val () = check "resolve rejects unbound identifier"
+                 (case resolveCatch "fn main() -> i32 { return x; }" of
+                    SOME m => String.isSubstring "E0300" m
+                  | NONE => false)
+      val () = check "resolve rejects duplicate fns"
+                 (case resolveCatch "fn a() -> unit {} fn a() -> unit {}" of
+                    SOME m => String.isSubstring "E0302" m
+                  | NONE => false)
+
+      (* --- type checker --- *)
+      val () = print "\n[checker]\n"
+      fun checkCatch s =
+        (Checker.check (Resolver.resolve (parseSrc s)); NONE)
+        handle Fail msg => SOME msg
+      val () = check "checker rejects bool for i32 return"
+                 (case checkCatch "fn main() -> i32 { return true; }" of
+                    SOME m => String.isSubstring "E0400" m
+                  | NONE => false)
+      val () = check "checker accepts literal return"
+                 (checkCatch "fn main() -> i32 { return 42; }" = NONE)
+      val () = check "checker accepts let and return path"
+                 (checkCatch
+                    "fn main() -> i32 { let x: i32 = 7; return x; }" = NONE)
+      val () = check "checker rejects int/bool binop"
+                 (case checkCatch "fn main() -> i32 { return 1 + true; }" of
+                    SOME m => String.isSubstring "E0400" m
+                  | NONE => false)
+      val () = check "checker accepts if-else int"
+                 (checkCatch
+                    "fn main() -> i32 { return if true { 40 } else { 2 }; }" = NONE)
+      val () = check "checker accepts let with inferred binop"
+                 (checkCatch
+                    "fn main() -> i32 { let x = 1 + 2; return x; }" = NONE)
+
+      (* --- end-to-end (parse through C string) --- *)
+      val () = print "\n[e2e]\n"
+      fun compileToC s =
+        let
+          val ast = Resolver.resolve (parseSrc s)
+          val ast = Checker.check ast
+          val ast = ContractAnalyzer.analyze ast
+        in
+          Codegen.emit (Lowering.lower ast)
+        end
+      val c42 = compileToC "fn main() -> i32 { return 42; }"
+      val () = check "e2e C includes return 42"
+                 (String.isSubstring "return 42" c42)
+      val () = check "e2e C includes sv0_runtime.h"
+                 (String.isSubstring "sv0_runtime.h" c42)
+      val cAdd = compileToC "fn main() -> i32 { return 1 + 2; }"
+      val () = check "e2e C binop return"
+                 (String.isSubstring "+" cAdd andalso String.isSubstring "return" cAdd)
+      val cIf = compileToC "fn main() -> i32 { return if true { 40 } else { 2 }; }"
+      val () = check "e2e C if-else"
+                 (String.isSubstring "if (" cIf andalso String.isSubstring "else" cIf)
+
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"
       val tokens = Lexer.tokenize "<test>" ""
