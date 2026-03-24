@@ -19,6 +19,9 @@ structure Codegen :> CODEGEN = struct
     | Ir.VUnit => "0"
     | _ => raise Fail "value not supported in codegen slice"
 
+  fun emitCallArgs (vs : Ir.value list) : string =
+    String.concatWith ", " (map emitValue vs)
+
   fun emitExpr (e : Ir.expr) : string =
     case e of
       Ir.Literal v => emitValue v
@@ -27,6 +30,20 @@ structure Codegen :> CODEGEN = struct
         "(" ^ emitValue v1 ^ " " ^ opStr ^ " " ^ emitValue v2 ^ ")"
     | Ir.Unop (opStr, v) => "(" ^ opStr ^ emitValue v ^ ")"
     | _ => raise Fail "expression not supported in codegen slice"
+
+  fun emitParamList (names : string list) : string =
+    case names of
+      [] => "void"
+    | _ => String.concatWith ", " (map (fn n => "int " ^ n) names)
+
+  (* isStatic: true for helpers (need forward decl), false for main. *)
+  fun emitFnProto (isStatic : bool) (b : Ir.block) : string =
+    let
+      val retTy = cTypeForRet (#instrs b)
+      val staticKw = if isStatic then "static " else ""
+    in
+      staticKw ^ retTy ^ " " ^ #label b ^ "(" ^ emitParamList (#params b) ^ ")"
+    end
 
   fun emitInstr (indent : string) (retTy : string) (ins : Ir.instr) : string =
     case ins of
@@ -40,19 +57,22 @@ structure Codegen :> CODEGEN = struct
         ^ indent ^ "} else {\n"
         ^ String.concat (map (emitInstr (indent ^ "  ") retTy) el)
         ^ indent ^ "}\n"
+    | Ir.Call (SOME d, f, vs) =>
+        indent ^ "int " ^ d ^ " = " ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
+    | Ir.Call (NONE, f, vs) =>
+        indent ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
     | Ir.Return NONE =>
         if retTy = "void" then indent ^ "return;\n"
         else raise Fail "invalid return without value for int function"
     | Ir.Return (SOME v) => indent ^ "return " ^ emitValue v ^ ";\n"
     | _ => raise Fail "instruction not supported in codegen slice"
 
-  fun emitBlock (b : Ir.block) : string =
-    let
-      val retTy = cTypeForRet (#instrs b)
-      val body = String.concat (map (emitInstr "  " retTy) (#instrs b))
-    in
-      retTy ^ " " ^ #label b ^ "(void) {\n" ^ body ^ "}\n\n"
-    end
+  fun emitBlockBody (b : Ir.block) : string =
+    let val retTy = cTypeForRet (#instrs b)
+    in String.concat (map (emitInstr "  " retTy) (#instrs b)) end
+
+  fun emitBlockDefn (isStatic : bool) (b : Ir.block) : string =
+    emitFnProto isStatic b ^ " {\n" ^ emitBlockBody b ^ "}\n\n"
 
   fun splitMain (bs : Ir.block list) : Ir.block list * Ir.block option =
     let
@@ -71,13 +91,15 @@ structure Codegen :> CODEGEN = struct
       let
         val (others, mainOpt) = splitMain prog
         val prelude = "#include \"sv0_runtime.h\"\n\n"
+        val forwardDecls =
+          String.concat (map (fn b => emitFnProto true b ^ ";\n") others)
         val statics =
-          String.concat (map (fn b => "static " ^ emitBlock b) others)
+          String.concat (map (fn b => emitBlockDefn true b) others)
         val mainPart =
           case mainOpt of
-            SOME b => emitBlock b
+            SOME b => emitBlockDefn false b
           | NONE => "int main(void) { return 0; }\n"
       in
-        prelude ^ statics ^ mainPart
+        prelude ^ forwardDecls ^ "\n" ^ statics ^ mainPart
       end
 end

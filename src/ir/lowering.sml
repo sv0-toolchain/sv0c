@@ -43,6 +43,11 @@ structure Lowering :> LOWERING = struct
     | Ast.BitNot => "~"
     | _ => raise Fail "unop not supported in lowering slice"
 
+  fun paramName ((p : Ast.pat, _) : Ast.pat * Ast.ty) : string =
+    case p of
+      Ast.PatBind (x, _) => x
+    | _ => raise Fail "parameter must be PatBind in lowering slice"
+
   (* Instrs that compute e, ending with a simple value (for Binop/Unop leaves). *)
   and lowerExprToValue (e : Ast.expr) : Ir.instr list * Ir.value =
     case e of
@@ -55,6 +60,17 @@ structure Lowering :> LOWERING = struct
            end
     | Ast.ExprLit (l, _) => ([], lowerLit l)
     | Ast.ExprPath ([x], _) => ([], Ir.VVar x)
+    | Ast.ExprCall (Ast.ExprPath ([callee], _), args, _) =>
+        let
+          fun oneArg a =
+            let val (ia, va) = lowerExprToValue a in (ia, va) end
+          val pairs = map oneArg args
+          val inss = List.concat (map #1 pairs)
+          val vals = map #2 pairs
+          val t = freshTmp ()
+        in
+          (inss @ [Ir.Call (SOME t, callee, vals)], Ir.VVar t)
+        end
     | Ast.ExprBinop (b, l, r, _) =>
         let
           val (il, vl) = lowerExprToValue l
@@ -215,7 +231,11 @@ structure Lowering :> LOWERING = struct
         body : Ast.expr, span : Span.span
       }) : Ir.block =
     (tmpCtr := 0;
-     {label = #name r, instrs = lowerBody (#body r)})
+     {
+       label = #name r,
+       params = map paramName (#params r),
+       instrs = lowerBody (#body r)
+     })
 
   fun lower (prog : Ast.program) : Ir.program =
     let

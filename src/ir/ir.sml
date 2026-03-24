@@ -28,7 +28,7 @@ structure Ir = struct
     | FieldAccess of value * string
     | IndexAccess of value * value
 
-  type block = {label : label, instrs : instr list}
+  type block = {label : label, params : string list, instrs : instr list}
 
   type program = block list
 end
