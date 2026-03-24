@@ -1,5 +1,5 @@
-(* Contract analysis: Checker.type-checks `requires` as bool when present.
-   This pass is a no-op for now; later it can lower contracts to sv0_runtime calls. *)
+(* Contract analysis: requires/ensures are type-checked in Checker and lowered
+   to sv0_requires / sv0_ensures in Lowering. This pass is still a pass-through. *)
 structure ContractAnalyzer :> ANALYZER = struct
   fun analyze prog = prog
 end

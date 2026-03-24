@@ -19,6 +19,8 @@ structure Ir = struct
     | Branch of value * label * label
     | Jump of label
     | Call of string option * string * value list
+    | Requires of expr * string (* condition, function name for diagnostics *)
+    | Ensures of expr * string
 
   and expr =
       Literal of value
