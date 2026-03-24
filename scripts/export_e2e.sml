@@ -1,6 +1,8 @@
 (* Emit build/e2e_generated.c for Makefile e2e target. Run from sv0c: sml < scripts/export_e2e.sml *)
 CM.make "sources.cm";
-val src = "fn main() -> i32 { return 42; }\n";
+val src =
+  "fn inc(x: i32) -> i32 { return x + 1; }\n" ^
+  "fn main() -> i32 { return inc(41); }\n";
 val toks = Lexer.tokenize "e2e.sv0" src;
 val ast = Parser.parse toks;
 val ast = Resolver.resolve ast;
