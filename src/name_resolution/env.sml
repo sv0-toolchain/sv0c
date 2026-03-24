@@ -1,6 +1,7 @@
 structure Env :> ENV = struct
   datatype env = Env of {
     modVals : string list,
+    fnArity : (string * int) list,
     modTys : string list,
     frames : string list list
   }
@@ -13,7 +14,7 @@ structure Env :> ENV = struct
   fun isPreludeType t = List.exists (fn p => p = t) preludeTypes
 
   val empty : env =
-    Env { modVals = [], modTys = [], frames = [] }
+    Env { modVals = [], fnArity = [], modTys = [], frames = [] }
 
   fun dupModVal name (Env r) =
     List.exists (fn n => n = name) (#modVals r)
@@ -30,6 +31,21 @@ structure Env :> ENV = struct
           Env
             {
               modVals = name :: #modVals r,
+              fnArity = #fnArity r,
+              modTys = #modTys r,
+              frames = #frames r
+            }
+
+  fun registerFnArity e name arity =
+    case e of
+      Env r =>
+        if List.exists (fn (n, _) => n = name) (#fnArity r) then
+          raise Fail ("E0308: duplicate function arity for `" ^ name ^ "`")
+        else
+          Env
+            {
+              modVals = #modVals r,
+              fnArity = (name, arity) :: #fnArity r,
               modTys = #modTys r,
               frames = #frames r
             }
@@ -45,16 +61,30 @@ structure Env :> ENV = struct
           Env
             {
               modVals = #modVals r,
+              fnArity = #fnArity r,
               modTys = name :: #modTys r,
               frames = #frames r
             }
 
   fun enterScope (Env r) =
-    Env { modVals = #modVals r, modTys = #modTys r, frames = [] :: #frames r }
+    Env
+      {
+        modVals = #modVals r,
+        fnArity = #fnArity r,
+        modTys = #modTys r,
+        frames = [] :: #frames r
+      }
 
   fun exitScope (Env r) =
     case #frames r of
-      _ :: rest => Env { modVals = #modVals r, modTys = #modTys r, frames = rest }
+      _ :: rest =>
+        Env
+          {
+            modVals = #modVals r,
+            fnArity = #fnArity r,
+            modTys = #modTys r,
+            frames = rest
+          }
     | [] => Env r
 
   fun bindLocal e name =
@@ -65,6 +95,7 @@ structure Env :> ENV = struct
             Env
               {
                 modVals = #modVals r,
+                fnArity = #fnArity r,
                 modTys = #modTys r,
                 frames = [[name]]
               }
@@ -72,6 +103,7 @@ structure Env :> ENV = struct
             Env
               {
                 modVals = #modVals r,
+                fnArity = #fnArity r,
                 modTys = #modTys r,
                 frames = (name :: frame) :: rest
               }
@@ -92,6 +124,15 @@ structure Env :> ENV = struct
     in
       inFrames (#frames r)
       orelse List.exists (fn n => String.compare (n, name) = EQUAL) (#modVals r)
+    end
+
+  fun lookupFnArity (Env r) name =
+    let
+      fun find [] = NONE
+        | find ((n, a) :: rest) =
+            if String.compare (n, name) = EQUAL then SOME a else find rest
+    in
+      find (#fnArity r)
     end
 
   fun lookupType (Env r) (ctx : {allowSelf : bool}) path =

@@ -50,7 +50,21 @@ structure Resolver :> RESOLVER = struct
     | Ast.ExprBinop (_, a, b, _) =>
         (resolveExpr ctx env a; resolveExpr ctx env b)
     | Ast.ExprCall (f, args, _) =>
-        (resolveExpr ctx env f; app (resolveExpr ctx env) args)
+        let
+          val () =
+            case f of
+              Ast.ExprPath ([nm], _) =>
+                (case Env.lookupFnArity env nm of
+                   SOME n =>
+                     if length args <> n then
+                       raise Fail
+                         ("E0307: wrong number of arguments for `" ^ nm ^ "`")
+                     else ()
+                 | NONE => ())
+            | _ => ()
+        in
+          (resolveExpr ctx env f; app (resolveExpr ctx env) args)
+        end
     | Ast.ExprMethodCall (recv, _, args, _) =>
         (resolveExpr ctx env recv; app (resolveExpr ctx env) args)
     | Ast.ExprField (e1, _, _) => resolveExpr ctx env e1
@@ -228,7 +242,8 @@ structure Resolver :> RESOLVER = struct
 
   fun registerItem (env : Env.env) (it : Ast.item) : Env.env =
     case it of
-      Ast.ItemFn { name, ... } => Env.registerModuleValue env name
+      Ast.ItemFn { name, params, ... } =>
+        Env.registerFnArity (Env.registerModuleValue env name) name (length params)
     | Ast.ItemStruct { name, ... } => Env.registerModuleType env name
     | Ast.ItemEnum { name, ... } => Env.registerModuleType env name
     | Ast.ItemTrait { name, ... } => Env.registerModuleType env name
