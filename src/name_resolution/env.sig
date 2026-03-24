@@ -9,6 +9,9 @@ signature ENV = sig
   val registerModuleValue : env -> string -> env
   val registerModuleType : env -> string -> env
 
+  (* Record arity for a module-level function (after registerModuleValue for same name). *)
+  val registerFnArity : env -> string -> int -> env
+
   (* Open/close a block scope (fn body, ExprBlock, etc.). *)
   val enterScope : env -> env
   val exitScope : env -> env
@@ -17,6 +20,9 @@ signature ENV = sig
   val bindLocal : env -> string -> env
 
   val lookupValue : env -> string -> bool
+
+  (* Arity of a module-level function, if registered. *)
+  val lookupFnArity : env -> string -> int option
 
   (* Single-segment type paths, optional Self (impl bodies), and prelude primitives. *)
   val lookupType : env -> {allowSelf : bool} -> Ast.path -> bool
