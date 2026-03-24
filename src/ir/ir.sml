@@ -11,7 +11,10 @@ structure Ir = struct
 
   datatype instr =
       Nop
+    | DeclVar of string
     | Assign of string * expr
+    | Store of string * expr
+    | IfElse of expr * instr list * instr list
     | Return of value option
     | Branch of value * label * label
     | Jump of label

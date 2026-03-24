@@ -1,3 +1,229 @@
+(* Lower a type-checked program to IR (one block per fn). *)
+
 structure Lowering :> LOWERING = struct
-  fun lower _ = []
+
+  val tmpCtr = ref 0
+
+  fun freshTmp () =
+    let val n = !tmpCtr
+    in tmpCtr := n + 1; "_sv0t" ^ Int.toString n end
+
+  fun astBinopToC (b : Ast.binop) : string =
+    case b of
+      Ast.Add => "+"
+    | Ast.Sub => "-"
+    | Ast.Mul => "*"
+    | Ast.Div => "/"
+    | Ast.Rem => "%"
+    | Ast.BitAnd => "&"
+    | Ast.BitOr => "|"
+    | Ast.BitXor => "^"
+    | Ast.Shl => "<<"
+    | Ast.Shr => ">>"
+    | Ast.And => "&&"
+    | Ast.Or => "||"
+    | Ast.Eq => "=="
+    | Ast.Neq => "!="
+    | Ast.Lt => "<"
+    | Ast.Gt => ">"
+    | Ast.Leq => "<="
+    | Ast.Geq => ">="
+
+  fun lowerLit (l : Ast.literal) : Ir.value =
+    case l of
+      Ast.IntLit i => Ir.VInt i
+    | Ast.BoolLit b => Ir.VBool b
+    | Ast.UnitLit => Ir.VUnit
+    | _ => raise Fail "literal not supported in lowering slice"
+
+  fun unopToC (u : Ast.unop) : string =
+    case u of
+      Ast.Neg => "-"
+    | Ast.Not => "!"
+    | Ast.BitNot => "~"
+    | _ => raise Fail "unop not supported in lowering slice"
+
+  (* Instrs that compute e, ending with a simple value (for Binop/Unop leaves). *)
+  and lowerExprToValue (e : Ast.expr) : Ir.instr list * Ir.value =
+    case e of
+      Ast.ExprBlock (stmts, opt, _) =>
+        let val is = List.concat (map lowerStmt stmts)
+        in case opt of
+             SOME e2 =>
+               let val (i2, v2) = lowerExprToValue e2 in (is @ i2, v2) end
+           | NONE => (is, Ir.VUnit)
+           end
+    | Ast.ExprLit (l, _) => ([], lowerLit l)
+    | Ast.ExprPath ([x], _) => ([], Ir.VVar x)
+    | Ast.ExprBinop (b, l, r, _) =>
+        let
+          val (il, vl) = lowerExprToValue l
+          val (ir, vr) = lowerExprToValue r
+          val t = freshTmp ()
+        in
+          (il @ ir @ [Ir.Assign (t, Ir.Binop (astBinopToC b, vl, vr))], Ir.VVar t)
+        end
+    | Ast.ExprUnop (u, e1, _) =>
+        let
+          val (i, v) = lowerExprToValue e1
+          val t = freshTmp ()
+        in
+          (i @ [Ir.Assign (t, Ir.Unop (unopToC u, v))], Ir.VVar t)
+        end
+    | Ast.ExprIf (c, th, SOME el, _) =>
+        let
+          val t = freshTmp ()
+          val u = freshTmp ()
+          val (ic, ec) = lowerExprWithInstrs c
+          val thSt = lowerIntoVarInstrs th u
+          val elSt = lowerIntoVarInstrs el u
+        in
+          ( ic @ [Ir.DeclVar t, Ir.DeclVar u, Ir.IfElse (ec, thSt, elSt),
+                  Ir.Store (t, Ir.Load u)]
+          , Ir.VVar t)
+        end
+    | Ast.ExprIf (c, th, NONE, _) =>
+        let val (ic, ec) = lowerExprWithInstrs c
+        in (ic @ [Ir.IfElse (ec, lowerExprForEffect th, [])], Ir.VUnit) end
+    | _ =>
+        let
+          val (instrs, rhs) = lowerExprWithInstrs e
+          val t = freshTmp ()
+        in
+          (instrs @ [Ir.Assign (t, rhs)], Ir.VVar t)
+        end
+
+  (* Build Ir.expr; may use lowerExprToValue for non-leaf operands. *)
+  and lowerExprWithInstrs (e : Ast.expr) : Ir.instr list * Ir.expr =
+    case e of
+      Ast.ExprBlock (stmts, opt, _) =>
+        let val is = List.concat (map lowerStmt stmts)
+        in case opt of
+             SOME e2 =>
+               let val (i2, rhs) = lowerExprWithInstrs e2 in (is @ i2, rhs) end
+           | NONE => (is, Ir.Literal Ir.VUnit)
+           end
+    | Ast.ExprLit (l, _) => ([], Ir.Literal (lowerLit l))
+    | Ast.ExprPath ([x], _) => ([], Ir.Load x)
+    | Ast.ExprBinop (b, l, r, _) =>
+        let
+          val (il, vl) = lowerExprToValue l
+          val (ir, vr) = lowerExprToValue r
+        in
+          (il @ ir, Ir.Binop (astBinopToC b, vl, vr))
+        end
+    | Ast.ExprUnop (u, e1, _) =>
+        let
+          val (i, v) = lowerExprToValue e1
+        in
+          (i, Ir.Unop (unopToC u, v))
+        end
+    | _ =>
+        let
+          val (instrs, v) = lowerExprToValue e
+        in
+          case v of
+            Ir.VVar x => (instrs, Ir.Load x)
+          | _ => (instrs, Ir.Literal v)
+        end
+
+  (* Assign into existing variable name t (outer scope already declares t if needed). *)
+  and lowerIntoVarInstrs (e : Ast.expr) (t : string) : Ir.instr list =
+    case e of
+      Ast.ExprBlock (stmts, opt, _) =>
+        let val is = List.concat (map lowerStmt stmts)
+        in case opt of
+             SOME e2 => is @ lowerIntoVarInstrs e2 t
+           | NONE => is @ [Ir.Store (t, Ir.Literal Ir.VUnit)]
+           end
+    | Ast.ExprLit (l, _) => [Ir.Store (t, Ir.Literal (lowerLit l))]
+    | Ast.ExprPath ([x], _) => [Ir.Store (t, Ir.Load x)]
+    | Ast.ExprIf (c, th, SOME el, _) =>
+        let
+          val u = freshTmp ()
+          val (ic, ec) = lowerExprWithInstrs c
+          val thSt = lowerIntoVarInstrs th u
+          val elSt = lowerIntoVarInstrs el u
+        in
+          ic @ [Ir.DeclVar u, Ir.IfElse (ec, thSt, elSt), Ir.Store (t, Ir.Load u)]
+        end
+    | Ast.ExprIf (c, th, NONE, _) =>
+        let val (ic, ec) = lowerExprWithInstrs c
+        in
+          ic
+          @ [Ir.IfElse (ec, lowerIntoVarInstrs th t,
+               [Ir.Store (t, Ir.Literal Ir.VUnit)])]
+        end
+    | _ =>
+        let
+          val (instrs, rhs) = lowerExprWithInstrs e
+        in
+          instrs @ [Ir.Store (t, rhs)]
+        end
+
+  (* Evaluate for side effects / discarded unit result (blocks, if without else). *)
+  and lowerExprForEffect (e : Ast.expr) : Ir.instr list =
+    case e of
+      Ast.ExprBlock (stmts, opt, _) =>
+        let val is = List.concat (map lowerStmt stmts)
+        in case opt of NONE => is | SOME e2 => is @ lowerExprForEffect e2 end
+    | Ast.ExprIf (c, th, NONE, _) =>
+        let val (ic, ec) = lowerExprWithInstrs c
+        in ic @ [Ir.IfElse (ec, lowerExprForEffect th, [])] end
+    | Ast.ExprIf (c, th, SOME el, _) =>
+        let val (ic, ec) = lowerExprWithInstrs c
+        in ic @ [Ir.IfElse (ec, lowerExprForEffect th, lowerExprForEffect el)] end
+    | _ =>
+        let val (instrs, _) = lowerExprToValue e in instrs end
+
+  and lowerStmt (st : Ast.stmt) : Ir.instr list =
+    case st of
+      Ast.StmtLet (Ast.PatBind (x, _), _, _, SOME init, _) =>
+        let val (instrs, rhs) = lowerExprWithInstrs init
+        in instrs @ [Ir.Assign (x, rhs)] end
+    | Ast.StmtSemi (Ast.ExprReturn (SOME e, _), _) => lowerReturn e
+    | Ast.StmtSemi (Ast.ExprReturn (NONE, _), _) => [Ir.Return NONE]
+    | Ast.StmtExpr (Ast.ExprReturn (SOME e, _), _) => lowerReturn e
+    | Ast.StmtExpr (Ast.ExprReturn (NONE, _), _) => [Ir.Return NONE]
+    | Ast.StmtSemi (e, _) => lowerExprForEffect e
+    | Ast.StmtExpr (e, _) => lowerExprForEffect e
+    | _ => raise Fail "statement not supported in lowering slice"
+
+  and lowerReturn (e : Ast.expr) : Ir.instr list =
+    let val (instrs, v) = lowerExprToValue e
+    in instrs @ [Ir.Return (SOME v)] end
+
+  fun lowerBlock (stmts : Ast.stmt list, opt : Ast.expr option) : Ir.instr list =
+    let
+      val is = List.concat (map lowerStmt stmts)
+      val tail =
+        case opt of
+          NONE => []
+        | SOME e => lowerReturn e
+    in
+      is @ tail
+    end
+
+  fun lowerBody (body : Ast.expr) : Ir.instr list =
+    case body of
+      Ast.ExprBlock (stmts, opt, _) => lowerBlock (stmts, opt)
+    | e => lowerReturn e
+
+  fun lowerFn (r : {
+        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        ret : Ast.ty option, contracts : Ast.contract list,
+        body : Ast.expr, span : Span.span
+      }) : Ir.block =
+    (tmpCtr := 0;
+     {label = #name r, instrs = lowerBody (#body r)})
+
+  fun lower (prog : Ast.program) : Ir.program =
+    let
+      fun one it =
+        case it of
+          Ast.ItemFn r => SOME (lowerFn r)
+        | _ => NONE
+    in
+      List.mapPartial one prog
+    end
 end
