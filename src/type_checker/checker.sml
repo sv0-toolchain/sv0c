@@ -93,7 +93,11 @@ structure Checker :> CHECKER = struct
       Ast.ExprLit (Ast.IntLit _, _) => Types.TyInt 32
     | Ast.ExprLit (Ast.BoolLit _, _) => Types.TyBool
     | Ast.ExprLit (Ast.UnitLit, _) => Types.TyUnit
-    | Ast.ExprPath ([x], _) => lookup env x
+    | Ast.ExprPath ([x], _) =>
+        (case lookup env x of
+           Types.TyFn _ =>
+             raise Fail "E0411: function values are not supported in this slice"
+         | t => t)
     | Ast.ExprBlock (stmts, opt, _) =>
         let
           val envAfter =
@@ -147,6 +151,23 @@ structure Checker :> CHECKER = struct
         in
           if Unify.unify (t1, t2) then t1 else raise Fail "E0400: type mismatch"
         end
+    | Ast.ExprCall (Ast.ExprPath ([name], _), args, _) =>
+        (case lookup env name of
+           Types.TyFn (paramTys, outTy) =>
+             let
+               fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
+                 | zipCheck (a :: ar) (t :: tr) =
+                     (expect (synth retTy env a, t); zipCheck ar tr)
+                 | zipCheck _ _ =
+                     raise Fail "E0413: arity mismatch in type checker"
+             in
+               zipCheck args paramTys;
+               outTy
+             end
+         | _ => raise Fail "E0412: call target is not a function")
+    | Ast.ExprCall _ =>
+        raise Fail
+          "E0402: only direct calls to named functions are supported in this slice"
     | _ =>
         raise Fail "E0402: expression form not supported in type checker slice"
 
@@ -204,7 +225,42 @@ structure Checker :> CHECKER = struct
       Ast.ExprBlock (stmts, opt, _) => checkBlock env retTy (stmts, opt)
     | _ => expect (synth retTy env body, retTy)
 
-  fun checkFn (r : {
+  fun itemFnTy (r : {
+        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        ret : Ast.ty option, contracts : Ast.contract list,
+        body : Ast.expr, span : Span.span
+      }) : Types.ty =
+    let
+      val retTy =
+        case #ret r of
+          NONE => raise Fail "E0409: function needs an explicit return type in this slice"
+        | SOME at =>
+            (case astTyToTy at of
+               SOME t => t
+             | NONE => raise Fail "E0406: unknown return type")
+      val paramTys =
+        List.map
+          (fn (_, pt) =>
+             case astTyToTy pt of
+               SOME t => t
+             | NONE => raise Fail "E0406: unknown parameter type")
+          (#params r)
+    in
+      Types.TyFn (paramTys, retTy)
+    end
+
+  fun modEnvFromProg (prog : Ast.program) : venv =
+    let
+      fun one (it : Ast.item, acc : venv) : venv =
+        case it of
+          Ast.ItemFn r => extend acc (#name r) (itemFnTy r)
+        | _ => acc
+    in
+      List.foldl one [] prog
+    end
+
+  fun checkFn (modEnv : venv)
+    (r : {
         name : Ast.ident, params : (Ast.pat * Ast.ty) list,
         ret : Ast.ty option, contracts : Ast.contract list,
         body : Ast.expr, span : Span.span
@@ -217,7 +273,6 @@ structure Checker :> CHECKER = struct
             (case astTyToTy at of
                SOME t => t
              | NONE => raise Fail "E0406: unknown return type")
-      val env0 : venv = []
       val env1 =
         List.foldl
           (fn ((p, pt), acc) =>
@@ -227,17 +282,20 @@ structure Checker :> CHECKER = struct
                     SOME t => extend acc x t
                   | NONE => raise Fail "E0406: unknown parameter type")
              | _ => raise Fail "E0410: parameters must be simple bindings here")
-          env0 (#params r)
+          modEnv (#params r)
       val () = app (checkContract env1) (#contracts r)
     in
       checkExprAsBody env1 retTy (#body r)
     end
 
-  fun checkItem (it : Ast.item) : unit =
-    case it of
-      Ast.ItemFn r => checkFn r
-    | _ => ()
-
   fun check (prog : Ast.program) : Ast.program =
-    (app checkItem prog; prog)
+    let
+      val modEnv = modEnvFromProg prog
+      fun checkOne it =
+        case it of
+          Ast.ItemFn r => checkFn modEnv r
+        | _ => ()
+    in
+      (app checkOne prog; prog)
+    end
 end
