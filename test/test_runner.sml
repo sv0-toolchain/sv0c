@@ -315,6 +315,17 @@ structure TestRunner = struct
                  (checkCatch
                     "fn inc(x: i32) -> i32 { return x + 1; }\n\
                     \fn main() -> i32 { return inc(41); }" = NONE)
+      val () = check "checker accepts requires and ensures true"
+                 (checkCatch
+                    "fn main() -> i32 requires(true) ensures(true) { return 42; }" = NONE)
+      val () = check "checker accepts ensures with result"
+                 (checkCatch
+                    "fn main() -> i32 ensures(result >= 0) { return 7; }" = NONE)
+      val () = check "checker rejects result in ensures for unit return"
+                 (case checkCatch
+                        "fn main() -> unit ensures(result) { }" of
+                    SOME m => String.isSubstring "E0520" m
+                  | NONE => false)
 
       (* --- end-to-end (parse through C string) --- *)
       val () = print "\n[e2e]\n"
@@ -344,6 +355,12 @@ structure TestRunner = struct
       val () = check "e2e C static helper and call"
                  (String.isSubstring "static int inc" cCall
                   andalso String.isSubstring "inc(41)" cCall)
+      val cContracts =
+        compileToC
+          "fn main() -> i32 requires(true) ensures(true) { return 42; }"
+      val () = check "e2e C emits sv0_requires and sv0_ensures"
+                 (String.isSubstring "sv0_requires" cContracts
+                  andalso String.isSubstring "sv0_ensures" cContracts)
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

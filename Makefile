@@ -3,7 +3,7 @@ ML_BUILD := ml-build
 HEAP     := sv0c
 CC       ?= cc
 
-.PHONY: build test heap clean e2e
+.PHONY: build test heap clean e2e test-contract-runtime
 
 build:
 	echo 'CM.make "sources.cm";' | $(SML)
@@ -22,6 +22,14 @@ build/e2e_generated.c: scripts/export_e2e.sml sources.cm
 e2e: build/e2e_generated.c
 	$(CC) -o build/e2e_run build/e2e_generated.c -Iruntime runtime/sv0_runtime.c
 	./build/e2e_run; test $$? -eq 42
+
+build/contract_requires_fail.c: scripts/export_requires_false.sml sources.cm
+	mkdir -p build
+	$(SML) < scripts/export_requires_false.sml
+
+test-contract-runtime: build/contract_requires_fail.c
+	$(CC) -o build/contract_requires_fail_run build/contract_requires_fail.c -Iruntime runtime/sv0_runtime.c
+	./build/contract_requires_fail_run; test $$? -eq 1
 
 clean:
 	rm -rf .cm build
