@@ -324,7 +324,7 @@ structure Parser :> PARSER = struct
     | Ast.ExprBlock (_, _, s) => s
     | Ast.ExprIf (_, _, _, s) => s
     | Ast.ExprMatch (_, _, s) => s
-    | Ast.ExprWhile (_, _, s) => s
+    | Ast.ExprWhile (_, _, _, s) => s
     | Ast.ExprFor (_, _, _, s) => s
     | Ast.ExprLoop (_, s) => s
     | Ast.ExprReturn (_, s) => s
@@ -780,22 +780,25 @@ structure Parser :> PARSER = struct
 
   and parseWhileExpr ts =
     let val (cond, r1) = parseExpr ts
-        val r2 = parseLoopInv r1
+        val (invs, r2) = parseLoopInvList r1
         val (body, r3) = parseBlock r2
     in
-      (Ast.ExprWhile (cond, body, merge2 (exprSpan cond, exprSpan body)), r3)
+      ( Ast.ExprWhile (cond, invs, body, merge2 (exprSpan cond, exprSpan body))
+      , r3)
     end
 
-  and parseLoopInv r =
+  and parseLoopInvList r =
     case r of
       (Token.LOOP_INVARIANT, _) :: (Token.LPAREN, _) :: r1 =>
-        let val (_, r2) = parseExpr r1
+        let val (e, r2) = parseExpr r1
         in
           case r2 of
-            (Token.RPAREN, _) :: r3 => parseLoopInv r3
+            (Token.RPAREN, _) :: r3 =>
+              let val (rest, r4) = parseLoopInvList r3
+              in (e :: rest, r4) end
           | _ => raise Fail "loop_invariant )"
         end
-    | _ => r
+    | _ => ([], r)
 
   and parseForExpr ts =
     let val (p, r1) = parsePat ts

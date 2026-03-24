@@ -7,6 +7,9 @@ structure Lowering :> LOWERING = struct
   (* While lowering an ensures expression that may read `result`, map to this C slot. *)
   val ensuresResultSlot : string option ref = ref NONE
 
+  (* Function name for sv0_requires diagnostics (entry contracts + loop invariants). *)
+  val currentFnName : string ref = ref ""
+
   val retValueSlot : string = "_sv0ret"
 
   fun freshTmp () =
@@ -52,6 +55,15 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprIf (c, th, el, _) =>
         mentionsResult c orelse mentionsResult th
         orelse (case el of SOME z => mentionsResult z | NONE => false)
+    | Ast.ExprWhile (c, invs, b, _) =>
+        mentionsResult c orelse List.exists mentionsResult invs
+        orelse mentionsResult b
+    | Ast.ExprFor (_, it, b, _) =>
+        mentionsResult it orelse mentionsResult b
+    | Ast.ExprLoop (b, _) => mentionsResult b
+    | Ast.ExprBreak (NONE, _) => false
+    | Ast.ExprBreak (SOME e, _) => mentionsResult e
+    | Ast.ExprContinue _ => false
     | _ => false
 
   fun unopToC (u : Ast.unop) : string =
@@ -123,6 +135,16 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprIf (c, th, NONE, _) =>
         let val (ic, ec) = lowerExprWithInstrs c
         in (ic @ [Ir.IfElse (ec, lowerExprForEffect th, [])], Ir.VUnit) end
+    | Ast.ExprWhile (cond, invs, body, span) =>
+        (lowerExprForEffect (Ast.ExprWhile (cond, invs, body, span)), Ir.VUnit)
+    | Ast.ExprFor (p, it, body, span) =>
+        (lowerExprForEffect (Ast.ExprFor (p, it, body, span)), Ir.VUnit)
+    | Ast.ExprLoop (body, span) =>
+        (lowerExprForEffect (Ast.ExprLoop (body, span)), Ir.VUnit)
+    | Ast.ExprBreak _ =>
+        raise Fail "E0402: break in value position in lowering slice"
+    | Ast.ExprContinue _ =>
+        raise Fail "E0402: continue in value position in lowering slice"
     | _ =>
         let
           val (instrs, rhs) = lowerExprWithInstrs e
@@ -220,6 +242,41 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprIf (c, th, SOME el, _) =>
         let val (ic, ec) = lowerExprWithInstrs c
         in ic @ [Ir.IfElse (ec, lowerExprForEffect th, lowerExprForEffect el)] end
+    | Ast.ExprWhile (cond, invs, body, _) =>
+        let
+          val (ic, ec) = lowerExprWithInstrs cond
+          val invInstrs =
+            List.concat (
+              map (fn inv =>
+                let val (pre, ie) = lowerExprWithInstrs inv
+                in pre @ [Ir.Requires (ie, !currentFnName)] end) invs)
+          val bi = lowerExprForEffect body
+        in
+          ic @ [Ir.While (ec, invInstrs @ bi)]
+        end
+    | Ast.ExprFor (Ast.PatBind (x, _), Ast.ExprRange (SOME lo, SOME hi, _), body, _) =>
+        let
+          val hiT = freshTmp ()
+          val iT = freshTmp ()
+          val (iHi, eHi) = lowerExprWithInstrs hi
+          val (iLo, eLo) = lowerExprWithInstrs lo
+          val initParts =
+            iHi @ [Ir.Assign (hiT, eHi)] @ iLo @ [Ir.Assign (iT, eLo)]
+          val cond = Ir.Binop ("<", Ir.VVar iT, Ir.VVar hiT)
+          val iterBody =
+            [ Ir.Block (Ir.Assign (x, Ir.Load iT) :: lowerExprForEffect body)
+            , Ir.Store (iT, Ir.Binop ("+", Ir.VVar iT, Ir.VInt 1))]
+        in
+          initParts @ [Ir.While (cond, iterBody)]
+        end
+    | Ast.ExprFor _ =>
+        raise Fail "for-loop lowering: expected PatBind and lo..hi range"
+    | Ast.ExprLoop (body, _) =>
+        [Ir.While (Ir.Literal (Ir.VBool true), lowerExprForEffect body)]
+    | Ast.ExprBreak (NONE, _) => [Ir.Break]
+    | Ast.ExprBreak (SOME _, _) =>
+        raise Fail "break with value not supported in lowering slice"
+    | Ast.ExprContinue _ => [Ir.Continue]
     | _ =>
         let val (instrs, _) = lowerExprToValue e in instrs end
 
@@ -296,6 +353,10 @@ structure Lowering :> LOWERING = struct
               | Ir.Return NONE => eg @ [Ir.Return NONE]
               | Ir.IfElse (c, th, el) =>
                   [Ir.IfElse (c, inj th, inj el)]
+              | Ir.While (c, th) => [Ir.While (c, inj th)]
+              | Ir.Block th => [Ir.Block (inj th)]
+              | Ir.Break => [Ir.Break]
+              | Ir.Continue => [Ir.Continue]
               | x => [x]) xs)
       in
         inj is
@@ -343,7 +404,10 @@ structure Lowering :> LOWERING = struct
                  in pre @ [Ir.Requires (ec, fnName)] end) reqs)
       val ensParts =
         map (fn e => lowerEnsuresClause e useRetSlot) enss
-      val () = (tmpCtr := 0; ensuresResultSlot := NONE)
+      val () =
+        ( currentFnName := fnName
+        ; tmpCtr := 0
+        ; ensuresResultSlot := NONE)
       val body0 = lowerBody (#body r)
       val body1 = injectEnsuresAndRetSlot fnName useRetSlot ensParts body0
       val decl = if useRetSlot then [Ir.DeclVar retValueSlot] else []

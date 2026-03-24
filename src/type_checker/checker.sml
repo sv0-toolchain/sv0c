@@ -5,6 +5,16 @@ structure Checker :> CHECKER = struct
 
   type venv = (string * Types.ty) list
 
+  val loopDepth = ref 0
+
+  fun withLoop (f : unit -> 'a) : 'a =
+    let val () = loopDepth := !loopDepth + 1
+        val r = f () handle ex => (loopDepth := !loopDepth - 1; raise ex)
+    in
+      loopDepth := !loopDepth - 1;
+      r
+    end
+
   fun extend (env : venv) (x : string) (t : Types.ty) : venv = (x, t) :: env
 
   fun lookup [] x =
@@ -151,6 +161,35 @@ structure Checker :> CHECKER = struct
         in
           if Unify.unify (t1, t2) then t1 else raise Fail "E0400: type mismatch"
         end
+    | Ast.ExprWhile (cond, invs, body, _) =>
+        let
+          val () = app (fn inv => expect (synth retTy env inv, Types.TyBool)) invs
+          val () = expect (synth retTy env cond, Types.TyBool)
+          val () = withLoop (fn () => (ignore (synth retTy env body); ()))
+        in
+          Types.TyUnit
+        end
+    | Ast.ExprFor (Ast.PatBind (x, _), Ast.ExprRange (SOME lo, SOME hi, _), body, _) =>
+        let
+          val () = expect (synth retTy env lo, Types.TyInt 32)
+          val () = expect (synth retTy env hi, Types.TyInt 32)
+          val envB = extend env x (Types.TyInt 32)
+          val () = withLoop (fn () => (ignore (synth retTy envB body); ()))
+        in
+          Types.TyUnit
+        end
+    | Ast.ExprFor _ =>
+        raise Fail "E0402: for-loop requires a simple binding and lo..hi range"
+    | Ast.ExprLoop (body, _) =>
+        (withLoop (fn () => (ignore (synth retTy env body); ())); Types.TyUnit)
+    | Ast.ExprBreak (NONE, _) =>
+        if !loopDepth > 0 then Types.TyUnit
+        else raise Fail "E0414: break outside loop"
+    | Ast.ExprBreak (SOME _, _) =>
+        raise Fail "E0415: break with value not supported in this slice"
+    | Ast.ExprContinue _ =>
+        if !loopDepth > 0 then Types.TyUnit
+        else raise Fail "E0416: continue outside loop"
     | Ast.ExprCall (Ast.ExprPath ([name], _), args, _) =>
         (case lookup env name of
            Types.TyFn (paramTys, outTy) =>
@@ -210,6 +249,16 @@ structure Checker :> CHECKER = struct
     | Ast.ExprIf (c, th, el, _) =>
         exprReferencesResult c orelse exprReferencesResult th
         orelse (case el of SOME z => exprReferencesResult z | NONE => false)
+    | Ast.ExprWhile (c, invs, b, _) =>
+        exprReferencesResult c
+        orelse List.exists exprReferencesResult invs
+        orelse exprReferencesResult b
+    | Ast.ExprFor (_, it, b, _) =>
+        exprReferencesResult it orelse exprReferencesResult b
+    | Ast.ExprLoop (b, _) => exprReferencesResult b
+    | Ast.ExprBreak (NONE, _) => false
+    | Ast.ExprBreak (SOME e, _) => exprReferencesResult e
+    | Ast.ExprContinue _ => false
     | _ => false
 
   fun checkContract (env : venv) (retTy : Types.ty) (c : Ast.contract) : unit =

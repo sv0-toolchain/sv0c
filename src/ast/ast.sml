@@ -50,7 +50,7 @@ structure Ast = struct
     | ExprBlock of stmt list * expr option * Span.span
     | ExprIf of expr * expr * expr option * Span.span
     | ExprMatch of expr * arm list * Span.span
-    | ExprWhile of expr * expr * Span.span
+    | ExprWhile of expr * expr list * expr * Span.span
     | ExprFor of pat * expr * expr * Span.span
     | ExprLoop of expr * Span.span
     | ExprReturn of expr option * Span.span
