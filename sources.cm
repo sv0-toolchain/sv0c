@@ -1,0 +1,50 @@
+Group is
+  $/basis.cm
+  $/smlnj-lib.cm
+
+  (* error reporting *)
+  src/error/span.sig
+  src/error/span.sml
+  src/error/diagnostic.sig
+  src/error/diagnostic.sml
+
+  (* lexer *)
+  src/lexer/token.sml
+  src/lexer/lexer.sig
+  src/lexer/lexer.sml
+
+  (* AST *)
+  src/ast/ast.sml
+
+  (* parser *)
+  src/parser/parser.sig
+  src/parser/parser.sml
+
+  (* name resolution *)
+  src/name_resolution/env.sig
+  src/name_resolution/env.sml
+  src/name_resolution/resolver.sig
+  src/name_resolution/resolver.sml
+
+  (* type checker *)
+  src/type_checker/types.sml
+  src/type_checker/unify.sig
+  src/type_checker/unify.sml
+  src/type_checker/checker.sig
+  src/type_checker/checker.sml
+
+  (* contract analyzer *)
+  src/contract_analyzer/analyzer.sig
+  src/contract_analyzer/analyzer.sml
+
+  (* IR *)
+  src/ir/ir.sml
+  src/ir/lowering.sig
+  src/ir/lowering.sml
+
+  (* C backend *)
+  src/backend/c/codegen.sig
+  src/backend/c/codegen.sml
+
+  (* entry point *)
+  src/main.sml

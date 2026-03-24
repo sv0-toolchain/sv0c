@@ -55,9 +55,25 @@ sv0 source (.sv0)
 
 ## building
 
+requires SML/NJ (tested with 110.99.9).
+
 ```bash
-# requires SML/NJ
-sml src/main.sml
+make build         # compile all modules via CM
+make test          # run test suite (15 tests)
+make heap          # export heap image to build/sv0c
+make clean         # remove .cm cache and build artifacts
+```
+
+to run the compiler directly:
+
+```bash
+sml @SMLload=build/sv0c input.sv0       # after make heap
+```
+
+or interactively:
+
+```bash
+echo 'CM.make "sources.cm"; Main.compile "input.sv0";' | sml
 ```
 
 ## specification
