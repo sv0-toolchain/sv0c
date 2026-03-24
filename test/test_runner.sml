@@ -280,6 +280,12 @@ structure TestRunner = struct
                  (case resolveCatch "fn a() -> unit {} fn a() -> unit {}" of
                     SOME m => String.isSubstring "E0302" m
                   | NONE => false)
+      val () = check "resolve rejects wrong call arity"
+                 (case resolveCatch
+                        "fn f(a: i32) -> i32 { return a; }\n\
+                        \fn main() -> i32 { return f(1, 2); }" of
+                    SOME m => String.isSubstring "E0307" m
+                  | NONE => false)
 
       (* --- type checker --- *)
       val () = print "\n[checker]\n"
@@ -305,6 +311,10 @@ structure TestRunner = struct
       val () = check "checker accepts let with inferred binop"
                  (checkCatch
                     "fn main() -> i32 { let x = 1 + 2; return x; }" = NONE)
+      val () = check "checker accepts call to sibling fn"
+                 (checkCatch
+                    "fn inc(x: i32) -> i32 { return x + 1; }\n\
+                    \fn main() -> i32 { return inc(41); }" = NONE)
 
       (* --- end-to-end (parse through C string) --- *)
       val () = print "\n[e2e]\n"
@@ -327,6 +337,13 @@ structure TestRunner = struct
       val cIf = compileToC "fn main() -> i32 { return if true { 40 } else { 2 }; }"
       val () = check "e2e C if-else"
                  (String.isSubstring "if (" cIf andalso String.isSubstring "else" cIf)
+      val cCall =
+        compileToC
+          "fn inc(x: i32) -> i32 { return x + 1; }\n\
+          \fn main() -> i32 { return inc(41); }"
+      val () = check "e2e C static helper and call"
+                 (String.isSubstring "static int inc" cCall
+                  andalso String.isSubstring "inc(41)" cCall)
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"
