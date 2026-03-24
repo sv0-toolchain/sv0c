@@ -61,6 +61,10 @@ structure Codegen :> CODEGEN = struct
         indent ^ "int " ^ d ^ " = " ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
     | Ir.Call (NONE, f, vs) =>
         indent ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
+    | Ir.Requires (e, fnName) =>
+        indent ^ "sv0_requires(" ^ emitExpr e ^ ", \"" ^ fnName ^ "\");\n"
+    | Ir.Ensures (e, fnName) =>
+        indent ^ "sv0_ensures(" ^ emitExpr e ^ ", \"" ^ fnName ^ "\");\n"
     | Ir.Return NONE =>
         if retTy = "void" then indent ^ "return;\n"
         else raise Fail "invalid return without value for int function"
