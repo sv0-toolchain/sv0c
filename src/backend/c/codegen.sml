@@ -57,6 +57,16 @@ structure Codegen :> CODEGEN = struct
         ^ indent ^ "} else {\n"
         ^ String.concat (map (emitInstr (indent ^ "  ") retTy) el)
         ^ indent ^ "}\n"
+    | Ir.While (ec, body) =>
+        indent ^ "while (" ^ emitExpr ec ^ ") {\n"
+        ^ String.concat (map (emitInstr (indent ^ "  ") retTy) body)
+        ^ indent ^ "}\n"
+    | Ir.Block body =>
+        indent ^ "{\n"
+        ^ String.concat (map (emitInstr (indent ^ "  ") retTy) body)
+        ^ indent ^ "}\n"
+    | Ir.Break => indent ^ "break;\n"
+    | Ir.Continue => indent ^ "continue;\n"
     | Ir.Call (SOME d, f, vs) =>
         indent ^ "int " ^ d ^ " = " ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
     | Ir.Call (NONE, f, vs) =>

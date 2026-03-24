@@ -99,8 +99,10 @@ structure Resolver :> RESOLVER = struct
                 resolveExpr ctx envP body
               end)
            arms)
-    | Ast.ExprWhile (cond, body, _) =>
-        (resolveExpr ctx env cond; resolveExpr ctx env body)
+    | Ast.ExprWhile (cond, invs, body, _) =>
+        ( resolveExpr ctx env cond
+        ; app (resolveExpr ctx env) invs
+        ; resolveExpr ctx env body)
     | Ast.ExprFor (pat, it, body, _) =>
         let
           val () = resolveExpr ctx env it

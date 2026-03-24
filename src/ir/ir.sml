@@ -15,6 +15,10 @@ structure Ir = struct
     | Assign of string * expr
     | Store of string * expr
     | IfElse of expr * instr list * instr list
+    | While of expr * instr list
+    | Block of instr list
+    | Break
+    | Continue
     | Return of value option
     | Branch of value * label * label
     | Jump of label

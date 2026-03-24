@@ -326,6 +326,23 @@ structure TestRunner = struct
                         "fn main() -> unit ensures(result) { }" of
                     SOME m => String.isSubstring "E0520" m
                   | NONE => false)
+      val () = check "checker rejects break outside loop"
+                 (case checkCatch "fn main() -> unit { break; }" of
+                    SOME m => String.isSubstring "E0414" m
+                  | NONE => false)
+      val () = check "checker rejects for without range"
+                 (* Parenthesize iterator: `for x in y {}` parses `y {}` as struct literal. *)
+                 (case checkCatch
+                        "fn main() -> unit { let y: i32 = 1; for x in (y) { } }" of
+                    SOME m => String.isSubstring "E0402" m
+                  | NONE => false)
+      val () = check "checker accepts while with loop_invariant"
+                 (checkCatch
+                    "fn main() -> unit { while false loop_invariant(true) { } }" =
+                    NONE)
+      val () = check "checker accepts for range"
+                 (checkCatch
+                    "fn main() -> unit { for i in 0..1 { } }" = NONE)
 
       (* --- end-to-end (parse through C string) --- *)
       val () = print "\n[e2e]\n"
@@ -361,6 +378,16 @@ structure TestRunner = struct
       val () = check "e2e C emits sv0_requires and sv0_ensures"
                  (String.isSubstring "sv0_requires" cContracts
                   andalso String.isSubstring "sv0_ensures" cContracts)
+      val nl = String.str #"\n"
+      val cLoop =
+        compileToC
+          ("fn main() -> i32 requires(true) ensures(true) {" ^ nl ^
+           "  while false loop_invariant(true) {};" ^ nl ^
+           "  for i in 0..0 {};" ^ nl ^ "  return 42;" ^ nl ^ "}")
+      val () = check "e2e C while and for (for desugars to while)"
+                 (String.isSubstring "while (" cLoop)
+      val () = check "e2e C loop invariant uses sv0_requires"
+                 (String.isSubstring "sv0_requires" cLoop)
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

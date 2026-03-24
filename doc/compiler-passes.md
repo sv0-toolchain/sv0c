@@ -7,9 +7,9 @@ This document summarizes what each pipeline stage does today and how errors are 
 1. **Lexer** (`Lexer.tokenize`) — Characters to located tokens. Lexical errors are not yet classified with E01xx codes in all cases.
 2. **Parser** (`Parser.parse`) — Tokens to `Ast.program`. Syntax errors raise `Fail` with a short message.
 3. **Name resolution** (`Resolver.resolve`) — Validates duplicate top-level value and type names, checks unbound identifiers in expressions, and checks that type paths refer to built-in or module-level types. Single-segment value and type paths are supported; qualified paths (`a::b`) are rejected with E0305 until module resolution is complete.
-4. **Type checker** (`Checker.check`) — Maps a subset of `Ast.ty` to `Types.ty`, checks `fn` bodies (literals, paths, `let` with `PatBind`, `return`, block tails, empty `unit` bodies). `requires` contracts must be `bool`-typed expressions. Raises `Fail` with **E04xx** / **E05xx** (see below).
+4. **Type checker** (`Checker.check`) — Maps a subset of `Ast.ty` to `Types.ty`, checks `fn` bodies (literals, paths, `let` with `PatBind`, `return`, block tails, empty `unit` bodies), **`while` / `for` over `lo..hi` / `loop`**, and **`break` / `continue` only inside loops**. `requires` contracts must be `bool`-typed expressions. Raises `Fail` with **E04xx** / **E05xx** (see below).
 5. **Contract analyzer** (`ContractAnalyzer.analyze`) — No-op for now; `requires` is already type-checked in the checker.
-6. **IR lowering** (`Lowering.lower`) — One `Ir.block` per `ItemFn`: `StmtLet` with literal rhs, `return`, optional block tail. Other statement/expression forms raise `Fail`.
+6. **IR lowering** (`Lowering.lower`) — One `Ir.block` per `ItemFn`: `StmtLet`, `return`, `if`, calls, **`while`**, **`for`** (desugared per Q4 to a counter + `while`), **`loop`** (infinite `while`), **`break` / `continue`**, and **`loop_invariant(e)` on `while`** (each invariant becomes **`sv0_requires`** at the top of the emitted C loop body). Other statement/expression forms raise `Fail`.
 7. **C codegen** (`Codegen.emit`) — Emits C99: non-`main` functions as `static`, `main` as global. Empty IR still yields a trivial `int main(void) { return 0; }`.
 
 ## Name resolution (E03xx)
@@ -34,8 +34,11 @@ Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `Str
 | E0401  | Unbound name in type-checker value environment. |
 | E0402  | Expression form not in the checked slice. |
 | E0403–E0410 | Unsupported or ill-formed `let`, parameters, nested items, missing return. |
-| E0501  | `ensures` not type-checked in this slice. |
-| E0502  | `loop_invariant` not type-checked in this slice. |
+| E0414  | `break` outside a loop. |
+| E0415  | `break expr` (value) not supported in this slice. |
+| E0416  | `continue` outside a loop. |
+| E0502  | `loop_invariant` as an `fn`-level contract not supported; use `loop_invariant(...)` on `while` (parsed into `ExprWhile`, type-checked as `bool`, lowered to `sv0_requires`). |
+| E0520  | `ensures` must not use `result` when the return type is `unit`. |
 
 ## Unification
 
@@ -53,3 +56,5 @@ Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `Str
 ## Tests
 
 Run `make test` from `sv0c/`. Sections in `test/test_runner.sml`: `[parser]`, `[resolver]`, `[checker]`, `[e2e]`, `[pipeline]`. Run `make e2e` for a full compile-and-execute smoke test.
+
+**Block parsing:** A `while` / `for` / `loop` expression that is **not** the block’s tail must be followed by **`;`** before the next statement (same rule as other expression statements).
