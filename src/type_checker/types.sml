@@ -3,6 +3,8 @@ structure Types = struct
       TyUnit
     | TyBool
     | TyChar
+    | TyStruct of string
+    | TyEnum of string
     | TyInt of int
     | TyUint of int
     | TyFloat of int

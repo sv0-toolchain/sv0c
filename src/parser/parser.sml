@@ -197,13 +197,68 @@ structure Parser :> PARSER = struct
       ors a r0
     end
 
+  (* Path already parsed (e.g. E::A); { } = struct pat, ( ) = enum constructor pat. *)
+  and pathPatternFrom (startTs : ts, path : Ast.path, r2 : ts) : Ast.pat * ts =
+    case r2 of
+      (Token.LBRACE, s2) :: r3 =>
+        let
+          fun fields r acc =
+            case r of
+              (Token.RBRACKET, _) :: _ => raise Fail "bad struct pat"
+            | (Token.DOTDOT, _) :: (Token.RBRACE, s3) :: r4 =>
+                (rev acc, r4)
+            | (Token.RBRACE, s3) :: r4 => (rev acc, r4)
+            | _ =>
+                let val (fld, r4) =
+                      case r of
+                        (Token.IDENT f, _) :: (Token.COLON, _) :: r5 =>
+                          let val (pp, r6) = parsePat r5
+                          in ((f, pp), r6) end
+                      | (Token.IDENT f, _) :: r5 => ((f, Ast.PatBind (f, sp r)), r5)
+                      | _ => raise Fail "struct pattern field"
+                in
+                  case r4 of
+                    (Token.COMMA, _) :: r5 => fields r5 (fld :: acc)
+                  | (Token.RBRACE, _) :: _ =>
+                      fields r4 (fld :: acc)
+                  | _ => raise Fail "expected , or } in struct pat"
+                end
+        in
+          let val (fs, r4) = fields r3 []
+          in (Ast.PatStruct (path, fs, merge2 (sp startTs, sp r4)), r4) end
+        end
+    | (Token.LPAREN, _) :: _ =>
+        let
+          fun args r acc =
+            case r of
+              (Token.RPAREN, s3) :: r4 =>
+                (Ast.PatEnum (path, rev acc, merge2 (sp startTs, s3)), r4)
+            | _ =>
+                let val (pa, r5) = parsePat r
+                in
+                  case r5 of
+                    (Token.COMMA, _) :: r6 => args r6 (pa :: acc)
+                  | (Token.RPAREN, s3) :: r6 =>
+                      (Ast.PatEnum (path, rev (pa :: acc), merge2 (sp startTs, s3)), r6)
+                  | _ => raise Fail "enum pattern args"
+                end
+        in
+          args (tl r2) []
+        end
+    | _ => raise Fail "bad pattern after path"
+
   and parsePatAtom ts : Ast.pat * ts =
     case ts of
       [] => raise Fail "expected pattern"
     | (Token.IDENT "_", s) :: r => (Ast.PatWild s, r)
     | (Token.MUT, s1) :: (Token.IDENT i, s2) :: r =>
         (Ast.PatBind (i, merge2 (s1, s2)), r)
-    | (Token.IDENT i, s) :: r => (Ast.PatBind (i, s), r)
+    | (Token.IDENT i, s) :: r =>
+        (case r of
+           (Token.COLONCOLON, _) :: _ =>
+             let val (path, r2) = parsePath ts
+             in pathPatternFrom (ts, path, r2) end
+         | _ => (Ast.PatBind (i, s), r))
     | (Token.MINUS, s0) :: r1 =>
         (case r1 of
            (Token.INT_LIT n, s) :: r2 =>
@@ -251,55 +306,7 @@ structure Parser :> PARSER = struct
                  end
              | _ =>
                  let val (path, r2) = parsePath ts
-                 in
-                   case r2 of
-                     (Token.LBRACE, s2) :: r3 =>
-                       let
-                         fun fields r acc =
-                           case r of
-                             (Token.RBRACKET, _) :: _ => raise Fail "bad struct pat"
-                           | (Token.DOTDOT, _) :: (Token.RBRACE, s3) :: r4 =>
-                               (rev acc, r4)
-                           | (Token.RBRACE, s3) :: r4 => (rev acc, r4)
-                           | _ =>
-                               let val (fld, r4) =
-                                 case r of
-                                   (Token.IDENT f, _) :: (Token.COLON, _) :: r5 =>
-                                     let val (pp, r6) = parsePat r5
-                                     in ((f, pp), r6) end
-                                 | (Token.IDENT f, _) :: r5 => ((f, Ast.PatBind (f, sp r)), r5)
-                                 | _ => raise Fail "struct pattern field"
-                               in
-                                 case r4 of
-                                   (Token.COMMA, _) :: r5 => fields r5 (fld :: acc)
-                                 | (Token.RBRACE, _) :: _ =>
-                                     fields r4 (fld :: acc)
-                                 | _ => raise Fail "expected , or } in struct pat"
-                               end
-                       in
-                         let val (fs, r4) = fields r3 []
-                         in (Ast.PatStruct (path, fs, merge2 (sp ts, sp r4)), r4) end
-                       end
-                     | (Token.LPAREN, _) :: _ =>
-                         let
-                           fun args r acc =
-                             case r of
-                               (Token.RPAREN, s3) :: r4 =>
-                                 (Ast.PatEnum (path, rev acc, merge2 (sp ts, s3)), r4)
-                             | _ =>
-                                 let val (pa, r5) = parsePat r
-                                 in
-                                   case r5 of
-                                     (Token.COMMA, _) :: r6 => args r6 (pa :: acc)
-                                   | (Token.RPAREN, s3) :: r6 =>
-                                       (Ast.PatEnum (path, rev (pa :: acc), merge2 (sp ts, s3)), r6)
-                                   | _ => raise Fail "enum pattern args"
-                                 end
-                         in
-                           args (tl r2) []
-                         end
-                     | _ => raise Fail "bad pattern after path"
-                 end)
+                 in pathPatternFrom (ts, path, r2) end)
   and litFromTok (t, s) : Ast.literal option =
     case t of
       Token.INT_LIT n => SOME (Ast.IntLit n)
@@ -374,25 +381,29 @@ structure Parser :> PARSER = struct
     | assignBinop _ = NONE
 
   (* --- expression parsing (Pratt / precedence climbing) --- *)
-  fun parseExpr ts = parseRangeExpr ts
-  and parseRangeExpr ts =
-    let val (left, r0) = parseOrExpr ts
+  (* allowStruct: false for scrutinee/cond positions where `{` must start a block/arm list,
+     not a struct literal after a bare path (e.g. match e { ... }, if e { ... }). *)
+  fun parseExpr ts = parseRangeExpr true ts
+  and parseRangeExpr allowStruct ts =
+    let val (left, r0) = parseOrExpr allowStruct ts
     in
       case r0 of
         (Token.DOTDOT, s1) :: r1 =>
-          let val (right, r2) = parseOrExpr r1
+          let val (right, r2) = parseOrExpr allowStruct r1
           in (Ast.ExprRange (SOME left, SOME right, merge2 (exprSpan left, exprSpan right)), r2) end
       | (Token.DOTDOTEQ, s1) :: r1 =>
-          let val (right, r2) = parseOrExpr r1
+          let val (right, r2) = parseOrExpr allowStruct r1
           in (Ast.ExprRange (SOME left, SOME right, merge2 (exprSpan left, exprSpan right)), r2) end
       | _ => (left, r0)
     end
 
-  and parseOrExpr ts = parseLeftAssoc parseAndExpr (fn Token.PIPEPIPE => true | _ => false) ts
-  and parseAndExpr ts = parseLeftAssoc parseCmpExpr (fn Token.AMPAMP => true | _ => false) ts
+  and parseOrExpr allowStruct ts =
+    parseLeftAssoc parseAndExpr (fn Token.PIPEPIPE => true | _ => false) allowStruct ts
+  and parseAndExpr allowStruct ts =
+    parseLeftAssoc parseCmpExpr (fn Token.AMPAMP => true | _ => false) allowStruct ts
 
-  and parseCmpExpr ts =
-    let val (left, r0) = parseBitOrExpr ts
+  and parseCmpExpr allowStruct ts =
+    let val (left, r0) = parseBitOrExpr allowStruct ts
     in
       case r0 of
         (tok, _) :: r1 =>
@@ -400,7 +411,7 @@ structure Parser :> PARSER = struct
              SOME b =>
                if tok = Token.EQEQ orelse tok = Token.BANGEQ orelse tok = Token.LT
                   orelse tok = Token.GT orelse tok = Token.LTEQ orelse tok = Token.GTEQ then
-                 let val (right, r2) = parseBitOrExpr r1
+                 let val (right, r2) = parseBitOrExpr allowStruct r1
                  in
                    (Ast.ExprBinop (b, left, right,
                      merge2 (exprSpan left, exprSpan right)), r2)
@@ -410,23 +421,29 @@ structure Parser :> PARSER = struct
       | _ => (left, r0)
     end
 
-  and parseBitOrExpr ts = parseLeftAssoc parseBitXorExpr (fn Token.PIPE => true | _ => false) ts
-  and parseBitXorExpr ts = parseLeftAssoc parseBitAndExpr (fn Token.CARET => true | _ => false) ts
-  and parseBitAndExpr ts = parseLeftAssoc parseShiftExpr (fn Token.AMP => true | _ => false) ts
-  and parseShiftExpr ts = parseLeftAssoc parseAddExpr (fn Token.LTLT => true | Token.GTGT => true | _ => false) ts
-  and parseAddExpr ts = parseLeftAssoc parseMulExpr (fn Token.PLUS => true | Token.MINUS => true | _ => false) ts
-  and parseMulExpr ts = parseLeftAssoc parseCastExpr (fn Token.STAR => true | Token.SLASH => true | Token.PERCENT => true | _ => false) ts
+  and parseBitOrExpr allowStruct ts =
+    parseLeftAssoc parseBitXorExpr (fn Token.PIPE => true | _ => false) allowStruct ts
+  and parseBitXorExpr allowStruct ts =
+    parseLeftAssoc parseBitAndExpr (fn Token.CARET => true | _ => false) allowStruct ts
+  and parseBitAndExpr allowStruct ts =
+    parseLeftAssoc parseShiftExpr (fn Token.AMP => true | _ => false) allowStruct ts
+  and parseShiftExpr allowStruct ts =
+    parseLeftAssoc parseAddExpr (fn Token.LTLT => true | Token.GTGT => true | _ => false) allowStruct ts
+  and parseAddExpr allowStruct ts =
+    parseLeftAssoc parseMulExpr (fn Token.PLUS => true | Token.MINUS => true | _ => false) allowStruct ts
+  and parseMulExpr allowStruct ts =
+    parseLeftAssoc parseCastExpr (fn Token.STAR => true | Token.SLASH => true | Token.PERCENT => true | _ => false) allowStruct ts
 
-  and parseLeftAssoc sub isOp ts =
+  and parseLeftAssoc sub isOp allowStruct ts =
     let
-      val (first, r0) = sub ts
+      val (first, r0) = sub allowStruct ts
       fun loop left r =
         case r of
           (tok, _) :: r1 =>
             if isOp tok then
               (case binopOf tok of
                  SOME b =>
-                   let val (right, r2) = sub r1
+                   let val (right, r2) = sub allowStruct r1
                    in
                      loop (Ast.ExprBinop (b, left, right,
                        merge2 (exprSpan left, exprSpan right))) r2
@@ -438,9 +455,9 @@ structure Parser :> PARSER = struct
       loop first r0
     end
 
-  and parseCastExpr ts =
+  and parseCastExpr allowStruct ts =
     let
-      val (first, r0) = parseUnaryExpr ts
+      val (first, r0) = parseUnaryExpr allowStruct ts
       fun casts left r =
         case r of
           (Token.AS, _) :: r1 =>
@@ -453,32 +470,32 @@ structure Parser :> PARSER = struct
       casts first r0
     end
 
-  and parseUnaryExpr ts =
+  and parseUnaryExpr allowStruct ts =
     case ts of
       (Token.MINUS, s) :: r =>
-        let val (e, r2) = parseUnaryExpr r
+        let val (e, r2) = parseUnaryExpr allowStruct r
         in (Ast.ExprUnop (Ast.Neg, e, merge2 (s, exprSpan e)), r2) end
     | (Token.BANG, s) :: r =>
-        let val (e, r2) = parseUnaryExpr r
+        let val (e, r2) = parseUnaryExpr allowStruct r
         in (Ast.ExprUnop (Ast.Not, e, merge2 (s, exprSpan e)), r2) end
     | (Token.TILDE, s) :: r =>
-        let val (e, r2) = parseUnaryExpr r
+        let val (e, r2) = parseUnaryExpr allowStruct r
         in (Ast.ExprUnop (Ast.BitNot, e, merge2 (s, exprSpan e)), r2) end
     | (Token.STAR, s) :: r =>
-        let val (e, r2) = parseUnaryExpr r
+        let val (e, r2) = parseUnaryExpr allowStruct r
         in (Ast.ExprUnop (Ast.Deref, e, merge2 (s, exprSpan e)), r2) end
     | (Token.AMP, s) :: r =>
         (case r of
            (Token.MUT, _) :: r2 =>
-             let val (e, r3) = parseUnaryExpr r2
+             let val (e, r3) = parseUnaryExpr allowStruct r2
              in (Ast.ExprUnop (Ast.BorrowMut, e, merge2 (s, exprSpan e)), r3) end
          | _ =>
-             let val (e, r2) = parseUnaryExpr r
+             let val (e, r2) = parseUnaryExpr allowStruct r
              in (Ast.ExprUnop (Ast.Borrow, e, merge2 (s, exprSpan e)), r2) end)
-    | _ => parsePostfixExpr ts
+    | _ => parsePostfixExpr allowStruct ts
 
-  and parsePostfixExpr ts =
-    let val (first, r0) = parsePrimaryExpr ts
+  and parsePostfixExpr allowStruct ts =
+    let val (first, r0) = parsePrimaryExpr allowStruct ts
     fun loop e r =
       case r of
         (Token.LPAREN, s2) :: r1 =>
@@ -502,7 +519,7 @@ structure Parser :> PARSER = struct
       | (Token.DOT, _) :: (Token.INT_LIT n, s3) :: r2 =>
           loop (Ast.ExprTupleField (e, IntInf.toInt n, merge2 (exprSpan e, s3))) r2
       | (Token.LBRACKET, s2) :: r1 =>
-          let val (ix, r2) = parseExpr r1
+          let val (ix, r2) = parseRangeExpr true r1
           in
             case r2 of
               (Token.RBRACKET, s3) :: r3 =>
@@ -533,7 +550,7 @@ structure Parser :> PARSER = struct
           more [e1] r1
         end
 
-  and parsePrimaryExpr ts =
+  and parsePrimaryExpr allowStruct ts =
     case ts of
       [] => raise Fail "expected expression"
     | (t, s) :: r1 =>
@@ -549,10 +566,13 @@ structure Parser :> PARSER = struct
                  in
                    case r2 of
                      (Token.LBRACE, _) :: r3 =>
-                       let val (fields, r4) = parseStructFields r3
-                       in
-                         (Ast.ExprStruct (path, fields, merge2 (s, sp r4)), r4)
-                       end
+                       if allowStruct then
+                         let val (fields, r4) = parseStructFields r3
+                         in
+                           (Ast.ExprStruct (path, fields, merge2 (s, sp r4)), r4)
+                         end
+                       else
+                         (Ast.ExprPath (path, s), r2)
                    | _ => (Ast.ExprPath (path, s), r2)
                  end
              | Token.LPAREN =>
@@ -668,7 +688,7 @@ structure Parser :> PARSER = struct
             (Token.COMMA, _) :: r3 =>
               let val (rest, r4) = parseStructFields r3
               in (fd :: rest, r4) end
-          | (Token.RBRACE, _) :: r3 => ([fd], r2)
+          | (Token.RBRACE, _) :: r3 => ([fd], r3)
           | _ => raise Fail "struct fields"
         end
 
@@ -703,7 +723,7 @@ structure Parser :> PARSER = struct
         end
 
   and parseIfExpr ts =
-    let val (cond, r1) = parseExpr ts
+    let val (cond, r1) = parseRangeExpr false ts
         val (thenB, r2) = parseBlock r1
     in
       case r2 of
@@ -726,7 +746,7 @@ structure Parser :> PARSER = struct
     end
 
   and parseMatchExpr ts =
-    let val (scr, r1) = parseExpr ts
+    let val (scr, r1) = parseRangeExpr false ts
     in
       case r1 of
         (Token.LBRACE, s1) :: r2 =>
@@ -779,7 +799,7 @@ structure Parser :> PARSER = struct
         end
 
   and parseWhileExpr ts =
-    let val (cond, r1) = parseExpr ts
+    let val (cond, r1) = parseRangeExpr false ts
         val (invs, r2) = parseLoopInvList r1
         val (body, r3) = parseBlock r2
     in
@@ -805,7 +825,7 @@ structure Parser :> PARSER = struct
     in
       case r1 of
         (Token.IN, _) :: r2 =>
-          let val (it, r3) = parseExpr r2
+          let val (it, r3) = parseRangeExpr false r2
               val (body, r4) = parseBlock r3
           in
             (Ast.ExprFor (p, it, body, merge2 (sp ts, exprSpan body)), r4)
@@ -822,7 +842,7 @@ structure Parser :> PARSER = struct
       (Token.SEMICOLON, _) :: _ => (Ast.ExprReturn (NONE, s), ts)
     | (Token.RBRACE, _) :: _ => (Ast.ExprReturn (NONE, s), ts)
     | _ =>
-        let val (e, r1) = parseExpr ts
+        let val (e, r1) = parseRangeExpr true ts
         in (Ast.ExprReturn (SOME e, merge2 (s, exprSpan e)), r1) end
 
   and parseQuant isForall s ts =

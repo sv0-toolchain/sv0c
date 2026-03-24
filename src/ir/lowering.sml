@@ -3,14 +3,17 @@
 structure Lowering :> LOWERING = struct
 
   val tmpCtr = ref 0
-
-  (* While lowering an ensures expression that may read `result`, map to this C slot. *)
   val ensuresResultSlot : string option ref = ref NONE
-
-  (* Function name for sv0_requires diagnostics (entry contracts + loop invariants). *)
   val currentFnName : string ref = ref ""
-
   val retValueSlot : string = "_sv0ret"
+
+  val theProg : Ast.program ref = ref []
+  val structFieldOrder : (string * string list) list ref = ref []
+  (* enum name -> (variant name -> tag), max payload ints *)
+  val enumVariants : (string * ((string * int) list * int)) list ref = ref []
+
+  val currentFnParams : (string * Ast.ty) list ref = ref []
+  val scrutLocals : (string * string) list ref = ref []
 
   fun freshTmp () =
     let val n = !tmpCtr
@@ -37,12 +40,122 @@ structure Lowering :> LOWERING = struct
     | Ast.Leq => "<="
     | Ast.Geq => ">="
 
+  fun astTyToCString (t : Ast.ty) : string =
+    case t of
+      Ast.TyUnit _ => "void"
+    | Ast.TyName (["unit"], _) => "void"
+    | Ast.TyName (["i32"], _) => "int"
+    | Ast.TyName (["bool"], _) => "int"
+    | Ast.TyName ([n], _) => n
+    | _ => "int"
+
+  fun calleeRetCty (name : string) : string =
+    case
+      List.find
+        (fn it =>
+           case it of Ast.ItemFn r => #name r = name | _ => false) (!theProg)
+    of
+      SOME (Ast.ItemFn r) =>
+        (case #ret r of SOME at => astTyToCString at | NONE => "int")
+    | _ => "int"
+
+  fun exprInitCty (e : Ast.expr) : string =
+    case e of
+      Ast.ExprStruct (n :: _, _, _) => n
+    | Ast.ExprPath ([a, _], _) => a
+    | Ast.ExprCall (Ast.ExprPath ([f], _), _, _) => calleeRetCty f
+    | Ast.ExprCall (Ast.ExprPath ([en, _], _), _, _) => en
+    | Ast.ExprLit (Ast.BoolLit _, _) => "int"
+    | Ast.ExprLit (Ast.IntLit _, _) => "int"
+    | _ => "int"
+
+  fun matchScrutCty (e : Ast.expr) : string =
+    case e of
+      Ast.ExprPath ([a, b], _) => a
+    | Ast.ExprPath ([x], _) =>
+        (case List.find (fn (v, _) => v = x) (!scrutLocals) of
+           SOME (_, ct) => ct
+         | NONE =>
+             (case List.find (fn (n, _) => n = x) (!currentFnParams) of
+                SOME (_, aty) => astTyToCString aty
+              | NONE => "int"))
+    | Ast.ExprCall (Ast.ExprPath ([f], _), _, _) => calleeRetCty f
+    | Ast.ExprLit (Ast.BoolLit _, _) => "int"
+    | Ast.ExprLit (Ast.IntLit _, _) => "int"
+    | _ => "int"
+
+  fun structFields (sn : string) : string list =
+    case List.find (fn (n, _) => n = sn) (!structFieldOrder) of
+      SOME (_, fs) => fs
+    | NONE => raise Fail ("lowering: unknown struct `" ^ sn ^ "`")
+
+  fun enumTag (en : string) (vn : string) : int =
+    case List.find (fn (n, _) => n = en) (!enumVariants) of
+      SOME (_, (tags, _)) =>
+        (case List.find (fn (v, _) => v = vn) tags of
+           SOME (_, k) => k
+         | NONE => raise Fail ("lowering: unknown enum variant `" ^ en ^ "::" ^ vn ^ "`"))
+    | NONE => raise Fail ("lowering: unknown enum `" ^ en ^ "`")
+
+  fun valueToExpr (v : Ir.value) : Ir.expr =
+    case v of
+      Ir.VVar xv => Ir.Load xv
+    | _ => Ir.Literal v
+
+  fun enumStorePayload (dst : string) (vals : Ir.value list) : Ir.instr list =
+    let
+      fun pName i = "p" ^ Int.toString i
+      fun one (i, v) = Ir.StoreField (dst, pName i, valueToExpr v)
+    in
+      List.tabulate (length vals, fn i => one (i, List.nth (vals, i)))
+    end
+
+  fun findVariantAst (en : string) (vn : string) : Ast.variant =
+    case List.find (fn it => case it of Ast.ItemEnum r => #name r = en | _ => false)
+      (!theProg) of
+      SOME (Ast.ItemEnum {variants, ...}) =>
+        (case List.find (fn v =>
+               let val n =
+                 case v of
+                   Ast.VariantUnit (nm, _) => nm
+                 | Ast.VariantTuple (nm, _, _) => nm
+                 | Ast.VariantStruct (nm, _, _) => nm
+               in n = vn end) variants of
+           SOME v => v
+         | NONE => raise Fail ("lowering: variant not in AST `" ^ en ^ "::" ^ vn ^ "`"))
+    | _ => raise Fail ("lowering: enum not in AST `" ^ en ^ "`")
+
   fun lowerLit (l : Ast.literal) : Ir.value =
     case l of
       Ast.IntLit i => Ir.VInt i
     | Ast.BoolLit b => Ir.VBool b
     | Ast.UnitLit => Ir.VUnit
     | _ => raise Fail "literal not supported in lowering slice"
+
+  fun scanLets (stmts : Ast.stmt list) : (string * string) list =
+    List.concat (
+      map (fn st =>
+        case st of
+          Ast.StmtLet (Ast.PatBind (x, _), _, to, SOME init, _) =>
+            let
+              val cty =
+                case to of
+                  SOME at => astTyToCString at
+                | NONE => exprInitCty init
+            in
+              [(x, cty)]
+            end
+        | _ => []) stmts)
+
+  fun withScrutLocals (extra : (string * string) list) (thunk : unit -> 'a) : 'a =
+    let
+      val old = !scrutLocals
+      val () = scrutLocals := extra @ old
+      val res = thunk () handle ex => (scrutLocals := old; raise ex)
+      val () = scrutLocals := old
+    in
+      res
+    end
 
   fun mentionsResult (e : Ast.expr) : bool =
     case e of
@@ -61,6 +174,15 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprFor (_, it, b, _) =>
         mentionsResult it orelse mentionsResult b
     | Ast.ExprLoop (b, _) => mentionsResult b
+    | Ast.ExprMatch (scr, arms, _) =>
+        mentionsResult scr
+        orelse List.exists
+          (fn Ast.Arm (_, g, bd) =>
+             (case g of SOME ge => mentionsResult ge | NONE => false)
+             orelse mentionsResult bd) arms
+    | Ast.ExprField (e1, _, _) => mentionsResult e1
+    | Ast.ExprStruct (_, fs, _) =>
+        List.exists (mentionsResult o #2) fs
     | Ast.ExprBreak (NONE, _) => false
     | Ast.ExprBreak (SOME e, _) => mentionsResult e
     | Ast.ExprContinue _ => false
@@ -78,22 +200,116 @@ structure Lowering :> LOWERING = struct
       Ast.PatBind (x, _) => x
     | _ => raise Fail "parameter must be PatBind in lowering slice"
 
-  (* Instrs that compute e, ending with a simple value (for Binop/Unop leaves). *)
-  and lowerExprToValue (e : Ast.expr) : Ir.instr list * Ir.value =
+  fun matchArmSetup (pat : Ast.pat) (scrVar : string) (scrCty : string) :
+    Ir.instr list * Ir.expr * Ir.instr list =
+    case pat of
+      Ast.PatWild _ =>
+        ([], Ir.Literal (Ir.VBool true), [])
+    | Ast.PatBind (x, _) =>
+        let
+          val bindPre =
+            if scrCty = "int" then [Ir.Assign (x, Ir.Load scrVar)]
+            else [Ir.DeclNamed (scrCty, x), Ir.Store (x, Ir.Load scrVar)]
+        in
+          ([], Ir.Literal (Ir.VBool true), bindPre)
+        end
+    | Ast.PatLit (Ast.IntLit i, _) =>
+        ( [],
+          Ir.Binop ("==", Ir.VVar scrVar, Ir.VInt i),
+          [] )
+    | Ast.PatLit (Ast.BoolLit true, _) =>
+        ( [],
+          Ir.Binop ("!=", Ir.VVar scrVar, Ir.VInt 0),
+          [] )
+    | Ast.PatLit (Ast.BoolLit false, _) =>
+        ( [],
+          Ir.Binop ("==", Ir.VVar scrVar, Ir.VInt 0),
+          [] )
+    | Ast.PatEnum (path, inners, _) =>
+        (case path of
+           [en, vn] =>
+             let
+               val k = enumTag en vn
+               val cond =
+                 Ir.Binop
+                   ( "=="
+                   , Ir.VMember (Ir.VVar scrVar, "tag")
+                   , Ir.VInt (IntInf.fromInt k))
+               val va = findVariantAst en vn
+               val bindPre =
+                 case va of
+                   Ast.VariantUnit _ => []
+                 | Ast.VariantTuple _ =>
+                     let
+                       fun bindOne (i, p) =
+                         case p of
+                           Ast.PatWild _ => []
+                         | Ast.PatBind (xb, _) =>
+                             [ Ir.Assign
+                                 ( xb
+                                 , Ir.Literal
+                                     (Ir.VMember (Ir.VVar scrVar, "p" ^ Int.toString i))
+                                 ) ]
+                         | _ =>
+                             raise Fail
+                               "lowering: enum tuple arm pattern not supported"
+                       val pairs = ListPair.zip (List.tabulate (length inners, fn i => i), inners)
+                     in
+                       List.concat (map bindOne pairs)
+                     end
+                 | Ast.VariantStruct _ =>
+                     raise Fail
+                       "lowering: struct enum variants in match not supported yet"
+             in
+               ([], cond, bindPre)
+             end
+         | _ => raise Fail "lowering: bad PatEnum path")
+    | _ => raise Fail "lowering: match pattern not supported"
+
+  fun lowerExprToValue (e : Ast.expr) : Ir.instr list * Ir.value =
     case e of
       Ast.ExprBlock (stmts, opt, _) =>
-        let val is = List.concat (map lowerStmt stmts)
-        in case opt of
-             SOME e2 =>
-               let val (i2, v2) = lowerExprToValue e2 in (is @ i2, v2) end
-           | NONE => (is, Ir.VUnit)
-           end
+        withScrutLocals (scanLets stmts) (fn () =>
+          let val is = List.concat (map lowerStmt stmts)
+          in case opt of
+               SOME e2 =>
+                 let val (i2, v2) = lowerExprToValue e2 in (is @ i2, v2) end
+             | NONE => (is, Ir.VUnit) end)
     | Ast.ExprLit (l, _) => ([], lowerLit l)
     | Ast.ExprPath ([x], _) =>
         (case !ensuresResultSlot of
            SOME rs =>
              if x = "result" then ([], Ir.VVar rs) else ([], Ir.VVar x)
          | NONE => ([], Ir.VVar x))
+    | Ast.ExprPath ([en, vn], _) =>
+        let val t = freshTmp ()
+        in
+          ( [Ir.DeclNamed (en, t)] @ enumConstructInstrs t en vn []
+          , Ir.VVar t)
+        end
+    | Ast.ExprField (e1, f, _) =>
+        let val (i1, v1) = lowerExprToValue e1 in (i1, Ir.VMember (v1, f)) end
+    | Ast.ExprStruct (path, fields, _) =>
+        let
+          val sn = hd path
+          val order = structFields sn
+          val t = freshTmp ()
+          fun findField n =
+            case List.find (fn (nm, _) => nm = n) fields of
+              SOME (_, ex) => ex
+            | NONE => raise Fail ("lowering: missing struct field `" ^ n ^ "`")
+          fun oneField fname =
+            let val (pi, ei) = lowerExprWithInstrs (findField fname)
+            in pi @ [Ir.StoreField (t, fname, ei)] end
+        in
+          ([Ir.DeclNamed (sn, t)] @ List.concat (map oneField order), Ir.VVar t)
+        end
+    | Ast.ExprCall (Ast.ExprPath ([en, vn], _), args, _) =>
+        let val t = freshTmp ()
+        in
+          ( [Ir.DeclNamed (en, t)] @ enumConstructInstrs t en vn args
+          , Ir.VVar t)
+        end
     | Ast.ExprCall (Ast.ExprPath ([callee], _), args, _) =>
         let
           fun oneArg a =
@@ -102,8 +318,18 @@ structure Lowering :> LOWERING = struct
           val inss = List.concat (map #1 pairs)
           val vals = map #2 pairs
           val t = freshTmp ()
+          val rty = calleeRetCty callee
         in
-          (inss @ [Ir.Call (SOME t, callee, vals)], Ir.VVar t)
+          (inss @ [Ir.Call (SOME t, callee, vals, rty)], Ir.VVar t)
+        end
+    | Ast.ExprMatch (scrut, arms, _) =>
+        let
+          val sct = matchScrutCty scrut
+          val (isS, scrVar) = bindScrutVar scrut sct
+          val out = freshTmp ()
+          val isA = lowerMatchArms out scrVar sct arms
+        in
+          (isS @ [Ir.DeclVar out] @ isA, Ir.VVar out)
         end
     | Ast.ExprBinop (b, l, r, _) =>
         let
@@ -153,16 +379,15 @@ structure Lowering :> LOWERING = struct
           (instrs @ [Ir.Assign (t, rhs)], Ir.VVar t)
         end
 
-  (* Build Ir.expr; may use lowerExprToValue for non-leaf operands. *)
   and lowerExprWithInstrs (e : Ast.expr) : Ir.instr list * Ir.expr =
     case e of
       Ast.ExprBlock (stmts, opt, _) =>
-        let val is = List.concat (map lowerStmt stmts)
-        in case opt of
-             SOME e2 =>
-               let val (i2, rhs) = lowerExprWithInstrs e2 in (is @ i2, rhs) end
-           | NONE => (is, Ir.Literal Ir.VUnit)
-           end
+        withScrutLocals (scanLets stmts) (fn () =>
+          let val is = List.concat (map lowerStmt stmts)
+          in case opt of
+               SOME e2 =>
+                 let val (i2, rhs) = lowerExprWithInstrs e2 in (is @ i2, rhs) end
+             | NONE => (is, Ir.Literal Ir.VUnit) end)
     | Ast.ExprLit (l, _) => ([], Ir.Literal (lowerLit l))
     | Ast.ExprPath ([x], _) =>
         (case !ensuresResultSlot of
@@ -177,29 +402,19 @@ structure Lowering :> LOWERING = struct
           (il @ ir, Ir.Binop (astBinopToC b, vl, vr))
         end
     | Ast.ExprUnop (u, e1, _) =>
-        let
-          val (i, v) = lowerExprToValue e1
-        in
-          (i, Ir.Unop (unopToC u, v))
-        end
+        let val (i, v) = lowerExprToValue e1 in (i, Ir.Unop (unopToC u, v)) end
     | _ =>
-        let
-          val (instrs, v) = lowerExprToValue e
-        in
-          case v of
-            Ir.VVar x => (instrs, Ir.Load x)
-          | _ => (instrs, Ir.Literal v)
-        end
+        let val (instrs, v) = lowerExprToValue e
+        in case v of Ir.VVar x => (instrs, Ir.Load x) | _ => (instrs, Ir.Literal v) end
 
-  (* Assign into existing variable name t (outer scope already declares t if needed). *)
   and lowerIntoVarInstrs (e : Ast.expr) (t : string) : Ir.instr list =
     case e of
       Ast.ExprBlock (stmts, opt, _) =>
-        let val is = List.concat (map lowerStmt stmts)
-        in case opt of
-             SOME e2 => is @ lowerIntoVarInstrs e2 t
-           | NONE => is @ [Ir.Store (t, Ir.Literal Ir.VUnit)]
-           end
+        withScrutLocals (scanLets stmts) (fn () =>
+          let val is = List.concat (map lowerStmt stmts)
+          in case opt of
+               SOME e2 => is @ lowerIntoVarInstrs e2 t
+             | NONE => is @ [Ir.Store (t, Ir.Literal Ir.VUnit)] end)
     | Ast.ExprLit (l, _) => [Ir.Store (t, Ir.Literal (lowerLit l))]
     | Ast.ExprPath ([x], _) =>
         (case !ensuresResultSlot of
@@ -224,18 +439,15 @@ structure Lowering :> LOWERING = struct
                [Ir.Store (t, Ir.Literal Ir.VUnit)])]
         end
     | _ =>
-        let
-          val (instrs, rhs) = lowerExprWithInstrs e
-        in
-          instrs @ [Ir.Store (t, rhs)]
-        end
+        let val (instrs, rhs) = lowerExprWithInstrs e
+        in instrs @ [Ir.Store (t, rhs)] end
 
-  (* Evaluate for side effects / discarded unit result (blocks, if without else). *)
   and lowerExprForEffect (e : Ast.expr) : Ir.instr list =
     case e of
       Ast.ExprBlock (stmts, opt, _) =>
-        let val is = List.concat (map lowerStmt stmts)
-        in case opt of NONE => is | SOME e2 => is @ lowerExprForEffect e2 end
+        withScrutLocals (scanLets stmts) (fn () =>
+          let val is = List.concat (map lowerStmt stmts)
+          in case opt of NONE => is | SOME e2 => is @ lowerExprForEffect e2 end)
     | Ast.ExprIf (c, th, NONE, _) =>
         let val (ic, ec) = lowerExprWithInstrs c
         in ic @ [Ir.IfElse (ec, lowerExprForEffect th, [])] end
@@ -282,9 +494,37 @@ structure Lowering :> LOWERING = struct
 
   and lowerStmt (st : Ast.stmt) : Ir.instr list =
     case st of
-      Ast.StmtLet (Ast.PatBind (x, _), _, _, SOME init, _) =>
-        let val (instrs, rhs) = lowerExprWithInstrs init
-        in instrs @ [Ir.Assign (x, rhs)] end
+      Ast.StmtLet (Ast.PatBind (x, _), _, to, SOME init, _) =>
+        let
+          val cty =
+            case to of
+              SOME at => astTyToCString at
+            | NONE => exprInitCty init
+          val () = scrutLocals := (x, cty) :: !scrutLocals
+        in
+          case init of
+            Ast.ExprStruct (path, fields, _) =>
+              let
+                val sn = hd path
+                val order = structFields sn
+                fun findField n =
+                  case List.find (fn (nm, _) => nm = n) fields of
+                    SOME (_, ex) => ex
+                  | NONE => raise Fail ("lowering: missing struct field `" ^ n ^ "`")
+                fun oneField fname =
+                  let val (pi, ei) = lowerExprWithInstrs (findField fname)
+                  in pi @ [Ir.StoreField (x, fname, ei)] end
+              in
+                [Ir.DeclNamed (sn, x)] @ List.concat (map oneField order)
+              end
+          | Ast.ExprCall (Ast.ExprPath ([en, vn], _), args, _) =>
+              [Ir.DeclNamed (en, x)] @ enumConstructInstrs x en vn args
+          | Ast.ExprPath ([en, vn], _) =>
+              [Ir.DeclNamed (en, x)] @ enumConstructInstrs x en vn []
+          | _ =>
+              let val (instrs, rhs) = lowerExprWithInstrs init
+              in instrs @ [Ir.Assign (x, rhs)] end
+        end
     | Ast.StmtSemi (Ast.ExprReturn (SOME e, _), _) => lowerReturn e
     | Ast.StmtSemi (Ast.ExprReturn (NONE, _), _) => [Ir.Return NONE]
     | Ast.StmtExpr (Ast.ExprReturn (SOME e, _), _) => lowerReturn e
@@ -296,6 +536,62 @@ structure Lowering :> LOWERING = struct
   and lowerReturn (e : Ast.expr) : Ir.instr list =
     let val (instrs, v) = lowerExprToValue e
     in instrs @ [Ir.Return (SOME v)] end
+
+  and lowerMatchArms (out : string) (scrVar : string) (scrCty : string)
+    (arms : Ast.arm list) : Ir.instr list =
+    case arms of
+      [] => raise Fail "lowering: non-exhaustive match"
+    | Ast.Arm (pat, guard, body) :: rest =>
+        let
+          val isLast = null rest
+          val next = if isLast then [] else lowerMatchArms out scrVar scrCty rest
+          val (cpre, cexp, bindPre) = matchArmSetup pat scrVar scrCty
+          val bodyIs = bindPre @ lowerIntoVarInstrs body out
+          val th =
+            case guard of
+              NONE => bodyIs
+            | SOME g =>
+                let val (gi, ge) = lowerExprWithInstrs g
+                in gi @ [Ir.IfElse (ge, bodyIs, next)] end
+        in
+          cpre @ [Ir.IfElse (cexp, th, next)]
+        end
+
+  and bindScrutVar (scrut : Ast.expr) (cty : string) : Ir.instr list * string =
+    let val (is, v) = lowerExprToValue scrut
+    in
+      case v of
+        Ir.VVar x => (is, x)
+      | Ir.VInt _ =>
+          let val t = freshTmp ()
+          in (is @ [Ir.Assign (t, Ir.Literal v)], t) end
+      | Ir.VBool _ =>
+          let val t = freshTmp ()
+          in (is @ [Ir.Assign (t, Ir.Literal v)], t) end
+      | _ =>
+          let
+            val t = freshTmp ()
+            val (ii, ee) = lowerExprWithInstrs scrut
+          in
+            if cty = "int" then (is @ ii @ [Ir.Assign (t, ee)], t)
+            else (is @ ii @ [Ir.DeclNamed (cty, t), Ir.Store (t, ee)], t)
+          end
+    end
+
+  and enumConstructInstrs (dst : string) (en : string) (vn : string)
+    (args : Ast.expr list) : Ir.instr list =
+    let
+      fun oneArg a =
+        let val (ia, va) = lowerExprToValue a in (ia, va) end
+      val pairs = map oneArg args
+      val inss = List.concat (map #1 pairs)
+      val vals = map #2 pairs
+      val k = enumTag en vn
+    in
+      inss
+      @ [Ir.StoreField (dst, "tag", Ir.Literal (Ir.VInt (IntInf.fromInt k)))]
+      @ enumStorePayload dst vals
+    end
 
   fun lowerBlock (stmts : Ast.stmt list, opt : Ast.expr option) : Ir.instr list =
     let
@@ -375,6 +671,15 @@ structure Lowering :> LOWERING = struct
     else
       lowerExprWithInstrs e
 
+  fun fnRetCty (r : {
+        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        ret : Ast.ty option, contracts : Ast.contract list,
+        body : Ast.expr, span : Span.span
+      }) : string =
+    case #ret r of
+      NONE => "int"
+    | SOME at => astTyToCString at
+
   fun lowerFn (r : {
         name : Ast.ident, params : (Ast.pat * Ast.ty) list,
         ret : Ast.ty option, contracts : Ast.contract list,
@@ -404,28 +709,106 @@ structure Lowering :> LOWERING = struct
                  in pre @ [Ir.Requires (ec, fnName)] end) reqs)
       val ensParts =
         map (fn e => lowerEnsuresClause e useRetSlot) enss
+      val ps =
+        map (fn pt => (paramName pt, astTyToCString (#2 pt))) (#params r)
       val () =
         ( currentFnName := fnName
         ; tmpCtr := 0
-        ; ensuresResultSlot := NONE)
+        ; ensuresResultSlot := NONE
+        ; scrutLocals := []
+        ; currentFnParams := map (fn (p, t) => (paramName (p, t), t)) (#params r))
       val body0 = lowerBody (#body r)
       val body1 = injectEnsuresAndRetSlot fnName useRetSlot ensParts body0
       val decl = if useRetSlot then [Ir.DeclVar retValueSlot] else []
+      val retTy = fnRetCty r
     in
       {
         label = fnName,
-        params = map paramName (#params r),
+        params = ps,
+        retCType = retTy,
         instrs = decl @ reqInstrs @ body1
       }
     end
 
+  fun variantSlots (v : Ast.variant) : int =
+    case v of
+      Ast.VariantUnit _ => 0
+    | Ast.VariantTuple (_, ts, _) => length ts
+    | Ast.VariantStruct (_, fs, _) => length fs
+
+  fun emitStructTd (r : {
+        name : Ast.ident, fields : (Ast.ident * Ast.ty) list, span : Span.span
+      }) : string =
+    let
+      val lines =
+        map (fn (f, aty) => "  " ^ astTyToCString aty ^ " " ^ f ^ ";\n") (#fields r)
+    in
+      "typedef struct {\n" ^ String.concat lines ^ "} " ^ #name r ^ ";\n"
+    end
+
+  fun emitEnumTd (r : {
+        name : Ast.ident, variants : Ast.variant list, span : Span.span
+      }) : string =
+    let
+      val maxP =
+        List.foldl (fn (v, m) => Int.max (variantSlots v, m)) 0 (#variants r)
+      val ps =
+        if maxP <= 0 then ""
+        else
+          String.concat (
+            List.tabulate (maxP, fn i => "  int p" ^ Int.toString i ^ ";\n"))
+    in
+      "typedef struct {\n  int tag;\n" ^ ps ^ "} " ^ #name r ^ ";\n"
+    end
+
+  fun collectTypedefs (prog : Ast.program) : string =
+    String.concat (
+      List.mapPartial (fn Ast.ItemStruct r => SOME (emitStructTd r) | _ => NONE)
+        prog
+      @ List.mapPartial (fn Ast.ItemEnum r => SOME (emitEnumTd r) | _ => NONE)
+          prog)
+
+  fun buildStructOrder (prog : Ast.program) : (string * string list) list =
+    List.mapPartial
+      (fn Ast.ItemStruct {name, fields, ...} =>
+         SOME (name, map #1 fields) | _ => NONE) prog
+
+  fun buildEnumVariants (prog : Ast.program) : (string * ((string * int) list * int)) list =
+    let
+      fun tagl i [] = []
+        | tagl i (v :: vs) =
+            let val nm =
+              case v of
+                Ast.VariantUnit (n, _) => n
+              | Ast.VariantTuple (n, _, _) => n
+              | Ast.VariantStruct (n, _, _) => n
+            in
+              (nm, i) :: tagl (i + 1) vs
+            end
+      fun oneEnum (name, variants) =
+        let
+          val maxP =
+            List.foldl (fn (v, m) => Int.max (variantSlots v, m)) 0 variants
+        in
+          (name, (tagl 0 variants, maxP))
+        end
+    in
+      List.mapPartial
+        (fn Ast.ItemEnum {name, variants, ...} =>
+           SOME (oneEnum (name, variants)) | _ => NONE) prog
+    end
+
   fun lower (prog : Ast.program) : Ir.program =
     let
+      val () =
+        ( theProg := prog
+        ; structFieldOrder := buildStructOrder prog
+        ; enumVariants := buildEnumVariants prog)
       fun one it =
         case it of
           Ast.ItemFn r => SOME (lowerFn r)
         | _ => NONE
     in
-      List.mapPartial one prog
+      {typedefs = collectTypedefs prog, blocks = List.mapPartial one prog}
     end
 end
