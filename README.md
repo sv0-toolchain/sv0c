@@ -62,6 +62,7 @@ requires SML/NJ (tested with 110.99.9).
 make build         # compile all modules via CM
 make test          # run test suite (see test_runner for current count)
 make e2e           # emit C, compile with cc, run binary (exit code 42)
+make test-contract-runtime  # compile requires(false) fixture; expect exit 1
 make heap          # export heap image to build/sv0c
 make clean         # remove .cm cache and build artifacts
 ```
