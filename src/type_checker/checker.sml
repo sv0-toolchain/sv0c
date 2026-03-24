@@ -22,6 +22,35 @@ structure Checker :> CHECKER = struct
     | lookup ((n, t) :: r) x =
         if String.compare (n, x) = EQUAL then t else lookup r x
 
+  datatype variantShape = VSUnit | VSTuple of Types.ty list
+
+  val structDefs : (string * (string * Types.ty) list) list ref = ref []
+  val enumDefs : (string * (string * variantShape) list) list ref = ref []
+
+  fun structNames () : string list = map #1 (!structDefs)
+  fun enumNames () : string list = map #1 (!enumDefs)
+
+  fun fieldsOfStruct (sn : string) : (string * Types.ty) list =
+    case List.find (fn (n, _) => n = sn) (!structDefs) of
+      SOME (_, fs) => fs
+    | NONE => raise Fail ("E0420: unknown struct type `" ^ sn ^ "`")
+
+  fun variantShapeOf (en : string) (vn : string) : variantShape =
+    case List.find (fn (n, _) => n = en) (!enumDefs) of
+      SOME (_, vs) =>
+        (case List.find (fn (v, _) => v = vn) vs of
+           SOME (_, sh) => sh
+         | NONE =>
+             raise Fail ("E0421: unknown variant `" ^ en ^ "::" ^ vn ^ "`"))
+    | NONE => raise Fail ("E0422: unknown enum type `" ^ en ^ "`")
+
+  fun ctorTy (en : string) (sh : variantShape) : Types.ty =
+    case sh of
+      VSUnit => Types.TyFn ([], Types.TyEnum en)
+    | VSTuple ts => Types.TyFn (ts, Types.TyEnum en)
+
+  fun pathKey (p : Ast.path) : string = String.concatWith "::" p
+
   fun astTyToTy (t : Ast.ty) : Types.ty option =
     case t of
       Ast.TyName ([name], _) =>
@@ -46,7 +75,13 @@ structure Checker :> CHECKER = struct
          | "str" => SOME Types.TyString
          | "string" => SOME Types.TyString
          | "String" => SOME Types.TyString
-         | _ => NONE)
+         | _ =>
+             if List.exists (fn s => s = name) (structNames ()) then
+               SOME (Types.TyStruct name)
+             else if List.exists (fn e => e = name) (enumNames ()) then
+               SOME (Types.TyEnum name)
+             else
+               NONE)
     | Ast.TyUnit _ => SOME Types.TyUnit
     | Ast.TyRef (t2, _) =>
         (case astTyToTy t2 of
@@ -77,6 +112,94 @@ structure Checker :> CHECKER = struct
     if Unify.unify (got, want) then ()
     else raise Fail "E0400: type mismatch"
 
+  fun initTypes (prog : Ast.program) : unit =
+    let
+      val structs = List.mapPartial (fn Ast.ItemStruct r => SOME r | _ => NONE) prog
+      val enums = List.mapPartial (fn Ast.ItemEnum r => SOME r | _ => NONE) prog
+      val sn = map #name structs
+      val en = map #name enums
+      val () =
+        app (fn n =>
+               if List.exists (fn m => m = n) en then
+                 raise Fail ("E0417: name `" ^ n ^ "` is both struct and enum")
+               else ()) sn
+      fun namedOnlyTy name =
+        if List.exists (fn x => x = name) sn then SOME (Types.TyStruct name)
+        else if List.exists (fn x => x = name) en then SOME (Types.TyEnum name)
+        else NONE
+      fun resolveFieldTy (t : Ast.ty) : Types.ty =
+        case t of
+          Ast.TyName ([name], _) =>
+            (case name of
+               "unit" => Types.TyUnit
+             | "bool" => Types.TyBool
+             | "char" => Types.TyChar
+             | "i32" => Types.TyInt 32
+             | "i8" => Types.TyInt 8
+             | "i16" => Types.TyInt 16
+             | "i64" => Types.TyInt 64
+             | "u32" => Types.TyUint 32
+             | "u8" => Types.TyUint 8
+             | "u16" => Types.TyUint 16
+             | "u64" => Types.TyUint 64
+             | _ =>
+                 (case namedOnlyTy name of
+                    SOME u => u
+                  | NONE => raise Fail "E0406: unknown type in struct/enum field"))
+        | Ast.TyUnit _ => Types.TyUnit
+        | Ast.TyTuple (ts, _) =>
+            Types.TyTuple (map resolveFieldTy ts)
+        | Ast.TyRef _ =>
+            raise Fail "E0424: ref types in struct fields not supported in this slice"
+        | Ast.TyRefMut _ =>
+            raise Fail "E0424: ref types in struct fields not supported in this slice"
+        | _ =>
+            raise Fail "E0424: type form not supported in struct/enum field"
+      fun structOne (r : {
+            name : Ast.ident,
+            fields : (Ast.ident * Ast.ty) list,
+            span : Span.span
+          }) =
+        (#name r, map (fn (f, aty) => (f, resolveFieldTy aty)) (#fields r))
+      fun variantName v =
+        case v of
+          Ast.VariantUnit (n, _) => n
+        | Ast.VariantTuple (n, _, _) => n
+        | Ast.VariantStruct (n, _, _) => n
+      fun variantShape v =
+        case v of
+          Ast.VariantUnit _ => VSUnit
+        | Ast.VariantTuple (_, ts, _) => VSTuple (map resolveFieldTy ts)
+        | Ast.VariantStruct (_, fs, _) =>
+            VSTuple (map (resolveFieldTy o #2) fs)
+      fun dupVariants names =
+        let
+          fun go [] _ = ()
+            | go (x :: xs) seen =
+                if List.exists (fn y => y = x) seen then
+                  raise Fail "E0423: duplicate variant in enum"
+                else
+                  go xs (x :: seen)
+        in
+          go names []
+        end
+      fun enumOne (r : {
+            name : Ast.ident,
+            variants : Ast.variant list,
+            span : Span.span
+          }) =
+        let val vnames = map variantName (#variants r)
+        in
+          dupVariants vnames;
+          (#name r, map (fn v => (variantName v, variantShape v)) (#variants r))
+        end
+      val sd = map structOne structs
+      val ed = map enumOne enums
+    in
+      structDefs := sd;
+      enumDefs := ed
+    end
+
   datatype binopKind = Arith | Logic | Cmp
 
   fun binopClass (b : Ast.binop) : binopKind =
@@ -97,6 +220,45 @@ structure Checker :> CHECKER = struct
       st :: _ => stmtReturns st
     | [] => false
 
+  fun bindPat (scrutTy : Types.ty) (pat : Ast.pat) (env : venv) : venv =
+    case pat of
+      Ast.PatWild _ => env
+    | Ast.PatBind (x, _) =>
+        if
+          Unify.unify (scrutTy, Types.TyInt 32) orelse Unify.unify (scrutTy, Types.TyBool)
+          orelse (case scrutTy of Types.TyEnum _ => true | _ => false)
+        then
+          extend env x scrutTy
+        else
+          raise Fail "E0425: pattern binding does not match scrutinee type"
+    | Ast.PatLit (Ast.IntLit _, _) =>
+        (expect (scrutTy, Types.TyInt 32); env)
+    | Ast.PatLit (Ast.BoolLit _, _) =>
+        (expect (scrutTy, Types.TyBool); env)
+    | Ast.PatEnum (path, inners, _) =>
+        (case path of
+           [en, vn] =>
+             let val () = expect (scrutTy, Types.TyEnum en)
+             in
+               case variantShapeOf en vn of
+                 VSUnit =>
+                   (case inners of
+                      [] => env
+                    | _ => raise Fail "E0426: enum pattern arity mismatch")
+               | VSTuple ts =>
+                   let
+                     fun bindMany e [] [] = e
+                       | bindMany e (p :: ps) (t :: tr) =
+                           bindMany (bindPat t p e) ps tr
+                       | bindMany _ _ _ =
+                           raise Fail "E0426: enum pattern arity mismatch"
+                   in
+                     bindMany env inners ts
+                   end
+             end
+         | _ => raise Fail "E0427: bad enum pattern path")
+    | _ => raise Fail "E0428: pattern form not supported in match"
+
   (* retTy is the enclosing function's return type (for return/blocks in subexprs). *)
   fun synth (retTy : Types.ty) (env : venv) (e : Ast.expr) : Types.ty =
     case e of
@@ -108,6 +270,17 @@ structure Checker :> CHECKER = struct
            Types.TyFn _ =>
              raise Fail "E0411: function values are not supported in this slice"
          | t => t)
+    | Ast.ExprPath (segs, _) =>
+        let val k = pathKey segs
+        in
+          case lookup env k of
+            Types.TyFn ([], resTy) => resTy
+          | Types.TyFn _ =>
+              raise Fail
+                "E0419: use call syntax for enum constructor with payload"
+          | _ =>
+              raise Fail ("E0401: unbound value in type checker: `" ^ k ^ "`")
+        end
     | Ast.ExprBlock (stmts, opt, _) =>
         let
           val envAfter =
@@ -190,23 +363,93 @@ structure Checker :> CHECKER = struct
     | Ast.ExprContinue _ =>
         if !loopDepth > 0 then Types.TyUnit
         else raise Fail "E0416: continue outside loop"
-    | Ast.ExprCall (Ast.ExprPath ([name], _), args, _) =>
-        (case lookup env name of
-           Types.TyFn (paramTys, outTy) =>
+    | Ast.ExprCall (Ast.ExprPath (segs, _), args, _) =>
+        let val k = pathKey segs
+        in
+          case lookup env k of
+            Types.TyFn (paramTys, outTy) =>
+              let
+                fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
+                  | zipCheck (a :: ar) (t :: tr) =
+                      (expect (synth retTy env a, t); zipCheck ar tr)
+                  | zipCheck _ _ =
+                      raise Fail "E0413: arity mismatch in type checker"
+              in
+                zipCheck args paramTys;
+                outTy
+              end
+          | _ => raise Fail "E0412: call target is not a function"
+        end
+    | Ast.ExprStruct (path, fields, _) =>
+        (case path of
+           [sn] =>
              let
-               fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
-                 | zipCheck (a :: ar) (t :: tr) =
-                     (expect (synth retTy env a, t); zipCheck ar tr)
-                 | zipCheck _ _ =
-                     raise Fail "E0413: arity mismatch in type checker"
+               val fs = fieldsOfStruct sn
+               fun tyOfField f =
+                 case List.find (fn (n, _) => n = f) fs of
+                   SOME (_, t) => t
+                 | NONE =>
+                     raise Fail ("E0429: struct `" ^ sn ^ "` has no field `" ^ f ^ "`")
+               fun haveField f =
+                 case List.find (fn (n, _) => n = f) fields of
+                   SOME _ => true
+                 | NONE => false
+               val () =
+                 app (fn (f, _) =>
+                        if haveField f then ()
+                        else raise Fail ("E0430: missing field `" ^ f ^ "` in struct literal"))
+                   fs
+               val () =
+                 app (fn (f, _) =>
+                        case List.find (fn (n, _) => n = f) fs of
+                          SOME _ => ()
+                        | NONE =>
+                            raise Fail ("E0435: unknown field `" ^ f ^ "` in struct literal"))
+                   fields
+               val () =
+                 app (fn (f, e) =>
+                        expect (synth retTy env e, tyOfField f)) fields
              in
-               zipCheck args paramTys;
-               outTy
+               Types.TyStruct sn
              end
-         | _ => raise Fail "E0412: call target is not a function")
-    | Ast.ExprCall _ =>
-        raise Fail
-          "E0402: only direct calls to named functions are supported in this slice"
+         | _ => raise Fail "E0431: struct literal needs a simple type name")
+    | Ast.ExprField (e1, f, _) =>
+        (case synth retTy env e1 of
+           Types.TyStruct sn =>
+             (case List.find (fn (n, _) => n = f) (fieldsOfStruct sn) of
+                SOME (_, t) => t
+              | NONE =>
+                  raise Fail ("E0429: struct `" ^ sn ^ "` has no field `" ^ f ^ "`"))
+         | _ => raise Fail "E0432: field access on non-struct value")
+    | Ast.ExprMatch (scrut, arms, _) =>
+        let
+          val scrutTy = synth retTy env scrut
+          val () =
+            case scrutTy of
+              Types.TyEnum _ => ()
+            | Types.TyBool => ()
+            | Types.TyInt 32 => ()
+            | _ =>
+                raise Fail
+                  "E0433: match scrutinee must be enum, bool, or i32 in this slice"
+          fun armTy (Ast.Arm (pat, guard, body)) =
+            let
+              val envP = bindPat scrutTy pat env
+              val () =
+                case guard of
+                  NONE => ()
+                | SOME g => expect (synth retTy envP g, Types.TyBool)
+            in
+              synth retTy envP body
+            end
+          val armTys = map armTy arms
+        in
+          case armTys of
+            [] => raise Fail "E0434: match needs at least one arm"
+          | t :: ts =>
+              if List.all (fn u => Unify.unify (t, u)) ts then t
+              else raise Fail "E0400: type mismatch"
+        end
     | _ =>
         raise Fail "E0402: expression form not supported in type checker slice"
 
@@ -256,6 +499,15 @@ structure Checker :> CHECKER = struct
     | Ast.ExprFor (_, it, b, _) =>
         exprReferencesResult it orelse exprReferencesResult b
     | Ast.ExprLoop (b, _) => exprReferencesResult b
+    | Ast.ExprMatch (scr, arms, _) =>
+        exprReferencesResult scr
+        orelse List.exists
+          (fn Ast.Arm (_, g, bd) =>
+             (case g of SOME ge => exprReferencesResult ge | NONE => false)
+             orelse exprReferencesResult bd) arms
+    | Ast.ExprField (e1, _, _) => exprReferencesResult e1
+    | Ast.ExprStruct (_, fs, _) =>
+        List.exists (exprReferencesResult o #2) fs
     | Ast.ExprBreak (NONE, _) => false
     | Ast.ExprBreak (SOME e, _) => exprReferencesResult e
     | Ast.ExprContinue _ => false
@@ -324,8 +576,14 @@ structure Checker :> CHECKER = struct
         case it of
           Ast.ItemFn r => extend acc (#name r) (itemFnTy r)
         | _ => acc
+      val acc0 = List.foldl one [] prog
     in
-      List.foldl one [] prog
+      List.foldl
+        (fn ((en, vars), acc) =>
+           List.foldl
+             (fn ((vn, sh), a) =>
+                extend a (pathKey [en, vn]) (ctorTy en sh)) acc vars) acc0
+        (!enumDefs)
     end
 
   fun checkFn (modEnv : venv)
@@ -359,6 +617,7 @@ structure Checker :> CHECKER = struct
 
   fun check (prog : Ast.program) : Ast.program =
     let
+      val () = initTypes prog
       val modEnv = modEnvFromProg prog
       fun checkOne it =
         case it of

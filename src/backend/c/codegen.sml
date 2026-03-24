@@ -4,12 +4,6 @@ structure Codegen :> CODEGEN = struct
 
   fun intLit (i : IntInf.int) : string = IntInf.toString i
 
-  fun cTypeForRet (instrs : Ir.instr list) : string =
-    case List.rev instrs of
-      (Ir.Return NONE) :: _ => "void"
-    | [] => "void"
-    | _ => "int"
-
   fun emitValue (v : Ir.value) : string =
     case v of
       Ir.VInt i => intLit i
@@ -17,6 +11,8 @@ structure Codegen :> CODEGEN = struct
     | Ir.VBool false => "0"
     | Ir.VVar x => x
     | Ir.VUnit => "0"
+    | Ir.VMember (Ir.VVar x, f) => x ^ "." ^ f
+    | Ir.VMember (v2, f) => "(" ^ emitValue v2 ^ ")." ^ f
     | _ => raise Fail "value not supported in codegen slice"
 
   fun emitCallArgs (vs : Ir.value list) : string =
@@ -31,15 +27,16 @@ structure Codegen :> CODEGEN = struct
     | Ir.Unop (opStr, v) => "(" ^ opStr ^ emitValue v ^ ")"
     | _ => raise Fail "expression not supported in codegen slice"
 
-  fun emitParamList (names : string list) : string =
-    case names of
+  fun emitParamList (ps : (string * string) list) : string =
+    case ps of
       [] => "void"
-    | _ => String.concatWith ", " (map (fn n => "int " ^ n) names)
+    | _ =>
+        String.concatWith ", " (map (fn (n, cty) => cty ^ " " ^ n) ps)
 
   (* isStatic: true for helpers (need forward decl), false for main. *)
   fun emitFnProto (isStatic : bool) (b : Ir.block) : string =
     let
-      val retTy = cTypeForRet (#instrs b)
+      val retTy = #retCType b
       val staticKw = if isStatic then "static " else ""
     in
       staticKw ^ retTy ^ " " ^ #label b ^ "(" ^ emitParamList (#params b) ^ ")"
@@ -49,8 +46,11 @@ structure Codegen :> CODEGEN = struct
     case ins of
       Ir.Nop => ""
     | Ir.DeclVar x => indent ^ "int " ^ x ^ ";\n"
+    | Ir.DeclNamed (cty, x) => indent ^ cty ^ " " ^ x ^ ";\n"
     | Ir.Assign (x, e) => indent ^ "int " ^ x ^ " = " ^ emitExpr e ^ ";\n"
     | Ir.Store (x, e) => indent ^ x ^ " = " ^ emitExpr e ^ ";\n"
+    | Ir.StoreField (base, fld, e) =>
+        indent ^ base ^ "." ^ fld ^ " = " ^ emitExpr e ^ ";\n"
     | Ir.IfElse (ec, th, el) =>
         indent ^ "if (" ^ emitExpr ec ^ ") {\n"
         ^ String.concat (map (emitInstr (indent ^ "  ") retTy) th)
@@ -67,9 +67,9 @@ structure Codegen :> CODEGEN = struct
         ^ indent ^ "}\n"
     | Ir.Break => indent ^ "break;\n"
     | Ir.Continue => indent ^ "continue;\n"
-    | Ir.Call (SOME d, f, vs) =>
-        indent ^ "int " ^ d ^ " = " ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
-    | Ir.Call (NONE, f, vs) =>
+    | Ir.Call (SOME d, f, vs, rty) =>
+        indent ^ rty ^ " " ^ d ^ " = " ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
+    | Ir.Call (NONE, f, vs, _) =>
         indent ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
     | Ir.Requires (e, fnName) =>
         indent ^ "sv0_requires(" ^ emitExpr e ^ ", \"" ^ fnName ^ "\");\n"
@@ -77,12 +77,14 @@ structure Codegen :> CODEGEN = struct
         indent ^ "sv0_ensures(" ^ emitExpr e ^ ", \"" ^ fnName ^ "\");\n"
     | Ir.Return NONE =>
         if retTy = "void" then indent ^ "return;\n"
-        else raise Fail "invalid return without value for int function"
-    | Ir.Return (SOME v) => indent ^ "return " ^ emitValue v ^ ";\n"
+        else raise Fail "invalid return without value for non-void function"
+    | Ir.Return (SOME v) =>
+        if retTy = "void" then indent ^ "return;\n"
+        else indent ^ "return " ^ emitValue v ^ ";\n"
     | _ => raise Fail "instruction not supported in codegen slice"
 
   fun emitBlockBody (b : Ir.block) : string =
-    let val retTy = cTypeForRet (#instrs b)
+    let val retTy = #retCType b
     in String.concat (map (emitInstr "  " retTy) (#instrs b)) end
 
   fun emitBlockDefn (isStatic : bool) (b : Ir.block) : string =
@@ -98,22 +100,27 @@ structure Codegen :> CODEGEN = struct
     end
 
   fun emit (prog : Ir.program) : string =
-    if null prog then
-      "#include \"sv0_runtime.h\"\n\
-      \int main(void) { return 0; }\n"
-    else
-      let
-        val (others, mainOpt) = splitMain prog
-        val prelude = "#include \"sv0_runtime.h\"\n\n"
-        val forwardDecls =
-          String.concat (map (fn b => emitFnProto true b ^ ";\n") others)
-        val statics =
-          String.concat (map (fn b => emitBlockDefn true b) others)
-        val mainPart =
-          case mainOpt of
-            SOME b => emitBlockDefn false b
-          | NONE => "int main(void) { return 0; }\n"
-      in
-        prelude ^ forwardDecls ^ "\n" ^ statics ^ mainPart
-      end
+    let val blocks = #blocks prog
+    in
+      if null blocks then
+        "#include \"sv0_runtime.h\"\n\
+        \int main(void) { return 0; }\n"
+      else
+        let
+          val (others, mainOpt) = splitMain blocks
+          val prelude = "#include \"sv0_runtime.h\"\n\n"
+          val td = #typedefs prog
+          val tdPart = if td = "" then "" else td ^ "\n"
+          val forwardDecls =
+            String.concat (map (fn b => emitFnProto true b ^ ";\n") others)
+          val statics =
+            String.concat (map (fn b => emitBlockDefn true b) others)
+          val mainPart =
+            case mainOpt of
+              SOME b => emitBlockDefn false b
+            | NONE => "int main(void) { return 0; }\n"
+        in
+          prelude ^ tdPart ^ forwardDecls ^ "\n" ^ statics ^ mainPart
+        end
+    end
 end

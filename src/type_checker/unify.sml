@@ -12,6 +12,8 @@ structure Unify :> UNIFY = struct
     | (_, Types.TyVar _) => false
     | (Types.TyUnit, Types.TyUnit) => true
     | (Types.TyBool, Types.TyBool) => true
+    | (Types.TyStruct a, Types.TyStruct b) => a = b
+    | (Types.TyEnum a, Types.TyEnum b) => a = b
     | (Types.TyChar, Types.TyChar) => true
     | (Types.TyInt w1, Types.TyInt w2) => w1 = w2
     | (Types.TyUint w1, Types.TyUint w2) => w1 = w2

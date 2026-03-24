@@ -51,7 +51,7 @@ sv0 source (.sv0)
 | `src/backend/c/` | sv0-IR to C99 code generation |
 | `src/error/` | error reporting with source spans |
 | `test/` | test suite |
-| `doc/` | pass-by-pass notes ([compiler-passes.md](doc/compiler-passes.md)) |
+| `doc/` | pass-by-pass notes ([compiler-passes.md](doc/compiler-passes.md)) — includes structs, enums, and `match` (Milestone 1 Phase 5) |
 | `build/` | build artifacts (gitignored) |
 
 ## building

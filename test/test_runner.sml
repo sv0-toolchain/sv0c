@@ -250,6 +250,7 @@ structure TestRunner = struct
       (* --- parser --- *)
       val () = print "\n[parser]\n"
       fun parseSrc s = Parser.parse (Lexer.tokenize "<test>" s)
+      val nl = String.str #"\n"
       val pMain = parseSrc "fn main() -> i32 { return 0; }"
       val () = check "parse single top-level fn" (length pMain = 1)
       val () = check "parse fn name main"
@@ -286,6 +287,10 @@ structure TestRunner = struct
                         \fn main() -> i32 { return f(1, 2); }" of
                     SOME m => String.isSubstring "E0307" m
                   | NONE => false)
+      val () = check "resolve accepts enum constructor paths"
+                 (resolveCatch
+                    ("enum Hue { R(), B() }" ^ nl ^
+                     "fn main() -> i32 { let _v = Hue::R(); return 0; }") = NONE)
 
       (* --- type checker --- *)
       val () = print "\n[checker]\n"
@@ -343,6 +348,28 @@ structure TestRunner = struct
       val () = check "checker accepts for range"
                  (checkCatch
                     "fn main() -> unit { for i in 0..1 { } }" = NONE)
+      val () = check "checker accepts struct literal and field"
+                 (checkCatch
+                    ("struct Point { x: i32, y: i32 }" ^ nl ^
+                     "fn main() -> i32 { let p: Point = Point { x: 3, y: 4 }; return p.x; }") =
+                    NONE)
+      val () = check "checker accepts enum unit and match"
+                 (checkCatch
+                    ("enum Color { Red(), Green() }" ^ nl ^
+                     "fn main() -> i32 { let c = Color::Red(); return match c { Color::Red() => 1, Color::Green() => 2 }; }") =
+                    NONE)
+      val () = check "checker accepts enum tuple variant and bind"
+                 (checkCatch
+                    ("enum Msg { Empty(), N(i32) }" ^ nl ^
+                     "fn main() -> i32 { let m = Msg::N(5); return match m { Msg::Empty() => 0, Msg::N(x) => x }; }") =
+                    NONE)
+      val () = check "checker accepts match on i32"
+                 (checkCatch
+                    "fn main() -> i32 { return match 7 { 0 => 0, _ => 42 }; }" = NONE)
+      val () = check "checker accepts match on bool"
+                 (checkCatch
+                    "fn main() -> i32 { return match true { true => 1, false => 0 }; }" =
+                    NONE)
 
       (* --- end-to-end (parse through C string) --- *)
       val () = print "\n[e2e]\n"
@@ -378,7 +405,6 @@ structure TestRunner = struct
       val () = check "e2e C emits sv0_requires and sv0_ensures"
                  (String.isSubstring "sv0_requires" cContracts
                   andalso String.isSubstring "sv0_ensures" cContracts)
-      val nl = String.str #"\n"
       val cLoop =
         compileToC
           ("fn main() -> i32 requires(true) ensures(true) {" ^ nl ^
@@ -388,6 +414,22 @@ structure TestRunner = struct
                  (String.isSubstring "while (" cLoop)
       val () = check "e2e C loop invariant uses sv0_requires"
                  (String.isSubstring "sv0_requires" cLoop)
+      val cStruct =
+        compileToC
+          ("struct Pt { x: i32 }" ^ nl ^
+           "fn main() -> i32 { let p: Pt = Pt { x: 5 }; return p.x; }")
+      val () = check "e2e C struct typedef and field load"
+                 (String.isSubstring "typedef struct" cStruct
+                  andalso String.isSubstring "Pt" cStruct
+                  andalso String.isSubstring "p.x" cStruct)
+      val cEnum =
+        compileToC
+          ("enum E { A(), B() }" ^ nl ^
+           "fn main() -> i32 { let e = E::A(); return match e { E::A() => 9, E::B() => 0 }; }")
+      val () = check "e2e C enum tag and match"
+                 (String.isSubstring ".tag" cEnum
+                  andalso String.isSubstring "if (" cEnum
+                  andalso String.isSubstring "= 9" cEnum)
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

@@ -5,12 +5,12 @@ This document summarizes what each pipeline stage does today and how errors are 
 ## Pipeline order
 
 1. **Lexer** (`Lexer.tokenize`) — Characters to located tokens. Lexical errors are not yet classified with E01xx codes in all cases.
-2. **Parser** (`Parser.parse`) — Tokens to `Ast.program`. Syntax errors raise `Fail` with a short message.
-3. **Name resolution** (`Resolver.resolve`) — Validates duplicate top-level value and type names, checks unbound identifiers in expressions, and checks that type paths refer to built-in or module-level types. Single-segment value and type paths are supported; qualified paths (`a::b`) are rejected with E0305 until module resolution is complete.
-4. **Type checker** (`Checker.check`) — Maps a subset of `Ast.ty` to `Types.ty`, checks `fn` bodies (literals, paths, `let` with `PatBind`, `return`, block tails, empty `unit` bodies), **`while` / `for` over `lo..hi` / `loop`**, and **`break` / `continue` only inside loops**. `requires` contracts must be `bool`-typed expressions. Raises `Fail` with **E04xx** / **E05xx** (see below).
+2. **Parser** (`Parser.parse`) — Tokens to `Ast.program`. Syntax errors raise `Fail` with a short message. **Expression parsing** threads `allowStruct`: in positions where a `{` must start a block or match arms (`match`, `if`, `while`, `for` iterator), a bare identifier must **not** be parsed as the start of a struct literal `name { ... }` (see `parseRangeExpr` / `parsePrimaryExpr` in `parser.sml`). **Patterns:** `IDENT` followed by `::` is parsed as a qualified path (enum/struct pattern suffix), not as a simple `PatBind`.
+3. **Name resolution** (`Resolver.resolve`) — Validates duplicate top-level value and type names, checks unbound identifiers, and validates type paths against the module type environment. **Value paths** may be multi-segment for **enum variant constructors** (`Enum::Variant`) and similar keys registered from `ItemEnum`. **Type paths** cover struct/enum names for literals and patterns. Cross-file `module::item` resolution is deferred (Milestone 1 Phase 8 scope).
+4. **Type checker** (`Checker.check`) — Maps `Ast.ty` to `Types.ty` including **user struct and enum names** (`TyStruct` / `TyEnum`). Checks `fn` bodies including **struct literals** (`ExprStruct`), **field access** (`ExprField`), **enum construction** (`Enum::Variant(...)`), and **`match`** on enum, `bool`, and `i32` (literal, `_`, and bind arms per the supported grammar). Still covers **`while` / `for` over `lo..hi` / `loop`** and **`break` / `continue` only inside loops**. `requires` contracts must be `bool`-typed. Raises `Fail` with **E04xx** / **E05xx** (see below).
 5. **Contract analyzer** (`ContractAnalyzer.analyze`) — No-op for now; `requires` is already type-checked in the checker.
-6. **IR lowering** (`Lowering.lower`) — One `Ir.block` per `ItemFn`: `StmtLet`, `return`, `if`, calls, **`while`**, **`for`** (desugared per Q4 to a counter + `while`), **`loop`** (infinite `while`), **`break` / `continue`**, and **`loop_invariant(e)` on `while`** (each invariant becomes **`sv0_requires`** at the top of the emitted C loop body). Other statement/expression forms raise `Fail`.
-7. **C codegen** (`Codegen.emit`) — Emits C99: non-`main` functions as `static`, `main` as global. Empty IR still yields a trivial `int main(void) { return 0; }`.
+6. **IR lowering** (`Lowering.lower`) — One `Ir.block` per `ItemFn`: `StmtLet`, `return`, `if`, calls, **`while`**, **`for`** (desugared per Q4 to a counter + `while`), **`loop`**, **`break` / `continue`**, **`loop_invariant(e)` on `while`**, **struct** values (fields, locals), **enum** values (discriminant + payloads), and **`match`** lowered to **C-style `if` chains** (tag tests for enums, comparisons for primitives). Typedef names and C type hints flow through `Ir.program` for struct/enum carriers.
+7. **C codegen** (`Codegen.emit`) — Emits C99: a **typedef prelude** for struct and enum carrier types, **`static`** non-`main` functions, global `main`. Locals and params use C struct types where the IR indicates (not only `int`). Empty IR still yields a trivial `int main(void) { return 0; }`.
 
 ## Name resolution (E03xx)
 
@@ -21,7 +21,7 @@ This document summarizes what each pipeline stage does today and how errors are 
 | E0302  | Duplicate module-level value (e.g. two `fn` with the same name). |
 | E0303  | Attempt to define a type with the same name as a built-in primitive. |
 | E0304  | Duplicate module-level type. |
-| E0305  | Qualified value path not implemented. |
+| E0305  | Reserved (historical); multi-segment **value** paths are used for `Enum::Variant` in this milestone. Arbitrary module-qualified paths remain future work. |
 | E0306  | `|` pattern alternatives not supported in this pass. |
 
 Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `String`, and `unit`. `Self` is allowed only inside `trait` and `impl` bodies for type positions.
@@ -40,13 +40,19 @@ Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `Str
 | E0502  | `loop_invariant` as an `fn`-level contract not supported; use `loop_invariant(...)` on `while` (parsed into `ExprWhile`, type-checked as `bool`, lowered to `sv0_requires`). |
 | E0520  | `ensures` must not use `result` when the return type is `unit`. |
 
+## Structs and enums (Phase 5)
+
+- **Structs:** `ItemStruct` defines fields; literals must use the struct type path; field reads compile to member access in C.
+- **Enums:** `ItemEnum` defines variants (unit, tuple, or struct payload). Each variant is registered as a value with arity. Runtime representation is a C `struct` with a **`tag`** discriminator and payload fields (`p0`, …) as needed for the largest variant shape the compiler uses for that enum.
+- **`match`:** Enum arms use `PatEnum` patterns; arms are lowered to comparisons on `.tag` (and bindings from payload locals). `bool` / `i32` matches use literal and wildcard/bind patterns supported by the checker.
+
 ## Unification
 
-`Unify.unify` implements structural equality on ground `Types.ty` (and same-index `TyVar`). It is used by `Checker.expect` for compatibility checks.
+`Unify.unify` implements structural equality on ground `Types.ty` (including `TyStruct` / `TyEnum` names) and same-index `TyVar`. It is used by `Checker.expect` for compatibility checks.
 
 ## End-to-end compile
 
-- **In-process:** `make test` runs `[e2e]` checks that build C text from a sample `fn main() -> i32 { return 42; }`.
+- **In-process:** `make test` runs `[e2e]` checks including struct typedef + field access, enum tag + `match`, and smaller slices (e.g. `return 42`).
 - **Host C compiler:** `make e2e` runs `scripts/export_e2e.sml` to write `build/e2e_generated.c`, then compiles and runs the binary; the process exit code must be **42**.
 
 ## Environment representation

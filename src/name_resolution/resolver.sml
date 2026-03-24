@@ -39,13 +39,12 @@ structure Resolver :> RESOLVER = struct
   and resolveExpr (ctx : ctx) (env : Env.env) (e : Ast.expr) : unit =
     case e of
       Ast.ExprLit _ => ()
-    | Ast.ExprPath ([x], _) =>
-        if Env.lookupValue env x then ()
-        else raise Fail ("E0300: unbound identifier `" ^ x ^ "`")
     | Ast.ExprPath (segs, _) =>
-        raise Fail
-          ("E0305: qualified value paths are not implemented yet (`" ^
-           pathToString segs ^ "`)")
+        let val key = pathToString segs
+        in
+          if Env.lookupValue env key then ()
+          else raise Fail ("E0300: unbound identifier `" ^ key ^ "`")
+        end
     | Ast.ExprUnop (_, e1, _) => resolveExpr ctx env e1
     | Ast.ExprBinop (_, a, b, _) =>
         (resolveExpr ctx env a; resolveExpr ctx env b)
@@ -53,14 +52,31 @@ structure Resolver :> RESOLVER = struct
         let
           val () =
             case f of
-              Ast.ExprPath ([nm], _) =>
-                (case Env.lookupFnArity env nm of
-                   SOME n =>
-                     if length args <> n then
-                       raise Fail
-                         ("E0307: wrong number of arguments for `" ^ nm ^ "`")
-                     else ()
-                 | NONE => ())
+              Ast.ExprPath (segs, _) =>
+                let val key = pathToString segs
+                in
+                  case Env.lookupFnArity env key of
+                    SOME n =>
+                      if length args <> n then
+                        raise Fail
+                          ("E0307: wrong number of arguments for `" ^ key ^ "`")
+                      else ()
+                  | NONE =>
+                      if length segs = 1 then
+                        case segs of
+                          [nm] =>
+                            (case Env.lookupFnArity env nm of
+                               SOME n =>
+                                 if length args <> n then
+                                   raise Fail
+                                     ("E0307: wrong number of arguments for `" ^
+                                      nm ^ "`")
+                                 else ()
+                             | NONE => ())
+                        | _ => ()
+                      else
+                        ()
+                end
             | _ => ()
         in
           (resolveExpr ctx env f; app (resolveExpr ctx env) args)
@@ -143,10 +159,22 @@ structure Resolver :> RESOLVER = struct
     | Ast.PatLit _ => ()
     | Ast.PatTuple (ps, _) => app (resolvePatShape ctx env) ps
     | Ast.PatStruct (path, fs, _) =>
-        (if Env.lookupType env ctx path then ()
+        (if length path >= 2 then
+           if Env.lookupValue env (pathToString path) then ()
+           else
+             raise Fail
+               ("E0300: unbound enum constructor in pattern `" ^
+                pathToString path ^ "`")
+         else if Env.lookupType env ctx path then ()
          else raise Fail ("E0301: unknown type `" ^ pathToString path ^ "` in pattern");
          app (fn (_, p2) => resolvePatShape ctx env p2) fs)
-    | Ast.PatEnum (_, ps, _) => app (resolvePatShape ctx env) ps
+    | Ast.PatEnum (path, ps, _) =>
+        (if Env.lookupValue env (pathToString path) then ()
+         else
+           raise Fail
+             ("E0300: unbound enum constructor in pattern `" ^
+              pathToString path ^ "`");
+         app (resolvePatShape ctx env) ps)
     | Ast.PatOr _ =>
         raise Fail "E0306: | patterns are not supported in name resolution yet"
 
@@ -244,12 +272,27 @@ structure Resolver :> RESOLVER = struct
     | Ast.ItemUse _ => ()
     | Ast.ItemModule _ => ()
 
+  fun enumVariantReg (en : string) (v : Ast.variant) : string * int =
+    case v of
+      Ast.VariantUnit (n, _) => (pathToString [en, n], 0)
+    | Ast.VariantTuple (n, tys, _) => (pathToString [en, n], length tys)
+    | Ast.VariantStruct (n, fs, _) => (pathToString [en, n], length fs)
+
   fun registerItem (env : Env.env) (it : Ast.item) : Env.env =
     case it of
       Ast.ItemFn { name, params, ... } =>
         Env.registerFnArity (Env.registerModuleValue env name) name (length params)
     | Ast.ItemStruct { name, ... } => Env.registerModuleType env name
-    | Ast.ItemEnum { name, ... } => Env.registerModuleType env name
+    | Ast.ItemEnum { name, variants, ... } =>
+        let
+          val e1 = Env.registerModuleType env name
+        in
+          List.foldl
+            (fn (v, e) =>
+               let val (q, ar) = enumVariantReg name v
+               in Env.registerFnArity (Env.registerModuleValue e q) q ar end) e1
+            variants
+        end
     | Ast.ItemTrait { name, ... } => Env.registerModuleType env name
     | Ast.ItemTypeAlias (name, _, _) => Env.registerModuleType env name
     | Ast.ItemImpl _ => env
