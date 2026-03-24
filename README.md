@@ -51,6 +51,7 @@ sv0 source (.sv0)
 | `src/backend/c/` | sv0-IR to C99 code generation |
 | `src/error/` | error reporting with source spans |
 | `test/` | test suite |
+| `doc/` | pass-by-pass notes ([compiler-passes.md](doc/compiler-passes.md)) |
 | `build/` | build artifacts (gitignored) |
 
 ## building
@@ -59,7 +60,8 @@ requires SML/NJ (tested with 110.99.9).
 
 ```bash
 make build         # compile all modules via CM
-make test          # run test suite (15 tests)
+make test          # run test suite (see test_runner for current count)
+make e2e           # emit C, compile with cc, run binary (exit code 42)
 make heap          # export heap image to build/sv0c
 make clean         # remove .cm cache and build artifacts
 ```

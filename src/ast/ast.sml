@@ -61,6 +61,7 @@ structure Ast = struct
     | ExprCast of expr * ty * Span.span
     | ExprRange of expr option * expr option * Span.span
     | ExprTry of expr * Span.span
+    | ExprAssert of expr * Span.span
     | ExprStruct of path * (ident * expr) list * Span.span
     | ExprTuple of expr list * Span.span
     | ExprArray of expr list * Span.span
