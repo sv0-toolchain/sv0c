@@ -181,7 +181,9 @@ structure Resolver :> RESOLVER = struct
       val env0 = Env.enterScope env
       val env1 =
         List.foldl (fn ((p, _), acc) => bindPatternLocals acc p) env0 (#params r)
-      val () = app (resolveContract ctx env1) (#contracts r)
+      (* ensures/requires may reference `result` (checker types it as the fn return). *)
+      val envContracts = Env.bindLocal env1 "result"
+      val () = app (resolveContract ctx envContracts) (#contracts r)
     in
       resolveExpr ctx env1 (#body r)
     end
