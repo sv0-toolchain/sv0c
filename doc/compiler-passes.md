@@ -6,11 +6,11 @@ This document summarizes what each pipeline stage does today and how errors are 
 
 1. **Lexer** (`Lexer.tokenize`) — Characters to located tokens. Lexical errors are not yet classified with E01xx codes in all cases.
 2. **Parser** (`Parser.parse`) — Tokens to `Ast.program`. Syntax errors raise `Fail` with a short message. **Expression parsing** threads `allowStruct`: in positions where a `{` must start a block or match arms (`match`, `if`, `while`, `for` iterator), a bare identifier must **not** be parsed as the start of a struct literal `name { ... }` (see `parseRangeExpr` / `parsePrimaryExpr` in `parser.sml`). **Patterns:** `IDENT` followed by `::` is parsed as a qualified path (enum/struct pattern suffix), not as a simple `PatBind`.
-3. **Name resolution** (`Resolver.resolve`) — Validates duplicate top-level value and type names, checks unbound identifiers, and validates type paths against the module type environment. **Value paths** may be multi-segment for **enum variant constructors** (`Enum::Variant`) and similar keys registered from `ItemEnum`. **Intrinsics:** `println` is pre-registered (arity 1); a top-level `fn println` collides with **E0302**. **Type paths** cover struct/enum names for literals and patterns. Cross-file `module::item` resolution is deferred (Milestone 1 Phase 8 scope).
-4. **Type checker** (`Checker.check`) — Maps `Ast.ty` to `Types.ty` including **user struct and enum names** (`TyStruct` / `TyEnum`). Checks `fn` bodies including **struct literals** (`ExprStruct`), **field access** (`ExprField`), **enum construction** (`Enum::Variant(...)`), **`match`** on enum, `bool`, and `i32`, **parenthesized unary tuples** (`ExprTuple` of one element, for `(expr)` grouping), **`as` casts** between **integral** types only, **string literals** (`TyString`), **`println("literal")`**, and **`?`** on enums shaped **`Ok(T)` / `Err(E)`** with one field each, where the **enclosing function’s return type is that same enum** (early error return on `Err`). Still covers **`while` / `for` over `lo..hi` / `loop`** and **`break` / `continue` only inside loops**. `requires` contracts must be `bool`-typed. Raises `Fail` with **E04xx** / **E05xx** (see below).
+3. **Name resolution** (`Resolver.resolve`) — Validates duplicate top-level value and type names, checks unbound identifiers, and validates type paths against the module type environment. **Value paths** may be multi-segment for **enum variant constructors** (`Enum::Variant`) and similar keys registered from `ItemEnum`. **Intrinsics** (arity-checked; a top-level `fn` with the same name collides with **E0302**): **`println`** (1), **`old`** (1), **`forall`** (3), **`exists`** (3), **`no_alias`** (2). **`forall` / `exists`:** the iterator name in `name in lo..hi` is bound in the resolver environment for the predicate subexpression only (mirrors the type checker). **Type paths** cover struct/enum names for literals and patterns. Cross-file `module::item` resolution is deferred (Milestone 1 Phase 8 scope).
+4. **Type checker** (`Checker.check`) — Maps `Ast.ty` to `Types.ty` including **user struct and enum names** (`TyStruct` / `TyEnum`). Checks `fn` bodies including **struct literals** (`ExprStruct`), **field access** (`ExprField`), **enum construction** (`Enum::Variant(...)`), **`match`** on enum, `bool`, and `i32`, **parenthesized unary tuples** (`ExprTuple` of one element, for `(expr)` grouping), **`as` casts** between **integral** types only, **string literals** (`TyString`), **`println("literal")`**, **`?`** on enums shaped **`Ok(T)` / `Err(E)`** with one field each (same enum as the function return), and **contract-only** forms when **`inContractExpr`** is set for **`requires` / `ensures`**: **`old(x)`** (parameter `x` only), **`forall(i in lo..hi, p)`** / **`exists(...)`** (half-open **`i32`** range, **`p : bool`**), **`no_alias(&a, &b)`** / **`&mut`** (same inner **`T`**), and **`&` / `&mut`** on a simple parameter name. Still covers **`while` / `for` over `lo..hi` / `loop`** and **`break` / `continue` only inside loops**. `requires` contracts must be `bool`-typed. Messages use **`E04xx` / `E05xx`** and often include **`(hint: …)`** after the code (see table). **`Fail`** is caught at the **`sv0c`** CLI and printed as **`sv0c error: …`** ([`main.sml`](../src/main.sml)).
 5. **Contract analyzer** (`ContractAnalyzer.analyze`) — No-op for now; `requires` is already type-checked in the checker.
-6. **IR lowering** (`Lowering.lower`) — One `Ir.block` per `ItemFn`: `StmtLet`, `return`, `if`, calls, **`while`**, **`for`** (desugared per Q4 to a counter + `while`), **`loop`**, **`break` / `continue`**, **`loop_invariant(e)` on `while`**, **struct** values, **enum** values, **`match`** as **`if` chains**, **`as` casts** (`Ir.Unop` with a C cast prefix), **`println`** → **`sv0_println`**, **`?`** → load scrutinee, compare **`.tag`** to **`Err`**, **return** whole enum on error else **store `p0`** into a pre-declared payload temp (so it stays in scope for `let x = …?`). **`let`** from a non-struct/enum RHS uses **`DeclNamed` + `Store`** when the inferred C type is not `int`. Typedef names and C type hints flow through `Ir.program`.
-7. **C codegen** (`Codegen.emit`) — Emits C99: a **typedef prelude** for struct and enum carrier types, **`static`** non-`main` functions, global `main`. Emits **`int8_t` / `int16_t` / …** via `stdint.h` (included from `sv0_runtime.h`) for integral casts. **`Ir.VString`** → C string literal (escaped). **`Ir.FieldAccess`** for enum payload loads. Empty IR still yields a trivial `int main(void) { return 0; }`.
+6. **IR lowering** (`Lowering.lower`) — One `Ir.block` per `ItemFn`: `StmtLet`, `return`, `if`, calls, **`while`**, **`for`** (desugared per Q4 to a counter + `while`), **`loop`**, **`break` / `continue`**, **`loop_invariant(e)` on `while`**, **struct** values, **enum** values, **`match`** as **`if` chains**, **`as` casts** (`Ir.Unop` with a C cast prefix), **`println`** → **`sv0_println`**, **`?`** → load scrutinee, compare **`.tag`** to **`Err`**, **return** whole enum on error else **store `p0`** into a pre-declared payload temp (so it stays in scope for `let x = …?`). **Phase 9 contracts:** for each parameter **`x`** mentioned in **`old(x)`**, emit **`_sv0old_x`** initialized from **`x`** after any **`_sv0ret`** decl and **before** **`requires`**; **`old(x)`** lowers to **`Load _sv0old_x`**. **`forall` / `exists`** lower to a **`while`** with an accumulator (**`exists`** breaks on first true predicate). **`no_alias`** → **`sv0_no_alias`** with **`Ir.VAddrOf`** arguments. **`requires` / `ensures` IR** is lowered **after** **`tmpCtr` reset** in this order: **`requires`** clauses, **function body**, then **`ensures`** clauses (so temporaries do not collide). **`let`** from a non-struct/enum RHS uses **`DeclNamed` + `Store`** when the inferred C type is not `int`. Typedef names and C type hints flow through `Ir.program`.
+7. **C codegen** (`Codegen.emit`) — Emits C99: a **typedef prelude** for struct and enum carrier types, **`static`** non-`main` functions, global `main`. Emits **`int8_t` / `int16_t` / …** via `stdint.h` (included from `sv0_runtime.h`) for integral casts. **`Ir.VString`** → C string literal (escaped). **`Ir.VAddrOf`** → **`(&name)`**. **`Ir.FieldAccess`** for enum payload loads. Empty IR still yields a trivial `int main(void) { return 0; }`.
 
 ## Name resolution (E03xx)
 
@@ -46,6 +46,14 @@ Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `Str
 | E0444  | **`println`** requires a **single string literal** argument. |
 | E0445  | **`?`** operand must be an **enum**. |
 | E0446  | Multi-element **tuples** are not in this slice (unary `(e)` is peeled to `e`). |
+| E0521  | **`old(...)`** only in **`requires` / `ensures`**. |
+| E0522  | **`old`** needs a single **parameter** name (not a local, not a compound expression). |
+| E0523  | **`forall` / `exists`:** only in contracts; domain must be **`lo..hi`**; body **`bool`**. |
+| E0524  | **`no_alias`** needs **`&T` / `&mut T`** with matching inner **`T`**. |
+| E0525  | **`&` / `&mut`** only in contract expressions (for **`no_alias`**). |
+| E0526  | **`no_alias(...)`** only in **`requires` / `ensures`**. |
+| E0540  | Lowering: unsupported unary (beyond slice). |
+| E0541  | Lowering: **`&`** not applied to a simple name (should not reach lowering if checker is consistent). |
 
 ## Structs and enums (Phase 5)
 
@@ -60,13 +68,22 @@ Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `Str
 - **`?`:** Rust-style on a user-defined enum with **`Ok`** / **`Err`** variants (single payload each). The **function must return that enum**; on `Err`, the lowered code **returns** the enum value from the function.
 - **Deferred (not Phase 6):** **`Vec` / `Box` / heap `string` APIs**, generic **`Option`/`Result`**, and **method dispatch** — need more type system and runtime surface than this slice.
 
+## Contract builtins (Phase 9)
+
+- **`result`:** Already supported in **`ensures`** (lowering maps to the return-value slot when needed).
+- **`old(x)`:** Snapshot of parameter **`x`** at function entry (`_sv0old_x` in C).
+- **`forall` / `exists`:** Bounded **`i32`** iteration with runtime checking (not a verifier).
+- **`no_alias`:** Emits **`sv0_no_alias`** (pointer inequality; approximation only). See [`sv0_runtime.h`](../runtime/sv0_runtime.h).
+- **Diagnostics:** Prefer stable **`E05xx`** strings with **`(hint: …)`** for contract mistakes. Rich **`Diagnostic.format`** exists for future pipeline integration; today the driver surfaces raw **`Fail`** strings.
+- **Golden tests:** Sources under [`test/data/golden/`](../test/data/golden/) (`fail/` = checker errors with hints; `pass/` = compile + **`cc`** + run with exit **0**).
+
 ## Unification
 
 `Unify.unify` implements structural equality on ground `Types.ty` (including `TyStruct` / `TyEnum` names) and same-index `TyVar`. It is used by `Checker.expect` for compatibility checks.
 
 ## End-to-end compile
 
-- **In-process:** `make test` runs `[e2e]` checks including casts, `println`, `?` on enums, struct/enum/match, and smaller slices (e.g. `return 42`).
+- **In-process:** `make test` runs `[e2e]` (C string assertions), **`[golden]`** (file-based **`test/data/golden/**`), and smaller slices (e.g. `return 42`).
 - **Host C compiler:** `make e2e` runs `scripts/export_e2e.sml` to write `build/e2e_generated.c`, then compiles and runs the binary; the process exit code must be **42**.
 
 ## Environment representation
@@ -75,6 +92,6 @@ Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `Str
 
 ## Tests
 
-Run `make test` from `sv0c/`. Sections in `test/test_runner.sml`: `[parser]`, `[resolver]`, `[checker]`, `[e2e]`, `[pipeline]`. Run `make e2e` for a full compile-and-execute smoke test.
+Run `make test` from `sv0c/`. Sections in `test/test_runner.sml`: `[parser]`, `[resolver]`, `[checker]`, `[e2e]`, **`[golden]`**, `[pipeline]`. Run `make e2e` for a full compile-and-execute smoke test.
 
 **Block parsing:** A `while` / `for` / `loop` expression that is **not** the block’s tail must be followed by **`;`** before the next statement (same rule as other expression statements).

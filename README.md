@@ -4,7 +4,7 @@ the sv0 bootstrap compiler, implemented in Standard ML (SML/NJ).
 
 ## purpose
 
-sv0c reads `.sv0` source files and compiles them to C source code, which is then compiled to native binaries by a standard C compiler (`cc`/`gcc`). this is the milestone 1 bootstrap compiler that will eventually be rewritten in sv0 itself.
+sv0c reads `.sv0` source files and compiles them to C source code, which is then compiled to native binaries by a standard C compiler (`cc`/`gcc`). this is the milestone 1 bootstrap compiler that will eventually be rewritten in sv0 itself. for what is actually in that slice versus deferred to milestone 2, see [sv0doc/milestone-1-complete.md](../sv0doc/milestone-1-complete.md).
 
 ## architecture
 
