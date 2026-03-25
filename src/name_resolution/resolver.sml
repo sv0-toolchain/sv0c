@@ -3,6 +3,10 @@
 
 structure Resolver :> RESOLVER = struct
 
+  val recordedImportAliases : (string * string) list ref = ref []
+
+  fun peekImportAliases () : (string * string) list = !recordedImportAliases
+
   type ctx = { allowSelf : bool }
 
   fun pathToString (p : Ast.path) : string =
@@ -24,9 +28,12 @@ structure Resolver :> RESOLVER = struct
 
   fun resolveTy (ctx : ctx) (env : Env.env) (t : Ast.ty) : unit =
     case t of
-      Ast.TyName (path, _) =>
+      Ast.TyName (path, sp) =>
         if Env.lookupType env ctx path then ()
-        else raise Fail ("E0301: unknown type `" ^ pathToString path ^ "`")
+        else
+          raise Diagnostic.Diag
+            (Diagnostic.error
+               ("E0301", "unknown type `" ^ pathToString path ^ "`", sp))
     | Ast.TyRef (t2, _) => resolveTy ctx env t2
     | Ast.TyRefMut (t2, _) => resolveTy ctx env t2
     | Ast.TyArray (t2, e, _) =>
@@ -39,11 +46,14 @@ structure Resolver :> RESOLVER = struct
   and resolveExpr (ctx : ctx) (env : Env.env) (e : Ast.expr) : unit =
     case e of
       Ast.ExprLit _ => ()
-    | Ast.ExprPath (segs, _) =>
+    | Ast.ExprPath (segs, sp) =>
         let val key = pathToString segs
         in
           if Env.lookupValue env key then ()
-          else raise Fail ("E0300: unbound identifier `" ^ key ^ "`")
+          else
+            raise Diagnostic.Diag
+              (Diagnostic.error
+                 ("E0300", "unbound identifier `" ^ key ^ "`", sp))
         end
     | Ast.ExprUnop (_, e1, _) => resolveExpr ctx env e1
     | Ast.ExprBinop (_, a, b, _) =>
@@ -278,6 +288,12 @@ structure Resolver :> RESOLVER = struct
     | Ast.ItemUse _ => ()
     | Ast.ItemModule _ => ()
 
+  fun variantStem (v : Ast.variant) : string =
+    case v of
+      Ast.VariantUnit (n, _) => n
+    | Ast.VariantTuple (n, _, _) => n
+    | Ast.VariantStruct (n, _, _) => n
+
   fun enumVariantReg (en : string) (v : Ast.variant) : string * int =
     case v of
       Ast.VariantUnit (n, _) => (pathToString [en, n], 0)
@@ -305,6 +321,62 @@ structure Resolver :> RESOLVER = struct
     | Ast.ItemUse _ => env
     | Ast.ItemModule _ => env
 
+  fun applyUseClause (prog : Ast.program) (env : Env.env) (it : Ast.item) :
+    Env.env =
+    case it of
+      Ast.ItemUse (path, span) =>
+        (case path of
+           [m, nm] =>
+             let
+               val tgt = m ^ "__" ^ nm
+               fun asDiag msg =
+                 raise Diagnostic.Diag (Diagnostic.error ("E0309", msg, span))
+               fun findEnum () =
+                 List.find
+                   (fn Ast.ItemEnum {name, ...} => name = tgt | _ => false) prog
+             in
+               case Env.lookupFnArity env tgt of
+                 SOME _ =>
+                   ( recordedImportAliases := (nm, tgt) :: !recordedImportAliases
+                   ; Env.registerValueAlias env nm tgt
+                     handle Fail msg => asDiag msg)
+               | NONE =>
+                   if Env.lookupType env {allowSelf = false} [tgt] then
+                     case findEnum () of
+                       SOME (Ast.ItemEnum {variants, ...}) =>
+                         let
+                           val envT =
+                             Env.registerTypeAlias env nm tgt
+                               handle Fail msg => asDiag msg
+                         in
+                           List.foldl
+                             (fn (v, e) =>
+                                let
+                                  val vn = variantStem v
+                                  val from = pathToString [nm, vn]
+                                  val to = pathToString [tgt, vn]
+                                in
+                                  ( recordedImportAliases := (from, to) ::
+                                      !recordedImportAliases
+                                  ; Env.registerValueAlias e from to
+                                    handle Fail msg => asDiag msg)
+                                end) envT variants
+                         end
+                     | NONE =>
+                         Env.registerTypeAlias env nm tgt
+                           handle Fail msg => asDiag msg
+                   else
+                     asDiag
+                       ("unknown module item `" ^ pathToString path ^ "`")
+             end
+         | _ =>
+             raise Diagnostic.Diag
+               (Diagnostic.error
+                  ( "E0309"
+                  , "use expects `module_name::item_name` in this slice"
+                  , span)))
+    | _ => env
+
   fun withIntrinsics (e : Env.env) : Env.env =
     let
       val e1 =
@@ -318,11 +390,14 @@ structure Resolver :> RESOLVER = struct
 
   fun resolve (prog : Ast.program) : Ast.program =
     let
+      val () = recordedImportAliases := []
       (* Intrinsics first so user `fn println` / `fn old` / … collides with E0302 (reserved). *)
       val env0 =
         List.foldl (fn (it, acc) => registerItem acc it) (withIntrinsics Env.empty) prog
+      val env1 =
+        List.foldl (fn (it, e) => applyUseClause prog e it) env0 prog
       val ctx0 : ctx = { allowSelf = false }
-      val () = app (resolveTopItem ctx0 env0) prog
+      val () = app (resolveTopItem ctx0 env1) prog
     in
       prog
     end

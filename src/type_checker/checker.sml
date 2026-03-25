@@ -40,22 +40,42 @@ structure Checker :> CHECKER = struct
   val structDefs : (string * (string * Types.ty) list) list ref = ref []
   val enumDefs : (string * (string * variantShape) list) list ref = ref []
 
+  (* `use mod::Ty` import aliases (short name -> mangled canonical type name). *)
+  val tyImportAliases : (string * string) list ref = ref []
+
+  fun clearTyImportAliases () : unit = tyImportAliases := []
+
+  fun addTyImportAlias (from : string) (to : string) : unit =
+    tyImportAliases := (from, to) :: !tyImportAliases
+
+  fun canonTyImport (n : string) : string =
+    case List.find (fn (a, _) => String.compare (a, n) = EQUAL) (!tyImportAliases) of
+      SOME (_, b) =>
+        if String.compare (b, n) = EQUAL then n else canonTyImport b
+    | NONE => n
+
   fun structNames () : string list = map #1 (!structDefs)
   fun enumNames () : string list = map #1 (!enumDefs)
 
   fun fieldsOfStruct (sn : string) : (string * Types.ty) list =
-    case List.find (fn (n, _) => n = sn) (!structDefs) of
-      SOME (_, fs) => fs
-    | NONE => raise Fail ("E0420: unknown struct type `" ^ sn ^ "`")
+    let val s0 = canonTyImport sn
+    in
+      case List.find (fn (n, _) => String.compare (n, s0) = EQUAL) (!structDefs) of
+        SOME (_, fs) => fs
+      | NONE => raise Fail ("E0420: unknown struct type `" ^ sn ^ "`")
+    end
 
   fun variantShapeOf (en : string) (vn : string) : variantShape =
-    case List.find (fn (n, _) => n = en) (!enumDefs) of
-      SOME (_, vs) =>
-        (case List.find (fn (v, _) => v = vn) vs of
-           SOME (_, sh) => sh
-         | NONE =>
-             raise Fail ("E0421: unknown variant `" ^ en ^ "::" ^ vn ^ "`"))
-    | NONE => raise Fail ("E0422: unknown enum type `" ^ en ^ "`")
+    let val e0 = canonTyImport en
+    in
+      case List.find (fn (n, _) => String.compare (n, e0) = EQUAL) (!enumDefs) of
+        SOME (_, vs) =>
+          (case List.find (fn (v, _) => String.compare (v, vn) = EQUAL) vs of
+             SOME (_, sh) => sh
+           | NONE =>
+               raise Fail ("E0421: unknown variant `" ^ en ^ "::" ^ vn ^ "`"))
+      | NONE => raise Fail ("E0422: unknown enum type `" ^ en ^ "`")
+    end
 
   fun ctorTy (en : string) (sh : variantShape) : Types.ty =
     case sh of
@@ -67,34 +87,37 @@ structure Checker :> CHECKER = struct
   fun astTyToTy (t : Ast.ty) : Types.ty option =
     case t of
       Ast.TyName ([name], _) =>
-        (case name of
-           "unit" => SOME Types.TyUnit
-         | "bool" => SOME Types.TyBool
-         | "char" => SOME Types.TyChar
-         | "i32" => SOME (Types.TyInt 32)
-         | "u32" => SOME (Types.TyUint 32)
-         | "i64" => SOME (Types.TyInt 64)
-         | "u64" => SOME (Types.TyUint 64)
-         | "i128" => SOME (Types.TyInt 128)
-         | "u128" => SOME (Types.TyUint 128)
-         | "i8" => SOME (Types.TyInt 8)
-         | "u8" => SOME (Types.TyUint 8)
-         | "i16" => SOME (Types.TyInt 16)
-         | "u16" => SOME (Types.TyUint 16)
-         | "isize" => SOME Types.TyIsize
-         | "usize" => SOME Types.TyUsize
-         | "f32" => SOME (Types.TyFloat 32)
-         | "f64" => SOME (Types.TyFloat 64)
-         | "str" => SOME Types.TyString
-         | "string" => SOME Types.TyString
-         | "String" => SOME Types.TyString
-         | _ =>
-             if List.exists (fn s => s = name) (structNames ()) then
-               SOME (Types.TyStruct name)
-             else if List.exists (fn e => e = name) (enumNames ()) then
-               SOME (Types.TyEnum name)
-             else
-               NONE)
+        let val name0 = canonTyImport name
+        in
+          case name0 of
+            "unit" => SOME Types.TyUnit
+          | "bool" => SOME Types.TyBool
+          | "char" => SOME Types.TyChar
+          | "i32" => SOME (Types.TyInt 32)
+          | "u32" => SOME (Types.TyUint 32)
+          | "i64" => SOME (Types.TyInt 64)
+          | "u64" => SOME (Types.TyUint 64)
+          | "i128" => SOME (Types.TyInt 128)
+          | "u128" => SOME (Types.TyUint 128)
+          | "i8" => SOME (Types.TyInt 8)
+          | "u8" => SOME (Types.TyUint 8)
+          | "i16" => SOME (Types.TyInt 16)
+          | "u16" => SOME (Types.TyUint 16)
+          | "isize" => SOME Types.TyIsize
+          | "usize" => SOME Types.TyUsize
+          | "f32" => SOME (Types.TyFloat 32)
+          | "f64" => SOME (Types.TyFloat 64)
+          | "str" => SOME Types.TyString
+          | "string" => SOME Types.TyString
+          | "String" => SOME Types.TyString
+          | _ =>
+              if List.exists (fn s => String.compare (s, name0) = EQUAL) (structNames ()) then
+                SOME (Types.TyStruct name0)
+              else if List.exists (fn e => String.compare (e, name0) = EQUAL) (enumNames ()) then
+                SOME (Types.TyEnum name0)
+              else
+                NONE
+        end
     | Ast.TyUnit _ => SOME Types.TyUnit
     | Ast.TyRef (t2, _) =>
         (case astTyToTy t2 of
@@ -794,6 +817,11 @@ structure Checker :> CHECKER = struct
       Types.TyFn (paramTys, retTy)
     end
 
+  fun envFind (env : venv) (x : string) : Types.ty option =
+    case List.find (fn (n, _) => String.compare (n, x) = EQUAL) env of
+      SOME (_, t) => SOME t
+    | NONE => NONE
+
   fun modEnvFromProg (prog : Ast.program) : venv =
     let
       fun one (it : Ast.item, acc : venv) : venv =
@@ -802,13 +830,40 @@ structure Checker :> CHECKER = struct
         | _ => acc
       val acc0 = List.foldl one [] prog
       val acc1 = extend acc0 "println" (Types.TyFn ([Types.TyString], Types.TyUnit))
+      val acc2 =
+        List.foldl
+          (fn ((en, vars), acc) =>
+             List.foldl
+               (fn ((vn, sh), a) =>
+                  extend a (pathKey [en, vn]) (ctorTy en sh)) acc vars) acc1
+          (!enumDefs)
+      fun oneUse (it : Ast.item, acc : venv) : venv =
+        case it of
+          Ast.ItemUse ([m, nm], _) =>
+            let val q = m ^ "__" ^ nm
+            in
+              case envFind acc q of
+                SOME t => extend acc nm t
+              | NONE =>
+                  if List.exists (fn s => String.compare (s, q) = EQUAL) (structNames ()) then
+                    (addTyImportAlias nm q; acc)
+                  else if List.exists (fn e => String.compare (e, q) = EQUAL) (enumNames ()) then
+                    let
+                      val vars =
+                        case List.find (fn (en, _) => String.compare (en, q) = EQUAL) (!enumDefs) of
+                          SOME (_, vs) => vs
+                        | NONE => []
+                      val () = addTyImportAlias nm q
+                    in
+                      List.foldl
+                        (fn ((vn, sh), a) =>
+                           extend a (pathKey [nm, vn]) (ctorTy q sh)) acc vars
+                    end
+                  else acc
+            end
+        | _ => acc
     in
-      List.foldl
-        (fn ((en, vars), acc) =>
-           List.foldl
-             (fn ((vn, sh), a) =>
-                extend a (pathKey [en, vn]) (ctorTy en sh)) acc vars) acc1
-        (!enumDefs)
+      List.foldl oneUse acc2 prog
     end
 
   fun checkFn (modEnv : venv)
@@ -849,6 +904,7 @@ structure Checker :> CHECKER = struct
 
   fun check (prog : Ast.program) : Ast.program =
     let
+      val () = clearTyImportAliases ()
       val () = initTypes prog
       val modEnv = modEnvFromProg prog
       fun checkOne it =

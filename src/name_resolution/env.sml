@@ -3,6 +3,7 @@ structure Env :> ENV = struct
     modVals : string list,
     fnArity : (string * int) list,
     modTys : string list,
+    tyAlias : (string * string) list,
     frames : string list list
   }
 
@@ -14,13 +15,26 @@ structure Env :> ENV = struct
   fun isPreludeType t = List.exists (fn p => p = t) preludeTypes
 
   val empty : env =
-    Env { modVals = [], fnArity = [], modTys = [], frames = [] }
+    Env { modVals = [], fnArity = [], modTys = [], tyAlias = [], frames = [] }
 
   fun dupModVal name (Env r) =
     List.exists (fn n => n = name) (#modVals r)
 
   fun dupModTy name (Env r) =
     List.exists (fn n => n = name) (#modTys r)
+
+  fun hasTyAliasName (Env r) from =
+    List.exists (fn (a, _) => String.compare (a, from) = EQUAL) (#tyAlias r)
+
+  fun resolveCanonicalTy (e as Env r) t =
+    case List.find (fn (a, _) => String.compare (a, t) = EQUAL) (#tyAlias r) of
+      SOME (_, b) =>
+        if String.compare (b, t) = EQUAL then t else resolveCanonicalTy e b
+    | NONE => t
+
+  fun typeIsRegistered (Env r) t =
+    isPreludeType t
+    orelse List.exists (fn n => String.compare (n, t) = EQUAL) (#modTys r)
 
   fun registerModuleValue e name =
     case e of
@@ -33,13 +47,15 @@ structure Env :> ENV = struct
               modVals = name :: #modVals r,
               fnArity = #fnArity r,
               modTys = #modTys r,
+              tyAlias = #tyAlias r,
               frames = #frames r
             }
 
   fun registerFnArity e name arity =
     case e of
       Env r =>
-        if List.exists (fn (n, _) => n = name) (#fnArity r) then
+        if List.exists (fn (n, _) => String.compare (n, name) = EQUAL) (#fnArity r)
+        then
           raise Fail ("E0308: duplicate function arity for `" ^ name ^ "`")
         else
           Env
@@ -47,6 +63,7 @@ structure Env :> ENV = struct
               modVals = #modVals r,
               fnArity = (name, arity) :: #fnArity r,
               modTys = #modTys r,
+              tyAlias = #tyAlias r,
               frames = #frames r
             }
 
@@ -63,6 +80,7 @@ structure Env :> ENV = struct
               modVals = #modVals r,
               fnArity = #fnArity r,
               modTys = name :: #modTys r,
+              tyAlias = #tyAlias r,
               frames = #frames r
             }
 
@@ -72,6 +90,7 @@ structure Env :> ENV = struct
         modVals = #modVals r,
         fnArity = #fnArity r,
         modTys = #modTys r,
+        tyAlias = #tyAlias r,
         frames = [] :: #frames r
       }
 
@@ -83,6 +102,7 @@ structure Env :> ENV = struct
             modVals = #modVals r,
             fnArity = #fnArity r,
             modTys = #modTys r,
+            tyAlias = #tyAlias r,
             frames = rest
           }
     | [] => Env r
@@ -97,6 +117,7 @@ structure Env :> ENV = struct
                 modVals = #modVals r,
                 fnArity = #fnArity r,
                 modTys = #modTys r,
+                tyAlias = #tyAlias r,
                 frames = [[name]]
               }
         | frame :: rest =>
@@ -105,6 +126,7 @@ structure Env :> ENV = struct
                 modVals = #modVals r,
                 fnArity = #fnArity r,
                 modTys = #modTys r,
+                tyAlias = #tyAlias r,
                 frames = (name :: frame) :: rest
               }
 
@@ -135,12 +157,47 @@ structure Env :> ENV = struct
       find (#fnArity r)
     end
 
-  fun lookupType (Env r) (ctx : {allowSelf : bool}) path =
+  fun registerValueAlias e localName targetName =
+    case e of
+      Env r =>
+        if dupModVal localName e then
+          raise Fail ("E0302: duplicate module-level value `" ^ localName ^ "`")
+        else
+          case lookupFnArity e targetName of
+            SOME ar =>
+              registerFnArity (registerModuleValue e localName) localName ar
+          | NONE =>
+              raise Fail
+                ("E0310: unknown import target `" ^ targetName ^ "` for value alias")
+
+  fun registerTypeAlias e from to =
+    case e of
+      Env r =>
+        if isPreludeType from then
+          raise Fail ("E0303: cannot use built-in type name as import alias")
+        else if hasTyAliasName e from orelse dupModTy from e then
+          raise Fail ("E0304: duplicate type `" ^ from ^ "`")
+        else if not (typeIsRegistered e to) then
+          raise Fail ("E0311: unknown type for import alias `" ^ to ^ "`")
+        else
+          Env
+            {
+              modVals = #modVals r,
+              fnArity = #fnArity r,
+              modTys = #modTys r,
+              tyAlias = (from, to) :: #tyAlias r,
+              frames = #frames r
+            }
+
+  fun lookupType (e as Env r) (ctx : {allowSelf : bool}) path =
     case path of
       [] => false
     | [ "Self" ] => #allowSelf ctx
     | [ t ] =>
-        isPreludeType t
-        orelse List.exists (fn n => String.compare (n, t) = EQUAL) (#modTys r)
+        let val canon = resolveCanonicalTy e t
+        in
+          isPreludeType canon
+          orelse List.exists (fn n => String.compare (n, canon) = EQUAL) (#modTys r)
+        end
     | _ => false
 end

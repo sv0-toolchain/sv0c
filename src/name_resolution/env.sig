@@ -12,6 +12,12 @@ signature ENV = sig
   (* Record arity for a module-level function (after registerModuleValue for same name). *)
   val registerFnArity : env -> string -> int -> env
 
+  (* Import `localName` as an alias for function/ctor `targetName` (e.g. lib__foo). *)
+  val registerValueAlias : env -> string -> string -> env
+
+  (* Import type name `localName` as alias for canonical mangled type `targetName`. *)
+  val registerTypeAlias : env -> string -> string -> env
+
   (* Open/close a block scope (fn body, ExprBlock, etc.). *)
   val enterScope : env -> env
   val exitScope : env -> env
@@ -24,6 +30,7 @@ signature ENV = sig
   (* Arity of a module-level function, if registered. *)
   val lookupFnArity : env -> string -> int option
 
-  (* Single-segment type paths, optional Self (impl bodies), and prelude primitives. *)
+  (* Single-segment type paths, optional Self (impl bodies), and prelude primitives.
+     Type aliases from `use` are resolved to their canonical name before lookup. *)
   val lookupType : env -> {allowSelf : bool} -> Ast.path -> bool
 end
