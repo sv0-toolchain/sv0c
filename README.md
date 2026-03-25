@@ -60,13 +60,17 @@ requires SML/NJ (tested with 110.99.9).
 
 ```bash
 make build         # compile all modules via CM
+make check         # CM compile only (fast smoke; no test_runner)
 make test          # run test suite (see test_runner for current count)
 make e2e           # emit C, compile with cc, run binary (exit code 42)
 make integration   # Rmd-style scenarios under test/integration/ (needs heap)
+make integration-vm # bytecode compile + sv0vm run (see parent repo `make ci`)
 make test-contract-runtime  # compile requires(false) fixture; expect exit 1
 make heap          # export heap image to build/sv0c
 make clean         # remove .cm cache and build artifacts
 ```
+
+VM backend: `Main.main ((), ["--target=vm", "path/to/file.sv0"])` writes `build/vm/<stem>.sv0b` (run via `sv0vm/scripts/run_sv0b.sml` with `SV0B` set).
 
 to run the compiler directly:
 
