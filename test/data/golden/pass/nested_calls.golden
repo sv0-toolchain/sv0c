@@ -1,0 +1,5 @@
+# Chained static helpers (names must remain C-safe).
+static int twice
+twice(_sv0t0)
+quadruple(3)
+!static int double

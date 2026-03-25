@@ -1,0 +1,3 @@
+# no_alias lowers to runtime pointer check before requires.
+sv0_no_alias
+(&a), (&b))

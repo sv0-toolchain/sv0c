@@ -528,17 +528,93 @@ structure TestRunner = struct
       fun writeBuild path content =
         let val outs = TextIO.openOut path
         in TextIO.output (outs, content); TextIO.closeOut outs end
+      (* Optional sidecars next to pass/*.sv0:
+         - pass/<stem>.golden — one non-empty, non-# line each: plain = required C substring;
+           leading `!` = forbidden substring (must not appear in emitted C).
+         - pass/<stem>.stdout — if present, program stdout (after trim) must equal this file (trimmed). *)
+      fun fileExists path =
+        let val ins = TextIO.openIn path
+        in TextIO.closeIn ins; true end
+        handle _ => false
+      fun trimBoth (s : string) =
+        let
+          val n = String.size s
+          fun isWS c =
+            c = #" " orelse c = #"\t" orelse c = #"\r" orelse c = #"\n"
+          fun left i =
+            if i < n andalso isWS (String.sub (s, i)) then left (i + 1) else i
+          fun right j =
+            if j > 0 andalso isWS (String.sub (s, j - 1)) then right (j - 1) else j
+          val i0 = left 0
+          val j0 = right n
+        in
+          if i0 >= j0 then "" else String.substring (s, i0, j0 - i0)
+        end
+      fun goldenSidecarCFrags stem =
+        let val p = "test/data/golden/pass/" ^ stem ^ ".golden"
+        in
+          if not (fileExists p) then ([], [])
+          else
+            let
+              val raw = readGolden p
+              fun lines [] (req, forbid) = (rev req, rev forbid)
+                | lines (#"\n" :: rest) acc = lines rest acc
+                | lines cs (req, forbid) =
+                    let
+                      fun take [] (got, rest) = (String.implode (rev got), rest)
+                        | take (#"\n" :: rest) (got, _) =
+                            (String.implode (rev got), rest)
+                        | take (c :: rest) (got, r) = take rest (c :: got, r)
+                      val (line, rest) = take cs ([], [])
+                      val t = trimBoth line
+                    in
+                      if t = "" orelse String.sub (t, 0) = #"#" then
+                        lines rest (req, forbid)
+                      else if String.sub (t, 0) = #"!" then
+                        let
+                          val neg =
+                            trimBoth (String.substring (t, 1, String.size t - 1))
+                        in
+                          if neg = "" then lines rest (req, forbid)
+                          else lines rest (req, neg :: forbid)
+                        end
+                      else lines rest (t :: req, forbid)
+                    end
+            in
+              lines (String.explode raw) ([], [])
+            end
+        end
       fun goldenPassCompileRun stem =
         let
-          val c =
-            compileToC (readGolden ("test/data/golden/pass/" ^ stem ^ ".sv0"))
+          val src = "test/data/golden/pass/" ^ stem ^ ".sv0"
+          val outExpect = "test/data/golden/pass/" ^ stem ^ ".stdout"
+          val c = compileToC (readGolden src)
+          val (frags, noFrags) = goldenSidecarCFrags stem
+          val cFragsOk =
+            List.all (fn frag => String.isSubstring frag c) frags
+            andalso List.all (fn frag => not (String.isSubstring frag c)) noFrags
           val () = writeBuild "build/golden_tmp.c" c
           val cmp =
             OS.Process.system
               ("cc -o build/golden_tmp_run build/golden_tmp.c -Iruntime runtime/sv0_runtime.c")
+          val linkOk = OS.Process.isSuccess cmp
+          val runOk =
+            if fileExists outExpect then
+              OS.Process.isSuccess
+                (OS.Process.system
+                   "./build/golden_tmp_run > build/golden_tmp_stdout.txt 2>&1")
+            else OS.Process.isSuccess (OS.Process.system "./build/golden_tmp_run")
+          val stdoutOk =
+            if not (fileExists outExpect) then true
+            else
+              let
+                val exp = trimBoth (readGolden outExpect)
+                val act = trimBoth (readGolden "build/golden_tmp_stdout.txt")
+              in
+                act = exp
+              end
         in
-          OS.Process.isSuccess cmp
-          andalso OS.Process.isSuccess (OS.Process.system "./build/golden_tmp_run")
+          cFragsOk andalso linkOk andalso runOk andalso stdoutOk
         end
         handle _ => false
       val () = check "golden pass forall_requires compile+run"
@@ -557,6 +633,8 @@ structure TestRunner = struct
                  (goldenPassCompileRun "nested_calls")
       val () = check "golden pass clamp_contract compile+run"
                  (goldenPassCompileRun "clamp_contract")
+      val () = check "golden pass println_ok compile+run+stdout"
+                 (goldenPassCompileRun "println_ok")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"
