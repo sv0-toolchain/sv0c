@@ -9,6 +9,7 @@ structure Ir = struct
     | VUnit
     | VVar of string
     | VMember of value * string
+    | VAddrOf of string (* &param for contract no_alias *)
 
   datatype instr =
       Nop

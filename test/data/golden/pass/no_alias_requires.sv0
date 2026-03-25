@@ -1,0 +1,8 @@
+fn sum(a: i32, b: i32) -> i32 requires(no_alias(&a, &b)) ensures(true) {
+  return a + b;
+}
+
+fn main() -> i32 {
+  let _s: i32 = sum(20, 22);
+  return 0;
+}

@@ -33,6 +33,7 @@ structure Codegen :> CODEGEN = struct
     | Ir.VString s => "\"" ^ cEscapeString s ^ "\""
     | Ir.VMember (Ir.VVar x, f) => x ^ "." ^ f
     | Ir.VMember (v2, f) => "(" ^ emitValue v2 ^ ")." ^ f
+    | Ir.VAddrOf x => "(&" ^ x ^ ")"
     | _ => raise Fail "value not supported in codegen slice"
 
   fun emitCallArgs (vs : Ir.value list) : string =

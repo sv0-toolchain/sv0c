@@ -7,6 +7,19 @@ structure Checker :> CHECKER = struct
 
   val loopDepth = ref 0
 
+  (* Set for the duration of checkContract on each requires/ensures expression. *)
+  val inContractExpr : bool ref = ref false
+  val contractParamNames : string list ref = ref []
+
+  fun withContractExpr (thunk : unit -> unit) : unit =
+    let val () = inContractExpr := true
+    in (thunk (); inContractExpr := false) handle ex =>
+      (inContractExpr := false; raise ex)
+    end
+
+  fun isContractParam (x : string) : bool =
+    List.exists (fn p => String.compare (p, x) = EQUAL) (!contractParamNames)
+
   fun withLoop (f : unit -> 'a) : 'a =
     let val () = loopDepth := !loopDepth + 1
         val r = f () handle ex => (loopDepth := !loopDepth - 1; raise ex)
@@ -275,8 +288,151 @@ structure Checker :> CHECKER = struct
          | _ => raise Fail "E0427: bad enum pattern path")
     | _ => raise Fail "E0428: pattern form not supported in match"
 
+  (* Multi-segment path calls: builtins, quantifiers, println, user fns. *)
+  fun synthExprCall (retTy : Types.ty) (env : venv) (segs : Ast.path)
+    (args : Ast.expr list) : Types.ty =
+    case segs of
+      ["old"] =>
+        if not (!inContractExpr) then
+          raise Fail
+            "E0521: old(...) is only allowed in requires/ensures (hint: place it in a contract clause)"
+        else
+          (case args of
+             [Ast.ExprPath ([x], _)] =>
+                   if not (isContractParam x) then
+                     raise Fail
+                       "E0522: old(...) argument must be a function parameter (hint: use a parameter name, not a local binding)"
+                   else
+                     lookup env x
+               | _ =>
+                   raise Fail
+                     "E0522: old(...) expects a single parameter name (hint: use old(x), not an expression such as old(x + 1))")
+    | ["forall"] =>
+        if not (!inContractExpr) then
+          raise Fail
+            "E0523: quantifiers are only allowed in requires/ensures (hint: forall(i in lo..hi, pred) with i32 range)"
+        else
+          (case args of
+             [Ast.ExprPath ([i], _), dom, body] =>
+               (case dom of
+                  Ast.ExprRange (SOME lo, SOME hi, _) =>
+                    let
+                      val () = expect (synth retTy env lo, Types.TyInt 32)
+                      val () = expect (synth retTy env hi, Types.TyInt 32)
+                      val envI = extend env i (Types.TyInt 32)
+                    in
+                      expect (synth retTy envI body, Types.TyBool);
+                      Types.TyBool
+                    end
+                | _ =>
+                    raise Fail
+                      "E0523: forall domain must be a half-open i32 range `lo..hi`")
+           | _ =>
+               raise Fail "E0523: forall expects `(i in lo..hi, predicate)`")
+    | ["exists"] =>
+        if not (!inContractExpr) then
+          raise Fail
+            "E0523: quantifiers are only allowed in requires/ensures (hint: exists(i in lo..hi, pred) with i32 range)"
+        else
+          (case args of
+             [Ast.ExprPath ([i], _), dom, body] =>
+               (case dom of
+                  Ast.ExprRange (SOME lo, SOME hi, _) =>
+                    let
+                      val () = expect (synth retTy env lo, Types.TyInt 32)
+                      val () = expect (synth retTy env hi, Types.TyInt 32)
+                      val envI = extend env i (Types.TyInt 32)
+                    in
+                      expect (synth retTy envI body, Types.TyBool);
+                      Types.TyBool
+                    end
+                | _ =>
+                    raise Fail
+                      "E0523: exists domain must be a half-open i32 range `lo..hi`")
+           | _ =>
+               raise Fail "E0523: exists expects `(i in lo..hi, predicate)`")
+    | ["no_alias"] =>
+        if not (!inContractExpr) then
+          raise Fail
+            "E0526: no_alias(...) is only allowed in requires/ensures (hint: no_alias is checked only in contract clauses; move it to requires or ensures)"
+        else
+          (case args of
+             [a, b] =>
+               let
+                 val ta = synth retTy env a
+                 val tb = synth retTy env b
+               in
+                 case (ta, tb) of
+                   (Types.TyRef t1, Types.TyRef t2) =>
+                     if Unify.unify (t1, t2) then Types.TyBool
+                     else
+                       raise Fail
+                         "E0524: no_alias expects two references to the same inner type"
+                 | (Types.TyRefMut t1, Types.TyRefMut t2) =>
+                     if Unify.unify (t1, t2) then Types.TyBool
+                     else
+                       raise Fail
+                         "E0524: no_alias expects two references to the same inner type"
+                 | (Types.TyRef t1, Types.TyRefMut t2) =>
+                     if Unify.unify (t1, t2) then Types.TyBool
+                     else
+                       raise Fail
+                         "E0524: no_alias expects two references to the same inner type"
+                 | (Types.TyRefMut t1, Types.TyRef t2) =>
+                     if Unify.unify (t1, t2) then Types.TyBool
+                     else
+                       raise Fail
+                         "E0524: no_alias expects two references to the same inner type"
+                 | _ =>
+                     raise Fail
+                       "E0524: no_alias expects `&x` / `&mut x` arguments of the same `T`"
+               end
+           | _ => raise Fail "E0524: no_alias expects exactly two arguments")
+    | [nm] =>
+        if String.compare (nm, "println") = EQUAL then
+          case args of
+            [Ast.ExprLit (Ast.StringLit _, _)] =>
+              (ignore (synth retTy env (List.hd args)); Types.TyUnit)
+          | _ =>
+              raise Fail
+                "E0444: println expects a single string literal argument (hint: println(\"text\"))"
+        else
+          let val k = pathKey segs
+          in
+            case lookup env k of
+              Types.TyFn (paramTys, outTy) =>
+                let
+                  fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
+                    | zipCheck (a :: ar) (t :: tr) =
+                        (expect (synth retTy env a, t); zipCheck ar tr)
+                    | zipCheck _ _ =
+                        raise Fail "E0413: arity mismatch in type checker"
+                in
+                  zipCheck args paramTys;
+                  outTy
+                end
+            | _ => raise Fail "E0412: call target is not a function"
+          end
+    | _ =>
+        let val k = pathKey segs
+        in
+          case lookup env k of
+            Types.TyFn (paramTys, outTy) =>
+              let
+                fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
+                  | zipCheck (a :: ar) (t :: tr) =
+                      (expect (synth retTy env a, t); zipCheck ar tr)
+                  | zipCheck _ _ =
+                      raise Fail "E0413: arity mismatch in type checker"
+              in
+                zipCheck args paramTys;
+                outTy
+              end
+          | _ => raise Fail "E0412: call target is not a function"
+        end
+
   (* retTy is the enclosing function's return type (for return/blocks in subexprs). *)
-  fun synth (retTy : Types.ty) (env : venv) (e : Ast.expr) : Types.ty =
+  and synth (retTy : Types.ty) (env : venv) (e : Ast.expr) : Types.ty =
     case e of
       Ast.ExprLit (Ast.IntLit _, _) => Types.TyInt 32
     | Ast.ExprLit (Ast.BoolLit _, _) => Types.TyBool
@@ -317,6 +473,32 @@ structure Checker :> CHECKER = struct
         (expect (synth retTy env e1, Types.TyBool); Types.TyBool)
     | Ast.ExprUnop (Ast.BitNot, e1, _) =>
         (expect (synth retTy env e1, Types.TyInt 32); Types.TyInt 32)
+    | Ast.ExprUnop (Ast.Borrow, e1, _) =>
+        if not (!inContractExpr) then
+          raise Fail
+            "E0525: `&` is only allowed in requires/ensures expressions (hint: use `&` only inside contract clauses, e.g. no_alias(&a, &b))"
+        else
+          (case e1 of
+             Ast.ExprPath ([x], _) =>
+               (case lookup env x of
+                  Types.TyFn _ =>
+                    raise Fail "E0525: cannot take address of a function in a contract"
+                | t => Types.TyRef t)
+           | _ =>
+               raise Fail "E0525: `&` in contracts requires a simple parameter name")
+    | Ast.ExprUnop (Ast.BorrowMut, e1, _) =>
+        if not (!inContractExpr) then
+          raise Fail
+            "E0525: `&mut` is only allowed in requires/ensures expressions (hint: use `&mut` only inside contract clauses)"
+        else
+          (case e1 of
+             Ast.ExprPath ([x], _) =>
+               (case lookup env x of
+                  Types.TyFn _ =>
+                    raise Fail "E0525: cannot take address of a function in a contract"
+                | t => Types.TyRefMut t)
+           | _ =>
+               raise Fail "E0525: `&mut` in contracts requires a simple parameter name")
     | Ast.ExprUnop _ =>
         raise Fail "E0402: unary operator not supported in type checker slice"
     | Ast.ExprBinop (b, l, r, _) =>
@@ -384,28 +566,7 @@ structure Checker :> CHECKER = struct
         if !loopDepth > 0 then Types.TyUnit
         else raise Fail "E0416: continue outside loop"
     | Ast.ExprCall (Ast.ExprPath (segs, _), args, _) =>
-        if case segs of [nm] => String.compare (nm, "println") = EQUAL | _ => false then
-          case args of
-            [Ast.ExprLit (Ast.StringLit _, _)] =>
-              (ignore (synth retTy env (List.hd args)); Types.TyUnit)
-          | _ => raise Fail "E0444: println expects a single string literal argument"
-        else
-          let val k = pathKey segs
-          in
-            case lookup env k of
-              Types.TyFn (paramTys, outTy) =>
-                let
-                  fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
-                    | zipCheck (a :: ar) (t :: tr) =
-                        (expect (synth retTy env a, t); zipCheck ar tr)
-                    | zipCheck _ _ =
-                        raise Fail "E0413: arity mismatch in type checker"
-                in
-                  zipCheck args paramTys;
-                  outTy
-                end
-            | _ => raise Fail "E0412: call target is not a function"
-          end
+        synthExprCall retTy env segs args
     | Ast.ExprStruct (path, fields, _) =>
         (case path of
            [sn] =>
@@ -577,7 +738,8 @@ structure Checker :> CHECKER = struct
 
   fun checkContract (env : venv) (retTy : Types.ty) (c : Ast.contract) : unit =
     case c of
-      Ast.Requires (e, _) => expect (synth Types.TyUnit env e, Types.TyBool)
+      Ast.Requires (e, _) =>
+        withContractExpr (fn () => expect (synth retTy env e, Types.TyBool))
     | Ast.Ensures (e, _) =>
         let
           val envR = extend env "result" retTy
@@ -585,7 +747,7 @@ structure Checker :> CHECKER = struct
           if Unify.unify (retTy, Types.TyUnit) andalso exprReferencesResult e then
             raise Fail "E0520: ensures cannot use result when return type is unit"
           else
-            expect (synth retTy envR e, Types.TyBool)
+            withContractExpr (fn () => expect (synth retTy envR e, Types.TyBool))
         end
     | Ast.LoopInvariant _ =>
         raise Fail "E0502: loop_invariant not type-checked in this slice"
@@ -673,7 +835,14 @@ structure Checker :> CHECKER = struct
                   | NONE => raise Fail "E0406: unknown parameter type")
              | _ => raise Fail "E0410: parameters must be simple bindings here")
           modEnv (#params r)
-      val () = app (checkContract env1 retTy) (#contracts r)
+      val paramNames =
+        List.mapPartial
+          (fn (p, _) =>
+             case p of Ast.PatBind (x, _) => SOME x | _ => NONE) (#params r)
+      val () = contractParamNames := paramNames
+      val () =
+        (app (checkContract env1 retTy) (#contracts r); contractParamNames := [])
+        handle ex => (contractParamNames := []; raise ex)
     in
       checkExprAsBody env1 retTy (#body r)
     end

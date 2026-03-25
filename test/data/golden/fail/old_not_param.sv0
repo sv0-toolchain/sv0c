@@ -1,0 +1,3 @@
+fn f(x: i32) -> i32 requires(old(x + 1) == 0) ensures(true) {
+  return x;
+}

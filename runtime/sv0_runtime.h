@@ -38,6 +38,11 @@ static inline void sv0_ensures(bool cond, const char *fn_name) {
     }
 }
 
+/* Phase 9: pointer inequality (runtime approximation of no_alias) */
+static inline bool sv0_no_alias(const void *a, const void *b) {
+    return a != b;
+}
+
 /* I/O (Phase 6): single string argument, newline appended */
 static inline void sv0_println(const char *s) {
     printf("%s\n", s);

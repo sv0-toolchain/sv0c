@@ -472,6 +472,73 @@ structure TestRunner = struct
       val () = check "e2e C try operator on enum"
                  (String.isSubstring ".tag" cTry
                   andalso String.isSubstring "return" cTry)
+      val cNoAlias =
+        compileToC
+          ("fn sum(a: i32, b: i32) -> i32 requires(no_alias(&a, &b)) ensures(true) { return a + b; }" ^ nl ^
+           "fn main() -> i32 { return sum(10, 32); }")
+      val () = check "e2e C contract no_alias lowers to sv0_no_alias"
+                 (String.isSubstring "sv0_no_alias" cNoAlias
+                  andalso String.isSubstring "(&" cNoAlias)
+      val cOldSnap =
+        compileToC
+          ("fn inc(x: i32) -> i32 requires(true) ensures(result == old(x) + 1) { return x + 1; }" ^ nl ^
+           "fn main() -> i32 { return inc(40); }")
+      val () = check "e2e C ensures old(x) emits _sv0old_ snapshot"
+                 (String.isSubstring "_sv0old_x" cOldSnap)
+      val cForall =
+        compileToC
+          "fn main() -> i32 requires(forall(i in 0..2, i >= 0)) ensures(true) { return 42; }"
+      val () = check "e2e C forall in requires lowers to while loop"
+                 (String.isSubstring "while (" cForall)
+
+      (* --- golden: file-based contract / Phase 9 --- *)
+      val () = print "\n[golden]\n"
+      fun readGolden rel =
+        let
+          val i = TextIO.openIn rel
+          val s = TextIO.inputAll i
+          val () = TextIO.closeIn i
+        in
+          s
+        end
+      fun goldenFail stem want =
+        case checkCatch (readGolden ("test/data/golden/fail/" ^ stem ^ ".sv0")) of
+          SOME m =>
+            String.isSubstring want m
+            andalso String.isSubstring "hint:" m
+          | NONE => false
+      val () = check "golden fail borrow_in_body E0525 + hint"
+                 (goldenFail "borrow_in_body" "E0525")
+      val () = check "golden fail old_in_body E0521 + hint"
+                 (goldenFail "old_in_body" "E0521")
+      val () = check "golden fail no_alias_in_body E0526 + hint"
+                 (goldenFail "no_alias_in_body" "E0526")
+      val () = check "golden fail old_not_param E0522 + hint"
+                 (goldenFail "old_not_param" "E0522")
+      fun writeBuild path content =
+        let val outs = TextIO.openOut path
+        in TextIO.output (outs, content); TextIO.closeOut outs end
+      fun goldenPassCompileRun stem =
+        let
+          val c =
+            compileToC (readGolden ("test/data/golden/pass/" ^ stem ^ ".sv0"))
+          val () = writeBuild "build/golden_tmp.c" c
+          val cmp =
+            OS.Process.system
+              ("cc -o build/golden_tmp_run build/golden_tmp.c -Iruntime runtime/sv0_runtime.c")
+        in
+          OS.Process.isSuccess cmp
+          andalso OS.Process.isSuccess (OS.Process.system "./build/golden_tmp_run")
+        end
+        handle _ => false
+      val () = check "golden pass forall_requires compile+run"
+                 (goldenPassCompileRun "forall_requires")
+      val () = check "golden pass exists_requires compile+run"
+                 (goldenPassCompileRun "exists_requires")
+      val () = check "golden pass old_ensures compile+run"
+                 (goldenPassCompileRun "old_ensures")
+      val () = check "golden pass no_alias_requires compile+run"
+                 (goldenPassCompileRun "no_alias_requires")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"
