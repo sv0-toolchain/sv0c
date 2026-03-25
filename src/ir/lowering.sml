@@ -46,6 +46,14 @@ structure Lowering :> LOWERING = struct
     | Ast.TyName (["unit"], _) => "void"
     | Ast.TyName (["i32"], _) => "int"
     | Ast.TyName (["bool"], _) => "int"
+    | Ast.TyName (["i8"], _) => "int8_t"
+    | Ast.TyName (["u8"], _) => "uint8_t"
+    | Ast.TyName (["i16"], _) => "int16_t"
+    | Ast.TyName (["u16"], _) => "uint16_t"
+    | Ast.TyName (["i64"], _) => "int64_t"
+    | Ast.TyName (["u64"], _) => "uint64_t"
+    | Ast.TyName (["isize"], _) => "intptr_t"
+    | Ast.TyName (["usize"], _) => "uintptr_t"
     | Ast.TyName ([n], _) => n
     | _ => "int"
 
@@ -65,6 +73,7 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprPath ([a, _], _) => a
     | Ast.ExprCall (Ast.ExprPath ([f], _), _, _) => calleeRetCty f
     | Ast.ExprCall (Ast.ExprPath ([en, _], _), _, _) => en
+    | Ast.ExprTuple ([e1], _) => exprInitCty e1
     | Ast.ExprLit (Ast.BoolLit _, _) => "int"
     | Ast.ExprLit (Ast.IntLit _, _) => "int"
     | _ => "int"
@@ -80,6 +89,7 @@ structure Lowering :> LOWERING = struct
                 SOME (_, aty) => astTyToCString aty
               | NONE => "int"))
     | Ast.ExprCall (Ast.ExprPath ([f], _), _, _) => calleeRetCty f
+    | Ast.ExprTuple ([e1], _) => matchScrutCty e1
     | Ast.ExprLit (Ast.BoolLit _, _) => "int"
     | Ast.ExprLit (Ast.IntLit _, _) => "int"
     | _ => "int"
@@ -130,7 +140,14 @@ structure Lowering :> LOWERING = struct
       Ast.IntLit i => Ir.VInt i
     | Ast.BoolLit b => Ir.VBool b
     | Ast.UnitLit => Ir.VUnit
+    | Ast.StringLit s => Ir.VString s
     | _ => raise Fail "literal not supported in lowering slice"
+
+  fun okPayloadCty (en : string) : string =
+    case findVariantAst en "Ok" of
+      Ast.VariantTuple (_, [aty], _) => astTyToCString aty
+    | _ =>
+        raise Fail "lowering: `?` requires Ok(T) with exactly one payload field"
 
   fun scanLets (stmts : Ast.stmt list) : (string * string) list =
     List.concat (
@@ -183,9 +200,12 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprField (e1, _, _) => mentionsResult e1
     | Ast.ExprStruct (_, fs, _) =>
         List.exists (mentionsResult o #2) fs
+    | Ast.ExprTuple (es, _) => List.exists mentionsResult es
     | Ast.ExprBreak (NONE, _) => false
     | Ast.ExprBreak (SOME e, _) => mentionsResult e
     | Ast.ExprContinue _ => false
+    | Ast.ExprCast (e1, _, _) => mentionsResult e1
+    | Ast.ExprTry (e1, _) => mentionsResult e1
     | _ => false
 
   fun unopToC (u : Ast.unop) : string =
@@ -276,6 +296,7 @@ structure Lowering :> LOWERING = struct
                  let val (i2, v2) = lowerExprToValue e2 in (is @ i2, v2) end
              | NONE => (is, Ir.VUnit) end)
     | Ast.ExprLit (l, _) => ([], lowerLit l)
+    | Ast.ExprTuple ([e1], _) => lowerExprToValue e1
     | Ast.ExprPath ([x], _) =>
         (case !ensuresResultSlot of
            SOME rs =>
@@ -310,6 +331,8 @@ structure Lowering :> LOWERING = struct
           ( [Ir.DeclNamed (en, t)] @ enumConstructInstrs t en vn args
           , Ir.VVar t)
         end
+    | Ast.ExprCall (Ast.ExprPath (["println"], _), [Ast.ExprLit (Ast.StringLit s, _)], _) =>
+        ([Ir.Call (NONE, "sv0_println", [Ir.VString s], "void")], Ir.VUnit)
     | Ast.ExprCall (Ast.ExprPath ([callee], _), args, _) =>
         let
           fun oneArg a =
@@ -345,6 +368,44 @@ structure Lowering :> LOWERING = struct
           val t = freshTmp ()
         in
           (i @ [Ir.Assign (t, Ir.Unop (unopToC u, v))], Ir.VVar t)
+        end
+    | Ast.ExprCast (e1, tgtAst, _) =>
+        let
+          val cty = astTyToCString tgtAst
+          val castOp = "(" ^ cty ^ ")"
+          val (i1, v1) = lowerExprToValue e1
+          val t = freshTmp ()
+        in
+          if cty = "int" then
+            (i1 @ [Ir.Assign (t, Ir.Unop (castOp, v1))], Ir.VVar t)
+          else
+            ( i1 @ [Ir.DeclNamed (cty, t), Ir.Store (t, Ir.Unop (castOp, v1))]
+            , Ir.VVar t)
+        end
+    | Ast.ExprTry (e1, _) =>
+        let
+          val en = matchScrutCty e1
+          val () =
+            if en = "int" orelse en = "void" then
+              raise Fail "lowering: `?` expected enum-typed expression"
+            else
+              ()
+          val errK = IntInf.fromInt (enumTag en "Err")
+          val pCty = okPayloadCty en
+          val (i1, ee) = lowerExprWithInstrs e1
+          val u = freshTmp ()
+          val out = freshTmp ()
+          val declOut =
+            if pCty = "int" then [Ir.DeclVar out] else [Ir.DeclNamed (pCty, out)]
+          val cond =
+            Ir.Binop ("==", Ir.VMember (Ir.VVar u, "tag"), Ir.VInt errK)
+          val retErr = [Ir.Return (SOME (Ir.VVar u))]
+          val takeOk = [Ir.Store (out, Ir.FieldAccess (Ir.VVar u, "p0"))]
+        in
+          (* Declare payload slot before if/else so it is in scope after `?`. *)
+          ( i1 @ [Ir.DeclNamed (en, u), Ir.Store (u, ee)] @ declOut
+            @ [Ir.IfElse (cond, retErr, takeOk)]
+          , Ir.VVar out)
         end
     | Ast.ExprIf (c, th, SOME el, _) =>
         let
@@ -389,6 +450,7 @@ structure Lowering :> LOWERING = struct
                  let val (i2, rhs) = lowerExprWithInstrs e2 in (is @ i2, rhs) end
              | NONE => (is, Ir.Literal Ir.VUnit) end)
     | Ast.ExprLit (l, _) => ([], Ir.Literal (lowerLit l))
+    | Ast.ExprTuple ([e1], _) => lowerExprWithInstrs e1
     | Ast.ExprPath ([x], _) =>
         (case !ensuresResultSlot of
            SOME rs =>
@@ -416,6 +478,7 @@ structure Lowering :> LOWERING = struct
                SOME e2 => is @ lowerIntoVarInstrs e2 t
              | NONE => is @ [Ir.Store (t, Ir.Literal Ir.VUnit)] end)
     | Ast.ExprLit (l, _) => [Ir.Store (t, Ir.Literal (lowerLit l))]
+    | Ast.ExprTuple ([e1], _) => lowerIntoVarInstrs e1 t
     | Ast.ExprPath ([x], _) =>
         (case !ensuresResultSlot of
            SOME rs =>
@@ -522,8 +585,16 @@ structure Lowering :> LOWERING = struct
           | Ast.ExprPath ([en, vn], _) =>
               [Ir.DeclNamed (en, x)] @ enumConstructInstrs x en vn []
           | _ =>
-              let val (instrs, rhs) = lowerExprWithInstrs init
-              in instrs @ [Ir.Assign (x, rhs)] end
+              let
+                val (instrs, rhs) = lowerExprWithInstrs init
+                val cty =
+                  case to of
+                    SOME at => astTyToCString at
+                  | NONE => exprInitCty init
+              in
+                if cty = "int" then instrs @ [Ir.Assign (x, rhs)]
+                else instrs @ [Ir.DeclNamed (cty, x), Ir.Store (x, rhs)]
+              end
         end
     | Ast.StmtSemi (Ast.ExprReturn (SOME e, _), _) => lowerReturn e
     | Ast.StmtSemi (Ast.ExprReturn (NONE, _), _) => [Ir.Return NONE]

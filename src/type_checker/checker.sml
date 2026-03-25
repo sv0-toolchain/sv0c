@@ -112,6 +112,22 @@ structure Checker :> CHECKER = struct
     if Unify.unify (got, want) then ()
     else raise Fail "E0400: type mismatch"
 
+  fun isIntegralTy (t : Types.ty) : bool =
+    case t of
+      Types.TyInt _ => true
+    | Types.TyUint _ => true
+    | Types.TyIsize => true
+    | Types.TyUsize => true
+    | _ => false
+
+  (* `?` on TyEnum en: must match fn return type; Ok/Err each carry one field. *)
+  fun okErrPayloadTys (en : string) : Types.ty * Types.ty =
+    case (variantShapeOf en "Ok", variantShapeOf en "Err") of
+      (VSTuple [tOk], VSTuple [tErr]) => (tOk, tErr)
+    | _ =>
+        raise Fail
+          "E0441: `?` requires variants Ok(T) and Err(E) with exactly one field each"
+
   fun initTypes (prog : Ast.program) : unit =
     let
       val structs = List.mapPartial (fn Ast.ItemStruct r => SOME r | _ => NONE) prog
@@ -176,7 +192,7 @@ structure Checker :> CHECKER = struct
         let
           fun go [] _ = ()
             | go (x :: xs) seen =
-                if List.exists (fn y => y = x) seen then
+                if List.exists (fn y => String.compare (y, x) = EQUAL) seen then
                   raise Fail "E0423: duplicate variant in enum"
                 else
                   go xs (x :: seen)
@@ -265,6 +281,10 @@ structure Checker :> CHECKER = struct
       Ast.ExprLit (Ast.IntLit _, _) => Types.TyInt 32
     | Ast.ExprLit (Ast.BoolLit _, _) => Types.TyBool
     | Ast.ExprLit (Ast.UnitLit, _) => Types.TyUnit
+    | Ast.ExprLit (Ast.StringLit _, _) => Types.TyString
+    | Ast.ExprTuple ([e1], _) => synth retTy env e1
+    | Ast.ExprTuple _ =>
+        raise Fail "E0446: multi-element tuples are not supported in this slice"
     | Ast.ExprPath ([x], _) =>
         (case lookup env x of
            Types.TyFn _ =>
@@ -364,22 +384,28 @@ structure Checker :> CHECKER = struct
         if !loopDepth > 0 then Types.TyUnit
         else raise Fail "E0416: continue outside loop"
     | Ast.ExprCall (Ast.ExprPath (segs, _), args, _) =>
-        let val k = pathKey segs
-        in
-          case lookup env k of
-            Types.TyFn (paramTys, outTy) =>
-              let
-                fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
-                  | zipCheck (a :: ar) (t :: tr) =
-                      (expect (synth retTy env a, t); zipCheck ar tr)
-                  | zipCheck _ _ =
-                      raise Fail "E0413: arity mismatch in type checker"
-              in
-                zipCheck args paramTys;
-                outTy
-              end
-          | _ => raise Fail "E0412: call target is not a function"
-        end
+        if case segs of [nm] => String.compare (nm, "println") = EQUAL | _ => false then
+          case args of
+            [Ast.ExprLit (Ast.StringLit _, _)] =>
+              (ignore (synth retTy env (List.hd args)); Types.TyUnit)
+          | _ => raise Fail "E0444: println expects a single string literal argument"
+        else
+          let val k = pathKey segs
+          in
+            case lookup env k of
+              Types.TyFn (paramTys, outTy) =>
+                let
+                  fun zipCheck ([] : Ast.expr list) ([] : Types.ty list) = ()
+                    | zipCheck (a :: ar) (t :: tr) =
+                        (expect (synth retTy env a, t); zipCheck ar tr)
+                    | zipCheck _ _ =
+                        raise Fail "E0413: arity mismatch in type checker"
+                in
+                  zipCheck args paramTys;
+                  outTy
+                end
+            | _ => raise Fail "E0412: call target is not a function"
+          end
     | Ast.ExprStruct (path, fields, _) =>
         (case path of
            [sn] =>
@@ -450,6 +476,39 @@ structure Checker :> CHECKER = struct
               if List.all (fn u => Unify.unify (t, u)) ts then t
               else raise Fail "E0400: type mismatch"
         end
+    | Ast.ExprCast (e1, tgtAst, _) =>
+        let
+          val tSrc = synth retTy env e1
+          val tTgt =
+            case astTyToTy tgtAst of
+              SOME t => t
+            | NONE => raise Fail "E0406: unknown type in as-cast target"
+        in
+          if isIntegralTy tSrc andalso isIntegralTy tTgt then tTgt
+          else raise Fail "E0440: as-cast is only supported between integral types"
+        end
+    | Ast.ExprTry (e1, _) =>
+        let val tScr = synth retTy env e1
+        in
+          case tScr of
+            Types.TyEnum en =>
+              let
+                val () =
+                  case retTy of
+                    Types.TyEnum en2 =>
+                      if en = en2 then ()
+                      else
+                        raise Fail
+                          "E0442: `?` scrutinee enum must match function return type"
+                  | _ =>
+                      raise Fail
+                        "E0443: `?` requires the enclosing function to return the same enum type"
+                val (tOk, _) = okErrPayloadTys en
+              in
+                tOk
+              end
+          | _ => raise Fail "E0445: `?` operand must be an enum (Ok/Err shape)"
+        end
     | _ =>
         raise Fail "E0402: expression form not supported in type checker slice"
 
@@ -508,9 +567,12 @@ structure Checker :> CHECKER = struct
     | Ast.ExprField (e1, _, _) => exprReferencesResult e1
     | Ast.ExprStruct (_, fs, _) =>
         List.exists (exprReferencesResult o #2) fs
+    | Ast.ExprTuple (es, _) => List.exists exprReferencesResult es
     | Ast.ExprBreak (NONE, _) => false
     | Ast.ExprBreak (SOME e, _) => exprReferencesResult e
     | Ast.ExprContinue _ => false
+    | Ast.ExprCast (e1, _, _) => exprReferencesResult e1
+    | Ast.ExprTry (e1, _) => exprReferencesResult e1
     | _ => false
 
   fun checkContract (env : venv) (retTy : Types.ty) (c : Ast.contract) : unit =
@@ -577,12 +639,13 @@ structure Checker :> CHECKER = struct
           Ast.ItemFn r => extend acc (#name r) (itemFnTy r)
         | _ => acc
       val acc0 = List.foldl one [] prog
+      val acc1 = extend acc0 "println" (Types.TyFn ([Types.TyString], Types.TyUnit))
     in
       List.foldl
         (fn ((en, vars), acc) =>
            List.foldl
              (fn ((vn, sh), a) =>
-                extend a (pathKey [en, vn]) (ctorTy en sh)) acc vars) acc0
+                extend a (pathKey [en, vn]) (ctorTy en sh)) acc vars) acc1
         (!enumDefs)
     end
 

@@ -299,9 +299,15 @@ structure Resolver :> RESOLVER = struct
     | Ast.ItemUse _ => env
     | Ast.ItemModule _ => env
 
+  fun withIntrinsics (e : Env.env) : Env.env =
+    Env.registerFnArity
+      (Env.registerModuleValue e "println") "println" 1
+
   fun resolve (prog : Ast.program) : Ast.program =
     let
-      val env0 = List.foldl (fn (it, acc) => registerItem acc it) Env.empty prog
+      (* Intrinsics first so user `fn println` collides with E0302 (reserved). *)
+      val env0 =
+        List.foldl (fn (it, acc) => registerItem acc it) (withIntrinsics Env.empty) prog
       val ctx0 : ctx = { allowSelf = false }
       val () = app (resolveTopItem ctx0 env0) prog
     in
