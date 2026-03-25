@@ -1,0 +1,15 @@
+fn twice(x: i32) -> i32 {
+  return x + x;
+}
+
+fn quadruple(x: i32) -> i32 {
+  return twice(twice(x));
+}
+
+fn main() -> i32 {
+  if quadruple(3) == 12 {
+    return 0;
+  } else {
+    return 1;
+  }
+}

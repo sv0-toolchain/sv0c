@@ -1,0 +1,4 @@
+fn main() -> i32 {
+  let _b: bool = exists(i in 0..4, i == 2);
+  return 0;
+}
