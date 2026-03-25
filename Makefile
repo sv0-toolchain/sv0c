@@ -3,13 +3,18 @@ ML_BUILD := ml-build
 HEAP     := sv0c
 CC       ?= cc
 
-.PHONY: build test heap clean e2e test-contract-runtime integration
+.PHONY: build test check heap clean e2e test-contract-runtime integration integration-vm
 
 build:
 	echo 'CM.make "sources.cm";' | $(SML)
 
 test:
 	echo 'CM.make "sources.cm"; use "test/test_runner.sml";' | $(SML)
+
+check:
+	@tmp=$$(mktemp); echo 'CM.make "sources.cm";' | $(SML) >$$tmp 2>&1; \
+	  if grep -q 'Error:' $$tmp; then tail -40 $$tmp; rm -f $$tmp; exit 1; fi; \
+	  rm -f $$tmp
 
 heap:
 	mkdir -p build
@@ -33,6 +38,9 @@ test-contract-runtime: build/contract_requires_fail.c
 
 integration: heap
 	"$(CURDIR)/../task/sv0c-milestone-1/02-integration-test.sh"
+
+integration-vm:
+	bash "$(CURDIR)/../task/sv0vm-milestone-2/02-integration-test.sh"
 
 clean:
 	rm -rf .cm build

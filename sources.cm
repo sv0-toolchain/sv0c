@@ -46,6 +46,11 @@ Group is
   src/backend/c/codegen.sig
   src/backend/c/codegen.sml
 
+  (* VM backend *)
+  src/backend/vm/bytecode.sml
+  src/backend/vm/vm_codegen.sig
+  src/backend/vm/vm_codegen.sml
+
   (* multi-file link / name mangling *)
   src/link/link.sig
   src/link/link.sml
