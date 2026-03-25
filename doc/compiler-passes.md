@@ -2,6 +2,8 @@
 
 This document summarizes what each pipeline stage does today and how errors are reported.
 
+It aligns with the pipeline stages in the [sv0 compiler vision and design](http://development.sasankvishnubhatla.net/tcowmbh/task/sv0-compiler-vision-and-design.html) document (lexer → parser → name resolution → type checker → contract analysis → **sv0-IR** → backends). **Note:** the vision describes **SSA-form** IR for analysis and optimization; the Milestone 1 compiler lowers to an **imperative IR** with labeled blocks (`Ir.program`). SSA remains future work; the C backend consumes this IR today.
+
 ## Pipeline order
 
 1. **Lexer** (`Lexer.tokenize`) — Characters to located tokens. Lexical errors are not yet classified with E01xx codes in all cases.
