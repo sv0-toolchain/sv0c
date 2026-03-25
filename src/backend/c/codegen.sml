@@ -4,6 +4,25 @@ structure Codegen :> CODEGEN = struct
 
   fun intLit (i : IntInf.int) : string = IntInf.toString i
 
+  fun cEscapeString (s : string) : string =
+    let
+      val n = String.size s
+      fun one i =
+        case String.sub (s, i) of
+          #"\"" => "\\\""
+        | #"\\" => "\\\\"
+        | #"\n" => "\\n"
+        | #"\t" => "\\t"
+        | #"\r" => "\\r"
+        | c =>
+            if Char.ord c < 32 then
+              "\\" ^ Int.toString (Char.ord c)
+            else
+              String.str c
+    in
+      String.concat (List.tabulate (n, one))
+    end
+
   fun emitValue (v : Ir.value) : string =
     case v of
       Ir.VInt i => intLit i
@@ -11,6 +30,7 @@ structure Codegen :> CODEGEN = struct
     | Ir.VBool false => "0"
     | Ir.VVar x => x
     | Ir.VUnit => "0"
+    | Ir.VString s => "\"" ^ cEscapeString s ^ "\""
     | Ir.VMember (Ir.VVar x, f) => x ^ "." ^ f
     | Ir.VMember (v2, f) => "(" ^ emitValue v2 ^ ")." ^ f
     | _ => raise Fail "value not supported in codegen slice"
@@ -25,6 +45,7 @@ structure Codegen :> CODEGEN = struct
     | Ir.Binop (opStr, v1, v2) =>
         "(" ^ emitValue v1 ^ " " ^ opStr ^ " " ^ emitValue v2 ^ ")"
     | Ir.Unop (opStr, v) => "(" ^ opStr ^ emitValue v ^ ")"
+    | Ir.FieldAccess (v, f) => "(" ^ emitValue v ^ ")." ^ f
     | _ => raise Fail "expression not supported in codegen slice"
 
   fun emitParamList (ps : (string * string) list) : string =

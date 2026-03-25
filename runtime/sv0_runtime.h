@@ -38,4 +38,9 @@ static inline void sv0_ensures(bool cond, const char *fn_name) {
     }
 }
 
+/* I/O (Phase 6): single string argument, newline appended */
+static inline void sv0_println(const char *s) {
+    printf("%s\n", s);
+}
+
 #endif /* SV0_RUNTIME_H */

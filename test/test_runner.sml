@@ -370,6 +370,31 @@ structure TestRunner = struct
                  (checkCatch
                     "fn main() -> i32 { return match true { true => 1, false => 0 }; }" =
                     NONE)
+      val () = check "checker accepts integral as-cast"
+                 (checkCatch
+                    "fn main() -> i32 { return (1000 as i16) as i32; }" = NONE)
+      val () = check "checker rejects as-cast from bool"
+                 (case checkCatch "fn main() -> i32 { return true as i32; }" of
+                    SOME _ => true
+                  | NONE => false)
+      val () = check "checker accepts println string literal"
+                 (checkCatch "fn main() -> unit { println(\"x\"); }" = NONE)
+      val () = check "checker rejects println non-literal"
+                 (case checkCatch "fn main() -> unit { println(1); }" of
+                    SOME _ => true
+                  | NONE => false)
+      val () = check "checker accepts ? with matching enum return"
+                 (checkCatch
+                    ("enum R { Ok(i32), Err(i32) }" ^ nl ^
+                     "fn okv() -> R { return R::Ok(3); }" ^ nl ^
+                     "fn main() -> R { let x = okv()?; return R::Ok(x); }") = NONE)
+      val () = check "checker rejects ? when return type is not that enum"
+                 (case checkCatch
+                        ("enum R { Ok(i32), Err(i32) }" ^ nl ^
+                         "fn k() -> R { return R::Ok(1); }" ^ nl ^
+                         "fn main() -> i32 { return k()?; }") of
+                    SOME _ => true
+                  | NONE => false)
 
       (* --- end-to-end (parse through C string) --- *)
       val () = print "\n[e2e]\n"
@@ -430,6 +455,23 @@ structure TestRunner = struct
                  (String.isSubstring ".tag" cEnum
                   andalso String.isSubstring "if (" cEnum
                   andalso String.isSubstring "= 9" cEnum)
+      val cCast =
+        compileToC "fn main() -> i32 { return (1000 as i16) as i32; }"
+      val () = check "e2e C integral as-cast"
+                 (String.isSubstring "int16_t" cCast
+                  andalso String.isSubstring "int main" cCast)
+      val cPrint = compileToC "fn main() -> unit { println(\"hi\"); }"
+      val () = check "e2e C println intrinsic"
+                 (String.isSubstring "sv0_println" cPrint
+                  andalso String.isSubstring "\"hi\"" cPrint)
+      val cTry =
+        compileToC
+          ("enum R { Ok(i32), Err(i32) }" ^ nl ^
+           "fn okv() -> R { return R::Ok(7); }" ^ nl ^
+           "fn main() -> R { let x = okv()?; return R::Ok(x); }")
+      val () = check "e2e C try operator on enum"
+                 (String.isSubstring ".tag" cTry
+                  andalso String.isSubstring "return" cTry)
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"
