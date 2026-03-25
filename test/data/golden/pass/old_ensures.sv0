@@ -1,0 +1,8 @@
+fn inc(x: i32) -> i32 requires(true) ensures(result == old(x) + 1) {
+  return x + 1;
+}
+
+fn main() -> i32 {
+  let _v: i32 = inc(41);
+  return 0;
+}

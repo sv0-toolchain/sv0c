@@ -48,6 +48,12 @@ structure Resolver :> RESOLVER = struct
     | Ast.ExprUnop (_, e1, _) => resolveExpr ctx env e1
     | Ast.ExprBinop (_, a, b, _) =>
         (resolveExpr ctx env a; resolveExpr ctx env b)
+    | Ast.ExprCall (Ast.ExprPath (["forall"], _), [Ast.ExprPath ([i], _), dom, body], _) =>
+        ( resolveExpr ctx env dom
+        ; resolveExpr ctx (Env.bindLocal env i) body)
+    | Ast.ExprCall (Ast.ExprPath (["exists"], _), [Ast.ExprPath ([i], _), dom, body], _) =>
+        ( resolveExpr ctx env dom
+        ; resolveExpr ctx (Env.bindLocal env i) body)
     | Ast.ExprCall (f, args, _) =>
         let
           val () =
@@ -300,12 +306,19 @@ structure Resolver :> RESOLVER = struct
     | Ast.ItemModule _ => env
 
   fun withIntrinsics (e : Env.env) : Env.env =
-    Env.registerFnArity
-      (Env.registerModuleValue e "println") "println" 1
+    let
+      val e1 =
+        Env.registerFnArity (Env.registerModuleValue e "println") "println" 1
+      val e2 = Env.registerFnArity (Env.registerModuleValue e1 "old") "old" 1
+      val e3 = Env.registerFnArity (Env.registerModuleValue e2 "forall") "forall" 3
+      val e4 = Env.registerFnArity (Env.registerModuleValue e3 "exists") "exists" 3
+    in
+      Env.registerFnArity (Env.registerModuleValue e4 "no_alias") "no_alias" 2
+    end
 
   fun resolve (prog : Ast.program) : Ast.program =
     let
-      (* Intrinsics first so user `fn println` collides with E0302 (reserved). *)
+      (* Intrinsics first so user `fn println` / `fn old` / … collides with E0302 (reserved). *)
       val env0 =
         List.foldl (fn (it, acc) => registerItem acc it) (withIntrinsics Env.empty) prog
       val ctx0 : ctx = { allowSelf = false }

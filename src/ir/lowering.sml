@@ -199,7 +199,7 @@ structure Lowering :> LOWERING = struct
              orelse mentionsResult bd) arms
     | Ast.ExprField (e1, _, _) => mentionsResult e1
     | Ast.ExprStruct (_, fs, _) =>
-        List.exists (mentionsResult o #2) fs
+        List.exists (fn (_, fe) => mentionsResult fe) fs
     | Ast.ExprTuple (es, _) => List.exists mentionsResult es
     | Ast.ExprBreak (NONE, _) => false
     | Ast.ExprBreak (SOME e, _) => mentionsResult e
@@ -213,7 +213,59 @@ structure Lowering :> LOWERING = struct
       Ast.Neg => "-"
     | Ast.Not => "!"
     | Ast.BitNot => "~"
-    | _ => raise Fail "unop not supported in lowering slice"
+    | Ast.Borrow => "&"
+    | Ast.BorrowMut => "&"
+    | _ =>
+        raise Fail
+          "E0540: lowering: unary operator not supported (use `&` only in contracts)"
+
+  fun oldSlot (x : string) : string = "_sv0old_" ^ x
+
+  (* Parameter names referenced by old(x) in a contract expression. *)
+  fun allOldNames (e : Ast.expr) : string list =
+    let
+      fun go ex =
+        case ex of
+          Ast.ExprCall (Ast.ExprPath (["old"], _), [Ast.ExprPath ([x], _)], _) => [x]
+        | Ast.ExprLit _ => []
+        | Ast.ExprPath _ => []
+        | Ast.ExprBinop (_, l, r, _) => go l @ go r
+        | Ast.ExprUnop (_, e1, _) => go e1
+        | Ast.ExprCall (f, args, _) => go f @ List.concat (map go args)
+        | Ast.ExprIf (c, th, el, _) =>
+            go c @ go th @ (case el of SOME z => go z | NONE => [])
+        | Ast.ExprTuple (es, _) => List.concat (map go es)
+        | Ast.ExprRange (a, b, _) =>
+            (case a of SOME z => go z | NONE => [])
+            @ (case b of SOME z => go z | NONE => [])
+        | Ast.ExprField (e1, _, _) => go e1
+        | Ast.ExprStruct (_, fs, _) =>
+            List.concat (map (fn (_, fe) => go fe) fs)
+        | Ast.ExprWhile (c, invs, b, _) =>
+            go c @ List.concat (map go invs) @ go b
+        | Ast.ExprFor (_, it, b, _) => go it @ go b
+        | Ast.ExprLoop (b, _) => go b
+        | Ast.ExprMatch (scr, arms, _) =>
+            go scr
+            @ List.concat (
+                map (fn Ast.Arm (_, g, bd) =>
+                  (case g of SOME ge => go ge | NONE => []) @ go bd) arms)
+        | Ast.ExprCast (e1, _, _) => go e1
+        | Ast.ExprTry (e1, _) => go e1
+        | Ast.ExprBlock (stmts, opt, _) =>
+            List.concat (map goStmt stmts)
+            @ (case opt of SOME z => go z | NONE => [])
+        | _ => []
+      and goStmt st =
+        case st of
+          Ast.StmtLet (_, _, _, NONE, _) => []
+        | Ast.StmtLet (_, _, _, SOME ini, _) => go ini
+        | Ast.StmtSemi (e, _) => go e
+        | Ast.StmtExpr (e, _) => go e
+        | Ast.StmtItem _ => []
+    in
+      go e
+    end
 
   fun paramName ((p : Ast.pat, _) : Ast.pat * Ast.ty) : string =
     case p of
@@ -333,6 +385,21 @@ structure Lowering :> LOWERING = struct
         end
     | Ast.ExprCall (Ast.ExprPath (["println"], _), [Ast.ExprLit (Ast.StringLit s, _)], _) =>
         ([Ir.Call (NONE, "sv0_println", [Ir.VString s], "void")], Ir.VUnit)
+    | Ast.ExprCall (Ast.ExprPath (["old"], _), [Ast.ExprPath ([x], _)], _) =>
+        ([], Ir.VVar (oldSlot x))
+    | Ast.ExprCall (Ast.ExprPath (["no_alias"], _), [a, b], _) =>
+        let
+          val (ia, va) = lowerExprToValue a
+          val (ib, vb) = lowerExprToValue b
+          val t = freshTmp ()
+        in
+          ( ia @ ib @ [Ir.Call (SOME t, "sv0_no_alias", [va, vb], "bool")]
+          , Ir.VVar t)
+        end
+    | Ast.ExprUnop (Ast.Borrow, Ast.ExprPath ([x], _), _) =>
+        ([], Ir.VAddrOf x)
+    | Ast.ExprUnop (Ast.BorrowMut, Ast.ExprPath ([x], _), _) =>
+        ([], Ir.VAddrOf x)
     | Ast.ExprCall (Ast.ExprPath ([callee], _), args, _) =>
         let
           fun oneArg a =
@@ -362,6 +429,10 @@ structure Lowering :> LOWERING = struct
         in
           (il @ ir @ [Ir.Assign (t, Ir.Binop (astBinopToC b, vl, vr))], Ir.VVar t)
         end
+    | Ast.ExprUnop (Ast.Borrow, _, _) =>
+        raise Fail "E0541: lowering: `&` expects a simple name (checker should reject this)"
+    | Ast.ExprUnop (Ast.BorrowMut, _, _) =>
+        raise Fail "E0541: lowering: `&mut` expects a simple name (checker should reject this)"
     | Ast.ExprUnop (u, e1, _) =>
         let
           val (i, v) = lowerExprToValue e1
@@ -451,6 +522,10 @@ structure Lowering :> LOWERING = struct
              | NONE => (is, Ir.Literal Ir.VUnit) end)
     | Ast.ExprLit (l, _) => ([], Ir.Literal (lowerLit l))
     | Ast.ExprTuple ([e1], _) => lowerExprWithInstrs e1
+    | Ast.ExprCall (Ast.ExprPath (["forall"], _), [Ast.ExprPath ([iN], _), Ast.ExprRange (SOME lo, SOME hi, _), bod], _) =>
+        lowerQuant true iN lo hi bod
+    | Ast.ExprCall (Ast.ExprPath (["exists"], _), [Ast.ExprPath ([iN], _), Ast.ExprRange (SOME lo, SOME hi, _), bod], _) =>
+        lowerQuant false iN lo hi bod
     | Ast.ExprPath ([x], _) =>
         (case !ensuresResultSlot of
            SOME rs =>
@@ -468,6 +543,40 @@ structure Lowering :> LOWERING = struct
     | _ =>
         let val (instrs, v) = lowerExprToValue e
         in case v of Ir.VVar x => (instrs, Ir.Load x) | _ => (instrs, Ir.Literal v) end
+
+  and lowerQuant (isForall : bool) (iName : string) (lo : Ast.expr) (hi : Ast.expr)
+    (body : Ast.expr) : Ir.instr list * Ir.expr =
+    let
+      val hiT = freshTmp ()
+      val cntT = freshTmp ()
+      val accT = freshTmp ()
+      val (iHi, eHi) = lowerExprWithInstrs hi
+      val (iLo, eLo) = lowerExprWithInstrs lo
+      val initPart =
+        iHi @ [Ir.Assign (hiT, eHi)] @ iLo @ [Ir.Assign (cntT, eLo)]
+      val initAcc =
+        if isForall then Ir.Assign (accT, Ir.Literal (Ir.VBool true))
+        else Ir.Assign (accT, Ir.Literal (Ir.VBool false))
+      val cond = Ir.Binop ("<", Ir.VVar cntT, Ir.VVar hiT)
+      val pT = freshTmp ()
+      val (preB, ep) = lowerExprWithInstrs body
+      val predBlock = preB @ [Ir.DeclVar pT, Ir.Store (pT, ep)]
+      val br =
+        if isForall then
+          Ir.IfElse
+            ( Ir.Binop ("==", Ir.VVar pT, Ir.VInt 0)
+            , [Ir.Store (accT, Ir.Literal (Ir.VBool false)), Ir.Break]
+            , [])
+        else
+          Ir.IfElse
+            ( Ir.Binop ("!=", Ir.VVar pT, Ir.VInt 0)
+            , [Ir.Store (accT, Ir.Literal (Ir.VBool true)), Ir.Break]
+            , [])
+      val inner = Ir.Block (Ir.Assign (iName, Ir.Load cntT) :: predBlock @ [br])
+      val incr = Ir.Store (cntT, Ir.Binop ("+", Ir.VVar cntT, Ir.VInt 1))
+    in
+      (initPart @ [initAcc, Ir.While (cond, [inner, incr])], Ir.Load accT)
+    end
 
   and lowerIntoVarInstrs (e : Ast.expr) (t : string) : Ir.instr list =
     case e of
@@ -773,13 +882,33 @@ structure Lowering :> LOWERING = struct
              | _ => NONE) contracts
       val useRetSlot =
         not (retSyntaxIsUnit r) andalso List.exists mentionsResult enss
-      val reqInstrs =
+      val contractExprs = reqs @ enss
+      fun uniqOldNames [] acc = rev acc
+        | uniqOldNames (x :: xr) acc =
+            if List.exists (fn u => String.compare (u, x) = EQUAL) acc then
+              uniqOldNames xr acc
+            else
+              uniqOldNames xr (x :: acc)
+      val oldMentions =
+        uniqOldNames (List.concat (map allOldNames contractExprs)) []
+      val oldTargets =
+        List.filter
+          (fn (p, _) =>
+             case p of
+               Ast.PatBind (x, _) =>
+                 List.exists (fn nm => String.compare (nm, x) = EQUAL) oldMentions
+             | _ => false) (#params r)
+      val oldInstrs =
         List.concat (
-          map (fn e =>
-                 let val (pre, ec) = lowerExprWithInstrs e
-                 in pre @ [Ir.Requires (ec, fnName)] end) reqs)
-      val ensParts =
-        map (fn e => lowerEnsuresClause e useRetSlot) enss
+          map (fn pt =>
+            let
+              val x = paramName pt
+              val cty = astTyToCString (#2 pt)
+              val s = oldSlot x
+            in
+              if cty = "int" then [Ir.DeclVar s, Ir.Store (s, Ir.Load x)]
+              else [Ir.DeclNamed (cty, s), Ir.Store (s, Ir.Load x)]
+            end) oldTargets)
       val ps =
         map (fn pt => (paramName pt, astTyToCString (#2 pt))) (#params r)
       val () =
@@ -788,7 +917,14 @@ structure Lowering :> LOWERING = struct
         ; ensuresResultSlot := NONE
         ; scrutLocals := []
         ; currentFnParams := map (fn (p, t) => (paramName (p, t), t)) (#params r))
+      val reqInstrs =
+        List.concat (
+          map (fn e =>
+                 let val (pre, ec) = lowerExprWithInstrs e
+                 in pre @ [Ir.Requires (ec, fnName)] end) reqs)
       val body0 = lowerBody (#body r)
+      val ensParts =
+        map (fn e => lowerEnsuresClause e useRetSlot) enss
       val body1 = injectEnsuresAndRetSlot fnName useRetSlot ensParts body0
       val decl = if useRetSlot then [Ir.DeclVar retValueSlot] else []
       val retTy = fnRetCty r
@@ -797,7 +933,7 @@ structure Lowering :> LOWERING = struct
         label = fnName,
         params = ps,
         retCType = retTy,
-        instrs = decl @ reqInstrs @ body1
+        instrs = decl @ oldInstrs @ reqInstrs @ body1
       }
     end
 

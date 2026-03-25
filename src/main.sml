@@ -14,8 +14,10 @@ structure Main = struct
     in
       print cCode
     end
-    handle IO.Io {name, ...} =>
-      TextIO.output (TextIO.stdErr, "error: cannot open " ^ name ^ "\n")
+    handle Fail msg =>
+      TextIO.output (TextIO.stdErr, "sv0c error: " ^ msg ^ "\n")
+    | IO.Io {name, ...} =>
+      TextIO.output (TextIO.stdErr, "sv0c error: cannot open " ^ name ^ "\n")
 
   fun main (_, args) =
     case args of
