@@ -1,0 +1,4 @@
+fn main() -> i32 {
+  let _b: bool = forall(i in 0..2, i >= 0);
+  return 0;
+}

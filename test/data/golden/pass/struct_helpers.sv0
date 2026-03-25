@@ -1,0 +1,20 @@
+struct Vec2 {
+  x: i32,
+  y: i32,
+}
+
+fn manhattan(a: Vec2, b: Vec2) -> i32 {
+  let dx: i32 = if a.x > b.x { a.x - b.x } else { b.x - a.x };
+  let dy: i32 = if a.y > b.y { a.y - b.y } else { b.y - a.y };
+  return dx + dy;
+}
+
+fn main() -> i32 {
+  let p: Vec2 = Vec2 { x: 0, y: 0 };
+  let q: Vec2 = Vec2 { x: 3, y: 2 };
+  if manhattan(p, q) == 5 {
+    return 0;
+  } else {
+    return 1;
+  }
+}

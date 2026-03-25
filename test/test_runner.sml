@@ -519,6 +519,12 @@ structure TestRunner = struct
                  (goldenFail "no_alias_in_body" "E0526")
       val () = check "golden fail old_not_param E0522 + hint"
                  (goldenFail "old_not_param" "E0522")
+      val () = check "golden fail forall_in_body E0523 + hint"
+                 (goldenFail "forall_in_body" "E0523")
+      val () = check "golden fail exists_in_body E0523 + hint"
+                 (goldenFail "exists_in_body" "E0523")
+      val () = check "golden fail println_non_string E0444 + hint"
+                 (goldenFail "println_non_string" "E0444")
       fun writeBuild path content =
         let val outs = TextIO.openOut path
         in TextIO.output (outs, content); TextIO.closeOut outs end
@@ -543,6 +549,14 @@ structure TestRunner = struct
                  (goldenPassCompileRun "old_ensures")
       val () = check "golden pass no_alias_requires compile+run"
                  (goldenPassCompileRun "no_alias_requires")
+      val () = check "golden pass struct_helpers compile+run"
+                 (goldenPassCompileRun "struct_helpers")
+      val () = check "golden pass enum_workflow compile+run"
+                 (goldenPassCompileRun "enum_workflow")
+      val () = check "golden pass nested_calls compile+run"
+                 (goldenPassCompileRun "nested_calls")
+      val () = check "golden pass clamp_contract compile+run"
+                 (goldenPassCompileRun "clamp_contract")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

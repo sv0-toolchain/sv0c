@@ -1,0 +1,18 @@
+fn clamp(x: i32, lo: i32, hi: i32) -> i32 requires(lo <= hi) ensures(result >= lo && result <= hi) {
+  if x < lo {
+    return lo;
+  } else if x > hi {
+    return hi;
+  } else {
+    return x;
+  }
+}
+
+fn main() -> i32 {
+  let v: i32 = clamp(15, 0, 10);
+  if v == 10 {
+    return 0;
+  } else {
+    return 1;
+  }
+}

@@ -1,0 +1,22 @@
+enum Outcome {
+  Ok(i32),
+  Err(i32),
+}
+
+fn main() -> i32 {
+  let a = Outcome::Ok(42);
+  let b = Outcome::Err(-1);
+  let ok_part: i32 = match a {
+    Outcome::Ok(v) => v,
+    Outcome::Err(_) => 999,
+  };
+  let err_part: i32 = match b {
+    Outcome::Ok(_) => 999,
+    Outcome::Err(e) => e,
+  };
+  if ok_part == 42 && err_part == -1 {
+    return 0;
+  } else {
+    return 1;
+  }
+}
