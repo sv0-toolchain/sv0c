@@ -12,6 +12,8 @@ structure Diagnostic :> DIAGNOSTIC = struct
     help : string list
   }
 
+  exception Diag of diagnostic
+
   fun error (code, msg, sp) =
     {severity = Error, code = code, message = msg,
      span = sp, related = [], help = []}

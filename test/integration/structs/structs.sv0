@@ -1,0 +1,13 @@
+struct Pt {
+  x: i32,
+  y: i32,
+}
+
+fn area(p: Pt) -> i32 {
+  return p.x * p.y;
+}
+
+fn main() -> i32 {
+  let q: Pt = Pt { x: 6, y: 7 };
+  return area(q);
+}

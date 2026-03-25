@@ -1,0 +1,10 @@
+/* Rmd milestone 1: generic functions. Parametric polymorphism (<T>) is not in the
+   type checker yet; this program locks in the intended end-to-end path using a
+   concrete monomorphic identity until monomorphization lands. */
+fn id_i32(x: i32) -> i32 {
+  return x;
+}
+
+fn main() -> i32 {
+  return id_i32(99);
+}

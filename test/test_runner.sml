@@ -268,6 +268,7 @@ structure TestRunner = struct
       fun resolveCatch s =
         (Resolver.resolve (parseSrc s); NONE)
         handle Fail msg => SOME msg
+        | Diagnostic.Diag d => SOME (Diagnostic.format NONE d)
       val () = check "resolve trivial main"
                  (resolveCatch "fn main() -> i32 { return 0; }" = NONE)
       val () = check "resolve let binds return"
@@ -297,6 +298,7 @@ structure TestRunner = struct
       fun checkCatch s =
         (Checker.check (Resolver.resolve (parseSrc s)); NONE)
         handle Fail msg => SOME msg
+        | Diagnostic.Diag d => SOME (Diagnostic.format NONE d)
       val () = check "checker rejects bool for i32 return"
                  (case checkCatch "fn main() -> i32 { return true; }" of
                     SOME m => String.isSubstring "E0400" m
@@ -401,8 +403,10 @@ structure TestRunner = struct
       fun compileToC s =
         let
           val ast = Resolver.resolve (parseSrc s)
+          val () = Lowering.setImportAliases (Resolver.peekImportAliases ())
           val ast = Checker.check ast
           val ast = ContractAnalyzer.analyze ast
+          val ast = Link.stripLinkDirectives ast
         in
           Codegen.emit (Lowering.lower ast)
         end
@@ -546,8 +550,10 @@ structure TestRunner = struct
       val ast = Parser.parse tokens
       val () = check "Parser.parse empty" (null ast)
       val ast = Resolver.resolve ast
+      val () = Lowering.setImportAliases (Resolver.peekImportAliases ())
       val ast = Checker.check ast
       val ast = ContractAnalyzer.analyze ast
+      val ast = Link.stripLinkDirectives ast
       val ir = Lowering.lower ast
       val c = Codegen.emit ir
       val () = check "Codegen.emit produces C"

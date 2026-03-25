@@ -1,0 +1,5 @@
+use lib::bump;
+
+fn main() -> i32 {
+  return bump(41);
+}

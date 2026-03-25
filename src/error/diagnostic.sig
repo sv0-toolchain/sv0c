@@ -4,6 +4,8 @@ signature DIAGNOSTIC = sig
   type related
   type diagnostic
 
+  exception Diag of diagnostic
+
   val error : string * string * Span.span -> diagnostic
   val warning : string * string * Span.span -> diagnostic
   val note : string * Span.span -> diagnostic

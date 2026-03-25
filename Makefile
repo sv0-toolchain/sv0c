@@ -3,7 +3,7 @@ ML_BUILD := ml-build
 HEAP     := sv0c
 CC       ?= cc
 
-.PHONY: build test heap clean e2e test-contract-runtime
+.PHONY: build test heap clean e2e test-contract-runtime integration
 
 build:
 	echo 'CM.make "sources.cm";' | $(SML)
@@ -30,6 +30,9 @@ build/contract_requires_fail.c: scripts/export_requires_false.sml sources.cm
 test-contract-runtime: build/contract_requires_fail.c
 	$(CC) -o build/contract_requires_fail_run build/contract_requires_fail.c -Iruntime runtime/sv0_runtime.c
 	./build/contract_requires_fail_run; test $$? -eq 1
+
+integration: heap
+	"$(CURDIR)/../task/sv0c-milestone-1/02-integration-test.sh"
 
 clean:
 	rm -rf .cm build

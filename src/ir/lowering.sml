@@ -12,12 +12,56 @@ structure Lowering :> LOWERING = struct
   (* enum name -> (variant name -> tag), max payload ints *)
   val enumVariants : (string * ((string * int) list * int)) list ref = ref []
 
+  val importAliases : (string * string) list ref = ref []
+
+  fun setImportAliases (xs : (string * string) list) : unit = importAliases := xs
+
   val currentFnParams : (string * Ast.ty) list ref = ref []
   val scrutLocals : (string * string) list ref = ref []
 
   fun freshTmp () =
     let val n = !tmpCtr
     in tmpCtr := n + 1; "_sv0t" ^ Int.toString n end
+
+  fun splitQName (s : string) : string list =
+    let
+      val sz = String.size s
+      fun findDbl (i : int) : int option =
+        if i + 1 >= sz then NONE
+        else if String.sub (s, i) = #":" andalso String.sub (s, i + 1) = #":" then
+          SOME i
+        else findDbl (i + 1)
+    in
+      case findDbl 0 of
+        NONE => [s]
+      | SOME i =>
+          String.substring (s, 0, i)
+          :: splitQName (String.substring (s, i + 2, sz - (i + 2)))
+    end
+
+  fun resolveFnCallee (n : string) : string =
+    case
+      List.find (fn (a, _) => String.compare (a, n) = EQUAL) (!importAliases)
+    of
+      SOME (_, t) =>
+        (case splitQName t of
+           [_] => t
+         | _ =>
+             raise Fail ("lowering: import alias for `" ^ n ^ "` is not a function"))
+    | NONE => n
+
+  fun resolveEnumCtorPath (en : string) (vn : string) : string * string =
+    let val k = en ^ "::" ^ vn
+    in
+      case
+        List.find (fn (a, _) => String.compare (a, k) = EQUAL) (!importAliases)
+      of
+        SOME (_, t) =>
+          (case splitQName t of
+             [e2, v2] => (e2, v2)
+           | _ => (en, vn))
+      | NONE => (en, vn)
+    end
 
   fun astBinopToC (b : Ast.binop) : string =
     case b of
@@ -58,21 +102,25 @@ structure Lowering :> LOWERING = struct
     | _ => "int"
 
   fun calleeRetCty (name : string) : string =
-    case
-      List.find
-        (fn it =>
-           case it of Ast.ItemFn r => #name r = name | _ => false) (!theProg)
-    of
-      SOME (Ast.ItemFn r) =>
-        (case #ret r of SOME at => astTyToCString at | NONE => "int")
-    | _ => "int"
+    let val name0 = resolveFnCallee name
+    in
+      case
+        List.find
+          (fn it =>
+             case it of Ast.ItemFn r => #name r = name0 | _ => false) (!theProg)
+      of
+        SOME (Ast.ItemFn r) =>
+          (case #ret r of SOME at => astTyToCString at | NONE => "int")
+      | _ => "int"
+    end
 
   fun exprInitCty (e : Ast.expr) : string =
     case e of
       Ast.ExprStruct (n :: _, _, _) => n
-    | Ast.ExprPath ([a, _], _) => a
+    | Ast.ExprPath ([en, vn], _) => #1 (resolveEnumCtorPath en vn)
     | Ast.ExprCall (Ast.ExprPath ([f], _), _, _) => calleeRetCty f
-    | Ast.ExprCall (Ast.ExprPath ([en, _], _), _, _) => en
+    | Ast.ExprCall (Ast.ExprPath ([en, vn], _), _, _) =>
+        #1 (resolveEnumCtorPath en vn)
     | Ast.ExprTuple ([e1], _) => exprInitCty e1
     | Ast.ExprLit (Ast.BoolLit _, _) => "int"
     | Ast.ExprLit (Ast.IntLit _, _) => "int"
@@ -80,7 +128,7 @@ structure Lowering :> LOWERING = struct
 
   fun matchScrutCty (e : Ast.expr) : string =
     case e of
-      Ast.ExprPath ([a, b], _) => a
+      Ast.ExprPath ([en, vn], _) => #1 (resolveEnumCtorPath en vn)
     | Ast.ExprPath ([x], _) =>
         (case List.find (fn (v, _) => v = x) (!scrutLocals) of
            SOME (_, ct) => ct
@@ -355,9 +403,11 @@ structure Lowering :> LOWERING = struct
              if x = "result" then ([], Ir.VVar rs) else ([], Ir.VVar x)
          | NONE => ([], Ir.VVar x))
     | Ast.ExprPath ([en, vn], _) =>
-        let val t = freshTmp ()
+        let
+          val (en0, vn0) = resolveEnumCtorPath en vn
+          val t = freshTmp ()
         in
-          ( [Ir.DeclNamed (en, t)] @ enumConstructInstrs t en vn []
+          ( [Ir.DeclNamed (en0, t)] @ enumConstructInstrs t en0 vn0 []
           , Ir.VVar t)
         end
     | Ast.ExprField (e1, f, _) =>
@@ -378,9 +428,11 @@ structure Lowering :> LOWERING = struct
           ([Ir.DeclNamed (sn, t)] @ List.concat (map oneField order), Ir.VVar t)
         end
     | Ast.ExprCall (Ast.ExprPath ([en, vn], _), args, _) =>
-        let val t = freshTmp ()
+        let
+          val (en0, vn0) = resolveEnumCtorPath en vn
+          val t = freshTmp ()
         in
-          ( [Ir.DeclNamed (en, t)] @ enumConstructInstrs t en vn args
+          ( [Ir.DeclNamed (en0, t)] @ enumConstructInstrs t en0 vn0 args
           , Ir.VVar t)
         end
     | Ast.ExprCall (Ast.ExprPath (["println"], _), [Ast.ExprLit (Ast.StringLit s, _)], _) =>
@@ -408,9 +460,10 @@ structure Lowering :> LOWERING = struct
           val inss = List.concat (map #1 pairs)
           val vals = map #2 pairs
           val t = freshTmp ()
+          val callee0 = resolveFnCallee callee
           val rty = calleeRetCty callee
         in
-          (inss @ [Ir.Call (SOME t, callee, vals, rty)], Ir.VVar t)
+          (inss @ [Ir.Call (SOME t, callee0, vals, rty)], Ir.VVar t)
         end
     | Ast.ExprMatch (scrut, arms, _) =>
         let
@@ -690,9 +743,11 @@ structure Lowering :> LOWERING = struct
                 [Ir.DeclNamed (sn, x)] @ List.concat (map oneField order)
               end
           | Ast.ExprCall (Ast.ExprPath ([en, vn], _), args, _) =>
-              [Ir.DeclNamed (en, x)] @ enumConstructInstrs x en vn args
+              let val (en0, vn0) = resolveEnumCtorPath en vn
+              in [Ir.DeclNamed (en0, x)] @ enumConstructInstrs x en0 vn0 args end
           | Ast.ExprPath ([en, vn], _) =>
-              [Ir.DeclNamed (en, x)] @ enumConstructInstrs x en vn []
+              let val (en0, vn0) = resolveEnumCtorPath en vn
+              in [Ir.DeclNamed (en0, x)] @ enumConstructInstrs x en0 vn0 [] end
           | _ =>
               let
                 val (instrs, rhs) = lowerExprWithInstrs init

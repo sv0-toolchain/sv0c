@@ -1,6 +1,10 @@
 CM.make "sources.cm";
 fun try s =
-  (Checker.check (Resolver.resolve (Parser.parse (Lexer.tokenize "<t>" s))); "OK")
+  let val ast = Resolver.resolve (Parser.parse (Lexer.tokenize "<t>" s))
+      val () = Lowering.setImportAliases (Resolver.peekImportAliases ())
+  in
+    (Checker.check ast; "OK")
+  end
   handle Fail m => m;
 print (try "fn main() -> unit ensures(result) { }\n");
 print "\n";

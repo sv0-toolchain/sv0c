@@ -62,6 +62,7 @@ requires SML/NJ (tested with 110.99.9).
 make build         # compile all modules via CM
 make test          # run test suite (see test_runner for current count)
 make e2e           # emit C, compile with cc, run binary (exit code 42)
+make integration   # Rmd-style scenarios under test/integration/ (needs heap)
 make test-contract-runtime  # compile requires(false) fixture; expect exit 1
 make heap          # export heap image to build/sv0c
 make clean         # remove .cm cache and build artifacts
@@ -71,6 +72,7 @@ to run the compiler directly:
 
 ```bash
 sml @SMLload=build/sv0c input.sv0       # after make heap
+sml @SMLload=build/sv0c --project path/to/dir   # all *.sv0 in dir (multi-file)
 ```
 
 or interactively:

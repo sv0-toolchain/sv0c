@@ -46,5 +46,9 @@ Group is
   src/backend/c/codegen.sig
   src/backend/c/codegen.sml
 
+  (* multi-file link / name mangling *)
+  src/link/link.sig
+  src/link/link.sml
+
   (* entry point *)
   src/main.sml
