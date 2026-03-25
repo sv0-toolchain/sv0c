@@ -1,0 +1,4 @@
+# requires/ensures on non-unit fn with parameter use in predicates.
+sv0_requires((lo <= hi)
+sv0_ensures((_sv0t3 && _sv0t4)
+clamp(15, 0, 10)

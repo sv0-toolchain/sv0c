@@ -1,0 +1,4 @@
+# Emitted C must contain bounded-quantifier lowering (while + break path).
+while (
+break
+sv0_requires(_sv0t2

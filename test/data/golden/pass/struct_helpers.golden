@@ -1,0 +1,4 @@
+# Struct typedef, by-value fields, helper with multiple returns.
+typedef struct {
+manhattan(Vec2
+int dx

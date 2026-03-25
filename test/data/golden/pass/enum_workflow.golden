@@ -1,0 +1,4 @@
+# Enum as tagged struct + discriminated tag tests.
+} Outcome;
+a.tag = 0
+a.p0 = 42
