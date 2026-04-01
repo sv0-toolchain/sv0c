@@ -1,0 +1,25 @@
+/* Transliteration seed: see rewrite/README.md (maps to src/error/span.sml). */
+
+struct Pos {
+  line: i32,
+  col: i32,
+  offset: i32,
+}
+
+fn pos_line(p: Pos) -> i32 {
+  return p.line;
+}
+
+fn pos_col(p: Pos) -> i32 {
+  return p.col;
+}
+
+fn span_length(start_off: i32, stop_off: i32) -> i32 {
+  return stop_off - start_off;
+}
+
+fn main() -> i32 {
+  let p: Pos = Pos { line: 2, col: 5, offset: 42 };
+  let sum: i32 = pos_line(p) + pos_col(p) + span_length(10, 14);
+  return sum - sum;
+}
