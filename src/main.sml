@@ -92,12 +92,29 @@ structure Main = struct
       compileProgramVm (SOME source) ast out
     end
 
+  fun projectVmEntryStem (dir : string) : string =
+    let val mainPath = OS.Path.concat (dir, "main.sv0")
+    in if OS.FileSys.access (mainPath, []) then "main" else "program"
+    end
+
+  fun compileProjectDirVm (dir : string) : unit =
+    let
+      val ast = Link.linkProjectDir dir
+      val stem = projectVmEntryStem dir
+      val out = "build/vm/" ^ stem ^ ".sv0b"
+      val () = OS.FileSys.mkDir "build/vm" handle OS.SysErr _ => ()
+    in
+      compileProgramVm NONE ast out
+    end
+
   fun main (_, args) : OS.Process.status =
     case args of
       ["--target=vm", filename] =>
         (compileFileVm filename; OS.Process.success)
-    | "--target" :: "vm" :: filename :: _ =>
-        (compileFileVm filename; OS.Process.success)
+    | ["--target=vm", "--project", dir] =>
+        (compileProjectDirVm dir; OS.Process.success)
+    | ["--project", dir, "--target=vm"] =>
+        (compileProjectDirVm dir; OS.Process.success)
     | ["--project", dir] =>
         (compileProjectDir dir; OS.Process.success)
     | [filename] =>
@@ -107,6 +124,7 @@ structure Main = struct
             "sv0c: sv0 bootstrap compiler\n\
             \usage: sv0c <file.sv0>\n\
             \       sv0c --target=vm <file.sv0>   (emit build/vm/<stem>.sv0b)\n\
-            \       sv0c --project <dir>   (all *.sv0 in directory)\n")
+            \       sv0c --target=vm --project <dir>   (emit build/vm/main.sv0b)\n\
+            \       sv0c --project <dir>   (all *.sv0 in directory, C to stdout)\n")
         ; OS.Process.failure)
 end

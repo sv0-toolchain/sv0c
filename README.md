@@ -70,7 +70,7 @@ make heap          # export heap image to build/sv0c
 make clean         # remove .cm cache and build artifacts
 ```
 
-VM backend: `Main.main ((), ["--target=vm", "path/to/file.sv0"])` writes `build/vm/<stem>.sv0b` (run via `sv0vm/scripts/run_sv0b.sml` with `SV0B` set).
+VM backend: `Main.main ((), ["--target=vm", "path/to/file.sv0"])` writes `build/vm/<stem>.sv0b`. Multi-file projects: `Main.main ((), ["--target=vm", "--project", "path/to/dir"])` writes `build/vm/main.sv0b` when `main.sv0` exists in that directory. Run bytecode via `sv0vm/scripts/run_sv0b.sml` with `SV0B` set, or `./scripts/sv0 vm-run` / `./scripts/sv0 repl` from the toolchain root.
 
 to run the compiler directly:
 
