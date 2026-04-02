@@ -10,7 +10,20 @@ From the **sv0-toolchain** root (or `sv0c/` with adjusted paths):
 ./scripts/sv0 rewrite-build
 ```
 
-This compiles every `rewrite/*.sv0` to `build/vm/<stem>.sv0b` and runs each on **sv0vm** (exit code must be 0).
+CI uses **`rewrite-sources.list`**: one path per line (paths relative to `sv0c/`). If the list is missing or empty, every `rewrite/*.sv0` is used. Each entry is compiled to `build/vm/<stem>.sv0b` and run on **sv0vm** (exit code must be 0).
+
+**Layout and transliteration order:** see [`LAYOUT.md`](./LAYOUT.md).
+
+**Golden bootstrap C:** checked-in files under `golden/stage0/<stem>.c` are compared on every `./scripts/sv0 test` / `ci` to the current SML heap output for the matching `rewrite/<stem>.sv0` (see `rewrite-sources.list`). Add or update a golden when you intentionally change emitted C.
+
+**C backend / self-host snapshots** (from toolchain root):
+
+```bash
+./scripts/sv0 emit-c rewrite/span_core.sv0
+./scripts/sv0 self-host-capture-stage0 rewrite/span_core.sv0   # → build/self-host-compare/stage0/span_core.c
+./scripts/sv0 self-host-compare span_core   # diffs stage0 vs stage1 when both exist
+./scripts/sv0 self-host-check-golden        # diff golden/stage0/*.c vs fresh emit (same as test)
+```
 
 From `sv0c/` only, after `make heap`:
 
