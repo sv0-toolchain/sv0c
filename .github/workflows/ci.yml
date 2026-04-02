@@ -1,0 +1,32 @@
+# Standalone sv0c: compile + unit tests + C runtime smoke (e2e / contract). Meta-repo integration lives in sv0-toolchain.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SML/NJ and C toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y smlnj build-essential
+
+      - name: Check and unit tests
+        run: make check test
+
+      - name: E2E and contract runtime (C + sv0_runtime)
+        run: make e2e test-contract-runtime
