@@ -1,0 +1,5 @@
+# Standalone .sv0 programs under sv0c/ (paths relative to sv0c/).
+# Each file must define fn main() -> i32 (or unit) and exit 0 on the VM (rewrite-build).
+# Order is arbitrary today (each program is compiled separately).
+
+rewrite/span_core.sv0
