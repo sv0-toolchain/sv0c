@@ -40,4 +40,4 @@ Transliterated subset of `sml/error/span.sml` / `span.sig`. `main` uses a simple
 
 ## `diagnostic_core.sv0`
 
-Transliterated subset of `sml/error/diagnostic.sig` + `diagnostic.sml`: `datatype severity` as enum `Severity`, diagnostic-shaped values with `sev_tag` (stand-in until VM supports `struct { sev: Severity, … }`) and span line. See the file header and [`LAYOUT.md`](./LAYOUT.md) for VM limits and growth plan.
+Transliterated subset of `sml/error/diagnostic.sig` + `diagnostic.sml`: enum `Severity`, proxy `Diagnostic` (i32 fields for code/message/span/related/help shapes), and a **byte-length** model of `format` (header, `  -->` line, optional gutter+snippet, related/help block sizes, final newline). See the file header and [`LAYOUT.md`](./LAYOUT.md) for VM vs C notes (length math is inlined in `main` so bootstrap VM matches C until the VM call ABI bug for some multi-arg callees is fixed).
