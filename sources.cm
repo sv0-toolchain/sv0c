@@ -3,57 +3,57 @@ Group is
   $/smlnj-lib.cm
 
   (* error reporting *)
-  src/error/span.sig
-  src/error/span.sml
-  src/error/diagnostic.sig
-  src/error/diagnostic.sml
+  sml/error/span.sig
+  sml/error/span.sml
+  sml/error/diagnostic.sig
+  sml/error/diagnostic.sml
 
   (* lexer *)
-  src/lexer/token.sml
-  src/lexer/lexer.sig
-  src/lexer/lexer.sml
+  sml/lexer/token.sml
+  sml/lexer/lexer.sig
+  sml/lexer/lexer.sml
 
   (* AST *)
-  src/ast/ast.sml
+  sml/ast/ast.sml
 
   (* parser *)
-  src/parser/parser.sig
-  src/parser/parser.sml
+  sml/parser/parser.sig
+  sml/parser/parser.sml
 
   (* name resolution *)
-  src/name_resolution/env.sig
-  src/name_resolution/env.sml
-  src/name_resolution/resolver.sig
-  src/name_resolution/resolver.sml
+  sml/name_resolution/env.sig
+  sml/name_resolution/env.sml
+  sml/name_resolution/resolver.sig
+  sml/name_resolution/resolver.sml
 
   (* type checker *)
-  src/type_checker/types.sml
-  src/type_checker/unify.sig
-  src/type_checker/unify.sml
-  src/type_checker/checker.sig
-  src/type_checker/checker.sml
+  sml/type_checker/types.sml
+  sml/type_checker/unify.sig
+  sml/type_checker/unify.sml
+  sml/type_checker/checker.sig
+  sml/type_checker/checker.sml
 
   (* contract analyzer *)
-  src/contract_analyzer/analyzer.sig
-  src/contract_analyzer/analyzer.sml
+  sml/contract_analyzer/analyzer.sig
+  sml/contract_analyzer/analyzer.sml
 
   (* IR *)
-  src/ir/ir.sml
-  src/ir/lowering.sig
-  src/ir/lowering.sml
+  sml/ir/ir.sml
+  sml/ir/lowering.sig
+  sml/ir/lowering.sml
 
   (* C backend *)
-  src/backend/c/codegen.sig
-  src/backend/c/codegen.sml
+  sml/backend/c/codegen.sig
+  sml/backend/c/codegen.sml
 
   (* VM backend *)
-  src/backend/vm/bytecode.sml
-  src/backend/vm/vm_codegen.sig
-  src/backend/vm/vm_codegen.sml
+  sml/backend/vm/bytecode.sml
+  sml/backend/vm/vm_codegen.sig
+  sml/backend/vm/vm_codegen.sml
 
   (* multi-file link / name mangling *)
-  src/link/link.sig
-  src/link/link.sml
+  sml/link/link.sig
+  sml/link/link.sml
 
   (* entry point *)
-  src/main.sml
+  sml/main.sml
