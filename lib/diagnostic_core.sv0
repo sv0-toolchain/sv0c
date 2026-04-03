@@ -1,7 +1,11 @@
-/* Transliteration seed: sml/error/diagnostic.sig + diagnostic.sml (subset).
-   Maps severity + diagnostic record to i32 tags/proxies (code/message/related/help
-   as nonempty flags and lengths). Trailing commas in struct literals exercise
-   parseStructFields consuming the closing `}`. */
+/* Transliteration seed: sml/error/diagnostic.sig + diagnostic.sml — format-oriented slice.
+   SML `format` builds one string (header, `  -->` line, optional source snippet, related,
+   help, trailing newline). `println` only accepts string literals here, so this file
+   models **byte length** of that layout (same composition as diagnostic.sml).
+   Length math is **inlined in main** with `let` steps: the VM call ABI mishandles some
+   multi-argument callees when many functions are present (4th i32 arg was dropped in
+   callees like `format_header_len`); C backend is correct. `dec_pos` is recursive digit
+   width for non-negative values only (caller branches on sign). */
 
 enum Severity {
   Error(),
@@ -12,11 +16,27 @@ enum Severity {
 struct Diagnostic {
   sev_tag: i32,
   code_nonempty: i32,
+  code_len: i32,
   msg_len: i32,
   line: i32,
   col: i32,
+  span_len: i32,
+  file_nonempty: i32,
+  file_len: i32,
   related_len: i32,
+  related_fmt_len: i32,
   help_len: i32,
+  help_fmt_len: i32,
+}
+
+fn dec_pos(n: i32) -> i32 {
+  if n == 0 {
+    return 1;
+  } else if n < 10 {
+    return 1;
+  } else {
+    return 1 + dec_pos(n / 10);
+  }
 }
 
 fn is_error_sev(s: Severity) -> i32 {
@@ -28,34 +48,96 @@ fn is_error_sev(s: Severity) -> i32 {
 }
 
 fn main() -> i32 {
-  let e: Diagnostic = Diagnostic {
+  let d: Diagnostic = Diagnostic {
     sev_tag: 0,
     code_nonempty: 1,
+    code_len: 3,
     msg_len: 24,
     line: 10,
     col: 3,
+    span_len: 4,
+    file_nonempty: 1,
+    file_len: 8,
     related_len: 0,
+    related_fmt_len: 0,
     help_len: 1,
+    help_fmt_len: 19,
   };
-  let w: Diagnostic = Diagnostic {
-    sev_tag: 1,
-    code_nonempty: 0,
-    msg_len: 5,
-    line: 20,
-    col: 1,
-    related_len: 2,
-    help_len: 0,
+  let has_source: i32 = 1;
+  let src_line_len: i32 = 15;
+  let sev_tag: i32 = d.sev_tag;
+  let code_nonempty: i32 = d.code_nonempty;
+  let code_len: i32 = d.code_len;
+  let msg_len: i32 = d.msg_len;
+  let line: i32 = d.line;
+  let col: i32 = d.col;
+  let span_len: i32 = d.span_len;
+  let file_nonempty: i32 = d.file_nonempty;
+  let file_len: i32 = d.file_len;
+  let related_fmt_len: i32 = d.related_fmt_len;
+  let help_fmt_len: i32 = d.help_fmt_len;
+  let sev_word: i32 = match sev_tag {
+    0 => 5,
+    1 => 7,
+    _ => 4,
   };
-  let tag_e: i32 = e.sev_tag;
-  let c_e: i32 = match tag_e {
-    0 => 1,
-    _ => 0,
+  let code_bracket: i32 = if code_nonempty == 0 {
+    0
+  } else {
+    2 + code_len
   };
-  let tag_w: i32 = w.sev_tag;
-  let c_w: i32 = match tag_w {
-    0 => 1,
-    _ => 0,
+  let header_core: i32 = sev_word + code_bracket + 2 + msg_len;
+  let header_len: i32 = header_core + 1;
+  let file_part: i32 = if file_nonempty == 0 {
+    0
+  } else {
+    file_len + 1
   };
-  let warn_is_not_err: i32 = is_error_sev(Severity::Warning());
-  return c_e + c_w + warn_is_not_err + e.line + e.col + e.help_len - 15;
+  let line_digits: i32 = if line < 0 {
+    1 + dec_pos(0 - line)
+  } else {
+    dec_pos(line)
+  };
+  let col_digits: i32 = if col < 0 {
+    1 + dec_pos(0 - col)
+  } else {
+    dec_pos(col)
+  };
+  let loc_len: i32 = 6 + file_part + line_digits + 1 + col_digits + 1;
+  let gw: i32 = if line_digits > 2 {
+    line_digits
+  } else {
+    2
+  };
+  let pref: i32 = gw + 3;
+  let blank: i32 = pref + 1;
+  let numbered: i32 = pref + src_line_len + 1;
+  let col_pad: i32 = if col <= 1 {
+    0
+  } else {
+    col - 1
+  };
+  let carets: i32 = if span_len < 1 {
+    1
+  } else {
+    span_len
+  };
+  let underline: i32 = pref + col_pad + carets + 1;
+  let snippet_len: i32 = if has_source == 0 {
+    0
+  } else {
+    blank + numbered + underline
+  };
+  let body_len: i32 = header_len + loc_len + snippet_len + related_fmt_len + help_fmt_len;
+  let n: i32 = body_len + 1;
+  let expect: i32 = 116;
+  let ok_len: i32 = n - expect;
+  let is_err: i32 = if sev_tag == 0 {
+    1
+  } else {
+    0
+  };
+  let ok_sev: i32 = is_err - 1;
+  let ok_warn: i32 = is_error_sev(Severity::Warning());
+  return ok_len + ok_sev + ok_warn;
 }
