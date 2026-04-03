@@ -50,6 +50,14 @@ Transliterated subset of `sml/error/diagnostic.sig` + `diagnostic.sml`: enum `Se
 
 Bounded slice of `sml/name_resolution/env.*`: two-slot module value list (numeric ids), `env_register` / `env_lookup`, `env_empty`. Exercises **multi-slot struct** arguments and returns on the VM.
 
+## `lib/resolver_value_core.sv0`
+
+Bounded three-slot module-value list with `lookup_value` / `resolve_path_ok` — tiny slice of `ExprPath` resolution (`sml/name_resolution/resolver.sml` + `Env.lookupValue`).
+
 ## `lexer/token_keyword_core.sv0`
 
 Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — anchor for `sml/lexer/token.sml`. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
+
+## `lexer/token_delim_core.sv0`
+
+Delimiter / punctuation tags (`( ) { } , ;`) in a band disjoint from keyword tags, plus `is_delimiter_tag`.

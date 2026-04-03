@@ -21,8 +21,8 @@ Rough bottom-up order (mirrors `sml/` data flow):
 
 1. **Span / positions** — `sml/error/span.sml` → `lib/span_core.sv0` (seed)
 2. **Diagnostics** — `sml/error/diagnostic.*` → `lib/diagnostic_core.sv0` (format length model); `lib/diagnostic_batch_core.sv0` (`hasErrors` / `errorCount` on three tag slots).
-3. **Lexer** — `sml/lexer/*` → `lexer/*.sv0` (seed: `lexer/token_keyword_core.sv0`).
-4. **Env (name resolution)** — `sml/name_resolution/env.*` → `lib/env_core.sv0` (bounded module-value register + lookup).
+3. **Lexer** — `sml/lexer/*` → `lexer/*.sv0` (seeds: `lexer/token_keyword_core.sv0`, `lexer/token_delim_core.sv0`).
+4. **Env (name resolution)** — `sml/name_resolution/env.*` → `lib/env_core.sv0` (bounded module-value register + lookup); `lib/resolver_value_core.sv0` (three-slot `lookup_value` / path check slice).
 5. **AST** — `sml/ast/*`
 6. **Parser** — `sml/parser/*`
 7. **Name resolution** — `sml/name_resolution/*` (full resolver; builds on **§4**)
