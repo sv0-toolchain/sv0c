@@ -81,3 +81,11 @@ Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — a
 ## `lexer/token_delim_core.sv0`
 
 Delimiter / punctuation tags (`( ) { } , ;`) in a band disjoint from keyword tags, plus `is_delimiter_tag`.
+
+## `lexer/token_op_core.sv0`
+
+Operator tags (`+ - * / == != -> => ::`) in band **20–28**, plus `is_operator_tag`.
+
+## `lib/type_alias_core.sv0`
+
+Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unrolled multi-hop resolution (chains into prelude id **1** = `i32` per `lookup_type_core` convention).

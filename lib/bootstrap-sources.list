@@ -12,5 +12,7 @@ lib/env_scope_core.sv0
 lib/lookup_value_core.sv0
 lib/resolver_call_core.sv0
 lib/lookup_type_core.sv0
+lib/type_alias_core.sv0
 lexer/token_keyword_core.sv0
 lexer/token_delim_core.sv0
+lexer/token_op_core.sv0
