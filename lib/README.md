@@ -2,7 +2,7 @@
 
 This tree holds **sv0 source** that mirrors slices of the SML bootstrap compiler (`sml/**/*.sml`) for the self-hosting roadmap (`task/sv0-toolchain-milestone-3-self-host.Rmd`).
 
-Sibling directories at the `sv0c/` root (e.g. **`lexer/`**, **`parser/`**) are reserved for additional transliterated modules as the surface grows. **`sml/`** is the bootstrap implementation; **`lib/`** + those dirs are the sv0 track.
+Sibling directories at the `sv0c/` root (**`lexer/`**, **`parser/`**, …) hold additional transliterated modules as the surface grows. **`sml/`** is the bootstrap implementation; **`lib/`** + those dirs are the sv0 track.
 
 ## Build
 
@@ -12,7 +12,7 @@ From the **sv0-toolchain** root:
 ./scripts/sv0 bootstrap-build
 ```
 
-CI reads **`lib/bootstrap-sources.list`**: one path per line (relative to `sv0c/`). If the list is missing or empty, every top-level `lib/*.sv0` is used. Each listed file is compiled to **`build/vm/<basename>.sv0b`** (basename only — keep names unique across `lib/` and `lexer/`).
+CI reads **`lib/bootstrap-sources.list`**: one path per line (relative to `sv0c/`). If the list is missing or empty, every top-level `lib/*.sv0` is used. Each listed file is compiled to **`build/vm/<basename>.sv0b`** (basename only — keep names unique across **`lib/`**, **`lexer/`**, **`parser/`**, …).
 
 **Layout and transliteration order:** [`LAYOUT.md`](./LAYOUT.md).
 
@@ -93,3 +93,7 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 ## `lib/lookup_type_alias_core.sv0`
 
 **Integrated** `TypeEnvAlias`: module types + aliases together; **`lookup_type_resolved`** = `resolveCanonicalTy` then prelude or `modTys` (matches `lookupType` for a one-segment path). **Self** (99) bypasses alias expansion when `allow_self` is set — use this file as the main reference when testing the type-lookup pipeline end-to-end; keep `lookup_type_core` and `type_alias_core` as smaller pieces.
+
+## `parser/expr_entry_core.sv0`
+
+**parsePrimaryExpr** entry dispatch: **`parse_primary_dispatch`** maps stand-in token tags to arm ids **1–20** in the same order as `parser.sml` after **`litFromTok`**. **`lexer_keyword_tag_to_dispatch`** / **`lexer_delim_tag_to_dispatch`** tie **`token_keyword_core`** (**`if` = 3**) and **`token_delim_core`** (**`(` = 10**, **`{` = 12**) into that table; **`primary_arm_is_compound`** flags arms that always recurse. Compare directly with `parsePrimaryExpr` when extending the bootstrap parser.
