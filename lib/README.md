@@ -97,3 +97,7 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 ## `parser/expr_entry_core.sv0`
 
 **parsePrimaryExpr** entry dispatch: **`parse_primary_dispatch`** maps stand-in token tags to arm ids **1–20** in the same order as `parser.sml` after **`litFromTok`**. **`lexer_keyword_tag_to_dispatch`** / **`lexer_delim_tag_to_dispatch`** tie **`token_keyword_core`** (**`if` = 3**) and **`token_delim_core`** (**`(` = 10**, **`[` = 16**, **`{` = 12**) into that table; **`primary_arm_is_compound`** flags arms that always recurse. Compare directly with `parsePrimaryExpr` when extending the bootstrap parser.
+
+## `parser/item_entry_core.sv0`
+
+**parseItem** dispatch (top-level items): arms **1–9** = **module, use, fn, struct, enum, trait, impl, type, newtype** in `parser.sml` case order. Stand-in tags **180–187** plus **`fn` = 1** from **`token_keyword_core`**; **`lexer_keyword_fn_to_item_arm`** maps **`tag_kw_fn`**. **`item_arm_has_item_body`** marks **fn/struct/enum/trait/impl** (items that normally carry a body in the full parser). Use this for module-level entry testing; block **`tryStmt`** is a separate future seed.
