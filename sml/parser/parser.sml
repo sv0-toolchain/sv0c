@@ -669,7 +669,10 @@ structure Parser :> PARSER = struct
 
   and parseStructFields r =
     case r of
-      (Token.RBRACE, _) :: r2 => ([], r)
+      (* Consume `}` so the struct literal ends before `;` / `,` / `)` in the outer
+         context. Trailing comma after the last field recurses here; returning `r`
+         (with RBRACE still on the stream) broke `let` / stmts (expected `;`). *)
+      (Token.RBRACE, _) :: r2 => ([], r2)
     | _ =>
         let
           fun one rr =
@@ -1382,7 +1385,6 @@ structure Parser :> PARSER = struct
                      | (NONE, _) =>
                          let val (it, r1) = parseItem r0
                          in loop (it :: acc) r1 end)
-                    handle Fail _ => rev acc
               end
       in
         loop [] tokens

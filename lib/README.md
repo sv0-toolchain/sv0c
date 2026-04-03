@@ -36,4 +36,8 @@ echo 'CM.make "sources.cm"; Main.main ((), ["--target=vm", "lib/span_core.sv0"])
 
 ## `span_core.sv0`
 
-Transliterated subset of `sml/error/span.sml` / `span.sig` (see table in the previous `rewrite/README.md` history). `main` stays straight-line so the bootstrap IR/VM path emits an entry function.
+Transliterated subset of `sml/error/span.sml` / `span.sig`. `main` uses a simple `return` so the bootstrap IR/VM path emits an entry function.
+
+## `diagnostic_core.sv0`
+
+Transliterated subset of `sml/error/diagnostic.sig` + `diagnostic.sml`: `datatype severity` as enum `Severity`, diagnostic-shaped values with `sev_tag` (stand-in until VM supports `struct { sev: Severity, … }`) and span line. See the file header and [`LAYOUT.md`](./LAYOUT.md) for VM limits and growth plan.

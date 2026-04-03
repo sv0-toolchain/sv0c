@@ -3,3 +3,4 @@
 # Order is arbitrary today (each program is compiled separately).
 
 lib/span_core.sv0
+lib/diagnostic_core.sv0
