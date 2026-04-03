@@ -1,0 +1,120 @@
+/* Transliteration seed: sml/name_resolution/env.sml — preludeTypes, registerModuleType,
+   lookupType for a single-segment path. Numeric ids stand in for type names; Self uses
+   sentinel 99 when allow_self is set. */
+
+fn tag_ty_i32() -> i32 {
+  return 1;
+}
+
+fn tag_ty_bool() -> i32 {
+  return 2;
+}
+
+fn tag_ty_unit() -> i32 {
+  return 3;
+}
+
+fn tag_ty_str() -> i32 {
+  return 4;
+}
+
+fn tag_ty_self() -> i32 {
+  return 99;
+}
+
+fn is_prelude_type_id(t: i32) -> i32 {
+  if t == 1 {
+    return 1;
+  } else {
+    if t == 2 {
+      return 1;
+    } else {
+      if t == 3 {
+        return 1;
+      } else {
+        if t == 4 {
+          return 1;
+        } else {
+          return 0;
+        }
+      }
+    }
+  }
+}
+
+struct TypeEnv2 {
+  t0: i32,
+  t1: i32,
+  n: i32,
+}
+
+fn ty_empty() -> TypeEnv2 {
+  return TypeEnv2 { t0: 0, t1: 0, n: 0 };
+}
+
+fn ty_register(e: TypeEnv2, id: i32) -> TypeEnv2 {
+  if e.n == 0 {
+    return TypeEnv2 { t0: id, t1: e.t1, n: 1 };
+  } else {
+    if e.n == 1 {
+      return TypeEnv2 { t0: e.t0, t1: id, n: 2 };
+    } else {
+      return e;
+    }
+  }
+}
+
+fn ty_mod_lookup(e: TypeEnv2, id: i32) -> i32 {
+  if e.n >= 1 {
+    if e.t0 == id {
+      return 1;
+    } else {
+      if e.n >= 2 {
+        if e.t1 == id {
+          return 1;
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    }
+  } else {
+    return 0;
+  }
+}
+
+/* allow_self: 0 or 1 (impl ctx). */
+fn lookup_type_simple(e: TypeEnv2, tid: i32, allow_self: i32) -> i32 {
+  if allow_self == 1 {
+    if tid == 99 {
+      return 1;
+    } else {
+      if is_prelude_type_id(tid) == 1 {
+        return 1;
+      } else {
+        return ty_mod_lookup(e, tid);
+      }
+    }
+  } else {
+    if is_prelude_type_id(tid) == 1 {
+      return 1;
+    } else {
+      return ty_mod_lookup(e, tid);
+    }
+  }
+}
+
+fn main() -> i32 {
+  let e0: TypeEnv2 = ty_empty();
+  let ok_pre: i32 = 1 - lookup_type_simple(e0, tag_ty_i32(), 0);
+  let ok_pre2: i32 = 1 - lookup_type_simple(e0, tag_ty_bool(), 0);
+  let e1: TypeEnv2 = ty_register(e0, 40);
+  let e2: TypeEnv2 = ty_register(e1, 41);
+  let ok_mod: i32 = 1 - lookup_type_simple(e2, 40, 0);
+  let ok_miss: i32 = lookup_type_simple(e2, 50, 0);
+  let ok_self_yes: i32 = 1 - lookup_type_simple(e2, tag_ty_self(), 1);
+  let ok_self_no: i32 = lookup_type_simple(e2, tag_ty_self(), 0);
+  let ok_n: i32 = e2.n - 2;
+  return ok_pre + ok_pre2 + ok_mod + ok_miss + ok_self_yes + ok_self_no + ok_n;
+}

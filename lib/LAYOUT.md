@@ -22,7 +22,7 @@ Rough bottom-up order (mirrors `sml/` data flow):
 1. **Span / positions** — `sml/error/span.sml` → `lib/span_core.sv0` (seed)
 2. **Diagnostics** — `sml/error/diagnostic.*` → `lib/diagnostic_core.sv0` (format length model); `lib/diagnostic_batch_core.sv0` (`hasErrors` / `errorCount` on three tag slots).
 3. **Lexer** — `sml/lexer/*` → `lexer/*.sv0` (seeds: `lexer/token_keyword_core.sv0`, `lexer/token_delim_core.sv0`).
-4. **Env (name resolution)** — `sml/name_resolution/env.*` → `lib/env_core.sv0` (bounded module-value register + lookup); `lib/env_scope_core.sv0` (`enterScope` / `bindLocal` / `exitScope` slice, two frames × two locals); `lib/lookup_value_core.sv0` (**merged** `lookupValue`: locals then module); `lib/resolver_value_core.sv0` (three-slot path-only `lookup_value`); `lib/resolver_arity_core.sv0` (`registerFnArity` / `lookupFnArity` / call-arity check).
+4. **Env (name resolution)** — `sml/name_resolution/env.*` → `lib/env_core.sv0` (bounded module-value register + lookup); `lib/env_scope_core.sv0` (`enterScope` / `bindLocal` / `exitScope` slice, two frames × two locals); `lib/lookup_value_core.sv0` (**merged** `lookupValue`: locals then module); `lib/resolver_value_core.sv0` (three-slot path-only `lookup_value`); `lib/resolver_arity_core.sv0` (`registerFnArity` / `lookupFnArity` / call-arity check); `lib/resolver_call_core.sv0` (**merged** value env + arity + `expr_call_ok`); `lib/lookup_type_core.sv0` (prelude type tags + `registerModuleType` slice + single-segment `lookupType` / **Self**).
 5. **AST** — `sml/ast/*`
 6. **Parser** — `sml/parser/*`
 7. **Name resolution** — `sml/name_resolution/*` (full resolver; builds on **§4**)

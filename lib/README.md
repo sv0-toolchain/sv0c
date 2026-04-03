@@ -66,6 +66,14 @@ Two-slot function arity table (`FnArity2`), `lookup_fn_arity` (−1 = absent), a
 
 **Merged** `FullEnv`: module slots + scope stack in one struct; **`lookup_value`** matches SML order (innermost locals, then `modVals`). Smaller seeds (`env_core`, `env_scope_core`) remain as isolated building blocks.
 
+## `lib/resolver_call_core.sv0`
+
+**Merged** `FullEnvCall`: same shape as `lookup_value_core` plus embedded fn-arity table; **`ec_expr_call_ok`** = value must resolve, then arity check when a row exists (`resolver.sml` `ExprCall` path).
+
+## `lib/lookup_type_core.sv0`
+
+Prelude type tags (`i32`/`bool`/`unit`/`str` as numeric ids), two-slot module types, **`lookup_type_simple`** with optional **Self** (sentinel id 99) when `allow_self` is set — slice of `lookupType` for one-segment paths.
+
 ## `lexer/token_keyword_core.sv0`
 
 Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — anchor for `sml/lexer/token.sml`. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
