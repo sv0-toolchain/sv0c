@@ -54,6 +54,14 @@ Bounded slice of `sml/name_resolution/env.*`: two-slot module value list (numeri
 
 Bounded three-slot module-value list with `lookup_value` / `resolve_path_ok` — tiny slice of `ExprPath` resolution (`sml/name_resolution/resolver.sml` + `Env.lookupValue`).
 
+## `lib/resolver_arity_core.sv0`
+
+Two-slot function arity table (`FnArity2`), `lookup_fn_arity` (−1 = absent), and `call_arity_ok` matching resolver checks when arity is known.
+
+## `lib/env_scope_core.sv0`
+
+`scope_enter` / `scope_bind` / `scope_exit` / `scope_lookup` on a bounded two-frame, two-local-per-frame model (`sml/name_resolution/env.sml` frames).
+
 ## `lexer/token_keyword_core.sv0`
 
 Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — anchor for `sml/lexer/token.sml`. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).

@@ -1,0 +1,81 @@
+/* Transliteration seed: sml/name_resolution/env.sml — registerFnArity + lookupFnArity
+   and resolver-style arity check when an arity row exists. Numeric ids stand in for names.
+   Fixed two-slot table; duplicate name registration is ignored (bounded corpus). */
+
+struct FnArity2 {
+  n: i32,
+  n0: i32,
+  a0: i32,
+  n1: i32,
+  a1: i32,
+}
+
+fn arity_empty() -> FnArity2 {
+  return FnArity2 { n: 0, n0: 0, a0: 0, n1: 0, a1: 0 };
+}
+
+fn arity_register(e: FnArity2, name_id: i32, arity: i32) -> FnArity2 {
+  if e.n >= 1 {
+    if e.n0 == name_id {
+      return e;
+    } else {
+      if e.n >= 2 {
+        if e.n1 == name_id {
+          return e;
+        } else {
+          return e;
+        }
+      } else {
+        return FnArity2 { n: 2, n0: e.n0, a0: e.a0, n1: name_id, a1: arity };
+      }
+    }
+  } else {
+    return FnArity2 { n: 1, n0: name_id, a0: arity, n1: 0, a1: 0 };
+  }
+}
+
+fn lookup_fn_arity(e: FnArity2, name_id: i32) -> i32 {
+  if e.n >= 1 {
+    if e.n0 == name_id {
+      return e.a0;
+    } else {
+      if e.n >= 2 {
+        if e.n1 == name_id {
+          return e.a1;
+        } else {
+          return -1;
+        }
+      } else {
+        return -1;
+      }
+    }
+  } else {
+    return -1;
+  }
+}
+
+/* Returns 1 if no arity row or argc matches; 0 if arity is known and mismatched. */
+fn call_arity_ok(e: FnArity2, name_id: i32, argc: i32) -> i32 {
+  let ar: i32 = lookup_fn_arity(e, name_id);
+  if ar < 0 {
+    return 1;
+  } else {
+    if ar == argc {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
+
+fn main() -> i32 {
+  let e0: FnArity2 = arity_empty();
+  let e1: FnArity2 = arity_register(e0, 5, 2);
+  let e2: FnArity2 = arity_register(e1, 6, 1);
+  let fail_right: i32 = 1 - call_arity_ok(e2, 5, 2);
+  let fail_wrong: i32 = call_arity_ok(e2, 5, 3);
+  let fail_other: i32 = 1 - call_arity_ok(e2, 6, 1);
+  let fail_absent: i32 = 1 - call_arity_ok(e2, 99, 0);
+  let fail_miss: i32 = lookup_fn_arity(e2, 7) + 1;
+  return fail_right + fail_wrong + fail_other + fail_absent + fail_miss;
+}
