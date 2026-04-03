@@ -20,7 +20,7 @@ All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the 
 Rough bottom-up order (mirrors `sml/` data flow):
 
 1. **Span / positions** — `sml/error/span.sml` → `lib/span_core.sv0` (seed)
-2. **Diagnostics** — `sml/error/diagnostic.*`
+2. **Diagnostics** — `sml/error/diagnostic.*` → `lib/diagnostic_core.sv0` (subset: `Severity` enum + 2-field `Diagnostic { sev_tag, line }` + `match` on tags; VM lowering does not yet emit `main` for larger struct literals or struct-returning helpers — see file header comments)
 3. **Lexer** — `sml/lexer/*` → `lexer/*.sv0`
 4. **AST** — `sml/ast/*`
 5. **Parser** — `sml/parser/*`

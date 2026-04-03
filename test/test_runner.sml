@@ -262,6 +262,14 @@ structure TestRunner = struct
                  (case restExpr of
                     (Token.EOF, _) :: _ => true
                   | _ => false)
+      val pTrailStruct = parseSrc (
+        "struct Pt { x: i32, y: i32, z: i32 }" ^ nl ^
+        "fn main() -> i32 {" ^ nl ^
+        "  let p: Pt = Pt { x: 1, y: 2, z: 3, };" ^ nl ^
+        "  return p.x;" ^ nl ^
+        "}")
+      val () = check "parse trailing-comma struct literal consumes closing brace"
+        (length pTrailStruct = 2)
 
       (* --- name resolution --- *)
       val () = print "\n[resolver]\n"
@@ -354,6 +362,11 @@ structure TestRunner = struct
                  (checkCatch
                     ("struct Point { x: i32, y: i32 }" ^ nl ^
                      "fn main() -> i32 { let p: Point = Point { x: 3, y: 4 }; return p.x; }") =
+                    NONE)
+      val () = check "checker accepts trailing-comma struct literal in let"
+                 (checkCatch
+                    ("struct Point { x: i32, y: i32 }" ^ nl ^
+                     "fn main() -> i32 { let p: Point = Point { x: 3, y: 4, }; return p.x; }") =
                     NONE)
       val () = check "checker accepts enum unit and match"
                  (checkCatch

@@ -1,0 +1,61 @@
+/* Transliteration seed: sml/error/diagnostic.sig + diagnostic.sml (subset).
+   Maps severity + diagnostic record to i32 tags/proxies (code/message/related/help
+   as nonempty flags and lengths). Trailing commas in struct literals exercise
+   parseStructFields consuming the closing `}`. */
+
+enum Severity {
+  Error(),
+  Warning(),
+  Note(),
+}
+
+struct Diagnostic {
+  sev_tag: i32,
+  code_nonempty: i32,
+  msg_len: i32,
+  line: i32,
+  col: i32,
+  related_len: i32,
+  help_len: i32,
+}
+
+fn is_error_sev(s: Severity) -> i32 {
+  match s {
+    Severity::Error() => 1,
+    Severity::Warning() => 0,
+    Severity::Note() => 0,
+  }
+}
+
+fn main() -> i32 {
+  let e: Diagnostic = Diagnostic {
+    sev_tag: 0,
+    code_nonempty: 1,
+    msg_len: 24,
+    line: 10,
+    col: 3,
+    related_len: 0,
+    help_len: 1,
+  };
+  let w: Diagnostic = Diagnostic {
+    sev_tag: 1,
+    code_nonempty: 0,
+    msg_len: 5,
+    line: 20,
+    col: 1,
+    related_len: 2,
+    help_len: 0,
+  };
+  let tag_e: i32 = e.sev_tag;
+  let c_e: i32 = match tag_e {
+    0 => 1,
+    _ => 0,
+  };
+  let tag_w: i32 = w.sev_tag;
+  let c_w: i32 = match tag_w {
+    0 => 1,
+    _ => 0,
+  };
+  let warn_is_not_err: i32 = is_error_sev(Severity::Warning());
+  return c_e + c_w + warn_is_not_err + e.line + e.col + e.help_len - 15;
+}
