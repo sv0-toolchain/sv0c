@@ -1,0 +1,56 @@
+/* Transliteration seed: sml/lexer/token.sml — delimiter / punctuation subset as i32 tags.
+   Discriminants are in a band disjoint from keyword tags in token_keyword_core.sv0. */
+
+fn tag_delim_lparen() -> i32 {
+  return 10;
+}
+
+fn tag_delim_rparen() -> i32 {
+  return 11;
+}
+
+fn tag_delim_lbrace() -> i32 {
+  return 12;
+}
+
+fn tag_delim_rbrace() -> i32 {
+  return 13;
+}
+
+fn tag_delim_comma() -> i32 {
+  return 14;
+}
+
+fn tag_delim_semi() -> i32 {
+  return 15;
+}
+
+fn is_delimiter_tag(t: i32) -> i32 {
+  if t == 10 {
+    return 1;
+  } else if t == 11 {
+    return 1;
+  } else if t == 12 {
+    return 1;
+  } else if t == 13 {
+    return 1;
+  } else if t == 14 {
+    return 1;
+  } else if t == 15 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+fn main() -> i32 {
+  let ok_lp: i32 = is_delimiter_tag(tag_delim_lparen()) - 1;
+  let ok_rp: i32 = is_delimiter_tag(tag_delim_rparen()) - 1;
+  let ok_lb: i32 = is_delimiter_tag(tag_delim_lbrace()) - 1;
+  let ok_rb: i32 = is_delimiter_tag(tag_delim_rbrace()) - 1;
+  let ok_cm: i32 = is_delimiter_tag(tag_delim_comma()) - 1;
+  let ok_sm: i32 = is_delimiter_tag(tag_delim_semi()) - 1;
+  let ok_non: i32 = is_delimiter_tag(3);
+  let ok_kw: i32 = is_delimiter_tag(1);
+  return ok_lp + ok_rp + ok_lb + ok_rb + ok_cm + ok_sm + ok_non + ok_kw;
+}
