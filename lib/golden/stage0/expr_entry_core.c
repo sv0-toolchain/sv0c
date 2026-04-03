@@ -30,7 +30,7 @@ static int tok_self(void);
 static int tok_self_ty(void);
 static int tok_result(void);
 static int tok_ident(void);
-static int tok_lbracket_syn(void);
+static int tok_lbracket_delim(void);
 static int tok_match_kw(void);
 static int tok_while_kw(void);
 static int tok_for_kw(void);
@@ -167,8 +167,8 @@ static int tok_ident(void) {
   return 73;
 }
 
-static int tok_lbracket_syn(void) {
-  return 17;
+static int tok_lbracket_delim(void) {
+  return 16;
 }
 
 static int tok_match_kw(void) {
@@ -273,7 +273,7 @@ static int parse_primary_dispatch(int t) {
                         _sv0t11 = 0;
                       } else {
                         int _sv0t12;
-                        if ((t == 17)) {
+                        if ((t == 16)) {
                           return 7;
                           _sv0t12 = 0;
                         } else {
@@ -446,7 +446,7 @@ int main(void) {
   int _sv0t10 = parse_primary_dispatch(12);
   int _sv0t11 = arm_lbrace();
   int f4 = (_sv0t10 - _sv0t11);
-  int _sv0t12 = tok_lbracket_syn();
+  int _sv0t12 = tok_lbracket_delim();
   int _sv0t13 = parse_primary_dispatch(_sv0t12);
   int _sv0t14 = arm_lbracket();
   int f5 = (_sv0t13 - _sv0t14);
@@ -468,25 +468,32 @@ int main(void) {
   int f10 = (_sv0t24 - _sv0t25);
   int _sv0t26 = lexer_delim_tag_to_dispatch(11);
   int f11 = _sv0t26;
-  int _sv0t27 = arm_lit();
-  int _sv0t28 = primary_arm_is_compound(_sv0t27);
-  int f12 = _sv0t28;
-  int _sv0t29 = arm_if();
-  int _sv0t30 = primary_arm_is_compound(_sv0t29);
-  int f13 = (1 - _sv0t30);
-  int _sv0t31 = (f0 + f1);
-  int _sv0t32 = (_sv0t31 + f2);
-  int _sv0t33 = (_sv0t32 + f3);
-  int _sv0t34 = (_sv0t33 + f4);
-  int _sv0t35 = (_sv0t34 + f5);
-  int _sv0t36 = (_sv0t35 + f6);
-  int _sv0t37 = (_sv0t36 + f7);
-  int _sv0t38 = (_sv0t37 + f8);
-  int _sv0t39 = (_sv0t38 + f9);
-  int _sv0t40 = (_sv0t39 + f10);
-  int _sv0t41 = (_sv0t40 + f11);
-  int _sv0t42 = (_sv0t41 + f12);
-  int _sv0t43 = (_sv0t42 + f13);
-  return _sv0t43;
+  int _sv0t27 = lexer_delim_tag_to_dispatch(16);
+  int _sv0t28 = arm_lbracket();
+  int f12 = (_sv0t27 - _sv0t28);
+  int _sv0t29 = lexer_delim_tag_to_dispatch(17);
+  int f13 = _sv0t29;
+  int _sv0t30 = arm_lit();
+  int _sv0t31 = primary_arm_is_compound(_sv0t30);
+  int f14 = _sv0t31;
+  int _sv0t32 = arm_if();
+  int _sv0t33 = primary_arm_is_compound(_sv0t32);
+  int f15 = (1 - _sv0t33);
+  int _sv0t34 = (f0 + f1);
+  int _sv0t35 = (_sv0t34 + f2);
+  int _sv0t36 = (_sv0t35 + f3);
+  int _sv0t37 = (_sv0t36 + f4);
+  int _sv0t38 = (_sv0t37 + f5);
+  int _sv0t39 = (_sv0t38 + f6);
+  int _sv0t40 = (_sv0t39 + f7);
+  int _sv0t41 = (_sv0t40 + f8);
+  int _sv0t42 = (_sv0t41 + f9);
+  int _sv0t43 = (_sv0t42 + f10);
+  int _sv0t44 = (_sv0t43 + f11);
+  int _sv0t45 = (_sv0t44 + f12);
+  int _sv0t46 = (_sv0t45 + f13);
+  int _sv0t47 = (_sv0t46 + f14);
+  int _sv0t48 = (_sv0t47 + f15);
+  return _sv0t48;
 }
 
