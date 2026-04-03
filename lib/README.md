@@ -89,3 +89,7 @@ Operator tags (`+ - * / == != -> => ::`) in band **20–28**, plus `is_operator_
 ## `lib/type_alias_core.sv0`
 
 Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unrolled multi-hop resolution (chains into prelude id **1** = `i32` per `lookup_type_core` convention).
+
+## `lib/lookup_type_alias_core.sv0`
+
+**Integrated** `TypeEnvAlias`: module types + aliases together; **`lookup_type_resolved`** = `resolveCanonicalTy` then prelude or `modTys` (matches `lookupType` for a one-segment path). **Self** (99) bypasses alias expansion when `allow_self` is set — use this file as the main reference when testing the type-lookup pipeline end-to-end; keep `lookup_type_core` and `type_alias_core` as smaller pieces.

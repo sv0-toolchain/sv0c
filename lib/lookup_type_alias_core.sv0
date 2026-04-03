@@ -1,0 +1,180 @@
+/* End-to-end transliteration seed: sml/name_resolution/env.sml — lookupType for [t]
+   after resolveCanonicalTy, then prelude or modTys. Merges module types + tyAlias in one
+   struct so tests mirror the real pipeline (easier to diff against env.sml than split files).
+   Self (id 99) skips alias resolution, matching the Ast.path special case. */
+
+struct TypeEnvAlias {
+  t0: i32,
+  t1: i32,
+  tn: i32,
+  an: i32,
+  af0: i32,
+  at0: i32,
+  af1: i32,
+  at1: i32,
+}
+
+fn tag_ty_self() -> i32 {
+  return 99;
+}
+
+fn is_prelude_type_id(t: i32) -> i32 {
+  if t == 1 {
+    return 1;
+  } else {
+    if t == 2 {
+      return 1;
+    } else {
+      if t == 3 {
+        return 1;
+      } else {
+        if t == 4 {
+          return 1;
+        } else {
+          return 0;
+        }
+      }
+    }
+  }
+}
+
+fn tea_empty() -> TypeEnvAlias {
+  return TypeEnvAlias { t0: 0, t1: 0, tn: 0, an: 0, af0: 0, at0: 0, af1: 0, at1: 0 };
+}
+
+fn tea_ty_register(e: TypeEnvAlias, id: i32) -> TypeEnvAlias {
+  if e.tn == 0 {
+    return TypeEnvAlias { t0: id, t1: e.t1, tn: 1, an: e.an, af0: e.af0, at0: e.at0, af1: e.af1, at1: e.at1 };
+  } else {
+    if e.tn == 1 {
+      return TypeEnvAlias { t0: e.t0, t1: id, tn: 2, an: e.an, af0: e.af0, at0: e.at0, af1: e.af1, at1: e.at1 };
+    } else {
+      return e;
+    }
+  }
+}
+
+fn tea_alias_register(e: TypeEnvAlias, from_id: i32, to_id: i32) -> TypeEnvAlias {
+  if e.an >= 1 {
+    if e.af0 == from_id {
+      return e;
+    } else {
+      if e.an >= 2 {
+        if e.af1 == from_id {
+          return e;
+        } else {
+          return e;
+        }
+      } else {
+        return TypeEnvAlias { t0: e.t0, t1: e.t1, tn: e.tn, an: 2, af0: e.af0, at0: e.at0, af1: from_id, at1: to_id };
+      }
+    }
+  } else {
+    return TypeEnvAlias { t0: e.t0, t1: e.t1, tn: e.tn, an: 1, af0: from_id, at0: to_id, af1: 0, at1: 0 };
+  }
+}
+
+fn tea_ty_mod_lookup(e: TypeEnvAlias, id: i32) -> i32 {
+  if e.tn >= 1 {
+    if e.t0 == id {
+      return 1;
+    } else {
+      if e.tn >= 2 {
+        if e.t1 == id {
+          return 1;
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn tea_alias_step(e: TypeEnvAlias, t: i32) -> i32 {
+  if e.an >= 1 {
+    if e.af0 == t {
+      return e.at0;
+    } else {
+      if e.an >= 2 {
+        if e.af1 == t {
+          return e.at1;
+        } else {
+          return t;
+        }
+      } else {
+        return t;
+      }
+    }
+  } else {
+    return t;
+  }
+}
+
+fn tea_resolve_canonical(e: TypeEnvAlias, t: i32) -> i32 {
+  let s1: i32 = tea_alias_step(e, t);
+  if s1 == t {
+    return t;
+  } else {
+    let s2: i32 = tea_alias_step(e, s1);
+    if s2 == s1 {
+      return s1;
+    } else {
+      let s3: i32 = tea_alias_step(e, s2);
+      if s3 == s2 {
+        return s2;
+      } else {
+        let s4: i32 = tea_alias_step(e, s3);
+        if s4 == s3 {
+          return s3;
+        } else {
+          return s4;
+        }
+      }
+    }
+  }
+}
+
+/* Mirrors lookupType env ctx for path [tid]: resolveCanonicalTy then prelude/modTys.
+   allow_self: 0 or 1; Self uses tid 99 and does not go through tyAlias. */
+fn lookup_type_resolved(e: TypeEnvAlias, tid: i32, allow_self: i32) -> i32 {
+  if allow_self == 1 {
+    if tid == 99 {
+      return 1;
+    } else {
+      let c: i32 = tea_resolve_canonical(e, tid);
+      if is_prelude_type_id(c) == 1 {
+        return 1;
+      } else {
+        return tea_ty_mod_lookup(e, c);
+      }
+    }
+  } else {
+    let c2: i32 = tea_resolve_canonical(e, tid);
+    if is_prelude_type_id(c2) == 1 {
+      return 1;
+    } else {
+      return tea_ty_mod_lookup(e, c2);
+    }
+  }
+}
+
+fn main() -> i32 {
+  let e0: TypeEnvAlias = tea_empty();
+  let e1: TypeEnvAlias = tea_ty_register(e0, 40);
+  let e2: TypeEnvAlias = tea_ty_register(e1, 41);
+  let e3: TypeEnvAlias = tea_alias_register(e2, 50, 40);
+  let e4: TypeEnvAlias = tea_alias_register(e3, 10, 1);
+  let ok_alias_mod: i32 = 1 - lookup_type_resolved(e4, 50, 0);
+  let ok_chain_pre: i32 = 1 - lookup_type_resolved(e4, 10, 0);
+  let ok_direct_pre: i32 = 1 - lookup_type_resolved(e4, 2, 0);
+  let e5: TypeEnvAlias = tea_alias_register(tea_empty(), 60, 61);
+  let ok_bad_chain: i32 = lookup_type_resolved(e5, 60, 0);
+  let ok_self: i32 = 1 - lookup_type_resolved(e4, tag_ty_self(), 1);
+  let ok_self_block: i32 = lookup_type_resolved(e4, tag_ty_self(), 0);
+  let ok_miss: i32 = lookup_type_resolved(e4, 77, 0);
+  return ok_alias_mod + ok_chain_pre + ok_direct_pre + ok_bad_chain + ok_self + ok_self_block + ok_miss;
+}
