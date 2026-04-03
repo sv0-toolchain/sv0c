@@ -1,4 +1,4 @@
-/* Transliteration seed: see rewrite/README.md (maps to src/error/span.sml). */
+/* Transliteration seed: see lib/README.md (maps to sml/error/span.sml). */
 
 struct Pos {
   line: i32,

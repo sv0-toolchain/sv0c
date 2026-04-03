@@ -125,6 +125,6 @@ structure Main = struct
             \usage: sv0c <file.sv0>\n\
             \       sv0c --target=vm <file.sv0>   (emit build/vm/<stem>.sv0b)\n\
             \       sv0c --target=vm --project <dir>   (emit build/vm/main.sv0b)\n\
-            \       sv0c --project <dir>   (all *.sv0 in directory, C to stdout)\n")
+            \       sv0c --project <dir>   (all *.sv0 under dir recursively, C to stdout)\n")
         ; OS.Process.failure)
 end

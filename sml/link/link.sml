@@ -3,17 +3,34 @@ structure Link :> LINK = struct
   fun isSv0 (name : string) : bool =
     String.isSuffix ".sv0" name
 
-  fun listSv0 (dir : string) : string list =
+  fun isHidden (name : string) : bool =
+    name = "." orelse name = ".."
+    orelse (String.size name > 0 andalso String.sub (name, 0) = #".")
+
+  fun walkSv0 (dir : string) (acc : string list) : string list =
     let
       val d = OS.FileSys.openDir dir
       fun loop acc =
         case OS.FileSys.readDir d of
           NONE => (OS.FileSys.closeDir d; acc)
-        | SOME n =>
-            if isSv0 n then loop (OS.Path.concat (dir, n) :: acc) else loop acc
+        | SOME name =>
+            if isHidden name then loop acc
+            else
+              let val path = OS.Path.concat (dir, name)
+              in
+                if OS.FileSys.isDir path then loop (walkSv0 path acc)
+                else if isSv0 name then loop (path :: acc)
+                else loop acc
+              end
     in
-      rev (loop [])
+      loop acc
     end
+
+  (* All *.sv0 under dir, any depth; skips hidden dirs/files (names starting with '.'). *)
+  fun listSv0 (dir : string) : string list =
+    ListMergeSort.sort
+      (fn (a, b) => case String.compare (a, b) of GREATER => false | _ => true)
+      (walkSv0 dir [])
 
   fun fileStem (path : string) : string =
     case OS.Path.splitBaseExt (OS.Path.file path) of
@@ -281,10 +298,7 @@ structure Link :> LINK = struct
 
   fun linkProjectDir (dir : string) : Ast.program =
     let
-      val paths =
-        ListMergeSort.sort
-          (fn (a, b) => case String.compare (a, b) of GREATER => true | _ => false)
-          (listSv0 dir)
+      val paths = listSv0 dir
       val () =
         if null paths then raise Fail ("E0321: no .sv0 files in `" ^ dir ^ "`")
         else ()

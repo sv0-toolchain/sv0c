@@ -1,5 +1,5 @@
 signature LINK = sig
-  (* All `*.sv0` in `dir`, sorted by path. Same mangling rules as linkDirectory. *)
+  (* All `*.sv0` under `dir` (recursive), sorted by path. Same mangling as linkDirectory. *)
   val linkProjectDir : string -> Ast.program
 
   (* `entryPath` must be a file; uses parent directory as project root. *)
