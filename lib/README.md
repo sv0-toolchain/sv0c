@@ -80,7 +80,7 @@ Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — a
 
 ## `lexer/token_delim_core.sv0`
 
-Delimiter / punctuation tags (`( ) { } , ;`) in a band disjoint from keyword tags, plus `is_delimiter_tag`.
+Delimiter / punctuation tags (`( ) { } , ; [ ]`) in band **10–17**, disjoint from keyword tags, plus `is_delimiter_tag`.
 
 ## `lexer/token_op_core.sv0`
 
@@ -96,4 +96,4 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 ## `parser/expr_entry_core.sv0`
 
-**parsePrimaryExpr** entry dispatch: **`parse_primary_dispatch`** maps stand-in token tags to arm ids **1–20** in the same order as `parser.sml` after **`litFromTok`**. **`lexer_keyword_tag_to_dispatch`** / **`lexer_delim_tag_to_dispatch`** tie **`token_keyword_core`** (**`if` = 3**) and **`token_delim_core`** (**`(` = 10**, **`{` = 12**) into that table; **`primary_arm_is_compound`** flags arms that always recurse. Compare directly with `parsePrimaryExpr` when extending the bootstrap parser.
+**parsePrimaryExpr** entry dispatch: **`parse_primary_dispatch`** maps stand-in token tags to arm ids **1–20** in the same order as `parser.sml` after **`litFromTok`**. **`lexer_keyword_tag_to_dispatch`** / **`lexer_delim_tag_to_dispatch`** tie **`token_keyword_core`** (**`if` = 3**) and **`token_delim_core`** (**`(` = 10**, **`[` = 16**, **`{` = 12**) into that table; **`primary_arm_is_compound`** flags arms that always recurse. Compare directly with `parsePrimaryExpr` when extending the bootstrap parser.

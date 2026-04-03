@@ -6,6 +6,8 @@ static int tag_delim_lbrace(void);
 static int tag_delim_rbrace(void);
 static int tag_delim_comma(void);
 static int tag_delim_semi(void);
+static int tag_delim_lbracket(void);
+static int tag_delim_rbracket(void);
 static int is_delimiter_tag(int t);
 
 static int tag_delim_lparen(void) {
@@ -30,6 +32,14 @@ static int tag_delim_comma(void) {
 
 static int tag_delim_semi(void) {
   return 15;
+}
+
+static int tag_delim_lbracket(void) {
+  return 16;
+}
+
+static int tag_delim_rbracket(void) {
+  return 17;
 }
 
 static int is_delimiter_tag(int t) {
@@ -64,8 +74,22 @@ static int is_delimiter_tag(int t) {
               return 1;
               _sv0t6 = 0;
             } else {
-              return 0;
-              _sv0t6 = 0;
+              int _sv0t7;
+              if ((t == 16)) {
+                return 1;
+                _sv0t7 = 0;
+              } else {
+                int _sv0t8;
+                if ((t == 17)) {
+                  return 1;
+                  _sv0t8 = 0;
+                } else {
+                  return 0;
+                  _sv0t8 = 0;
+                }
+                _sv0t7 = _sv0t8;
+              }
+              _sv0t6 = _sv0t7;
             }
             _sv0t5 = _sv0t6;
           }
@@ -100,17 +124,25 @@ int main(void) {
   int _sv0t10 = tag_delim_semi();
   int _sv0t11 = is_delimiter_tag(_sv0t10);
   int ok_sm = (_sv0t11 - 1);
-  int _sv0t12 = is_delimiter_tag(3);
-  int ok_non = _sv0t12;
-  int _sv0t13 = is_delimiter_tag(1);
-  int ok_kw = _sv0t13;
-  int _sv0t14 = (ok_lp + ok_rp);
-  int _sv0t15 = (_sv0t14 + ok_lb);
-  int _sv0t16 = (_sv0t15 + ok_rb);
-  int _sv0t17 = (_sv0t16 + ok_cm);
-  int _sv0t18 = (_sv0t17 + ok_sm);
-  int _sv0t19 = (_sv0t18 + ok_non);
-  int _sv0t20 = (_sv0t19 + ok_kw);
-  return _sv0t20;
+  int _sv0t12 = tag_delim_lbracket();
+  int _sv0t13 = is_delimiter_tag(_sv0t12);
+  int ok_lbk = (_sv0t13 - 1);
+  int _sv0t14 = tag_delim_rbracket();
+  int _sv0t15 = is_delimiter_tag(_sv0t14);
+  int ok_rbk = (_sv0t15 - 1);
+  int _sv0t16 = is_delimiter_tag(3);
+  int ok_non = _sv0t16;
+  int _sv0t17 = is_delimiter_tag(1);
+  int ok_kw = _sv0t17;
+  int _sv0t18 = (ok_lp + ok_rp);
+  int _sv0t19 = (_sv0t18 + ok_lb);
+  int _sv0t20 = (_sv0t19 + ok_rb);
+  int _sv0t21 = (_sv0t20 + ok_cm);
+  int _sv0t22 = (_sv0t21 + ok_sm);
+  int _sv0t23 = (_sv0t22 + ok_lbk);
+  int _sv0t24 = (_sv0t23 + ok_rbk);
+  int _sv0t25 = (_sv0t24 + ok_non);
+  int _sv0t26 = (_sv0t25 + ok_kw);
+  return _sv0t26;
 }
 

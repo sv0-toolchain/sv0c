@@ -1,7 +1,7 @@
 /* Transliteration seed: sml/parser/parser.sml — parsePrimaryExpr first-token dispatch.
    Each return value is a stable arm id (1..20) matching the case order after litFromTok
    in parsePrimaryExpr (lines ~557–668). Use this table when cross-checking the SML parser;
-   bridge helpers map lexer seed tags where they align (keyword if=3, delim 10/12). */
+   bridge helpers map lexer seed tags where they align (keyword if=3; delim 10/12/16). */
 
 fn arm_lit() -> i32 {
   return 1;
@@ -125,8 +125,9 @@ fn tok_ident() -> i32 {
   return 73;
 }
 
-fn tok_lbracket_syn() -> i32 {
-  return 17;
+/* lexer/token_delim_core.sv0: tag_delim_lbracket() == 16 */
+fn tok_lbracket_delim() -> i32 {
+  return 16;
 }
 
 fn tok_match_kw() -> i32 {
@@ -207,7 +208,7 @@ fn parse_primary_dispatch(t: i32) -> i32 {
                       if t == 10 {
                         return 6;
                       } else {
-                        if t == 17 {
+                        if t == 16 {
                           return 7;
                         } else {
                           if t == 12 {
@@ -282,7 +283,7 @@ fn lexer_keyword_tag_to_dispatch(kw: i32) -> i32 {
   return parse_primary_dispatch(kw);
 }
 
-/* token_delim_core.sv0: LPAREN=10, LBRACE=12 — RPAREN etc. are not expression starters. */
+/* token_delim_core.sv0: LPAREN=10, LBRACKET=16, LBRACE=12 — RBRACKET etc. not expr starters. */
 fn lexer_delim_tag_to_dispatch(d: i32) -> i32 {
   return parse_primary_dispatch(d);
 }
@@ -306,14 +307,16 @@ fn main() -> i32 {
   let f2: i32 = parse_primary_dispatch(3) - arm_if();
   let f3: i32 = parse_primary_dispatch(10) - arm_lparen();
   let f4: i32 = parse_primary_dispatch(12) - arm_lbrace();
-  let f5: i32 = parse_primary_dispatch(tok_lbracket_syn()) - arm_lbracket();
+  let f5: i32 = parse_primary_dispatch(tok_lbracket_delim()) - arm_lbracket();
   let f6: i32 = parse_primary_dispatch(tok_ident()) - arm_ident();
   let f7: i32 = parse_primary_dispatch(tok_match_kw()) - arm_match();
   let f8: i32 = parse_primary_dispatch(99);
   let f9: i32 = lexer_keyword_tag_to_dispatch(3) - arm_if();
   let f10: i32 = lexer_delim_tag_to_dispatch(10) - arm_lparen();
   let f11: i32 = lexer_delim_tag_to_dispatch(11);
-  let f12: i32 = primary_arm_is_compound(arm_lit());
-  let f13: i32 = 1 - primary_arm_is_compound(arm_if());
-  return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13;
+  let f12: i32 = lexer_delim_tag_to_dispatch(16) - arm_lbracket();
+  let f13: i32 = lexer_delim_tag_to_dispatch(17);
+  let f14: i32 = primary_arm_is_compound(arm_lit());
+  let f15: i32 = 1 - primary_arm_is_compound(arm_if());
+  return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10 + f11 + f12 + f13 + f14 + f15;
 }
