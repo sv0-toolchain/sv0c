@@ -2,10 +2,7 @@
    SML `format` builds one string (header, `  -->` line, optional source snippet, related,
    help, trailing newline). `println` only accepts string literals here, so this file
    models **byte length** of that layout (same composition as diagnostic.sml).
-   Length math is **inlined in main** with `let` steps: the VM call ABI mishandles some
-   multi-argument callees when many functions are present (4th i32 arg was dropped in
-   callees like `format_header_len`); C backend is correct. `dec_pos` is recursive digit
-   width for non-negative values only (caller branches on sign). */
+   Helpers take scalar i32 parameters; `main` passes fields from a `Diagnostic` literal. */
 
 enum Severity {
   Error(),
@@ -29,22 +26,134 @@ struct Diagnostic {
   help_fmt_len: i32,
 }
 
-fn dec_pos(n: i32) -> i32 {
-  if n == 0 {
-    return 1;
-  } else if n < 10 {
-    return 1;
-  } else {
-    return 1 + dec_pos(n / 10);
-  }
-}
-
 fn is_error_sev(s: Severity) -> i32 {
   match s {
     Severity::Error() => 1,
     Severity::Warning() => 0,
     Severity::Note() => 0,
   }
+}
+
+fn max_i32(a: i32, b: i32) -> i32 {
+  if a > b {
+    return a;
+  } else {
+    return b;
+  }
+}
+
+fn decimal_digits_non_negative(n: i32) -> i32 {
+  if n == 0 {
+    return 1;
+  } else if n < 10 {
+    return 1;
+  } else {
+    return 1 + decimal_digits_non_negative(n / 10);
+  }
+}
+
+fn decimal_digits_i32(n: i32) -> i32 {
+  if n < 0 {
+    return 1 + decimal_digits_non_negative(0 - n);
+  } else {
+    return decimal_digits_non_negative(n);
+  }
+}
+
+fn span_len_at_least_one(slen: i32) -> i32 {
+  if slen < 1 {
+    return 1;
+  } else {
+    return slen;
+  }
+}
+
+fn rel_col_pad(col: i32) -> i32 {
+  if col <= 1 {
+    return 0;
+  } else {
+    return col - 1;
+  }
+}
+
+fn gutter_width(line: i32) -> i32 {
+  return max_i32(decimal_digits_i32(line), 2);
+}
+
+fn sev_label_len(sev_tag: i32) -> i32 {
+  match sev_tag {
+    0 => 5,
+    1 => 7,
+    _ => 4,
+  }
+}
+
+fn bracket_code_len(code_nonempty: i32, code_len: i32) -> i32 {
+  if code_nonempty == 0 {
+    return 0;
+  } else {
+    return 2 + code_len;
+  }
+}
+
+fn format_header_len(
+  sev_tag: i32,
+  code_nonempty: i32,
+  code_len: i32,
+  msg_len: i32
+) -> i32 {
+  let suf: i32 = bracket_code_len(code_nonempty, code_len);
+  let head: i32 = sev_label_len(sev_tag) + suf + 2 + msg_len;
+  return head + 1;
+}
+
+fn file_colon_part(file_nonempty: i32, file_len: i32) -> i32 {
+  if file_nonempty == 0 {
+    return 0;
+  } else {
+    return file_len + 1;
+  }
+}
+
+fn format_loc_len(file_nonempty: i32, file_len: i32, line: i32, col: i32) -> i32 {
+  let prefix: i32 = 6 + file_colon_part(file_nonempty, file_len) + decimal_digits_i32(line);
+  let colon_and_col: i32 = 1 + decimal_digits_i32(col);
+  let loc_nl: i32 = 1;
+  return prefix + colon_and_col + loc_nl;
+}
+
+fn format_snippet_len(line: i32, col: i32, span_len: i32, has_source: i32, src_line_len: i32) -> i32 {
+  if has_source == 0 {
+    return 0;
+  } else {
+    let gw: i32 = gutter_width(line);
+    let pref: i32 = gw + 3;
+    let blank: i32 = pref + 1;
+    let numbered: i32 = pref + src_line_len + 1;
+    let underline: i32 = pref + rel_col_pad(col) + span_len_at_least_one(span_len) + 1;
+    return blank + numbered + underline;
+  }
+}
+
+fn format_diagnostic_len(
+  sev_tag: i32,
+  code_nonempty: i32,
+  code_len: i32,
+  msg_len: i32,
+  line: i32,
+  col: i32,
+  span_len: i32,
+  file_nonempty: i32,
+  file_len: i32,
+  related_fmt_len: i32,
+  help_fmt_len: i32,
+  has_source: i32,
+  src_line_len: i32
+) -> i32 {
+  let h: i32 = format_header_len(sev_tag, code_nonempty, code_len, msg_len);
+  let l: i32 = format_loc_len(file_nonempty, file_len, line, col);
+  let s: i32 = format_snippet_len(line, col, span_len, has_source, src_line_len);
+  return h + l + s + related_fmt_len + help_fmt_len + 1;
 }
 
 fn main() -> i32 {
@@ -63,76 +172,24 @@ fn main() -> i32 {
     help_len: 1,
     help_fmt_len: 19,
   };
-  let has_source: i32 = 1;
-  let src_line_len: i32 = 15;
-  let sev_tag: i32 = d.sev_tag;
-  let code_nonempty: i32 = d.code_nonempty;
-  let code_len: i32 = d.code_len;
-  let msg_len: i32 = d.msg_len;
-  let line: i32 = d.line;
-  let col: i32 = d.col;
-  let span_len: i32 = d.span_len;
-  let file_nonempty: i32 = d.file_nonempty;
-  let file_len: i32 = d.file_len;
-  let related_fmt_len: i32 = d.related_fmt_len;
-  let help_fmt_len: i32 = d.help_fmt_len;
-  let sev_word: i32 = match sev_tag {
-    0 => 5,
-    1 => 7,
-    _ => 4,
-  };
-  let code_bracket: i32 = if code_nonempty == 0 {
-    0
-  } else {
-    2 + code_len
-  };
-  let header_core: i32 = sev_word + code_bracket + 2 + msg_len;
-  let header_len: i32 = header_core + 1;
-  let file_part: i32 = if file_nonempty == 0 {
-    0
-  } else {
-    file_len + 1
-  };
-  let line_digits: i32 = if line < 0 {
-    1 + dec_pos(0 - line)
-  } else {
-    dec_pos(line)
-  };
-  let col_digits: i32 = if col < 0 {
-    1 + dec_pos(0 - col)
-  } else {
-    dec_pos(col)
-  };
-  let loc_len: i32 = 6 + file_part + line_digits + 1 + col_digits + 1;
-  let gw: i32 = if line_digits > 2 {
-    line_digits
-  } else {
-    2
-  };
-  let pref: i32 = gw + 3;
-  let blank: i32 = pref + 1;
-  let numbered: i32 = pref + src_line_len + 1;
-  let col_pad: i32 = if col <= 1 {
-    0
-  } else {
-    col - 1
-  };
-  let carets: i32 = if span_len < 1 {
-    1
-  } else {
-    span_len
-  };
-  let underline: i32 = pref + col_pad + carets + 1;
-  let snippet_len: i32 = if has_source == 0 {
-    0
-  } else {
-    blank + numbered + underline
-  };
-  let body_len: i32 = header_len + loc_len + snippet_len + related_fmt_len + help_fmt_len;
-  let n: i32 = body_len + 1;
+  let n: i32 = format_diagnostic_len(
+    d.sev_tag,
+    d.code_nonempty,
+    d.code_len,
+    d.msg_len,
+    d.line,
+    d.col,
+    d.span_len,
+    d.file_nonempty,
+    d.file_len,
+    d.related_fmt_len,
+    d.help_fmt_len,
+    1,
+    15
+  );
   let expect: i32 = 116;
   let ok_len: i32 = n - expect;
-  let is_err: i32 = if sev_tag == 0 {
+  let is_err: i32 = if d.sev_tag == 0 {
     1
   } else {
     0
