@@ -12,7 +12,7 @@ From the **sv0-toolchain** root:
 ./scripts/sv0 bootstrap-build
 ```
 
-CI reads **`lib/bootstrap-sources.list`**: one path per line (relative to `sv0c/`). If the list is missing or empty, every top-level `lib/*.sv0` is used. Each listed file is compiled to `build/vm/<stem>.sv0b` and run on **sv0vm** (exit code 0).
+CI reads **`lib/bootstrap-sources.list`**: one path per line (relative to `sv0c/`). If the list is missing or empty, every top-level `lib/*.sv0` is used. Each listed file is compiled to **`build/vm/<basename>.sv0b`** (basename only — keep names unique across `lib/` and `lexer/`).
 
 **Layout and transliteration order:** [`LAYOUT.md`](./LAYOUT.md).
 
@@ -41,3 +41,15 @@ Transliterated subset of `sml/error/span.sml` / `span.sig`. `main` uses a simple
 ## `diagnostic_core.sv0`
 
 Transliterated subset of `sml/error/diagnostic.sig` + `diagnostic.sml`: enum `Severity`, proxy `Diagnostic` (i32 fields for code/message/span/related/help shapes), and a **byte-length** model of `format` (header, `  -->` line, optional gutter+snippet, related/help block sizes, final newline). Helpers use scalar `i32` parameters; see [`LAYOUT.md`](./LAYOUT.md) for transliteration order.
+
+## `diagnostic_batch_core.sv0`
+
+`hasErrors` / `errorCount` over three severity tags (0 = error), matching `diagnostic.sml` list helpers without a list type.
+
+## `env_core.sv0`
+
+Bounded slice of `sml/name_resolution/env.*`: two-slot module value list (numeric ids), `env_register` / `env_lookup`, `env_empty`. Exercises **multi-slot struct** arguments and returns on the VM.
+
+## `lexer/token_keyword_core.sv0`
+
+Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — anchor for `sml/lexer/token.sml`. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).

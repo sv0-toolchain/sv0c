@@ -1,0 +1,36 @@
+/* Transliteration seed: sml/error/diagnostic.sml — hasErrors / errorCount on lists.
+   No list type in this slice: three severity tags (0=Error, 1=Warning, 2=Note). */
+
+fn sev_is_error(tag: i32) -> i32 {
+  if tag == 0 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+fn has_errors3(t0: i32, t1: i32, t2: i32) -> i32 {
+  if sev_is_error(t0) == 1 {
+    return 1;
+  } else if sev_is_error(t1) == 1 {
+    return 1;
+  } else if sev_is_error(t2) == 1 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+fn error_count3(t0: i32, t1: i32, t2: i32) -> i32 {
+  return sev_is_error(t0) + sev_is_error(t1) + sev_is_error(t2);
+}
+
+fn main() -> i32 {
+  let h: i32 = has_errors3(0, 0, 2);
+  let want_h: i32 = 1;
+  let c: i32 = error_count3(0, 0, 2);
+  let want_c: i32 = 2;
+  let h2: i32 = has_errors3(2, 1, 2);
+  let want_h2: i32 = 0;
+  return (h - want_h) + (c - want_c) + (h2 - want_h2);
+}
