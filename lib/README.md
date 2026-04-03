@@ -62,6 +62,10 @@ Two-slot function arity table (`FnArity2`), `lookup_fn_arity` (−1 = absent), a
 
 `scope_enter` / `scope_bind` / `scope_exit` / `scope_lookup` on a bounded two-frame, two-local-per-frame model (`sml/name_resolution/env.sml` frames).
 
+## `lib/lookup_value_core.sv0`
+
+**Merged** `FullEnv`: module slots + scope stack in one struct; **`lookup_value`** matches SML order (innermost locals, then `modVals`). Smaller seeds (`env_core`, `env_scope_core`) remain as isolated building blocks.
+
 ## `lexer/token_keyword_core.sv0`
 
 Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — anchor for `sml/lexer/token.sml`. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
