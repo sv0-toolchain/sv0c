@@ -10,7 +10,7 @@ All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the 
 | `sv0c/lib/` | **Stage-1+** sv0 sources: shared/compiler-core slices (`span_core.sv0`, …) |
 | `sv0c/lib/bootstrap-sources.list` | Standalone `.sv0` programs CI runs via **`bootstrap-build`** (each has `main`, VM exit 0); paths relative to `sv0c/` |
 | `sv0c/lib/golden/stage0/<stem>.c` | Checked-in bootstrap C for listed programs; `sv0 test` diffs fresh SML heap output |
-| `sv0c/lexer/`, `sv0c/parser/`, … | **sv0** pipeline modules (same names as under `sml/`); parser seed: `parser/expr_entry_core.sv0` |
+| `sv0c/lexer/`, `sv0c/parser/`, … | **sv0** pipeline modules (same names as under `sml/`); parser seeds: `parser/expr_entry_core.sv0`, `parser/item_entry_core.sv0`, `parser/stmt_entry_core.sv0` |
 | `build/self-host-compare/` | Generated C snapshots for stage0 vs stage1 (gitignored at meta-repo root) |
 
 **`sv0c --project <dir>`** collects **all `*.sv0` recursively** under `dir` (skips hidden path components). Subdirectories are supported (see `test/integration/modules/`).
@@ -24,7 +24,7 @@ Rough bottom-up order (mirrors `sml/` data flow):
 3. **Lexer** — `sml/lexer/*` → `lexer/*.sv0` (seeds: `lexer/token_keyword_core.sv0`, `lexer/token_delim_core.sv0` — paired punct **10–17**, `lexer/token_op_core.sv0`).
 4. **Env (name resolution)** — `sml/name_resolution/env.*` → `lib/env_core.sv0` (bounded module-value register + lookup); `lib/env_scope_core.sv0` (`enterScope` / `bindLocal` / `exitScope` slice, two frames × two locals); `lib/lookup_value_core.sv0` (**merged** `lookupValue`: locals then module); `lib/resolver_value_core.sv0` (three-slot path-only `lookup_value`); `lib/resolver_arity_core.sv0` (`registerFnArity` / `lookupFnArity` / call-arity check); `lib/resolver_call_core.sv0` (**merged** value env + arity + `expr_call_ok`); `lib/lookup_type_core.sv0` (prelude type tags + `registerModuleType` slice + single-segment `lookupType` / **Self**); `lib/type_alias_core.sv0` (`tyAlias`, `hasTyAliasName`, `resolveCanonicalTy`); `lib/lookup_type_alias_core.sv0` (**integrated** `resolveCanonicalTy` then prelude/mod **`lookupType`** in one struct — primary dev/test story for type paths).
 5. **AST** — `sml/ast/*`
-6. **Parser** — `sml/parser/*` → `parser/expr_entry_core.sv0` (**parsePrimaryExpr** dispatch + lexer bridges); `parser/item_entry_core.sv0` (**parseItem** top-level dispatch + **`tag_kw_fn`** bridge)
+6. **Parser** — `sml/parser/*` → `parser/expr_entry_core.sv0` (**parsePrimaryExpr** dispatch + lexer bridges); `parser/item_entry_core.sv0` (**parseItem** top-level dispatch + **`tag_kw_fn`** bridge); `parser/stmt_entry_core.sv0` (**tryStmt** first-token order + **`tag_kw_let`** / assert stand-in + assign fallback arm)
 7. **Name resolution** — `sml/name_resolution/*` (full resolver; builds on **§4**)
 8. **Type checker** — `sml/type_checker/*`
 9. **Contracts** — `sml/contract_analyzer/*`

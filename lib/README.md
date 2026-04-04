@@ -100,4 +100,8 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 ## `parser/item_entry_core.sv0`
 
-**parseItem** dispatch (top-level items): arms **1–9** = **module, use, fn, struct, enum, trait, impl, type, newtype** in `parser.sml` case order. Stand-in tags **180–187** plus **`fn` = 1** from **`token_keyword_core`**; **`lexer_keyword_fn_to_item_arm`** maps **`tag_kw_fn`**. **`item_arm_has_item_body`** marks **fn/struct/enum/trait/impl** (items that normally carry a body in the full parser). Use this for module-level entry testing; block **`tryStmt`** is a separate future seed.
+**parseItem** dispatch (top-level items): arms **1–9** = **module, use, fn, struct, enum, trait, impl, type, newtype** in `parser.sml` case order. Stand-in tags **180–187** plus **`fn` = 1** from **`token_keyword_core`**; **`lexer_keyword_fn_to_item_arm`** maps **`tag_kw_fn`**. **`item_arm_has_item_body`** marks **fn/struct/enum/trait/impl** (items that normally carry a body in the full parser). Pairs with **`parser/stmt_entry_core.sv0`** for block-level **`tryStmt`**.
+
+## `parser/stmt_entry_core.sv0`
+
+**tryStmt** first match: arms **1–5** = **let, break, continue, assert,** then **assign/expr path** (`tryAssignStmt` in SML). **`tag_kw_let` = 2** from **`token_keyword_core`**; **`tok_stmt_assert` = 56** matches **`parser/expr_entry_core.sv0`** **`tok_assert_kw`**; **break/continue** use stand-ins **190**/**191** until the keyword lexer seed grows. **`try_stmt_is_assign_fallback_arm`** is true only for arm **5**. **`parse_block_after_try_stmt_failed`** is a numeric placeholder for the **`parseBlock`** branch that calls **`parseExpr`** when **`tryStmt`** returns **`NONE`**.
