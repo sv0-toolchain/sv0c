@@ -19,3 +19,4 @@ lexer/token_delim_core.sv0
 lexer/token_op_core.sv0
 parser/expr_entry_core.sv0
 parser/item_entry_core.sv0
+parser/stmt_entry_core.sv0

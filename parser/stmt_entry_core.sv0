@@ -1,0 +1,94 @@
+/* Transliteration seed: sml/parser/parser.sml — tryStmt first-arm dispatch (lines ~914–948).
+   Case order: LET, BREAK, CONTINUE, ASSERT, else tryAssignStmt. Does not model parseExpr fallback
+   inside parseBlock when tryStmt returns NONE; see comment on parse_block_after_try_stmt. */
+
+fn try_arm_let() -> i32 {
+  return 1;
+}
+
+fn try_arm_break() -> i32 {
+  return 2;
+}
+
+fn try_arm_continue() -> i32 {
+  return 3;
+}
+
+fn try_arm_assert() -> i32 {
+  return 4;
+}
+
+fn try_arm_assign_fallback() -> i32 {
+  return 5;
+}
+
+/* Stand-ins until keyword band lists break/continue in lexer seeds (see expr_entry assert). */
+fn tok_stmt_break() -> i32 {
+  return 190;
+}
+
+fn tok_stmt_continue() -> i32 {
+  return 191;
+}
+
+/* parser/expr_entry_core.sv0: tok_assert_kw() == 56 */
+fn tok_stmt_assert() -> i32 {
+  return 56;
+}
+
+/* token_keyword_core.sv0: tag_kw_let() == 2 */
+fn parse_try_stmt_dispatch(t: i32) -> i32 {
+  if t == 2 {
+    return 1;
+  } else {
+    if t == 190 {
+      return 2;
+    } else {
+      if t == 191 {
+        return 3;
+      } else {
+        if t == 56 {
+          return 4;
+        } else {
+          return 5;
+        }
+      }
+    }
+  }
+}
+
+fn lexer_keyword_let_to_try_stmt_arm(kw: i32) -> i32 {
+  if kw == 2 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+fn try_stmt_is_assign_fallback_arm(arm: i32) -> i32 {
+  if arm == 5 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+/* In parseBlock: if tryStmt yields NONE, parser takes parseExpr (expr stmt or closing }). */
+fn parse_block_after_try_stmt_failed() -> i32 {
+  return 1;
+}
+
+fn main() -> i32 {
+  let f0: i32 = parse_try_stmt_dispatch(2) - try_arm_let();
+  let f1: i32 = parse_try_stmt_dispatch(tok_stmt_break()) - try_arm_break();
+  let f2: i32 = parse_try_stmt_dispatch(tok_stmt_continue()) - try_arm_continue();
+  let f3: i32 = parse_try_stmt_dispatch(tok_stmt_assert()) - try_arm_assert();
+  let f4: i32 = parse_try_stmt_dispatch(73) - try_arm_assign_fallback();
+  let f5: i32 = parse_try_stmt_dispatch(99) - try_arm_assign_fallback();
+  let f6: i32 = lexer_keyword_let_to_try_stmt_arm(2) - try_arm_let();
+  let f7: i32 = lexer_keyword_let_to_try_stmt_arm(1);
+  let f8: i32 = try_stmt_is_assign_fallback_arm(try_arm_assign_fallback()) - 1;
+  let f9: i32 = try_stmt_is_assign_fallback_arm(try_arm_let());
+  let f10: i32 = parse_block_after_try_stmt_failed() - 1;
+  return f0 + f1 + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10;
+}
