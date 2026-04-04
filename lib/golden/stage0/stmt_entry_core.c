@@ -34,11 +34,11 @@ static int try_arm_assign_fallback(void) {
 }
 
 static int tok_stmt_break(void) {
-  return 190;
+  return 4;
 }
 
 static int tok_stmt_continue(void) {
-  return 191;
+  return 5;
 }
 
 static int tok_stmt_assert(void) {
@@ -53,12 +53,12 @@ static int parse_try_stmt_dispatch(int t) {
     _sv0t1 = 0;
   } else {
     int _sv0t2;
-    if ((t == 190)) {
+    if ((t == 4)) {
       return 2;
       _sv0t2 = 0;
     } else {
       int _sv0t3;
-      if ((t == 191)) {
+      if ((t == 5)) {
         return 3;
         _sv0t3 = 0;
       } else {

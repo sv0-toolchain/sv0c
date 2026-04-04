@@ -76,7 +76,7 @@ Prelude type tags (`i32`/`bool`/`unit`/`str` as numeric ids), two-slot module ty
 
 ## `lexer/token_keyword_core.sv0`
 
-Keyword discriminants (`fn` / `let` / `if`) as `i32` tags and a classifier — anchor for `sml/lexer/token.sml`. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
+Keyword discriminants as `i32` tags in band **1–5** (`fn`, `let`, `if`, `break`, `continue`) plus **`is_keyword_tag`** — anchor for `sml/lexer/token.sml`. **`tag_kw_break`** / **`tag_kw_continue`** wire **`parser/stmt_entry_core.sv0`**. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
 
 ## `lexer/token_delim_core.sv0`
 
@@ -104,4 +104,4 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 ## `parser/stmt_entry_core.sv0`
 
-**tryStmt** first match: arms **1–5** = **let, break, continue, assert,** then **assign/expr path** (`tryAssignStmt` in SML). **`tag_kw_let` = 2** from **`token_keyword_core`**; **`tok_stmt_assert` = 56** matches **`parser/expr_entry_core.sv0`** **`tok_assert_kw`**; **break/continue** use stand-ins **190**/**191** until the keyword lexer seed grows. **`try_stmt_is_assign_fallback_arm`** is true only for arm **5**. **`parse_block_after_try_stmt_failed`** is a numeric placeholder for the **`parseBlock`** branch that calls **`parseExpr`** when **`tryStmt`** returns **`NONE`**.
+**tryStmt** first match: arms **1–5** = **let, break, continue, assert,** then **assign/expr path** (`tryAssignStmt` in SML). **`tag_kw_let` = 2**, **`tag_kw_break` = 4**, **`tag_kw_continue` = 5** from **`token_keyword_core`**; **`tok_stmt_assert` = 56** matches **`parser/expr_entry_core.sv0`** **`tok_assert_kw`**. **`try_stmt_is_assign_fallback_arm`** is true only for arm **5**. **`parse_block_after_try_stmt_failed`** is a numeric placeholder for the **`parseBlock`** branch that calls **`parseExpr`** when **`tryStmt`** returns **`NONE`**.
