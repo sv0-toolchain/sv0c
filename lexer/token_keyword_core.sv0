@@ -1,7 +1,8 @@
 /* Transliteration seed: sml/lexer/token.sml — keyword subset as i32 tags.
    Full tokens are a large datatype; this bootstrap file fixes discriminants for
-   three keywords used in every program (fn, let, if) and a classifier used by
-   later lexer tables. */
+   keywords used across seeds (fn, let, if, break, continue) and a classifier used by
+   later lexer tables. Tags 1–5 are reserved for this band; parser/stmt_entry_core
+   dispatches break/continue via 4/5. */
 
 fn tag_kw_fn() -> i32 {
   return 1;
@@ -15,12 +16,24 @@ fn tag_kw_if() -> i32 {
   return 3;
 }
 
+fn tag_kw_break() -> i32 {
+  return 4;
+}
+
+fn tag_kw_continue() -> i32 {
+  return 5;
+}
+
 fn is_keyword_tag(t: i32) -> i32 {
   if t == 1 {
     return 1;
   } else if t == 2 {
     return 1;
   } else if t == 3 {
+    return 1;
+  } else if t == 4 {
+    return 1;
+  } else if t == 5 {
     return 1;
   } else {
     return 0;
@@ -31,6 +44,8 @@ fn main() -> i32 {
   let ok_fn: i32 = is_keyword_tag(tag_kw_fn()) - 1;
   let ok_let: i32 = is_keyword_tag(tag_kw_let()) - 1;
   let ok_if: i32 = is_keyword_tag(tag_kw_if()) - 1;
+  let ok_break: i32 = is_keyword_tag(tag_kw_break()) - 1;
+  let ok_continue: i32 = is_keyword_tag(tag_kw_continue()) - 1;
   let ok_non: i32 = is_keyword_tag(99);
-  return ok_fn + ok_let + ok_if + ok_non;
+  return ok_fn + ok_let + ok_if + ok_break + ok_continue + ok_non;
 }

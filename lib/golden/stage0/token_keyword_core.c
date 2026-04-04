@@ -3,6 +3,8 @@
 static int tag_kw_fn(void);
 static int tag_kw_let(void);
 static int tag_kw_if(void);
+static int tag_kw_break(void);
+static int tag_kw_continue(void);
 static int is_keyword_tag(int t);
 
 static int tag_kw_fn(void) {
@@ -15,6 +17,14 @@ static int tag_kw_let(void) {
 
 static int tag_kw_if(void) {
   return 3;
+}
+
+static int tag_kw_break(void) {
+  return 4;
+}
+
+static int tag_kw_continue(void) {
+  return 5;
 }
 
 static int is_keyword_tag(int t) {
@@ -34,8 +44,22 @@ static int is_keyword_tag(int t) {
         return 1;
         _sv0t3 = 0;
       } else {
-        return 0;
-        _sv0t3 = 0;
+        int _sv0t4;
+        if ((t == 4)) {
+          return 1;
+          _sv0t4 = 0;
+        } else {
+          int _sv0t5;
+          if ((t == 5)) {
+            return 1;
+            _sv0t5 = 0;
+          } else {
+            return 0;
+            _sv0t5 = 0;
+          }
+          _sv0t4 = _sv0t5;
+        }
+        _sv0t3 = _sv0t4;
       }
       _sv0t2 = _sv0t3;
     }
@@ -55,11 +79,19 @@ int main(void) {
   int _sv0t4 = tag_kw_if();
   int _sv0t5 = is_keyword_tag(_sv0t4);
   int ok_if = (_sv0t5 - 1);
-  int _sv0t6 = is_keyword_tag(99);
-  int ok_non = _sv0t6;
-  int _sv0t7 = (ok_fn + ok_let);
-  int _sv0t8 = (_sv0t7 + ok_if);
-  int _sv0t9 = (_sv0t8 + ok_non);
-  return _sv0t9;
+  int _sv0t6 = tag_kw_break();
+  int _sv0t7 = is_keyword_tag(_sv0t6);
+  int ok_break = (_sv0t7 - 1);
+  int _sv0t8 = tag_kw_continue();
+  int _sv0t9 = is_keyword_tag(_sv0t8);
+  int ok_continue = (_sv0t9 - 1);
+  int _sv0t10 = is_keyword_tag(99);
+  int ok_non = _sv0t10;
+  int _sv0t11 = (ok_fn + ok_let);
+  int _sv0t12 = (_sv0t11 + ok_if);
+  int _sv0t13 = (_sv0t12 + ok_break);
+  int _sv0t14 = (_sv0t13 + ok_continue);
+  int _sv0t15 = (_sv0t14 + ok_non);
+  return _sv0t15;
 }
 

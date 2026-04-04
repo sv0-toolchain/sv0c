@@ -22,13 +22,13 @@ fn try_arm_assign_fallback() -> i32 {
   return 5;
 }
 
-/* Stand-ins until keyword band lists break/continue in lexer seeds (see expr_entry assert). */
+/* lexer/token_keyword_core.sv0: tag_kw_break() == 4, tag_kw_continue() == 5 */
 fn tok_stmt_break() -> i32 {
-  return 190;
+  return 4;
 }
 
 fn tok_stmt_continue() -> i32 {
-  return 191;
+  return 5;
 }
 
 /* parser/expr_entry_core.sv0: tok_assert_kw() == 56 */
@@ -41,10 +41,10 @@ fn parse_try_stmt_dispatch(t: i32) -> i32 {
   if t == 2 {
     return 1;
   } else {
-    if t == 190 {
+    if t == 4 {
       return 2;
     } else {
-      if t == 191 {
+      if t == 5 {
         return 3;
       } else {
         if t == 56 {
