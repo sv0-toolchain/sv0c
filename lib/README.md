@@ -105,3 +105,7 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 ## `parser/stmt_entry_core.sv0`
 
 **tryStmt** first match: arms **1–5** = **let, break, continue, assert,** then **assign/expr path** (`tryAssignStmt` in SML). **`tag_kw_let` = 2**, **`tag_kw_break` = 4**, **`tag_kw_continue` = 5** from **`token_keyword_core`**; **`tok_stmt_assert` = 56** matches **`parser/expr_entry_core.sv0`** **`tok_assert_kw`**. **`try_stmt_is_assign_fallback_arm`** is true only for arm **5**. **`parse_block_after_try_stmt_failed`** is a numeric placeholder for the **`parseBlock`** branch that calls **`parseExpr`** when **`tryStmt`** returns **`NONE`**.
+
+## `parser/assign_lhs_core.sv0`
+
+**parseAssignTarget** + **`tryParseAssignLHS`** (numeric model): **`try_lhs_starts`** accepts **`*`** (**`tag_op_star` = 22**) or **ident** (**73**); **`is_assign_follow_tok`** recognizes assignment **`=`** stand-in **210** and **`+=`** (**211**, only **`assignBinop`** case in this slice — **`PLUSEQ`** / **`Ast.Add`** in SML). **`assign_binop_tag`** is **1** for **211**, **0** otherwise (expand to full **`assignBinop`** table later). Depth helpers mirror **deref chain**, **`.ident` / `.int` field**, **`[lit]`** index (placeholder index token **40**), and reject **ident `;`**. Composes with **`stmt_entry_core`** arm **5** before a full **`tryAssignStmt`** seed adds **`parseExpr`** + semicolon.
