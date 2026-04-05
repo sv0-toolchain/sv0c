@@ -114,6 +114,10 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 **assignBinop** in **`parser.sml`**: tags **211–220** = **`+=`** … **`>>=`** in case order (same as **`lexer/token_op_core`** **`tag_op_*eq`**); **`assign_binop_ast_tag`** returns **1–10** (numeric **`Ast`** binop ids for tests). **`is_assign_binop_tok`** is **`> 0`**.
 
+## `parser/expr_rhs_stub_core.sv0`
+
+Post-**`=`** / compound-assign **RHS** stub (not full **`parseExpr`**): **`int` lit (40)**, **`ident` (73)**, or **`lit + lit`** with **`lexer/token_op_core`** **`tag_op_plus` = 20**, each form ending with **`;` (15)**. **`rhs_stub_atom_count`** returns **1** or **3** atoms (excluding **`;`**). **`parser/try_assign_stmt_core.sv0`** duplicates **`rhs_stub_ok_with_semi`** for a single bootstrap program.
+
 ## `parser/try_assign_stmt_core.sv0`
 
-**tryAssignStmt** in **`parser.sml`**: after **`tryParseAssignLHS`**, require **`Token.EQ`** (**19**) or assign binop (**211–220**), then **`parseExpr`** as **one** **`tok_rhs_atom` (40)**, then **`SEMICOLON` (15)**. **`assign_op_follows_lhs`** matches **`isAssignTok`**. Linear streams cover **`=`** / **`+=`** / **`-=`** / **`>>=`**, field **`+=`**, and reject **missing `;`**, **`==` (24)**, bad RHS. Extend when **`parseExpr`** is transliterated.
+**tryAssignStmt** in **`parser.sml`**: after **`tryParseAssignLHS`**, **`assign_op_follows_lhs`** (**`isAssignTok`**), then **`rhs_stub_ok_with_semi`** for RHS + **`;`**. Covers atom, **`ident`**, **`1 + 2`**-style RHS (via **`try_assign_id_op_rhs_stub`**), **`*x = …`** with atom RHS, **field**, **`+=`** with binop RHS, and rejects **missing `;`**, **`==` (24)**, truncated **`+`**. Extend when real **`parseExpr`** is transliterated.
