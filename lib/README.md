@@ -120,7 +120,7 @@ Post-**`=`** / compound-assign **RHS** stub (not full **`parseExpr`**): **`int` 
 
 ## `parser/expr_pratt_stub_core.sv0`
 
-Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*` (22)** binds tighter than **`+` (20)**; atoms **40** / **73**; optional unary **`-` (21)** at **t0**. **`pratt_from_atom`** parses from a primary through **`;`**; **`pratt_rhs_ok_with_semi7` (t0..t6)** uses **`t6`** only on the unary path so **` - lit + lit * lit ;`** fits; **`pratt_rhs_ok_with_semi`** is **`semi7(..., 0)`**. **`try_assign_stmt_core`** duplicates these plus **`try_assign_*_op_pratt_rhs_stub7`** for the seven-token RHS window.
+Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*` (22)** binds tighter than the **add tier** **`+` (20)** / **`-` (21)** (**`pratt_is_add_binop`**, same as **`parseAddExpr`** **PLUS** / **MINUS**); atoms **40** / **73**; optional unary **`-` (21)** at **`semi7`** **t0** only. **`pratt_from_atom`** allows **`a-b ;`**, **`a-b*c ;`**, **`a*b-c ;`** (still one add-tier op after the leading **term** in six slots). **`pratt_rhs_ok_with_semi7`** and **`stub7`** assign helpers as before.
 
 ## `parser/expr_prec_ladder_core.sv0`
 
