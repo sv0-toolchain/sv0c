@@ -84,7 +84,7 @@ Delimiter / punctuation tags (`( ) { } , ; [ ] . =`) in band **10–19** (**`=`*
 
 ## `lexer/token_op_core.sv0`
 
-Operator tags (`+ - * / == != -> => ::`) in band **20–28**, plus `is_operator_tag`.
+Operator tags (`+ - * / == != -> => ::`) in band **20–28**, plus `is_operator_tag`. Compound assignment tokens **`+= … >>=`** use band **211–220** (`tag_op_pluseq` … `tag_op_gtgteq`), same numbers as **`parser/assign_binop_core.sv0`**; **`is_compound_assign_tag`** classifies that band (distinct from **`is_operator_tag`** — **`=`** assignment stays **`tag_delim_eq` = 19**).
 
 ## `lib/type_alias_core.sv0`
 
@@ -112,7 +112,7 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 ## `parser/assign_binop_core.sv0`
 
-**assignBinop** in **`parser.sml`**: stand-in tags **211–220** = **`+=`** … **`>>=`** in case order; **`assign_binop_ast_tag`** returns **1–10** (numeric **`Ast`** binop ids for tests). **`is_assign_binop_tok`** is **`> 0`**. Lexer **`token_op_core`** can adopt these tags later.
+**assignBinop** in **`parser.sml`**: tags **211–220** = **`+=`** … **`>>=`** in case order (same as **`lexer/token_op_core`** **`tag_op_*eq`**); **`assign_binop_ast_tag`** returns **1–10** (numeric **`Ast`** binop ids for tests). **`is_assign_binop_tok`** is **`> 0`**.
 
 ## `parser/try_assign_stmt_core.sv0`
 

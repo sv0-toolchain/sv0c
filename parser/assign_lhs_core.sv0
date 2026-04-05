@@ -1,7 +1,7 @@
 /* Transliteration seed: sml/parser/parser.sml — parseAssignTarget + tryParseAssignLHS (lines ~1010–1051).
    Token tags cross-ref: lexer/token_op_core tag_op_star() = 22; expr_entry tok_ident() = 73;
    token_delim lbracket/rbracket 16/17, dot 18, assignment EQ 19; expr int lit stand-in 40.
-   Assign binop band **211–220** matches **parser/assign_binop_core.sv0** / **`assignBinop`** in **`parser.sml`**. */
+   Assign binop band **211–220** matches **`assignBinop`** / **`assign_binop_core`** and **`lexer/token_op_core`** **`is_compound_assign_tag`**. */
 
 fn tok_lhs_dot() -> i32 {
   return 18;
