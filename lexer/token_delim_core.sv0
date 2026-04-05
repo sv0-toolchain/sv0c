@@ -33,6 +33,15 @@ fn tag_delim_rbracket() -> i32 {
   return 17;
 }
 
+fn tag_delim_dot() -> i32 {
+  return 18;
+}
+
+/* Token.EQ — assignment '=' (distinct from tag_op_eq == in token_op_core.sv0). */
+fn tag_delim_eq() -> i32 {
+  return 19;
+}
+
 fn is_delimiter_tag(t: i32) -> i32 {
   if t == 10 {
     return 1;
@@ -50,6 +59,10 @@ fn is_delimiter_tag(t: i32) -> i32 {
     return 1;
   } else if t == 17 {
     return 1;
+  } else if t == 18 {
+    return 1;
+  } else if t == 19 {
+    return 1;
   } else {
     return 0;
   }
@@ -64,7 +77,9 @@ fn main() -> i32 {
   let ok_sm: i32 = is_delimiter_tag(tag_delim_semi()) - 1;
   let ok_lbk: i32 = is_delimiter_tag(tag_delim_lbracket()) - 1;
   let ok_rbk: i32 = is_delimiter_tag(tag_delim_rbracket()) - 1;
+  let ok_dot: i32 = is_delimiter_tag(tag_delim_dot()) - 1;
+  let ok_eq: i32 = is_delimiter_tag(tag_delim_eq()) - 1;
   let ok_non: i32 = is_delimiter_tag(3);
   let ok_kw: i32 = is_delimiter_tag(1);
-  return ok_lp + ok_rp + ok_lb + ok_rb + ok_cm + ok_sm + ok_lbk + ok_rbk + ok_non + ok_kw;
+  return ok_lp + ok_rp + ok_lb + ok_rb + ok_cm + ok_sm + ok_lbk + ok_rbk + ok_dot + ok_eq + ok_non + ok_kw;
 }

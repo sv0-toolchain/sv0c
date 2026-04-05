@@ -80,7 +80,7 @@ Keyword discriminants as `i32` tags in band **1–5** (`fn`, `let`, `if`, `break
 
 ## `lexer/token_delim_core.sv0`
 
-Delimiter / punctuation tags (`( ) { } , ; [ ]`) in band **10–17**, disjoint from keyword tags, plus `is_delimiter_tag`.
+Delimiter / punctuation tags (`( ) { } , ; [ ] . =`) in band **10–19** (**`=`** is **`Token.EQ`** assignment, not **`==`** — see **`tag_op_eq`** in **`token_op_core`**), disjoint from keyword tags, plus `is_delimiter_tag`.
 
 ## `lexer/token_op_core.sv0`
 
@@ -108,4 +108,4 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 ## `parser/assign_lhs_core.sv0`
 
-**parseAssignTarget** + **`tryParseAssignLHS`** (numeric model): **`try_lhs_starts`** accepts **`*`** (**`tag_op_star` = 22**) or **ident** (**73**); **`is_assign_follow_tok`** recognizes assignment **`=`** stand-in **210** and **`+=`** (**211**, only **`assignBinop`** case in this slice — **`PLUSEQ`** / **`Ast.Add`** in SML). **`assign_binop_tag`** is **1** for **211**, **0** otherwise (expand to full **`assignBinop`** table later). Depth helpers mirror **deref chain**, **`.ident` / `.int` field**, **`[lit]`** index (placeholder index token **40**), and reject **ident `;`**. Composes with **`stmt_entry_core`** arm **5** before a full **`tryAssignStmt`** seed adds **`parseExpr`** + semicolon.
+**parseAssignTarget** + **`tryParseAssignLHS`** (numeric model): **`try_lhs_starts`** accepts **`*`** (**`tag_op_star` = 22**) or **ident** (**73**); **`tok_lhs_dot`** / **`tok_assign_eq`** use **`lexer/token_delim_core`** **`tag_delim_dot` = 18** and **`tag_delim_eq` = 19**; **`is_assign_follow_tok`** also accepts **`+=`** (**211**, only **`assignBinop`** case in this slice — **`PLUSEQ`** / **`Ast.Add`** in SML). **`assign_binop_tag`** is **1** for **211**, **0** otherwise (expand to full **`assignBinop`** table later). Depth helpers mirror **deref chain**, **`.ident` / `.int` field**, **`[lit]`** index (placeholder index token **40**), and reject **ident `;`**. Composes with **`stmt_entry_core`** arm **5** before a full **`tryAssignStmt`** seed adds **`parseExpr`** + semicolon.

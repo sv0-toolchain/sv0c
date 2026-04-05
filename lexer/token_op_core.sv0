@@ -1,5 +1,5 @@
 /* Transliteration seed: sml/lexer/token.sml — operator / punctuator subset as i32 tags.
-   Tag band 20–28 is disjoint from keyword (1–3) and delimiter (10–15) seeds. */
+   Tag band 20–28 is disjoint from keyword (1–5) and delimiter (10–19) seeds. */
 
 fn tag_op_plus() -> i32 {
   return 20;
