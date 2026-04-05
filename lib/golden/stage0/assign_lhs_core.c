@@ -19,11 +19,11 @@ static int assign_target_depth_index_with_eq(int t0, int t1, int t2, int t3, int
 static int try_lhs_ident_tail_is_assign_follow(int tail);
 
 static int tok_lhs_dot(void) {
-  return 200;
+  return 18;
 }
 
 static int tok_assign_eq(void) {
-  return 210;
+  return 19;
 }
 
 static int tok_pluseq(void) {
@@ -92,7 +92,7 @@ static int assign_binop_tag(int t) {
 static int is_assign_follow_tok(int t) {
   int _sv0t0;
   int _sv0t1;
-  if ((t == 210)) {
+  if ((t == 19)) {
     return 1;
     _sv0t1 = 0;
   } else {
@@ -121,16 +121,16 @@ static int assign_target_depth_if_assign_eq(int t0, int t1, int t2, int t3) {
   int _sv0t1;
   if ((t0 == 73)) {
     int _sv0t2;
-    if ((t1 == 210)) {
+    if ((t1 == 19)) {
       return 1;
       _sv0t2 = 0;
     } else {
       int _sv0t3;
-      if ((t1 == 200)) {
+      if ((t1 == 18)) {
         int _sv0t4;
         if ((t2 == 73)) {
           int _sv0t5;
-          if ((t3 == 210)) {
+          if ((t3 == 19)) {
             return 2;
             _sv0t5 = 0;
           } else {
@@ -142,7 +142,7 @@ static int assign_target_depth_if_assign_eq(int t0, int t1, int t2, int t3) {
           int _sv0t6;
           if ((t2 == 40)) {
             int _sv0t7;
-            if ((t3 == 210)) {
+            if ((t3 == 19)) {
               return 2;
               _sv0t7 = 0;
             } else {
@@ -170,7 +170,7 @@ static int assign_target_depth_if_assign_eq(int t0, int t1, int t2, int t3) {
       int _sv0t9;
       if ((t1 == 73)) {
         int _sv0t10;
-        if ((t2 == 210)) {
+        if ((t2 == 19)) {
           return 2;
           _sv0t10 = 0;
         } else {
@@ -202,7 +202,7 @@ static int assign_target_depth_star_star_ident_eq(int t0, int t1, int t2, int t3
       int _sv0t3;
       if ((t2 == 73)) {
         int _sv0t4;
-        if ((t3 == 210)) {
+        if ((t3 == 19)) {
           return 3;
           _sv0t4 = 0;
         } else {
@@ -239,7 +239,7 @@ static int assign_target_depth_index_with_eq(int t0, int t1, int t2, int t3, int
         int _sv0t4;
         if ((t3 == 17)) {
           int _sv0t5;
-          if ((t4 == 210)) {
+          if ((t4 == 19)) {
             return 2;
             _sv0t5 = 0;
           } else {
