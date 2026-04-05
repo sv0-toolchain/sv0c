@@ -1,0 +1,156 @@
+/* Transliteration seed: sml/parser/parser.sml — tryAssignStmt (lines ~976–1008).
+   After tryParseAssignLHS, the next token must be Token.EQ or an assign binop; parseExpr is modeled
+   as consuming a single RHS placeholder token (40 = int lit, same as assign_lhs_core); statement
+   must end with SEMICOLON (15). Composes with parser/assign_lhs_core.sv0 + lexer/token_delim_core. */
+
+fn tok_ident() -> i32 {
+  return 73;
+}
+
+fn tok_star() -> i32 {
+  return 22;
+}
+
+fn tok_assign_eq() -> i32 {
+  return 19;
+}
+
+fn tok_pluseq() -> i32 {
+  return 211;
+}
+
+fn tok_rhs_atom() -> i32 {
+  return 40;
+}
+
+fn tok_semi() -> i32 {
+  return 15;
+}
+
+fn tok_lhs_dot() -> i32 {
+  return 18;
+}
+
+fn tok_op_eqeq() -> i32 {
+  return 24;
+}
+
+fn assign_op_is_eq_or_pluseq(t: i32) -> i32 {
+  if t == 19 {
+    return 1;
+  } else {
+    if t == 211 {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
+
+/* Linear stream: simple path lhs already consumed conceptually — here full stream from first lhs token. */
+fn try_assign_linear_4(t0: i32, t1: i32, t2: i32, t3: i32) -> i32 {
+  if t0 == 73 {
+    if assign_op_is_eq_or_pluseq(t1) == 1 {
+      if t2 == 40 {
+        if t3 == 15 {
+          return 1;
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn try_assign_linear_5_deref(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32) -> i32 {
+  if t0 == 22 {
+    if t1 == 73 {
+      if t2 == 19 {
+        if t3 == 40 {
+          if t4 == 15 {
+            return 1;
+          } else {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      } else {
+        if t2 == 211 {
+          if t3 == 40 {
+            if t4 == 15 {
+              return 1;
+            } else {
+              return 0;
+            }
+          } else {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      }
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn try_assign_linear_6_field(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
+  if t0 == 73 {
+    if t1 == 18 {
+      if t2 == 73 {
+        if t3 == 19 {
+          if t4 == 40 {
+            if t5 == 15 {
+              return 1;
+            } else {
+              return 0;
+            }
+          } else {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn main() -> i32 {
+  let e0: i32 = assign_op_is_eq_or_pluseq(tok_assign_eq()) - 1;
+  let e1: i32 = assign_op_is_eq_or_pluseq(tok_pluseq()) - 1;
+  let e2: i32 = assign_op_is_eq_or_pluseq(tok_op_eqeq());
+  let e3: i32 =
+    try_assign_linear_4(tok_ident(), tok_assign_eq(), tok_rhs_atom(), tok_semi()) - 1;
+  let e4: i32 =
+    try_assign_linear_4(tok_ident(), tok_pluseq(), tok_rhs_atom(), tok_semi()) - 1;
+  let e5: i32 =
+    try_assign_linear_5_deref(tok_star(), tok_ident(), tok_assign_eq(), tok_rhs_atom(), tok_semi()) -
+      1;
+  let e6: i32 =
+    try_assign_linear_5_deref(tok_star(), tok_ident(), tok_pluseq(), tok_rhs_atom(), tok_semi()) - 1;
+  let e7: i32 =
+    try_assign_linear_6_field(tok_ident(), tok_lhs_dot(), tok_ident(), tok_assign_eq(), tok_rhs_atom(), tok_semi()) -
+      1;
+  let e8: i32 =
+    try_assign_linear_4(tok_ident(), tok_assign_eq(), tok_rhs_atom(), tok_ident());
+  let e9: i32 = try_assign_linear_4(tok_ident(), tok_op_eqeq(), tok_rhs_atom(), tok_semi());
+  let e10: i32 = try_assign_linear_4(tok_ident(), tok_assign_eq(), tok_semi(), tok_semi());
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10;
+}
