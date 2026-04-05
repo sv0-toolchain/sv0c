@@ -1,0 +1,90 @@
+/* Transliteration seed: sml/parser/parser.sml — parseCastExpr (lines ~458–471).
+   After parseUnaryExpr, zero or more (**AS**, **parseType**). This stub: base = one atom
+   (int lit **40** or ident **73**); optional single **as** to type ident **i32** (also **73** in
+   lexer); then **SEMICOLON** **15**. **as** keyword stand-in **61** (next after **tok_no_alias_kw** **60**
+   in parser/expr_entry_core.sv0). No chained **as** yet; no full **parseType**. */
+
+fn tok_int_lit() -> i32 {
+  return 40;
+}
+
+fn tok_ident() -> i32 {
+  return 73;
+}
+
+fn tok_as_kw() -> i32 {
+  return 61;
+}
+
+fn tok_semi() -> i32 {
+  return 15;
+}
+
+fn tok_plus() -> i32 {
+  return 20;
+}
+
+fn cast_base_atom(t: i32) -> i32 {
+  if t == 40 {
+    return 1;
+  } else {
+    if t == 73 {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
+
+/* **1** iff type slot is ident stand-in for primitive name **i32** (**IDENT** in real lexer). */
+fn cast_ty_i32_ident(t: i32) -> i32 {
+  if t == 73 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+/* **1** iff **t0..t3** is **base ;** or **base as ty_i32 ;** (pad unused with **0**). */
+fn parse_cast_stub_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32) -> i32 {
+  if cast_base_atom(t0) == 1 {
+    if t1 == 15 {
+      return 1;
+    } else {
+      if t1 == 61 {
+        if cast_ty_i32_ident(t2) == 1 {
+          if t3 == 15 {
+            return 1;
+          } else {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn main() -> i32 {
+  let e0: i32 = parse_cast_stub_ok_with_semi(tok_int_lit(), tok_semi(), 0, 0) - 1;
+  let e1: i32 = parse_cast_stub_ok_with_semi(tok_ident(), tok_semi(), 0, 0) - 1;
+  let e2: i32 =
+    parse_cast_stub_ok_with_semi(tok_int_lit(), tok_as_kw(), tok_ident(), tok_semi()) - 1;
+  let e3: i32 =
+    parse_cast_stub_ok_with_semi(tok_ident(), tok_as_kw(), tok_ident(), tok_semi()) - 1;
+  let bad_mul: i32 =
+    parse_cast_stub_ok_with_semi(tok_int_lit(), tok_plus(), tok_int_lit(), tok_semi());
+  let bad_ty_lit: i32 =
+    parse_cast_stub_ok_with_semi(tok_int_lit(), tok_as_kw(), tok_int_lit(), tok_semi());
+  let bad_no_semi: i32 =
+    parse_cast_stub_ok_with_semi(tok_int_lit(), tok_as_kw(), tok_ident(), tok_plus());
+  let bad_as_first: i32 =
+    parse_cast_stub_ok_with_semi(tok_as_kw(), tok_int_lit(), tok_ident(), tok_semi());
+  let e4: i32 = bad_mul + bad_ty_lit + bad_no_semi + bad_as_first;
+  return e0 + e1 + e2 + e3 + e4;
+}
