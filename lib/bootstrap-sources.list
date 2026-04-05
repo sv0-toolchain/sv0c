@@ -26,4 +26,5 @@ parser/expr_rhs_stub_core.sv0
 parser/expr_pratt_stub_core.sv0
 parser/expr_prec_ladder_core.sv0
 parser/expr_cast_core.sv0
+parser/type_parse_core.sv0
 parser/try_assign_stmt_core.sv0

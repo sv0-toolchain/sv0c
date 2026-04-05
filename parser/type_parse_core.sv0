@@ -1,0 +1,52 @@
+/* Transliteration seed: sml/parser/parser.sml — parseType (lines ~97–177), minimal prefix slice.
+   **Unit** **`()`**: **LPAREN** **10** then **RPAREN** **11** (**lexer/token_delim_core.sv0**).
+   Single-segment primitive or path start: **IDENT** **73** (same stand-in as parser/expr_entry_core.sv0).
+   No tuples with innards, no **&**, no **[]**, no **Self**, no paths with **.** yet. */
+
+fn tok_lparen() -> i32 {
+  return 10;
+}
+
+fn tok_rparen() -> i32 {
+  return 11;
+}
+
+fn tok_ident() -> i32 {
+  return 73;
+}
+
+fn tok_int_lit() -> i32 {
+  return 40;
+}
+
+/* **1** iff **t0 t1** is **`()`** (**TyUnit** in SML). */
+fn parse_type_unit_ok(t0: i32, t1: i32) -> i32 {
+  if t0 == 10 {
+    if t1 == 11 {
+      return 1;
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+/* **1** iff **t0** starts a single-token type (**IDENT** primitive or path head in real parser). */
+fn parse_type_ident_ok(t0: i32) -> i32 {
+  if t0 == 73 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+fn main() -> i32 {
+  let e0: i32 = parse_type_unit_ok(tok_lparen(), tok_rparen()) - 1;
+  let e1: i32 = parse_type_ident_ok(tok_ident()) - 1;
+  let bad_unit_open: i32 = parse_type_unit_ok(tok_lparen(), tok_lparen());
+  let bad_unit_ident: i32 = parse_type_unit_ok(tok_ident(), tok_rparen());
+  let bad_ident_lit: i32 = parse_type_ident_ok(tok_int_lit());
+  let e2: i32 = bad_unit_open + bad_unit_ident + bad_ident_lit;
+  return e0 + e1 + e2;
+}
