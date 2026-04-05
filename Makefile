@@ -19,6 +19,15 @@ check:
 heap:
 	mkdir -p build
 	$(ML_BUILD) sources.cm Main.main build/$(HEAP)
+	@cd build && \
+	  if [ -L $(HEAP) ]; then rm -f $(HEAP); fi && \
+	  if [ ! -f $(HEAP) ]; then \
+	    for img in $(HEAP).*; do \
+	      [ -f "$$img" ] || continue; \
+	      ln -sf "$$img" "$(HEAP)"; \
+	      break; \
+	    done; \
+	  fi
 
 build/e2e_generated.c: scripts/export_e2e.sml sources.cm
 	mkdir -p build

@@ -1,0 +1,78 @@
+/* Transliteration seed: tiny slice of parseExpr for assignment RHS — not full Pratt.
+   After Token.EQ or compound assign, parseExpr consumes an expression then the parser expects ';'.
+   This stub accepts: int lit (40), path ident (73), or lit + lit (40, tag_op_plus 20, 40).
+   lexer/token_op_core.sv0: tag_op_plus() == 20. */
+
+fn tok_int_lit() -> i32 {
+  return 40;
+}
+
+fn tok_ident() -> i32 {
+  return 73;
+}
+
+fn tok_plus() -> i32 {
+  return 20;
+}
+
+fn tok_semi() -> i32 {
+  return 15;
+}
+
+/* 1 if t0..t3 form a valid stub RHS immediately followed by SEMICOLON (unused args 0). */
+fn rhs_stub_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32) -> i32 {
+  if t0 == 40 {
+    if t1 == 15 {
+      return 1;
+    } else {
+      if t1 == 20 {
+        if t2 == 40 {
+          if t3 == 15 {
+            return 1;
+          } else {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    }
+  } else {
+    if t0 == 73 {
+      if t1 == 15 {
+        return 1;
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  }
+}
+
+/* Atom count of RHS only (0 = invalid); excludes ';'. */
+fn rhs_stub_atom_count(t0: i32, t1: i32, t2: i32, t3: i32) -> i32 {
+  if rhs_stub_ok_with_semi(t0, t1, t2, t3) == 1 {
+    if t1 == 15 {
+      return 1;
+    } else {
+      return 3;
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn main() -> i32 {
+  let e0: i32 = rhs_stub_ok_with_semi(tok_int_lit(), tok_semi(), 0, 0) - 1;
+  let e1: i32 = rhs_stub_ok_with_semi(tok_ident(), tok_semi(), 0, 0) - 1;
+  let e2: i32 =
+    rhs_stub_ok_with_semi(tok_int_lit(), tok_plus(), tok_int_lit(), tok_semi()) - 1;
+  let e3: i32 = rhs_stub_ok_with_semi(tok_int_lit(), tok_plus(), tok_semi(), 0);
+  let e4: i32 = rhs_stub_ok_with_semi(tok_int_lit(), 24, tok_int_lit(), tok_semi());
+  let e5: i32 = rhs_stub_atom_count(tok_int_lit(), tok_semi(), 0, 0) - 1;
+  let e6: i32 = rhs_stub_atom_count(tok_int_lit(), tok_plus(), tok_int_lit(), tok_semi()) - 3;
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6;
+}
