@@ -4,7 +4,9 @@ static int tag_op_plus(void);
 static int tag_op_minus(void);
 static int tag_op_star(void);
 static int tag_op_slash(void);
+static int tag_op_percent(void);
 static int tag_op_eqeq(void);
+static int is_mul_tier_tag(int t);
 static int prec_binary_rank(int t);
 static int mul_tier_binds_tighter_than_add_tier(void);
 static int is_add_layer_binop(int t);
@@ -26,8 +28,40 @@ static int tag_op_slash(void) {
   return 23;
 }
 
+static int tag_op_percent(void) {
+  return 29;
+}
+
 static int tag_op_eqeq(void) {
   return 24;
+}
+
+static int is_mul_tier_tag(int t) {
+  int _sv0t0;
+  int _sv0t1;
+  if ((t == 22)) {
+    return 1;
+    _sv0t1 = 0;
+  } else {
+    int _sv0t2;
+    if ((t == 23)) {
+      return 1;
+      _sv0t2 = 0;
+    } else {
+      int _sv0t3;
+      if ((t == 29)) {
+        return 1;
+        _sv0t3 = 0;
+      } else {
+        return 0;
+        _sv0t3 = 0;
+      }
+      _sv0t2 = _sv0t3;
+    }
+    _sv0t1 = _sv0t2;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
 }
 
 static int prec_binary_rank(int t) {
@@ -42,20 +76,14 @@ static int prec_binary_rank(int t) {
       return 1;
       _sv0t2 = 0;
     } else {
+      int _sv0t4 = is_mul_tier_tag(t);
       int _sv0t3;
-      if ((t == 22)) {
+      if ((_sv0t4 == 1)) {
         return 2;
         _sv0t3 = 0;
       } else {
-        int _sv0t4;
-        if ((t == 23)) {
-          return 2;
-          _sv0t4 = 0;
-        } else {
-          return 0;
-          _sv0t4 = 0;
-        }
-        _sv0t3 = _sv0t4;
+        return 0;
+        _sv0t3 = 0;
       }
       _sv0t2 = _sv0t3;
     }
@@ -105,23 +133,7 @@ static int is_add_layer_binop(int t) {
 }
 
 static int is_mul_layer_binop(int t) {
-  int _sv0t0;
-  int _sv0t1;
-  if ((t == 22)) {
-    return 1;
-    _sv0t1 = 0;
-  } else {
-    int _sv0t2;
-    if ((t == 23)) {
-      return 1;
-      _sv0t2 = 0;
-    } else {
-      return 0;
-      _sv0t2 = 0;
-    }
-    _sv0t1 = _sv0t2;
-  }
-  _sv0t0 = _sv0t1;
+  int _sv0t0 = is_mul_tier_tag(t);
   return _sv0t0;
 }
 
@@ -152,14 +164,22 @@ int main(void) {
   int _sv0t15 = tag_op_plus();
   int _sv0t16 = is_mul_layer_binop(_sv0t15);
   int e8 = _sv0t16;
-  int _sv0t17 = (e0 + e1);
-  int _sv0t18 = (_sv0t17 + e2);
-  int _sv0t19 = (_sv0t18 + e3);
-  int _sv0t20 = (_sv0t19 + e4);
-  int _sv0t21 = (_sv0t20 + e5);
-  int _sv0t22 = (_sv0t21 + e6);
-  int _sv0t23 = (_sv0t22 + e7);
-  int _sv0t24 = (_sv0t23 + e8);
-  return _sv0t24;
+  int _sv0t17 = tag_op_percent();
+  int _sv0t18 = prec_binary_rank(_sv0t17);
+  int e9 = (_sv0t18 - 2);
+  int _sv0t19 = tag_op_percent();
+  int _sv0t20 = is_mul_layer_binop(_sv0t19);
+  int e10 = (_sv0t20 - 1);
+  int _sv0t21 = (e0 + e1);
+  int _sv0t22 = (_sv0t21 + e2);
+  int _sv0t23 = (_sv0t22 + e3);
+  int _sv0t24 = (_sv0t23 + e4);
+  int _sv0t25 = (_sv0t24 + e5);
+  int _sv0t26 = (_sv0t25 + e6);
+  int _sv0t27 = (_sv0t26 + e7);
+  int _sv0t28 = (_sv0t27 + e8);
+  int _sv0t29 = (_sv0t28 + e9);
+  int _sv0t30 = (_sv0t29 + e10);
+  return _sv0t30;
 }
 

@@ -108,7 +108,7 @@ fn tok_char_lit() -> i32 {
   return 45;
 }
 
-/* 70+ avoids collision with lexer/token_op_core.sv0 band 20–28. */
+/* 70+ avoids collision with lexer/token_op_core.sv0 band 20–29. */
 fn tok_self() -> i32 {
   return 70;
 }

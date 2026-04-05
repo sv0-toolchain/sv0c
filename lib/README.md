@@ -84,7 +84,7 @@ Delimiter / punctuation tags (`( ) { } , ; [ ] . =`) in band **10–19** (**`=`*
 
 ## `lexer/token_op_core.sv0`
 
-Operator tags (`+ - * / == != -> => ::`) in band **20–28**, plus `is_operator_tag`. Compound assignment tokens **`+= … >>=`** use band **211–220** (`tag_op_pluseq` … `tag_op_gtgteq`), same numbers as **`parser/assign_binop_core.sv0`**; **`is_compound_assign_tag`** classifies that band (distinct from **`is_operator_tag`** — **`=`** assignment stays **`tag_delim_eq` = 19**).
+Operator tags (`+ - * / == != -> => :: %`) in band **20–29** (**`%`** = **29**, same mul tier as **`*`**/**`/`** in **parser.sml**), plus `is_operator_tag`. Compound assignment tokens **`+= … >>=`** use band **211–220** (`tag_op_pluseq` … `tag_op_gtgteq`), same numbers as **`parser/assign_binop_core.sv0`**; **`is_compound_assign_tag`** classifies that band (distinct from **`is_operator_tag`** — **`=`** assignment stays **`tag_delim_eq` = 19**).
 
 ## `lib/type_alias_core.sv0`
 
@@ -124,7 +124,7 @@ Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*`
 
 ## `parser/expr_prec_ladder_core.sv0`
 
-**`parseAddExpr`** / **`parseMulExpr`** / **`parseLeftAssoc`** in **`parser.sml`**: documents the full **`parseExpr`** chain down to those layers; encodes **add** tier tags **20–21** vs **mul** tier **22–23** (**`lexer/token_op_core`**), with **`prec_binary_rank`**, **`is_add_layer_binop`**, **`is_mul_layer_binop`**, and **`mul_tier_binds_tighter_than_add_tier`**. **`tag_op_eqeq` (24)** is **not** in either tier here (cmp layer in SML). Bridges the numeric Pratt stub to the real precedence ladder without parsing token streams.
+**`parseAddExpr`** / **`parseMulExpr`** / **`parseLeftAssoc`** in **`parser.sml`**: documents the full **`parseExpr`** chain down to those layers; encodes **add** tier **20–21** vs **mul** tier **22**/**23**/**29** (**STAR**/**SLASH**/**PERCENT** in **`token_op_core`**), with **`prec_binary_rank`**, **`is_add_layer_binop`**, **`is_mul_layer_binop`**, and **`mul_tier_binds_tighter_than_add_tier`**. **`tag_op_eqeq` (24)** is **not** in either tier here (cmp layer in SML). Bridges the numeric Pratt stub to the real precedence ladder without parsing token streams.
 
 ## `parser/try_assign_stmt_core.sv0`
 

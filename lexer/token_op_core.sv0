@@ -1,6 +1,6 @@
 /* Transliteration seed: sml/lexer/token.sml — operator / punctuator subset as i32 tags.
-   Band 20–28: binary / misc ops (includes == as tag_op_eq). Band 211–220: compound assigns
-   PLUSEQ … GTGTEQ — same numbers as parser/assign_binop_core.sv0 / assignBinop in parser.sml. */
+   Band 20–29: binary / misc ops (**PERCENT** **29** sits with mul ops in **parser.sml** **parseMulExpr**;
+   **==** stays **24**). Band 211–220: compound assigns PLUSEQ … GTGTEQ — same as **assign_binop_core** / **assignBinop**. */
 
 fn tag_op_plus() -> i32 {
   return 20;
@@ -36,6 +36,10 @@ fn tag_op_fat_arrow() -> i32 {
 
 fn tag_op_coloncolon() -> i32 {
   return 28;
+}
+
+fn tag_op_percent() -> i32 {
+  return 29;
 }
 
 fn tag_op_pluseq() -> i32 {
@@ -106,7 +110,11 @@ fn is_operator_tag(t: i32) -> i32 {
                   if t == 28 {
                     return 1;
                   } else {
-                    return 0;
+                    if t == 29 {
+                      return 1;
+                    } else {
+                      return 0;
+                    }
                   }
                 }
               }
@@ -172,6 +180,7 @@ fn main() -> i32 {
   let a6: i32 = is_operator_tag(tag_op_arrow()) - 1;
   let a7: i32 = is_operator_tag(tag_op_fat_arrow()) - 1;
   let a8: i32 = is_operator_tag(tag_op_coloncolon()) - 1;
+  let a11: i32 = is_operator_tag(tag_op_percent()) - 1;
   let a9: i32 = is_operator_tag(3);
   let a10: i32 = is_operator_tag(15);
   let b0: i32 = is_compound_assign_tag(tag_op_pluseq()) - 1;
@@ -187,6 +196,6 @@ fn main() -> i32 {
   let b10: i32 = is_compound_assign_tag(19);
   let b11: i32 = is_compound_assign_tag(24);
   let b12: i32 = is_compound_assign_tag(99);
-  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + b0 + b1 + b2 + b3 + b4 + b5 + b6 + b7 + b8 + b9 +
+  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a11 + a9 + a10 + b0 + b1 + b2 + b3 + b4 + b5 + b6 + b7 + b8 + b9 +
     b10 + b11 + b12;
 }
