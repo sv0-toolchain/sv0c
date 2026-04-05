@@ -118,6 +118,10 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 Post-**`=`** / compound-assign **RHS** stub (not full **`parseExpr`**): **`int` lit (40)**, **`ident` (73)**, or **`lit + lit`** with **`lexer/token_op_core`** **`tag_op_plus` = 20**, each form ending with **`;` (15)**. **`rhs_stub_atom_count`** returns **1** or **3** atoms (excluding **`;`**). **`parser/try_assign_stmt_core.sv0`** duplicates **`rhs_stub_ok_with_semi`** for a single bootstrap program.
 
+## `parser/expr_pratt_stub_core.sv0`
+
+Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*` (22)** binds tighter than **`+` (20)**; atoms **40** / **73**; **`pratt_rhs_ok_with_semi`** on **t0..t5** accepts **`a;`**, **`a+b;`**, **`a*b;`**, **`a+b*c;`**, **`a*b+c;`**, **`a*b*c;`** (each **`a,b,c`** atom). Longer chains or **`-`** are out of scope here. **`try_assign_stmt_core`** can adopt this shape when **`parseExpr`** is wired.
+
 ## `parser/try_assign_stmt_core.sv0`
 
 **tryAssignStmt** in **`parser.sml`**: after **`tryParseAssignLHS`**, **`assign_op_follows_lhs`** (**`isAssignTok`**), then **`rhs_stub_ok_with_semi`** for RHS + **`;`**. Covers atom, **`ident`**, **`1 + 2`**-style RHS (via **`try_assign_id_op_rhs_stub`**), **`*x = …`** with atom RHS and **`try_assign_deref_op_rhs_stub`** for **`*x = 1 + 2`**, **field** atom RHS plus **`try_assign_field_op_rhs_stub`** for **`a.b = 1 + 2`**, **index** (**`ident [ int_lit ]`**, tags **16** / **17**) via **`try_assign_index_op_rhs_stub`** for **`a[i] = 1 + 2`**, **`+=`** with binop RHS, and rejects **missing `;`**, **`==` (24)**, truncated **`+`**, non-deref where **`STAR`** was expected, **`EQ` where DOT was expected** between field path segments, **DOT where LBRACKET was expected** after **`ident`**. Extend when real **`parseExpr`** is transliterated.
