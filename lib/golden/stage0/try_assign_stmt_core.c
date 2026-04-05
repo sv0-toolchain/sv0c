@@ -4,11 +4,14 @@ static int tok_ident(void);
 static int tok_star(void);
 static int tok_assign_eq(void);
 static int tok_pluseq(void);
+static int tok_minuseq(void);
+static int tok_gtgteq(void);
 static int tok_rhs_atom(void);
 static int tok_semi(void);
 static int tok_lhs_dot(void);
 static int tok_op_eqeq(void);
-static int assign_op_is_eq_or_pluseq(int t);
+static int assign_binop_ast_tag(int t);
+static int assign_op_follows_lhs(int t);
 static int try_assign_linear_4(int t0, int t1, int t2, int t3);
 static int try_assign_linear_5_deref(int t0, int t1, int t2, int t3, int t4);
 static int try_assign_linear_6_field(int t0, int t1, int t2, int t3, int t4, int t5);
@@ -29,6 +32,14 @@ static int tok_pluseq(void) {
   return 211;
 }
 
+static int tok_minuseq(void) {
+  return 212;
+}
+
+static int tok_gtgteq(void) {
+  return 220;
+}
+
 static int tok_rhs_atom(void) {
   return 40;
 }
@@ -45,15 +56,93 @@ static int tok_op_eqeq(void) {
   return 24;
 }
 
-static int assign_op_is_eq_or_pluseq(int t) {
+static int assign_binop_ast_tag(int t) {
+  int _sv0t0;
+  int _sv0t1;
+  if ((t == 211)) {
+    return 1;
+    _sv0t1 = 0;
+  } else {
+    int _sv0t2;
+    if ((t == 212)) {
+      return 2;
+      _sv0t2 = 0;
+    } else {
+      int _sv0t3;
+      if ((t == 213)) {
+        return 3;
+        _sv0t3 = 0;
+      } else {
+        int _sv0t4;
+        if ((t == 214)) {
+          return 4;
+          _sv0t4 = 0;
+        } else {
+          int _sv0t5;
+          if ((t == 215)) {
+            return 5;
+            _sv0t5 = 0;
+          } else {
+            int _sv0t6;
+            if ((t == 216)) {
+              return 6;
+              _sv0t6 = 0;
+            } else {
+              int _sv0t7;
+              if ((t == 217)) {
+                return 7;
+                _sv0t7 = 0;
+              } else {
+                int _sv0t8;
+                if ((t == 218)) {
+                  return 8;
+                  _sv0t8 = 0;
+                } else {
+                  int _sv0t9;
+                  if ((t == 219)) {
+                    return 9;
+                    _sv0t9 = 0;
+                  } else {
+                    int _sv0t10;
+                    if ((t == 220)) {
+                      return 10;
+                      _sv0t10 = 0;
+                    } else {
+                      return 0;
+                      _sv0t10 = 0;
+                    }
+                    _sv0t9 = _sv0t10;
+                  }
+                  _sv0t8 = _sv0t9;
+                }
+                _sv0t7 = _sv0t8;
+              }
+              _sv0t6 = _sv0t7;
+            }
+            _sv0t5 = _sv0t6;
+          }
+          _sv0t4 = _sv0t5;
+        }
+        _sv0t3 = _sv0t4;
+      }
+      _sv0t2 = _sv0t3;
+    }
+    _sv0t1 = _sv0t2;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
+static int assign_op_follows_lhs(int t) {
   int _sv0t0;
   int _sv0t1;
   if ((t == 19)) {
     return 1;
     _sv0t1 = 0;
   } else {
+    int _sv0t3 = assign_binop_ast_tag(t);
     int _sv0t2;
-    if ((t == 211)) {
+    if ((_sv0t3 > 0)) {
       return 1;
       _sv0t2 = 0;
     } else {
@@ -70,7 +159,7 @@ static int try_assign_linear_4(int t0, int t1, int t2, int t3) {
   int _sv0t0;
   int _sv0t1;
   if ((t0 == 73)) {
-    int _sv0t3 = assign_op_is_eq_or_pluseq(t1);
+    int _sv0t3 = assign_op_follows_lhs(t1);
     int _sv0t2;
     if ((_sv0t3 == 1)) {
       int _sv0t4;
@@ -108,48 +197,28 @@ static int try_assign_linear_5_deref(int t0, int t1, int t2, int t3, int t4) {
   if ((t0 == 22)) {
     int _sv0t2;
     if ((t1 == 73)) {
+      int _sv0t4 = assign_op_follows_lhs(t2);
       int _sv0t3;
-      if ((t2 == 19)) {
-        int _sv0t4;
+      if ((_sv0t4 == 1)) {
+        int _sv0t5;
         if ((t3 == 40)) {
-          int _sv0t5;
+          int _sv0t6;
           if ((t4 == 15)) {
             return 1;
-            _sv0t5 = 0;
+            _sv0t6 = 0;
           } else {
             return 0;
-            _sv0t5 = 0;
+            _sv0t6 = 0;
           }
-          _sv0t4 = _sv0t5;
+          _sv0t5 = _sv0t6;
         } else {
           return 0;
-          _sv0t4 = 0;
+          _sv0t5 = 0;
         }
-        _sv0t3 = _sv0t4;
+        _sv0t3 = _sv0t5;
       } else {
-        int _sv0t6;
-        if ((t2 == 211)) {
-          int _sv0t7;
-          if ((t3 == 40)) {
-            int _sv0t8;
-            if ((t4 == 15)) {
-              return 1;
-              _sv0t8 = 0;
-            } else {
-              return 0;
-              _sv0t8 = 0;
-            }
-            _sv0t7 = _sv0t8;
-          } else {
-            return 0;
-            _sv0t7 = 0;
-          }
-          _sv0t6 = _sv0t7;
-        } else {
-          return 0;
-          _sv0t6 = 0;
-        }
-        _sv0t3 = _sv0t6;
+        return 0;
+        _sv0t3 = 0;
       }
       _sv0t2 = _sv0t3;
     } else {
@@ -173,24 +242,25 @@ static int try_assign_linear_6_field(int t0, int t1, int t2, int t3, int t4, int
     if ((t1 == 18)) {
       int _sv0t3;
       if ((t2 == 73)) {
+        int _sv0t5 = assign_op_follows_lhs(t3);
         int _sv0t4;
-        if ((t3 == 19)) {
-          int _sv0t5;
+        if ((_sv0t5 == 1)) {
+          int _sv0t6;
           if ((t4 == 40)) {
-            int _sv0t6;
+            int _sv0t7;
             if ((t5 == 15)) {
               return 1;
-              _sv0t6 = 0;
+              _sv0t7 = 0;
             } else {
               return 0;
-              _sv0t6 = 0;
+              _sv0t7 = 0;
             }
-            _sv0t5 = _sv0t6;
+            _sv0t6 = _sv0t7;
           } else {
             return 0;
-            _sv0t5 = 0;
+            _sv0t6 = 0;
           }
-          _sv0t4 = _sv0t5;
+          _sv0t4 = _sv0t6;
         } else {
           return 0;
           _sv0t4 = 0;
@@ -216,13 +286,13 @@ static int try_assign_linear_6_field(int t0, int t1, int t2, int t3, int t4, int
 
 int main(void) {
   int _sv0t0 = tok_assign_eq();
-  int _sv0t1 = assign_op_is_eq_or_pluseq(_sv0t0);
+  int _sv0t1 = assign_op_follows_lhs(_sv0t0);
   int e0 = (_sv0t1 - 1);
   int _sv0t2 = tok_pluseq();
-  int _sv0t3 = assign_op_is_eq_or_pluseq(_sv0t2);
+  int _sv0t3 = assign_op_follows_lhs(_sv0t2);
   int e1 = (_sv0t3 - 1);
   int _sv0t4 = tok_op_eqeq();
-  int _sv0t5 = assign_op_is_eq_or_pluseq(_sv0t4);
+  int _sv0t5 = assign_op_follows_lhs(_sv0t4);
   int e2 = _sv0t5;
   int _sv0t6 = tok_ident();
   int _sv0t7 = tok_assign_eq();
@@ -276,16 +346,39 @@ int main(void) {
   int _sv0t48 = tok_semi();
   int _sv0t49 = try_assign_linear_4(_sv0t45, _sv0t46, _sv0t47, _sv0t48);
   int e10 = _sv0t49;
-  int _sv0t50 = (e0 + e1);
-  int _sv0t51 = (_sv0t50 + e2);
-  int _sv0t52 = (_sv0t51 + e3);
-  int _sv0t53 = (_sv0t52 + e4);
-  int _sv0t54 = (_sv0t53 + e5);
-  int _sv0t55 = (_sv0t54 + e6);
-  int _sv0t56 = (_sv0t55 + e7);
-  int _sv0t57 = (_sv0t56 + e8);
-  int _sv0t58 = (_sv0t57 + e9);
-  int _sv0t59 = (_sv0t58 + e10);
-  return _sv0t59;
+  int _sv0t50 = tok_ident();
+  int _sv0t51 = tok_minuseq();
+  int _sv0t52 = tok_rhs_atom();
+  int _sv0t53 = tok_semi();
+  int _sv0t54 = try_assign_linear_4(_sv0t50, _sv0t51, _sv0t52, _sv0t53);
+  int e11 = (_sv0t54 - 1);
+  int _sv0t55 = tok_ident();
+  int _sv0t56 = tok_gtgteq();
+  int _sv0t57 = tok_rhs_atom();
+  int _sv0t58 = tok_semi();
+  int _sv0t59 = try_assign_linear_4(_sv0t55, _sv0t56, _sv0t57, _sv0t58);
+  int e12 = (_sv0t59 - 1);
+  int _sv0t60 = tok_ident();
+  int _sv0t61 = tok_lhs_dot();
+  int _sv0t62 = tok_ident();
+  int _sv0t63 = tok_minuseq();
+  int _sv0t64 = tok_rhs_atom();
+  int _sv0t65 = tok_semi();
+  int _sv0t66 = try_assign_linear_6_field(_sv0t60, _sv0t61, _sv0t62, _sv0t63, _sv0t64, _sv0t65);
+  int e13 = (_sv0t66 - 1);
+  int _sv0t67 = (e0 + e1);
+  int _sv0t68 = (_sv0t67 + e2);
+  int _sv0t69 = (_sv0t68 + e3);
+  int _sv0t70 = (_sv0t69 + e4);
+  int _sv0t71 = (_sv0t70 + e5);
+  int _sv0t72 = (_sv0t71 + e6);
+  int _sv0t73 = (_sv0t72 + e7);
+  int _sv0t74 = (_sv0t73 + e8);
+  int _sv0t75 = (_sv0t74 + e9);
+  int _sv0t76 = (_sv0t75 + e10);
+  int _sv0t77 = (_sv0t76 + e11);
+  int _sv0t78 = (_sv0t77 + e12);
+  int _sv0t79 = (_sv0t78 + e13);
+  return _sv0t79;
 }
 

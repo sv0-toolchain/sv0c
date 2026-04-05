@@ -1,7 +1,7 @@
 /* Transliteration seed: sml/parser/parser.sml — parseAssignTarget + tryParseAssignLHS (lines ~1010–1051).
    Token tags cross-ref: lexer/token_op_core tag_op_star() = 22; expr_entry tok_ident() = 73;
    token_delim lbracket/rbracket 16/17, dot 18, assignment EQ 19; expr int lit stand-in 40.
-   PLUSEQ stand-in 211 (full assign-binop table later). */
+   Assign binop band **211–220** matches **parser/assign_binop_core.sv0** / **`assignBinop`** in **`parser.sml`**. */
 
 fn tok_lhs_dot() -> i32 {
   return 18;
@@ -13,6 +13,14 @@ fn tok_assign_eq() -> i32 {
 
 fn tok_pluseq() -> i32 {
   return 211;
+}
+
+fn tok_minuseq() -> i32 {
+  return 212;
+}
+
+fn tok_gtgteq() -> i32 {
+  return 220;
 }
 
 /* lexer/token_op_core.sv0: tag_op_star() == 22 */
@@ -55,11 +63,47 @@ fn try_lhs_starts(t: i32) -> i32 {
   }
 }
 
-fn assign_binop_tag(t: i32) -> i32 {
+fn assign_binop_ast_tag(t: i32) -> i32 {
   if t == 211 {
     return 1;
   } else {
-    return 0;
+    if t == 212 {
+      return 2;
+    } else {
+      if t == 213 {
+        return 3;
+      } else {
+        if t == 214 {
+          return 4;
+        } else {
+          if t == 215 {
+            return 5;
+          } else {
+            if t == 216 {
+              return 6;
+            } else {
+              if t == 217 {
+                return 7;
+              } else {
+                if t == 218 {
+                  return 8;
+                } else {
+                  if t == 219 {
+                    return 9;
+                  } else {
+                    if t == 220 {
+                      return 10;
+                    } else {
+                      return 0;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -67,7 +111,7 @@ fn is_assign_follow_tok(t: i32) -> i32 {
   if t == 19 {
     return 1;
   } else {
-    if assign_binop_tag(t) == 1 {
+    if assign_binop_ast_tag(t) > 0 {
       return 1;
     } else {
       return 0;
@@ -79,22 +123,22 @@ fn is_assign_tok(t: i32) -> i32 {
   return is_assign_follow_tok(t);
 }
 
-/* Depth of constructed assign-target shape when stream ends at '=' (1 = path only, +1 per deref, +1 per field/index). */
+/* Depth when stream ends at EQ or assign binop (211–220): 1 = path only, +1 per deref, +1 per field/index. */
 fn assign_target_depth_if_assign_eq(t0: i32, t1: i32, t2: i32, t3: i32) -> i32 {
   if t0 == 73 {
-    if t1 == 19 {
+    if is_assign_follow_tok(t1) == 1 {
       return 1;
     } else {
       if t1 == 18 {
         if t2 == 73 {
-          if t3 == 19 {
+          if is_assign_follow_tok(t3) == 1 {
             return 2;
           } else {
             return 0;
           }
         } else {
           if t2 == 40 {
-            if t3 == 19 {
+            if is_assign_follow_tok(t3) == 1 {
               return 2;
             } else {
               return 0;
@@ -110,7 +154,7 @@ fn assign_target_depth_if_assign_eq(t0: i32, t1: i32, t2: i32, t3: i32) -> i32 {
   } else {
     if t0 == 22 {
       if t1 == 73 {
-        if t2 == 19 {
+        if is_assign_follow_tok(t2) == 1 {
           return 2;
         } else {
           return 0;
@@ -128,7 +172,7 @@ fn assign_target_depth_star_star_ident_eq(t0: i32, t1: i32, t2: i32, t3: i32) ->
   if t0 == 22 {
     if t1 == 22 {
       if t2 == 73 {
-        if t3 == 19 {
+        if is_assign_follow_tok(t3) == 1 {
           return 3;
         } else {
           return 0;
@@ -149,7 +193,7 @@ fn assign_target_depth_index_with_eq(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32
     if t1 == 16 {
       if t2 == 40 {
         if t3 == 17 {
-          if t4 == 19 {
+          if is_assign_follow_tok(t4) == 1 {
             return 2;
           } else {
             return 0;
@@ -188,24 +232,30 @@ fn main() -> i32 {
   let e3: i32 = is_assign_follow_tok(tok_assign_eq()) - 1;
   let e4: i32 = is_assign_follow_tok(tok_pluseq()) - 1;
   let e5: i32 = is_assign_follow_tok(24);
-  let e6: i32 = assign_binop_tag(tok_pluseq()) - 1;
-  let e7: i32 = assign_binop_tag(tok_assign_eq());
-  let e8: i32 = is_assign_tok(tok_assign_eq()) - 1;
-  let e9: i32 = is_assign_tok(tok_pluseq()) - 1;
-  let e10: i32 = assign_target_depth_if_assign_eq(tok_ident(), tok_assign_eq(), 0, 0) - 1;
-  let e11: i32 = assign_target_depth_if_assign_eq(tok_star(), tok_ident(), tok_assign_eq(), 0) - 2;
-  let e12: i32 =
+  let e6: i32 = assign_binop_ast_tag(tok_pluseq()) - 1;
+  let e7: i32 = assign_binop_ast_tag(tok_minuseq()) - 2;
+  let e8: i32 = assign_binop_ast_tag(tok_gtgteq()) - 10;
+  let e9: i32 = assign_binop_ast_tag(tok_assign_eq());
+  let e10: i32 = assign_binop_ast_tag(24);
+  let e11: i32 = is_assign_tok(tok_assign_eq()) - 1;
+  let e12: i32 = is_assign_tok(tok_pluseq()) - 1;
+  let e13: i32 = is_assign_follow_tok(tok_minuseq()) - 1;
+  let e14: i32 = is_assign_follow_tok(tok_gtgteq()) - 1;
+  let e15: i32 = assign_target_depth_if_assign_eq(tok_ident(), tok_assign_eq(), 0, 0) - 1;
+  let e16: i32 = assign_target_depth_if_assign_eq(tok_star(), tok_ident(), tok_assign_eq(), 0) - 2;
+  let e17: i32 =
     assign_target_depth_if_assign_eq(tok_ident(), tok_lhs_dot(), tok_ident(), tok_assign_eq()) - 2;
-  let e13: i32 =
+  let e18: i32 =
     assign_target_depth_if_assign_eq(tok_ident(), tok_lhs_dot(), tok_int_lit(), tok_assign_eq()) - 2;
-  let e14: i32 =
+  let e19: i32 =
     assign_target_depth_index_with_eq(tok_ident(), tok_lbracket(), tok_int_lit(), tok_rbracket(), tok_assign_eq()) -
       2;
-  let e15: i32 =
+  let e20: i32 =
     assign_target_depth_star_star_ident_eq(tok_star(), tok_star(), tok_ident(), tok_assign_eq()) - 3;
-  let e16: i32 = assign_target_depth_if_assign_eq(tok_ident(), tok_semi(), 0, 0);
-  let e17: i32 = try_lhs_ident_tail_is_assign_follow(tok_assign_eq()) - 1;
-  let e18: i32 = try_lhs_ident_tail_is_assign_follow(tok_semi());
-  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14 + e15 + e16 + e17 +
-    e18;
+  let e21: i32 = assign_target_depth_if_assign_eq(tok_ident(), tok_semi(), 0, 0);
+  let e22: i32 = try_lhs_ident_tail_is_assign_follow(tok_assign_eq()) - 1;
+  let e23: i32 = try_lhs_ident_tail_is_assign_follow(tok_semi());
+  let e24: i32 = assign_target_depth_if_assign_eq(tok_ident(), tok_minuseq(), 0, 0) - 1;
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14 + e15 + e16 + e17 + e18 +
+    e19 + e20 + e21 + e22 + e23 + e24;
 }

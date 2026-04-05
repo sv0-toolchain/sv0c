@@ -21,4 +21,5 @@ parser/expr_entry_core.sv0
 parser/item_entry_core.sv0
 parser/stmt_entry_core.sv0
 parser/assign_lhs_core.sv0
+parser/assign_binop_core.sv0
 parser/try_assign_stmt_core.sv0
