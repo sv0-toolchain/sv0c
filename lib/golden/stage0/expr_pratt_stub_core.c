@@ -8,6 +8,7 @@ static int tok_minus(void);
 static int tok_semi(void);
 static int is_atom(int t);
 static int pratt_from_atom(int a, int t1, int t2, int t3, int t4, int t5);
+static int pratt_rhs_ok_with_semi7(int t0, int t1, int t2, int t3, int t4, int t5, int t6);
 static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5);
 
 static int tok_int_lit(void) {
@@ -187,7 +188,7 @@ static int pratt_from_atom(int a, int t1, int t2, int t3, int t4, int t5) {
   return _sv0t0;
 }
 
-static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5) {
+static int pratt_rhs_ok_with_semi7(int t0, int t1, int t2, int t3, int t4, int t5, int t6) {
   int _sv0t2 = is_atom(t0);
   int _sv0t0;
   int _sv0t1;
@@ -204,7 +205,7 @@ static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5
         return 0;
         _sv0t5 = 0;
       } else {
-        int _sv0t7 = pratt_from_atom(t1, t2, t3, t4, t5, 0);
+        int _sv0t7 = pratt_from_atom(t1, t2, t3, t4, t5, t6);
         return _sv0t7;
         _sv0t5 = 0;
       }
@@ -216,6 +217,11 @@ static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5
     _sv0t1 = _sv0t4;
   }
   _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
+static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5) {
+  int _sv0t0 = pratt_rhs_ok_with_semi7(t0, t1, t2, t3, t4, t5, 0);
   return _sv0t0;
 }
 
@@ -309,28 +315,38 @@ int main(void) {
   int _sv0t73 = tok_int_lit();
   int _sv0t74 = tok_star();
   int _sv0t75 = tok_int_lit();
-  int _sv0t76 = pratt_rhs_ok_with_semi(_sv0t70, _sv0t71, _sv0t72, _sv0t73, _sv0t74, _sv0t75);
-  int e13 = _sv0t76;
-  int _sv0t77 = tok_minus();
+  int _sv0t76 = tok_semi();
+  int _sv0t77 = pratt_rhs_ok_with_semi7(_sv0t70, _sv0t71, _sv0t72, _sv0t73, _sv0t74, _sv0t75, _sv0t76);
+  int e13 = (_sv0t77 - 1);
   int _sv0t78 = tok_minus();
-  int _sv0t79 = tok_int_lit();
-  int _sv0t80 = tok_semi();
-  int _sv0t81 = pratt_rhs_ok_with_semi(_sv0t77, _sv0t78, _sv0t79, _sv0t80, 0, 0);
-  int e14 = _sv0t81;
-  int _sv0t82 = (e0 + e1);
-  int _sv0t83 = (_sv0t82 + e2);
-  int _sv0t84 = (_sv0t83 + e3);
-  int _sv0t85 = (_sv0t84 + e4);
-  int _sv0t86 = (_sv0t85 + e5);
-  int _sv0t87 = (_sv0t86 + e6);
-  int _sv0t88 = (_sv0t87 + e7);
-  int _sv0t89 = (_sv0t88 + e8);
-  int _sv0t90 = (_sv0t89 + e9);
-  int _sv0t91 = (_sv0t90 + e10);
-  int _sv0t92 = (_sv0t91 + e11);
-  int _sv0t93 = (_sv0t92 + e12);
-  int _sv0t94 = (_sv0t93 + e13);
-  int _sv0t95 = (_sv0t94 + e14);
-  return _sv0t95;
+  int _sv0t79 = tok_minus();
+  int _sv0t80 = tok_int_lit();
+  int _sv0t81 = tok_semi();
+  int _sv0t82 = pratt_rhs_ok_with_semi(_sv0t78, _sv0t79, _sv0t80, _sv0t81, 0, 0);
+  int e14 = _sv0t82;
+  int _sv0t83 = tok_int_lit();
+  int _sv0t84 = tok_plus();
+  int _sv0t85 = tok_int_lit();
+  int _sv0t86 = tok_star();
+  int _sv0t87 = tok_int_lit();
+  int _sv0t88 = tok_semi();
+  int _sv0t89 = pratt_rhs_ok_with_semi7(_sv0t83, _sv0t84, _sv0t85, _sv0t86, _sv0t87, _sv0t88, 0);
+  int e15 = (_sv0t89 - 1);
+  int _sv0t90 = (e0 + e1);
+  int _sv0t91 = (_sv0t90 + e2);
+  int _sv0t92 = (_sv0t91 + e3);
+  int _sv0t93 = (_sv0t92 + e4);
+  int _sv0t94 = (_sv0t93 + e5);
+  int _sv0t95 = (_sv0t94 + e6);
+  int _sv0t96 = (_sv0t95 + e7);
+  int _sv0t97 = (_sv0t96 + e8);
+  int _sv0t98 = (_sv0t97 + e9);
+  int _sv0t99 = (_sv0t98 + e10);
+  int _sv0t100 = (_sv0t99 + e11);
+  int _sv0t101 = (_sv0t100 + e12);
+  int _sv0t102 = (_sv0t101 + e13);
+  int _sv0t103 = (_sv0t102 + e14);
+  int _sv0t104 = (_sv0t103 + e15);
+  return _sv0t104;
 }
 
