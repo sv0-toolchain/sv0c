@@ -18,6 +18,7 @@ static int tok_unary_minus(void);
 static int rhs_stub_ok_with_semi(int t0, int t1, int t2, int t3);
 static int pratt_is_atom(int t);
 static int pratt_from_atom(int a, int t1, int t2, int t3, int t4, int t5);
+static int pratt_rhs_ok_with_semi7(int t0, int t1, int t2, int t3, int t4, int t5, int t6);
 static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5);
 static int assign_binop_ast_tag(int t);
 static int assign_op_follows_lhs(int t);
@@ -26,12 +27,16 @@ static int try_assign_linear_5_deref(int t0, int t1, int t2, int t3, int t4);
 static int try_assign_linear_6_field(int t0, int t1, int t2, int t3, int t4, int t5);
 static int try_assign_id_op_rhs_stub(int op, int t0, int t1, int t2, int t3);
 static int try_assign_id_op_pratt_rhs_stub(int op, int t0, int t1, int t2, int t3, int t4, int t5);
+static int try_assign_id_op_pratt_rhs_stub7(int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6);
 static int try_assign_deref_op_rhs_stub(int t_star, int t_id, int op, int t0, int t1, int t2, int t3);
 static int try_assign_field_op_rhs_stub(int t_base, int t_dot, int t_field, int op, int r0, int r1, int r2, int r3);
 static int try_assign_index_op_rhs_stub(int t_id, int t_lbr, int t_idx, int t_rbr, int op, int r0, int r1, int r2, int r3);
 static int try_assign_deref_op_pratt_rhs_stub(int t_star, int t_id, int op, int t0, int t1, int t2, int t3, int t4, int t5);
+static int try_assign_deref_op_pratt_rhs_stub7(int t_star, int t_id, int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6);
 static int try_assign_field_op_pratt_rhs_stub(int t_base, int t_dot, int t_field, int op, int t0, int t1, int t2, int t3, int t4, int t5);
+static int try_assign_field_op_pratt_rhs_stub7(int t_base, int t_dot, int t_field, int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6);
 static int try_assign_index_op_pratt_rhs_stub(int t_id, int t_lbr, int t_idx, int t_rbr, int op, int t0, int t1, int t2, int t3, int t4, int t5);
+static int try_assign_index_op_pratt_rhs_stub7(int t_id, int t_lbr, int t_idx, int t_rbr, int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6);
 
 static int tok_ident(void) {
   return 73;
@@ -302,7 +307,7 @@ static int pratt_from_atom(int a, int t1, int t2, int t3, int t4, int t5) {
   return _sv0t0;
 }
 
-static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5) {
+static int pratt_rhs_ok_with_semi7(int t0, int t1, int t2, int t3, int t4, int t5, int t6) {
   int _sv0t2 = pratt_is_atom(t0);
   int _sv0t0;
   int _sv0t1;
@@ -319,7 +324,7 @@ static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5
         return 0;
         _sv0t5 = 0;
       } else {
-        int _sv0t7 = pratt_from_atom(t1, t2, t3, t4, t5, 0);
+        int _sv0t7 = pratt_from_atom(t1, t2, t3, t4, t5, t6);
         return _sv0t7;
         _sv0t5 = 0;
       }
@@ -331,6 +336,11 @@ static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5
     _sv0t1 = _sv0t4;
   }
   _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
+static int pratt_rhs_ok_with_semi(int t0, int t1, int t2, int t3, int t4, int t5) {
+  int _sv0t0 = pratt_rhs_ok_with_semi7(t0, t1, t2, t3, t4, t5, 0);
   return _sv0t0;
 }
 
@@ -555,6 +565,22 @@ static int try_assign_id_op_pratt_rhs_stub(int op, int t0, int t1, int t2, int t
   return _sv0t0;
 }
 
+static int try_assign_id_op_pratt_rhs_stub7(int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6) {
+  int _sv0t2 = assign_op_follows_lhs(op);
+  int _sv0t0;
+  int _sv0t1;
+  if ((_sv0t2 == 1)) {
+    int _sv0t3 = pratt_rhs_ok_with_semi7(t0, t1, t2, t3, t4, t5, t6);
+    return _sv0t3;
+    _sv0t1 = 0;
+  } else {
+    return 0;
+    _sv0t1 = 0;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
 static int try_assign_deref_op_rhs_stub(int t_star, int t_id, int op, int t0, int t1, int t2, int t3) {
   int _sv0t0;
   int _sv0t1;
@@ -696,6 +722,36 @@ static int try_assign_deref_op_pratt_rhs_stub(int t_star, int t_id, int op, int 
   return _sv0t0;
 }
 
+static int try_assign_deref_op_pratt_rhs_stub7(int t_star, int t_id, int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6) {
+  int _sv0t0;
+  int _sv0t1;
+  if ((t_star == 22)) {
+    int _sv0t2;
+    if ((t_id == 73)) {
+      int _sv0t4 = assign_op_follows_lhs(op);
+      int _sv0t3;
+      if ((_sv0t4 == 1)) {
+        int _sv0t5 = pratt_rhs_ok_with_semi7(t0, t1, t2, t3, t4, t5, t6);
+        return _sv0t5;
+        _sv0t3 = 0;
+      } else {
+        return 0;
+        _sv0t3 = 0;
+      }
+      _sv0t2 = _sv0t3;
+    } else {
+      return 0;
+      _sv0t2 = 0;
+    }
+    _sv0t1 = _sv0t2;
+  } else {
+    return 0;
+    _sv0t1 = 0;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
 static int try_assign_field_op_pratt_rhs_stub(int t_base, int t_dot, int t_field, int op, int t0, int t1, int t2, int t3, int t4, int t5) {
   int _sv0t0;
   int _sv0t1;
@@ -708,6 +764,43 @@ static int try_assign_field_op_pratt_rhs_stub(int t_base, int t_dot, int t_field
         int _sv0t4;
         if ((_sv0t5 == 1)) {
           int _sv0t6 = pratt_rhs_ok_with_semi(t0, t1, t2, t3, t4, t5);
+          return _sv0t6;
+          _sv0t4 = 0;
+        } else {
+          return 0;
+          _sv0t4 = 0;
+        }
+        _sv0t3 = _sv0t4;
+      } else {
+        return 0;
+        _sv0t3 = 0;
+      }
+      _sv0t2 = _sv0t3;
+    } else {
+      return 0;
+      _sv0t2 = 0;
+    }
+    _sv0t1 = _sv0t2;
+  } else {
+    return 0;
+    _sv0t1 = 0;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
+static int try_assign_field_op_pratt_rhs_stub7(int t_base, int t_dot, int t_field, int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6) {
+  int _sv0t0;
+  int _sv0t1;
+  if ((t_base == 73)) {
+    int _sv0t2;
+    if ((t_dot == 18)) {
+      int _sv0t3;
+      if ((t_field == 73)) {
+        int _sv0t5 = assign_op_follows_lhs(op);
+        int _sv0t4;
+        if ((_sv0t5 == 1)) {
+          int _sv0t6 = pratt_rhs_ok_with_semi7(t0, t1, t2, t3, t4, t5, t6);
           return _sv0t6;
           _sv0t4 = 0;
         } else {
@@ -747,6 +840,50 @@ static int try_assign_index_op_pratt_rhs_stub(int t_id, int t_lbr, int t_idx, in
           int _sv0t5;
           if ((_sv0t6 == 1)) {
             int _sv0t7 = pratt_rhs_ok_with_semi(t0, t1, t2, t3, t4, t5);
+            return _sv0t7;
+            _sv0t5 = 0;
+          } else {
+            return 0;
+            _sv0t5 = 0;
+          }
+          _sv0t4 = _sv0t5;
+        } else {
+          return 0;
+          _sv0t4 = 0;
+        }
+        _sv0t3 = _sv0t4;
+      } else {
+        return 0;
+        _sv0t3 = 0;
+      }
+      _sv0t2 = _sv0t3;
+    } else {
+      return 0;
+      _sv0t2 = 0;
+    }
+    _sv0t1 = _sv0t2;
+  } else {
+    return 0;
+    _sv0t1 = 0;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
+static int try_assign_index_op_pratt_rhs_stub7(int t_id, int t_lbr, int t_idx, int t_rbr, int op, int t0, int t1, int t2, int t3, int t4, int t5, int t6) {
+  int _sv0t0;
+  int _sv0t1;
+  if ((t_id == 73)) {
+    int _sv0t2;
+    if ((t_lbr == 16)) {
+      int _sv0t3;
+      if ((t_idx == 40)) {
+        int _sv0t4;
+        if ((t_rbr == 17)) {
+          int _sv0t6 = assign_op_follows_lhs(op);
+          int _sv0t5;
+          if ((_sv0t6 == 1)) {
+            int _sv0t7 = pratt_rhs_ok_with_semi7(t0, t1, t2, t3, t4, t5, t6);
             return _sv0t7;
             _sv0t5 = 0;
           } else {
@@ -1067,42 +1204,95 @@ int main(void) {
   int _sv0t250 = tok_semi();
   int _sv0t251 = try_assign_deref_op_pratt_rhs_stub(_sv0t243, _sv0t244, _sv0t245, _sv0t246, _sv0t247, _sv0t248, _sv0t249, _sv0t250, 0);
   int e36 = (_sv0t251 - 1);
-  int _sv0t252 = (e0 + e1);
-  int _sv0t253 = (_sv0t252 + e2);
-  int _sv0t254 = (_sv0t253 + e3);
-  int _sv0t255 = (_sv0t254 + e4);
-  int _sv0t256 = (_sv0t255 + e5);
-  int _sv0t257 = (_sv0t256 + e6);
-  int _sv0t258 = (_sv0t257 + e7);
-  int _sv0t259 = (_sv0t258 + e8);
-  int _sv0t260 = (_sv0t259 + e9);
-  int _sv0t261 = (_sv0t260 + e10);
-  int _sv0t262 = (_sv0t261 + e11);
-  int _sv0t263 = (_sv0t262 + e12);
-  int _sv0t264 = (_sv0t263 + e13);
-  int _sv0t265 = (_sv0t264 + e14);
-  int _sv0t266 = (_sv0t265 + e15);
-  int _sv0t267 = (_sv0t266 + e16);
-  int _sv0t268 = (_sv0t267 + e17);
-  int _sv0t269 = (_sv0t268 + e18);
-  int _sv0t270 = (_sv0t269 + e19);
-  int _sv0t271 = (_sv0t270 + e20);
-  int _sv0t272 = (_sv0t271 + e21);
-  int _sv0t273 = (_sv0t272 + e22);
-  int _sv0t274 = (_sv0t273 + e23);
-  int _sv0t275 = (_sv0t274 + e24);
-  int _sv0t276 = (_sv0t275 + e25);
-  int _sv0t277 = (_sv0t276 + e26);
-  int _sv0t278 = (_sv0t277 + e27);
-  int _sv0t279 = (_sv0t278 + e28);
-  int _sv0t280 = (_sv0t279 + e29);
-  int _sv0t281 = (_sv0t280 + e30);
-  int _sv0t282 = (_sv0t281 + e31);
-  int _sv0t283 = (_sv0t282 + e32);
-  int _sv0t284 = (_sv0t283 + e33);
-  int _sv0t285 = (_sv0t284 + e34);
-  int _sv0t286 = (_sv0t285 + e35);
-  int _sv0t287 = (_sv0t286 + e36);
-  return _sv0t287;
+  int _sv0t252 = tok_assign_eq();
+  int _sv0t253 = tok_unary_minus();
+  int _sv0t254 = tok_rhs_atom();
+  int _sv0t255 = tok_binop_plus();
+  int _sv0t256 = tok_rhs_atom();
+  int _sv0t257 = tok_binop_star();
+  int _sv0t258 = tok_rhs_atom();
+  int _sv0t259 = tok_semi();
+  int _sv0t260 = try_assign_id_op_pratt_rhs_stub7(_sv0t252, _sv0t253, _sv0t254, _sv0t255, _sv0t256, _sv0t257, _sv0t258, _sv0t259);
+  int e37 = (_sv0t260 - 1);
+  int _sv0t261 = tok_star();
+  int _sv0t262 = tok_ident();
+  int _sv0t263 = tok_assign_eq();
+  int _sv0t264 = tok_unary_minus();
+  int _sv0t265 = tok_rhs_atom();
+  int _sv0t266 = tok_binop_plus();
+  int _sv0t267 = tok_rhs_atom();
+  int _sv0t268 = tok_binop_star();
+  int _sv0t269 = tok_rhs_atom();
+  int _sv0t270 = tok_semi();
+  int _sv0t271 = try_assign_deref_op_pratt_rhs_stub7(_sv0t261, _sv0t262, _sv0t263, _sv0t264, _sv0t265, _sv0t266, _sv0t267, _sv0t268, _sv0t269, _sv0t270);
+  int e38 = (_sv0t271 - 1);
+  int _sv0t272 = tok_ident();
+  int _sv0t273 = tok_lhs_dot();
+  int _sv0t274 = tok_ident();
+  int _sv0t275 = tok_assign_eq();
+  int _sv0t276 = tok_unary_minus();
+  int _sv0t277 = tok_rhs_atom();
+  int _sv0t278 = tok_binop_plus();
+  int _sv0t279 = tok_rhs_atom();
+  int _sv0t280 = tok_binop_star();
+  int _sv0t281 = tok_rhs_atom();
+  int _sv0t282 = tok_semi();
+  int _sv0t283 = try_assign_field_op_pratt_rhs_stub7(_sv0t272, _sv0t273, _sv0t274, _sv0t275, _sv0t276, _sv0t277, _sv0t278, _sv0t279, _sv0t280, _sv0t281, _sv0t282);
+  int e39 = (_sv0t283 - 1);
+  int _sv0t284 = tok_ident();
+  int _sv0t285 = tok_lbracket();
+  int _sv0t286 = tok_rhs_atom();
+  int _sv0t287 = tok_rbracket();
+  int _sv0t288 = tok_assign_eq();
+  int _sv0t289 = tok_unary_minus();
+  int _sv0t290 = tok_rhs_atom();
+  int _sv0t291 = tok_binop_plus();
+  int _sv0t292 = tok_rhs_atom();
+  int _sv0t293 = tok_binop_star();
+  int _sv0t294 = tok_rhs_atom();
+  int _sv0t295 = tok_semi();
+  int _sv0t296 = try_assign_index_op_pratt_rhs_stub7(_sv0t284, _sv0t285, _sv0t286, _sv0t287, _sv0t288, _sv0t289, _sv0t290, _sv0t291, _sv0t292, _sv0t293, _sv0t294, _sv0t295);
+  int e40 = (_sv0t296 - 1);
+  int _sv0t297 = (e0 + e1);
+  int _sv0t298 = (_sv0t297 + e2);
+  int _sv0t299 = (_sv0t298 + e3);
+  int _sv0t300 = (_sv0t299 + e4);
+  int _sv0t301 = (_sv0t300 + e5);
+  int _sv0t302 = (_sv0t301 + e6);
+  int _sv0t303 = (_sv0t302 + e7);
+  int _sv0t304 = (_sv0t303 + e8);
+  int _sv0t305 = (_sv0t304 + e9);
+  int _sv0t306 = (_sv0t305 + e10);
+  int _sv0t307 = (_sv0t306 + e11);
+  int _sv0t308 = (_sv0t307 + e12);
+  int _sv0t309 = (_sv0t308 + e13);
+  int _sv0t310 = (_sv0t309 + e14);
+  int _sv0t311 = (_sv0t310 + e15);
+  int _sv0t312 = (_sv0t311 + e16);
+  int _sv0t313 = (_sv0t312 + e17);
+  int _sv0t314 = (_sv0t313 + e18);
+  int _sv0t315 = (_sv0t314 + e19);
+  int _sv0t316 = (_sv0t315 + e20);
+  int _sv0t317 = (_sv0t316 + e21);
+  int _sv0t318 = (_sv0t317 + e22);
+  int _sv0t319 = (_sv0t318 + e23);
+  int _sv0t320 = (_sv0t319 + e24);
+  int _sv0t321 = (_sv0t320 + e25);
+  int _sv0t322 = (_sv0t321 + e26);
+  int _sv0t323 = (_sv0t322 + e27);
+  int _sv0t324 = (_sv0t323 + e28);
+  int _sv0t325 = (_sv0t324 + e29);
+  int _sv0t326 = (_sv0t325 + e30);
+  int _sv0t327 = (_sv0t326 + e31);
+  int _sv0t328 = (_sv0t327 + e32);
+  int _sv0t329 = (_sv0t328 + e33);
+  int _sv0t330 = (_sv0t329 + e34);
+  int _sv0t331 = (_sv0t330 + e35);
+  int _sv0t332 = (_sv0t331 + e36);
+  int _sv0t333 = (_sv0t332 + e37);
+  int _sv0t334 = (_sv0t333 + e38);
+  int _sv0t335 = (_sv0t334 + e39);
+  int _sv0t336 = (_sv0t335 + e40);
+  return _sv0t336;
 }
 

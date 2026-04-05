@@ -1,8 +1,8 @@
 /* Transliteration seed: two-level precedence slice for assignment RHS (not full parseExpr).
    **term** = atom ( STAR atom )* ; **expr** = term ( PLUS term )* with STAR tighter than PLUS.
    Atoms: int lit **40**, ident **73**. PLUS = **20**, STAR = **22**, unary **MINUS** = **21** (**parseUnaryExpr** in **parser.sml**).
-   Optional single leading **21** before the primary (no chained unary minus in this seed). Fixed window **t0..t5**:
-   unary forms **` - lit ;`**, **` - lit + lit ;`**, **` - lit * lit ;`** fit; **` - lit + lit * lit ;`** needs a seventh token for **`;`** (not modeled here).
+   Optional single leading **21** before the primary (no chained unary minus in this seed).
+   **`pratt_rhs_ok_with_semi`** (**t0..t5**) pads **`t6=0`** to **`pratt_rhs_ok_with_semi7`**; unary **` - lit + lit * lit ;`** needs **seven** RHS slots (**t0..t6**).
    **parser/expr_prec_ladder_core.sv0** — add tier includes **21** for binary **MINUS** later; here **21** at **t0** is unary only. */
 
 fn tok_int_lit() -> i32 {
@@ -114,8 +114,8 @@ fn pratt_from_atom(a: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
   }
 }
 
-/* 1 if **t0..t5** is a valid **expr** + **`;`**; optional unary **MINUS** (**21**) at **t0** (one primary only after it). */
-fn pratt_rhs_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
+/* Seven-token RHS window: non-unary uses **t0..t5** only (**t6** should be **0**); unary at **t0** passes **t1..t6** into **`pratt_from_atom`**. */
+fn pratt_rhs_ok_with_semi7(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32, t6: i32) -> i32 {
   if is_atom(t0) == 1 {
     return pratt_from_atom(t0, t1, t2, t3, t4, t5);
   } else {
@@ -123,12 +123,17 @@ fn pratt_rhs_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) 
       if is_atom(t1) == 0 {
         return 0;
       } else {
-        return pratt_from_atom(t1, t2, t3, t4, t5, 0);
+        return pratt_from_atom(t1, t2, t3, t4, t5, t6);
       }
     } else {
       return 0;
     }
   }
+}
+
+/* 1 if **t0..t5** is a valid **expr** + **`;`**; unary **` - a+b*c ;`** needs **`pratt_rhs_ok_with_semi7`**. */
+fn pratt_rhs_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
+  return pratt_rhs_ok_with_semi7(t0, t1, t2, t3, t4, t5, 0);
 }
 
 fn main() -> i32 {
@@ -193,14 +198,19 @@ fn main() -> i32 {
     pratt_rhs_ok_with_semi(tok_minus(), tok_int_lit(), tok_star(), tok_int_lit(), tok_semi(), 0) - 1;
   let e12: i32 = pratt_rhs_ok_with_semi(tok_minus(), tok_ident(), tok_semi(), 0, 0, 0) - 1;
   let e13: i32 =
-    pratt_rhs_ok_with_semi(
+    pratt_rhs_ok_with_semi7(
       tok_minus(),
       tok_int_lit(),
       tok_plus(),
       tok_int_lit(),
       tok_star(),
-      tok_int_lit()
-    );
+      tok_int_lit(),
+      tok_semi()
+    ) -
+      1;
   let e14: i32 = pratt_rhs_ok_with_semi(tok_minus(), tok_minus(), tok_int_lit(), tok_semi(), 0, 0);
-  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14;
+  let e15: i32 =
+    pratt_rhs_ok_with_semi7(tok_int_lit(), tok_plus(), tok_int_lit(), tok_star(), tok_int_lit(), tok_semi(), 0) -
+      1;
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14 + e15;
 }
