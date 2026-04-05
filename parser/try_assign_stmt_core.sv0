@@ -193,6 +193,31 @@ fn try_assign_id_op_rhs_stub(op: i32, t0: i32, t1: i32, t2: i32, t3: i32) -> i32
   }
 }
 
+/* STAR (22) then IDENT (73), then assign op and RHS stub stream (four tokens, same as id_op path). */
+fn try_assign_deref_op_rhs_stub(
+  t_star: i32,
+  t_id: i32,
+  op: i32,
+  t0: i32,
+  t1: i32,
+  t2: i32,
+  t3: i32
+) -> i32 {
+  if t_star == 22 {
+    if t_id == 73 {
+      if assign_op_follows_lhs(op) == 1 {
+        return rhs_stub_ok_with_semi(t0, t1, t2, t3);
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
 fn main() -> i32 {
   let e0: i32 = assign_op_follows_lhs(tok_assign_eq()) - 1;
   let e1: i32 = assign_op_follows_lhs(tok_pluseq()) - 1;
@@ -248,5 +273,39 @@ fn main() -> i32 {
     );
   let e17: i32 =
     try_assign_linear_4(tok_ident(), tok_assign_eq(), tok_ident(), tok_semi()) - 1;
-  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14 + e15 + e16 + e17;
+  let e18: i32 =
+    try_assign_deref_op_rhs_stub(
+      tok_star(),
+      tok_ident(),
+      tok_assign_eq(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_rhs_atom(),
+      tok_semi()
+    ) -
+      1;
+  let e19: i32 =
+    try_assign_deref_op_rhs_stub(
+      tok_star(),
+      tok_ident(),
+      tok_assign_eq(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_semi(),
+      0
+    );
+  let e20: i32 =
+    try_assign_deref_op_rhs_stub(
+      tok_ident(),
+      tok_ident(),
+      tok_assign_eq(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_rhs_atom(),
+      tok_semi()
+    );
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14 + e15 + e16 + e17 +
+    e18 +
+    e19 +
+    e20;
 }
