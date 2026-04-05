@@ -128,7 +128,7 @@ Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*`
 
 ## `parser/expr_cast_core.sv0`
 
-**`parseCastExpr`** in **`parser.sml`**: after unary / postfix, repeated **`as`** + **`parseType`**. This seed accepts **base `;`** (atom **40** or **73** then **`;` 15**) or **base `as` `i32` `;`** (**`as`** stand-in **61**, type **`i32`** as **IDENT** **73**). Rejects **mul**-shaped middle, **int lit** as type slot, missing **`;`**, **`as`** first. Chained casts and full **`parseType`** are **not** modeled yet.
+**`parseCastExpr`** in **`parser.sml`**: after unary / postfix, repeated **`as`** + **`parseType`**. This seed uses **`parse_cast_stub_ok_with_semi6`**: **base `;`**, **base `as` ty `;`**, or **base `as` ty `as` ty `;`** (atom **40** or **73**; **`as`** **61**; each **ty** is **IDENT** **73**, standing in for any single-segment primitive name). Rejects **mul**-shaped tail, **int lit** as type, missing **`;`**, **`as`** first, bad second type, third **`as`** in-window. Full **`parseType`** not modeled.
 
 ## `parser/try_assign_stmt_core.sv0`
 
