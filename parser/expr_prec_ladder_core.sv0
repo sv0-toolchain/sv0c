@@ -1,0 +1,92 @@
+/* Transliteration seed: sml/parser/parser.sml — binary precedence **ladder** around **parseAddExpr** / **parseMulExpr**.
+   Full chain (for orientation): **parseExpr** → **parseRangeExpr** → **parseOrExpr** → **parseAndExpr** →
+   **parseCmpExpr** → **parseBitOrExpr** → **parseBitXorExpr** → **parseBitAndExpr** → **parseShiftExpr** →
+   **parseAddExpr** (**parseLeftAssoc** **parseMulExpr**, **PLUS** / **MINUS**) →
+   **parseMulExpr** (**parseLeftAssoc** **parseCastExpr**, **STAR** / **SLASH** / **PERCENT**) → …
+   This seed only ranks **add** vs **mul** tiers using **lexer/token_op_core** tags **20–23**. */
+
+fn tag_op_plus() -> i32 {
+  return 20;
+}
+
+fn tag_op_minus() -> i32 {
+  return 21;
+}
+
+fn tag_op_star() -> i32 {
+  return 22;
+}
+
+fn tag_op_slash() -> i32 {
+  return 23;
+}
+
+fn tag_op_eqeq() -> i32 {
+  return 24;
+}
+
+/* **0** = not modeled in this slice; **1** = add tier; **2** = mul tier (tighter). */
+fn prec_binary_rank(t: i32) -> i32 {
+  if t == 20 {
+    return 1;
+  } else {
+    if t == 21 {
+      return 1;
+    } else {
+      if t == 22 {
+        return 2;
+      } else {
+        if t == 23 {
+          return 2;
+        } else {
+          return 0;
+        }
+      }
+    }
+  }
+}
+
+fn mul_tier_binds_tighter_than_add_tier() -> i32 {
+  if prec_binary_rank(tag_op_star()) > prec_binary_rank(tag_op_plus()) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+fn is_add_layer_binop(t: i32) -> i32 {
+  if t == 20 {
+    return 1;
+  } else {
+    if t == 21 {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
+
+fn is_mul_layer_binop(t: i32) -> i32 {
+  if t == 22 {
+    return 1;
+  } else {
+    if t == 23 {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
+
+fn main() -> i32 {
+  let e0: i32 = mul_tier_binds_tighter_than_add_tier() - 1;
+  let e1: i32 = prec_binary_rank(tag_op_plus()) - 1;
+  let e2: i32 = prec_binary_rank(tag_op_minus()) - 1;
+  let e3: i32 = prec_binary_rank(tag_op_star()) - 2;
+  let e4: i32 = prec_binary_rank(tag_op_slash()) - 2;
+  let e5: i32 = prec_binary_rank(tag_op_eqeq());
+  let e6: i32 = is_add_layer_binop(tag_op_plus()) - 1;
+  let e7: i32 = is_mul_layer_binop(tag_op_star()) - 1;
+  let e8: i32 = is_mul_layer_binop(tag_op_plus());
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8;
+}
