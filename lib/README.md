@@ -108,8 +108,12 @@ Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unroll
 
 ## `parser/assign_lhs_core.sv0`
 
-**parseAssignTarget** + **`tryParseAssignLHS`** (numeric model): **`try_lhs_starts`** accepts **`*`** (**`tag_op_star` = 22**) or **ident** (**73**); **`tok_lhs_dot`** / **`tok_assign_eq`** use **`lexer/token_delim_core`** **`tag_delim_dot` = 18** and **`tag_delim_eq` = 19**; **`is_assign_follow_tok`** also accepts **`+=`** (**211**, only **`assignBinop`** case in this slice — **`PLUSEQ`** / **`Ast.Add`** in SML). **`assign_binop_tag`** is **1** for **211**, **0** otherwise (expand to full **`assignBinop`** table later). Depth helpers mirror **deref chain**, **`.ident` / `.int` field**, **`[lit]`** index (placeholder index token **40**), and reject **ident `;`**. Pairs with **`parser/try_assign_stmt_core.sv0`** for full **`tryAssignStmt`** closure.
+**parseAssignTarget** + **`tryParseAssignLHS`** (numeric model): **`try_lhs_starts`** accepts **`*`** (**`tag_op_star` = 22**) or **ident** (**73**); **`tok_lhs_dot`** / **`tok_assign_eq`** use **`lexer/token_delim_core`** **`tag_delim_dot` = 18** and **`tag_delim_eq` = 19**; **`is_assign_follow_tok`** is **`Token.EQ`** or any **`assign_binop_ast_tag`** **> 0** (**band 211–220**, see **`parser/assign_binop_core.sv0`**). Depth helpers end at **EQ** or any assign binop. Pairs with **`parser/try_assign_stmt_core.sv0`**.
+
+## `parser/assign_binop_core.sv0`
+
+**assignBinop** in **`parser.sml`**: stand-in tags **211–220** = **`+=`** … **`>>=`** in case order; **`assign_binop_ast_tag`** returns **1–10** (numeric **`Ast`** binop ids for tests). **`is_assign_binop_tok`** is **`> 0`**. Lexer **`token_op_core`** can adopt these tags later.
 
 ## `parser/try_assign_stmt_core.sv0`
 
-**tryAssignStmt** in **`parser.sml`**: after **`tryParseAssignLHS`**, require **`Token.EQ`** (**19**) or assign binop (**211** **`+=`** in this slice), then **`parseExpr`** modeled as **one** **`tok_rhs_atom` (40)**, then **`SEMICOLON` (15)**. **`assign_op_is_eq_or_pluseq`** is the numeric **`isAssignTok`** subset. Linear stream helpers cover **`x = 1;`**, **`x += 1;`**, **`*x = 1;`**, **`x.y = 1;`**, and reject **missing `;`**, **`==`** (**24**) instead of **`=`**, and **wrong RHS slot**. Extend RHS when **`parseExpr`** is transliterated.
+**tryAssignStmt** in **`parser.sml`**: after **`tryParseAssignLHS`**, require **`Token.EQ`** (**19**) or assign binop (**211–220**), then **`parseExpr`** as **one** **`tok_rhs_atom` (40)**, then **`SEMICOLON` (15)**. **`assign_op_follows_lhs`** matches **`isAssignTok`**. Linear streams cover **`=`** / **`+=`** / **`-=`** / **`>>=`**, field **`+=`**, and reject **missing `;`**, **`==` (24)**, bad RHS. Extend when **`parseExpr`** is transliterated.
