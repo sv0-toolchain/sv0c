@@ -1,0 +1,167 @@
+/* Transliteration seed: two-level precedence slice for assignment RHS (not full parseExpr).
+   **term** = atom ( STAR atom )* ; **expr** = term ( PLUS term )* with STAR tighter than PLUS.
+   Atoms: int lit **40**, ident **73**. PLUS = **20**, STAR = **22** (**lexer/token_op_core** **tag_op_star**).
+   Fixed window **t0..t5** then **;** at **t1**, **t3**, or **t5** depending on shape. */
+
+fn tok_int_lit() -> i32 {
+  return 40;
+}
+
+fn tok_ident() -> i32 {
+  return 73;
+}
+
+fn tok_plus() -> i32 {
+  return 20;
+}
+
+fn tok_star() -> i32 {
+  return 22;
+}
+
+fn tok_semi() -> i32 {
+  return 15;
+}
+
+fn is_atom(t: i32) -> i32 {
+  if t == 40 {
+    return 1;
+  } else {
+    if t == 73 {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
+
+/* 1 if **t0..t5** is a valid **expr** immediately followed by **;** (unused tail slots **0**). */
+fn pratt_rhs_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
+  if is_atom(t0) == 0 {
+    return 0;
+  } else {
+    if t1 == 15 {
+      return 1;
+    } else {
+      if t1 == 20 {
+        if is_atom(t2) == 0 {
+          return 0;
+        } else {
+          if t3 == 15 {
+            return 1;
+          } else {
+            if t3 == 22 {
+              if is_atom(t4) == 0 {
+                return 0;
+              } else {
+                if t5 == 15 {
+                  return 1;
+                } else {
+                  return 0;
+                }
+              }
+            } else {
+              return 0;
+            }
+          }
+        }
+      } else {
+        if t1 == 22 {
+          if is_atom(t2) == 0 {
+            return 0;
+          } else {
+            if t3 == 15 {
+              return 1;
+            } else {
+              if t3 == 22 {
+                if is_atom(t4) == 0 {
+                  return 0;
+                } else {
+                  if t5 == 15 {
+                    return 1;
+                  } else {
+                    return 0;
+                  }
+                }
+              } else {
+                if t3 == 20 {
+                  if is_atom(t4) == 0 {
+                    return 0;
+                  } else {
+                    if t5 == 15 {
+                      return 1;
+                    } else {
+                      return 0;
+                    }
+                  }
+                } else {
+                  return 0;
+                }
+              }
+            }
+          }
+        } else {
+          return 0;
+        }
+      }
+    }
+  }
+}
+
+fn main() -> i32 {
+  let e0: i32 = pratt_rhs_ok_with_semi(tok_int_lit(), tok_semi(), 0, 0, 0, 0) - 1;
+  let e1: i32 = pratt_rhs_ok_with_semi(tok_ident(), tok_semi(), 0, 0, 0, 0) - 1;
+  let e2: i32 =
+    pratt_rhs_ok_with_semi(tok_int_lit(), tok_plus(), tok_int_lit(), tok_semi(), 0, 0) - 1;
+  let e3: i32 =
+    pratt_rhs_ok_with_semi(tok_int_lit(), tok_star(), tok_int_lit(), tok_semi(), 0, 0) - 1;
+  let e4: i32 =
+    pratt_rhs_ok_with_semi(
+      tok_int_lit(),
+      tok_plus(),
+      tok_int_lit(),
+      tok_star(),
+      tok_int_lit(),
+      tok_semi()
+    ) -
+      1;
+  let e5: i32 =
+    pratt_rhs_ok_with_semi(
+      tok_int_lit(),
+      tok_star(),
+      tok_int_lit(),
+      tok_plus(),
+      tok_int_lit(),
+      tok_semi()
+    ) -
+      1;
+  let e6: i32 =
+    pratt_rhs_ok_with_semi(
+      tok_int_lit(),
+      tok_star(),
+      tok_int_lit(),
+      tok_star(),
+      tok_int_lit(),
+      tok_semi()
+    ) -
+      1;
+  let e7: i32 =
+    pratt_rhs_ok_with_semi(
+      tok_int_lit(),
+      tok_plus(),
+      tok_int_lit(),
+      tok_star(),
+      tok_int_lit(),
+      tok_ident()
+    );
+  let e8: i32 =
+    pratt_rhs_ok_with_semi(
+      tok_int_lit(),
+      tok_star(),
+      tok_int_lit(),
+      tok_star(),
+      tok_int_lit(),
+      0
+    );
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8;
+}
