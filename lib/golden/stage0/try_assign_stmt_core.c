@@ -19,6 +19,7 @@ static int try_assign_linear_5_deref(int t0, int t1, int t2, int t3, int t4);
 static int try_assign_linear_6_field(int t0, int t1, int t2, int t3, int t4, int t5);
 static int try_assign_id_op_rhs_stub(int op, int t0, int t1, int t2, int t3);
 static int try_assign_deref_op_rhs_stub(int t_star, int t_id, int op, int t0, int t1, int t2, int t3);
+static int try_assign_field_op_rhs_stub(int t_base, int t_dot, int t_field, int op, int r0, int r1, int r2, int r3);
 
 static int tok_ident(void) {
   return 73;
@@ -355,6 +356,43 @@ static int try_assign_deref_op_rhs_stub(int t_star, int t_id, int op, int t0, in
   return _sv0t0;
 }
 
+static int try_assign_field_op_rhs_stub(int t_base, int t_dot, int t_field, int op, int r0, int r1, int r2, int r3) {
+  int _sv0t0;
+  int _sv0t1;
+  if ((t_base == 73)) {
+    int _sv0t2;
+    if ((t_dot == 18)) {
+      int _sv0t3;
+      if ((t_field == 73)) {
+        int _sv0t5 = assign_op_follows_lhs(op);
+        int _sv0t4;
+        if ((_sv0t5 == 1)) {
+          int _sv0t6 = rhs_stub_ok_with_semi(r0, r1, r2, r3);
+          return _sv0t6;
+          _sv0t4 = 0;
+        } else {
+          return 0;
+          _sv0t4 = 0;
+        }
+        _sv0t3 = _sv0t4;
+      } else {
+        return 0;
+        _sv0t3 = 0;
+      }
+      _sv0t2 = _sv0t3;
+    } else {
+      return 0;
+      _sv0t2 = 0;
+    }
+    _sv0t1 = _sv0t2;
+  } else {
+    return 0;
+    _sv0t1 = 0;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
+
 int main(void) {
   int _sv0t0 = tok_assign_eq();
   int _sv0t1 = assign_op_follows_lhs(_sv0t0);
@@ -489,26 +527,58 @@ int main(void) {
   int _sv0t110 = tok_semi();
   int _sv0t111 = try_assign_deref_op_rhs_stub(_sv0t104, _sv0t105, _sv0t106, _sv0t107, _sv0t108, _sv0t109, _sv0t110);
   int e20 = _sv0t111;
-  int _sv0t112 = (e0 + e1);
-  int _sv0t113 = (_sv0t112 + e2);
-  int _sv0t114 = (_sv0t113 + e3);
-  int _sv0t115 = (_sv0t114 + e4);
-  int _sv0t116 = (_sv0t115 + e5);
-  int _sv0t117 = (_sv0t116 + e6);
-  int _sv0t118 = (_sv0t117 + e7);
-  int _sv0t119 = (_sv0t118 + e8);
-  int _sv0t120 = (_sv0t119 + e9);
-  int _sv0t121 = (_sv0t120 + e10);
-  int _sv0t122 = (_sv0t121 + e11);
-  int _sv0t123 = (_sv0t122 + e12);
-  int _sv0t124 = (_sv0t123 + e13);
-  int _sv0t125 = (_sv0t124 + e14);
-  int _sv0t126 = (_sv0t125 + e15);
-  int _sv0t127 = (_sv0t126 + e16);
-  int _sv0t128 = (_sv0t127 + e17);
-  int _sv0t129 = (_sv0t128 + e18);
-  int _sv0t130 = (_sv0t129 + e19);
-  int _sv0t131 = (_sv0t130 + e20);
-  return _sv0t131;
+  int _sv0t112 = tok_ident();
+  int _sv0t113 = tok_lhs_dot();
+  int _sv0t114 = tok_ident();
+  int _sv0t115 = tok_assign_eq();
+  int _sv0t116 = tok_rhs_atom();
+  int _sv0t117 = tok_binop_plus();
+  int _sv0t118 = tok_rhs_atom();
+  int _sv0t119 = tok_semi();
+  int _sv0t120 = try_assign_field_op_rhs_stub(_sv0t112, _sv0t113, _sv0t114, _sv0t115, _sv0t116, _sv0t117, _sv0t118, _sv0t119);
+  int e21 = (_sv0t120 - 1);
+  int _sv0t121 = tok_ident();
+  int _sv0t122 = tok_lhs_dot();
+  int _sv0t123 = tok_ident();
+  int _sv0t124 = tok_assign_eq();
+  int _sv0t125 = tok_rhs_atom();
+  int _sv0t126 = tok_binop_plus();
+  int _sv0t127 = tok_semi();
+  int _sv0t128 = try_assign_field_op_rhs_stub(_sv0t121, _sv0t122, _sv0t123, _sv0t124, _sv0t125, _sv0t126, _sv0t127, 0);
+  int e22 = _sv0t128;
+  int _sv0t129 = tok_ident();
+  int _sv0t130 = tok_assign_eq();
+  int _sv0t131 = tok_ident();
+  int _sv0t132 = tok_assign_eq();
+  int _sv0t133 = tok_rhs_atom();
+  int _sv0t134 = tok_binop_plus();
+  int _sv0t135 = tok_rhs_atom();
+  int _sv0t136 = tok_semi();
+  int _sv0t137 = try_assign_field_op_rhs_stub(_sv0t129, _sv0t130, _sv0t131, _sv0t132, _sv0t133, _sv0t134, _sv0t135, _sv0t136);
+  int e23 = _sv0t137;
+  int _sv0t138 = (e0 + e1);
+  int _sv0t139 = (_sv0t138 + e2);
+  int _sv0t140 = (_sv0t139 + e3);
+  int _sv0t141 = (_sv0t140 + e4);
+  int _sv0t142 = (_sv0t141 + e5);
+  int _sv0t143 = (_sv0t142 + e6);
+  int _sv0t144 = (_sv0t143 + e7);
+  int _sv0t145 = (_sv0t144 + e8);
+  int _sv0t146 = (_sv0t145 + e9);
+  int _sv0t147 = (_sv0t146 + e10);
+  int _sv0t148 = (_sv0t147 + e11);
+  int _sv0t149 = (_sv0t148 + e12);
+  int _sv0t150 = (_sv0t149 + e13);
+  int _sv0t151 = (_sv0t150 + e14);
+  int _sv0t152 = (_sv0t151 + e15);
+  int _sv0t153 = (_sv0t152 + e16);
+  int _sv0t154 = (_sv0t153 + e17);
+  int _sv0t155 = (_sv0t154 + e18);
+  int _sv0t156 = (_sv0t155 + e19);
+  int _sv0t157 = (_sv0t156 + e20);
+  int _sv0t158 = (_sv0t157 + e21);
+  int _sv0t159 = (_sv0t158 + e22);
+  int _sv0t160 = (_sv0t159 + e23);
+  return _sv0t160;
 }
 
