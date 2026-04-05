@@ -126,6 +126,10 @@ Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*`
 
 **`parseAddExpr`** / **`parseMulExpr`** / **`parseLeftAssoc`** in **`parser.sml`**: documents the full **`parseExpr`** chain down to those layers; encodes **add** tier **20–21** vs **mul** tier **22**/**23**/**29** (**STAR**/**SLASH**/**PERCENT** in **`token_op_core`**), with **`prec_binary_rank`**, **`is_add_layer_binop`**, **`is_mul_layer_binop`**, and **`mul_tier_binds_tighter_than_add_tier`**. **`tag_op_eqeq` (24)** is **not** in either tier here (cmp layer in SML). Bridges the numeric Pratt stub to the real precedence ladder without parsing token streams.
 
+## `parser/expr_cast_core.sv0`
+
+**`parseCastExpr`** in **`parser.sml`**: after unary / postfix, repeated **`as`** + **`parseType`**. This seed accepts **base `;`** (atom **40** or **73** then **`;` 15**) or **base `as` `i32` `;`** (**`as`** stand-in **61**, type **`i32`** as **IDENT** **73**). Rejects **mul**-shaped middle, **int lit** as type slot, missing **`;`**, **`as`** first. Chained casts and full **`parseType`** are **not** modeled yet.
+
 ## `parser/try_assign_stmt_core.sv0`
 
 **tryAssignStmt** in **`parser.sml`**: after **`tryParseAssignLHS`**, **`assign_op_follows_lhs`** (**`isAssignTok`**), then **`rhs_stub_ok_with_semi`** for RHS + **`;`**. Covers atom, **`ident`**, **`1 + 2`**-style RHS (via **`try_assign_id_op_rhs_stub`**), **`*x = …`** with atom RHS and **`try_assign_deref_op_rhs_stub`** for **`*x = 1 + 2`**, **field** atom RHS plus **`try_assign_field_op_rhs_stub`** for **`a.b = 1 + 2`**, **index** (**`ident [ int_lit ]`**, tags **16** / **17**) via **`try_assign_index_op_rhs_stub`** for **`a[i] = 1 + 2`**, **`+=`** with binop RHS, **`try_assign_*_op_pratt_rhs_stub`** (**six** RHS tokens, **`pratt_rhs_ok_with_semi`**), **`try_assign_*_op_pratt_rhs_stub7`** for unary **` - lit+lit*lit ;`** on ident / deref / field / index LHS, and rejects **missing `;`**, **`==` (24)**, truncated **`+`**, wrong LHS tokens, truncated Pratt. Extend when real **`parseExpr`** is transliterated.
