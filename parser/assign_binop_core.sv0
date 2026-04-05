@@ -1,5 +1,5 @@
 /* Transliteration seed: sml/parser/parser.sml — assignBinop (lines ~371–381).
-   Stand-in token band 211–220 (PLUSEQ … GTGTEQ) until lexer/token_op_core lists compound assigns.
+   Token band 211–220 matches lexer/token_op_core.sv0 tag_op_pluseq … tag_op_gtgteq.
    Return value matches Ast binop order: Add=1 … Shr=10 (numeric ids for tests, not full AST). */
 
 fn tok_pluseq() -> i32 {

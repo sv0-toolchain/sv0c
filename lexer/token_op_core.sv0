@@ -1,5 +1,6 @@
 /* Transliteration seed: sml/lexer/token.sml — operator / punctuator subset as i32 tags.
-   Tag band 20–28 is disjoint from keyword (1–5) and delimiter (10–19) seeds. */
+   Band 20–28: binary / misc ops (includes == as tag_op_eq). Band 211–220: compound assigns
+   PLUSEQ … GTGTEQ — same numbers as parser/assign_binop_core.sv0 / assignBinop in parser.sml. */
 
 fn tag_op_plus() -> i32 {
   return 20;
@@ -35,6 +36,46 @@ fn tag_op_fat_arrow() -> i32 {
 
 fn tag_op_coloncolon() -> i32 {
   return 28;
+}
+
+fn tag_op_pluseq() -> i32 {
+  return 211;
+}
+
+fn tag_op_minuseq() -> i32 {
+  return 212;
+}
+
+fn tag_op_stareq() -> i32 {
+  return 213;
+}
+
+fn tag_op_slasheq() -> i32 {
+  return 214;
+}
+
+fn tag_op_percenteq() -> i32 {
+  return 215;
+}
+
+fn tag_op_ampeq() -> i32 {
+  return 216;
+}
+
+fn tag_op_pipeeq() -> i32 {
+  return 217;
+}
+
+fn tag_op_careteq() -> i32 {
+  return 218;
+}
+
+fn tag_op_ltlteq() -> i32 {
+  return 219;
+}
+
+fn tag_op_gtgteq() -> i32 {
+  return 220;
 }
 
 fn is_operator_tag(t: i32) -> i32 {
@@ -77,6 +118,50 @@ fn is_operator_tag(t: i32) -> i32 {
   }
 }
 
+fn is_compound_assign_tag(t: i32) -> i32 {
+  if t == 211 {
+    return 1;
+  } else {
+    if t == 212 {
+      return 1;
+    } else {
+      if t == 213 {
+        return 1;
+      } else {
+        if t == 214 {
+          return 1;
+        } else {
+          if t == 215 {
+            return 1;
+          } else {
+            if t == 216 {
+              return 1;
+            } else {
+              if t == 217 {
+                return 1;
+              } else {
+                if t == 218 {
+                  return 1;
+                } else {
+                  if t == 219 {
+                    return 1;
+                  } else {
+                    if t == 220 {
+                      return 1;
+                    } else {
+                      return 0;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 fn main() -> i32 {
   let a0: i32 = is_operator_tag(tag_op_plus()) - 1;
   let a1: i32 = is_operator_tag(tag_op_minus()) - 1;
@@ -89,5 +174,19 @@ fn main() -> i32 {
   let a8: i32 = is_operator_tag(tag_op_coloncolon()) - 1;
   let a9: i32 = is_operator_tag(3);
   let a10: i32 = is_operator_tag(15);
-  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10;
+  let b0: i32 = is_compound_assign_tag(tag_op_pluseq()) - 1;
+  let b1: i32 = is_compound_assign_tag(tag_op_minuseq()) - 1;
+  let b2: i32 = is_compound_assign_tag(tag_op_stareq()) - 1;
+  let b3: i32 = is_compound_assign_tag(tag_op_slasheq()) - 1;
+  let b4: i32 = is_compound_assign_tag(tag_op_percenteq()) - 1;
+  let b5: i32 = is_compound_assign_tag(tag_op_ampeq()) - 1;
+  let b6: i32 = is_compound_assign_tag(tag_op_pipeeq()) - 1;
+  let b7: i32 = is_compound_assign_tag(tag_op_careteq()) - 1;
+  let b8: i32 = is_compound_assign_tag(tag_op_ltlteq()) - 1;
+  let b9: i32 = is_compound_assign_tag(tag_op_gtgteq()) - 1;
+  let b10: i32 = is_compound_assign_tag(19);
+  let b11: i32 = is_compound_assign_tag(24);
+  let b12: i32 = is_compound_assign_tag(99);
+  return a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + b0 + b1 + b2 + b3 + b4 + b5 + b6 + b7 + b8 + b9 +
+    b10 + b11 + b12;
 }
