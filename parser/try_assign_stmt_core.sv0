@@ -1,6 +1,7 @@
 /* Transliteration seed: sml/parser/parser.sml — tryAssignStmt (lines ~976–1008).
    After tryParseAssignLHS, next token is EQ or assign binop; RHS uses **parser/expr_rhs_stub_core**
    shapes (**rhs_stub_ok_with_semi** duplicated here): atom (**40** / **73**) or **40 + 40**, then **;** (15).
+   Brackets **LBRACKET** **16** / **RBRACKET** **17** align with **`lexer/token_delim_core`**.
    Composes with assign_lhs, delim, token_op **+** = 20. */
 
 fn tok_ident() -> i32 {
@@ -37,6 +38,14 @@ fn tok_semi() -> i32 {
 
 fn tok_lhs_dot() -> i32 {
   return 18;
+}
+
+fn tok_lbracket() -> i32 {
+  return 16;
+}
+
+fn tok_rbracket() -> i32 {
+  return 17;
 }
 
 fn tok_op_eqeq() -> i32 {
@@ -248,6 +257,41 @@ fn try_assign_field_op_rhs_stub(
   }
 }
 
+/* IDENT [ int_lit ] then assign op and RHS stub. Index expr is atom **40** only in this seed. */
+fn try_assign_index_op_rhs_stub(
+  t_id: i32,
+  t_lbr: i32,
+  t_idx: i32,
+  t_rbr: i32,
+  op: i32,
+  r0: i32,
+  r1: i32,
+  r2: i32,
+  r3: i32
+) -> i32 {
+  if t_id == 73 {
+    if t_lbr == 16 {
+      if t_idx == 40 {
+        if t_rbr == 17 {
+          if assign_op_follows_lhs(op) == 1 {
+            return rhs_stub_ok_with_semi(r0, r1, r2, r3);
+          } else {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
 fn main() -> i32 {
   let e0: i32 = assign_op_follows_lhs(tok_assign_eq()) - 1;
   let e1: i32 = assign_op_follows_lhs(tok_pluseq()) - 1;
@@ -368,11 +412,51 @@ fn main() -> i32 {
       tok_rhs_atom(),
       tok_semi()
     );
+  let e24: i32 =
+    try_assign_index_op_rhs_stub(
+      tok_ident(),
+      tok_lbracket(),
+      tok_rhs_atom(),
+      tok_rbracket(),
+      tok_assign_eq(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_rhs_atom(),
+      tok_semi()
+    ) -
+      1;
+  let e25: i32 =
+    try_assign_index_op_rhs_stub(
+      tok_ident(),
+      tok_lbracket(),
+      tok_rhs_atom(),
+      tok_rbracket(),
+      tok_assign_eq(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_semi(),
+      0
+    );
+  let e26: i32 =
+    try_assign_index_op_rhs_stub(
+      tok_ident(),
+      tok_lhs_dot(),
+      tok_rhs_atom(),
+      tok_rbracket(),
+      tok_assign_eq(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_rhs_atom(),
+      tok_semi()
+    );
   return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14 + e15 + e16 + e17 +
     e18 +
     e19 +
     e20 +
     e21 +
     e22 +
-    e23;
+    e23 +
+    e24 +
+    e25 +
+    e26;
 }
