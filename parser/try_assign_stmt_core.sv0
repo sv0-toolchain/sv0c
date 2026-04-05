@@ -1,7 +1,7 @@
 /* Transliteration seed: sml/parser/parser.sml — tryAssignStmt (lines ~976–1008).
    After tryParseAssignLHS, next token is EQ or assign binop; RHS uses **parser/expr_rhs_stub_core**
    shapes (**rhs_stub_ok_with_semi** duplicated here): atom (**40** / **73**) or **40 + 40**, then **;** (15).
-   **parser/expr_pratt_stub_core** — **pratt_rhs_ok_with_semi** duplicated for **`try_assign_*_op_pratt_rhs_stub`** (ident, deref, field, index LHS).
+   **parser/expr_pratt_stub_core** — **pratt_from_atom** + **pratt_rhs_ok_with_semi** (optional unary **21**) duplicated for **`try_assign_*_op_pratt_rhs_stub`**.
    Brackets **LBRACKET** **16** / **RBRACKET** **17** align with **`lexer/token_delim_core`**.
    Composes with assign_lhs, delim, token_op **+** = 20. */
 
@@ -61,6 +61,10 @@ fn tok_binop_star() -> i32 {
   return 22;
 }
 
+fn tok_unary_minus() -> i32 {
+  return 21;
+}
+
 fn rhs_stub_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32) -> i32 {
   if t0 == 40 {
     if t1 == 15 {
@@ -105,9 +109,9 @@ fn pratt_is_atom(t: i32) -> i32 {
   }
 }
 
-/* Duplicated from **parser/expr_pratt_stub_core.sv0**; see that file for shapes. */
-fn pratt_rhs_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
-  if pratt_is_atom(t0) == 0 {
+/* Duplicated from **parser/expr_pratt_stub_core.sv0**; see that file for shapes and unary **21** limits. */
+fn pratt_from_atom(a: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
+  if pratt_is_atom(a) == 0 {
     return 0;
   } else {
     if t1 == 15 {
@@ -174,6 +178,22 @@ fn pratt_rhs_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) 
           return 0;
         }
       }
+    }
+  }
+}
+
+fn pratt_rhs_ok_with_semi(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32, t5: i32) -> i32 {
+  if pratt_is_atom(t0) == 1 {
+    return pratt_from_atom(t0, t1, t2, t3, t4, t5);
+  } else {
+    if t0 == 21 {
+      if pratt_is_atom(t1) == 0 {
+        return 0;
+      } else {
+        return pratt_from_atom(t1, t2, t3, t4, t5, 0);
+      }
+    } else {
+      return 0;
     }
   }
 }
@@ -726,6 +746,51 @@ fn main() -> i32 {
       tok_semi()
     ) -
       1;
+  let e33: i32 =
+    try_assign_id_op_pratt_rhs_stub(
+      tok_assign_eq(),
+      tok_unary_minus(),
+      tok_rhs_atom(),
+      tok_semi(),
+      0,
+      0,
+      0
+    ) -
+      1;
+  let e34: i32 =
+    try_assign_id_op_pratt_rhs_stub(
+      tok_assign_eq(),
+      tok_unary_minus(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_rhs_atom(),
+      tok_semi(),
+      0
+    ) -
+      1;
+  let e35: i32 =
+    try_assign_id_op_pratt_rhs_stub(
+      tok_assign_eq(),
+      tok_unary_minus(),
+      tok_rhs_atom(),
+      tok_binop_plus(),
+      tok_rhs_atom(),
+      tok_binop_star(),
+      tok_rhs_atom()
+    );
+  let e36: i32 =
+    try_assign_deref_op_pratt_rhs_stub(
+      tok_star(),
+      tok_ident(),
+      tok_pluseq(),
+      tok_unary_minus(),
+      tok_rhs_atom(),
+      tok_binop_star(),
+      tok_rhs_atom(),
+      tok_semi(),
+      0
+    ) -
+      1;
   return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9 + e10 + e11 + e12 + e13 + e14 + e15 + e16 + e17 +
     e18 +
     e19 +
@@ -741,5 +806,9 @@ fn main() -> i32 {
     e29 +
     e30 +
     e31 +
-    e32;
+    e32 +
+    e33 +
+    e34 +
+    e35 +
+    e36;
 }
