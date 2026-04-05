@@ -2,7 +2,7 @@
    **term** = atom ( STAR atom )* ; **expr** = term ( PLUS term )* with STAR tighter than PLUS.
    Atoms: int lit **40**, ident **73**. PLUS = **20**, STAR = **22** (**lexer/token_op_core** **tag_op_star**).
    Fixed window **t0..t5** then **;** at **t1**, **t3**, or **t5** depending on shape.
-   **parser/expr_prec_ladder_core.sv0** — SML **parseAddExpr** / **parseMulExpr** tier tags (**20–23**). */
+   **parser/expr_prec_ladder_core.sv0** — SML **parseAddExpr** / **parseMulExpr** tier tags (**20–21** add; **22**, **23**, **29** mul). */
 
 fn tok_int_lit() -> i32 {
   return 40;
