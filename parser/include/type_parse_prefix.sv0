@@ -1,0 +1,30 @@
+/* Shared **parseType** prefix for transliteration seeds: **TyUnit** **`()`** and one-token **IDENT** type.
+   Include from **parser** tree via **`include "include/type_parse_prefix.sv0";`**. Depends on **token_type_stub.sv0**. */
+
+include "token_type_stub.sv0";
+
+fn tok_lparen() -> i32 {
+  return 10;
+}
+
+fn tok_rparen() -> i32 {
+  return 11;
+}
+
+/* **1** iff **t0 t1** is **`()`** (**LPAREN** **10**, **RPAREN** **11**). */
+fn parse_type_unit_ok(t0: i32, t1: i32) -> i32 {
+  if t0 == 10 {
+    if t1 == 11 {
+      return 1;
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+/* **1** iff **t0** is a single-token primitive **IDENT** slot (**73** in seeds). */
+fn parse_type_ident_ok(t0: i32) -> i32 {
+  return cast_ty_primitive_ident(t0);
+}

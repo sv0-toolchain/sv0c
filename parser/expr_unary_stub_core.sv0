@@ -1,0 +1,204 @@
+/* Transliteration seed: sml/parser/parser.sml — parseUnaryExpr (lines ~473–495), token-window slice.
+   **Atom** = int lit **40** or **IDENT** **73**. Unary operators (stand-in tags, seed-only band):
+   **MINUS** **21** (**token_op_core**), **BANG** **30**, **TILDE** **31**, deref **STAR** **22**,
+   **AMP** **32** (**borrow**), **MUT** **8** after **AMP** for **& mut** (not in **token_keyword_core** band yet).
+   **parse_unary_stub_ok5**: at most **four** leading unaries then atom in **t0..t4**; unused slots **0**.
+   Does not model **parsePostfixExpr** (calls, fields). */
+
+fn tok_int_lit() -> i32 {
+  return 40;
+}
+
+fn tok_ident() -> i32 {
+  return 73;
+}
+
+fn tag_op_minus() -> i32 {
+  return 21;
+}
+
+fn tag_bang() -> i32 {
+  return 30;
+}
+
+fn tag_tilde() -> i32 {
+  return 31;
+}
+
+fn tag_op_star() -> i32 {
+  return 22;
+}
+
+fn tag_amp() -> i32 {
+  return 32;
+}
+
+fn tag_kw_mut_stand_in() -> i32 {
+  return 8;
+}
+
+fn is_atom_tag(t: i32) -> i32 {
+  if t == 40 {
+    return 1;
+  } else {
+    if t == 73 {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}
+
+fn rest_all_zero4(a: i32, b: i32, c: i32, d: i32) -> i32 {
+  if a == 0 {
+    if b == 0 {
+      if c == 0 {
+        if d == 0 {
+          return 1;
+        } else {
+          return 0;
+        }
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn rest_all_zero3(a: i32, b: i32, c: i32) -> i32 {
+  if a == 0 {
+    if b == 0 {
+      if c == 0 {
+        return 1;
+      } else {
+        return 0;
+      }
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn rest_all_zero2(a: i32, b: i32) -> i32 {
+  if a == 0 {
+    if b == 0 {
+      return 1;
+    } else {
+      return 0;
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn rest_all_zero1(a: i32) -> i32 {
+  if a == 0 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+/* **1** iff **t0..t4** matches **parseUnaryExpr** chain then atom; pads **0**. */
+fn parse_unary_stub_ok5(t0: i32, t1: i32, t2: i32, t3: i32, t4: i32) -> i32 {
+  if is_atom_tag(t0) == 1 {
+    return rest_all_zero4(t1, t2, t3, t4);
+  } else {
+    if t0 == 21 {
+      if is_atom_tag(t1) == 1 {
+        return rest_all_zero3(t2, t3, t4);
+      } else {
+        if t1 == 21 {
+          if is_atom_tag(t2) == 1 {
+            return rest_all_zero2(t3, t4);
+          } else {
+            if t2 == 21 {
+              if is_atom_tag(t3) == 1 {
+                return rest_all_zero1(t4);
+              } else {
+                if t3 == 21 {
+                  if is_atom_tag(t4) == 1 {
+                    return 1;
+                  } else {
+                    return 0;
+                  }
+                } else {
+                  return 0;
+                }
+              }
+            } else {
+              return 0;
+            }
+          }
+        } else {
+          return 0;
+        }
+      }
+    } else {
+      if t0 == 30 {
+        if t1 == 22 {
+          if is_atom_tag(t2) == 1 {
+            return rest_all_zero2(t3, t4);
+          } else {
+            return 0;
+          }
+        } else {
+          return 0;
+        }
+      } else {
+        if t0 == 31 {
+          if is_atom_tag(t1) == 1 {
+            return rest_all_zero3(t2, t3, t4);
+          } else {
+            return 0;
+          }
+        } else {
+          if t0 == 32 {
+            if is_atom_tag(t1) == 1 {
+              return rest_all_zero3(t2, t3, t4);
+            } else {
+              if t1 == 8 {
+                if is_atom_tag(t2) == 1 {
+                  return rest_all_zero2(t3, t4);
+                } else {
+                  return 0;
+                }
+              } else {
+                return 0;
+              }
+            }
+          } else {
+            return 0;
+          }
+        }
+      }
+    }
+  }
+}
+
+fn main() -> i32 {
+  let e0: i32 = parse_unary_stub_ok5(tok_int_lit(), 0, 0, 0, 0) - 1;
+  let e1: i32 = parse_unary_stub_ok5(tok_ident(), 0, 0, 0, 0) - 1;
+  let e2: i32 = parse_unary_stub_ok5(tag_op_minus(), tok_int_lit(), 0, 0, 0) - 1;
+  let e3: i32 = parse_unary_stub_ok5(tag_op_minus(), tag_op_minus(), tok_ident(), 0, 0) - 1;
+  let e4: i32 =
+    parse_unary_stub_ok5(tag_op_minus(), tag_op_minus(), tag_op_minus(), tag_op_minus(), tok_int_lit()) -
+    1;
+  let e5: i32 = parse_unary_stub_ok5(tag_bang(), tag_op_star(), tok_ident(), 0, 0) - 1;
+  let e6: i32 = parse_unary_stub_ok5(tag_tilde(), tok_int_lit(), 0, 0, 0) - 1;
+  let e7: i32 = parse_unary_stub_ok5(tag_amp(), tok_ident(), 0, 0, 0) - 1;
+  let e8: i32 =
+    parse_unary_stub_ok5(tag_amp(), tag_kw_mut_stand_in(), tok_ident(), 0, 0) - 1;
+  let bad_trail: i32 = parse_unary_stub_ok5(tok_int_lit(), 21, 0, 0, 0);
+  let bad_fifth_minus: i32 =
+    parse_unary_stub_ok5(21, 21, 21, 21, 21);
+  let bad_bang_no_star: i32 = parse_unary_stub_ok5(tag_bang(), tok_ident(), 0, 0, 0);
+  let e9: i32 = bad_trail + bad_fifth_minus + bad_bang_no_star;
+  return e0 + e1 + e2 + e3 + e4 + e5 + e6 + e7 + e8 + e9;
+}

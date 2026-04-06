@@ -55,5 +55,8 @@ Group is
   sml/link/link.sig
   sml/link/link.sml
 
+  (* transliteration: textual include before lex *)
+  sml/include_expand.sml
+
   (* entry point *)
   sml/main.sml

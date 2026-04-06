@@ -50,7 +50,8 @@ structure Main = struct
 
   fun compileFile (path : string) : unit =
     let
-      val source = readFile path
+      val abs = OS.FileSys.fullPath path
+      val source = IncludeExpand.expandFile abs (readFile abs)
       val ast = Parser.parse (Lexer.tokenize path source)
     in
       compileProgram (SOME source) ast
@@ -85,7 +86,8 @@ structure Main = struct
 
   fun compileFileVm (path : string) : unit =
     let
-      val source = readFile path
+      val abs = OS.FileSys.fullPath path
+      val source = IncludeExpand.expandFile abs (readFile abs)
       val ast = Parser.parse (Lexer.tokenize path source)
       val out = "build/vm/" ^ baseNameSv0 path ^ ".sv0b"
     in

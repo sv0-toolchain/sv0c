@@ -1,11 +1,30 @@
 #include "sv0_runtime.h"
 
+static int tok_ident(void);
+static int cast_ty_primitive_ident(int t);
 static int tok_lparen(void);
 static int tok_rparen(void);
-static int tok_ident(void);
-static int tok_int_lit(void);
 static int parse_type_unit_ok(int t0, int t1);
 static int parse_type_ident_ok(int t0);
+static int tok_int_lit(void);
+
+static int tok_ident(void) {
+  return 73;
+}
+
+static int cast_ty_primitive_ident(int t) {
+  int _sv0t0;
+  int _sv0t1;
+  if ((t == 73)) {
+    return 1;
+    _sv0t1 = 0;
+  } else {
+    return 0;
+    _sv0t1 = 0;
+  }
+  _sv0t0 = _sv0t1;
+  return _sv0t0;
+}
 
 static int tok_lparen(void) {
   return 10;
@@ -13,14 +32,6 @@ static int tok_lparen(void) {
 
 static int tok_rparen(void) {
   return 11;
-}
-
-static int tok_ident(void) {
-  return 73;
-}
-
-static int tok_int_lit(void) {
-  return 40;
 }
 
 static int parse_type_unit_ok(int t0, int t1) {
@@ -45,17 +56,12 @@ static int parse_type_unit_ok(int t0, int t1) {
 }
 
 static int parse_type_ident_ok(int t0) {
-  int _sv0t0;
-  int _sv0t1;
-  if ((t0 == 73)) {
-    return 1;
-    _sv0t1 = 0;
-  } else {
-    return 0;
-    _sv0t1 = 0;
-  }
-  _sv0t0 = _sv0t1;
+  int _sv0t0 = cast_ty_primitive_ident(t0);
   return _sv0t0;
+}
+
+static int tok_int_lit(void) {
+  return 40;
 }
 
 int main(void) {
