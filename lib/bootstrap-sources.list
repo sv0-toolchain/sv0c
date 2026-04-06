@@ -14,6 +14,7 @@ lib/resolver_call_core.sv0
 lib/lookup_type_core.sv0
 lib/type_alias_core.sv0
 lib/lookup_type_alias_core.sv0
+lib/lower_unop_core.sv0
 lexer/token_keyword_core.sv0
 lexer/token_delim_core.sv0
 lexer/token_op_core.sv0
@@ -26,5 +27,6 @@ parser/expr_rhs_stub_core.sv0
 parser/expr_pratt_stub_core.sv0
 parser/expr_prec_ladder_core.sv0
 parser/expr_cast_core.sv0
+parser/expr_unary_stub_core.sv0
 parser/type_parse_core.sv0
 parser/try_assign_stmt_core.sv0

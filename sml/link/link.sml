@@ -289,9 +289,11 @@ structure Link :> LINK = struct
 
   fun parseFile (path : string) : Ast.program =
     let
-      val ins = TextIO.openIn path
-      val src = TextIO.inputAll ins
+      val abs = OS.FileSys.fullPath path
+      val ins = TextIO.openIn abs
+      val src0 = TextIO.inputAll ins
       val () = TextIO.closeIn ins
+      val src = IncludeExpand.expandFile abs src0
     in
       Parser.parse (Lexer.tokenize path src)
     end

@@ -1,0 +1,16 @@
+/* Shared lexer stand-ins for transliteration seeds: **IDENT** (**73**) and type slot check.
+   Spliced via **include "include/token_type_stub.sv0";** from files under **parser** (see
+   **sv0c/doc/transliteration-include.md**). No **main** — not a standalone bootstrap program.
+   (Avoid path segments that end with slash then star inside block comments; the lexer treats that as nested comment syntax.) */
+
+fn tok_ident() -> i32 {
+  return 73;
+}
+
+fn cast_ty_primitive_ident(t: i32) -> i32 {
+  if t == 73 {
+    return 1;
+  } else {
+    return 0;
+  }
+}
