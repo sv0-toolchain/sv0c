@@ -9,6 +9,7 @@ All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the 
 | `sv0c/sml/**/*.sml` | **Stage-0** bootstrap compiler (SML/NJ); reference for transliteration |
 | `sv0c/lib/` | **Stage-1+** sv0 sources: shared/compiler-core slices (`span_core.sv0`, …) |
 | `sv0c/lib/bootstrap-sources.list` | Standalone `.sv0` programs CI runs via **`bootstrap-build`** (each has `main`, VM exit 0); paths relative to `sv0c/` |
+| `sv0c/lib/self-host-sv0-loop.list` | Pilot sources for **`./scripts/sv0 self-host-sv0-loop`** (SML→C→native smoke + optional **`SV0_SELF_HOST_COMPILER`**); see **`doc/self-host-sv0-loop.md`** |
 | `sv0c/lib/golden/stage0/<stem>.c` | Checked-in bootstrap C for listed programs; `sv0 test` diffs fresh SML heap output |
 | `sv0c/lexer/`, `sv0c/parser/`, `sv0c/lib/` (IR slices), … | **sv0** pipeline modules (same names as under `sml/`); parser seeds include `expr_entry_core`, …, `expr_cast_core`, `expr_unary_stub_core`, `type_parse_core`, `try_assign_stmt_core`; first IR seed: `lower_unop_core` (see **§6**) |
 | `build/self-host-compare/` | Generated C snapshots for stage0 vs stage1 (gitignored at meta-repo root) |
@@ -54,3 +55,4 @@ Golden corpus starts with `lib/span_core.sv0` and grows with integration fixture
 | `./scripts/sv0 self-host-capture-stage0 <rel>` | Save stage-0 C snapshot |
 | `./scripts/sv0 self-host-compare <stem>` | Diff stage0 vs stage1 C |
 | `./scripts/sv0 self-host-check-golden` | Same golden diff as `sv0 test` |
+| `./scripts/sv0 self-host-sv0-loop` | Milestone **3** pilot: deterministic heap emit ×2, **`cc`**+run, optional self-host compiler diff |
