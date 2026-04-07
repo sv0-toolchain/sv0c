@@ -5,7 +5,7 @@
 ## v1 scope
 
 - **`manifest.txt`** lists **`.sv0`** sources (paths relative to **`sv0c/`**), one per line. Lines starting with **`#`** are comments.
-- **v1** mirrors **`lib/bootstrap-sources.list`** (same programs as **`bootstrap-build`** / **`./scripts/sv0 test`**) so we start with **~30** programs and grow toward **50–100**.
+- **v1** mirrors **`lib/bootstrap-sources.list`** (same programs as **`bootstrap-build`** / **`./scripts/sv0 test`**) — **lib/lexer/parser** seeds plus **VM-supported** integration smoke (**`hello`**, **`contracts`**, **`call_arg_order`**, **`println_ok`**) — and grows toward **50–100**. Programs that use VM-unsupported contract lowering (e.g. **`forall`**) stay C/golden-only until the VM backend catches up.
 
 ## Golden bytecode (SML reference)
 
