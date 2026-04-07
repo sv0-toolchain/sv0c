@@ -28,7 +28,7 @@ CI reads **`lib/bootstrap-sources.list`**: one path per line (relative to `sv0c/
 ./scripts/sv0 self-host-sv0-loop
 ```
 
-**Self-host loop pilot (milestone 3):** `lib/self-host-sv0-loop.list` drives **`./scripts/sv0 self-host-sv0-loop`** — SML heap emits C twice (must match), then **`cc`** compiles and runs each program. When you have a compiler binary built from sv0 sources, set **`SV0_SELF_HOST_COMPILER`** to a wrapper that prints C for one **`.sv0`** path argument; the script diffs against SML. Full story: [`../doc/self-host-sv0-loop.md`](../doc/self-host-sv0-loop.md).
+**Self-host loop pilot (milestone 3):** `lib/self-host-sv0-loop.list` drives **`./scripts/sv0 self-host-sv0-loop`** — SML heap emits C twice (must match), then **`cc`** compiles and runs each program. CI defaults to **`scripts/sv0-self-host-emit-c.sh`** (SML heap on stdout) so the **`diff`** leg always runs; set **`SV0_SELF_HOST_COMPILER`** to a **native** sv0-built compiler when available, or **`SV0_SKIP_SELF_HOST_COMPILER_DIFF=1`** to skip locally. Full story: [`../doc/self-host-sv0-loop.md`](../doc/self-host-sv0-loop.md).
 
 From `sv0c/` after `make heap`:
 

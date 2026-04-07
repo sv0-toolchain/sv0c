@@ -292,14 +292,18 @@ structure VmCodegen :> VM_CODEGEN = struct
             case body of
               [I.Block inner, st as I.Store _] =>
                 let
-                  val blockRaw = emitLoopSeq env retTy inner (fn () => [])
+                  val storeInsns = emitInstr env retTy st
+                  (* For-loop IR: body = [Block (...); Store increment]. A break inside the Block
+                     must skip the trailing increment and the loop's closing back-edge; include
+                     storeInsns in the break tail distance (see emitLoopSeq exitTail). *)
+                  val blockRaw = emitLoopSeq env retTy inner (fn () => []) storeInsns
                   val targetC = bodyStart + encLens blockRaw
                   val blockDone = patchContinueJumpsFrom blockRaw bodyStart targetC
                 in
-                  blockDone @ emitInstr env retTy st
+                  blockDone @ storeInsns
                 end
             | _ =>
-                emitLoopSeq env retTy body (fn () => [])
+                emitLoopSeq env retTy body (fn () => []) []
           val fullBody = bodyCore @ [B.JUMP loopExitSentinel]
           val forward = encLens fullBody
           val back = ~(encLens condC + jifLen + encLens fullBody)
@@ -310,18 +314,20 @@ structure VmCodegen :> VM_CODEGEN = struct
         end
 
       and emitLoopSeq (env : slot_env) (retTy : string) (stmts : I.instr list)
-        (cont : unit -> B.insn list) : B.insn list =
+        (cont : unit -> B.insn list) (exitTail : B.insn list) : B.insn list =
         case stmts of
           [] => cont ()
         | I.Break :: rest =>
-            (* Skip the closing back-edge (appended after bodyCore in emitWhileLoop), not only cont (). *)
+            (* Skip exitTail (e.g. for-loop increment) and the closing back-edge. *)
             let
-              val tail = emitLoopSeq env retTy rest cont @ [B.JUMP loopExitSentinel]
+              val tail =
+                emitLoopSeq env retTy rest cont exitTail @ exitTail @ [B.JUMP loopExitSentinel]
             in
               [B.JUMP (encLens tail)]
             end
         | I.Continue :: _ => [B.JUMP loopContinueSentinel]
-        | h :: t => emitLoopStmt env retTy h (fn () => emitLoopSeq env retTy t cont)
+        | h :: t =>
+            emitLoopStmt env retTy h (fn () => emitLoopSeq env retTy t cont exitTail) exitTail
 
       (* When break appears in the then-branch of IfElse, it must skip the else branch
          and everything after the whole IfElse (same as in C), not only the skip-else jump. *)
@@ -343,7 +349,7 @@ structure VmCodegen :> VM_CODEGEN = struct
             let
               val mergeCont =
                 fn () => emitLoopSeqWithBreakSuffix env retTy rest seqCont breakSuffix
-              val elC = emitLoopSeq env retTy el mergeCont
+              val elC = emitLoopSeq env retTy el mergeCont []
               val offEnd = encLens elC
               val breakSuffixFromInnerThen = elC
               val thC =
@@ -360,14 +366,14 @@ structure VmCodegen :> VM_CODEGEN = struct
             emitInstr env retTy ins
             @ emitLoopSeqWithBreakSuffix env retTy rest seqCont breakSuffix
 
-      and emitLoopStmt (env : slot_env) (retTy : string) (ins : I.instr) (cont : unit -> B.insn list) :
-        B.insn list =
+      and emitLoopStmt (env : slot_env) (retTy : string) (ins : I.instr) (cont : unit -> B.insn list)
+        (exitTail : B.insn list) : B.insn list =
         case ins of
-          I.Block xs => emitLoopSeq env retTy xs cont
+          I.Block xs => emitLoopSeq env retTy xs cont exitTail
         | I.IfElse (ec, th, el) =>
             let
               val mergeCont = cont
-              val elC = emitLoopSeq env retTy el mergeCont
+              val elC = emitLoopSeq env retTy el mergeCont exitTail
               val offEnd = encLens elC
               val breakSuffixFromThen = elC
               val thC =
