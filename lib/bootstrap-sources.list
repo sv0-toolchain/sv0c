@@ -31,8 +31,11 @@ parser/expr_unary_stub_core.sv0
 parser/type_parse_core.sv0
 parser/try_assign_stmt_core.sv0
 
-# Integration smoke (exit 0 on VM); contract-heavy goldens may be C-only until VM lowering matches.
+# Integration smoke (exit 0 on VM).
 test/integration/hello/hello.sv0
 test/integration/contracts/contracts.sv0
 test/integration/call_arg_order/call_arg_order.sv0
 test/data/golden/pass/println_ok.sv0
+test/data/golden/pass/forall_requires.sv0
+test/data/golden/pass/exists_requires.sv0
+test/data/golden/pass/old_ensures.sv0
