@@ -1,0 +1,14 @@
+/* Enum variant with a payload; bind the inner value in `match`. */
+
+enum Msg {
+  Empty(),
+  N(i32),
+}
+
+fn main() -> i32 {
+  let m = Msg::N(5);
+  return match m {
+    Msg::Empty() => 1,
+    Msg::N(x) => if x == 5 { 0 } else { 1 },
+  };
+}

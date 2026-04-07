@@ -1,0 +1,8 @@
+/* Match on an integer discriminant; `_` is the default arm. */
+
+fn main() -> i32 {
+  return match 7 {
+    0 => 1,
+    _ => 0,
+  };
+}
