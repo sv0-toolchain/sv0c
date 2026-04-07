@@ -68,6 +68,9 @@ structure VmCodegen :> VM_CODEGEN = struct
      the body is laid out. Must not collide with a real JUMP_IF/JUMP offset. *)
   val loopExitSentinel : int = ~987654321
 
+  (* Placeholder for continue; patched to jump to loop head or for-loop increment. *)
+  val loopContinueSentinel : int = ~876543210
+
   type pool = {strings : string list ref, index : (string * int) list ref}
 
   fun poolInit () : pool =
@@ -253,6 +256,25 @@ structure VmCodegen :> VM_CODEGEN = struct
           (!next, !env)
         end
 
+      fun patchContinueJumpsFrom (xs : B.insn list) (fromPos : int) (targetAbs : int) :
+        B.insn list =
+        let
+          fun go pos [] acc = List.rev acc
+            | go pos (h :: t) acc =
+                let val len = encLen h
+                in
+                  case h of
+                    B.JUMP n =>
+                      if n = loopContinueSentinel then
+                        go (pos + len) t (B.JUMP (targetAbs - (pos + len)) :: acc)
+                      else
+                        go (pos + len) t (h :: acc)
+                  | _ => go (pos + len) t (h :: acc)
+                end
+        in
+          go fromPos xs []
+        end
+
       fun replaceLoopExitJump (xs : B.insn list) (back : int) : B.insn list =
         case List.rev xs of
           B.JUMP n :: rest =>
@@ -265,21 +287,40 @@ structure VmCodegen :> VM_CODEGEN = struct
         let
           val condC = emitExpr structs enums env pool ec
           val jifLen = encLen (B.JUMP_IF_NOT 0)
-          val fullBody = emitLoopSeq env retTy body (fn () => [B.JUMP loopExitSentinel])
+          val bodyStart = encLens condC + jifLen
+          val bodyCore =
+            case body of
+              [I.Block inner, st as I.Store _] =>
+                let
+                  val blockRaw = emitLoopSeq env retTy inner (fn () => [])
+                  val targetC = bodyStart + encLens blockRaw
+                  val blockDone = patchContinueJumpsFrom blockRaw bodyStart targetC
+                in
+                  blockDone @ emitInstr env retTy st
+                end
+            | _ =>
+                emitLoopSeq env retTy body (fn () => [])
+          val fullBody = bodyCore @ [B.JUMP loopExitSentinel]
           val forward = encLens fullBody
           val back = ~(encLens condC + jifLen + encLens fullBody)
           val fullBodyFixed = replaceLoopExitJump fullBody back
+          val whole = condC @ [B.JUMP_IF_NOT forward] @ fullBodyFixed
         in
-          condC @ [B.JUMP_IF_NOT forward] @ fullBodyFixed
+          patchContinueJumpsFrom whole 0 0
         end
 
       and emitLoopSeq (env : slot_env) (retTy : string) (stmts : I.instr list)
         (cont : unit -> B.insn list) : B.insn list =
         case stmts of
           [] => cont ()
-        | I.Break :: _ =>
-            let val suffix = cont ()
-            in [B.JUMP (encLens suffix)] end
+        | I.Break :: rest =>
+            (* Skip the closing back-edge (appended after bodyCore in emitWhileLoop), not only cont (). *)
+            let
+              val tail = emitLoopSeq env retTy rest cont @ [B.JUMP loopExitSentinel]
+            in
+              [B.JUMP (encLens tail)]
+            end
+        | I.Continue :: _ => [B.JUMP loopContinueSentinel]
         | h :: t => emitLoopStmt env retTy h (fn () => emitLoopSeq env retTy t cont)
 
       (* When break appears in the then-branch of IfElse, it must skip the else branch
@@ -289,6 +330,7 @@ structure VmCodegen :> VM_CODEGEN = struct
         case stmts of
           [] => seqCont ()
         | I.Break :: _ => [B.JUMP (encLens breakSuffix)]
+        | I.Continue :: _ => [B.JUMP loopContinueSentinel]
         | h :: t =>
             emitLoopStmtWithBreakSuffix env retTy h t seqCont breakSuffix
 
@@ -374,7 +416,7 @@ structure VmCodegen :> VM_CODEGEN = struct
         | I.While (ec, body) => emitWhileLoop env retTy ec body
         | I.Block xs => emitBlock env retTy xs
         | I.Break => raise Fail "vm: break not supported in VM backend"
-        | I.Continue => raise Fail "vm: continue not supported in VM backend"
+        | I.Continue => raise Fail "vm: continue not supported outside loop in VM backend"
         | I.Return NONE =>
             if retTy = "void" then [B.RETURN_SLOTS 0] else raise Fail "vm: bad void return"
         | I.Return (SOME v) =>

@@ -1,0 +1,11 @@
+/* continue in for must jump to the loop increment; nested while exercises outer break + inner for. */
+
+fn main() -> i32 {
+  while true {
+    for j in 0..3 {
+      continue;
+    };
+    break;
+  };
+  return 0;
+}
