@@ -1,0 +1,5 @@
+/* Relational operators and chaining comparisons in a condition. */
+
+fn main() -> i32 {
+  return if 1 < 2 && 2 < 3 { 0 } else { 1 };
+}

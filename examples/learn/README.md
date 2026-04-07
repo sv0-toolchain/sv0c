@@ -15,6 +15,8 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 | `09_struct.sv0` | `struct`, literal, field access |
 | `10_generics_placeholder.sv0` | Monomorphic stand-in (see integration `generics`) |
 | `11_contracts_requires.sv0` | `requires` / `ensures` on `main` |
+| `12_logical_operators.sv0` | Boolean **`&&`** / **`||`** in `if` conditions |
+| `13_compare_chain.sv0` | Chained **`<`** comparisons with **`&&`** |
 
 ## Prerequisites
 
@@ -24,12 +26,16 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 ## Compile to bytecode and run (VM)
 
 ```bash
-# from sv0-toolchain root
+# from sv0-toolchain root (paths below are relative to sv0c/)
 ./scripts/sv0 vm-compile examples/learn/01_minimal_main.sv0
 ./scripts/sv0 vm-run sv0c/build/vm/01_minimal_main.sv0b
 ```
 
-The VM exit code is the program’s **`main`** return value (often **`0`**).
+The VM exit code is the program’s **`main`** return value (often **`0`**). Example: **`12_logical_operators.sv0`** returns **`0`** because **`true && false`** is false; try changing the condition to **`false || true`** to see exit **`0`** with **`||`**.
+
+## Full toolchain check (optional)
+
+From the repo root, **`./scripts/sv0 test`** runs bootstrap builds, stage0 golden C diffs, VM parity, integration tests, and the self-host pilot loop (see **`task/sv0-toolchain-milestone-2-prep.Rmd`**). For Python-only guards without SML/NJ, use **`./scripts/sv0 test-guards`**.
 
 ## Print C (bootstrap compiler)
 
