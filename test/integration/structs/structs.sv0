@@ -9,5 +9,5 @@ fn area(p: Pt) -> i32 {
 
 fn main() -> i32 {
   let q: Pt = Pt { x: 6, y: 7 };
-  return area(q);
+  return if area(q) == 42 { 0 } else { 1 };
 }

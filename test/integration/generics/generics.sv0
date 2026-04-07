@@ -6,5 +6,5 @@ fn id_i32(x: i32) -> i32 {
 }
 
 fn main() -> i32 {
-  return id_i32(99);
+  return if id_i32(99) == 99 { 0 } else { 1 };
 }
