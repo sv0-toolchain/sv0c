@@ -5,7 +5,7 @@
 ## v1 scope
 
 - **`manifest.txt`** lists **`.sv0`** sources (paths relative to **`sv0c/`**), one per line. Lines starting with **`#`** are comments.
-- **v1** mirrors **`lib/bootstrap-sources.list`** (same programs as **`bootstrap-build`** / **`./scripts/sv0 test`**) — **lib/lexer/parser** seeds, **VM-supported** integration tests (**`hello`**, **`contracts`**, **`patterns`**, **`structs`**, **`generics`**, **`call_arg_order`**, **`continue_loops`**, **`println_ok`**, contract goldens), plus **`test/vm-parity/programs/*.sv0`** smoke — **50** entries as of **vm-parity-v1.4**, growing toward **50–100**. Programs that use VM-unsupported lowering (e.g. **`no_alias`** / **`VAddrOf`**) stay out of this list until the VM backend catches up.
+- **v1** mirrors **`lib/bootstrap-sources.list`** (same programs as **`bootstrap-build`** / **`./scripts/sv0 test`**) — **lib/lexer/parser** seeds, **VM-supported** integration tests (**`hello`**, **`contracts`**, **`patterns`**, **`structs`**, **`generics`**, **`call_arg_order`**, **`continue_loops`**, **`println_ok`**, contract goldens), plus **`test/vm-parity/programs/*.sv0`** smoke — **60** entries as of **vm-parity-v1.5**, growing toward **50–100**. Programs that use VM-unsupported lowering (e.g. **`no_alias`** / **`VAddrOf`**) stay out of this list until the VM backend catches up.
 
 ## Golden bytecode (SML reference)
 
