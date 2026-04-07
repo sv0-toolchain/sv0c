@@ -127,7 +127,9 @@ structure VmCodegen :> VM_CODEGEN = struct
         end
     | I.VMember (v2, f) =>
         emitExpr structs enums env pool (I.FieldAccess (v2, f))
-    | I.VAddrOf _ => raise Fail "vm: VAddrOf in bytecode slice"
+    | I.VAddrOf x =>
+        let val {base, ...} = lookupSlot env x
+        in [B.PUSH_I32 (int32 (IntInf.fromInt base))] end
     | I.VFloat _ => raise Fail "vm: float in bytecode slice"
 
   and emitExpr (structs : (string * string list) list) (enums : (string * int) list)
@@ -429,6 +431,21 @@ structure VmCodegen :> VM_CODEGEN = struct
             emitValue structs enums env pool v @ [B.RETURN_SLOTS (valueWidth env v)]
         | I.Call (NONE, "sv0_println", [I.VString s], _) =>
             [B.PUSH_STRING (poolAdd pool s), B.CALL_BUILTIN 0]
+        | I.Call (SOME d, "sv0_no_alias", vs, _) =>
+            let
+              fun pushArg v =
+                case v of
+                  I.VVar x =>
+                    let val {base, width, ...} = lookupSlot env x
+                    in List.tabulate (width, fn k => B.LOAD_LOCAL (base + k)) end
+                | _ => emitValue structs enums env pool v
+              val pushes = List.concat (map pushArg vs)
+              val {base, width, ...} = lookupSlot env d
+              val stores =
+                List.tabulate (width, fn k => B.STORE_LOCAL (base + width - 1 - k))
+            in
+              pushes @ [B.CALL_BUILTIN 1] @ stores
+            end
         | I.Call (NONE, f, vs, _) =>
             let
               val nargs =

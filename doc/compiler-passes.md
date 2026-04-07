@@ -78,7 +78,7 @@ Built-in types include numeric primitives, `bool`, `char`, `str`, `string`, `Str
 - **`result`:** Already supported in **`ensures`** (lowering maps to the return-value slot when needed).
 - **`old(x)`:** Snapshot of parameter **`x`** at function entry (`_sv0old_x` in C).
 - **`forall` / `exists`:** Bounded **`i32`** iteration with runtime checking (not a verifier).
-- **`no_alias`:** Emits **`sv0_no_alias`** (pointer inequality; approximation only). See [`sv0_runtime.h`](../runtime/sv0_runtime.h).
+- **`no_alias`:** Emits **`sv0_no_alias`** (pointer inequality; approximation only). See [`sv0_runtime.h`](../runtime/sv0_runtime.h). **VM:** arguments are **`Ir.VAddrOf`** for **`&param`**; codegen pushes each binding’s **local base slot** as **`i32`**, then **`CALL_BUILTIN` 1** (interpreter compares for inequality and leaves **`bool`** for **`CONTRACT_CHECK`**).
 - **Diagnostics:** Prefer stable **`E05xx`** strings with **`(hint: …)`** for contract mistakes. Resolver **`E0300` / `E0301` / `E0309`** raise **`Diagnostic.Diag`**; other stages still often use raw **`Fail`** until migrated.
 - **Golden tests:** Sources under [`test/data/golden/`](../test/data/golden/) (`fail/` = checker errors with hints; `pass/` = compile + **`cc`** + run with exit **0**). For **`pass/`**, optional sidecars next to the **`.sv0`** file: **`<stem>.golden`** lists one rule per non-comment line — plain text = required substring in emitted C; a line starting with **`!`** = forbidden substring (must not appear); **`<stem>.stdout`**, if present, is the expected program stdout after trim (e.g. **`println`** output), compared to the captured run output.
 
