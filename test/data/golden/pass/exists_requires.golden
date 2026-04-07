@@ -1,4 +1,4 @@
 # exists: loop until predicate; distinct from forall (break on != 0).
 while (
 k == 2)
-sv0_requires(_sv0t2
+sv0_requires(
