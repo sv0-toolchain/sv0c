@@ -60,6 +60,7 @@ test/vm-parity/programs/vm_eq.sv0
 test/vm-parity/programs/vm_else_if.sv0
 test/vm-parity/programs/vm_false_or_true.sv0
 test/vm-parity/programs/vm_for_nest.sv0
+test/vm-parity/programs/vm_for_break.sv0
 test/vm-parity/programs/vm_for_range.sv0
 test/vm-parity/programs/vm_for_twice.sv0
 test/vm-parity/programs/vm_gt.sv0
