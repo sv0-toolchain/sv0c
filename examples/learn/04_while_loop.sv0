@@ -1,0 +1,8 @@
+/* while with break: the body runs once, then break exits the loop. */
+
+fn main() -> i32 {
+  while true {
+    break;
+  };
+  return 0;
+}

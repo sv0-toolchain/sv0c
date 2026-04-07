@@ -1,0 +1,14 @@
+/* Enums with nullary variants and exhaustive match. */
+
+enum Side {
+  Left(),
+  Right(),
+}
+
+fn main() -> i32 {
+  let s = Side::Right();
+  return match s {
+    Side::Left() => 1,
+    Side::Right() => 0,
+  };
+}

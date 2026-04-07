@@ -56,6 +56,7 @@ sv0 source (.sv0)
 | `lexer/` | future sv0 lexer sources (parallel to `sml/lexer/`) |
 | `test/` | test suite |
 | `doc/` | pass-by-pass notes ([compiler-passes.md](doc/compiler-passes.md)) — includes structs, enums, and `match` (Milestone 1 Phase 5) |
+| `examples/learn/` | small **`.sv0`** tutorials + [README](examples/learn/README.md) for **`vm-compile`**, **`emit-c`**, **`repl`** from the toolchain root |
 | `build/` | build artifacts (gitignored) |
 
 ## building

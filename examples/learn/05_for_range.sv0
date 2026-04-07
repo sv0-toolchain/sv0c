@@ -1,0 +1,7 @@
+/* Half-open numeric range: 0..3 runs the body for i = 0, 1, 2 (see VM smokes under test/vm-parity/programs/). */
+
+fn main() -> i32 {
+  for i in 0..3 {
+  };
+  return 0;
+}

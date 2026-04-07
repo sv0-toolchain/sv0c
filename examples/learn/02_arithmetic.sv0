@@ -1,0 +1,5 @@
+/* Integer arithmetic; operator precedence matches typical C-like rules. */
+
+fn main() -> i32 {
+  return 1 + 2 * 3 - 7;
+}

@@ -1,0 +1,9 @@
+/* Functions return by value; arguments are passed in order. */
+
+fn double(x: i32) -> i32 {
+  return x + x;
+}
+
+fn main() -> i32 {
+  return double(3) - 6;
+}

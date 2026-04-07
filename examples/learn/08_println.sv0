@@ -1,0 +1,7 @@
+/* println is available when the runtime links the compiler test harness;
+   VM runs surface stdout the same way as integration goldens. */
+
+fn main() -> i32 {
+  println("hello from sv0");
+  return 0;
+}
