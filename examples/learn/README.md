@@ -17,6 +17,9 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 | `11_contracts_requires.sv0` | `requires` / `ensures` on `main` |
 | `12_logical_operators.sv0` | Boolean **`&&`** / **`||`** in `if` conditions |
 | `13_compare_chain.sv0` | Chained **`<`** comparisons with **`&&`** |
+| `14_match_integer.sv0` | `match` on an **`i32`** literal + default **`_`** arm |
+| `15_enum_payload.sv0` | Enum variant carrying **`i32`**; bind in **`match`** |
+| `16_try_operator.sv0` | **`?`** on a call returning the same enum as **`main`** |
 
 ## Prerequisites
 
@@ -31,7 +34,7 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 ./scripts/sv0 vm-run sv0c/build/vm/01_minimal_main.sv0b
 ```
 
-The VM exit code is the program’s **`main`** return value (often **`0`**). Example: **`12_logical_operators.sv0`** returns **`0`** because **`true && false`** is false; try changing the condition to **`false || true`** to see exit **`0`** with **`||`**.
+The VM exit code is derived from **`main`** (for **`i32`** programs it is the integer return). Example: **`12_logical_operators.sv0`** exits **`0`** because **`true && false`** takes the **`else`** branch. **`16_try_operator.sv0`** uses **`main() -> R`** (`Ok`/`Err` enum); **`vm-run`** reports the lowered result (e.g. **`vm_exit:7`** for **`Ok(7)`** in this sample).
 
 ## Full toolchain check (optional)
 

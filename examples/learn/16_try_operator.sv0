@@ -1,0 +1,15 @@
+/* The `?` operator propagates the error-ish variant of the same enum return type. */
+
+enum R {
+  Ok(i32),
+  Err(i32),
+}
+
+fn okv() -> R {
+  return R::Ok(7);
+}
+
+fn main() -> R {
+  let x = okv()?;
+  return R::Ok(x);
+}
