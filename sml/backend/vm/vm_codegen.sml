@@ -64,6 +64,10 @@ structure VmCodegen :> VM_CODEGEN = struct
   fun encLens (xs : B.insn list) : int =
     List.foldl (fn (i, a) => a + encLen i) 0 xs
 
+  (* Placeholder offset for the closing back-edge of a while-loop; patched after
+     the body is laid out. Must not collide with a real JUMP_IF/JUMP offset. *)
+  val loopExitSentinel : int = ~987654321
+
   type pool = {strings : string list ref, index : (string * int) list ref}
 
   fun poolInit () : pool =
@@ -249,7 +253,92 @@ structure VmCodegen :> VM_CODEGEN = struct
           (!next, !env)
         end
 
-      fun emitInstr (env : slot_env) (retTy : string) (ins : I.instr) : B.insn list =
+      fun replaceLoopExitJump (xs : B.insn list) (back : int) : B.insn list =
+        case List.rev xs of
+          B.JUMP n :: rest =>
+            if n = loopExitSentinel then List.rev (B.JUMP back :: rest)
+            else raise Fail "vm: expected loop exit JUMP placeholder"
+        | _ => raise Fail "vm: loop body did not end with back-edge jump"
+
+      and emitWhileLoop (env : slot_env) (retTy : string) (ec : I.expr) (body : I.instr list) :
+        B.insn list =
+        let
+          val condC = emitExpr structs enums env pool ec
+          val jifLen = encLen (B.JUMP_IF_NOT 0)
+          val fullBody = emitLoopSeq env retTy body (fn () => [B.JUMP loopExitSentinel])
+          val forward = encLens fullBody
+          val back = ~(encLens condC + jifLen + encLens fullBody)
+          val fullBodyFixed = replaceLoopExitJump fullBody back
+        in
+          condC @ [B.JUMP_IF_NOT forward] @ fullBodyFixed
+        end
+
+      and emitLoopSeq (env : slot_env) (retTy : string) (stmts : I.instr list)
+        (cont : unit -> B.insn list) : B.insn list =
+        case stmts of
+          [] => cont ()
+        | I.Break :: _ =>
+            let val suffix = cont ()
+            in [B.JUMP (encLens suffix)] end
+        | h :: t => emitLoopStmt env retTy h (fn () => emitLoopSeq env retTy t cont)
+
+      (* When break appears in the then-branch of IfElse, it must skip the else branch
+         and everything after the whole IfElse (same as in C), not only the skip-else jump. *)
+      and emitLoopSeqWithBreakSuffix (env : slot_env) (retTy : string) (stmts : I.instr list)
+        (seqCont : unit -> B.insn list) (breakSuffix : B.insn list) : B.insn list =
+        case stmts of
+          [] => seqCont ()
+        | I.Break :: _ => [B.JUMP (encLens breakSuffix)]
+        | h :: t =>
+            emitLoopStmtWithBreakSuffix env retTy h t seqCont breakSuffix
+
+      and emitLoopStmtWithBreakSuffix (env : slot_env) (retTy : string) (ins : I.instr)
+        (rest : I.instr list) (seqCont : unit -> B.insn list) (breakSuffix : B.insn list) :
+        B.insn list =
+        case ins of
+          I.Block xs => emitLoopSeqWithBreakSuffix env retTy (xs @ rest) seqCont breakSuffix
+        | I.IfElse (ec, th, el) =>
+            let
+              val mergeCont =
+                fn () => emitLoopSeqWithBreakSuffix env retTy rest seqCont breakSuffix
+              val elC = emitLoopSeq env retTy el mergeCont
+              val offEnd = encLens elC
+              val breakSuffixFromInnerThen = elC
+              val thC =
+                emitLoopSeqWithBreakSuffix env retTy th (fn () => [B.JUMP offEnd]) breakSuffixFromInnerThen
+              val c = emitExpr structs enums env pool ec
+              val offElse = encLens thC
+            in
+              c @ [B.JUMP_IF_NOT offElse] @ thC @ elC
+            end
+        | I.While (ec, innerBody) =>
+            emitWhileLoop env retTy ec innerBody
+            @ emitLoopSeqWithBreakSuffix env retTy rest seqCont breakSuffix
+        | _ =>
+            emitInstr env retTy ins
+            @ emitLoopSeqWithBreakSuffix env retTy rest seqCont breakSuffix
+
+      and emitLoopStmt (env : slot_env) (retTy : string) (ins : I.instr) (cont : unit -> B.insn list) :
+        B.insn list =
+        case ins of
+          I.Block xs => emitLoopSeq env retTy xs cont
+        | I.IfElse (ec, th, el) =>
+            let
+              val mergeCont = cont
+              val elC = emitLoopSeq env retTy el mergeCont
+              val offEnd = encLens elC
+              val breakSuffixFromThen = elC
+              val thC =
+                emitLoopSeqWithBreakSuffix env retTy th (fn () => [B.JUMP offEnd]) breakSuffixFromThen
+              val c = emitExpr structs enums env pool ec
+              val offElse = encLens thC
+            in
+              c @ [B.JUMP_IF_NOT offElse] @ thC @ elC
+            end
+        | I.While (ec, innerBody) => emitWhileLoop env retTy ec innerBody @ cont ()
+        | _ => emitInstr env retTy ins @ cont ()
+
+      and emitInstr (env : slot_env) (retTy : string) (ins : I.instr) : B.insn list =
         case ins of
           I.Nop => []
         | I.DeclVar _ => []
@@ -282,16 +371,7 @@ structure VmCodegen :> VM_CODEGEN = struct
             in
               c @ [B.JUMP_IF_NOT offElse] @ th' @ [B.JUMP offEnd] @ el'
             end
-        | I.While (ec, body) =>
-            let
-              val condC = emitExpr structs enums env pool ec
-              val bodyC = emitBlock env retTy body
-              val forward = encLens bodyC + encLen (B.JUMP 0)
-              val back =
-                ~(encLens condC + encLen (B.JUMP_IF_NOT 0) + encLens bodyC + encLen (B.JUMP 0))
-            in
-              condC @ [B.JUMP_IF_NOT forward] @ bodyC @ [B.JUMP back]
-            end
+        | I.While (ec, body) => emitWhileLoop env retTy ec body
         | I.Block xs => emitBlock env retTy xs
         | I.Break => raise Fail "vm: break not supported in VM backend"
         | I.Continue => raise Fail "vm: continue not supported in VM backend"
