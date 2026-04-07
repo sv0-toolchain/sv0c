@@ -91,6 +91,15 @@ test/vm-parity/programs/vm_triple_call.sv0
 test/vm-parity/programs/vm_true_and_false.sv0
 test/vm-parity/programs/vm_while_false.sv0
 test/vm-parity/programs/vm_while_once_break.sv0
+test/vm-parity/programs/vm_bitor_seven.sv0
+test/vm-parity/programs/vm_div_twice_minus.sv0
+test/vm-parity/programs/vm_else_only.sv0
+test/vm-parity/programs/vm_match_blue.sv0
+test/vm-parity/programs/vm_mod_to_zero.sv0
+test/vm-parity/programs/vm_paren_mul_sub.sv0
+test/vm-parity/programs/vm_shl_three.sv0
+test/vm-parity/programs/vm_sub_three_lit.sv0
+test/vm-parity/programs/vm_two_fn_add.sv0
 test/data/golden/pass/println_ok.sv0
 test/data/golden/pass/forall_requires.sv0
 test/data/golden/pass/exists_requires.sv0

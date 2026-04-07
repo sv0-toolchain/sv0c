@@ -609,7 +609,7 @@ structure TestRunner = struct
           val () = writeBuild "build/golden_tmp.c" c
           val cmp =
             OS.Process.system
-              ("cc -o build/golden_tmp_run build/golden_tmp.c -Iruntime runtime/sv0_runtime.c")
+              ("cc -std=c99 -Wno-parentheses-equality -o build/golden_tmp_run build/golden_tmp.c -Iruntime runtime/sv0_runtime.c")
           val linkOk = OS.Process.isSuccess cmp
           val runOk =
             if fileExists outExpect then
