@@ -34,7 +34,7 @@ The VM exit code is the program’s **`main`** return value (often **`0`**).
 
 ## Self-host pilot loop (SML → C → native)
 
-The mechanical loop exercised in **`./scripts/sv0 test`** uses **`lib/self-host-sv0-loop.list`**, not these tutorials. See **`sv0c/doc/self-host-sv0-loop.md`** and **`task/sv0-toolchain-milestone-3-self-host.Rmd`**.
+The mechanical loop exercised in **`./scripts/sv0 test`** uses **`lib/self-host-sv0-loop.list`** (pilot seeds, not these tutorials). See **`sv0c/doc/self-host-sv0-loop.md`** and **`task/sv0-toolchain-milestone-3-self-host.Rmd`**.
 
 ## Normative language definition
 
