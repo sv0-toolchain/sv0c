@@ -1,6 +1,6 @@
 # Self-hosting compiler layout (milestone 3, phase 1)
 
-All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the working plan for directories and **transliteration order** (bootstrap SML → sv0). It is not normative for the language (see **sv0doc**).
+All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the working plan for directories and **transliteration order** (bootstrap SML → sv0). It is not normative for the language (see **sv0doc**). For a **milestone-3-wide** inventory and sequencing narrative, see **`doc/transliteration-plan.md`**.
 
 ## Directories (current + planned)
 

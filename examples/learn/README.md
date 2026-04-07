@@ -15,11 +15,12 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 | `09_struct.sv0` | `struct`, literal, field access |
 | `10_generics_placeholder.sv0` | Monomorphic stand-in (see integration `generics`) |
 | `11_contracts_requires.sv0` | `requires` / `ensures` on `main` |
-| `12_logical_operators.sv0` | Boolean **`&&`** / **`||`** in `if` conditions |
+| `12_logical_operators.sv0` | Boolean **`&&`** / **`||`** in`if` conditions |
 | `13_compare_chain.sv0` | Chained **`<`** comparisons with **`&&`** |
 | `14_match_integer.sv0` | `match` on an **`i32`** literal + default **`_`** arm |
 | `15_enum_payload.sv0` | Enum variant carrying **`i32`**; bind in **`match`** |
 | `16_try_operator.sv0` | **`?`** on a call returning the same enum as **`main`** |
+| `17_no_alias_contract.sv0` | **`requires(no_alias(&a, &b))`** on a function |
 
 ## Prerequisites
 
