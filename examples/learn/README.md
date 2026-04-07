@@ -2,6 +2,20 @@
 
 Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus. They are **not** on the bootstrap or VM-parity manifests; use them to learn syntax and the toolchain from the **sv0-toolchain** repo root.
 
+| File | Topic |
+|------|--------|
+| `01_minimal_main.sv0` | Smallest `main` / exit code |
+| `02_arithmetic.sv0` | Integer operators and precedence |
+| `03_if_expression.sv0` | `if` as expression |
+| `04_while_loop.sv0` | `while` + `break` |
+| `05_for_range.sv0` | `for` over half-open range |
+| `06_call_function.sv0` | Calling a sibling `fn` |
+| `07_enum_match.sv0` | `enum` + `match` |
+| `08_println.sv0` | `println` and stdout |
+| `09_struct.sv0` | `struct`, literal, field access |
+| `10_generics_placeholder.sv0` | Monomorphic stand-in (see integration `generics`) |
+| `11_contracts_requires.sv0` | `requires` / `ensures` on `main` |
+
 ## Prerequisites
 
 - [SML/NJ](https://smlnj.org/) on your `PATH` (for the bootstrap compiler).

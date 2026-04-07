@@ -1,0 +1,5 @@
+/* Simple requires/ensures on main (see test/integration/contracts/). */
+
+fn main() -> i32 requires(true) ensures(true) {
+  return 0;
+}
