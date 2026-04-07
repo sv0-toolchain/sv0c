@@ -1,0 +1,15 @@
+/* Struct types: fields and struct literals (see test/integration/structs/). */
+
+struct Pt {
+  x: i32,
+  y: i32,
+}
+
+fn area(p: Pt) -> i32 {
+  return p.x * p.y;
+}
+
+fn main() -> i32 {
+  let q: Pt = Pt { x: 6, y: 7 };
+  return if area(q) == 42 { 0 } else { 1 };
+}
