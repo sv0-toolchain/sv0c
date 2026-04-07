@@ -25,7 +25,10 @@ CI reads **`lib/bootstrap-sources.list`**: one path per line (relative to `sv0c/
 ./scripts/sv0 self-host-capture-stage0 lib/span_core.sv0
 ./scripts/sv0 self-host-compare span_core
 ./scripts/sv0 self-host-check-golden
+./scripts/sv0 self-host-sv0-loop
 ```
+
+**Self-host loop pilot (milestone 3):** `lib/self-host-sv0-loop.list` drives **`./scripts/sv0 self-host-sv0-loop`** — SML heap emits C twice (must match), then **`cc`** compiles and runs each program. When you have a compiler binary built from sv0 sources, set **`SV0_SELF_HOST_COMPILER`** to a wrapper that prints C for one **`.sv0`** path argument; the script diffs against SML. Full story: [`../doc/self-host-sv0-loop.md`](../doc/self-host-sv0-loop.md).
 
 From `sv0c/` after `make heap`:
 
