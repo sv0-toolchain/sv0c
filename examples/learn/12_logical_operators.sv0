@@ -1,0 +1,5 @@
+/* Boolean `&&` and `||` inside `if` conditions (short-circuit like C). */
+
+fn main() -> i32 {
+  return if true && false { 1 } else { 0 };
+}
