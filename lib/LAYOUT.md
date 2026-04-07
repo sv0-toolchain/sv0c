@@ -12,6 +12,7 @@ All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the 
 | `sv0c/lib/golden/stage0/<stem>.c` | Checked-in bootstrap C for listed programs; `sv0 test` diffs fresh SML heap output |
 | `sv0c/lexer/`, `sv0c/parser/`, `sv0c/lib/` (IR slices), … | **sv0** pipeline modules (same names as under `sml/`); parser seeds include `expr_entry_core`, …, `expr_cast_core`, `expr_unary_stub_core`, `type_parse_core`, `try_assign_stmt_core`; first IR seed: `lower_unop_core` (see **§6**) |
 | `build/self-host-compare/` | Generated C snapshots for stage0 vs stage1 (gitignored at meta-repo root) |
+| `test/vm-parity/` | Milestone **3** VM bytecode parity: **`manifest.txt`**, **`golden/sml/*.sv0b`** (SML reference); see **`test/vm-parity/README.md`** |
 
 **`sv0c --project <dir>`** collects **all `*.sv0` recursively** under `dir` (skips hidden path components). Subdirectories are supported (see `test/integration/modules/`).
 
