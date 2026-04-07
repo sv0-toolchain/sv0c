@@ -1,0 +1,9 @@
+/* if is an expression: both branches must agree on the result type (here i32). */
+
+fn main() -> i32 {
+  return if 1 < 2 {
+    0
+  } else {
+    1
+  };
+}

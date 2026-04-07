@@ -1,0 +1,5 @@
+/* Smallest program: entry point returns an exit code to the host / VM. */
+
+fn main() -> i32 {
+  return 0;
+}
