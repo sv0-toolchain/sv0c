@@ -1,0 +1,21 @@
+/* Same logic as the minimal example; the teaching goal is the *native* toolchain path.
+ *
+ * From the sv0-toolchain repository root (with SML/NJ available):
+ *
+ * 1) Emit C with the bootstrap compiler:
+ *      ./scripts/sv0 emit-c examples/learn/22_native_c_path.sv0 > /tmp/learn22.c
+ *
+ * 2) Compile and link the C runtime (paths relative to repo root):
+ *      cc -o /tmp/learn22 /tmp/learn22.c -Isv0c/runtime sv0c/runtime/sv0_runtime.c
+ *
+ * 3) Run the native binary:
+ *      /tmp/learn22
+ *      echo $?    # expect 0
+ *
+ * For bytecode instead, use ./scripts/sv0 vm-compile … and ./scripts/sv0 vm-run …
+ * as described in examples/learn/README.md.
+ */
+
+fn main() -> i32 {
+  return 0;
+}
