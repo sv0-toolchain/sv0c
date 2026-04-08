@@ -1,0 +1,39 @@
+/* Transliteration seed: sml/link/link.sml - stripLinkDirectives (lines ~321-327).
+   Top-level item kind stand-ins (tags): 1 ItemFn, 2 ItemUse (removed), 3 ItemModule (removed), 4 ItemStruct.
+   strip_link_keep_item(tag) is 1 iff the item is retained (same filter as SML: drop ItemUse / ItemModule only). */
+
+fn item_tag_fn() -> i32 {
+  return 1;
+}
+
+fn item_tag_use() -> i32 {
+  return 2;
+}
+
+fn item_tag_module() -> i32 {
+  return 3;
+}
+
+fn item_tag_struct() -> i32 {
+  return 4;
+}
+
+fn strip_link_keep_item(tag: i32) -> i32 {
+  if tag == 2 {
+    return 0;
+  } else {
+    if tag == 3 {
+      return 0;
+    } else {
+      return 1;
+    }
+  }
+}
+
+fn main() -> i32 {
+  let a_fn: i32 = strip_link_keep_item(item_tag_fn()) - 1;
+  let a_use: i32 = strip_link_keep_item(item_tag_use());
+  let a_mod: i32 = strip_link_keep_item(item_tag_module());
+  let a_struct: i32 = strip_link_keep_item(item_tag_struct()) - 1;
+  return a_fn + a_use + a_mod + a_struct;
+}

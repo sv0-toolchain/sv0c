@@ -20,8 +20,8 @@ This document is a **roadmap** for moving the authoritative implementation from 
 | Name resolution | `sml/name_resolution/` | `lib/env_*`, `lib/resolver_*`, `lib/lookup_*` | Full `resolver.sml`, modules, `use` |
 | Types | `sml/type_checker/` | seeds only (`type_alias`, lookups) | `checker.sml`, `unify.sml`, full inference |
 | Contracts | `sml/contract_analyzer/` | C + VM lowering | Analyzer in sv0; VM parity for remaining contract forms |
-| IR | `sml/ir/` | `lib/lower_unop_core` | `lowering.sml` transliteration |
-| Link | `sml/link/` | — | `stripLinkDirectives`, project linking |
+| IR | `sml/ir/` | `lib/lower_unop_core`, `lib/lower_lit_core` | `lowering.sml` transliteration |
+| Link | `sml/link/` | `lib/link_strip_core` | `stripLinkDirectives`; full project linking still SML |
 | C backend | `sml/backend/c/` | — | `codegen.sml` (large) |
 | VM backend | `sml/backend/vm/` | `vm_codegen.sml` (SML) | Keep encoder in SML until self-host; parity tests |
 

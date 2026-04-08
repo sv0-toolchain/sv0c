@@ -11,7 +11,7 @@ All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the 
 | `sv0c/lib/bootstrap-sources.list` | Standalone `.sv0` programs CI runs via **`bootstrap-build`** (each has `main`, VM exit 0); paths relative to `sv0c/` |
 | `sv0c/lib/self-host-sv0-loop.list` | Pilot sources for **`./scripts/sv0 self-host-sv0-loop`** (SML→C→native smoke + optional **`SV0_SELF_HOST_COMPILER`**); see **`doc/self-host-sv0-loop.md`** |
 | `sv0c/lib/golden/stage0/<stem>.c` | Checked-in bootstrap C for listed programs; `sv0 test` diffs fresh SML heap output |
-| `sv0c/lexer/`, `sv0c/parser/`, `sv0c/lib/` (IR slices), … | **sv0** pipeline modules (same names as under `sml/`); parser seeds include `expr_entry_core`, …, `expr_cast_core`, `expr_unary_stub_core`, `type_parse_core`, `try_assign_stmt_core`; first IR seed: `lower_unop_core` (see **§6**) |
+| `sv0c/lexer/`, `sv0c/parser/`, `sv0c/lib/` (IR / link slices), … | **sv0** pipeline modules (same names as under `sml/`); parser seeds include `expr_entry_core`, …, `expr_cast_core`, `expr_unary_stub_core`, `type_parse_core`, `try_assign_stmt_core`; IR seeds: `lower_unop_core`, `lower_lit_core`; link seed: `link_strip_core` (see **§6**) |
 | `build/self-host-compare/` | Generated C snapshots for stage0 vs stage1 (gitignored at meta-repo root) |
 | `test/vm-parity/` | Milestone **3** VM bytecode parity: **`manifest.txt`**, **`golden/sml/*.sv0b`** (SML reference); see **`test/vm-parity/README.md`** |
 
@@ -30,8 +30,9 @@ Rough bottom-up order (mirrors `sml/` data flow):
 7. **Name resolution** — `sml/name_resolution/*` (full resolver; builds on **§4**)
 8. **Type checker** — `sml/type_checker/*`
 9. **Contracts** — `sml/contract_analyzer/*`
-10. **IR** — `sml/ir/*` → `lib/lower_unop_core.sv0` (**unopToC** / **ExprUnop** discriminant slice toward **`Ir.Unop`** vs **addr-of**)
-11. **Backends** — `sml/backend/c/*`, `sml/backend/vm/*`
+10. **IR** — `sml/ir/*` → `lib/lower_unop_core.sv0` (**unopToC** / **ExprUnop** discriminant slice toward **`Ir.Unop`** vs **addr-of**); `lib/lower_lit_core.sv0` (**lowerLit** literal-kind slice: **Int** / **Bool** / **Unit** / **String** vs unsupported)
+11. **Link** — `sml/link/link.sml` → `lib/link_strip_core.sv0` (**stripLinkDirectives** top-level item filter: drop **ItemUse** / **ItemModule** only)
+12. **Backends** — `sml/backend/c/*`, `sml/backend/vm/*`
 
 Adjust when a layer needs a feature not yet in sv0; either extend the language or keep that slice in SML longer.
 
