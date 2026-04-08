@@ -1,0 +1,74 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`calleeRetCty`**: look up **`Ast.ItemFn`** by resolved callee name in the program;
+   if **no** matching item or **no** explicit return type → C type class **`int`**; otherwise **`astTyToCString`** on the return type.
+   Harness: **`prog_has_fn`** (0 = miss), **`fn_has_explicit_ret`** (0 = **`NONE`** in SML), **`ret_ty_shape`** = **`ty_shape_tag`** for **`param_ty_cstring_class`** (mirrors **`lower_ast_ty_cstring_core.sv0`** / **`lower_match_scrut_cty_core.sv0`** subset). **`resolveFnCallee`** / import aliases are out of scope for this slice. */
+
+fn c_ty_void() -> i32 {
+  return 1;
+}
+
+fn c_ty_int() -> i32 {
+  return 2;
+}
+
+fn c_ty_passthru_name() -> i32 {
+  return 11;
+}
+
+/* Same subset as **`param_ty_cstring_class`** in **`lower_match_scrut_cty_core.sv0`**. */
+fn param_ty_cstring_class(ty_shape_tag: i32) -> i32 {
+  if ty_shape_tag == 0 {
+    return c_ty_void();
+  } else {
+    if ty_shape_tag == 1 {
+      return c_ty_void();
+    } else {
+      if ty_shape_tag == 2 {
+        return c_ty_int();
+      } else {
+        if ty_shape_tag == 3 {
+          return c_ty_int();
+        } else {
+          if ty_shape_tag == 13 {
+            return c_ty_passthru_name();
+          } else {
+            return c_ty_int();
+          }
+        }
+      }
+    }
+  }
+}
+
+fn callee_ret_cty_class(prog_has_fn: i32, fn_has_explicit_ret: i32, ret_ty_shape: i32) -> i32 {
+  if prog_has_fn == 0 {
+    return c_ty_int();
+  } else {
+    if fn_has_explicit_ret == 0 {
+      return c_ty_int();
+    } else {
+      return param_ty_cstring_class(ret_ty_shape);
+    }
+  }
+}
+
+fn main() -> i32 {
+  if callee_ret_cty_class(0, 0, 0) != c_ty_int() {
+    return 1;
+  }
+  if callee_ret_cty_class(0, 1, 2) != c_ty_int() {
+    return 1;
+  }
+  if callee_ret_cty_class(1, 0, 0) != c_ty_int() {
+    return 1;
+  }
+  if callee_ret_cty_class(1, 1, 2) != c_ty_int() {
+    return 1;
+  }
+  if callee_ret_cty_class(1, 1, 0) != c_ty_void() {
+    return 1;
+  }
+  if callee_ret_cty_class(1, 1, 13) != c_ty_passthru_name() {
+    return 1;
+  }
+  return 0;
+}
