@@ -29,6 +29,7 @@ lib/lower_match_scrut_cty_core.sv0
 lib/lower_callee_ret_cty_core.sv0
 lib/lower_enum_tag_core.sv0
 lib/lower_struct_fields_core.sv0
+lib/lower_resolve_fn_callee_core.sv0
 lib/checker_mut_assign_core.sv0
 lib/link_strip_core.sv0
 parser/expr_rhs_stub_core.sv0
