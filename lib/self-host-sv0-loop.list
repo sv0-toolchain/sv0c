@@ -16,3 +16,15 @@ parser/expr_entry_core.sv0
 parser/item_entry_core.sv0
 parser/stmt_entry_core.sv0
 parser/type_parse_core.sv0
+
+# IR / checker / link + additional parser slices (single-TU cc+run smoke; 2026-04-07)
+lib/lower_lit_core.sv0
+lib/lower_binop_core.sv0
+lib/checker_mut_assign_core.sv0
+lib/link_strip_core.sv0
+parser/expr_rhs_stub_core.sv0
+parser/expr_pratt_stub_core.sv0
+parser/expr_prec_ladder_core.sv0
+parser/expr_cast_core.sv0
+parser/expr_unary_stub_core.sv0
+parser/try_assign_stmt_core.sv0
