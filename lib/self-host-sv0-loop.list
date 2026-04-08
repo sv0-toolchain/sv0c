@@ -21,6 +21,7 @@ parser/type_parse_core.sv0
 lib/lower_lit_core.sv0
 lib/lower_binop_core.sv0
 lib/lower_assign_lhs_core.sv0
+lib/lower_ast_ty_cstring_core.sv0
 lib/checker_mut_assign_core.sv0
 lib/link_strip_core.sv0
 parser/expr_rhs_stub_core.sv0

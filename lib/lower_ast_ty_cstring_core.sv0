@@ -1,0 +1,159 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`astTyToCString`**: **`TyUnit`**, primitive **`TyName`** arms
+   (**`unit`**, **`i32`**, **`bool`**, fixed-width ints, **`isize`/`usize`**), arbitrary single **`TyName [n]`** (C type = **`n`**),
+   and the **`_ => "int"`** fallback. **`ty_shape_tag`** is a test harness encoding of those shapes; return values are
+   stable **c_ty_class** ids (not string bytes). */
+
+fn c_ty_void() -> i32 {
+  return 1;
+}
+
+fn c_ty_int() -> i32 {
+  return 2;
+}
+
+fn c_ty_int8() -> i32 {
+  return 3;
+}
+
+fn c_ty_uint8() -> i32 {
+  return 4;
+}
+
+fn c_ty_int16() -> i32 {
+  return 5;
+}
+
+fn c_ty_uint16() -> i32 {
+  return 6;
+}
+
+fn c_ty_int64() -> i32 {
+  return 7;
+}
+
+fn c_ty_uint64() -> i32 {
+  return 8;
+}
+
+fn c_ty_intptr() -> i32 {
+  return 9;
+}
+
+fn c_ty_uintptr() -> i32 {
+  return 10;
+}
+
+fn c_ty_passthru_name() -> i32 {
+  return 11;
+}
+
+/* ty_shape_tag: 0 TyUnit, 1 unit, 2 i32, 3 bool, 4 i8, 5 u8, 6 i16, 7 u16, 8 i64, 9 u64, 10 isize, 11 usize,
+   12 complex/fallback (_), 13 other TyName ([n], n) passthrough. */
+fn ast_ty_cstring_class(ty_shape_tag: i32) -> i32 {
+  if ty_shape_tag == 0 {
+    return c_ty_void();
+  } else {
+    if ty_shape_tag == 1 {
+      return c_ty_void();
+    } else {
+      if ty_shape_tag == 2 {
+        return c_ty_int();
+      } else {
+        if ty_shape_tag == 3 {
+          return c_ty_int();
+        } else {
+          if ty_shape_tag == 4 {
+            return c_ty_int8();
+          } else {
+            if ty_shape_tag == 5 {
+              return c_ty_uint8();
+            } else {
+              if ty_shape_tag == 6 {
+                return c_ty_int16();
+              } else {
+                if ty_shape_tag == 7 {
+                  return c_ty_uint16();
+                } else {
+                  if ty_shape_tag == 8 {
+                    return c_ty_int64();
+                  } else {
+                    if ty_shape_tag == 9 {
+                      return c_ty_uint64();
+                    } else {
+                      if ty_shape_tag == 10 {
+                        return c_ty_intptr();
+                      } else {
+                        if ty_shape_tag == 11 {
+                          return c_ty_uintptr();
+                        } else {
+                          if ty_shape_tag == 12 {
+                            return c_ty_int();
+                          } else {
+                            if ty_shape_tag == 13 {
+                              return c_ty_passthru_name();
+                            } else {
+                              return c_ty_int();
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+fn main() -> i32 {
+  if ast_ty_cstring_class(0) != c_ty_void() {
+    return 1;
+  }
+  if ast_ty_cstring_class(1) != c_ty_void() {
+    return 1;
+  }
+  if ast_ty_cstring_class(2) != c_ty_int() {
+    return 1;
+  }
+  if ast_ty_cstring_class(3) != c_ty_int() {
+    return 1;
+  }
+  if ast_ty_cstring_class(4) != c_ty_int8() {
+    return 1;
+  }
+  if ast_ty_cstring_class(5) != c_ty_uint8() {
+    return 1;
+  }
+  if ast_ty_cstring_class(6) != c_ty_int16() {
+    return 1;
+  }
+  if ast_ty_cstring_class(7) != c_ty_uint16() {
+    return 1;
+  }
+  if ast_ty_cstring_class(8) != c_ty_int64() {
+    return 1;
+  }
+  if ast_ty_cstring_class(9) != c_ty_uint64() {
+    return 1;
+  }
+  if ast_ty_cstring_class(10) != c_ty_intptr() {
+    return 1;
+  }
+  if ast_ty_cstring_class(11) != c_ty_uintptr() {
+    return 1;
+  }
+  if ast_ty_cstring_class(12) != c_ty_int() {
+    return 1;
+  }
+  if ast_ty_cstring_class(13) != c_ty_passthru_name() {
+    return 1;
+  }
+  if ast_ty_cstring_class(99) != c_ty_int() {
+    return 1;
+  }
+  return 0;
+}
