@@ -57,6 +57,7 @@ sv0 source (.sv0)
 | `test/` | test suite |
 | `doc/` | pass-by-pass notes ([compiler-passes.md](doc/compiler-passes.md)) — includes structs, enums, and `match` (Milestone 1 Phase 5) |
 | `examples/learn/` | small **`.sv0`** tutorials + [README](examples/learn/README.md) for **`vm-compile`**, **`emit-c`**, **`repl`** from the toolchain root |
+| `examples/libs/` | **educational library-shaped** multi-file packages (not bootstrap seeds) + [README](examples/libs/README.md) |
 | `build/` | build artifacts (gitignored) |
 
 ## building
