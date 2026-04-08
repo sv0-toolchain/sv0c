@@ -1,11 +1,13 @@
-/* `continue` skips the rest of the body and starts the next `for` iteration (same idea as `continue` in a `while`). */
+/* `continue` skips the rest of the body and starts the next iteration. `let mut` + assignment works in the checker slice (see `lib/checker_mut_assign_core.sv0` / `checker.sml`). */
 
 fn main() -> i32 {
-  for j in 0..10 {
-    if j < 8 {
+  let mut i = 0;
+  while i < 10 {
+    i = i + 1;
+    if i < 8 {
       continue;
     };
-    return j;
+    return i;
   };
   return 0;
 }
