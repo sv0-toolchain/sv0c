@@ -63,6 +63,14 @@ structure Lowering :> LOWERING = struct
       | NONE => (en, vn)
     end
 
+  datatype assign_lhs = ALVar of string | ALField of string * string
+
+  fun classifyAssignLhs (lhs : Ast.expr) : assign_lhs option =
+    case lhs of
+      Ast.ExprPath ([x], _) => SOME (ALVar x)
+    | Ast.ExprField (Ast.ExprPath ([b], _), fld, _) => SOME (ALField (b, fld))
+    | _ => NONE
+
   fun astBinopToC (b : Ast.binop) : string =
     case b of
       Ast.Add => "+"
@@ -556,6 +564,10 @@ structure Lowering :> LOWERING = struct
         raise Fail "E0402: break in value position in lowering slice"
     | Ast.ExprContinue _ =>
         raise Fail "E0402: continue in value position in lowering slice"
+    | Ast.ExprAssign (lhs, rhs, sp) =>
+        (lowerExprForEffect (Ast.ExprAssign (lhs, rhs, sp)), Ir.VUnit)
+    | Ast.ExprAssignOp (b, lhs, rhs, sp) =>
+        (lowerExprForEffect (Ast.ExprAssignOp (b, lhs, rhs, sp)), Ir.VUnit)
     | _ =>
         let
           val (instrs, rhs) = lowerExprWithInstrs e
@@ -714,9 +726,35 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprBreak (SOME _, _) =>
         raise Fail "break with value not supported in lowering slice"
     | Ast.ExprContinue _ => [Ir.Continue]
-    | Ast.ExprAssign (Ast.ExprPath ([x], _), rhs, _) =>
-        let val (ir, vr) = lowerExprWithInstrs rhs
-        in ir @ [Ir.Store (x, vr)] end
+    | Ast.ExprAssign (lhs, rhs, _) =>
+        (case classifyAssignLhs lhs of
+           SOME (ALVar x) =>
+             let val (ir, vr) = lowerExprWithInstrs rhs
+             in ir @ [Ir.Store (x, vr)] end
+         | SOME (ALField (b, f)) =>
+             let val (ir, vr) = lowerExprWithInstrs rhs
+             in ir @ [Ir.StoreField (b, f, vr)] end
+         | NONE =>
+             raise Fail "lowering: assignment lhs must be a name or one-level field")
+    | Ast.ExprAssignOp (b, lhs, rhs, _) =>
+        let
+          val opStr = astBinopToC b
+          val (irR, vR) = lowerExprToValue rhs
+        in
+          case classifyAssignLhs lhs of
+            SOME (ALVar x) =>
+              irR @ [Ir.Store (x, Ir.Binop (opStr, Ir.VVar x, vR))]
+          | SOME (ALField (base, fld)) =>
+              irR
+              @ [ Ir.StoreField
+                    ( base
+                    , fld
+                    , Ir.Binop (opStr, Ir.VMember (Ir.VVar base, fld), vR)
+                    )
+                ]
+          | NONE =>
+              raise Fail "lowering: compound-assign lhs must be a name or one-level field"
+        end
     | _ =>
         let val (instrs, _) = lowerExprToValue e in instrs end
 

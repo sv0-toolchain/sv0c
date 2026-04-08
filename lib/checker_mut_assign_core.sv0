@@ -1,7 +1,8 @@
 /* Transliteration seed: **sml/type_checker/checker.sml** — **`let mut`** bindings carry an assignable
-   flag in the value environment; **`checkExprStmt`** on **`ExprAssign`** requires a simple **`ExprPath`**
-   lhs and **`envEntry` → (_, true)**. Error codes **E0448** / **E0449** are documented in
-   **doc/compiler-passes.md**. This seed only models the **i32** “slot is assignable” predicate. */
+   flag; **`checkExprStmt`** accepts **`ExprAssign`** / **`ExprAssignOp`** when the lhs is a simple name
+   or **`p.f`** (one field), with **`envEntry` → (_, true)** on the root binding. **E0448** / **E0449**
+   / **E0450** are documented in **doc/compiler-passes.md**. This seed only models numeric error codes
+   and a boolean “assignable slot” predicate. */
 
 fn binding_assignable(is_let_mut: i32) -> i32 {
   return is_let_mut;

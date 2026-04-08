@@ -1,0 +1,14 @@
+struct Pt {
+  x: i32,
+}
+
+fn bump(p: Pt) -> i32 {
+  return p.x + 1;
+}
+
+fn main() -> i32 {
+  let mut q: Pt = Pt { x: 5 };
+  q.x = 7;
+  q.x += 3;
+  return if bump(q) == 11 { 0 } else { 1 };
+}
