@@ -18,7 +18,7 @@ This document is a **roadmap** for moving the authoritative implementation from 
 | Lexer | `sml/lexer/` | `lexer/token_*_core` | Full `lexer.sml` → unified token stream + errors |
 | Parser | `sml/parser/` | `parser/*_core` | Merge cores into `parseExpr` / `parseStmt` / `parseItem` tracks; error recovery |
 | Name resolution | `sml/name_resolution/` | `lib/env_*`, `lib/resolver_*`, `lib/lookup_*` | Full `resolver.sml`, modules, `use` |
-| Types | `sml/type_checker/` | seeds: `type_alias`, lookups, **`checker_mut_assign_core`** (`let mut` / **E0448** / **E0449**) | `checker.sml`, `unify.sml`, full inference |
+| Types | `sml/type_checker/` | seeds: `type_alias`, lookups, **`checker_mut_assign_core`** (`let mut`, **`=`** / **`+=`** to **`x`** or **`p.f`**, **E0448** / **E0449** / **E0450**) | `checker.sml`, `unify.sml`, full inference |
 | Contracts | `sml/contract_analyzer/` | C + VM lowering | Analyzer in sv0; VM parity for remaining contract forms |
 | IR | `sml/ir/` | `lib/lower_unop_core`, `lib/lower_lit_core` | `lowering.sml` transliteration |
 | Link | `sml/link/` | `lib/link_strip_core` | `stripLinkDirectives`; full project linking still SML |

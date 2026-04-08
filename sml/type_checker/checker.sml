@@ -269,6 +269,24 @@ structure Checker :> CHECKER = struct
     | (Ast.And | Ast.Or) => Logic
     | (Ast.Eq | Ast.Neq | Ast.Lt | Ast.Gt | Ast.Leq | Ast.Geq) => Cmp
 
+  datatype assign_lhs = ALVar of string | ALField of string * string
+
+  fun classifyAssignLhs (lhs : Ast.expr) : assign_lhs option =
+    case lhs of
+      Ast.ExprPath ([x], _) => SOME (ALVar x)
+    | Ast.ExprField (Ast.ExprPath ([b], _), fld, _) => SOME (ALField (b, fld))
+    | _ => NONE
+
+  fun tyOfStructField (sn : string) (f : string) : Types.ty =
+    case List.find (fn (n, _) => n = f) (fieldsOfStruct sn) of
+      SOME (_, t) => t
+    | NONE =>
+        raise Fail ("E0429: struct `" ^ sn ^ "` has no field `" ^ f ^ "`")
+
+  fun assignLhsBad () : 'a =
+    raise Fail
+      "E0449: assignment left-hand side must be a simple name or a one-level field `p.f` of a local binding in this slice"
+
   fun stmtReturns (st : Ast.stmt) : bool =
     case st of
       Ast.StmtSemi (Ast.ExprReturn _, _) => true
@@ -713,24 +731,78 @@ structure Checker :> CHECKER = struct
     | _ =>
         raise Fail "E0402: expression form not supported in type checker slice"
 
+  and checkPlainAssign (env : venv) (retTy : Types.ty) (lhs : Ast.expr)
+    (rhs : Ast.expr) : unit =
+    case classifyAssignLhs lhs of
+      NONE => assignLhsBad ()
+    | SOME (ALVar x) =>
+        (case envEntry env x of
+           SOME (t, true) => expect (synth retTy env rhs, t)
+         | SOME (_, false) =>
+             raise Fail
+               ("E0448: cannot assign to immutable binding `" ^ x
+                ^ "` (hint: use `let mut " ^ x ^ "` if you need assignment)")
+         | NONE =>
+             raise Fail ("E0401: unbound value in type checker: `" ^ x ^ "`"))
+    | SOME (ALField (b, f)) =>
+        (case envEntry env b of
+           SOME (Types.TyStruct sn, true) =>
+             let val tFld = tyOfStructField sn f
+             in expect (synth retTy env rhs, tFld) end
+         | SOME (_, false) =>
+             raise Fail
+               ("E0448: cannot assign to field through immutable binding `" ^ b
+                ^ "` (hint: use `let mut " ^ b ^ "` if you need field assignment)")
+         | SOME _ =>
+             raise Fail
+               "E0449: field assignment requires the base binding to have struct type"
+         | NONE =>
+             raise Fail ("E0401: unbound value in type checker: `" ^ b ^ "`"))
+
+  and checkCompoundAssign (env : venv) (retTy : Types.ty) (b : Ast.binop)
+    (lhs : Ast.expr) (rhs : Ast.expr) : unit =
+    case binopClass b of
+      Arith =>
+        (case classifyAssignLhs lhs of
+           NONE => assignLhsBad ()
+         | SOME (ALVar x) =>
+             (case envEntry env x of
+                SOME (t, true) =>
+                  (expect (t, Types.TyInt 32); expect (synth retTy env rhs, Types.TyInt 32))
+              | SOME (_, false) =>
+                  raise Fail
+                    ("E0448: cannot assign to immutable binding `" ^ x
+                     ^ "` (hint: use `let mut " ^ x ^ "` if you need compound assignment)")
+              | NONE =>
+                  raise Fail ("E0401: unbound value in type checker: `" ^ x ^ "`"))
+         | SOME (ALField (base, f)) =>
+             (case envEntry env base of
+                SOME (Types.TyStruct sn, true) =>
+                  let val tFld = tyOfStructField sn f
+                  in
+                    expect (tFld, Types.TyInt 32);
+                    expect (synth retTy env rhs, Types.TyInt 32)
+                  end
+              | SOME (_, false) =>
+                  raise Fail
+                    ("E0448: cannot assign to field through immutable binding `" ^ base
+                     ^ "` (hint: use `let mut " ^ base
+                     ^ "` if you need compound field assignment)")
+              | SOME _ =>
+                  raise Fail
+                    "E0449: field assignment requires the base binding to have struct type"
+              | NONE =>
+                  raise Fail ("E0401: unbound value in type checker: `" ^ base ^ "`")))
+    | _ =>
+        raise Fail
+          "E0450: compound assignment (`+=`, etc.) only supports arithmetic operators in this slice"
+
   and checkExprStmt (env : venv) (retTy : Types.ty) (e : Ast.expr) : unit =
     case e of
       Ast.ExprReturn (NONE, _) => expect (Types.TyUnit, retTy)
     | Ast.ExprReturn (SOME e2, _) => expect (synth retTy env e2, retTy)
-    | Ast.ExprAssign (lhs, rhs, _) =>
-        (case lhs of
-           Ast.ExprPath ([x], _) =>
-             (case envEntry env x of
-                SOME (t, true) => expect (synth retTy env rhs, t)
-              | SOME (_, false) =>
-                  raise Fail
-                    ("E0448: cannot assign to immutable binding `" ^ x
-                     ^ "` (hint: use `let mut " ^ x ^ "` if you need assignment)")
-              | NONE =>
-                  raise Fail ("E0401: unbound value in type checker: `" ^ x ^ "`"))
-         | _ =>
-             raise Fail
-               "E0449: assignment left-hand side must be a simple name in this slice")
+    | Ast.ExprAssign (lhs, rhs, _) => checkPlainAssign env retTy lhs rhs
+    | Ast.ExprAssignOp (b, lhs, rhs, _) => checkCompoundAssign env retTy b lhs rhs
     | _ => ignore (synth retTy env e)
 
   and checkStmt (retTy : Types.ty) (env : venv) (st : Ast.stmt) : venv =
@@ -789,6 +861,8 @@ structure Checker :> CHECKER = struct
     | Ast.ExprCast (e1, _, _) => exprReferencesResult e1
     | Ast.ExprTry (e1, _) => exprReferencesResult e1
     | Ast.ExprAssign (l, r, _) =>
+        exprReferencesResult l orelse exprReferencesResult r
+    | Ast.ExprAssignOp (_, l, r, _) =>
         exprReferencesResult l orelse exprReferencesResult r
     | _ => false
 

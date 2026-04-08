@@ -1,0 +1,12 @@
+/* Mut struct root: `p.f =` and `p.f +=` when `p` is `let mut` (one field level). From repo root: `./scripts/sv0 vm-compile examples/learn/20_struct_mut_field_assign.sv0` then `./scripts/sv0 vm-run sv0c/build/vm/20_struct_mut_field_assign.sv0b`. */
+
+struct Counter {
+  n: i32,
+}
+
+fn main() -> i32 {
+  let mut c: Counter = Counter { n: 0 };
+  c.n = 2;
+  c.n += 3;
+  return if c.n == 5 { 0 } else { 1 };
+}

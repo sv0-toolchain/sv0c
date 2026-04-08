@@ -373,12 +373,31 @@ structure TestRunner = struct
                         "fn main() -> i32 { let i = 0; i = 1; return i; }" of
                     SOME m => String.isSubstring "E0448" m
                   | NONE => false)
-      val () = check "checker rejects assign lhs not a simple name"
+      val () = check "checker accepts let mut struct field assign"
+                 (checkCatch
+                    ("struct P { x: i32 }" ^ nl ^
+                     "fn main() -> i32 { let mut p: P = P { x: 0 }; p.x = 1; return p.x; }") =
+                    NONE)
+      val () = check "checker rejects field assign through immutable binding"
                  (case checkCatch
                         ("struct P { x: i32 }" ^ nl ^
-                         "fn main() -> i32 { let mut p: P = P { x: 0 }; p.x = 1; return p.x; }") of
+                         "fn main() -> i32 { let p: P = P { x: 0 }; p.x = 1; return p.x; }") of
+                    SOME m => String.isSubstring "E0448" m
+                  | NONE => false)
+      val () = check "checker rejects assign lhs not a simple name or one-level field"
+                 (case checkCatch
+                        ("struct Q { y: i32 }" ^ nl ^ "struct P { q: Q }" ^ nl ^
+                         "fn main() -> i32 { let mut p: P = P { q: Q { y: 0 } }; p.q.y = 1; return 0; }") of
                     SOME m => String.isSubstring "E0449" m
                   | NONE => false)
+      val () = check "checker accepts let mut and +="
+                 (checkCatch
+                    "fn main() -> i32 { let mut i = 0; i += 1; return i; }" = NONE)
+      val () = check "checker accepts mut struct field +="
+                 (checkCatch
+                    ("struct P { x: i32 }" ^ nl ^
+                     "fn main() -> i32 { let mut p: P = P { x: 0 }; p.x += 2; return p.x; }") =
+                    NONE)
       val () = check "checker accepts for range"
                  (checkCatch
                     "fn main() -> unit { for i in 0..1 { } }" = NONE)
@@ -491,6 +510,20 @@ structure TestRunner = struct
                  (String.isSubstring "int i" cMutAsg
                   andalso String.isSubstring "i =" cMutAsg
                   andalso String.isSubstring "return" cMutAsg)
+      val cFieldAsg =
+        compileToC
+          ("struct Pt { x: i32 }" ^ nl ^
+           "fn main() -> i32 { let mut p: Pt = Pt { x: 0 }; p.x = 3; return p.x; }")
+      val () = check "e2e C mut struct field assign"
+                 (String.isSubstring "p.x = " cFieldAsg
+                  andalso String.isSubstring "return" cFieldAsg)
+      val cFieldPe =
+        compileToC
+          ("struct Pt { x: i32 }" ^ nl ^
+           "fn main() -> i32 { let mut p: Pt = Pt { x: 1 }; p.x += 2; return p.x; }")
+      val () = check "e2e C mut struct field +="
+                 (String.isSubstring "p.x = " cFieldPe
+                  andalso String.isSubstring "+" cFieldPe)
       val cStruct =
         compileToC
           ("struct Pt { x: i32 }" ^ nl ^
