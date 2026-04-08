@@ -714,6 +714,9 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprBreak (SOME _, _) =>
         raise Fail "break with value not supported in lowering slice"
     | Ast.ExprContinue _ => [Ir.Continue]
+    | Ast.ExprAssign (Ast.ExprPath ([x], _), rhs, _) =>
+        let val (ir, vr) = lowerExprWithInstrs rhs
+        in ir @ [Ir.Store (x, vr)] end
     | _ =>
         let val (instrs, _) = lowerExprToValue e in instrs end
 

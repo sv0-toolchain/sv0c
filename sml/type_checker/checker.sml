@@ -3,7 +3,8 @@
 
 structure Checker :> CHECKER = struct
 
-  type venv = (string * Types.ty) list
+  type venv = (string * Types.ty * bool) list
+  (* Third component: assignable (`let mut`); plain `let` and params are false. *)
 
   val loopDepth = ref 0
 
@@ -28,12 +29,19 @@ structure Checker :> CHECKER = struct
       r
     end
 
-  fun extend (env : venv) (x : string) (t : Types.ty) : venv = (x, t) :: env
+  fun extend (env : venv) (x : string) (t : Types.ty) (mut : bool) : venv =
+    (x, t, mut) :: env
 
   fun lookup [] x =
         raise Fail ("E0401: unbound value in type checker: `" ^ x ^ "`")
-    | lookup ((n, t) :: r) x =
+    | lookup ((n, t, _) :: r) x =
         if String.compare (n, x) = EQUAL then t else lookup r x
+
+  fun envEntry (env : venv) (x : string) : (Types.ty * bool) option =
+    case env of
+      [] => NONE
+    | (n, t, m) :: r =>
+        if String.compare (n, x) = EQUAL then SOME (t, m) else envEntry r x
 
   datatype variantShape = VSUnit | VSTuple of Types.ty list
 
@@ -280,7 +288,7 @@ structure Checker :> CHECKER = struct
           Unify.unify (scrutTy, Types.TyInt 32) orelse Unify.unify (scrutTy, Types.TyBool)
           orelse (case scrutTy of Types.TyEnum _ => true | _ => false)
         then
-          extend env x scrutTy
+          extend env x scrutTy false
         else
           raise Fail "E0425: pattern binding does not match scrutinee type"
     | Ast.PatLit (Ast.IntLit _, _) =>
@@ -342,7 +350,7 @@ structure Checker :> CHECKER = struct
                     let
                       val () = expect (synth retTy env lo, Types.TyInt 32)
                       val () = expect (synth retTy env hi, Types.TyInt 32)
-                      val envI = extend env i (Types.TyInt 32)
+                      val envI = extend env i (Types.TyInt 32) false
                     in
                       expect (synth retTy envI body, Types.TyBool);
                       Types.TyBool
@@ -364,7 +372,7 @@ structure Checker :> CHECKER = struct
                     let
                       val () = expect (synth retTy env lo, Types.TyInt 32)
                       val () = expect (synth retTy env hi, Types.TyInt 32)
-                      val envI = extend env i (Types.TyInt 32)
+                      val envI = extend env i (Types.TyInt 32) false
                     in
                       expect (synth retTy envI body, Types.TyBool);
                       Types.TyBool
@@ -580,7 +588,7 @@ structure Checker :> CHECKER = struct
         let
           val () = expect (synth retTy env lo, Types.TyInt 32)
           val () = expect (synth retTy env hi, Types.TyInt 32)
-          val envB = extend env x (Types.TyInt 32)
+          val envB = extend env x (Types.TyInt 32) false
           val () = withLoop (fn () => (ignore (synth retTy envB body); ()))
         in
           Types.TyUnit
@@ -709,11 +717,25 @@ structure Checker :> CHECKER = struct
     case e of
       Ast.ExprReturn (NONE, _) => expect (Types.TyUnit, retTy)
     | Ast.ExprReturn (SOME e2, _) => expect (synth retTy env e2, retTy)
+    | Ast.ExprAssign (lhs, rhs, _) =>
+        (case lhs of
+           Ast.ExprPath ([x], _) =>
+             (case envEntry env x of
+                SOME (t, true) => expect (synth retTy env rhs, t)
+              | SOME (_, false) =>
+                  raise Fail
+                    ("E0448: cannot assign to immutable binding `" ^ x
+                     ^ "` (hint: use `let mut " ^ x ^ "` if you need assignment)")
+              | NONE =>
+                  raise Fail ("E0401: unbound value in type checker: `" ^ x ^ "`"))
+         | _ =>
+             raise Fail
+               "E0449: assignment left-hand side must be a simple name in this slice")
     | _ => ignore (synth retTy env e)
 
   and checkStmt (retTy : Types.ty) (env : venv) (st : Ast.stmt) : venv =
     case st of
-      Ast.StmtLet (Ast.PatBind (x, _), _, to, SOME init, _) =>
+      Ast.StmtLet (Ast.PatBind (x, _), isMut, to, SOME init, _) =>
         let
           val tyInit = synth retTy env init
           val tyBind =
@@ -724,7 +746,7 @@ structure Checker :> CHECKER = struct
                    SOME t => (expect (tyInit, t); t)
                  | NONE => raise Fail "E0406: unknown type in let annotation")
         in
-          extend env x tyBind
+          extend env x tyBind isMut
         end
     | Ast.StmtLet _ =>
         raise Fail "E0407: let in this slice requires PatBind and initializer"
@@ -766,6 +788,8 @@ structure Checker :> CHECKER = struct
     | Ast.ExprContinue _ => false
     | Ast.ExprCast (e1, _, _) => exprReferencesResult e1
     | Ast.ExprTry (e1, _) => exprReferencesResult e1
+    | Ast.ExprAssign (l, r, _) =>
+        exprReferencesResult l orelse exprReferencesResult r
     | _ => false
 
   fun checkContract (env : venv) (retTy : Types.ty) (c : Ast.contract) : unit =
@@ -774,7 +798,7 @@ structure Checker :> CHECKER = struct
         withContractExpr (fn () => expect (synth retTy env e, Types.TyBool))
     | Ast.Ensures (e, _) =>
         let
-          val envR = extend env "result" retTy
+          val envR = extend env "result" retTy false
         in
           if Unify.unify (retTy, Types.TyUnit) andalso exprReferencesResult e then
             raise Fail "E0520: ensures cannot use result when return type is unit"
@@ -827,24 +851,24 @@ structure Checker :> CHECKER = struct
     end
 
   fun envFind (env : venv) (x : string) : Types.ty option =
-    case List.find (fn (n, _) => String.compare (n, x) = EQUAL) env of
-      SOME (_, t) => SOME t
+    case envEntry env x of
+      SOME (t, _) => SOME t
     | NONE => NONE
 
   fun modEnvFromProg (prog : Ast.program) : venv =
     let
       fun one (it : Ast.item, acc : venv) : venv =
         case it of
-          Ast.ItemFn r => extend acc (#name r) (itemFnTy r)
+          Ast.ItemFn r => extend acc (#name r) (itemFnTy r) false
         | _ => acc
       val acc0 = List.foldl one [] prog
-      val acc1 = extend acc0 "println" (Types.TyFn ([Types.TyString], Types.TyUnit))
+      val acc1 = extend acc0 "println" (Types.TyFn ([Types.TyString], Types.TyUnit)) false
       val acc2 =
         List.foldl
           (fn ((en, vars), acc) =>
              List.foldl
                (fn ((vn, sh), a) =>
-                  extend a (pathKey [en, vn]) (ctorTy en sh)) acc vars) acc1
+                  extend a (pathKey [en, vn]) (ctorTy en sh) false) acc vars) acc1
           (!enumDefs)
       fun oneUse (it : Ast.item, acc : venv) : venv =
         case it of
@@ -852,7 +876,7 @@ structure Checker :> CHECKER = struct
             let val q = m ^ "__" ^ nm
             in
               case envFind acc q of
-                SOME t => extend acc nm t
+                SOME t => extend acc nm t false
               | NONE =>
                   if List.exists (fn s => String.compare (s, q) = EQUAL) (structNames ()) then
                     (addTyImportAlias nm q; acc)
@@ -866,7 +890,7 @@ structure Checker :> CHECKER = struct
                     in
                       List.foldl
                         (fn ((vn, sh), a) =>
-                           extend a (pathKey [nm, vn]) (ctorTy q sh)) acc vars
+                           extend a (pathKey [nm, vn]) (ctorTy q sh) false) acc vars
                     end
                   else acc
             end
@@ -895,7 +919,7 @@ structure Checker :> CHECKER = struct
              case p of
                Ast.PatBind (x, _) =>
                  (case astTyToTy pt of
-                    SOME t => extend acc x t
+                    SOME t => extend acc x t false
                   | NONE => raise Fail "E0406: unknown parameter type")
              | _ => raise Fail "E0410: parameters must be simple bindings here")
           modEnv (#params r)

@@ -21,7 +21,7 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 | `15_enum_payload.sv0` | Enum variant carrying **`i32`**; bind in **`match`** |
 | `16_try_operator.sv0` | **`?`** on a call returning the same enum as **`main`** |
 | `17_no_alias_contract.sv0` | **`requires(no_alias(&a, &b))`** on a function |
-| `18_continue_in_loop.sv0` | **`continue`** inside **`for`** (skips to next iteration) |
+| `18_continue_in_loop.sv0` | **`continue`** in **`while`** with **`let mut`** + assignment |
 | `19_loop_invariant.sv0` | **`loop_invariant`** on **`while`** (see **`emit-c`** for `sv0_requires` lowering) |
 
 ## Prerequisites

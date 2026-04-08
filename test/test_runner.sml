@@ -365,6 +365,20 @@ structure TestRunner = struct
                  (checkCatch
                     "fn main() -> unit { while false loop_invariant(true) { } }" =
                     NONE)
+      val () = check "checker accepts let mut and assign"
+                 (checkCatch
+                    "fn main() -> i32 { let mut i = 0; i = i + 1; return i; }" = NONE)
+      val () = check "checker rejects assign to immutable let"
+                 (case checkCatch
+                        "fn main() -> i32 { let i = 0; i = 1; return i; }" of
+                    SOME m => String.isSubstring "E0448" m
+                  | NONE => false)
+      val () = check "checker rejects assign lhs not a simple name"
+                 (case checkCatch
+                        ("struct P { x: i32 }" ^ nl ^
+                         "fn main() -> i32 { let mut p: P = P { x: 0 }; p.x = 1; return p.x; }") of
+                    SOME m => String.isSubstring "E0449" m
+                  | NONE => false)
       val () = check "checker accepts for range"
                  (checkCatch
                     "fn main() -> unit { for i in 0..1 { } }" = NONE)
@@ -471,6 +485,12 @@ structure TestRunner = struct
                  (String.isSubstring "while (" cLoop)
       val () = check "e2e C loop invariant uses sv0_requires"
                  (String.isSubstring "sv0_requires" cLoop)
+      val cMutAsg =
+        compileToC "fn main() -> i32 { let mut i = 0; i = i + 1; return i; }"
+      val () = check "e2e C let mut assign lowers to store"
+                 (String.isSubstring "int i" cMutAsg
+                  andalso String.isSubstring "i =" cMutAsg
+                  andalso String.isSubstring "return" cMutAsg)
       val cStruct =
         compileToC
           ("struct Pt { x: i32 }" ^ nl ^
