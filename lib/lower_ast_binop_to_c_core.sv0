@@ -1,0 +1,176 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`astBinopToC`**: maps each **`Ast.binop`** to a C operator string.
+   **`binop_tag`** follows **`Ast.binop`** declaration order (**1** = **`Add`** … **18** = **`Geq`**).
+   **`ast_binop_to_c_width_class`** returns **1** when the C spelling is one character (**`+`**, **`-`**, **`<`**, …),
+   **2** when it is two (**`<<`**, **`&&`**, **`==`**, **`<=`**, …), **0** if **`binop_tag`** is out of range. */
+
+fn c_op_width_single() -> i32 {
+  return 1;
+}
+
+fn c_op_width_double() -> i32 {
+  return 2;
+}
+
+fn binop_tag_add() -> i32 {
+  return 1;
+}
+
+fn binop_tag_sub() -> i32 {
+  return 2;
+}
+
+fn binop_tag_mul() -> i32 {
+  return 3;
+}
+
+fn binop_tag_div() -> i32 {
+  return 4;
+}
+
+fn binop_tag_rem() -> i32 {
+  return 5;
+}
+
+fn binop_tag_bitand() -> i32 {
+  return 6;
+}
+
+fn binop_tag_bitor() -> i32 {
+  return 7;
+}
+
+fn binop_tag_bitxor() -> i32 {
+  return 8;
+}
+
+fn binop_tag_shl() -> i32 {
+  return 9;
+}
+
+fn binop_tag_shr() -> i32 {
+  return 10;
+}
+
+fn binop_tag_and() -> i32 {
+  return 11;
+}
+
+fn binop_tag_or() -> i32 {
+  return 12;
+}
+
+fn binop_tag_eq() -> i32 {
+  return 13;
+}
+
+fn binop_tag_neq() -> i32 {
+  return 14;
+}
+
+fn binop_tag_lt() -> i32 {
+  return 15;
+}
+
+fn binop_tag_gt() -> i32 {
+  return 16;
+}
+
+fn binop_tag_leq() -> i32 {
+  return 17;
+}
+
+fn binop_tag_geq() -> i32 {
+  return 18;
+}
+
+fn ast_binop_to_c_width_class(binop_tag: i32) -> i32 {
+  if binop_tag < 1 {
+    return 0;
+  } else {
+    if binop_tag > 18 {
+      return 0;
+    } else {
+      if binop_tag > 8 {
+        if binop_tag > 10 {
+          if binop_tag > 14 {
+            if binop_tag > 16 {
+              return c_op_width_double();
+            } else {
+              return c_op_width_single();
+            }
+          } else {
+            return c_op_width_double();
+          }
+        } else {
+          return c_op_width_double();
+        }
+      } else {
+        return c_op_width_single();
+      }
+    }
+  }
+}
+
+fn main() -> i32 {
+  if ast_binop_to_c_width_class(binop_tag_add()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_sub()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_mul()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_div()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_rem()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_bitand()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_bitor()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_bitxor()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_shl()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_shr()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_and()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_or()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_eq()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_neq()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_lt()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_gt()) != c_op_width_single() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_leq()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(binop_tag_geq()) != c_op_width_double() {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(0) != 0 {
+    return 1;
+  }
+  if ast_binop_to_c_width_class(19) != 0 {
+    return 1;
+  }
+  return 0;
+}
