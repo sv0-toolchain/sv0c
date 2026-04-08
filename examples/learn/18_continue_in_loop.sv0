@@ -1,0 +1,11 @@
+/* `continue` skips the rest of the body and starts the next `for` iteration (same idea as `continue` in a `while`). */
+
+fn main() -> i32 {
+  for j in 0..10 {
+    if j < 8 {
+      continue;
+    };
+    return j;
+  };
+  return 0;
+}

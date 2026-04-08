@@ -21,6 +21,8 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 | `15_enum_payload.sv0` | Enum variant carrying **`i32`**; bind in **`match`** |
 | `16_try_operator.sv0` | **`?`** on a call returning the same enum as **`main`** |
 | `17_no_alias_contract.sv0` | **`requires(no_alias(&a, &b))`** on a function |
+| `18_continue_in_loop.sv0` | **`continue`** inside **`for`** (skips to next iteration) |
+| `19_loop_invariant.sv0` | **`loop_invariant`** on **`while`** (see **`emit-c`** for `sv0_requires` lowering) |
 
 ## Prerequisites
 
@@ -45,6 +47,12 @@ From the repo root, **`./scripts/sv0 test`** runs bootstrap builds, stage0 golde
 
 ```bash
 ./scripts/sv0 emit-c examples/learn/08_println.sv0 | head
+```
+
+For **`loop_invariant`**, the interesting lowering is visible in C output:
+
+```bash
+./scripts/sv0 emit-c examples/learn/19_loop_invariant.sv0 | head -30
 ```
 
 ## Format and REPL
