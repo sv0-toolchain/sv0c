@@ -20,7 +20,7 @@ This document is a **roadmap** for moving the authoritative implementation from 
 | Name resolution | `sml/name_resolution/` | `lib/env_*`, `lib/resolver_*`, `lib/lookup_*` | Full `resolver.sml`, modules, `use` |
 | Types | `sml/type_checker/` | seeds: `type_alias`, lookups, **`checker_mut_assign_core`** (`let mut`, **`=`** / **`+=`** to **`x`** or **`p.f`**, **E0448** / **E0449** / **E0450**) | `checker.sml`, `unify.sml`, full inference |
 | Contracts | `sml/contract_analyzer/` | C + VM lowering | Analyzer in sv0; VM already runs quantified **`requires`** (**`forall_requires`**, **`exists_requires`** on **vm-parity**); extend for analyzer + any new clause shapes |
-| IR | `sml/ir/` | `lib/lower_unop_core`, `lib/lower_lit_core`, `lib/lower_binop_core`, `lib/lower_assign_lhs_core`, `lib/lower_ast_ty_cstring_core`, `lib/lower_value_to_expr_core` (`valueToExpr`), `lib/lower_ast_binop_to_c_core` (`astBinopToC` operator-width classes), `lib/lower_expr_init_cty_core` (`exprInitCty` shape classes) | `lowering.sml` transliteration |
+| IR | `sml/ir/` | `lib/lower_unop_core`, `lib/lower_lit_core`, `lib/lower_binop_core`, `lib/lower_assign_lhs_core`, `lib/lower_ast_ty_cstring_core`, `lib/lower_value_to_expr_core` (`valueToExpr`), `lib/lower_ast_binop_to_c_core` (`astBinopToC` operator-width classes), `lib/lower_expr_init_cty_core` (`exprInitCty` shape classes), `lib/lower_match_scrut_cty_core` (`matchScrutCty` + param **`astTyToCString`** subset) | `lowering.sml` transliteration |
 | Link | `sml/link/` | `lib/link_strip_core` | `stripLinkDirectives`; full project linking still SML |
 | C backend | `sml/backend/c/` | — | `codegen.sml` (large) |
 | VM backend | `sml/backend/vm/` | `vm_codegen.sml` (SML) | Keep encoder in SML until self-host; parity tests |
