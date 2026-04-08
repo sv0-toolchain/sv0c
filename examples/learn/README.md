@@ -24,6 +24,7 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 | `18_continue_in_loop.sv0` | **`continue`** in **`while`** with **`let mut`** + assignment |
 | `19_loop_invariant.sv0` | **`loop_invariant`** on **`while`** (see **`emit-c`** for `sv0_requires` lowering) |
 | `20_struct_mut_field_assign.sv0` | **`let mut`** struct + **`p.f =`** and **`p.f +=`** (one field level) |
+| `21_mut_i32_compound.sv0` | **`let mut`** scalar + **`+=`** / **`-=`** / **`*=`** (arithmetic compound ops) |
 
 ## Prerequisites
 

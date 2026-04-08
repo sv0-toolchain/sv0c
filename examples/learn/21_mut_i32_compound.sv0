@@ -1,0 +1,13 @@
+/* Compound assignment on a mut `i32`: `+=`, `-=`, `*=`. Same rules as `x = x + rhs` after RHS is evaluated.
+   From sv0-toolchain repo root:
+   ./scripts/sv0 vm-compile examples/learn/21_mut_i32_compound.sv0
+   ./scripts/sv0 vm-run sv0c/build/vm/21_mut_i32_compound.sv0b
+   Or print C: ./scripts/sv0 emit-c examples/learn/21_mut_i32_compound.sv0 | head */
+
+fn main() -> i32 {
+  let mut x: i32 = 10;
+  x += 5;
+  x -= 3;
+  x *= 2;
+  return if x == 24 { 0 } else { 1 };
+}
