@@ -1,0 +1,12 @@
+/* Demo for edu_bits: exit 42 using is_even(4). */
+
+use lib::is_even;
+
+fn main() -> i32 {
+  let bonus: i32 = if is_even(4) {
+    2
+  } else {
+    0
+  };
+  return 40 + bonus;
+}

@@ -1,0 +1,48 @@
+/* edu_clamp — example library (module `lib`)
+ *
+ * TEACHING: "clamp" is a classic API where *relationships* between parameters
+ * matter. Types give you three i32 values; they do not prove lo <= hi.
+ * In full sv0 you might write:
+ *   fn clamp(...) -> i32 requires(lo <= hi) ensures(result >= lo && result <= hi)
+ * The bootstrap compiler may not accept every ensures shape yet — check sv0doc
+ * and compiler-passes.md — so this file uses comments as the specification.
+ *
+ * NOT SHIPPED AS STD: see examples/libs/README.md.
+ */
+
+module lib;
+
+/* Return the smaller of two signed integers. No overflow edge cases for i32 min/max
+ * in this toy version — a production API might document behavior for INT_MIN patterns.
+ */
+fn min_i32(a: i32, b: i32) -> i32 {
+  if a < b {
+    return a;
+  }
+  return b;
+}
+
+/* Return the larger of two signed integers. */
+fn max_i32(a: i32, b: i32) -> i32 {
+  if a > b {
+    return a;
+  }
+  return b;
+}
+
+/* Clamp x into [lo, hi] when lo <= hi.
+ *
+ * When lo > hi, this implementation still picks a value by comparing x to lo and hi
+ * independently — useful only to show that *undefined* English specs need a contract.
+ * A shipping library would require lo <= hi or use Result/Option.
+ */
+fn clamp(x: i32, lo: i32, hi: i32) -> i32 {
+  let mut t: i32 = x;
+  if t < lo {
+    t = lo;
+  }
+  if t > hi {
+    t = hi;
+  }
+  return t;
+}

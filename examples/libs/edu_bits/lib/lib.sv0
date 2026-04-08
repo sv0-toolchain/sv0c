@@ -1,0 +1,28 @@
+/* edu_bits — example library (module `lib`)
+ *
+ * TEACHING: Parity is many students' first encounter with "%" and with the
+ * difference between machine arithmetic and "mathematical" integers.
+ * Normative rules for % on negative operands live in sv0doc/ — this file
+ * calls out that demos use small non-negative literals.
+ *
+ * NOT SHIPPED AS STD: see examples/libs/README.md.
+ */
+
+module lib;
+
+/* True when n is divisible by 2. For introductory demos, call with n >= 0
+ * so the relationship to "even" in plain English matches intuition.
+ */
+fn is_even(n: i32) -> bool {
+  return (n % 2) == 0;
+}
+
+/* Logical negation of is_even — written without duplicating the % expression
+ * so students see one canonical test and a derived predicate.
+ */
+fn is_odd(n: i32) -> bool {
+  if is_even(n) {
+    return false;
+  }
+  return true;
+}

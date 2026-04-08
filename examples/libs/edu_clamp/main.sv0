@@ -1,0 +1,7 @@
+/* Demo for edu_clamp: proves clamp(100, 0, 10) == 10 on the VM exit code. */
+
+use lib::clamp;
+
+fn main() -> i32 {
+  return clamp(100, 0, 10);
+}

@@ -83,6 +83,10 @@ For **`loop_invariant`**, the interesting lowering is visible in C output:
 
 The mechanical loop exercised in **`./scripts/sv0 test`** uses **`lib/self-host-sv0-loop.list`** (pilot seeds, not these tutorials). See **`sv0c/doc/self-host-sv0-loop.md`** and **`task/sv0-toolchain-milestone-3-self-host.Rmd`**.
 
+## Example libraries (stdlib-shaped, not seeds)
+
+Heavily documented multi-file **packages** live under **`examples/libs/`** ([`../libs/README.md`](../libs/README.md)) — **`edu_clamp`**, **`edu_bits`**, etc. Use **`vm-project-compile`** on each package root the same way as **`23_project_minimal/`**.
+
 ## Normative language definition
 
 Grammar and bytecode: **`sv0doc/`** (submodule), linked from the workspace **`README.md`**.
