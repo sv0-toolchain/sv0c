@@ -24,6 +24,7 @@ lib/lower_ast_binop_to_c_core.sv0
 lib/lower_expr_init_cty_core.sv0
 lib/lower_match_scrut_cty_core.sv0
 lib/lower_callee_ret_cty_core.sv0
+lib/lower_enum_tag_core.sv0
 lib/checker_mut_assign_core.sv0
 lib/link_strip_core.sv0
 lexer/token_keyword_core.sv0
