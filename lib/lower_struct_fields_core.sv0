@@ -1,0 +1,33 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`structFields`**: look up **`sn`** in **`!structFieldOrder`**; **`SOME (_, fs)`** returns the field-name list **`fs`**; **`NONE`** **`raise Fail`**.
+   Harness: **`struct_table_hit`** (1 iff the struct name is registered), **`field_count_if_hit`** = **`length fs`** when hit. Unknown struct returns **255** (not a real field count — stands in for SML **`raise`**). */
+
+fn sf_err_unknown_struct() -> i32 {
+  return 255;
+}
+
+fn struct_fields_field_count(struct_table_hit: i32, field_count_if_hit: i32) -> i32 {
+  if struct_table_hit == 0 {
+    return sf_err_unknown_struct();
+  } else {
+    return field_count_if_hit;
+  }
+}
+
+fn main() -> i32 {
+  if struct_fields_field_count(0, 0) != sf_err_unknown_struct() {
+    return 1;
+  }
+  if struct_fields_field_count(0, 99) != sf_err_unknown_struct() {
+    return 1;
+  }
+  if struct_fields_field_count(1, 0) != 0 {
+    return 1;
+  }
+  if struct_fields_field_count(1, 1) != 1 {
+    return 1;
+  }
+  if struct_fields_field_count(1, 12) != 12 {
+    return 1;
+  }
+  return 0;
+}
