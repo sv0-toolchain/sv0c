@@ -371,7 +371,9 @@ structure TestRunner = struct
       val () = check "checker rejects assign to immutable let"
                  (case checkCatch
                         "fn main() -> i32 { let i = 0; i = 1; return i; }" of
-                    SOME m => String.isSubstring "E0448" m
+                    SOME m =>
+                      String.isSubstring "E0448" m
+                      andalso String.isSubstring "immutable" m
                   | NONE => false)
       val () = check "checker accepts let mut struct field assign"
                  (checkCatch
@@ -382,13 +384,17 @@ structure TestRunner = struct
                  (case checkCatch
                         ("struct P { x: i32 }" ^ nl ^
                          "fn main() -> i32 { let p: P = P { x: 0 }; p.x = 1; return p.x; }") of
-                    SOME m => String.isSubstring "E0448" m
+                    SOME m =>
+                      String.isSubstring "E0448" m
+                      andalso String.isSubstring "immutable" m
                   | NONE => false)
       val () = check "checker rejects assign lhs not a simple name or one-level field"
                  (case checkCatch
                         ("struct Q { y: i32 }" ^ nl ^ "struct P { q: Q }" ^ nl ^
                          "fn main() -> i32 { let mut p: P = P { q: Q { y: 0 } }; p.q.y = 1; return 0; }") of
-                    SOME m => String.isSubstring "E0449" m
+                    SOME m =>
+                      String.isSubstring "E0449" m
+                      andalso String.isSubstring "one-level" m
                   | NONE => false)
       val () = check "checker accepts let mut and +="
                  (checkCatch
