@@ -1,0 +1,9 @@
+/* Library module for `23_project_minimal`: keep `module lib;` and `fn` defs here.
+ * `main.sv0` uses `use lib::greet;` to call `greet`.
+ */
+
+module lib;
+
+fn greet(n: i32) -> i32 {
+  return n;
+}

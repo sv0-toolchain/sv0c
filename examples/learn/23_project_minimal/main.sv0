@@ -1,0 +1,16 @@
+/* Multi-file program: `main` imports a function from a sibling module.
+ *
+ * Build bytecode for the whole tree (paths relative to sv0c/):
+ *   ./scripts/sv0 vm-project-compile examples/learn/23_project_minimal
+ *
+ * Run (from sv0-toolchain root):
+ *   ./scripts/sv0 vm-run sv0c/build/vm/main.sv0b
+ *
+ * Expect exit code 42 (greet returns 40, main adds 2).
+ */
+
+use lib::greet;
+
+fn main() -> i32 {
+  return greet(40) + 2;
+}

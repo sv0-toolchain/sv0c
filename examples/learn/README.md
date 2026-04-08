@@ -26,6 +26,7 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 | `20_struct_mut_field_assign.sv0` | **`let mut`** struct + **`p.f =`** and **`p.f +=`** (one field level) |
 | `21_mut_i32_compound.sv0` | **`let mut`** scalar + **`+=`** / **`-=`** / **`*=`** (arithmetic compound ops) |
 | `22_native_c_path.sv0` | **Native `cc` path** — emit C, link **`sv0_runtime.c`**, run a binary (comments in file) |
+| `23_project_minimal/` | **Multi-file `module`** — `main.sv0` + `lib/lib.sv0`; use **`vm-project-compile`** (see below) |
 
 ## Prerequisites
 
@@ -39,6 +40,17 @@ Small **`.sv0`** programs that mirror the integration tests and VM smoke corpus.
 ./scripts/sv0 vm-compile examples/learn/01_minimal_main.sv0
 ./scripts/sv0 vm-run sv0c/build/vm/01_minimal_main.sv0b
 ```
+
+### Multi-file project (`module`, `use`)
+
+When sources live in a directory tree (e.g. **`main.sv0`** plus **`lib/lib.sv0`**), compile the project in one step:
+
+```bash
+./scripts/sv0 vm-project-compile examples/learn/23_project_minimal
+./scripts/sv0 vm-run sv0c/build/vm/main.sv0b
+```
+
+The compiler writes **`build/vm/main.sv0b`** when **`main.sv0`** exists under the project root (see **`sv0c/README.md`**).
 
 The VM exit code is derived from **`main`** (for **`i32`** programs it is the integer return). Example: **`12_logical_operators.sv0`** exits **`0`** because **`true && false`** takes the **`else`** branch. **`16_try_operator.sv0`** uses **`main() -> R`** (`Ok`/`Err` enum); **`vm-run`** reports the lowered result (e.g. **`vm_exit:7`** for **`Ok(7)`** in this sample).
 
