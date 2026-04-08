@@ -1,0 +1,39 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`valueToExpr`**: **`Ir.VVar`** → **`Ir.Load`**;
+   any other **`Ir.value`** → **`Ir.Literal v`**. **`v_kind`** is a harness tag (**1** = **`VVar`**). */
+
+fn ir_expr_load() -> i32 {
+  return 1;
+}
+
+fn ir_expr_literal() -> i32 {
+  return 2;
+}
+
+fn v_kind_var() -> i32 {
+  return 1;
+}
+
+/* 1 → Load; anything else → Literal (SML default arm). */
+fn value_to_expr_class(v_kind: i32) -> i32 {
+  if v_kind == v_kind_var() {
+    return ir_expr_load();
+  } else {
+    return ir_expr_literal();
+  }
+}
+
+fn main() -> i32 {
+  if value_to_expr_class(v_kind_var()) != ir_expr_load() {
+    return 1;
+  }
+  if value_to_expr_class(0) != ir_expr_literal() {
+    return 1;
+  }
+  if value_to_expr_class(2) != ir_expr_literal() {
+    return 1;
+  }
+  if value_to_expr_class(99) != ir_expr_literal() {
+    return 1;
+  }
+  return 0;
+}
