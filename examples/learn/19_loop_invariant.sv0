@@ -1,0 +1,7 @@
+/* `loop_invariant(expr)` on `while` is lowered to runtime checks on the C backend; this zero-trip loop matches the shape used in compiler e2e tests. */
+
+fn main() -> i32 {
+  while false loop_invariant(true) {
+  };
+  return 5;
+}
