@@ -1,0 +1,53 @@
+/* Transliteration seed: sml/ir/lowering.sml - lowerLit (lines ~186-192).
+   Literal kind stand-ins: 1 IntLit, 2 BoolLit, 3 UnitLit, 4 StringLit;
+   other tags unsupported in this slice (SML raises Fail). */
+
+fn lit_kind_int() -> i32 {
+  return 1;
+}
+
+fn lit_kind_bool() -> i32 {
+  return 2;
+}
+
+fn lit_kind_unit() -> i32 {
+  return 3;
+}
+
+fn lit_kind_string() -> i32 {
+  return 4;
+}
+
+fn lit_kind_other() -> i32 {
+  return 99;
+}
+
+/* 1 iff lowerLit would succeed for this literal kind tag. */
+fn lower_lit_supported(k: i32) -> i32 {
+  if k == 1 {
+    return 1;
+  } else {
+    if k == 2 {
+      return 1;
+    } else {
+      if k == 3 {
+        return 1;
+      } else {
+        if k == 4 {
+          return 1;
+        } else {
+          return 0;
+        }
+      }
+    }
+  }
+}
+
+fn main() -> i32 {
+  let a0: i32 = lower_lit_supported(lit_kind_int()) - 1;
+  let a1: i32 = lower_lit_supported(lit_kind_bool()) - 1;
+  let a2: i32 = lower_lit_supported(lit_kind_unit()) - 1;
+  let a3: i32 = lower_lit_supported(lit_kind_string()) - 1;
+  let a4: i32 = lower_lit_supported(lit_kind_other());
+  return a0 + a1 + a2 + a3 + a4;
+}

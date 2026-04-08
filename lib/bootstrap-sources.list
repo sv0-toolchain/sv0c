@@ -15,6 +15,8 @@ lib/lookup_type_core.sv0
 lib/type_alias_core.sv0
 lib/lookup_type_alias_core.sv0
 lib/lower_unop_core.sv0
+lib/lower_lit_core.sv0
+lib/link_strip_core.sv0
 lexer/token_keyword_core.sv0
 lexer/token_delim_core.sv0
 lexer/token_op_core.sv0
