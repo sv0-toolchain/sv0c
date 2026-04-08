@@ -1,0 +1,84 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`exprInitCty`**: C “initializer” / scratch type string for **`Ast.expr`**
+   shapes used by the C backend (struct name, enum ctor path head, callee return lookup, tuple unwrap, **`int`** for bool/int lits and default).
+   **`expr_shape_tag`** is a harness encoding; **`inner_shape`** is used only when **`expr_shape_tag`** is **5** (**`ExprTuple`** of one element — recurse). */
+
+fn ec_int() -> i32 {
+  return 1;
+}
+
+fn ec_struct_name() -> i32 {
+  return 2;
+}
+
+fn ec_enum_ty() -> i32 {
+  return 3;
+}
+
+fn ec_callee_ret() -> i32 {
+  return 4;
+}
+
+/* expr_shape_tag: 1 ExprStruct, 2 ExprPath [en,vn], 3 ExprCall on ExprPath [f],
+   4 ExprCall on ExprPath [en,vn], 5 ExprTuple [e1] (use inner_shape), 6 ExprLit bool, 7 ExprLit int, else → int. */
+fn expr_init_cty_class(expr_shape_tag: i32, inner_shape: i32) -> i32 {
+  if expr_shape_tag == 1 {
+    return ec_struct_name();
+  } else {
+    if expr_shape_tag == 2 {
+      return ec_enum_ty();
+    } else {
+      if expr_shape_tag == 3 {
+        return ec_callee_ret();
+      } else {
+        if expr_shape_tag == 4 {
+          return ec_enum_ty();
+        } else {
+          if expr_shape_tag == 5 {
+            return expr_init_cty_class(inner_shape, 0);
+          } else {
+            if expr_shape_tag == 6 {
+              return ec_int();
+            } else {
+              if expr_shape_tag == 7 {
+                return ec_int();
+              } else {
+                return ec_int();
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+fn main() -> i32 {
+  if expr_init_cty_class(1, 0) != ec_struct_name() {
+    return 1;
+  }
+  if expr_init_cty_class(2, 0) != ec_enum_ty() {
+    return 1;
+  }
+  if expr_init_cty_class(3, 0) != ec_callee_ret() {
+    return 1;
+  }
+  if expr_init_cty_class(4, 0) != ec_enum_ty() {
+    return 1;
+  }
+  if expr_init_cty_class(5, 7) != ec_int() {
+    return 1;
+  }
+  if expr_init_cty_class(5, 1) != ec_struct_name() {
+    return 1;
+  }
+  if expr_init_cty_class(6, 0) != ec_int() {
+    return 1;
+  }
+  if expr_init_cty_class(7, 0) != ec_int() {
+    return 1;
+  }
+  if expr_init_cty_class(99, 0) != ec_int() {
+    return 1;
+  }
+  return 0;
+}
