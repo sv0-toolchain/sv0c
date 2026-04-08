@@ -46,19 +46,28 @@ static int strip_link_keep_item(int tag) {
 int main(void) {
   int _sv0t0 = item_tag_fn();
   int _sv0t1 = strip_link_keep_item(_sv0t0);
-  int a_fn = (_sv0t1 - 1);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
   int _sv0t2 = item_tag_use();
   int _sv0t3 = strip_link_keep_item(_sv0t2);
-  int a_use = _sv0t3;
+  if ((_sv0t3 != 0)) {
+    return 1;
+  } else {
+  }
   int _sv0t4 = item_tag_module();
   int _sv0t5 = strip_link_keep_item(_sv0t4);
-  int a_mod = _sv0t5;
+  if ((_sv0t5 != 0)) {
+    return 1;
+  } else {
+  }
   int _sv0t6 = item_tag_struct();
   int _sv0t7 = strip_link_keep_item(_sv0t6);
-  int a_struct = (_sv0t7 - 1);
-  int _sv0t8 = (a_fn + a_use);
-  int _sv0t9 = (_sv0t8 + a_mod);
-  int _sv0t10 = (_sv0t9 + a_struct);
-  return _sv0t10;
+  if ((_sv0t7 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
 }
 

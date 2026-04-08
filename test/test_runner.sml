@@ -270,6 +270,13 @@ structure TestRunner = struct
         "}")
       val () = check "parse trailing-comma struct literal consumes closing brace"
         (length pTrailStruct = 2)
+      val () = check "parse braced if stmt without `;` before following return"
+        (case parseSrc ("fn main() -> i32 { if 1 == 1 { return 0; } return 1; }") of
+           Ast.ItemFn {body, ...} :: _ =>
+             (case body of
+                Ast.ExprBlock (sts, _, _) => length sts = 2
+              | _ => false)
+         | _ => false)
 
       (* --- name resolution --- *)
       val () = print "\n[resolver]\n"
@@ -323,6 +330,9 @@ structure TestRunner = struct
       val () = check "checker accepts if-else int"
                  (checkCatch
                     "fn main() -> i32 { return if true { 40 } else { 2 }; }" = NONE)
+      val () = check "checker accepts braced if stmt then return without `;` after `}`"
+                 (checkCatch
+                    "fn main() -> i32 { if 1 == 1 { return 0; } return 1; }" = NONE)
       val () = check "checker accepts let with inferred binop"
                  (checkCatch
                     "fn main() -> i32 { let x = 1 + 2; return x; }" = NONE)
@@ -432,8 +442,13 @@ structure TestRunner = struct
       val () = check "e2e C binop return"
                  (String.isSubstring "+" cAdd andalso String.isSubstring "return" cAdd)
       val cIf = compileToC "fn main() -> i32 { return if true { 40 } else { 2 }; }"
+      val cIfStmt = compileToC "fn main() -> i32 { if 1 == 1 { return 0; } return 1; }"
       val () = check "e2e C if-else"
                  (String.isSubstring "if (" cIf andalso String.isSubstring "else" cIf)
+      val () = check "e2e C braced if stmt in main (no `;` after `}`)"
+                 (String.isSubstring "if (" cIfStmt
+                  andalso String.isSubstring "return 0" cIfStmt
+                  andalso String.isSubstring "return 1" cIfStmt)
       val cCall =
         compileToC
           "fn inc(x: i32) -> i32 { return x + 1; }\n\

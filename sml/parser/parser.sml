@@ -883,6 +883,17 @@ structure Parser :> PARSER = struct
 
 
   (* --- block --- *)
+  (* Braced control-flow / block exprs may omit `;` before the next stmt (Rust-style). *)
+  and exprEndsWithBracedBlock e =
+    case e of
+      Ast.ExprIf _ => true
+    | Ast.ExprWhile _ => true
+    | Ast.ExprFor _ => true
+    | Ast.ExprLoop _ => true
+    | Ast.ExprMatch _ => true
+    | Ast.ExprBlock _ => true
+    | _ => false
+
   and parseBlock ts =
     case ts of
       (Token.LBRACE, s1) :: r1 =>
@@ -903,8 +914,11 @@ structure Parser :> PARSER = struct
                        | (Token.SEMICOLON, s2) :: r3 =>
                            loop r3 (Ast.StmtSemi (e, merge2 (exprSpan e, s2)) :: stmts)
                        | _ =>
-                           raise Fail ("expected ; or } after expr in block at " ^
-                                       Span.toString (sp r2))
+                           if exprEndsWithBracedBlock e then
+                             loop r2 (Ast.StmtSemi (e, exprSpan e) :: stmts)
+                           else
+                             raise Fail ("expected ; or } after expr in block at " ^
+                                         Span.toString (sp r2))
                      end)
         in
           loop r1 []

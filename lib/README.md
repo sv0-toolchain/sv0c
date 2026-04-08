@@ -147,11 +147,11 @@ Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*`
 
 ## `lib/lower_lit_core.sv0`
 
-**`lowerLit`** in **`lowering.sml`**: literal kind tags **1–4** (**IntLit**, **BoolLit**, **UnitLit**, **StringLit**) supported; any other tag maps to unsupported (SML raises **Fail**). **`main`** sums **`lower_lit_supported(...) - 1`** for the four supported kinds plus **`lower_lit_supported(other)`** (expect **0**), matching the **`lower_unop_core`** pattern (no **`if`** in **`main`** — current C lowering). See **`LAYOUT.md`** §10.
+**`lowerLit`** in **`lowering.sml`**: literal kind tags **1–4** (**IntLit**, **BoolLit**, **UnitLit**, **StringLit**) supported; any other tag maps to unsupported (SML raises **Fail**). **`main`** asserts each case with **`if`** / **`return`**. See **`LAYOUT.md`** §10.
 
 ## `lib/link_strip_core.sv0`
 
-**`stripLinkDirectives`** in **`link.sml`**: top-level item kind tags **1** (**ItemFn**), **2** (**ItemUse**, removed), **3** (**ItemModule**, removed), **4** (**ItemStruct**); **`strip_link_keep_item`** is **1** iff the item survives the filter. **`main`** combines **`strip_link_keep_item(...) - 1`** for kept items with raw values for stripped kinds (expect **0**), same **`main`**-shape constraint as **`lower_lit_core`**. See **`LAYOUT.md`** §11.
+**`stripLinkDirectives`** in **`link.sml`**: top-level item kind tags **1** (**ItemFn**), **2** (**ItemUse**, removed), **3** (**ItemModule**, removed), **4** (**ItemStruct**); **`strip_link_keep_item`** is **1** iff the item survives the filter. **`main`** asserts each tag with **`if`** / **`return`**. See **`LAYOUT.md`** §11.
 
 ## `parser/try_assign_stmt_core.sv0`
 
