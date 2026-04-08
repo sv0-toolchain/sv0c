@@ -31,9 +31,17 @@ fn strip_link_keep_item(tag: i32) -> i32 {
 }
 
 fn main() -> i32 {
-  let a_fn: i32 = strip_link_keep_item(item_tag_fn()) - 1;
-  let a_use: i32 = strip_link_keep_item(item_tag_use());
-  let a_mod: i32 = strip_link_keep_item(item_tag_module());
-  let a_struct: i32 = strip_link_keep_item(item_tag_struct()) - 1;
-  return a_fn + a_use + a_mod + a_struct;
+  if strip_link_keep_item(item_tag_fn()) != 1 {
+    return 1;
+  }
+  if strip_link_keep_item(item_tag_use()) != 0 {
+    return 1;
+  }
+  if strip_link_keep_item(item_tag_module()) != 0 {
+    return 1;
+  }
+  if strip_link_keep_item(item_tag_struct()) != 1 {
+    return 1;
+  }
+  return 0;
 }

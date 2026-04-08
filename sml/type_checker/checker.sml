@@ -548,9 +548,18 @@ structure Checker :> CHECKER = struct
                  raise Fail "E0400: type mismatch"
              end)
     | Ast.ExprIf (c, th, NONE, _) =>
-        (expect (synth retTy env c, Types.TyBool);
-         expect (synth retTy env th, Types.TyUnit);
-         Types.TyUnit)
+        let
+          val () = expect (synth retTy env c, Types.TyBool)
+          val tTh = synth retTy env th
+          val () =
+            case th of
+              Ast.ExprBlock (stmts, NONE, _) =>
+                if lastStmtReturns stmts then () else expect (tTh, Types.TyUnit)
+            | Ast.ExprBlock (_, SOME _, _) => expect (tTh, Types.TyUnit)
+            | _ => expect (tTh, Types.TyUnit)
+        in
+          Types.TyUnit
+        end
     | Ast.ExprIf (c, th, SOME el, _) =>
         let
           val () = expect (synth retTy env c, Types.TyBool)
