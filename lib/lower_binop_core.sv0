@@ -1,0 +1,102 @@
+/* Transliteration seed: sml/ir/lowering.sml — Ast binops lowered via Ir.Binop (Add through Shr).
+   Tags match assign_binop_core / Ast order: Add=1 … Shr=10; And/Or/cmp use other IR paths. */
+
+fn binop_tag_add() -> i32 {
+  return 1;
+}
+
+fn binop_tag_sub() -> i32 {
+  return 2;
+}
+
+fn binop_tag_mul() -> i32 {
+  return 3;
+}
+
+fn binop_tag_div() -> i32 {
+  return 4;
+}
+
+fn binop_tag_rem() -> i32 {
+  return 5;
+}
+
+fn binop_tag_bitand() -> i32 {
+  return 6;
+}
+
+fn binop_tag_bitor() -> i32 {
+  return 7;
+}
+
+fn binop_tag_bitxor() -> i32 {
+  return 8;
+}
+
+fn binop_tag_shl() -> i32 {
+  return 9;
+}
+
+fn binop_tag_shr() -> i32 {
+  return 10;
+}
+
+fn binop_tag_and() -> i32 {
+  return 11;
+}
+
+/* 1 iff lowering would use Ir.Binop for this Ast binop tag in the arithmetic slice. */
+fn lower_binop_is_ir_binop(tag: i32) -> i32 {
+  if tag < 1 {
+    return 0;
+  } else {
+    if tag > 10 {
+      return 0;
+    } else {
+      return 1;
+    }
+  }
+}
+
+fn main() -> i32 {
+  if lower_binop_is_ir_binop(binop_tag_add()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_sub()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_mul()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_div()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_rem()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_bitand()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_bitor()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_bitxor()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_shl()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_shr()) != 1 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(binop_tag_and()) != 0 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(0) != 0 {
+    return 1;
+  }
+  if lower_binop_is_ir_binop(18) != 0 {
+    return 1;
+  }
+  return 0;
+}
