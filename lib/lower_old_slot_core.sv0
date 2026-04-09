@@ -1,0 +1,26 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`oldSlot`**: **`_sv0old_" ^ x`** for **`old(x)`** snapshot locals in **`lowerFn`** (**`DeclVar`/`DeclNamed`** + **`Store`**).
+   Harness: fixed prefix length **8** (**`"_sv0old_"`** in SML); total identifier length surrogate **`8 + |x|`** (UTF-8 / source bytes not modeled — same as other length-only harnesses). */
+
+fn old_slot_prefix_len() -> i32 {
+  return 8;
+}
+
+fn old_slot_total_len(param_name_len: i32) -> i32 {
+  return old_slot_prefix_len() + param_name_len;
+}
+
+fn main() -> i32 {
+  if old_slot_prefix_len() != 8 {
+    return 1;
+  }
+  if old_slot_total_len(0) != 8 {
+    return 1;
+  }
+  if old_slot_total_len(1) != 9 {
+    return 1;
+  }
+  if old_slot_total_len(3) != 11 {
+    return 1;
+  }
+  return 0;
+}
