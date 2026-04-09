@@ -1,0 +1,45 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`lowerStmt`** (supported slice).
+   **`StmtSemi` / `StmtExpr` + `ExprReturn NONE`** → **`[Ir.Return NONE]`** (**1** instr).
+   **`StmtSemi` / `StmtExpr` + `ExprReturn SOME e`** → **`lowerReturn e`** = **`lowerExprToValue e` @ [Return SOME v]`** → length **`value_lower_len + 1`** (surrogate **`value_lower_len`**).
+   **`StmtSemi (e)` / `StmtExpr (e)`** when **`e`** is not a return form → **`lowerExprForEffect e`**; harness uses surrogate **`effect_instr_len`** (non-negative). Invalid **`stmt_kind`** or negative surrogates → **255**. */
+
+fn lower_stmt_total_len(stmt_kind: i32, ret_value_lower_len: i32, effect_instr_len: i32) -> i32 {
+  if stmt_kind == 0 {
+    return 1;
+  }
+  if stmt_kind == 1 {
+    if ret_value_lower_len < 0 {
+      return 255;
+    }
+    return ret_value_lower_len + 1;
+  }
+  if stmt_kind == 2 {
+    if effect_instr_len < 0 {
+      return 255;
+    }
+    return effect_instr_len;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if lower_stmt_total_len(0, 0, 0) != 1 {
+    return 1;
+  }
+  if lower_stmt_total_len(1, 5, 0) != 6 {
+    return 1;
+  }
+  if lower_stmt_total_len(1, -1, 0) != 255 {
+    return 1;
+  }
+  if lower_stmt_total_len(2, 0, 7) != 7 {
+    return 1;
+  }
+  if lower_stmt_total_len(2, 0, -1) != 255 {
+    return 1;
+  }
+  if lower_stmt_total_len(3, 0, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}
