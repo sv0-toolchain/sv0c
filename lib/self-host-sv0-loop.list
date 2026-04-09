@@ -34,6 +34,7 @@ lib/lower_resolve_enum_ctor_path_core.sv0
 lib/lower_split_qname_core.sv0
 lib/lower_enum_store_payload_core.sv0
 lib/lower_find_variant_ast_core.sv0
+lib/lower_ok_payload_cty_core.sv0
 lib/checker_mut_assign_core.sv0
 lib/link_strip_core.sv0
 parser/expr_rhs_stub_core.sv0
