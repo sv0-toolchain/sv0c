@@ -1,0 +1,72 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`lowerReturn`**, block **tail** into **`Return`** (**`lowerBody`** / **`lowerFn`** scaffolding).
+   **`lowerReturn`**: **`NONE`** → **`[Return NONE]`** (**1** IR node); **`SOME v`** after value lowering → **`pre @ [Return SOME v]`** → **`|pre| + 1`** (harness **`value_lower_len`** = **`|pre|`**).
+   **`lower_body_block_tail_len`**: IR length for **`stmt_prefix`** + optional tail — **`tail_kind` 0** = prefix only (**no** trailing **`Return`** in this harness); **1** = **`Return NONE`** after prefix (**`prefix + 1`**); **2** = lowered tail expr (**`tail_expr_len`**) + **`Return SOME`** (**`prefix + tail_expr_len + 1`**). Negative lengths or invalid **`tail_kind`** → **255**. */
+
+fn lower_return_ir_len(is_some: i32, value_lower_len: i32) -> i32 {
+  if is_some == 0 {
+    return 1;
+  }
+  if is_some == 1 {
+    if value_lower_len < 0 {
+      return 255;
+    }
+    return value_lower_len + 1;
+  }
+  return 255;
+}
+
+fn lower_body_block_tail_len(stmt_prefix_len: i32, tail_kind: i32, tail_expr_len: i32) -> i32 {
+  if stmt_prefix_len < 0 {
+    return 255;
+  }
+  if tail_kind == 0 {
+    return stmt_prefix_len;
+  }
+  if tail_kind == 1 {
+    return stmt_prefix_len + 1;
+  }
+  if tail_kind == 2 {
+    if tail_expr_len < 0 {
+      return 255;
+    }
+    return stmt_prefix_len + tail_expr_len + 1;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if lower_return_ir_len(0, 99) != 1 {
+    return 1;
+  }
+  if lower_return_ir_len(1, 0) != 1 {
+    return 1;
+  }
+  if lower_return_ir_len(1, 5) != 6 {
+    return 1;
+  }
+  if lower_return_ir_len(1, -1) != 255 {
+    return 1;
+  }
+  if lower_return_ir_len(2, 0) != 255 {
+    return 1;
+  }
+  if lower_body_block_tail_len(3, 0, 0) != 3 {
+    return 1;
+  }
+  if lower_body_block_tail_len(3, 1, 0) != 4 {
+    return 1;
+  }
+  if lower_body_block_tail_len(3, 2, 2) != 6 {
+    return 1;
+  }
+  if lower_body_block_tail_len(3, 2, -1) != 255 {
+    return 1;
+  }
+  if lower_body_block_tail_len(-1, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_body_block_tail_len(0, 3, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}
