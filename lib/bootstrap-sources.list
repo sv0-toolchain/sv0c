@@ -48,6 +48,7 @@ lib/lower_return_body_core.sv0
 lib/lower_fn_prefix_core.sv0
 lib/lower_body_dispatch_core.sv0
 lib/lower_stmt_dispatch_core.sv0
+lib/lower_stmt_let_init_core.sv0
 lib/checker_mut_assign_core.sv0
 lib/link_strip_core.sv0
 lexer/token_keyword_core.sv0

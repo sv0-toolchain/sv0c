@@ -1,0 +1,63 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`lowerStmt`** **`StmtLet (PatBind, _, to, SOME init)`** init dispatch.
+   **`ExprStruct`**: **`[DeclNamed (sn,x)]`** @ per-field **`lowerExprWithInstrs`** @ **`StoreField`** → length surrogate **`1 + struct_fields_ir_len`** (sum of **`|pre|+1`** per field folded into one non-negative int).
+   **`ExprCall` / `ExprPath`** enum ctor paths: **`DeclNamed`** + **`enumConstructInstrs`** → surrogate **`enum_pack_len`**.
+   **default**: **`lowerExprWithInstrs`** then **`int`** → **`+ [Assign]`** (**1**) else **`+ [DeclNamed, Store]`** (**2**) → **`rhs_pre_len + suffix`**, **`cty_is_int`** **0/1**. Invalid **`init_kind`** / negatives / bad **`cty_is_int`** → **255**. */
+
+fn lower_stmt_let_init_total_len(init_kind: i32, struct_fields_ir_len: i32, enum_pack_len: i32, rhs_pre_len: i32, cty_is_int: i32) -> i32 {
+  if init_kind == 0 {
+    if struct_fields_ir_len < 0 {
+      return 255;
+    }
+    return 1 + struct_fields_ir_len;
+  }
+  if init_kind == 1 {
+    if enum_pack_len < 0 {
+      return 255;
+    }
+    return enum_pack_len;
+  }
+  if init_kind == 2 {
+    if rhs_pre_len < 0 {
+      return 255;
+    }
+    if cty_is_int == 1 {
+      return rhs_pre_len + 1;
+    }
+    if cty_is_int == 0 {
+      return rhs_pre_len + 2;
+    }
+    return 255;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if lower_stmt_let_init_total_len(0, 5, 0, 0, 0) != 6 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(0, -1, 0, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(1, 0, 7, 0, 0) != 7 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(1, 0, -1, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(2, 0, 0, 3, 1) != 4 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(2, 0, 0, 3, 0) != 5 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(2, 0, 0, -1, 1) != 255 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(2, 0, 0, 0, 2) != 255 {
+    return 1;
+  }
+  if lower_stmt_let_init_total_len(3, 0, 0, 0, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}
