@@ -2,6 +2,8 @@
 
 All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the working plan for directories and **transliteration order** (bootstrap SML → sv0). It is not normative for the language (see **sv0doc**). For a **milestone-3-wide** inventory and sequencing narrative, see **`doc/transliteration-plan.md`**.
 
+**`PROGRESS.md` C-4:** keep this file and **`doc/transliteration-plan.md`** **aligned** when seeds change (directory table + §2 order here; §2 inventory table there). **`task/sv0-toolchain-milestone-3-checklist.Rmd`** owns row-level phase tracking.
+
 ## Directories (current + planned)
 
 | Path | Role |
