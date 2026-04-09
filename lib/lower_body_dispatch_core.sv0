@@ -1,0 +1,79 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`lowerBody`**, **`lowerBlock`**.
+   **`lowerBody`**: **`Ast.ExprBlock (stmts, opt)`** → **`lowerBlock (stmts, opt)`** = **`List.concat (map lowerStmt stmts)`** @ **`tail`**, where **`tail`** is **`[]`** if **`opt = NONE`**, else **`lowerReturn e`** if **`opt = SOME e`**; any other **`Ast.expr`** → **`lowerReturn e`** alone.
+   Harness **`return_ir_len`**: same contract as **`lower_return_body_core`** **`lower_return_ir_len`** (**`NONE`→1**, **`SOME`** after lowering → **`value_lower_len + 1`**).
+   **`lower_body_total_len`**: **`is_block` 0** → **`return_ir_len(direct_*)`**; **`is_block` 1** → **`stmt_instr_len`** + optional **`return_ir_len(tail_*)`**; invalid tags / negative **`stmt_instr_len`** → **255**. */
+
+fn return_ir_len(is_some: i32, value_lower_len: i32) -> i32 {
+  if is_some == 0 {
+    return 1;
+  }
+  if is_some == 1 {
+    if value_lower_len < 0 {
+      return 255;
+    }
+    return value_lower_len + 1;
+  }
+  return 255;
+}
+
+fn lower_body_total_len(is_block: i32, stmt_instr_len: i32, has_opt_tail: i32, tail_is_some: i32, tail_value_lower_len: i32, direct_is_some: i32, direct_value_lower_len: i32) -> i32 {
+  if is_block == 0 {
+    return return_ir_len(direct_is_some, direct_value_lower_len);
+  }
+  if is_block != 1 {
+    return 255;
+  }
+  if stmt_instr_len < 0 {
+    return 255;
+  }
+  if has_opt_tail == 0 {
+    return stmt_instr_len;
+  }
+  if has_opt_tail != 1 {
+    return 255;
+  }
+  if tail_is_some == 0 {
+    return stmt_instr_len + 1;
+  }
+  if tail_is_some == 1 {
+    if tail_value_lower_len < 0 {
+      return 255;
+    }
+    return stmt_instr_len + tail_value_lower_len + 1;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if lower_body_total_len(0, 0, 0, 0, 0, 0, 99) != 1 {
+    return 1;
+  }
+  if lower_body_total_len(0, 0, 0, 0, 0, 1, 5) != 6 {
+    return 1;
+  }
+  if lower_body_total_len(1, 3, 0, 0, 0, 0, 0) != 3 {
+    return 1;
+  }
+  if lower_body_total_len(1, 2, 1, 0, 0, 0, 0) != 3 {
+    return 1;
+  }
+  if lower_body_total_len(1, 2, 1, 1, 5, 0, 0) != 8 {
+    return 1;
+  }
+  if lower_body_total_len(2, 0, 0, 0, 0, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_body_total_len(1, -1, 0, 0, 0, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_body_total_len(1, 1, 2, 0, 0, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_body_total_len(1, 1, 1, 1, -1, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_body_total_len(0, 0, 0, 0, 0, 2, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}
