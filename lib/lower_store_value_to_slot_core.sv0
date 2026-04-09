@@ -1,0 +1,43 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`storeValueToSlot`**: **`Ir.VVar x`** with **`x = slot`** → **no** IR (**`[]`**); **`VVar`** different name → **`[Store(slot, Load x)]`**; any other **`Ir.value`** → **`[Store(slot, Literal v)]`**.
+   Harness: **`value_kind`** **1** = **`VVar`** path (**`same_slot`** **1** → **0** instr, **0** → **1** instr; other **`same_slot`** → **255**); **2** = non-**`VVar`** → **1** instr; else **255**. */
+
+fn store_value_to_slot_instr_count(value_kind: i32, same_slot: i32) -> i32 {
+  if value_kind == 1 {
+    if same_slot == 1 {
+      return 0;
+    }
+    if same_slot == 0 {
+      return 1;
+    }
+    return 255;
+  }
+  if value_kind == 2 {
+    return 1;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if store_value_to_slot_instr_count(1, 1) != 0 {
+    return 1;
+  }
+  if store_value_to_slot_instr_count(1, 0) != 1 {
+    return 1;
+  }
+  if store_value_to_slot_instr_count(2, 0) != 1 {
+    return 1;
+  }
+  if store_value_to_slot_instr_count(2, 1) != 1 {
+    return 1;
+  }
+  if store_value_to_slot_instr_count(1, 2) != 255 {
+    return 1;
+  }
+  if store_value_to_slot_instr_count(0, 0) != 255 {
+    return 1;
+  }
+  if store_value_to_slot_instr_count(3, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}

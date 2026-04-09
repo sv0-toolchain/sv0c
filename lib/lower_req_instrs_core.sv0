@@ -1,0 +1,50 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`reqInstrs`**: **`List.concat`** over **`reqs`** (each **`Ast.Requires`** expr), mapping **`e`** → **`let val (pre, ec) = lowerExprWithInstrs e in pre @ [Ir.Requires (ec, fnName)] end`**.
+   Harness: **`req_clause_ir_count(pre_len)`** = **`|pre| + 1`** (the trailing **`Ir.Requires`**); invalid **`pre_len < 0`** → **255**. **`req_instrs_uniform(n, pre_each)`** = **`n * (pre_each + 1)`** when **`n ≥ 0`** ( **`List.concat`** over **`n`** uniform clauses). */
+
+fn req_clause_ir_count(pre_len: i32) -> i32 {
+  if pre_len < 0 {
+    return 255;
+  }
+  return pre_len + 1;
+}
+
+fn req_instrs_uniform(num_reqs: i32, pre_each: i32) -> i32 {
+  if num_reqs < 0 {
+    return 255;
+  }
+  if pre_each < 0 {
+    return 255;
+  }
+  return num_reqs * (pre_each + 1);
+}
+
+fn main() -> i32 {
+  if req_clause_ir_count(0) != 1 {
+    return 1;
+  }
+  if req_clause_ir_count(5) != 6 {
+    return 1;
+  }
+  if req_clause_ir_count(-1) != 255 {
+    return 1;
+  }
+  if req_instrs_uniform(0, 0) != 0 {
+    return 1;
+  }
+  if req_instrs_uniform(1, 0) != 1 {
+    return 1;
+  }
+  if req_instrs_uniform(4, 0) != 4 {
+    return 1;
+  }
+  if req_instrs_uniform(3, 7) != 24 {
+    return 1;
+  }
+  if req_instrs_uniform(-1, 0) != 255 {
+    return 1;
+  }
+  if req_instrs_uniform(2, -3) != 255 {
+    return 1;
+  }
+  return 0;
+}
