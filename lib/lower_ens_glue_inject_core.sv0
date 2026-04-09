@@ -1,0 +1,79 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`ensGlue`**, **`lowerEnsuresClause`**, **`injectEnsuresAndRetSlot`**.
+   **`ensGlue`**: **`List.concat`** over **`ensParts`** (`(pre, ec)` from **`lowerEnsuresClause e useRetSlot`**) → **`pre @ [Ir.Ensures (ec, fnName)]`** per clause — same **`|pre|+1`** tail as **`reqInstrs`** but **`Ir.Ensures`**. **`lowerEnsuresClause`**: when **`mapResult`**, temporarily sets **`ensuresResultSlot`**; harness uses the same per-clause IR tail count (**`lowerExprWithInstrs`**).
+   **`injectEnsuresAndRetSlot`**: if **`ensParts`** empty, body unchanged; else **`inj`** wraps **`Return`**: **`useRetSlot`** false → **`eg @ [Return SOME v]`**; true → **`storeValueToSlot`** (**`store_tail`**) **@** **`eg @ [Return SOME (VVar retValueSlot)]`**. */
+
+fn ens_clause_ir_count(pre_len: i32) -> i32 {
+  if pre_len < 0 {
+    return 255;
+  }
+  return pre_len + 1;
+}
+
+fn ens_glue_uniform(num_ens: i32, pre_each: i32) -> i32 {
+  if num_ens < 0 {
+    return 255;
+  }
+  if pre_each < 0 {
+    return 255;
+  }
+  return num_ens * (pre_each + 1);
+}
+
+fn inject_skip_transform(num_ens_clauses: i32) -> i32 {
+  if num_ens_clauses == 0 {
+    return 1;
+  }
+  return 0;
+}
+
+fn inject_return_expand_len(use_ret_slot: i32, glue_len: i32, store_tail_len: i32) -> i32 {
+  if use_ret_slot != 0 {
+    if use_ret_slot != 1 {
+      return 255;
+    }
+  }
+  if glue_len < 0 {
+    return 255;
+  }
+  if store_tail_len < 0 {
+    return 255;
+  }
+  if use_ret_slot == 0 {
+    return glue_len + 1;
+  }
+  return store_tail_len + glue_len + 1;
+}
+
+fn main() -> i32 {
+  if ens_clause_ir_count(2) != 3 {
+    return 1;
+  }
+  if ens_clause_ir_count(-5) != 255 {
+    return 1;
+  }
+  if ens_glue_uniform(2, 3) != 8 {
+    return 1;
+  }
+  if inject_skip_transform(0) != 1 {
+    return 1;
+  }
+  if inject_skip_transform(3) != 0 {
+    return 1;
+  }
+  if inject_return_expand_len(0, 4, 9) != 5 {
+    return 1;
+  }
+  if inject_return_expand_len(1, 4, 0) != 5 {
+    return 1;
+  }
+  if inject_return_expand_len(1, 4, 1) != 6 {
+    return 1;
+  }
+  if inject_return_expand_len(2, 1, 0) != 255 {
+    return 1;
+  }
+  if inject_return_expand_len(0, -1, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}
