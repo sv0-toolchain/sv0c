@@ -51,6 +51,18 @@ From the **sv0-toolchain** repo root:
 
 `./scripts/sv0 test` runs **`self-host-sv0-loop`** after the stage0 golden checks. Requires **`cc`** and an executable **`scripts/sv0-self-host-emit-c.sh`** (tracked in git).
 
+## SML retirement guardrail (`PROGRESS.md` **C-6**)
+
+**`C-6` = done does *not* mean the SML bootstrap has been retired.** It means the **non-claim** policy is written down and cross-linked so agents and maintainers do not confuse **harness health** with **stakeholder closure**.
+
+| Topic | Where it is defined |
+|-------|----------------------|
+| Completion criteria before **`bootstrap-sml-final`** / **`sml-legacy/`** | **`task/sv0-toolchain-milestone-3-self-host.Rmd`** |
+| Pilot loop ≠ retirement | **`.cursor/rules/28-sml-retirement-and-self-host-bar.mdc`**, this file (**§ Pilot vs native**), **`README.md`** (bootstrap tag table at meta-repo root) |
+| Anti-patterns (no early tag, no **`sml/`** rename from pilot growth alone) | **`./scripts/sv0 milestone-orient show M3`** |
+
+**Actual retirement** (git tag on **sv0c**, directory rename, default build switch) stays a **human-owned** cutover only after the M3 task says the bar is met — not an automated checklist flip in **`PROGRESS.md`**.
+
 ## Related
 
 - **`task/sv0-toolchain-milestone-3-self-host.Rmd`** — definition of done for milestone 3 (full parity + SML retirement remain open).
