@@ -1,0 +1,120 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`uniqOldNames`**: deduplicate a **`string list`** while preserving **first-occurrence** order (**`List.exists`** on **`acc`** vs **`x :: acc`**), then **`rev acc`**.
+   Harness: up to **four** input **name** tags (**`i32`**, **`String.compare` `EQUAL`** → **`==`**) and **`in_len`** **0–4**; accumulator models **front** at **`a0`** (**SML** **`x :: acc`**). Output surrogate is final **`acc`** length ( **`rev`** does not change length). */
+
+fn uon_name_eq(a: i32, b: i32) -> i32 {
+  if a == b {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+fn uon_acc_has(x: i32, a0: i32, a1: i32, a2: i32, a3: i32, alen: i32) -> i32 {
+  if alen >= 1 {
+    if uon_name_eq(x, a0) == 1 {
+      return 1;
+    } else {
+      if alen >= 2 {
+        if uon_name_eq(x, a1) == 1 {
+          return 1;
+        } else {
+          if alen >= 3 {
+            if uon_name_eq(x, a2) == 1 {
+              return 1;
+            } else {
+              if alen >= 4 {
+                if uon_name_eq(x, a3) == 1 {
+                  return 1;
+                } else {
+                  return 0;
+                }
+              } else {
+                return 0;
+              }
+            }
+          } else {
+            return 0;
+          }
+        }
+      } else {
+        return 0;
+      }
+    }
+  } else {
+    return 0;
+  }
+}
+
+fn uniq_old_names_final_len(n0: i32, n1: i32, n2: i32, n3: i32, in_len: i32) -> i32 {
+  let mut a0: i32 = 0;
+  let mut a1: i32 = 0;
+  let mut a2: i32 = 0;
+  let mut a3: i32 = 0;
+  let mut alen: i32 = 0;
+  if in_len >= 1 {
+    let x0: i32 = n0;
+    if uon_acc_has(x0, a0, a1, a2, a3, alen) == 0 {
+      a3 = a2;
+      a2 = a1;
+      a1 = a0;
+      a0 = x0;
+      alen = alen + 1;
+    }
+  }
+  if in_len >= 2 {
+    let x1: i32 = n1;
+    if uon_acc_has(x1, a0, a1, a2, a3, alen) == 0 {
+      a3 = a2;
+      a2 = a1;
+      a1 = a0;
+      a0 = x1;
+      alen = alen + 1;
+    }
+  }
+  if in_len >= 3 {
+    let x2: i32 = n2;
+    if uon_acc_has(x2, a0, a1, a2, a3, alen) == 0 {
+      a3 = a2;
+      a2 = a1;
+      a1 = a0;
+      a0 = x2;
+      alen = alen + 1;
+    }
+  }
+  if in_len >= 4 {
+    let x3: i32 = n3;
+    if uon_acc_has(x3, a0, a1, a2, a3, alen) == 0 {
+      a3 = a2;
+      a2 = a1;
+      a1 = a0;
+      a0 = x3;
+      alen = alen + 1;
+    }
+  }
+  return alen;
+}
+
+fn main() -> i32 {
+  if uniq_old_names_final_len(1, 2, 3, 4, 0) != 0 {
+    return 1;
+  }
+  if uniq_old_names_final_len(5, 0, 0, 0, 1) != 1 {
+    return 1;
+  }
+  if uniq_old_names_final_len(1, 2, 1, 3, 4) != 3 {
+    return 1;
+  }
+  if uniq_old_names_final_len(9, 9, 9, 9, 4) != 1 {
+    return 1;
+  }
+  if uniq_old_names_final_len(2, 1, 2, 0, 3) != 2 {
+    return 1;
+  }
+  if uon_acc_has(3, 3, 0, 0, 0, 1) != 1 {
+    return 1;
+  }
+  if uon_acc_has(3, 2, 0, 0, 0, 1) != 0 {
+    return 1;
+  }
+  return 0;
+}
