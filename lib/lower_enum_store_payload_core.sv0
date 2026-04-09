@@ -1,0 +1,68 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`enumStorePayload`**: for **`vals : Ir.value list`**, emits **`length vals`** **`Ir.StoreField`** instructions
+   on **`dst`**, field names **`p0`…`p{n-1}`** (**`pName i`**), each RHS **`valueToExpr v`**. No **`Ir`** structs in this harness: expose **`p{i}`** suffix **`i`**
+   and **`valueToExpr`** class per slot (mirrors **`lower_value_to_expr_core.sv0`**). */
+
+fn ir_expr_load() -> i32 {
+  return 1;
+}
+
+fn ir_expr_literal() -> i32 {
+  return 2;
+}
+
+fn v_kind_var() -> i32 {
+  return 1;
+}
+
+fn value_to_expr_class(v_kind: i32) -> i32 {
+  if v_kind == v_kind_var() {
+    return ir_expr_load();
+  } else {
+    return ir_expr_literal();
+  }
+}
+
+/* SML **`pName i`** → **`"p" ^ Int.toString i`**; harness tracks the numeric suffix only. */
+fn enum_payload_field_suffix(i: i32) -> i32 {
+  return i;
+}
+
+/* Number of **`StoreField`** instructions (**`List.tabulate (length vals, …)`**). */
+fn enum_store_payload_count(len: i32) -> i32 {
+  return len;
+}
+
+fn main() -> i32 {
+  if enum_store_payload_count(0) != 0 {
+    return 1;
+  }
+  if enum_store_payload_count(4) != 4 {
+    return 1;
+  }
+  if enum_payload_field_suffix(0) != 0 {
+    return 1;
+  }
+  if enum_payload_field_suffix(3) != 3 {
+    return 1;
+  }
+  if value_to_expr_class(v_kind_var()) != ir_expr_load() {
+    return 1;
+  }
+  if value_to_expr_class(0) != ir_expr_literal() {
+    return 1;
+  }
+  /* Two-slot payload: suffixes **0**, **1** with **`VVar`** then non-var → **Load** then **Literal**. */
+  if enum_payload_field_suffix(0) != 0 {
+    return 1;
+  }
+  if value_to_expr_class(v_kind_var()) != ir_expr_load() {
+    return 1;
+  }
+  if enum_payload_field_suffix(1) != 1 {
+    return 1;
+  }
+  if value_to_expr_class(99) != ir_expr_literal() {
+    return 1;
+  }
+  return 0;
+}
