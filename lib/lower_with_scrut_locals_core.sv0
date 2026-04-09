@@ -1,0 +1,26 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`withScrutLocals`**: save **`!scrutLocals`** as **`old`**, set **`scrutLocals := extra @ old`**, run **`thunk`**, then **`scrutLocals := old`**.
+   If **`thunk`** raises, the **`handle`** restores **`old`** before **`raise`**. Harness: **`old_n`** / **`extra_n`** are list-length surrogates; enter depth **`old_n + extra_n`**; exit depth always **`old_n`** (success or exception). */
+
+fn wsl_depth_after_enter(old_n: i32, extra_n: i32) -> i32 {
+  return old_n + extra_n;
+}
+
+fn wsl_depth_after_exit(old_n: i32) -> i32 {
+  return old_n;
+}
+
+fn main() -> i32 {
+  if wsl_depth_after_enter(3, 2) != 5 {
+    return 1;
+  }
+  if wsl_depth_after_enter(0, 7) != 7 {
+    return 1;
+  }
+  if wsl_depth_after_exit(3) != 3 {
+    return 1;
+  }
+  if wsl_depth_after_exit(10) != 10 {
+    return 1;
+  }
+  return 0;
+}
