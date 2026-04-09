@@ -1,0 +1,118 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`scanLets`**: for each **`StmtLet (PatBind (x, _), _, to, SOME init, _)`**, emit **`[(x, cty)]`** where **`cty`** is **`astTyToCString at`** if **`to = SOME at`**, else **`exprInitCty init`**.
+   Other statements contribute **`[]`**. This harness models **one** candidate binding (no list concat). Return value packs the branch: **0** = not a scanned **`let`** arm; **1000+** = explicit type (**`lower_ok_payload_cty_core`**-style **`ty_shape_tag`** subset); **2000+** = **`exprInitCty`** (**`lower_expr_init_cty_core`** **`ec_*`** ids). */
+
+fn c_ty_void() -> i32 {
+  return 1;
+}
+
+fn c_ty_int() -> i32 {
+  return 2;
+}
+
+fn explicit_payload_ast_ty_class(ty_shape_tag: i32) -> i32 {
+  if ty_shape_tag == 0 {
+    return c_ty_void();
+  } else {
+    if ty_shape_tag == 1 {
+      return c_ty_void();
+    } else {
+      if ty_shape_tag == 2 {
+        return c_ty_int();
+      } else {
+        return c_ty_int();
+      }
+    }
+  }
+}
+
+fn ec_int() -> i32 {
+  return 1;
+}
+
+fn ec_struct_name() -> i32 {
+  return 2;
+}
+
+fn ec_enum_ty() -> i32 {
+  return 3;
+}
+
+fn ec_callee_ret() -> i32 {
+  return 4;
+}
+
+fn expr_init_cty_class(expr_shape_tag: i32, inner_shape: i32) -> i32 {
+  if expr_shape_tag == 1 {
+    return ec_struct_name();
+  } else {
+    if expr_shape_tag == 2 {
+      return ec_enum_ty();
+    } else {
+      if expr_shape_tag == 3 {
+        return ec_callee_ret();
+      } else {
+        if expr_shape_tag == 4 {
+          return ec_enum_ty();
+        } else {
+          if expr_shape_tag == 5 {
+            return expr_init_cty_class(inner_shape, 0);
+          } else {
+            if expr_shape_tag == 6 {
+              return ec_int();
+            } else {
+              if expr_shape_tag == 7 {
+                return ec_int();
+              } else {
+                return ec_int();
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/* **0** — not **`StmtLet`** + **`PatBind`** + **`SOME init`**; else **1000 + c_ty** or **2000 + ec_***. */
+fn scan_lets_binding_packed(
+  stmt_let_patbind_with_init: i32,
+  has_explicit_ty: i32,
+  ty_shape_tag: i32,
+  expr_shape_tag: i32,
+  expr_inner_shape: i32
+) -> i32 {
+  if stmt_let_patbind_with_init == 0 {
+    return 0;
+  } else {
+    if has_explicit_ty != 0 {
+      return 1000 + explicit_payload_ast_ty_class(ty_shape_tag);
+    } else {
+      return 2000 + expr_init_cty_class(expr_shape_tag, expr_inner_shape);
+    }
+  }
+}
+
+fn main() -> i32 {
+  if scan_lets_binding_packed(0, 0, 2, 7, 0) != 0 {
+    return 1;
+  }
+  if scan_lets_binding_packed(1, 1, 2, 0, 0) != 1002 {
+    return 1;
+  }
+  if scan_lets_binding_packed(1, 1, 0, 0, 0) != 1001 {
+    return 1;
+  }
+  if scan_lets_binding_packed(1, 0, 0, 7, 0) != 2001 {
+    return 1;
+  }
+  if scan_lets_binding_packed(1, 0, 0, 1, 0) != 2002 {
+    return 1;
+  }
+  if scan_lets_binding_packed(1, 0, 0, 3, 0) != 2004 {
+    return 1;
+  }
+  if scan_lets_binding_packed(1, 0, 0, 5, 1) != 2002 {
+    return 1;
+  }
+  return 0;
+}
