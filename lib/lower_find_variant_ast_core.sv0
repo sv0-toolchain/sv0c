@@ -1,0 +1,57 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`findVariantAst`**: look up **`ItemEnum`** named **`en`** in **`!theProg`**, then find variant **`vn`** in **`variants`**
+   (**`VariantUnit`** / **`VariantTuple`** / **`VariantStruct`** share the name **`nm`**). On miss, SML **`raise Fail`**. Harness mirrors **`lower_enum_tag_core`**: **`enum_ast_hit`**, **`variant_ast_hit`**,
+   and on success a **`variant_shape`** tag (**1** = unit, **2** = tuple, **3** = struct). Error codes **`254`** / **`255`** = unknown variant / unknown enum (same band as **`enumTag`** harness). */
+
+fn fva_err_unknown_enum() -> i32 {
+  return 255;
+}
+
+fn fva_err_unknown_variant() -> i32 {
+  return 254;
+}
+
+fn variant_shape_unit() -> i32 {
+  return 1;
+}
+
+fn variant_shape_tuple() -> i32 {
+  return 2;
+}
+
+fn variant_shape_struct() -> i32 {
+  return 3;
+}
+
+fn find_variant_ast_shape(enum_ast_hit: i32, variant_ast_hit: i32, shape_if_ok: i32) -> i32 {
+  if enum_ast_hit == 0 {
+    return fva_err_unknown_enum();
+  } else {
+    if variant_ast_hit == 0 {
+      return fva_err_unknown_variant();
+    } else {
+      return shape_if_ok;
+    }
+  }
+}
+
+fn main() -> i32 {
+  if find_variant_ast_shape(0, 0, variant_shape_unit()) != fva_err_unknown_enum() {
+    return 1;
+  }
+  if find_variant_ast_shape(0, 1, variant_shape_tuple()) != fva_err_unknown_enum() {
+    return 1;
+  }
+  if find_variant_ast_shape(1, 0, variant_shape_unit()) != fva_err_unknown_variant() {
+    return 1;
+  }
+  if find_variant_ast_shape(1, 1, variant_shape_unit()) != variant_shape_unit() {
+    return 1;
+  }
+  if find_variant_ast_shape(1, 1, variant_shape_tuple()) != variant_shape_tuple() {
+    return 1;
+  }
+  if find_variant_ast_shape(1, 1, variant_shape_struct()) != variant_shape_struct() {
+    return 1;
+  }
+  return 0;
+}
