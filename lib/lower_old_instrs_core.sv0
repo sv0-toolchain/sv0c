@@ -1,0 +1,40 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`oldInstrs`**: **`List.concat`** over **`oldTargets`**, each **`pt`** → **`oldSlot x`** then either **`[DeclVar s, Store(s, Load x)]`** (**`cty = "int"`**) or **`[DeclNamed (cty, s), Store(s, Load x)]`**.
+   Harness: **`old_instrs_per_target_count`**: **`cty_path`** **1** = **`int`** branch, **2** = **`DeclNamed`** branch — both emit **2** IR nodes; **`old_instrs_total`** = **2 ×** **`old_targets_hits`**. */
+
+fn old_instrs_per_target_count(cty_path: i32) -> i32 {
+  if cty_path == 1 {
+    return 2;
+  } else {
+    if cty_path == 2 {
+      return 2;
+    } else {
+      return 255;
+    }
+  }
+}
+
+fn old_instrs_total(old_targets_hits: i32) -> i32 {
+  return old_targets_hits * 2;
+}
+
+fn main() -> i32 {
+  if old_instrs_per_target_count(1) != 2 {
+    return 1;
+  }
+  if old_instrs_per_target_count(2) != 2 {
+    return 1;
+  }
+  if old_instrs_per_target_count(0) != 255 {
+    return 1;
+  }
+  if old_instrs_total(0) != 0 {
+    return 1;
+  }
+  if old_instrs_total(1) != 2 {
+    return 1;
+  }
+  if old_instrs_total(4) != 8 {
+    return 1;
+  }
+  return 0;
+}
