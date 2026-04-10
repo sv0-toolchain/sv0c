@@ -9,6 +9,7 @@ build:
 	echo 'CM.make "sources.cm";' | $(SML)
 
 test:
+	mkdir -p build
 	echo 'CM.make "sources.cm"; use "test/test_runner.sml";' | $(SML)
 
 check:
