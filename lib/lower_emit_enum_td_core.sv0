@@ -1,0 +1,31 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`emitEnumTd`**: C enum typedef string-section surrogate.
+   SML: `"typedef struct {\n  int tag;\n" ^ payload_lines ^ "} " ^ name ^ ";\n"`.
+   **`maxP`** = `foldl max variantSlots 0 variants` — maximum payload slot count across all variants.
+   If `maxP <= 0`: no payload lines. If `maxP > 0`: `maxP` lines of `"  int pN;\n"`.
+   Harness: **`emit_enum_td_section_count`** = **2** (header with tag + trailer) + **`maxP`** payload field lines (when > 0). Negative → **255**. */
+
+fn emit_enum_td_section_count(max_payload: i32) -> i32 {
+  if max_payload < 0 {
+    return 255;
+  }
+  if max_payload == 0 {
+    return 2;
+  }
+  return 2 + max_payload;
+}
+
+fn main() -> i32 {
+  if emit_enum_td_section_count(0) != 2 {
+    return 1;
+  }
+  if emit_enum_td_section_count(1) != 3 {
+    return 1;
+  }
+  if emit_enum_td_section_count(3) != 5 {
+    return 1;
+  }
+  if emit_enum_td_section_count(-1) != 255 {
+    return 1;
+  }
+  return 0;
+}

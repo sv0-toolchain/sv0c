@@ -1,0 +1,48 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`fnRetCty`**: return-type C-string class.
+   SML: `case #ret r of NONE => "int" | SOME at => astTyToCString at`.
+   Harness: **`has_ret`** **0** → no return annotation → class **1** ("int"); **1** → has annotation → delegates to **`ret_ty_class`** (same coding as **`lower_ast_ty_cstring_core`**: **1** = `TyUnit`/"void", **2** = primitive `TyName` like `i32`, **3** = named `TyName`, **4** = default "int").
+   Returns the C-type class tag. Unknown **`has_ret`** → **255**. */
+
+fn fn_ret_cty_class(has_ret: i32, ret_ty_class: i32) -> i32 {
+  if has_ret == 0 {
+    return 4;
+  }
+  if has_ret == 1 {
+    if ret_ty_class < 1 {
+      return 255;
+    }
+    if ret_ty_class > 4 {
+      return 255;
+    }
+    return ret_ty_class;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if fn_ret_cty_class(0, 0) != 4 {
+    return 1;
+  }
+  if fn_ret_cty_class(1, 1) != 1 {
+    return 1;
+  }
+  if fn_ret_cty_class(1, 2) != 2 {
+    return 1;
+  }
+  if fn_ret_cty_class(1, 3) != 3 {
+    return 1;
+  }
+  if fn_ret_cty_class(1, 4) != 4 {
+    return 1;
+  }
+  if fn_ret_cty_class(2, 0) != 255 {
+    return 1;
+  }
+  if fn_ret_cty_class(1, 0) != 255 {
+    return 1;
+  }
+  if fn_ret_cty_class(1, 5) != 255 {
+    return 1;
+  }
+  return 0;
+}

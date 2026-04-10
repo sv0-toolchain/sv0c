@@ -25,50 +25,32 @@ static TyAlias2 alias_empty(void) {
 }
 
 static TyAlias2 alias_register(TyAlias2 e, int from_id, int to_id) {
-  int _sv0t0;
-  int _sv0t1;
+  TyAlias2 out;
+  out = e;
   if ((e.an >= 1)) {
-    int _sv0t2;
-    if ((e.af0 == from_id)) {
-      return e;
-      _sv0t2 = 0;
-    } else {
-      int _sv0t3;
-      if ((e.an >= 2)) {
-        int _sv0t4;
-        if ((e.af1 == from_id)) {
-          return e;
-          _sv0t4 = 0;
-        } else {
-          return e;
-          _sv0t4 = 0;
-        }
-        _sv0t3 = _sv0t4;
+    if ((e.af0 != from_id)) {
+      if ((e.an < 2)) {
+        TyAlias2 _sv0t0;
+        _sv0t0.an = 2;
+        _sv0t0.af0 = e.af0;
+        _sv0t0.at0 = e.at0;
+        _sv0t0.af1 = from_id;
+        _sv0t0.at1 = to_id;
+        out = _sv0t0;
       } else {
-        TyAlias2 _sv0t5;
-        _sv0t5.an = 2;
-        _sv0t5.af0 = e.af0;
-        _sv0t5.at0 = e.at0;
-        _sv0t5.af1 = from_id;
-        _sv0t5.at1 = to_id;
-        return _sv0t5;
-        _sv0t3 = 0;
       }
-      _sv0t2 = _sv0t3;
+    } else {
     }
-    _sv0t1 = _sv0t2;
   } else {
-    TyAlias2 _sv0t6;
-    _sv0t6.an = 1;
-    _sv0t6.af0 = from_id;
-    _sv0t6.at0 = to_id;
-    _sv0t6.af1 = 0;
-    _sv0t6.at1 = 0;
-    return _sv0t6;
-    _sv0t1 = 0;
+    TyAlias2 _sv0t1;
+    _sv0t1.an = 1;
+    _sv0t1.af0 = from_id;
+    _sv0t1.at0 = to_id;
+    _sv0t1.af1 = 0;
+    _sv0t1.at1 = 0;
+    out = _sv0t1;
   }
-  _sv0t0 = _sv0t1;
-  return _sv0t0;
+  return out;
 }
 
 static int has_ty_alias_name(TyAlias2 e, int from_id) {

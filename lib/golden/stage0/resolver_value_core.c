@@ -22,46 +22,36 @@ static Env3 env3_empty(void) {
 }
 
 static Env3 env3_register(Env3 e, int id) {
-  int _sv0t0;
-  int _sv0t1;
+  Env3 out;
+  out = e;
   if ((e.n == 0)) {
-    Env3 _sv0t2;
-    _sv0t2.v0 = id;
-    _sv0t2.v1 = 0;
-    _sv0t2.v2 = 0;
-    _sv0t2.n = 1;
-    return _sv0t2;
-    _sv0t1 = 0;
+    Env3 _sv0t0;
+    _sv0t0.v0 = id;
+    _sv0t0.v1 = 0;
+    _sv0t0.v2 = 0;
+    _sv0t0.n = 1;
+    out = _sv0t0;
   } else {
-    int _sv0t3;
     if ((e.n == 1)) {
-      Env3 _sv0t4;
-      _sv0t4.v0 = e.v0;
-      _sv0t4.v1 = id;
-      _sv0t4.v2 = 0;
-      _sv0t4.n = 2;
-      return _sv0t4;
-      _sv0t3 = 0;
+      Env3 _sv0t1;
+      _sv0t1.v0 = e.v0;
+      _sv0t1.v1 = id;
+      _sv0t1.v2 = 0;
+      _sv0t1.n = 2;
+      out = _sv0t1;
     } else {
-      int _sv0t5;
       if ((e.n == 2)) {
-        Env3 _sv0t6;
-        _sv0t6.v0 = e.v0;
-        _sv0t6.v1 = e.v1;
-        _sv0t6.v2 = id;
-        _sv0t6.n = 3;
-        return _sv0t6;
-        _sv0t5 = 0;
+        Env3 _sv0t2;
+        _sv0t2.v0 = e.v0;
+        _sv0t2.v1 = e.v1;
+        _sv0t2.v2 = id;
+        _sv0t2.n = 3;
+        out = _sv0t2;
       } else {
-        return e;
-        _sv0t5 = 0;
       }
-      _sv0t3 = _sv0t5;
     }
-    _sv0t1 = _sv0t3;
   }
-  _sv0t0 = _sv0t1;
-  return _sv0t0;
+  return out;
 }
 
 static int lookup_value(Env3 e, int id) {

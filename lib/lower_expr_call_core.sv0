@@ -1,0 +1,68 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`ExprCall`** branches in **`lowerExprToValue`**: dispatch by callee shape.
+   **`call_kind`**: **0** `println(string)` — 1 instr (`Call`) + `VUnit`; **1** `old(x)` — 0 instrs + `VVar`; **2** `no_alias(a, b)` — `a_pre + b_pre + 1` (`Call`); **3** generic `fn(args...)` — `sum(arg_pre) + 1` (`Call`); **4** enum ctor call `En::Vn(args)` — `1 + enumConstructInstrs` (DeclNamed + eci); **5** unit enum path `En::Vn` — `1 + enumConstructInstrs` (DeclNamed + eci, args_len=0).
+   Negative **`args_pre_total`** yields **255**; unknown **`call_kind`** yields **255**. */
+
+fn expr_call_total_len(call_kind: i32, args_pre_total: i32, eci_len: i32) -> i32 {
+  if call_kind == 0 {
+    return 1;
+  }
+  if call_kind == 1 {
+    return 0;
+  }
+  if call_kind == 2 {
+    if args_pre_total < 0 {
+      return 255;
+    }
+    return args_pre_total + 1;
+  }
+  if call_kind == 3 {
+    if args_pre_total < 0 {
+      return 255;
+    }
+    return args_pre_total + 1;
+  }
+  if call_kind == 4 {
+    if eci_len < 0 {
+      return 255;
+    }
+    return 1 + eci_len;
+  }
+  if call_kind == 5 {
+    if eci_len < 0 {
+      return 255;
+    }
+    return 1 + eci_len;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if expr_call_total_len(0, 0, 0) != 1 {
+    return 1;
+  }
+  if expr_call_total_len(1, 0, 0) != 0 {
+    return 1;
+  }
+  if expr_call_total_len(2, 4, 0) != 5 {
+    return 1;
+  }
+  if expr_call_total_len(3, 0, 0) != 1 {
+    return 1;
+  }
+  if expr_call_total_len(3, 7, 0) != 8 {
+    return 1;
+  }
+  if expr_call_total_len(4, 0, 5) != 6 {
+    return 1;
+  }
+  if expr_call_total_len(5, 0, 3) != 4 {
+    return 1;
+  }
+  if expr_call_total_len(3, -1, 0) != 255 {
+    return 1;
+  }
+  if expr_call_total_len(9, 0, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}

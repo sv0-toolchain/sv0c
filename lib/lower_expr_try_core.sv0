@@ -1,0 +1,46 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`ExprTry`** in **`lowerExprToValue`**: the **`?`** operator lowering.
+   SML: `i1 @ [DeclNamed(en, u), Store(u, ee)] @ declOut @ [IfElse(cond, retErr, takeOk)]`
+   where **`declOut`** is 1 instr (DeclVar or DeclNamed depending on `pCty`), **`retErr`** = 1 (`Return`), **`takeOk`** = 1 (`Store`).
+   **`pCty_is_int`**: **1** → DeclVar, **0** → DeclNamed — both emit exactly **1** instr.
+   Harness: **`expr_try_total_len`** = **`wi_pre_len + 4`** (DeclNamed + Store + declOut + IfElse). Negative **`wi_pre_len`** or invalid **`pCty_is_int`** → **255**. Error band: **`scr_is_int_or_void`** = **1** → **254** (SML `raise`). */
+
+fn expr_try_total_len(wi_pre_len: i32, pCty_is_int: i32, scr_is_int_or_void: i32) -> i32 {
+  if scr_is_int_or_void == 1 {
+    return 254;
+  }
+  if wi_pre_len < 0 {
+    return 255;
+  }
+  if pCty_is_int < 0 {
+    return 255;
+  }
+  if pCty_is_int > 1 {
+    return 255;
+  }
+  return wi_pre_len + 4;
+}
+
+fn main() -> i32 {
+  if expr_try_total_len(0, 1, 0) != 4 {
+    return 1;
+  }
+  if expr_try_total_len(3, 0, 0) != 7 {
+    return 1;
+  }
+  if expr_try_total_len(0, 0, 0) != 4 {
+    return 1;
+  }
+  if expr_try_total_len(5, 1, 0) != 9 {
+    return 1;
+  }
+  if expr_try_total_len(0, 0, 1) != 254 {
+    return 1;
+  }
+  if expr_try_total_len(-1, 0, 0) != 255 {
+    return 1;
+  }
+  if expr_try_total_len(0, 2, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}

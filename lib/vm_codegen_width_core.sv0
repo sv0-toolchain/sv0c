@@ -1,0 +1,83 @@
+// vm_codegen_width_core.sv0
+// Surrogate for vm_codegen.sml widthOfCty + indexOfField + enumFieldNames.
+// Models slot width computation for the VM bytecode emitter.
+//
+// SML reference: sml/backend/vm/vm_codegen.sml
+//   fun widthOfCty, fun indexOfField, fun enumFieldNames
+//
+// cty_class tags:
+//   0 = void      -> width 0
+//   1 = int/bool  -> width 1
+//   2 = struct    -> width = field_count (looked up)
+//   3 = enum      -> width = 1 + max_payload (looked up)
+//   4 = unknown   -> width 1
+
+fn width_of_cty(cty_class: i32, lookup_width: i32) -> i32 {
+    if cty_class == 0 {
+        return 0;
+    }
+    if cty_class == 1 {
+        return 1;
+    }
+    if cty_class == 2 {
+        return lookup_width;
+    }
+    if cty_class == 3 {
+        return lookup_width;
+    }
+    return 1;
+}
+
+// indexOfField: linear search index (0-based).
+// Surrogate takes field_count and target_index; returns target_index if valid.
+fn index_of_field(field_count: i32, target_index: i32) -> i32 {
+    if target_index >= 0 {
+        if target_index < field_count {
+            return target_index;
+        }
+    }
+    return 255;
+}
+
+// enumFieldNames: "tag" + "p0".."p{width-2}" -> width names total.
+fn enum_field_name_count(enum_width: i32) -> i32 {
+    if enum_width <= 0 {
+        return 1;
+    }
+    return enum_width;
+}
+
+// valueWidth: VVar -> width from env, anything else -> 1
+fn value_width(val_tag: i32, env_width: i32) -> i32 {
+    if val_tag == 0 {
+        return env_width;
+    }
+    return 1;
+}
+
+fn main() -> i32 {
+    // widthOfCty
+    if width_of_cty(0, 0) != 0 { return 1; }
+    if width_of_cty(1, 0) != 1 { return 1; }
+    if width_of_cty(2, 3) != 3 { return 1; }
+    if width_of_cty(3, 4) != 4 { return 1; }
+    if width_of_cty(4, 0) != 1 { return 1; }
+
+    // indexOfField
+    if index_of_field(3, 0) != 0 { return 1; }
+    if index_of_field(3, 2) != 2 { return 1; }
+    if index_of_field(3, 3) != 255 { return 1; }
+    if index_of_field(3, 0 - 1) != 255 { return 1; }
+
+    // enumFieldNames count
+    if enum_field_name_count(0) != 1 { return 1; }
+    if enum_field_name_count(1) != 1 { return 1; }
+    if enum_field_name_count(3) != 3 { return 1; }
+
+    // valueWidth: VVar tag=0
+    if value_width(0, 3) != 3 { return 1; }
+    // non-VVar tag=1
+    if value_width(1, 3) != 1 { return 1; }
+
+    return 0;
+}

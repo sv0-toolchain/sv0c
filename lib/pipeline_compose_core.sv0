@@ -1,0 +1,115 @@
+// pipeline_compose_core.sv0
+// Surrogate for full compiler pipeline composition.
+// Models chaining resolve -> check -> analyze -> strip -> lower -> emit.
+//
+// SML reference: sml/main.sml
+//   fun compileProgram, fun compileProgramVm
+//
+// Each pass tag has a success/fail outcome.
+// Pipeline stops at first failure.
+//
+// Pass tags:
+//   0 = lex + parse
+//   1 = resolve
+//   2 = check
+//   3 = analyze
+//   4 = strip link directives
+//   5 = lower
+//   6 = emit (C)
+//   7 = emit (VM)
+
+// pipeline_run: returns the last successful pass index, or 255 on full success.
+// fail_at: pass index where failure occurs (255 = no failure).
+fn pipeline_run(pass_count: i32, fail_at: i32) -> i32 {
+    if fail_at >= 0 {
+        if fail_at < pass_count {
+            return fail_at;
+        }
+    }
+    return 255;
+}
+
+// pipeline_c: run 7 passes (0..6), return success tag
+fn pipeline_c_ok(fail_at: i32) -> i32 {
+    if pipeline_run(7, fail_at) == 255 {
+        return 1;
+    }
+    return 0;
+}
+
+// pipeline_vm: run 8 passes (0..7), return success tag
+fn pipeline_vm_ok(fail_at: i32) -> i32 {
+    if pipeline_run(8, fail_at) == 255 {
+        return 1;
+    }
+    return 0;
+}
+
+// error_in_pass: maps failure pass to diagnostic category
+//   0 = parse error (E01xx)
+//   1 = resolve error (E02xx)
+//   2 = type error (E04xx)
+//   3 = contract error (E05xx)
+//   4 = link error
+//   5 = lowering error
+//   6 = codegen error
+//   7 = vm codegen error
+fn error_category(fail_pass: i32) -> i32 {
+    if fail_pass == 0 { return 100; }
+    if fail_pass == 1 { return 200; }
+    if fail_pass == 2 { return 400; }
+    if fail_pass == 3 { return 500; }
+    if fail_pass == 4 { return 600; }
+    if fail_pass == 5 { return 700; }
+    if fail_pass == 6 { return 800; }
+    if fail_pass == 7 { return 900; }
+    return 0;
+}
+
+// output_kind: what the pipeline produces
+//   C pipeline: C source code (kind 1)
+//   VM pipeline: bytecode binary (kind 2)
+//   Failed: error diagnostic (kind 0)
+fn output_kind(target_tag: i32, success: i32) -> i32 {
+    if success == 0 {
+        return 0;
+    }
+    if target_tag == 0 {
+        return 1;
+    }
+    if target_tag == 1 {
+        return 2;
+    }
+    return 255;
+}
+
+fn main() -> i32 {
+    // pipeline_run: no failure -> 255
+    if pipeline_run(7, 255) != 255 { return 1; }
+
+    // failure at pass 2 -> 2
+    if pipeline_run(7, 2) != 2 { return 1; }
+
+    // failure beyond pass count -> 255 (success)
+    if pipeline_run(7, 10) != 255 { return 1; }
+
+    // pipeline_c_ok
+    if pipeline_c_ok(255) != 1 { return 1; }
+    if pipeline_c_ok(3) != 0 { return 1; }
+
+    // pipeline_vm_ok
+    if pipeline_vm_ok(255) != 1 { return 1; }
+    if pipeline_vm_ok(7) != 0 { return 1; }
+
+    // error category
+    if error_category(0) != 100 { return 1; }
+    if error_category(2) != 400 { return 1; }
+    if error_category(5) != 700 { return 1; }
+
+    // output kind
+    if output_kind(0, 1) != 1 { return 1; }
+    if output_kind(1, 1) != 2 { return 1; }
+    if output_kind(0, 0) != 0 { return 1; }
+
+    return 0;
+}

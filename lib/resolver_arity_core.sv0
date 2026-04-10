@@ -15,23 +15,17 @@ fn arity_empty() -> FnArity2 {
 }
 
 fn arity_register(e: FnArity2, name_id: i32, arity: i32) -> FnArity2 {
+  let mut out: FnArity2 = e;
   if e.n >= 1 {
-    if e.n0 == name_id {
-      return e;
-    } else {
-      if e.n >= 2 {
-        if e.n1 == name_id {
-          return e;
-        } else {
-          return e;
-        }
-      } else {
-        return FnArity2 { n: 2, n0: e.n0, a0: e.a0, n1: name_id, a1: arity };
+    if e.n0 != name_id {
+      if e.n < 2 {
+        out = FnArity2 { n: 2, n0: e.n0, a0: e.a0, n1: name_id, a1: arity };
       }
     }
   } else {
-    return FnArity2 { n: 1, n0: name_id, a0: arity, n1: 0, a1: 0 };
+    out = FnArity2 { n: 1, n0: name_id, a0: arity, n1: 0, a1: 0 };
   }
+  return out;
 }
 
 fn lookup_fn_arity(e: FnArity2, name_id: i32) -> i32 {

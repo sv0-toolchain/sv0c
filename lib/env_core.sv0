@@ -14,13 +14,13 @@ fn env_empty() -> Env2 {
 }
 
 fn env_register(e: Env2, id: i32) -> Env2 {
+  let mut out: Env2 = e;
   if e.n == 0 {
-    return Env2 { v0: id, v1: 0, n: 1 };
+    out = Env2 { v0: id, v1: 0, n: 1 };
   } else if e.n == 1 {
-    return Env2 { v0: e.v0, v1: id, n: 2 };
-  } else {
-    return e;
+    out = Env2 { v0: e.v0, v1: id, n: 2 };
   }
+  return out;
 }
 
 fn env_lookup(e: Env2, id: i32) -> i32 {

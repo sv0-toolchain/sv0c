@@ -74,95 +74,70 @@ static TypeEnvAlias tea_empty(void) {
 }
 
 static TypeEnvAlias tea_ty_register(TypeEnvAlias e, int id) {
-  int _sv0t0;
-  int _sv0t1;
+  TypeEnvAlias out;
+  out = e;
   if ((e.tn == 0)) {
-    TypeEnvAlias _sv0t2;
-    _sv0t2.t0 = id;
-    _sv0t2.t1 = e.t1;
-    _sv0t2.tn = 1;
-    _sv0t2.an = e.an;
-    _sv0t2.af0 = e.af0;
-    _sv0t2.at0 = e.at0;
-    _sv0t2.af1 = e.af1;
-    _sv0t2.at1 = e.at1;
-    return _sv0t2;
-    _sv0t1 = 0;
+    TypeEnvAlias _sv0t0;
+    _sv0t0.t0 = id;
+    _sv0t0.t1 = e.t1;
+    _sv0t0.tn = 1;
+    _sv0t0.an = e.an;
+    _sv0t0.af0 = e.af0;
+    _sv0t0.at0 = e.at0;
+    _sv0t0.af1 = e.af1;
+    _sv0t0.at1 = e.at1;
+    out = _sv0t0;
   } else {
-    int _sv0t3;
     if ((e.tn == 1)) {
-      TypeEnvAlias _sv0t4;
-      _sv0t4.t0 = e.t0;
-      _sv0t4.t1 = id;
-      _sv0t4.tn = 2;
-      _sv0t4.an = e.an;
-      _sv0t4.af0 = e.af0;
-      _sv0t4.at0 = e.at0;
-      _sv0t4.af1 = e.af1;
-      _sv0t4.at1 = e.at1;
-      return _sv0t4;
-      _sv0t3 = 0;
+      TypeEnvAlias _sv0t1;
+      _sv0t1.t0 = e.t0;
+      _sv0t1.t1 = id;
+      _sv0t1.tn = 2;
+      _sv0t1.an = e.an;
+      _sv0t1.af0 = e.af0;
+      _sv0t1.at0 = e.at0;
+      _sv0t1.af1 = e.af1;
+      _sv0t1.at1 = e.at1;
+      out = _sv0t1;
     } else {
-      return e;
-      _sv0t3 = 0;
     }
-    _sv0t1 = _sv0t3;
   }
-  _sv0t0 = _sv0t1;
-  return _sv0t0;
+  return out;
 }
 
 static TypeEnvAlias tea_alias_register(TypeEnvAlias e, int from_id, int to_id) {
-  int _sv0t0;
-  int _sv0t1;
+  TypeEnvAlias out;
+  out = e;
   if ((e.an >= 1)) {
-    int _sv0t2;
-    if ((e.af0 == from_id)) {
-      return e;
-      _sv0t2 = 0;
-    } else {
-      int _sv0t3;
-      if ((e.an >= 2)) {
-        int _sv0t4;
-        if ((e.af1 == from_id)) {
-          return e;
-          _sv0t4 = 0;
-        } else {
-          return e;
-          _sv0t4 = 0;
-        }
-        _sv0t3 = _sv0t4;
+    if ((e.af0 != from_id)) {
+      if ((e.an < 2)) {
+        TypeEnvAlias _sv0t0;
+        _sv0t0.t0 = e.t0;
+        _sv0t0.t1 = e.t1;
+        _sv0t0.tn = e.tn;
+        _sv0t0.an = 2;
+        _sv0t0.af0 = e.af0;
+        _sv0t0.at0 = e.at0;
+        _sv0t0.af1 = from_id;
+        _sv0t0.at1 = to_id;
+        out = _sv0t0;
       } else {
-        TypeEnvAlias _sv0t5;
-        _sv0t5.t0 = e.t0;
-        _sv0t5.t1 = e.t1;
-        _sv0t5.tn = e.tn;
-        _sv0t5.an = 2;
-        _sv0t5.af0 = e.af0;
-        _sv0t5.at0 = e.at0;
-        _sv0t5.af1 = from_id;
-        _sv0t5.at1 = to_id;
-        return _sv0t5;
-        _sv0t3 = 0;
       }
-      _sv0t2 = _sv0t3;
+    } else {
     }
-    _sv0t1 = _sv0t2;
   } else {
-    TypeEnvAlias _sv0t6;
-    _sv0t6.t0 = e.t0;
-    _sv0t6.t1 = e.t1;
-    _sv0t6.tn = e.tn;
-    _sv0t6.an = 1;
-    _sv0t6.af0 = from_id;
-    _sv0t6.at0 = to_id;
-    _sv0t6.af1 = 0;
-    _sv0t6.at1 = 0;
-    return _sv0t6;
-    _sv0t1 = 0;
+    TypeEnvAlias _sv0t1;
+    _sv0t1.t0 = e.t0;
+    _sv0t1.t1 = e.t1;
+    _sv0t1.tn = e.tn;
+    _sv0t1.an = 1;
+    _sv0t1.af0 = from_id;
+    _sv0t1.at0 = to_id;
+    _sv0t1.af1 = 0;
+    _sv0t1.at1 = 0;
+    out = _sv0t1;
   }
-  _sv0t0 = _sv0t1;
-  return _sv0t0;
+  return out;
 }
 
 static int tea_ty_mod_lookup(TypeEnvAlias e, int id) {

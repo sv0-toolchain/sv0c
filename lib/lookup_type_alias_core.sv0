@@ -43,35 +43,27 @@ fn tea_empty() -> TypeEnvAlias {
 }
 
 fn tea_ty_register(e: TypeEnvAlias, id: i32) -> TypeEnvAlias {
+  let mut out: TypeEnvAlias = e;
   if e.tn == 0 {
-    return TypeEnvAlias { t0: id, t1: e.t1, tn: 1, an: e.an, af0: e.af0, at0: e.at0, af1: e.af1, at1: e.at1 };
-  } else {
-    if e.tn == 1 {
-      return TypeEnvAlias { t0: e.t0, t1: id, tn: 2, an: e.an, af0: e.af0, at0: e.at0, af1: e.af1, at1: e.at1 };
-    } else {
-      return e;
-    }
+    out = TypeEnvAlias { t0: id, t1: e.t1, tn: 1, an: e.an, af0: e.af0, at0: e.at0, af1: e.af1, at1: e.at1 };
+  } else if e.tn == 1 {
+    out = TypeEnvAlias { t0: e.t0, t1: id, tn: 2, an: e.an, af0: e.af0, at0: e.at0, af1: e.af1, at1: e.at1 };
   }
+  return out;
 }
 
 fn tea_alias_register(e: TypeEnvAlias, from_id: i32, to_id: i32) -> TypeEnvAlias {
+  let mut out: TypeEnvAlias = e;
   if e.an >= 1 {
-    if e.af0 == from_id {
-      return e;
-    } else {
-      if e.an >= 2 {
-        if e.af1 == from_id {
-          return e;
-        } else {
-          return e;
-        }
-      } else {
-        return TypeEnvAlias { t0: e.t0, t1: e.t1, tn: e.tn, an: 2, af0: e.af0, at0: e.at0, af1: from_id, at1: to_id };
+    if e.af0 != from_id {
+      if e.an < 2 {
+        out = TypeEnvAlias { t0: e.t0, t1: e.t1, tn: e.tn, an: 2, af0: e.af0, at0: e.at0, af1: from_id, at1: to_id };
       }
     }
   } else {
-    return TypeEnvAlias { t0: e.t0, t1: e.t1, tn: e.tn, an: 1, af0: from_id, at0: to_id, af1: 0, at1: 0 };
+    out = TypeEnvAlias { t0: e.t0, t1: e.t1, tn: e.tn, an: 1, af0: from_id, at0: to_id, af1: 0, at1: 0 };
   }
+  return out;
 }
 
 fn tea_ty_mod_lookup(e: TypeEnvAlias, id: i32) -> i32 {

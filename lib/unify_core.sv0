@@ -1,0 +1,116 @@
+// unify_core.sv0
+// Surrogate for unify.sml type unification.
+// Models the structural type equality check.
+//
+// SML reference: sml/type_checker/unify.sml
+//   fun unify, fun unifyList
+//
+// Unification rules (modeled as tag-based dispatch):
+//   same kind + same payload -> 1 (unify)
+//   TyVar(i) == TyVar(j) iff i == j
+//   TyRef/TyRefMut cross-unify (structural, ignoring mutability)
+//   TyArray: same length + inner unifies
+//   TyTuple/TyFn: unifyList on children
+//   TyNamed: same name + unifyList on generics
+//   otherwise -> 0
+
+fn unify_simple(kind_a: i32, kind_b: i32) -> i32 {
+    // TyVar: both must be TyVar with same id (checked separately)
+    if kind_a == 18 {
+        if kind_b == 18 {
+            return 1;
+        }
+        return 0;
+    }
+    if kind_b == 18 {
+        return 0;
+    }
+    // ref/refmut cross-unify
+    if kind_a == 11 {
+        if kind_b == 11 { return 1; }
+        if kind_b == 12 { return 1; }
+        return 0;
+    }
+    if kind_a == 12 {
+        if kind_b == 11 { return 1; }
+        if kind_b == 12 { return 1; }
+        return 0;
+    }
+    // same kind for primitives/named
+    if kind_a == kind_b {
+        return 1;
+    }
+    return 0;
+}
+
+// For types with payload (widths, names): same kind + same payload
+fn unify_payload(kind_a: i32, kind_b: i32, payload_a: i32, payload_b: i32) -> i32 {
+    if unify_simple(kind_a, kind_b) == 0 {
+        return 0;
+    }
+    if kind_a == 5 { return payload_eq(payload_a, payload_b); }
+    if kind_a == 6 { return payload_eq(payload_a, payload_b); }
+    if kind_a == 7 { return payload_eq(payload_a, payload_b); }
+    if kind_a == 3 { return payload_eq(payload_a, payload_b); }
+    if kind_a == 4 { return payload_eq(payload_a, payload_b); }
+    if kind_a == 13 { return payload_eq(payload_a, payload_b); }
+    if kind_a == 17 { return payload_eq(payload_a, payload_b); }
+    if kind_a == 18 { return payload_eq(payload_a, payload_b); }
+    return 1;
+}
+
+fn payload_eq(a: i32, b: i32) -> i32 {
+    if a == b { return 1; }
+    return 0;
+}
+
+// unifyList: same length + pairwise unify -> 1
+fn unify_list_ok(len_a: i32, len_b: i32, all_pairs_match: i32) -> i32 {
+    if len_a != len_b {
+        return 0;
+    }
+    return all_pairs_match;
+}
+
+fn main() -> i32 {
+    // same primitives
+    if unify_simple(0, 0) != 1 { return 1; }
+    if unify_simple(1, 1) != 1 { return 1; }
+    if unify_simple(10, 10) != 1 { return 1; }
+
+    // different primitives
+    if unify_simple(0, 1) != 0 { return 1; }
+    if unify_simple(5, 6) != 0 { return 1; }
+
+    // TyVar
+    if unify_simple(18, 18) != 1 { return 1; }
+    if unify_simple(18, 0) != 0 { return 1; }
+    if unify_simple(0, 18) != 0 { return 1; }
+
+    // ref/refmut cross-unify
+    if unify_simple(11, 11) != 1 { return 1; }
+    if unify_simple(11, 12) != 1 { return 1; }
+    if unify_simple(12, 11) != 1 { return 1; }
+    if unify_simple(12, 12) != 1 { return 1; }
+    if unify_simple(11, 0) != 0 { return 1; }
+
+    // payload: TyInt(32) == TyInt(32)
+    if unify_payload(5, 5, 32, 32) != 1 { return 1; }
+    // TyInt(32) != TyInt(64)
+    if unify_payload(5, 5, 32, 64) != 0 { return 1; }
+    // TyVar(0) == TyVar(0)
+    if unify_payload(18, 18, 0, 0) != 1 { return 1; }
+    // TyVar(0) != TyVar(1)
+    if unify_payload(18, 18, 0, 1) != 0 { return 1; }
+    // TyStruct("a") == TyStruct("a")
+    if unify_payload(3, 3, 1, 1) != 1 { return 1; }
+    // TyStruct("a") != TyStruct("b")
+    if unify_payload(3, 3, 1, 2) != 0 { return 1; }
+
+    // unifyList
+    if unify_list_ok(2, 2, 1) != 1 { return 1; }
+    if unify_list_ok(2, 3, 1) != 0 { return 1; }
+    if unify_list_ok(2, 2, 0) != 0 { return 1; }
+
+    return 0;
+}

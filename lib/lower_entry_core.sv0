@@ -1,0 +1,68 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`lower`** (top-level entry): initialize program tables, map `lowerFn` over `ItemFn` items.
+   SML: `theProg := prog; structFieldOrder := buildStructOrder prog; enumVariants := buildEnumVariants prog; {typedefs = collectTypedefs prog, blocks = mapPartial one prog}` where `one (ItemFn r) = SOME (lowerFn r) | _ = NONE`.
+   Harness: **`item_count`** = total program items, **`fn_count`** = subset that are `ItemFn`, **`struct_count`** / **`enum_count`** = non-fn items contributing to typedefs.
+   Output: **`lower_block_count`** = **`fn_count`** (one IR block per `ItemFn`); **`lower_typedef_count`** = **`struct_count + enum_count`**. Negative → **255**. Sum exceeds item_count → **255**. */
+
+fn lower_block_count(item_count: i32, fn_count: i32) -> i32 {
+  if item_count < 0 {
+    return 255;
+  }
+  if fn_count < 0 {
+    return 255;
+  }
+  if fn_count > item_count {
+    return 255;
+  }
+  return fn_count;
+}
+
+fn lower_typedef_count(struct_count: i32, enum_count: i32) -> i32 {
+  if struct_count < 0 {
+    return 255;
+  }
+  if enum_count < 0 {
+    return 255;
+  }
+  return struct_count + enum_count;
+}
+
+fn lower_init_table_count(struct_count: i32, enum_count: i32) -> i32 {
+  if struct_count < 0 {
+    return 255;
+  }
+  if enum_count < 0 {
+    return 255;
+  }
+  return struct_count + enum_count;
+}
+
+fn main() -> i32 {
+  if lower_block_count(5, 3) != 3 {
+    return 1;
+  }
+  if lower_block_count(0, 0) != 0 {
+    return 1;
+  }
+  if lower_block_count(2, 3) != 255 {
+    return 1;
+  }
+  if lower_block_count(-1, 0) != 255 {
+    return 1;
+  }
+  if lower_typedef_count(2, 1) != 3 {
+    return 1;
+  }
+  if lower_typedef_count(0, 0) != 0 {
+    return 1;
+  }
+  if lower_typedef_count(-1, 0) != 255 {
+    return 1;
+  }
+  if lower_init_table_count(1, 2) != 3 {
+    return 1;
+  }
+  if lower_init_table_count(0, 0) != 0 {
+    return 1;
+  }
+  return 0;
+}

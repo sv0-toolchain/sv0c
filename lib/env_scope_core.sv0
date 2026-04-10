@@ -53,55 +53,43 @@ fn scope_lookup(e: ScopeMini, id: i32) -> i32 {
 }
 
 fn scope_bind(e: ScopeMini, id: i32) -> ScopeMini {
+  let mut out: ScopeMini = e;
   if e.d == 0 {
-    return ScopeMini { d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
+    out = ScopeMini { d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
+  } else if e.d == 1 {
+    if e.in_ == 0 {
+      out = ScopeMini { d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
+    } else if e.in_ == 1 {
+      out = ScopeMini { d: 1, i0: e.i0, i1: id, in_: 2, o0: 0, o1: 0, on: 0 };
+    }
   } else {
-    if e.d == 1 {
-      if e.in_ == 0 {
-        return ScopeMini { d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
-      } else {
-        if e.in_ == 1 {
-          return ScopeMini { d: 1, i0: e.i0, i1: id, in_: 2, o0: 0, o1: 0, on: 0 };
-        } else {
-          return e;
-        }
-      }
-    } else {
-      if e.in_ == 0 {
-        return ScopeMini { d: 2, i0: id, i1: 0, in_: 1, o0: e.o0, o1: e.o1, on: e.on };
-      } else {
-        if e.in_ == 1 {
-          return ScopeMini { d: 2, i0: e.i0, i1: id, in_: 2, o0: e.o0, o1: e.o1, on: e.on };
-        } else {
-          return e;
-        }
-      }
+    if e.in_ == 0 {
+      out = ScopeMini { d: 2, i0: id, i1: 0, in_: 1, o0: e.o0, o1: e.o1, on: e.on };
+    } else if e.in_ == 1 {
+      out = ScopeMini { d: 2, i0: e.i0, i1: id, in_: 2, o0: e.o0, o1: e.o1, on: e.on };
     }
   }
+  return out;
 }
 
 fn scope_enter(e: ScopeMini) -> ScopeMini {
+  let mut out: ScopeMini = e;
   if e.d == 0 {
-    return ScopeMini { d: 1, i0: 0, i1: 0, in_: 0, o0: 0, o1: 0, on: 0 };
-  } else {
-    if e.d == 1 {
-      return ScopeMini { d: 2, i0: 0, i1: 0, in_: 0, o0: e.i0, o1: e.i1, on: e.in_ };
-    } else {
-      return e;
-    }
+    out = ScopeMini { d: 1, i0: 0, i1: 0, in_: 0, o0: 0, o1: 0, on: 0 };
+  } else if e.d == 1 {
+    out = ScopeMini { d: 2, i0: 0, i1: 0, in_: 0, o0: e.i0, o1: e.i1, on: e.in_ };
   }
+  return out;
 }
 
 fn scope_exit(e: ScopeMini) -> ScopeMini {
+  let mut out: ScopeMini = e;
   if e.d == 2 {
-    return ScopeMini { d: 1, i0: e.o0, i1: e.o1, in_: e.on, o0: 0, o1: 0, on: 0 };
-  } else {
-    if e.d == 1 {
-      return scope_empty();
-    } else {
-      return e;
-    }
+    out = ScopeMini { d: 1, i0: e.o0, i1: e.o1, in_: e.on, o0: 0, o1: 0, on: 0 };
+  } else if e.d == 1 {
+    out = scope_empty();
   }
+  return out;
 }
 
 fn main() -> i32 {

@@ -1,0 +1,100 @@
+// codegen_emit_value_core.sv0
+// Surrogate for codegen.sml emitValue dispatch.
+// Models how many output segments each IR value kind contributes
+// to the emitted C string.
+//
+// SML reference: sml/backend/c/codegen.sml  fun emitValue
+
+// value_kind tags (mirror Ir.value constructors):
+//   1 = VInt        -> "intLit i"           -> 1 segment
+//   2 = VBool true  -> "1"                  -> 1 segment
+//   3 = VBool false -> "0"                  -> 1 segment
+//   4 = VVar        -> x                    -> 1 segment
+//   5 = VUnit       -> "0"                  -> 1 segment
+//   6 = VString     -> '"' ^ escape ^ '"'   -> 3 segments (open + body + close)
+//   7 = VMember(VVar) -> x ^ "." ^ f        -> 3 segments
+//   8 = VMember(other) -> "(" ^ emitValue ^ ")." ^ f  -> 4 segments
+//   9 = VAddrOf     -> "(&" ^ x ^ ")"       -> 3 segments
+
+fn emit_value_segment_count(value_kind: i32) -> i32 {
+    if value_kind == 1 {
+        return 1;
+    }
+    if value_kind == 2 {
+        return 1;
+    }
+    if value_kind == 3 {
+        return 1;
+    }
+    if value_kind == 4 {
+        return 1;
+    }
+    if value_kind == 5 {
+        return 1;
+    }
+    if value_kind == 6 {
+        return 3;
+    }
+    if value_kind == 7 {
+        return 3;
+    }
+    if value_kind == 8 {
+        return 4;
+    }
+    if value_kind == 9 {
+        return 3;
+    }
+    return 255;
+}
+
+// emitCallArgs: comma-separated emitValue for each arg.
+// Output segment count = sum of per-value segments + (n-1) separators.
+fn emit_call_args_segment_count(arg_count: i32, total_value_segments: i32) -> i32 {
+    if arg_count == 0 {
+        return 0;
+    }
+    return total_value_segments + arg_count - 1;
+}
+
+// cEscapeString: each char -> 1 or 2 output chars.
+// Surrogate: escaped_count characters that need escaping, plain_count that don't.
+fn c_escape_string_len(plain_count: i32, escaped_count: i32) -> i32 {
+    return plain_count + escaped_count * 2;
+}
+
+fn main() -> i32 {
+    // VInt -> 1
+    if emit_value_segment_count(1) != 1 { return 1; }
+    // VBool true -> 1
+    if emit_value_segment_count(2) != 1 { return 1; }
+    // VBool false -> 1
+    if emit_value_segment_count(3) != 1 { return 1; }
+    // VVar -> 1
+    if emit_value_segment_count(4) != 1 { return 1; }
+    // VUnit -> 1
+    if emit_value_segment_count(5) != 1 { return 1; }
+    // VString -> 3
+    if emit_value_segment_count(6) != 3 { return 1; }
+    // VMember(VVar) -> 3
+    if emit_value_segment_count(7) != 3 { return 1; }
+    // VMember(other) -> 4
+    if emit_value_segment_count(8) != 4 { return 1; }
+    // VAddrOf -> 3
+    if emit_value_segment_count(9) != 3 { return 1; }
+    // unknown -> 255
+    if emit_value_segment_count(99) != 255 { return 1; }
+
+    // emitCallArgs: 0 args -> 0
+    if emit_call_args_segment_count(0, 0) != 0 { return 1; }
+    // 1 arg with 1 segment -> 1 (no separator)
+    if emit_call_args_segment_count(1, 1) != 1 { return 1; }
+    // 3 args, total 5 value segments -> 5 + 2 separators = 7
+    if emit_call_args_segment_count(3, 5) != 7 { return 1; }
+
+    // cEscapeString: 5 plain + 2 escaped -> 5 + 4 = 9
+    if c_escape_string_len(5, 2) != 9 { return 1; }
+    // all plain: 10 + 0 = 10
+    if c_escape_string_len(10, 0) != 10 { return 1; }
+
+    return 0;
+}

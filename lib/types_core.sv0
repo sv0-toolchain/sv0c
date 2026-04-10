@@ -1,0 +1,103 @@
+// types_core.sv0
+// Surrogate for types.sml type representation.
+// Models type kind tags and freshVar counter.
+//
+// SML reference: sml/type_checker/types.sml
+//   datatype ty, fun freshVar
+//
+// Type kind tags:
+//   0  = TyUnit
+//   1  = TyBool
+//   2  = TyChar
+//   3  = TyStruct(name)
+//   4  = TyEnum(name)
+//   5  = TyInt(width)
+//   6  = TyUint(width)
+//   7  = TyFloat(width)
+//   8  = TyIsize
+//   9  = TyUsize
+//   10 = TyString
+//   11 = TyRef(inner)
+//   12 = TyRefMut(inner)
+//   13 = TyArray(inner, len)
+//   14 = TySlice(inner)
+//   15 = TyTuple(...)
+//   16 = TyFn(args, ret)
+//   17 = TyNamed(name, generics)
+//   18 = TyVar(id)
+//   19 = TyError
+
+fn ty_is_primitive(kind: i32) -> i32 {
+    if kind == 0 { return 1; }
+    if kind == 1 { return 1; }
+    if kind == 2 { return 1; }
+    if kind >= 5 {
+        if kind <= 10 {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+fn ty_is_compound(kind: i32) -> i32 {
+    if kind == 3 { return 1; }
+    if kind == 4 { return 1; }
+    if kind >= 11 {
+        if kind <= 17 {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+fn ty_has_inner(kind: i32) -> i32 {
+    if kind == 11 { return 1; }
+    if kind == 12 { return 1; }
+    if kind == 13 { return 1; }
+    if kind == 14 { return 1; }
+    return 0;
+}
+
+// freshVar: returns next id, then increments counter
+fn fresh_var(counter: i32) -> i32 {
+    return counter;
+}
+
+fn fresh_var_next(counter: i32) -> i32 {
+    return counter + 1;
+}
+
+fn main() -> i32 {
+    // primitives
+    if ty_is_primitive(0) != 1 { return 1; }
+    if ty_is_primitive(1) != 1 { return 1; }
+    if ty_is_primitive(2) != 1 { return 1; }
+    if ty_is_primitive(5) != 1 { return 1; }
+    if ty_is_primitive(10) != 1 { return 1; }
+    if ty_is_primitive(3) != 0 { return 1; }
+    if ty_is_primitive(15) != 0 { return 1; }
+
+    // compound
+    if ty_is_compound(3) != 1 { return 1; }
+    if ty_is_compound(4) != 1 { return 1; }
+    if ty_is_compound(11) != 1 { return 1; }
+    if ty_is_compound(17) != 1 { return 1; }
+    if ty_is_compound(0) != 0 { return 1; }
+    if ty_is_compound(18) != 0 { return 1; }
+
+    // has_inner
+    if ty_has_inner(11) != 1 { return 1; }
+    if ty_has_inner(12) != 1 { return 1; }
+    if ty_has_inner(13) != 1 { return 1; }
+    if ty_has_inner(14) != 1 { return 1; }
+    if ty_has_inner(0) != 0 { return 1; }
+    if ty_has_inner(15) != 0 { return 1; }
+
+    // freshVar
+    if fresh_var(0) != 0 { return 1; }
+    if fresh_var_next(0) != 1 { return 1; }
+    if fresh_var(5) != 5 { return 1; }
+    if fresh_var_next(5) != 6 { return 1; }
+
+    return 0;
+}

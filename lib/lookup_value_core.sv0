@@ -20,15 +20,13 @@ fn full_empty() -> FullEnv {
 }
 
 fn full_mod_register(e: FullEnv, id: i32) -> FullEnv {
+  let mut out: FullEnv = e;
   if e.mn == 0 {
-    return FullEnv { mv0: id, mv1: e.mv1, mn: 1, d: e.d, i0: e.i0, i1: e.i1, in_: e.in_, o0: e.o0, o1: e.o1, on: e.on };
-  } else {
-    if e.mn == 1 {
-      return FullEnv { mv0: e.mv0, mv1: id, mn: 2, d: e.d, i0: e.i0, i1: e.i1, in_: e.in_, o0: e.o0, o1: e.o1, on: e.on };
-    } else {
-      return e;
-    }
+    out = FullEnv { mv0: id, mv1: e.mv1, mn: 1, d: e.d, i0: e.i0, i1: e.i1, in_: e.in_, o0: e.o0, o1: e.o1, on: e.on };
+  } else if e.mn == 1 {
+    out = FullEnv { mv0: e.mv0, mv1: id, mn: 2, d: e.d, i0: e.i0, i1: e.i1, in_: e.in_, o0: e.o0, o1: e.o1, on: e.on };
   }
+  return out;
 }
 
 fn mod_lookup(e: FullEnv, id: i32) -> i32 {
@@ -96,55 +94,43 @@ fn lookup_value(e: FullEnv, id: i32) -> i32 {
 }
 
 fn full_scope_bind(e: FullEnv, id: i32) -> FullEnv {
+  let mut out: FullEnv = e;
   if e.d == 0 {
-    return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
+    out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
+  } else if e.d == 1 {
+    if e.in_ == 0 {
+      out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
+    } else if e.in_ == 1 {
+      out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: e.i0, i1: id, in_: 2, o0: 0, o1: 0, on: 0 };
+    }
   } else {
-    if e.d == 1 {
-      if e.in_ == 0 {
-        return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: id, i1: 0, in_: 1, o0: 0, o1: 0, on: 0 };
-      } else {
-        if e.in_ == 1 {
-          return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: e.i0, i1: id, in_: 2, o0: 0, o1: 0, on: 0 };
-        } else {
-          return e;
-        }
-      }
-    } else {
-      if e.in_ == 0 {
-        return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 2, i0: id, i1: 0, in_: 1, o0: e.o0, o1: e.o1, on: e.on };
-      } else {
-        if e.in_ == 1 {
-          return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 2, i0: e.i0, i1: id, in_: 2, o0: e.o0, o1: e.o1, on: e.on };
-        } else {
-          return e;
-        }
-      }
+    if e.in_ == 0 {
+      out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 2, i0: id, i1: 0, in_: 1, o0: e.o0, o1: e.o1, on: e.on };
+    } else if e.in_ == 1 {
+      out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 2, i0: e.i0, i1: id, in_: 2, o0: e.o0, o1: e.o1, on: e.on };
     }
   }
+  return out;
 }
 
 fn full_scope_enter(e: FullEnv) -> FullEnv {
+  let mut out: FullEnv = e;
   if e.d == 0 {
-    return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: 0, i1: 0, in_: 0, o0: 0, o1: 0, on: 0 };
-  } else {
-    if e.d == 1 {
-      return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 2, i0: 0, i1: 0, in_: 0, o0: e.i0, o1: e.i1, on: e.in_ };
-    } else {
-      return e;
-    }
+    out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: 0, i1: 0, in_: 0, o0: 0, o1: 0, on: 0 };
+  } else if e.d == 1 {
+    out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 2, i0: 0, i1: 0, in_: 0, o0: e.i0, o1: e.i1, on: e.in_ };
   }
+  return out;
 }
 
 fn full_scope_exit(e: FullEnv) -> FullEnv {
+  let mut out: FullEnv = e;
   if e.d == 2 {
-    return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: e.o0, i1: e.o1, in_: e.on, o0: 0, o1: 0, on: 0 };
-  } else {
-    if e.d == 1 {
-      return FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 0, i0: 0, i1: 0, in_: 0, o0: 0, o1: 0, on: 0 };
-    } else {
-      return e;
-    }
+    out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 1, i0: e.o0, i1: e.o1, in_: e.on, o0: 0, o1: 0, on: 0 };
+  } else if e.d == 1 {
+    out = FullEnv { mv0: e.mv0, mv1: e.mv1, mn: e.mn, d: 0, i0: 0, i1: 0, in_: 0, o0: 0, o1: 0, on: 0 };
   }
+  return out;
 }
 
 fn main() -> i32 {

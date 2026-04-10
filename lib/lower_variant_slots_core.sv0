@@ -1,0 +1,47 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`variantSlots`**: count payload fields in a variant.
+   SML: `VariantUnit => 0 | VariantTuple (_, ts, _) => length ts | VariantStruct (_, fs, _) => length fs`.
+   Harness: **`variant_kind`** **0** = `VariantUnit`, **1** = `VariantTuple`, **2** = `VariantStruct`; **`field_count`** = number of tuple components or struct fields. Unknown kind → **255**. Negative field count → **255**. */
+
+fn variant_slots(variant_kind: i32, field_count: i32) -> i32 {
+  if variant_kind == 0 {
+    return 0;
+  }
+  if variant_kind == 1 {
+    if field_count < 0 {
+      return 255;
+    }
+    return field_count;
+  }
+  if variant_kind == 2 {
+    if field_count < 0 {
+      return 255;
+    }
+    return field_count;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if variant_slots(0, 0) != 0 {
+    return 1;
+  }
+  if variant_slots(1, 3) != 3 {
+    return 1;
+  }
+  if variant_slots(2, 5) != 5 {
+    return 1;
+  }
+  if variant_slots(1, 0) != 0 {
+    return 1;
+  }
+  if variant_slots(0, 5) != 0 {
+    return 1;
+  }
+  if variant_slots(3, 0) != 255 {
+    return 1;
+  }
+  if variant_slots(1, -1) != 255 {
+    return 1;
+  }
+  return 0;
+}

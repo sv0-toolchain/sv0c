@@ -15,23 +15,17 @@ fn alias_empty() -> TyAlias2 {
 }
 
 fn alias_register(e: TyAlias2, from_id: i32, to_id: i32) -> TyAlias2 {
+  let mut out: TyAlias2 = e;
   if e.an >= 1 {
-    if e.af0 == from_id {
-      return e;
-    } else {
-      if e.an >= 2 {
-        if e.af1 == from_id {
-          return e;
-        } else {
-          return e;
-        }
-      } else {
-        return TyAlias2 { an: 2, af0: e.af0, at0: e.at0, af1: from_id, at1: to_id };
+    if e.af0 != from_id {
+      if e.an < 2 {
+        out = TyAlias2 { an: 2, af0: e.af0, at0: e.at0, af1: from_id, at1: to_id };
       }
     }
   } else {
-    return TyAlias2 { an: 1, af0: from_id, at0: to_id, af1: 0, at1: 0 };
+    out = TyAlias2 { an: 1, af0: from_id, at0: to_id, af1: 0, at1: 0 };
   }
+  return out;
 }
 
 fn has_ty_alias_name(e: TyAlias2, from_id: i32) -> i32 {

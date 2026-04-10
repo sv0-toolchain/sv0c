@@ -1,0 +1,87 @@
+// bytecode_encode_core.sv0
+// Surrogate for bytecode.sml instruction encoding sizes.
+// Models encodeInsn byte length per instruction kind.
+//
+// SML reference: sml/backend/vm/bytecode.sml  fun encodeInsn
+//
+// Instruction encoding sizes:
+//   1 byte:  HALT, POP, DUP, PUSH_UNIT, arith/logic/cmp (no payload)
+//   2 bytes: PUSH_BOOL, RETURN_SLOTS
+//   5 bytes: PUSH_I32, PUSH_STRING, LOAD_LOCAL, STORE_LOCAL,
+//            JUMP, JUMP_IF, JUMP_IF_NOT, CALL_BUILTIN,
+//            ALLOC_STRUCT, GET_FIELD, SET_FIELD, ALLOC_ARRAY,
+//            GET_TAG (1), GET_INDEX (1), SET_INDEX (1),
+//            GET_VARIANT_FIELD, CONTRACT_CHECK
+//   9 bytes: PUSH_I64, PUSH_F64, CALL (opcode + 4 + 4)
+//  13 bytes: CONSTRUCT_VARIANT (opcode + 4 + 4 + 4)
+//   5 bytes: CAST (opcode + 2 + 2)
+
+// insn_class: group instructions by encoding size
+//   0 = 1-byte (simple opcode, no payload)
+//   1 = 2-byte (opcode + u8)
+//   2 = 5-byte (opcode + i32/u32)
+//   3 = 9-byte (opcode + i64/f64 or opcode + u32 + u32)
+//   4 = 13-byte (opcode + u32 + u32 + u32)
+//   5 = 5-byte (opcode + u16 + u16, CAST)
+fn encode_insn_len(insn_class: i32) -> i32 {
+    if insn_class == 0 { return 1; }
+    if insn_class == 1 { return 2; }
+    if insn_class == 2 { return 5; }
+    if insn_class == 3 { return 9; }
+    if insn_class == 4 { return 13; }
+    if insn_class == 5 { return 5; }
+    return 255;
+}
+
+// encLens: total encoded length of an instruction list
+fn enc_lens(insn_count: i32, total_bytes: i32) -> i32 {
+    return total_bytes;
+}
+
+// File header: magic (4) + version (4) + string_count (4) + func_count (4) = 16
+fn file_header_len() -> i32 {
+    return 16;
+}
+
+// String pool entry: length (4) + chars
+fn string_entry_len(str_len: i32) -> i32 {
+    return 4 + str_len;
+}
+
+// Function entry: name_idx (4) + arity (4) + local_count (4) + code_len (4) + code
+fn func_entry_header_len() -> i32 {
+    return 16;
+}
+
+fn func_entry_total_len(code_bytes: i32) -> i32 {
+    return 16 + code_bytes;
+}
+
+fn main() -> i32 {
+    // encode lengths by class
+    if encode_insn_len(0) != 1 { return 1; }
+    if encode_insn_len(1) != 2 { return 1; }
+    if encode_insn_len(2) != 5 { return 1; }
+    if encode_insn_len(3) != 9 { return 1; }
+    if encode_insn_len(4) != 13 { return 1; }
+    if encode_insn_len(5) != 5 { return 1; }
+    if encode_insn_len(99) != 255 { return 1; }
+
+    // encLens
+    if enc_lens(3, 15) != 15 { return 1; }
+    if enc_lens(0, 0) != 0 { return 1; }
+
+    // file header
+    if file_header_len() != 16 { return 1; }
+
+    // string entry
+    if string_entry_len(5) != 9 { return 1; }
+    if string_entry_len(0) != 4 { return 1; }
+
+    // func entry
+    if func_entry_header_len() != 16 { return 1; }
+    if func_entry_total_len(20) != 36 { return 1; }
+    if func_entry_total_len(0) != 16 { return 1; }
+
+    return 0;
+}
