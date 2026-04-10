@@ -1,0 +1,34 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`lowerQuant`** (**`forall`** / **`exists`** over integer range **`lo..hi`** with body as predicate).
+   Surrogate for the **length** of the **`instr` list** paired with the accumulator load: **`initPart`** = **`|iHi|` + 1 + |iLo|` + 1** (assign hi/cnt temps), **`initAcc`** = **1**, **`While`** wraps **`Block`** (loop index assign + **`body_w`** predicate prelude + **`DeclVar`/`Store`** + **`br`** **`IfElse`**) and **incr** **Store**. Packed as **`hi_w + lo_w + body_w + 11`**; any negative **`hi_w`**, **`lo_w`**, or **`body_w`** → **255**. */
+
+fn lower_quant_ir_len(hi_w: i32, lo_w: i32, body_w: i32) -> i32 {
+  if hi_w < 0 {
+    return 255;
+  }
+  if lo_w < 0 {
+    return 255;
+  }
+  if body_w < 0 {
+    return 255;
+  }
+  return hi_w + lo_w + body_w + 11;
+}
+
+fn main() -> i32 {
+  if lower_quant_ir_len(0, 0, 0) != 11 {
+    return 1;
+  }
+  if lower_quant_ir_len(2, 3, 5) != 21 {
+    return 1;
+  }
+  if lower_quant_ir_len(-1, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_quant_ir_len(0, -1, 0) != 255 {
+    return 1;
+  }
+  if lower_quant_ir_len(0, 0, -1) != 255 {
+    return 1;
+  }
+  return 0;
+}
