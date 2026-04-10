@@ -1,0 +1,134 @@
+// vm_codegen_emit_instr_core.sv0
+// Surrogate for vm_codegen.sml emitInstr bytecode instruction count.
+// Models how many bytecode instructions each IR instruction kind produces.
+//
+// SML reference: sml/backend/vm/vm_codegen.sml  fun emitInstr
+//
+// instr_tag:
+//   0  = Nop           -> 0 insns
+//   1  = DeclVar       -> 0 insns (allocation only)
+//   2  = DeclNamed     -> 0 insns (allocation only)
+//   3  = Assign(x,e)   -> emitExpr(e) + width STORE_LOCAL
+//   4  = Store(x,e)    -> emitExpr(e) + width STORE_LOCAL
+//   5  = StoreField    -> emitExpr(e) + 1 STORE_LOCAL
+//   6  = IfElse        -> cond + JUMP_IF_NOT + then + JUMP + else
+//   7  = While         -> emitWhileLoop (complex)
+//   8  = Block         -> sum of child instructions
+//   9  = Break         -> error in emitInstr (only valid in loop context)
+//   10 = Continue      -> error in emitInstr (only valid in loop context)
+//   11 = Return NONE   -> [RETURN_SLOTS 0] (void) or error
+//   12 = Return SOME   -> emitValue(v) + [RETURN_SLOTS w]
+//   13 = Call(NONE, println) -> [PUSH_STRING, CALL_BUILTIN 0]
+//   14 = Call(SOME, no_alias) -> pushes + [CALL_BUILTIN 1] + stores
+//   15 = Call(NONE, f)  -> pushes + [CALL(ix, nargs)]
+//   16 = Call(SOME, f)  -> pushes + [CALL(ix, nargs)] + stores
+//   17 = Requires       -> emitExpr(e) + [CONTRACT_CHECK]
+//   18 = Ensures        -> emitExpr(e) + [CONTRACT_CHECK]
+
+fn emit_instr_insn_count(instr_tag: i32, expr_insns: i32, store_width: i32, extra: i32) -> i32 {
+    if instr_tag == 0 { return 0; }
+    if instr_tag == 1 { return 0; }
+    if instr_tag == 2 { return 0; }
+    // Assign: expr insns + width stores
+    if instr_tag == 3 { return expr_insns + store_width; }
+    // Store: expr insns + width stores
+    if instr_tag == 4 { return expr_insns + store_width; }
+    // StoreField: expr insns + 1 store
+    if instr_tag == 5 { return expr_insns + 1; }
+    // IfElse: cond + 1 (JUMP_IF_NOT) + then_insns + 1 (JUMP) + else_insns
+    //   expr_insns = cond count, store_width = then count, extra = else count
+    if instr_tag == 6 { return expr_insns + 1 + store_width + 1 + extra; }
+    // Block: sum of children
+    if instr_tag == 8 { return expr_insns; }
+    // Break/Continue: errors in non-loop context -> 254
+    if instr_tag == 9 { return 254; }
+    if instr_tag == 10 { return 254; }
+    // Return NONE (void): 1 (RETURN_SLOTS 0)
+    if instr_tag == 11 { return 1; }
+    // Return SOME: emitValue(v) + 1 (RETURN_SLOTS)
+    if instr_tag == 12 { return expr_insns + 1; }
+    // Call(NONE, println): 2 (PUSH_STRING + CALL_BUILTIN)
+    if instr_tag == 13 { return 2; }
+    // Call(SOME, no_alias): pushes + 1 (CALL_BUILTIN) + stores
+    if instr_tag == 14 { return expr_insns + 1 + store_width; }
+    // Call(NONE, f): pushes + 1 (CALL)
+    if instr_tag == 15 { return expr_insns + 1; }
+    // Call(SOME, f): pushes + 1 (CALL) + stores
+    if instr_tag == 16 { return expr_insns + 1 + store_width; }
+    // Requires: expr + 1 (CONTRACT_CHECK)
+    if instr_tag == 17 { return expr_insns + 1; }
+    // Ensures: expr + 1 (CONTRACT_CHECK)
+    if instr_tag == 18 { return expr_insns + 1; }
+    return 255;
+}
+
+// localCountAndEnv: scan instructions to count local slots.
+// Each DeclVar adds 1 slot, DeclNamed adds widthOfCty slots,
+// Assign(x,_) ensures x exists (1 slot if new),
+// Call(SOME d,_,_,rty) adds max(1, widthOfCty(rty)) slots.
+// IfElse/While/Block recurse into children.
+fn local_slot_delta(instr_tag: i32, cty_width: i32) -> i32 {
+    // DeclVar
+    if instr_tag == 1 { return 1; }
+    // DeclNamed
+    if instr_tag == 2 { return cty_width; }
+    // Assign (ensure int var exists)
+    if instr_tag == 3 { return 1; }
+    // Call(SOME d, _, _, rty) with result binding
+    if instr_tag == 16 {
+        if cty_width > 1 {
+            return cty_width;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+fn main() -> i32 {
+    // Nop -> 0
+    if emit_instr_insn_count(0, 0, 0, 0) != 0 { return 1; }
+    // DeclVar -> 0
+    if emit_instr_insn_count(1, 0, 0, 0) != 0 { return 1; }
+    // DeclNamed -> 0
+    if emit_instr_insn_count(2, 0, 0, 0) != 0 { return 1; }
+    // Assign: 2 expr insns + 1 store = 3
+    if emit_instr_insn_count(3, 2, 1, 0) != 3 { return 1; }
+    // Store: 1 expr insn + 3 stores (struct width) = 4
+    if emit_instr_insn_count(4, 1, 3, 0) != 4 { return 1; }
+    // StoreField: 2 expr insns + 1 = 3
+    if emit_instr_insn_count(5, 2, 0, 0) != 3 { return 1; }
+    // IfElse: cond=1 + 1 + then=3 + 1 + else=2 = 8
+    if emit_instr_insn_count(6, 1, 3, 2) != 8 { return 1; }
+    // Block: 5 child insns = 5
+    if emit_instr_insn_count(8, 5, 0, 0) != 5 { return 1; }
+    // Break -> 254 (error)
+    if emit_instr_insn_count(9, 0, 0, 0) != 254 { return 1; }
+    // Continue -> 254 (error)
+    if emit_instr_insn_count(10, 0, 0, 0) != 254 { return 1; }
+    // Return NONE -> 1
+    if emit_instr_insn_count(11, 0, 0, 0) != 1 { return 1; }
+    // Return SOME: 1 value insn + 1 = 2
+    if emit_instr_insn_count(12, 1, 0, 0) != 2 { return 1; }
+    // println: 2
+    if emit_instr_insn_count(13, 0, 0, 0) != 2 { return 1; }
+    // no_alias: 3 pushes + 1 + 2 stores = 6
+    if emit_instr_insn_count(14, 3, 2, 0) != 6 { return 1; }
+    // Call(NONE, f): 4 pushes + 1 = 5
+    if emit_instr_insn_count(15, 4, 0, 0) != 5 { return 1; }
+    // Call(SOME, f): 2 pushes + 1 + 3 stores = 6
+    if emit_instr_insn_count(16, 2, 3, 0) != 6 { return 1; }
+    // Requires: 1 expr + 1 = 2
+    if emit_instr_insn_count(17, 1, 0, 0) != 2 { return 1; }
+    // Ensures: 1 expr + 1 = 2
+    if emit_instr_insn_count(18, 1, 0, 0) != 2 { return 1; }
+
+    // localSlotDelta
+    if local_slot_delta(1, 0) != 1 { return 1; }
+    if local_slot_delta(2, 3) != 3 { return 1; }
+    if local_slot_delta(3, 0) != 1 { return 1; }
+    if local_slot_delta(16, 1) != 1 { return 1; }
+    if local_slot_delta(16, 4) != 4 { return 1; }
+    if local_slot_delta(0, 0) != 0 { return 1; }
+
+    return 0;
+}

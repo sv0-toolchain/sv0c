@@ -1,0 +1,35 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`collectTypedefs`**: scan program items for structs and enums, emit typedef strings.
+   SML: `String.concat (mapPartial emitStructTd prog @ mapPartial emitEnumTd prog)`.
+   Harness: **`struct_count`** = number of `ItemStruct` items, **`enum_count`** = number of `ItemEnum` items. Total typedef section count = **`struct_count + enum_count`** (one typedef block per item). Negative → **255**. */
+
+fn collect_typedefs_count(struct_count: i32, enum_count: i32) -> i32 {
+  if struct_count < 0 {
+    return 255;
+  }
+  if enum_count < 0 {
+    return 255;
+  }
+  return struct_count + enum_count;
+}
+
+fn main() -> i32 {
+  if collect_typedefs_count(0, 0) != 0 {
+    return 1;
+  }
+  if collect_typedefs_count(2, 3) != 5 {
+    return 1;
+  }
+  if collect_typedefs_count(1, 0) != 1 {
+    return 1;
+  }
+  if collect_typedefs_count(0, 4) != 4 {
+    return 1;
+  }
+  if collect_typedefs_count(-1, 0) != 255 {
+    return 1;
+  }
+  if collect_typedefs_count(0, -2) != 255 {
+    return 1;
+  }
+  return 0;
+}

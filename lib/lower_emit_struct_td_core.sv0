@@ -1,0 +1,27 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`emitStructTd`**: C struct typedef string-length surrogate.
+   SML: `"typedef struct {\n" ^ field_lines ^ "} " ^ name ^ ";\n"`.
+   Each field line: `"  " ^ astTyToCString aty ^ " " ^ f ^ ";\n"` — fixed overhead 5 chars (`"  "`, `" "`, `";\n"`) plus type and field name lengths.
+   Harness: **`struct_td_line_count`** = number of field lines emitted. Total output surrogate = **`field_count + 2`** (header + fields + trailer). Negative → **255**. */
+
+fn emit_struct_td_section_count(field_count: i32) -> i32 {
+  if field_count < 0 {
+    return 255;
+  }
+  return field_count + 2;
+}
+
+fn main() -> i32 {
+  if emit_struct_td_section_count(0) != 2 {
+    return 1;
+  }
+  if emit_struct_td_section_count(1) != 3 {
+    return 1;
+  }
+  if emit_struct_td_section_count(5) != 7 {
+    return 1;
+  }
+  if emit_struct_td_section_count(-1) != 255 {
+    return 1;
+  }
+  return 0;
+}

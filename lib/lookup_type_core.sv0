@@ -53,15 +53,13 @@ fn ty_empty() -> TypeEnv2 {
 }
 
 fn ty_register(e: TypeEnv2, id: i32) -> TypeEnv2 {
+  let mut out: TypeEnv2 = e;
   if e.n == 0 {
-    return TypeEnv2 { t0: id, t1: e.t1, n: 1 };
-  } else {
-    if e.n == 1 {
-      return TypeEnv2 { t0: e.t0, t1: id, n: 2 };
-    } else {
-      return e;
-    }
+    out = TypeEnv2 { t0: id, t1: e.t1, n: 1 };
+  } else if e.n == 1 {
+    out = TypeEnv2 { t0: e.t0, t1: id, n: 2 };
   }
+  return out;
 }
 
 fn ty_mod_lookup(e: TypeEnv2, id: i32) -> i32 {

@@ -81,32 +81,25 @@ static TypeEnv2 ty_empty(void) {
 }
 
 static TypeEnv2 ty_register(TypeEnv2 e, int id) {
-  int _sv0t0;
-  int _sv0t1;
+  TypeEnv2 out;
+  out = e;
   if ((e.n == 0)) {
-    TypeEnv2 _sv0t2;
-    _sv0t2.t0 = id;
-    _sv0t2.t1 = e.t1;
-    _sv0t2.n = 1;
-    return _sv0t2;
-    _sv0t1 = 0;
+    TypeEnv2 _sv0t0;
+    _sv0t0.t0 = id;
+    _sv0t0.t1 = e.t1;
+    _sv0t0.n = 1;
+    out = _sv0t0;
   } else {
-    int _sv0t3;
     if ((e.n == 1)) {
-      TypeEnv2 _sv0t4;
-      _sv0t4.t0 = e.t0;
-      _sv0t4.t1 = id;
-      _sv0t4.n = 2;
-      return _sv0t4;
-      _sv0t3 = 0;
+      TypeEnv2 _sv0t1;
+      _sv0t1.t0 = e.t0;
+      _sv0t1.t1 = id;
+      _sv0t1.n = 2;
+      out = _sv0t1;
     } else {
-      return e;
-      _sv0t3 = 0;
     }
-    _sv0t1 = _sv0t3;
   }
-  _sv0t0 = _sv0t1;
-  return _sv0t0;
+  return out;
 }
 
 static int ty_mod_lookup(TypeEnv2 e, int id) {

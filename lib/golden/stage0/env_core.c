@@ -19,32 +19,25 @@ static Env2 env_empty(void) {
 }
 
 static Env2 env_register(Env2 e, int id) {
-  int _sv0t0;
-  int _sv0t1;
+  Env2 out;
+  out = e;
   if ((e.n == 0)) {
-    Env2 _sv0t2;
-    _sv0t2.v0 = id;
-    _sv0t2.v1 = 0;
-    _sv0t2.n = 1;
-    return _sv0t2;
-    _sv0t1 = 0;
+    Env2 _sv0t0;
+    _sv0t0.v0 = id;
+    _sv0t0.v1 = 0;
+    _sv0t0.n = 1;
+    out = _sv0t0;
   } else {
-    int _sv0t3;
     if ((e.n == 1)) {
-      Env2 _sv0t4;
-      _sv0t4.v0 = e.v0;
-      _sv0t4.v1 = id;
-      _sv0t4.n = 2;
-      return _sv0t4;
-      _sv0t3 = 0;
+      Env2 _sv0t1;
+      _sv0t1.v0 = e.v0;
+      _sv0t1.v1 = id;
+      _sv0t1.n = 2;
+      out = _sv0t1;
     } else {
-      return e;
-      _sv0t3 = 0;
     }
-    _sv0t1 = _sv0t3;
   }
-  _sv0t0 = _sv0t1;
-  return _sv0t0;
+  return out;
 }
 
 static int env_lookup(Env2 e, int id) {

@@ -1,0 +1,26 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`paramName`**: extract parameter name from `(pat, ty)` pair.
+   SML: `case p of PatBind (x, _) => x | _ => raise Fail "..."`.
+   Harness: **`pat_kind`** **1** = `PatBind` → success tag **1**; anything else → error **255** (SML `raise`). Surrogate returns tag, not actual name string. */
+
+fn param_name_tag(pat_kind: i32) -> i32 {
+  if pat_kind == 1 {
+    return 1;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if param_name_tag(1) != 1 {
+    return 1;
+  }
+  if param_name_tag(0) != 255 {
+    return 1;
+  }
+  if param_name_tag(2) != 255 {
+    return 1;
+  }
+  if param_name_tag(-1) != 255 {
+    return 1;
+  }
+  return 0;
+}

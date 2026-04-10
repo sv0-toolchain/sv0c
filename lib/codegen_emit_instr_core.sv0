@@ -1,0 +1,169 @@
+// codegen_emit_instr_core.sv0
+// Surrogate for codegen.sml emitInstr dispatch.
+// Models how many output lines each IR instruction kind emits
+// in the generated C code.
+//
+// SML reference: sml/backend/c/codegen.sml  fun emitInstr
+//
+// instr_kind tags (mirror Ir.instr constructors):
+//   0 = Nop           -> ""                    -> 0 lines
+//   1 = DeclVar x     -> "int x;\n"            -> 1 line
+//   2 = DeclNamed     -> "cty x;\n"            -> 1 line
+//   3 = Assign(x,e)   -> "int x = expr;\n"     -> 1 line
+//   4 = Store(x,e)    -> "x = expr;\n"          -> 1 line
+//   5 = StoreField    -> "b.f = expr;\n"        -> 1 line
+//   6 = IfElse        -> if + then + else + close -> 3 + then_lines + else_lines
+//   7 = While         -> while + body + close   -> 2 + body_lines
+//   8 = Block         -> { + body + }           -> 2 + body_lines
+//   9 = Break         -> "break;\n"             -> 1 line
+//  10 = Continue      -> "continue;\n"          -> 1 line
+//  11 = Call(SOME)    -> "rty d = f(args);\n"   -> 1 line
+//  12 = Call(NONE)    -> "f(args);\n"           -> 1 line
+//  13 = Requires      -> "sv0_requires(...);\n" -> 1 line
+//  14 = Ensures       -> "sv0_ensures(...);\n"  -> 1 line
+//  15 = Return NONE   -> "return;\n"            -> 1 line
+//  16 = Return SOME   -> "return v;\n"          -> 1 line
+
+fn emit_instr_line_count(instr_kind: i32, child_lines_a: i32, child_lines_b: i32) -> i32 {
+    if instr_kind == 0 {
+        return 0;
+    }
+    if instr_kind == 1 {
+        return 1;
+    }
+    if instr_kind == 2 {
+        return 1;
+    }
+    if instr_kind == 3 {
+        return 1;
+    }
+    if instr_kind == 4 {
+        return 1;
+    }
+    if instr_kind == 5 {
+        return 1;
+    }
+    if instr_kind == 6 {
+        // IfElse: "if (...) {\n" + then_lines + "} else {\n" + else_lines + "}\n"
+        return 3 + child_lines_a + child_lines_b;
+    }
+    if instr_kind == 7 {
+        // While: "while (...) {\n" + body_lines + "}\n"
+        return 2 + child_lines_a;
+    }
+    if instr_kind == 8 {
+        // Block: "{\n" + body_lines + "}\n"
+        return 2 + child_lines_a;
+    }
+    if instr_kind == 9 {
+        return 1;
+    }
+    if instr_kind == 10 {
+        return 1;
+    }
+    if instr_kind == 11 {
+        return 1;
+    }
+    if instr_kind == 12 {
+        return 1;
+    }
+    if instr_kind == 13 {
+        return 1;
+    }
+    if instr_kind == 14 {
+        return 1;
+    }
+    if instr_kind == 15 {
+        return 1;
+    }
+    if instr_kind == 16 {
+        return 1;
+    }
+    return 255;
+}
+
+// emitBlockBody: sum of emitInstr lines for all instrs in a block
+fn emit_block_body_total_lines(instr_count: i32, total_instr_lines: i32) -> i32 {
+    if instr_count == 0 {
+        return 0;
+    }
+    return total_instr_lines;
+}
+
+// emitBlockDefn: proto line + "{\n" + body + "}\n\n"
+fn emit_block_defn_lines(body_lines: i32) -> i32 {
+    return 1 + body_lines + 1;
+}
+
+// Return(NONE) for void retTy -> "return;\n" (1 line)
+// Return(NONE) for non-void -> error (SML raises Fail)
+// Surrogate: ret_has_value=0 and ret_ty_is_void=1 -> 1
+//            ret_has_value=0 and ret_ty_is_void=0 -> 254 (error)
+//            ret_has_value=1 and ret_ty_is_void=1 -> "return;\n" (void ignores value)
+//            ret_has_value=1 and ret_ty_is_void=0 -> "return v;\n"
+fn return_line_count(ret_has_value: i32, ret_ty_is_void: i32) -> i32 {
+    if ret_has_value == 0 {
+        if ret_ty_is_void == 1 {
+            return 1;
+        }
+        return 254;
+    }
+    return 1;
+}
+
+fn main() -> i32 {
+    // Nop -> 0
+    if emit_instr_line_count(0, 0, 0) != 0 { return 1; }
+    // DeclVar -> 1
+    if emit_instr_line_count(1, 0, 0) != 1 { return 1; }
+    // DeclNamed -> 1
+    if emit_instr_line_count(2, 0, 0) != 1 { return 1; }
+    // Assign -> 1
+    if emit_instr_line_count(3, 0, 0) != 1 { return 1; }
+    // Store -> 1
+    if emit_instr_line_count(4, 0, 0) != 1 { return 1; }
+    // StoreField -> 1
+    if emit_instr_line_count(5, 0, 0) != 1 { return 1; }
+    // IfElse with 2 then + 3 else -> 3 + 2 + 3 = 8
+    if emit_instr_line_count(6, 2, 3) != 8 { return 1; }
+    // IfElse with 0 then + 0 else -> 3
+    if emit_instr_line_count(6, 0, 0) != 3 { return 1; }
+    // While with 4 body lines -> 2 + 4 = 6
+    if emit_instr_line_count(7, 4, 0) != 6 { return 1; }
+    // Block with 5 body lines -> 2 + 5 = 7
+    if emit_instr_line_count(8, 5, 0) != 7 { return 1; }
+    // Break -> 1
+    if emit_instr_line_count(9, 0, 0) != 1 { return 1; }
+    // Continue -> 1
+    if emit_instr_line_count(10, 0, 0) != 1 { return 1; }
+    // Call(SOME) -> 1
+    if emit_instr_line_count(11, 0, 0) != 1 { return 1; }
+    // Call(NONE) -> 1
+    if emit_instr_line_count(12, 0, 0) != 1 { return 1; }
+    // Requires -> 1
+    if emit_instr_line_count(13, 0, 0) != 1 { return 1; }
+    // Ensures -> 1
+    if emit_instr_line_count(14, 0, 0) != 1 { return 1; }
+    // Return NONE -> 1
+    if emit_instr_line_count(15, 0, 0) != 1 { return 1; }
+    // Return SOME -> 1
+    if emit_instr_line_count(16, 0, 0) != 1 { return 1; }
+    // unknown -> 255
+    if emit_instr_line_count(99, 0, 0) != 255 { return 1; }
+
+    // emitBlockBody: 0 instrs -> 0
+    if emit_block_body_total_lines(0, 0) != 0 { return 1; }
+    // 5 instrs producing 8 lines total -> 8
+    if emit_block_body_total_lines(5, 8) != 8 { return 1; }
+
+    // emitBlockDefn: body 3 lines -> 1 + 3 + 1 = 5
+    if emit_block_defn_lines(3) != 5 { return 1; }
+
+    // return dispatch
+    if return_line_count(0, 1) != 1 { return 1; }
+    if return_line_count(0, 0) != 254 { return 1; }
+    if return_line_count(1, 1) != 1 { return 1; }
+    if return_line_count(1, 0) != 1 { return 1; }
+
+    return 0;
+}

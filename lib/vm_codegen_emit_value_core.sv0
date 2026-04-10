@@ -1,0 +1,87 @@
+// vm_codegen_emit_value_core.sv0
+// Surrogate for vm_codegen.sml emitValue + emitExpr instruction counts.
+// Models how many bytecode instructions each IR value/expr kind produces.
+//
+// SML reference: sml/backend/vm/vm_codegen.sml
+//   fun emitValue, fun emitExpr
+//
+// value_tag:
+//   0 = VInt       -> [PUSH_I32]        -> 1 insn
+//   1 = VBool      -> [PUSH_BOOL]       -> 1 insn
+//   2 = VUnit      -> [PUSH_UNIT]       -> 1 insn
+//   3 = VString    -> [PUSH_STRING]     -> 1 insn
+//   4 = VVar       -> width LOAD_LOCAL instructions
+//   5 = VMember(VVar,f) -> [LOAD_LOCAL(base+idx)] -> 1 insn
+//   6 = VMember(other,f) -> delegated to emitExpr FieldAccess
+//   7 = VAddrOf    -> [PUSH_I32(base)]  -> 1 insn
+
+fn emit_value_insn_count(value_tag: i32, var_width: i32) -> i32 {
+    if value_tag == 0 { return 1; }
+    if value_tag == 1 { return 1; }
+    if value_tag == 2 { return 1; }
+    if value_tag == 3 { return 1; }
+    if value_tag == 4 { return var_width; }
+    if value_tag == 5 { return 1; }
+    if value_tag == 6 { return 1; }
+    if value_tag == 7 { return 1; }
+    return 255;
+}
+
+// expr_tag:
+//   0 = Literal     -> emitValue delegate
+//   1 = Load        -> width LOAD_LOCAL instructions
+//   2 = Binop       -> emitValue(v1) + emitValue(v2) + 1 (binop insn)
+//   3 = Unop("!")   -> emitValue(v) + 1 (NOT)
+//   4 = Unop("-")   -> emitValue(v) + 1 (NEG_I32)
+//   5 = Unop(cast)  -> emitValue(v) (identity)
+//   6 = FieldAccess(VVar) -> 1 (LOAD_LOCAL)
+
+fn emit_expr_insn_count(expr_tag: i32, child_count_a: i32, child_count_b: i32, load_width: i32) -> i32 {
+    if expr_tag == 0 { return child_count_a; }
+    if expr_tag == 1 { return load_width; }
+    if expr_tag == 2 { return child_count_a + child_count_b + 1; }
+    if expr_tag == 3 { return child_count_a + 1; }
+    if expr_tag == 4 { return child_count_a + 1; }
+    if expr_tag == 5 { return child_count_a; }
+    if expr_tag == 6 { return 1; }
+    return 255;
+}
+
+fn main() -> i32 {
+    // emitValue
+    if emit_value_insn_count(0, 0) != 1 { return 1; }
+    if emit_value_insn_count(1, 0) != 1 { return 1; }
+    if emit_value_insn_count(2, 0) != 1 { return 1; }
+    if emit_value_insn_count(3, 0) != 1 { return 1; }
+    // VVar with width 3 -> 3 LOAD_LOCAL
+    if emit_value_insn_count(4, 3) != 3 { return 1; }
+    if emit_value_insn_count(4, 1) != 1 { return 1; }
+    // VMember(VVar,f) -> 1
+    if emit_value_insn_count(5, 0) != 1 { return 1; }
+    // VMember(other,f) -> 1 (FieldAccess delegate)
+    if emit_value_insn_count(6, 0) != 1 { return 1; }
+    // VAddrOf -> 1
+    if emit_value_insn_count(7, 0) != 1 { return 1; }
+    // unknown -> 255
+    if emit_value_insn_count(99, 0) != 255 { return 1; }
+
+    // emitExpr
+    // Literal: delegate to emitValue (child_count_a = value insn count)
+    if emit_expr_insn_count(0, 1, 0, 0) != 1 { return 1; }
+    // Load with width 2 -> 2
+    if emit_expr_insn_count(1, 0, 0, 2) != 2 { return 1; }
+    // Binop: v1(1) + v2(1) + 1 = 3
+    if emit_expr_insn_count(2, 1, 1, 0) != 3 { return 1; }
+    // Binop: v1(3) + v2(1) + 1 = 5
+    if emit_expr_insn_count(2, 3, 1, 0) != 5 { return 1; }
+    // Unop("!"): v(1) + 1 = 2
+    if emit_expr_insn_count(3, 1, 0, 0) != 2 { return 1; }
+    // Unop("-"): v(1) + 1 = 2
+    if emit_expr_insn_count(4, 1, 0, 0) != 2 { return 1; }
+    // Unop(cast): v(1) = 1
+    if emit_expr_insn_count(5, 1, 0, 0) != 1 { return 1; }
+    // FieldAccess(VVar) -> 1
+    if emit_expr_insn_count(6, 0, 0, 0) != 1 { return 1; }
+
+    return 0;
+}

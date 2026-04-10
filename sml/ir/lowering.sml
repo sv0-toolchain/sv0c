@@ -712,9 +712,9 @@ structure Lowering :> LOWERING = struct
           val initParts =
             iHi @ [Ir.Assign (hiT, eHi)] @ iLo @ [Ir.Assign (iT, eLo)]
           val cond = Ir.Binop ("<", Ir.VVar iT, Ir.VVar hiT)
+          val incr = Ir.Store (iT, Ir.Binop ("+", Ir.VVar iT, Ir.VInt 1))
           val iterBody =
-            [ Ir.Block (Ir.Assign (x, Ir.Load iT) :: lowerExprForEffect body)
-            , Ir.Store (iT, Ir.Binop ("+", Ir.VVar iT, Ir.VInt 1))]
+            [ Ir.Block (Ir.Assign (x, Ir.Load iT) :: incr :: lowerExprForEffect body)]
         in
           initParts @ [Ir.While (cond, iterBody)]
         end

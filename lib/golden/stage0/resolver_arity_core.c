@@ -24,50 +24,32 @@ static FnArity2 arity_empty(void) {
 }
 
 static FnArity2 arity_register(FnArity2 e, int name_id, int arity) {
-  int _sv0t0;
-  int _sv0t1;
+  FnArity2 out;
+  out = e;
   if ((e.n >= 1)) {
-    int _sv0t2;
-    if ((e.n0 == name_id)) {
-      return e;
-      _sv0t2 = 0;
-    } else {
-      int _sv0t3;
-      if ((e.n >= 2)) {
-        int _sv0t4;
-        if ((e.n1 == name_id)) {
-          return e;
-          _sv0t4 = 0;
-        } else {
-          return e;
-          _sv0t4 = 0;
-        }
-        _sv0t3 = _sv0t4;
+    if ((e.n0 != name_id)) {
+      if ((e.n < 2)) {
+        FnArity2 _sv0t0;
+        _sv0t0.n = 2;
+        _sv0t0.n0 = e.n0;
+        _sv0t0.a0 = e.a0;
+        _sv0t0.n1 = name_id;
+        _sv0t0.a1 = arity;
+        out = _sv0t0;
       } else {
-        FnArity2 _sv0t5;
-        _sv0t5.n = 2;
-        _sv0t5.n0 = e.n0;
-        _sv0t5.a0 = e.a0;
-        _sv0t5.n1 = name_id;
-        _sv0t5.a1 = arity;
-        return _sv0t5;
-        _sv0t3 = 0;
       }
-      _sv0t2 = _sv0t3;
+    } else {
     }
-    _sv0t1 = _sv0t2;
   } else {
-    FnArity2 _sv0t6;
-    _sv0t6.n = 1;
-    _sv0t6.n0 = name_id;
-    _sv0t6.a0 = arity;
-    _sv0t6.n1 = 0;
-    _sv0t6.a1 = 0;
-    return _sv0t6;
-    _sv0t1 = 0;
+    FnArity2 _sv0t1;
+    _sv0t1.n = 1;
+    _sv0t1.n0 = name_id;
+    _sv0t1.a0 = arity;
+    _sv0t1.n1 = 0;
+    _sv0t1.a1 = 0;
+    out = _sv0t1;
   }
-  _sv0t0 = _sv0t1;
-  return _sv0t0;
+  return out;
 }
 
 static int lookup_fn_arity(FnArity2 e, int name_id) {

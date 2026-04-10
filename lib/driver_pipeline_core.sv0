@@ -1,0 +1,116 @@
+// driver_pipeline_core.sv0
+// Surrogate for main.sml compileProgram pipeline and CLI dispatch.
+// Models the compiler pass sequence and driver entry points.
+//
+// SML reference: sml/main.sml
+//   fun compileProgram, fun compileProgramVm, fun compileFile,
+//   fun compileFileVm, fun main
+//
+// Pipeline pass sequence (C backend):
+//   resolve -> setImportAliases -> check -> analyze -> stripLinkDirectives
+//   -> lower -> Codegen.emit -> print
+//
+// Pipeline pass sequence (VM backend):
+//   resolve -> setImportAliases -> check -> analyze -> stripLinkDirectives
+//   -> lower -> VmCodegen.emit(ast, ir) -> writeBytes
+//
+// Pass tags:
+//   0 = resolve
+//   1 = setImportAliases
+//   2 = check
+//   3 = analyze (pass-through today)
+//   4 = stripLinkDirectives
+//   5 = lower
+//   6 = emit (C or VM)
+//   7 = output (print or writeBytes)
+
+fn pipeline_pass_count(target_tag: i32) -> i32 {
+    if target_tag == 0 {
+        return 8;
+    }
+    if target_tag == 1 {
+        return 8;
+    }
+    return 255;
+}
+
+// baseNameSv0: strip ".sv0" extension if present.
+// Returns 1 if stripped, 0 if not.
+fn base_name_strips(name_len: i32, ends_sv0: i32) -> i32 {
+    if name_len > 4 {
+        if ends_sv0 == 1 {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// CLI dispatch: argument pattern -> action tag
+//   0 = "--target=vm" + filename -> compileFileVm
+//   1 = "--target=vm" + "--project" + dir -> compileProjectDirVm
+//   2 = "--project" + dir + "--target=vm" -> compileProjectDirVm
+//   3 = "--project" + dir -> compileProjectDir
+//   4 = filename only -> compileFile
+//   5 = other -> usage error
+fn cli_dispatch(arg_count: i32, has_target_vm: i32, has_project: i32) -> i32 {
+    if arg_count == 2 {
+        if has_target_vm == 1 {
+            return 0;
+        }
+    }
+    if arg_count == 3 {
+        if has_target_vm == 1 {
+            if has_project == 1 {
+                return 1;
+            }
+        }
+        if has_project == 1 {
+            if has_target_vm == 1 {
+                return 2;
+            }
+        }
+    }
+    if arg_count == 2 {
+        if has_project == 1 {
+            return 3;
+        }
+    }
+    if arg_count == 1 {
+        return 4;
+    }
+    return 5;
+}
+
+// projectVmEntryStem: "main" if main.sv0 exists, else "program"
+fn project_vm_entry_stem(main_exists: i32) -> i32 {
+    if main_exists == 1 {
+        return 0;
+    }
+    return 1;
+}
+
+fn main() -> i32 {
+    // pipeline pass count
+    if pipeline_pass_count(0) != 8 { return 1; }
+    if pipeline_pass_count(1) != 8 { return 1; }
+    if pipeline_pass_count(2) != 255 { return 1; }
+
+    // baseNameSv0
+    if base_name_strips(8, 1) != 1 { return 1; }
+    if base_name_strips(4, 1) != 0 { return 1; }
+    if base_name_strips(8, 0) != 0 { return 1; }
+    if base_name_strips(3, 1) != 0 { return 1; }
+
+    // CLI dispatch
+    if cli_dispatch(2, 1, 0) != 0 { return 1; }
+    if cli_dispatch(3, 1, 1) != 1 { return 1; }
+    if cli_dispatch(2, 0, 1) != 3 { return 1; }
+    if cli_dispatch(1, 0, 0) != 4 { return 1; }
+    if cli_dispatch(0, 0, 0) != 5 { return 1; }
+
+    // projectVmEntryStem
+    if project_vm_entry_stem(1) != 0 { return 1; }
+    if project_vm_entry_stem(0) != 1 { return 1; }
+
+    return 0;
+}

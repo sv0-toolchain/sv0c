@@ -1,0 +1,141 @@
+// codegen_split_main_emit_core.sv0
+// Surrogate for codegen.sml splitMain + emit + intLit.
+// Models top-level C program assembly: prelude, typedefs,
+// forward declarations, static function definitions, main.
+//
+// SML reference: sml/backend/c/codegen.sml
+//   fun intLit, fun splitMain, fun emit
+//
+// splitMain partitions blocks into (non-main others, main option).
+// emit assembles the final C output:
+//   empty blocks  -> prelude + minimal main (1 segment)
+//   non-empty     -> prelude + tdPart? + fwdDecls + "\n" + statics + mainPart
+//
+// Segment count surrogate models the number of logical output sections.
+
+fn int_lit_len(value: i32) -> i32 {
+    if value == 0 {
+        return 1;
+    }
+    let mut n: i32 = 0;
+    let mut v: i32 = value;
+    if v < 0 {
+        n = 1;
+        v = 0 - v;
+    }
+    for _i in 0..10 {
+        if v > 0 {
+            n = n + 1;
+            v = v / 10;
+        }
+    }
+    return n;
+}
+
+fn split_main_others_count(block_count: i32, has_main: i32) -> i32 {
+    if has_main == 1 {
+        return block_count - 1;
+    }
+    return block_count;
+}
+
+fn split_main_found(block_count: i32, has_main: i32) -> i32 {
+    if block_count > 0 {
+        if has_main == 1 {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// emit output section count:
+//   0 blocks -> 1 (single prelude+main string)
+//   >0 blocks -> 1 (prelude) + td (0/1) + 1 (fwdDecls concat)
+//                + 1 ("\n") + 1 (statics concat) + 1 (mainPart)
+//              = 5 + td
+// fwdDecls internally has others_count proto lines.
+// statics internally has others_count defn blocks.
+fn emit_section_count(block_count: i32, has_main: i32, has_typedefs: i32) -> i32 {
+    if block_count == 0 {
+        return 1;
+    }
+    let mut td: i32 = 0;
+    if has_typedefs == 1 {
+        td = 1;
+    }
+    return 5 + td;
+}
+
+// forward declaration line count: one "static retTy label(params);\n" per non-main block
+fn emit_forward_decl_count(block_count: i32, has_main: i32) -> i32 {
+    return split_main_others_count(block_count, has_main);
+}
+
+// static defn count: one emitBlockDefn per non-main block
+fn emit_static_defn_count(block_count: i32, has_main: i32) -> i32 {
+    return split_main_others_count(block_count, has_main);
+}
+
+// mainPart: emitBlockDefn(false, main) if present, else "int main(void) { return 0; }\n"
+// Either way, 1 logical section.
+fn emit_main_section(has_main: i32) -> i32 {
+    return 1;
+}
+
+fn main() -> i32 {
+    // --- intLit ---
+    if int_lit_len(0) != 1 { return 1; }
+    if int_lit_len(5) != 1 { return 1; }
+    if int_lit_len(42) != 2 { return 1; }
+    if int_lit_len(100) != 3 { return 1; }
+    if int_lit_len(9999) != 4 { return 1; }
+    if int_lit_len(0 - 1) != 2 { return 1; }
+    if int_lit_len(0 - 42) != 3 { return 1; }
+
+    // --- splitMain ---
+    // 0 blocks, no main -> others=0, found=0
+    if split_main_others_count(0, 0) != 0 { return 1; }
+    if split_main_found(0, 0) != 0 { return 1; }
+
+    // 3 blocks, no main -> others=3, found=0
+    if split_main_others_count(3, 0) != 3 { return 1; }
+    if split_main_found(3, 0) != 0 { return 1; }
+
+    // 3 blocks, has main -> others=2, found=1
+    if split_main_others_count(3, 1) != 2 { return 1; }
+    if split_main_found(3, 1) != 1 { return 1; }
+
+    // 1 block, has main -> others=0, found=1
+    if split_main_others_count(1, 1) != 0 { return 1; }
+    if split_main_found(1, 1) != 1 { return 1; }
+
+    // --- emit section count ---
+    // 0 blocks -> 1
+    if emit_section_count(0, 0, 0) != 1 { return 1; }
+
+    // 3 blocks, main, no typedefs -> 5
+    if emit_section_count(3, 1, 0) != 5 { return 1; }
+
+    // 3 blocks, main, typedefs -> 6
+    if emit_section_count(3, 1, 1) != 6 { return 1; }
+
+    // 1 block, no main, no typedefs -> 5
+    if emit_section_count(1, 0, 0) != 5 { return 1; }
+
+    // --- forward decl count ---
+    // 3 blocks, main -> 2 forward decls
+    if emit_forward_decl_count(3, 1) != 2 { return 1; }
+
+    // 3 blocks, no main -> 3 forward decls
+    if emit_forward_decl_count(3, 0) != 3 { return 1; }
+
+    // --- static defn count ---
+    if emit_static_defn_count(4, 1) != 3 { return 1; }
+    if emit_static_defn_count(4, 0) != 4 { return 1; }
+
+    // --- main section ---
+    if emit_main_section(1) != 1 { return 1; }
+    if emit_main_section(0) != 1 { return 1; }
+
+    return 0;
+}

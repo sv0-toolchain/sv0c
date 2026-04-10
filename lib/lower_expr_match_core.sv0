@@ -1,0 +1,35 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`ExprMatch`** in **`lowerExprToValue`**: compose **`bindScrutVar`** + **`DeclVar out`** + **`lowerMatchArms`** into total IR-length surrogate.
+   SML: `(isS @ [Ir.DeclVar out] @ isA, Ir.VVar out)` where `isS` = `bindScrutVar` preludes, `isA` = `lowerMatchArms` result.
+   Harness: **`expr_match_total_len`** = **`bind_scrut_len + 1 + match_arms_len`**. Negative inputs map to **255**. */
+
+fn expr_match_total_len(bind_scrut_len: i32, match_arms_len: i32) -> i32 {
+  if bind_scrut_len < 0 {
+    return 255;
+  }
+  if match_arms_len < 0 {
+    return 255;
+  }
+  return bind_scrut_len + 1 + match_arms_len;
+}
+
+fn main() -> i32 {
+  if expr_match_total_len(0, 0) != 1 {
+    return 1;
+  }
+  if expr_match_total_len(1, 5) != 7 {
+    return 1;
+  }
+  if expr_match_total_len(3, 10) != 14 {
+    return 1;
+  }
+  if expr_match_total_len(0, 1) != 2 {
+    return 1;
+  }
+  if expr_match_total_len(-1, 0) != 255 {
+    return 1;
+  }
+  if expr_match_total_len(0, -1) != 255 {
+    return 1;
+  }
+  return 0;
+}
