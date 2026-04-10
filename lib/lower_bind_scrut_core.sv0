@@ -1,0 +1,49 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`bindScrutVar`**: bind **`match`** scrutinee to a variable name + C type string.
+   **`lowerExprToValue`** prefix length **`tv_len`**; for non-**`VVar`** / non-literal re-lowering, **`wi_len`** is **`lowerExprWithInstrs`** prelude. **`val_kind` 0** = **`VVar`** (**`tv_len`** only); **1** = **`VInt`/`VBool`** literal (**`tv_len + 1`** assign to fresh tmp); **2** = other (**`tv_len + wi_len + 1`** **`int`** cty assign vs **`+ 2`** **`DeclNamed` + `Store`**). Invalid **`val_kind`** → **255**; negatives → **255**. **`int_cty` 1** = **`"int"`** for kind **2**. */
+
+fn bind_scrut_var_ir_len(tv_len: i32, wi_len: i32, val_kind: i32, int_cty: i32) -> i32 {
+  if tv_len < 0 {
+    return 255;
+  }
+  if wi_len < 0 {
+    return 255;
+  }
+  if val_kind == 0 {
+    return tv_len;
+  }
+  if val_kind == 1 {
+    return tv_len + 1;
+  }
+  if val_kind == 2 {
+    if int_cty == 1 {
+      return tv_len + wi_len + 1;
+    }
+    return tv_len + wi_len + 2;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if bind_scrut_var_ir_len(3, 9, 0, 0) != 3 {
+    return 1;
+  }
+  if bind_scrut_var_ir_len(2, 0, 1, 0) != 3 {
+    return 1;
+  }
+  if bind_scrut_var_ir_len(1, 4, 2, 1) != 6 {
+    return 1;
+  }
+  if bind_scrut_var_ir_len(1, 4, 2, 0) != 7 {
+    return 1;
+  }
+  if bind_scrut_var_ir_len(-1, 0, 0, 0) != 255 {
+    return 1;
+  }
+  if bind_scrut_var_ir_len(0, -1, 2, 1) != 255 {
+    return 1;
+  }
+  if bind_scrut_var_ir_len(0, 0, 3, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}

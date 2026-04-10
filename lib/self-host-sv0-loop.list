@@ -54,6 +54,9 @@ lib/lower_stmt_dispatch_core.sv0
 lib/lower_stmt_let_init_core.sv0
 lib/lower_expr_wi_tv_cluster_core.sv0
 lib/lower_expr_effect_iv_cluster_core.sv0
+lib/lower_quant_core.sv0
+lib/lower_bind_scrut_core.sv0
+lib/lower_match_one_arm_core.sv0
 lib/checker_mut_assign_core.sv0
 lib/link_strip_core.sv0
 parser/expr_rhs_stub_core.sv0

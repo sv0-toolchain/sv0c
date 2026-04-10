@@ -1,0 +1,50 @@
+/* Transliteration seed: **sml/ir/lowering.sml** — **`lowerMatchArms`** (one **`Ast.Arm`** step): **`cpre @ [IfElse(cexp, th, next)]`**.
+   **`bindPre @ lowerIntoVarInstrs`** → **`bind_pre + body_iv`**. **No guard**: **`th`** = **`body_is`**; **with guard**: **`th`** = **`guard_wi + 1 + body_is`** (inner **`IfElse`**). **`rest`** is the **`next`** arm list length (empty on last arm). Invalid **`has_guard`** (not **0** or **1**) → **255**; negative lengths → **255**. */
+
+fn lower_match_one_arm_ir_len(cpre: i32, bind_pre: i32, body_iv: i32, guard_wi: i32, has_guard: i32, rest: i32) -> i32 {
+  if cpre < 0 {
+    return 255;
+  }
+  if bind_pre < 0 {
+    return 255;
+  }
+  if body_iv < 0 {
+    return 255;
+  }
+  if guard_wi < 0 {
+    return 255;
+  }
+  if rest < 0 {
+    return 255;
+  }
+  let body_is: i32 = bind_pre + body_iv;
+  if has_guard == 0 {
+    return cpre + 1 + body_is + rest;
+  }
+  if has_guard == 1 {
+    return cpre + 1 + guard_wi + 1 + body_is + rest;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if lower_match_one_arm_ir_len(0, 1, 2, 0, 0, 0) != 4 {
+    return 1;
+  }
+  if lower_match_one_arm_ir_len(2, 0, 3, 5, 1, 0) != 12 {
+    return 1;
+  }
+  if lower_match_one_arm_ir_len(1, 1, 1, 0, 0, 7) != 11 {
+    return 1;
+  }
+  if lower_match_one_arm_ir_len(0, 0, 1, 4, 1, 2) != 9 {
+    return 1;
+  }
+  if lower_match_one_arm_ir_len(-1, 0, 0, 0, 0, 0) != 255 {
+    return 1;
+  }
+  if lower_match_one_arm_ir_len(0, 0, 0, 0, 2, 0) != 255 {
+    return 1;
+  }
+  return 0;
+}
