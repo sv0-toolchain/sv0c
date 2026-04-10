@@ -1,0 +1,91 @@
+/* Transliteration seed: **sml/ir/lowering.sml** - **`matchArmSetup`**: pattern to precondition, condition, and bind-prelude IR-length surrogates (cpre length, cond as one unit, bindPre length).
+   **`pat_kind`**: **0** **`PatWild`**, **1** **`PatBind`** (**`scr_is_int` 1** means one **`Assign`**, else **`DeclNamed` plus `Store`**), **2** int **`PatLit`**, **3** and **4** bool **`PatLit`**, **5** **`PatEnum`** unit variant (**`tuple_bind_count`** must be **0**), **6** enum tuple (**`tuple_bind_count`** equals **`PatBind`** inner count).
+   **7** maps to bad path surrogate **255**; **8** maps to struct enum in **`match`** (**SML** **`raise`**, surrogate **254**). Negative **`tuple_bind_count`** on kind **6** yields **255**; **`scr_is_int`** outside **0** or **1** on kind **1** yields **255**. */
+
+fn match_arm_setup_total_len(pat_kind: i32, scr_is_int: i32, tuple_bind_count: i32) -> i32 {
+  let cpre_len: i32 = 0;
+  let cond_len: i32 = 1;
+  if pat_kind == 0 {
+    return cpre_len + cond_len + 0;
+  }
+  if pat_kind == 1 {
+    if scr_is_int < 0 {
+      return 255;
+    }
+    if scr_is_int > 1 {
+      return 255;
+    }
+    if scr_is_int == 1 {
+      return cpre_len + cond_len + 1;
+    }
+    return cpre_len + cond_len + 2;
+  }
+  if pat_kind == 2 {
+    return cpre_len + cond_len + 0;
+  }
+  if pat_kind == 3 {
+    return cpre_len + cond_len + 0;
+  }
+  if pat_kind == 4 {
+    return cpre_len + cond_len + 0;
+  }
+  if pat_kind == 5 {
+    if tuple_bind_count != 0 {
+      return 255;
+    }
+    return cpre_len + cond_len + 0;
+  }
+  if pat_kind == 6 {
+    if tuple_bind_count < 0 {
+      return 255;
+    }
+    return cpre_len + cond_len + tuple_bind_count;
+  }
+  if pat_kind == 7 {
+    return 255;
+  }
+  if pat_kind == 8 {
+    return 254;
+  }
+  return 255;
+}
+
+fn main() -> i32 {
+  if match_arm_setup_total_len(0, 0, 0) != 1 {
+    return 1;
+  }
+  if match_arm_setup_total_len(1, 1, 0) != 2 {
+    return 1;
+  }
+  if match_arm_setup_total_len(1, 0, 0) != 3 {
+    return 1;
+  }
+  if match_arm_setup_total_len(2, 0, 0) != 1 {
+    return 1;
+  }
+  if match_arm_setup_total_len(5, 0, 0) != 1 {
+    return 1;
+  }
+  if match_arm_setup_total_len(6, 0, 3) != 4 {
+    return 1;
+  }
+  if match_arm_setup_total_len(5, 0, 1) != 255 {
+    return 1;
+  }
+  if match_arm_setup_total_len(7, 0, 0) != 255 {
+    return 1;
+  }
+  if match_arm_setup_total_len(8, 0, 0) != 254 {
+    return 1;
+  }
+  if match_arm_setup_total_len(9, 0, 0) != 255 {
+    return 1;
+  }
+  if match_arm_setup_total_len(1, -1, 0) != 255 {
+    return 1;
+  }
+  if match_arm_setup_total_len(6, 0, -1) != 255 {
+    return 1;
+  }
+  return 0;
+}

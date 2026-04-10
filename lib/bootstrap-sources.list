@@ -54,6 +54,8 @@ lib/lower_expr_effect_iv_cluster_core.sv0
 lib/lower_quant_core.sv0
 lib/lower_bind_scrut_core.sv0
 lib/lower_match_one_arm_core.sv0
+lib/lower_match_arm_setup_core.sv0
+lib/lower_enum_construct_instrs_core.sv0
 lib/checker_mut_assign_core.sv0
 lib/link_strip_core.sv0
 lexer/token_keyword_core.sv0
