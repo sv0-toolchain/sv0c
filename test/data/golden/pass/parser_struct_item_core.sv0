@@ -1,0 +1,82 @@
+// Surrogate for parser.sml parseStructItem
+// Models struct definition parsing: field list accumulation, type annotation,
+// and trailing comma/brace handling.
+
+fn struct_field_parts() -> i32 {
+    return 3;  // name + colon + type
+}
+
+fn struct_field_separator(next_tag: i32) -> i32 {
+    // 50 = COMMA, 51 = RBRACE
+    if next_tag == 50 { return 0; }   // comma -> more fields
+    if next_tag == 51 { return 1; }   // rbrace -> end of fields
+    return 2;                          // error
+}
+
+fn struct_has_generic_params(has_lt: bool) -> bool {
+    return has_lt;
+}
+
+fn count_fields(f0: bool, f1: bool, f2: bool, f3: bool, f4: bool,
+                f5: bool, f6: bool, f7: bool) -> i32 {
+    let mut count: i32 = 0;
+    if f0 { count = count + 1; }
+    if f1 { count = count + 1; }
+    if f2 { count = count + 1; }
+    if f3 { count = count + 1; }
+    if f4 { count = count + 1; }
+    if f5 { count = count + 1; }
+    if f6 { count = count + 1; }
+    if f7 { count = count + 1; }
+    return count;
+}
+
+fn struct_item_ast_tag() -> i32 {
+    return 20;  // ItemStruct tag
+}
+
+fn struct_expects_lbrace() -> bool {
+    return true;
+}
+
+fn field_may_have_pub(has_pub: bool) -> bool {
+    return has_pub;
+}
+
+fn struct_span_parts() -> i32 {
+    return 2;  // struct keyword span + closing brace span
+}
+
+fn main() -> i32 {
+    // field parts
+    if struct_field_parts() != 3 { return 1; }
+
+    // separator
+    if struct_field_separator(50) != 0 { return 10; }  // comma
+    if struct_field_separator(51) != 1 { return 11; }  // rbrace
+    if struct_field_separator(52) != 2 { return 12; }  // error
+
+    // generic params
+    if !struct_has_generic_params(true) { return 20; }
+    if struct_has_generic_params(false) { return 21; }
+
+    // count fields
+    if count_fields(true, true, true, false, false, false, false, false) != 3 { return 30; }
+    if count_fields(true, true, true, true, true, true, true, true) != 8 { return 31; }
+    if count_fields(false, false, false, false, false, false, false, false) != 0 { return 32; }
+
+    // ast tag
+    if struct_item_ast_tag() != 20 { return 40; }
+
+    // expects lbrace
+    if !struct_expects_lbrace() { return 50; }
+
+    // pub field
+    if !field_may_have_pub(true) { return 60; }
+    if field_may_have_pub(false) { return 61; }
+
+    // span parts
+    if struct_span_parts() != 2 { return 70; }
+
+    return 0;
+}

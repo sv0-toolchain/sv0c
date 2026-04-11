@@ -1,0 +1,76 @@
+// Surrogate for parser.sml parseUnaryExpr
+// Models unary prefix operator dispatch: Neg, Not, BitNot, Deref, Borrow, BorrowMut.
+
+fn unary_op_from_token(token_tag: i32, next_is_mut: bool) -> i32 {
+    // 70=MINUS, 71=BANG, 72=TILDE, 73=STAR, 74=AMP
+    if token_tag == 70 { return 1; }   // Neg
+    if token_tag == 71 { return 2; }   // Not
+    if token_tag == 72 { return 3; }   // BitNot
+    if token_tag == 73 { return 4; }   // Deref
+    if token_tag == 74 {
+        if next_is_mut { return 6; }   // BorrowMut
+        return 5;                       // Borrow
+    }
+    return 0;  // not a unary prefix
+}
+
+fn is_unary_prefix(token_tag: i32) -> bool {
+    if token_tag == 70 { return true; }   // -
+    if token_tag == 71 { return true; }   // !
+    if token_tag == 72 { return true; }   // ~
+    if token_tag == 73 { return true; }   // *
+    if token_tag == 74 { return true; }   // &
+    return false;
+}
+
+fn unary_tokens_consumed(op: i32) -> i32 {
+    if op == 6 { return 2; }   // &mut consumes two tokens
+    if op == 0 { return 0; }   // not a unary
+    return 1;
+}
+
+fn unary_is_borrow(op: i32) -> bool {
+    return op == 5 || op == 6;
+}
+
+fn unary_ast_tag() -> i32 {
+    return 5;  // ExprUnop tag
+}
+
+fn unary_precedence() -> i32 {
+    return 14;  // higher than binary ops
+}
+
+fn main() -> i32 {
+    // operator dispatch
+    if unary_op_from_token(70, false) != 1 { return 1; }   // - -> Neg
+    if unary_op_from_token(71, false) != 2 { return 2; }   // ! -> Not
+    if unary_op_from_token(72, false) != 3 { return 3; }   // ~ -> BitNot
+    if unary_op_from_token(73, false) != 4 { return 4; }   // * -> Deref
+    if unary_op_from_token(74, false) != 5 { return 5; }   // & -> Borrow
+    if unary_op_from_token(74, true) != 6 { return 6; }    // &mut -> BorrowMut
+    if unary_op_from_token(99, false) != 0 { return 7; }   // other -> not unary
+
+    // is_unary_prefix
+    if !is_unary_prefix(70) { return 10; }
+    if !is_unary_prefix(74) { return 11; }
+    if is_unary_prefix(50) { return 12; }   // COMMA is not unary
+
+    // tokens consumed
+    if unary_tokens_consumed(1) != 1 { return 20; }
+    if unary_tokens_consumed(6) != 2 { return 21; }
+    if unary_tokens_consumed(0) != 0 { return 22; }
+
+    // borrow check
+    if !unary_is_borrow(5) { return 30; }
+    if !unary_is_borrow(6) { return 31; }
+    if unary_is_borrow(1) { return 32; }
+
+    // ast tag
+    if unary_ast_tag() != 5 { return 40; }
+
+    // precedence
+    if unary_precedence() != 14 { return 50; }
+
+    return 0;
+}

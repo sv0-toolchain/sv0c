@@ -1,0 +1,67 @@
+// Surrogate for parser.sml parseIfExpr
+// Models the if/else/else-if expression structure classification.
+// After parsing the condition and then-block, classifies the trailing tokens.
+
+fn if_expr_kind(has_else: bool, else_is_if: bool) -> i32 {
+    if !has_else { return 0; }     // if-only (no else)
+    if else_is_if { return 1; }    // else-if chain
+    return 2;                       // if-else with block
+}
+
+fn if_expr_branch_count(has_else: bool, else_is_if: bool) -> i32 {
+    if !has_else { return 1; }
+    if else_is_if { return 3; }    // if + else-if + (possible else)
+    return 2;                       // if + else
+}
+
+fn if_expr_has_value(has_else: bool) -> bool {
+    return has_else;
+}
+
+fn if_expr_span_parts(has_else: bool) -> i32 {
+    if has_else { return 3; }   // cond span + then span + else span
+    return 2;                    // cond span + then span
+}
+
+fn if_expr_ast_tag() -> i32 {
+    return 10;  // ExprIf tag
+}
+
+fn chain_depth(e0_is_if: bool, e1_is_if: bool, e2_is_if: bool) -> i32 {
+    let mut depth: i32 = 1;
+    if e0_is_if { depth = depth + 1; } else { return depth; }
+    if e1_is_if { depth = depth + 1; } else { return depth; }
+    if e2_is_if { depth = depth + 1; }
+    return depth;
+}
+
+fn main() -> i32 {
+    // if-only
+    if if_expr_kind(false, false) != 0 { return 1; }
+    if if_expr_branch_count(false, false) != 1 { return 2; }
+    if if_expr_has_value(false) { return 3; }
+
+    // if-else
+    if if_expr_kind(true, false) != 2 { return 10; }
+    if if_expr_branch_count(true, false) != 2 { return 11; }
+    if !if_expr_has_value(true) { return 12; }
+
+    // else-if chain
+    if if_expr_kind(true, true) != 1 { return 20; }
+    if if_expr_branch_count(true, true) != 3 { return 21; }
+
+    // span parts
+    if if_expr_span_parts(false) != 2 { return 30; }
+    if if_expr_span_parts(true) != 3 { return 31; }
+
+    // ast tag
+    if if_expr_ast_tag() != 10 { return 40; }
+
+    // chain depth
+    if chain_depth(false, false, false) != 1 { return 50; }
+    if chain_depth(true, false, false) != 2 { return 51; }
+    if chain_depth(true, true, false) != 3 { return 52; }
+    if chain_depth(true, true, true) != 4 { return 53; }
+
+    return 0;
+}
