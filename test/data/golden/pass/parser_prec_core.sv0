@@ -1,0 +1,86 @@
+/* parser_prec_core.sv0 — seed for parser/parser.sml
+   Transliterates operator precedence levels used in Pratt parsing. */
+
+fn prec_of_binop(binop_tag: i32) -> i32 {
+    if binop_tag == 10 { return 1; }
+    if binop_tag == 11 { return 1; }
+    if binop_tag == 5 { return 2; }
+    if binop_tag == 6 { return 2; }
+    if binop_tag == 7 { return 2; }
+    if binop_tag == 12 { return 3; }
+    if binop_tag == 13 { return 3; }
+    if binop_tag == 14 { return 3; }
+    if binop_tag == 15 { return 3; }
+    if binop_tag == 16 { return 3; }
+    if binop_tag == 17 { return 3; }
+    if binop_tag == 8 { return 4; }
+    if binop_tag == 9 { return 4; }
+    if binop_tag == 0 { return 5; }
+    if binop_tag == 1 { return 5; }
+    if binop_tag == 2 { return 6; }
+    if binop_tag == 3 { return 6; }
+    if binop_tag == 4 { return 6; }
+    return 0;
+}
+
+fn is_right_assoc(binop_tag: i32) -> bool {
+    return false;
+}
+
+fn next_prec(current: i32, right_assoc: bool) -> i32 {
+    if right_assoc { return current; }
+    return current + 1;
+}
+
+fn binop_is_comparison(binop_tag: i32) -> bool {
+    let p: i32 = prec_of_binop(binop_tag);
+    return p == 3;
+}
+
+fn binop_is_arithmetic(binop_tag: i32) -> bool {
+    let p: i32 = prec_of_binop(binop_tag);
+    if p == 5 { return true; }
+    if p == 6 { return true; }
+    return false;
+}
+
+fn binop_is_logical(binop_tag: i32) -> bool {
+    let p: i32 = prec_of_binop(binop_tag);
+    return p == 1;
+}
+
+fn test_prec() -> i32 {
+    if prec_of_binop(10) != 1 { return 1; }
+    if prec_of_binop(12) != 3 { return 2; }
+    if prec_of_binop(0) != 5 { return 3; }
+    if prec_of_binop(2) != 6 { return 4; }
+    if prec_of_binop(8) != 4 { return 5; }
+    return 0;
+}
+
+fn test_next_prec() -> i32 {
+    if next_prec(3, false) != 4 { return 1; }
+    if next_prec(3, true) != 3 { return 2; }
+    return 0;
+}
+
+fn test_categories() -> i32 {
+    if binop_is_comparison(12) != true { return 1; }
+    if binop_is_comparison(0) != false { return 2; }
+    if binop_is_arithmetic(0) != true { return 3; }
+    if binop_is_arithmetic(2) != true { return 4; }
+    if binop_is_arithmetic(12) != false { return 5; }
+    if binop_is_logical(10) != true { return 6; }
+    if binop_is_logical(0) != false { return 7; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_prec();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_next_prec();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_categories();
+    if r3 != 0 { return 300 + r3; }
+    return 0;
+}
