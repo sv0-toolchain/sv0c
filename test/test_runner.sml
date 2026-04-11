@@ -922,6 +922,12 @@ structure TestRunner = struct
                  (goldenPassCompileRun "bytecode_file_layout_core")
       val () = check "golden pass lexer_skip_comment_core compile+run"
                  (goldenPassCompileRun "lexer_skip_comment_core")
+      val () = check "golden pass lexer_keyword_core compile+run"
+                 (goldenPassCompileRun "lexer_keyword_core")
+      val () = check "golden pass lexer_scan_ident_core compile+run"
+                 (goldenPassCompileRun "lexer_scan_ident_core")
+      val () = check "golden pass lexer_scan_char_core compile+run"
+                 (goldenPassCompileRun "lexer_scan_char_core")
       val () = check "golden pass lexer_scan_number_core compile+run"
                  (goldenPassCompileRun "lexer_scan_number_core")
       val () = check "golden pass lexer_scan_op_core compile+run"

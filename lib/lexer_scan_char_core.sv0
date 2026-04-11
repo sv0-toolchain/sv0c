@@ -1,0 +1,79 @@
+// Surrogate for lexer.sml scanChar
+// Models character literal parsing: after the opening quote,
+// handle plain char vs escape, then expect closing quote.
+
+fn char_lit_is_escape(c: i32) -> bool {
+    return c == 92;  // backslash
+}
+
+fn char_lit_value(is_escape: bool, plain_char: i32, escape_char: i32) -> i32 {
+    if is_escape {
+        if escape_char == 110 { return 10; }     // \n
+        if escape_char == 116 { return 9; }      // \t
+        if escape_char == 114 { return 13; }     // \r
+        if escape_char == 92 { return 92; }      // backslash
+        if escape_char == 39 { return 39; }      // \'
+        if escape_char == 48 { return 0; }       // \0
+        return escape_char;
+    }
+    return plain_char;
+}
+
+fn char_lit_chars_consumed(is_escape: bool, escape_char: i32) -> i32 {
+    // opening quote + char(s) + closing quote
+    if is_escape {
+        if escape_char == 120 { return 6; }  // \xHH = 6 chars: ' \ x H H '
+        return 4;  // normal escape: ' \ c '
+    }
+    return 3;  // plain char: ' c '
+}
+
+fn char_lit_has_closing_quote(after_char: i32) -> bool {
+    return after_char == 39;  // single quote
+}
+
+fn char_lit_token_tag() -> i32 {
+    return 3;  // CHAR_LIT token tag
+}
+
+fn main() -> i32 {
+    // plain character 'a' (97)
+    let v1: i32 = char_lit_value(false, 97, 0);
+    if v1 != 97 { return 1; }
+
+    // escape: '\n' (110)
+    let v2: i32 = char_lit_value(true, 0, 110);
+    if v2 != 10 { return 2; }
+
+    // escape: '\t' (116)
+    let v3: i32 = char_lit_value(true, 0, 116);
+    if v3 != 9 { return 3; }
+
+    // escape: '\\' (92)
+    let v4: i32 = char_lit_value(true, 0, 92);
+    if v4 != 92 { return 4; }
+
+    // escape: '\0' (48)
+    let v5: i32 = char_lit_value(true, 0, 48);
+    if v5 != 0 { return 5; }
+
+    // is_escape
+    if !char_lit_is_escape(92) { return 10; }
+    if char_lit_is_escape(97) { return 11; }
+
+    // chars consumed: plain
+    if char_lit_chars_consumed(false, 0) != 3 { return 20; }
+    // chars consumed: normal escape
+    if char_lit_chars_consumed(true, 110) != 4 { return 21; }
+    // chars consumed: hex escape
+    if char_lit_chars_consumed(true, 120) != 6 { return 22; }
+
+    // closing quote
+    if !char_lit_has_closing_quote(39) { return 30; }
+    if char_lit_has_closing_quote(97) { return 31; }
+
+    // token tag
+    if char_lit_token_tag() != 3 { return 40; }
+
+    return 0;
+}
