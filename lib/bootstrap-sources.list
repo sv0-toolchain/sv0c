@@ -92,6 +92,7 @@ test/integration/contracts/contracts.sv0
 test/integration/call_arg_order/call_arg_order.sv0
 test/integration/continue_loops/continue_loops.sv0
 test/integration/patterns/patterns.sv0
+test/integration/enum_tuple_match/enum_tuple_match.sv0
 test/integration/structs/structs.sv0
 test/integration/field_assign/field_assign.sv0
 test/integration/generics/generics.sv0
@@ -175,4 +176,10 @@ lib/bytecode_encode_core.sv0
 lib/types_core.sv0
 lib/unify_core.sv0
 lib/checker_dispatch_core.sv0
+lib/checker_binop_class_core.sv0
+lib/checker_synth_expr_core.sv0
+lib/checker_call_path_core.sv0
+lib/checker_check_fn_core.sv0
 lib/pipeline_compose_core.sv0
+test/integration/string_api/string_api.sv0
+test/integration/enum_struct_match/enum_struct_match.sv0

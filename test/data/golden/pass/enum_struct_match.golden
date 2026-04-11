@@ -1,0 +1,52 @@
+#include "sv0_runtime.h"
+
+typedef struct {
+  int tag;
+  int p0;
+  int p1;
+} Shape;
+
+static int describe(Shape s);
+
+static int describe(Shape s) {
+  int _sv0t0;
+  if ((s.tag == 0)) {
+    int r = s.p0;
+    _sv0t0 = r;
+  } else {
+    if ((s.tag == 1)) {
+      int w = s.p0;
+      int h = s.p1;
+      _sv0t0 = (w + h);
+    } else {
+      if ((s.tag == 2)) {
+        _sv0t0 = 0;
+      } else {
+      }
+    }
+  }
+  return _sv0t0;
+}
+
+int main(void) {
+  Shape r;
+  r.tag = 1;
+  r.p0 = 3;
+  r.p1 = 4;
+  int _sv0t0 = describe(r);
+  int d = _sv0t0;
+  if ((d != 7)) {
+    return 1;
+  } else {
+  }
+  Shape p;
+  p.tag = 2;
+  int _sv0t1 = describe(p);
+  int d2 = _sv0t1;
+  if ((d2 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+

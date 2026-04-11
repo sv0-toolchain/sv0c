@@ -7,9 +7,8 @@ structure Unify :> UNIFY = struct
 
   and unify (a : Types.ty, b : Types.ty) : bool =
     case (a, b) of
-      (Types.TyVar i, Types.TyVar j) => i = j
-    | (Types.TyVar _, _) => false
-    | (_, Types.TyVar _) => false
+      (Types.TyVar _, _) => true
+    | (_, Types.TyVar _) => true
     | (Types.TyUnit, Types.TyUnit) => true
     | (Types.TyBool, Types.TyBool) => true
     | (Types.TyStruct a, Types.TyStruct b) => a = b

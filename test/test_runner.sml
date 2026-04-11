@@ -443,10 +443,36 @@ structure TestRunner = struct
                   | NONE => false)
       val () = check "checker accepts println string literal"
                  (checkCatch "fn main() -> unit { println(\"x\"); }" = NONE)
-      val () = check "checker rejects println non-literal"
+      val () = check "checker accepts println string variable"
+                 (checkCatch
+                    ("fn main() -> unit { let s: string = \"hi\"; println(s); }") = NONE)
+      val () = check "checker rejects println non-string"
                  (case checkCatch "fn main() -> unit { println(1); }" of
                     SOME _ => true
                   | NONE => false)
+      val () = check "checker accepts string_len"
+                 (checkCatch
+                    ("fn main() -> i32 { let s: string = \"hi\"; return string_len(s); }") = NONE)
+      val () = check "checker accepts string_eq"
+                 (checkCatch
+                    ("fn main() -> bool { let a: string = \"x\"; let b: string = \"y\"; return string_eq(a, b); }") = NONE)
+      val () = check "checker accepts string_concat"
+                 (checkCatch
+                    ("fn main() -> unit { let a: string = \"x\"; let b: string = \"y\"; let c: string = string_concat(a, b); println(c); }") = NONE)
+      val () = check "checker accepts string_char_at"
+                 (checkCatch
+                    ("fn main() -> i32 { let s: string = \"hi\"; return string_char_at(s, 0); }") = NONE)
+      val () = check "checker accepts string_substr"
+                 (checkCatch
+                    ("fn main() -> unit { let s: string = \"hello\"; let t: string = string_substr(s, 1, 2); println(t); }") = NONE)
+      val () = check "checker accepts enum struct-payload match"
+                 (checkCatch
+                    ("enum S { R { w: i32, h: i32 } }" ^ nl ^
+                     "fn main() -> i32 { let s: S = S::R(1, 2); return match s { S::R { w, h } => w + h, }; }") = NONE)
+      val () = check "checker accepts enum unit variant pattern (no parens)"
+                 (checkCatch
+                    ("enum E { A, B(i32) }" ^ nl ^
+                     "fn main() -> i32 { let x: E = E::A; return match x { E::A => 0, E::B(v) => v, }; }") = NONE)
       val () = check "checker accepts ? with matching enum return"
                  (checkCatch
                     ("enum R { Ok(i32), Err(i32) }" ^ nl ^
@@ -459,6 +485,56 @@ structure TestRunner = struct
                          "fn main() -> i32 { return k()?; }") of
                     SOME _ => true
                   | NONE => false)
+
+      val () = check "checker accepts generic fn id<T>"
+                 (checkCatch
+                    ("fn id<T>(x: T) -> T { x }" ^ nl ^
+                     "fn main() -> i32 { let a: i32 = id(42); return a; }") = NONE)
+      val () = check "checker accepts generic struct Wrap<T>"
+                 (checkCatch
+                    ("struct Wrap<T> { value: T }" ^ nl ^
+                     "fn main() -> i32 { let w: Wrap = Wrap { value: 5 }; return w.value; }") = NONE)
+      val () = check "checker accepts generic enum Maybe<T>"
+                 (checkCatch
+                    ("enum Maybe<T> { Just(T), Nothing }" ^ nl ^
+                     "fn main() -> i32 { let m: Maybe = Maybe::Just(7); return match m { Maybe::Just(v) => v, Maybe::Nothing => 0, }; }") = NONE)
+      val () = check "checker accepts Vec<i32> new/push/len/get"
+                 (checkCatch
+                    ("fn main() -> i32 {" ^ nl ^
+                     "  let v: Vec<i32> = vec_new();" ^ nl ^
+                     "  vec_push(v, 42);" ^ nl ^
+                     "  let n: i32 = vec_len(v);" ^ nl ^
+                     "  let x: i32 = vec_get(v, 0);" ^ nl ^
+                     "  return x;" ^ nl ^
+                     "}") = NONE)
+      val () = check "checker accepts Vec<bool> type"
+                 (checkCatch
+                    ("fn main() -> i32 {" ^ nl ^
+                     "  let v: Vec<bool> = vec_new();" ^ nl ^
+                     "  vec_push(v, true);" ^ nl ^
+                     "  return 0;" ^ nl ^
+                     "}") = NONE)
+      val () = check "checker accepts Option<i32> with ? operator"
+                 (checkCatch
+                    ("enum Option<T> { Some(T), None }" ^ nl ^
+                     "fn try_opt(o: Option) -> Option {" ^ nl ^
+                     "  let v: i32 = o?;" ^ nl ^
+                     "  return Option::Some(v + 1);" ^ nl ^
+                     "}" ^ nl ^
+                     "fn main() -> i32 { return 0; }") = NONE)
+      val () = check "checker accepts Box<Expr> recursive enum"
+                 (checkCatch
+                    ("enum Expr { Lit(i32), Add(Box<Expr>, Box<Expr>) }" ^ nl ^
+                     "fn eval(e: Expr) -> i32 {" ^ nl ^
+                     "  match e {" ^ nl ^
+                     "    Expr::Lit(n) => n," ^ nl ^
+                     "    Expr::Add(l, r) => {" ^ nl ^
+                     "      let le: Expr = box_deref(l);" ^ nl ^
+                     "      return eval(le);" ^ nl ^
+                     "    }," ^ nl ^
+                     "  }" ^ nl ^
+                     "}" ^ nl ^
+                     "fn main() -> i32 { return 0; }") = NONE)
 
       (* --- end-to-end (parse through C string) --- *)
       val () = print "\n[e2e]\n"
@@ -555,6 +631,22 @@ structure TestRunner = struct
       val () = check "e2e C println intrinsic"
                  (String.isSubstring "sv0_println" cPrint
                   andalso String.isSubstring "\"hi\"" cPrint)
+      val cPrintVar =
+        compileToC
+          ("fn main() -> unit { let s: string = \"hello\"; println(s); }")
+      val () = check "e2e C println string variable"
+                 (String.isSubstring "const char*" cPrintVar
+                  andalso String.isSubstring "sv0_println(s)" cPrintVar)
+      val cStrLen =
+        compileToC
+          ("fn main() -> i32 { let s: string = \"hi\"; return string_len(s); }")
+      val () = check "e2e C string_len intrinsic"
+                 (String.isSubstring "sv0_string_len(s)" cStrLen)
+      val cStrConcat =
+        compileToC
+          ("fn main() -> unit { let a: string = \"x\"; let b: string = \"y\"; let c: string = string_concat(a, b); println(c); }")
+      val () = check "e2e C string_concat intrinsic"
+                 (String.isSubstring "sv0_string_concat(a, b)" cStrConcat)
       val cTry =
         compileToC
           ("enum R { Ok(i32), Err(i32) }" ^ nl ^
@@ -722,6 +814,18 @@ structure TestRunner = struct
                  (goldenPassCompileRun "clamp_contract")
       val () = check "golden pass println_ok compile+run+stdout"
                  (goldenPassCompileRun "println_ok")
+      val () = check "golden pass println_var compile+run+stdout"
+                 (goldenPassCompileRun "println_var")
+      val () = check "golden pass string_api compile+run+stdout"
+                 (goldenPassCompileRun "string_api")
+      val () = check "golden pass enum_struct_match compile+run"
+                 (goldenPassCompileRun "enum_struct_match")
+      val () = check "golden pass vec_api compile+run"
+                 (goldenPassCompileRun "vec_api")
+      val () = check "golden pass option_result compile+run"
+                 (goldenPassCompileRun "option_result")
+      val () = check "golden pass box_expr compile+run"
+                 (goldenPassCompileRun "box_expr")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

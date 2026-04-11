@@ -429,8 +429,8 @@ structure VmCodegen :> VM_CODEGEN = struct
             if retTy = "void" then [B.RETURN_SLOTS 0] else raise Fail "vm: bad void return"
         | I.Return (SOME v) =>
             emitValue structs enums env pool v @ [B.RETURN_SLOTS (valueWidth env v)]
-        | I.Call (NONE, "sv0_println", [I.VString s], _) =>
-            [B.PUSH_STRING (poolAdd pool s), B.CALL_BUILTIN 0]
+        | I.Call (NONE, "sv0_println", [v], _) =>
+            emitValue structs enums env pool v @ [B.CALL_BUILTIN 0]
         | I.Call (SOME d, "sv0_no_alias", vs, _) =>
             let
               fun pushArg v =
@@ -446,6 +446,42 @@ structure VmCodegen :> VM_CODEGEN = struct
             in
               pushes @ [B.CALL_BUILTIN 1] @ stores
             end
+        | I.Call (SOME d, "sv0_string_len", [v], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool v @ [B.CALL_BUILTIN 2, B.STORE_LOCAL base] end
+        | I.Call (SOME d, "sv0_string_eq", [va, vb], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool va @ emitValue structs enums env pool vb @ [B.CALL_BUILTIN 3, B.STORE_LOCAL base] end
+        | I.Call (SOME d, "sv0_string_concat", [va, vb], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool va @ emitValue structs enums env pool vb @ [B.CALL_BUILTIN 4, B.STORE_LOCAL base] end
+        | I.Call (SOME d, "sv0_string_char_at", [vs, vi], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool vs @ emitValue structs enums env pool vi @ [B.CALL_BUILTIN 5, B.STORE_LOCAL base] end
+        | I.Call (SOME d, "sv0_string_substr", [vs, vst, vl], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool vs @ emitValue structs enums env pool vst @ emitValue structs enums env pool vl @ [B.CALL_BUILTIN 6, B.STORE_LOCAL base] end
+        | I.Call (SOME d, "sv0_vec_new", [], _) =>
+            let val {base, ...} = lookupSlot env d
+            in [B.CALL_BUILTIN 7, B.STORE_LOCAL base] end
+        | I.Call (NONE, "sv0_vec_push", [vh, ve], _) =>
+            emitValue structs enums env pool vh @ emitValue structs enums env pool ve @ [B.CALL_BUILTIN 8]
+        | I.Call (SOME d, "sv0_vec_len", [vh], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool vh @ [B.CALL_BUILTIN 9, B.STORE_LOCAL base] end
+        | I.Call (SOME d, "sv0_vec_get", [vh, vi], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool vh @ emitValue structs enums env pool vi @ [B.CALL_BUILTIN 10, B.STORE_LOCAL base] end
+        | I.Call (NONE, "sv0_vec_set", [vh, vi, vv], _) =>
+            emitValue structs enums env pool vh @ emitValue structs enums env pool vi @ emitValue structs enums env pool vv @ [B.CALL_BUILTIN 11]
+        | I.Call (SOME d, "sv0_box_alloc", [vn], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool vn @ [B.CALL_BUILTIN 12, B.STORE_LOCAL base] end
+        | I.Call (NONE, "sv0_box_store", [vh, vo, vv], _) =>
+            emitValue structs enums env pool vh @ emitValue structs enums env pool vo @ emitValue structs enums env pool vv @ [B.CALL_BUILTIN 13]
+        | I.Call (SOME d, "sv0_box_load", [vh, vo], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool vh @ emitValue structs enums env pool vo @ [B.CALL_BUILTIN 14, B.STORE_LOCAL base] end
         | I.Call (NONE, f, vs, _) =>
             let
               val nargs =

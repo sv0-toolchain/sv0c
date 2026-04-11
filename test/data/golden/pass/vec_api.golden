@@ -1,0 +1,5 @@
+sv0_vec_new
+sv0_vec_push
+sv0_vec_len
+sv0_vec_get
+sv0_vec_set

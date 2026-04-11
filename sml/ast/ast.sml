@@ -19,7 +19,7 @@ structure Ast = struct
     | Eq | Neq | Lt | Gt | Leq | Geq
 
   datatype ty =
-      TyName of path * Span.span
+      TyName of path * ty list * Span.span
     | TyRef of ty * Span.span
     | TyRefMut of ty * Span.span
     | TyArray of ty * expr * Span.span
@@ -81,15 +81,18 @@ structure Ast = struct
 
   and item =
       ItemFn of {
-        name : ident, params : (pat * ty) list,
+        name : ident, type_params : ident list,
+        params : (pat * ty) list,
         ret : ty option, contracts : contract list,
         body : expr, span : Span.span
       }
     | ItemStruct of {
-        name : ident, fields : (ident * ty) list, span : Span.span
+        name : ident, type_params : ident list,
+        fields : (ident * ty) list, span : Span.span
       }
     | ItemEnum of {
-        name : ident, variants : variant list, span : Span.span
+        name : ident, type_params : ident list,
+        variants : variant list, span : Span.span
       }
     | ItemTrait of {
         name : ident, methods : item list, span : Span.span

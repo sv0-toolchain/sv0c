@@ -1,0 +1,110 @@
+/* Transliteration seed: sml/type_checker/checker.sml — synthExprCall
+   SML reference (lines 341–486, ~146 lines):
+     fun synthExprCall (retTy) (env) (segs : Ast.path) (args : Ast.expr list) : Types.ty
+   Path dispatch for call expressions: contract builtins, println, user fns.
+
+   Path tags:
+     0 = ["old"]      — requires inContractExpr; exactly 1 arg; E0521/E0522
+     1 = ["forall"]   — requires inContractExpr; exactly 2 args; E0523
+     2 = ["exists"]   — requires inContractExpr; exactly 2 args; E0523
+     3 = ["no_alias"] — requires inContractExpr; exactly 2 args; E0524
+     4 = ["println"]  — exactly 1 arg, string type; E0444
+     5 = [nm]         — single-segment user fn lookup
+     6 = multi-seg    — multi-segment qualified path */
+
+fn call_path_tag(seg_count: i32, first_seg_id: i32) -> i32 {
+    if seg_count == 1 {
+        if first_seg_id == 0 { return 0; }
+        if first_seg_id == 1 { return 1; }
+        if first_seg_id == 2 { return 2; }
+        if first_seg_id == 3 { return 3; }
+        if first_seg_id == 4 { return 4; }
+        return 5;
+    }
+    if seg_count >= 2 {
+        return 6;
+    }
+    return 255;
+}
+
+// contract builtin gate: returns 0 if allowed, error code if not
+fn contract_builtin_gate(path_tag: i32, in_contract: i32) -> i32 {
+    if path_tag == 0 {
+        if in_contract == 1 { return 0; }
+        return 521;
+    }
+    if path_tag == 1 {
+        if in_contract == 1 { return 0; }
+        return 523;
+    }
+    if path_tag == 2 {
+        if in_contract == 1 { return 0; }
+        return 523;
+    }
+    if path_tag == 3 {
+        if in_contract == 1 { return 0; }
+        return 524;
+    }
+    return 0;
+}
+
+// arity check for builtins: returns 0 if ok, error code if mismatch
+fn builtin_arity_check(path_tag: i32, arg_count: i32) -> i32 {
+    // old: exactly 1 arg
+    if path_tag == 0 {
+        if arg_count == 1 { return 0; }
+        return 521;
+    }
+    // forall, exists: exactly 2 args
+    if path_tag == 1 {
+        if arg_count == 2 { return 0; }
+        return 523;
+    }
+    if path_tag == 2 {
+        if arg_count == 2 { return 0; }
+        return 523;
+    }
+    // no_alias: exactly 2 args
+    if path_tag == 3 {
+        if arg_count == 2 { return 0; }
+        return 524;
+    }
+    // println: exactly 1 arg
+    if path_tag == 4 {
+        if arg_count == 1 { return 0; }
+        return 444;
+    }
+    return 0;
+}
+
+// user fn arity: compare arg_count vs param_count (E0413)
+fn fn_arity_check(arg_count: i32, param_count: i32) -> i32 {
+    if arg_count == param_count {
+        return 0;
+    }
+    return 413;
+}
+
+fn main() -> i32 {
+    // call_path_tag
+    if call_path_tag(1, 0) != 0 { return 1; }
+    if call_path_tag(1, 4) != 4 { return 1; }
+    if call_path_tag(1, 99) != 5 { return 1; }
+    if call_path_tag(2, 0) != 6 { return 1; }
+    // contract gate
+    if contract_builtin_gate(0, 1) != 0 { return 1; }
+    if contract_builtin_gate(0, 0) != 521 { return 1; }
+    if contract_builtin_gate(1, 0) != 523 { return 1; }
+    if contract_builtin_gate(3, 0) != 524 { return 1; }
+    if contract_builtin_gate(5, 0) != 0 { return 1; }
+    // builtin arity
+    if builtin_arity_check(0, 1) != 0 { return 1; }
+    if builtin_arity_check(0, 2) != 521 { return 1; }
+    if builtin_arity_check(1, 2) != 0 { return 1; }
+    if builtin_arity_check(4, 1) != 0 { return 1; }
+    if builtin_arity_check(4, 0) != 444 { return 1; }
+    // fn arity
+    if fn_arity_check(2, 2) != 0 { return 1; }
+    if fn_arity_check(1, 2) != 413 { return 1; }
+    return 0;
+}

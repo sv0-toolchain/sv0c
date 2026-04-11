@@ -1,0 +1,103 @@
+/* Transliteration seed: sml/type_checker/checker.sml — synth dispatch
+   SML reference (lines 489–737, ~249 lines):
+     fun synth (retTy) (env) (e : Ast.expr) : Types.ty =
+       case e of ExprLit (...) | ExprPath (...) | ExprBlock (...) | ...
+   The 15-arm case dispatch is the largest function in checker.sml.
+   This seed models the dispatch tag → result type class mapping and
+   the loop-depth / contract-expr side-state checks.
+
+   Expr tags (from ast.sml):
+     0=ExprLit 1=ExprPath 2=ExprBinop 3=ExprUnop 4=ExprCall
+     5=ExprIf 6=ExprBlock 7=ExprMatch 8=ExprStruct 9=ExprField
+     10=ExprCast 11=ExprTry 12=ExprWhile 13=ExprFor 14=ExprLoop
+     15=ExprBreak 16=ExprContinue 17=ExprReturn 18=ExprTuple
+     19=ExprAssign 20=ExprAssignOp
+
+   Result type classes:
+     0=int(i32) 1=bool 2=unit 3=struct 4=enum 5=string 6=inferred 255=error */
+
+fn synth_result_class(expr_tag: i32) -> i32 {
+    if expr_tag == 0 { return 6; }
+    if expr_tag == 1 { return 6; }
+    if expr_tag == 2 { return 6; }
+    if expr_tag == 3 { return 6; }
+    if expr_tag == 4 { return 6; }
+    if expr_tag == 5 { return 6; }
+    if expr_tag == 6 { return 6; }
+    if expr_tag == 7 { return 6; }
+    if expr_tag == 8 { return 3; }
+    if expr_tag == 9 { return 6; }
+    if expr_tag == 10 { return 6; }
+    if expr_tag == 11 { return 6; }
+    // ExprWhile, ExprFor, ExprLoop => TyUnit
+    if expr_tag == 12 { return 2; }
+    if expr_tag == 13 { return 2; }
+    if expr_tag == 14 { return 2; }
+    // ExprBreak, ExprContinue => TyUnit (require loopDepth > 0)
+    if expr_tag == 15 { return 2; }
+    if expr_tag == 16 { return 2; }
+    // ExprReturn => TyUnit
+    if expr_tag == 17 { return 2; }
+    return 255;
+}
+
+// break_ok / continue_ok: requires loop_depth > 0 (E0411/E0412)
+fn loop_ctx_check(loop_depth: i32, is_break: i32) -> i32 {
+    if loop_depth > 0 {
+        return 0;
+    }
+    if is_break == 1 {
+        return 411;
+    }
+    return 412;
+}
+
+// match scrutinee type class validation (E0433)
+// allowed: 0=i32, 1=bool, 4=enum; else error
+fn match_scrut_ok(scrut_type_class: i32) -> i32 {
+    if scrut_type_class == 0 { return 1; }
+    if scrut_type_class == 1 { return 1; }
+    if scrut_type_class == 4 { return 1; }
+    return 0;
+}
+
+// unop dispatch: 0=Neg → int, 1=Not → bool, 2=Borrow(contract), 3=BorrowMut(contract)
+fn unop_result_class(unop_tag: i32, in_contract: i32) -> i32 {
+    if unop_tag == 0 { return 0; }
+    if unop_tag == 1 { return 1; }
+    if unop_tag == 2 {
+        if in_contract == 1 { return 6; }
+        return 255;
+    }
+    if unop_tag == 3 {
+        if in_contract == 1 { return 6; }
+        return 255;
+    }
+    return 255;
+}
+
+fn main() -> i32 {
+    // synth_result_class
+    if synth_result_class(0) != 6 { return 1; }
+    if synth_result_class(8) != 3 { return 1; }
+    if synth_result_class(12) != 2 { return 1; }
+    if synth_result_class(15) != 2 { return 1; }
+    if synth_result_class(17) != 2 { return 1; }
+    if synth_result_class(99) != 255 { return 1; }
+    // loop_ctx_check
+    if loop_ctx_check(1, 1) != 0 { return 1; }
+    if loop_ctx_check(0, 1) != 411 { return 1; }
+    if loop_ctx_check(0, 0) != 412 { return 1; }
+    // match_scrut_ok
+    if match_scrut_ok(0) != 1 { return 1; }
+    if match_scrut_ok(1) != 1 { return 1; }
+    if match_scrut_ok(4) != 1 { return 1; }
+    if match_scrut_ok(3) != 0 { return 1; }
+    // unop_result_class
+    if unop_result_class(0, 0) != 0 { return 1; }
+    if unop_result_class(1, 0) != 1 { return 1; }
+    if unop_result_class(2, 1) != 6 { return 1; }
+    if unop_result_class(2, 0) != 255 { return 1; }
+    if unop_result_class(3, 1) != 6 { return 1; }
+    return 0;
+}

@@ -72,7 +72,8 @@ structure Link :> LINK = struct
 
   fun mapTy (tops : string list) (modId : string) (t : Ast.ty) : Ast.ty =
     case t of
-      Ast.TyName (p, sp) => Ast.TyName (mapPathSegs tops modId p, sp)
+      Ast.TyName (p, tyArgs, sp) =>
+        Ast.TyName (mapPathSegs tops modId p, map (mapTy tops modId) tyArgs, sp)
     | Ast.TyRef (t2, sp) => Ast.TyRef (mapTy tops modId t2, sp)
     | Ast.TyRefMut (t2, sp) => Ast.TyRefMut (mapTy tops modId t2, sp)
     | Ast.TyArray (t2, e, sp) =>
@@ -199,13 +200,15 @@ structure Link :> LINK = struct
 
   and mapFn (tops : string list) (modId : string)
     (r : {
-       name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+       name : Ast.ident, type_params : Ast.ident list,
+       params : (Ast.pat * Ast.ty) list,
        ret : Ast.ty option, contracts : Ast.contract list,
        body : Ast.expr, span : Span.span
      }) =
     {
       name =
         if #name r = "main" then "main" else mangle modId (#name r),
+      type_params = #type_params r,
       params =
         map (fn (p, t) => (mapPat tops modId p, mapTy tops modId t)) (#params r),
       ret = Option.map (mapTy tops modId) (#ret r),
@@ -216,21 +219,25 @@ structure Link :> LINK = struct
 
   and mapStruct (tops : string list) (modId : string)
     (r : {
-       name : Ast.ident, fields : (Ast.ident * Ast.ty) list,
+       name : Ast.ident, type_params : Ast.ident list,
+       fields : (Ast.ident * Ast.ty) list,
        span : Span.span
      }) =
     {
       name = mangle modId (#name r),
+      type_params = #type_params r,
       fields = map (fn (f, t) => (f, mapTy tops modId t)) (#fields r),
       span = #span r
     }
 
   and mapEnum (tops : string list) (modId : string)
     (r : {
-       name : Ast.ident, variants : Ast.variant list, span : Span.span
+       name : Ast.ident, type_params : Ast.ident list,
+       variants : Ast.variant list, span : Span.span
      }) =
     {
       name = mangle modId (#name r),
+      type_params = #type_params r,
       variants =
         map
           (fn v =>

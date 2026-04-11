@@ -95,18 +95,26 @@ structure Lowering :> LOWERING = struct
   fun astTyToCString (t : Ast.ty) : string =
     case t of
       Ast.TyUnit _ => "void"
-    | Ast.TyName (["unit"], _) => "void"
-    | Ast.TyName (["i32"], _) => "int"
-    | Ast.TyName (["bool"], _) => "int"
-    | Ast.TyName (["i8"], _) => "int8_t"
-    | Ast.TyName (["u8"], _) => "uint8_t"
-    | Ast.TyName (["i16"], _) => "int16_t"
-    | Ast.TyName (["u16"], _) => "uint16_t"
-    | Ast.TyName (["i64"], _) => "int64_t"
-    | Ast.TyName (["u64"], _) => "uint64_t"
-    | Ast.TyName (["isize"], _) => "intptr_t"
-    | Ast.TyName (["usize"], _) => "uintptr_t"
-    | Ast.TyName ([n], _) => n
+    | Ast.TyName (["unit"], _, _) => "void"
+    | Ast.TyName (["i32"], _, _) => "int"
+    | Ast.TyName (["bool"], _, _) => "int"
+    | Ast.TyName (["i8"], _, _) => "int8_t"
+    | Ast.TyName (["u8"], _, _) => "uint8_t"
+    | Ast.TyName (["i16"], _, _) => "int16_t"
+    | Ast.TyName (["u16"], _, _) => "uint16_t"
+    | Ast.TyName (["i64"], _, _) => "int64_t"
+    | Ast.TyName (["u64"], _, _) => "uint64_t"
+    | Ast.TyName (["isize"], _, _) => "intptr_t"
+    | Ast.TyName (["usize"], _, _) => "uintptr_t"
+    | Ast.TyName (["string"], _, _) => "const char*"
+    | Ast.TyName (["str"], _, _) => "const char*"
+    | Ast.TyName (["String"], _, _) => "const char*"
+    | Ast.TyName (["Vec"], _, _) => "int"
+    | Ast.TyName (["Box"], _, _) => "int"
+    | Ast.TyName ([n], _, _) =>
+        if List.exists (fn (sn, _) => sn = n) (!structFieldOrder) then n
+        else if List.exists (fn (en, _) => en = n) (!enumVariants) then n
+        else "int"
     | _ => "int"
 
   fun calleeRetCty (name : string) : string =
@@ -199,11 +207,138 @@ structure Lowering :> LOWERING = struct
     | Ast.StringLit s => Ir.VString s
     | _ => raise Fail "literal not supported in lowering slice"
 
-  fun okPayloadCty (en : string) : string =
-    case findVariantAst en "Ok" of
-      Ast.VariantTuple (_, [aty], _) => astTyToCString aty
-    | _ =>
-        raise Fail "lowering: `?` requires Ok(T) with exactly one payload field"
+  fun tryVariantNames (en : string) : {success: string, failure: string} =
+    case List.find (fn (n, _) => n = en) (!enumVariants) of
+      SOME (_, (tags, _)) =>
+        let
+          val names = map #1 tags
+          val hasOk = List.exists (fn v => v = "Ok") names
+          val hasErr = List.exists (fn v => v = "Err") names
+          val hasSome = List.exists (fn v => v = "Some") names
+          val hasNone = List.exists (fn v => v = "None") names
+        in
+          if hasOk andalso hasErr then {success="Ok", failure="Err"}
+          else if hasSome andalso hasNone then {success="Some", failure="None"}
+          else raise Fail "lowering: `?` requires Ok/Err or Some/None variants"
+        end
+    | NONE => raise Fail ("lowering: unknown enum `" ^ en ^ "`")
+
+  fun enumMaxPayload (en : string) : int =
+    case List.find (fn (n, _) => n = en) (!enumVariants) of
+      SOME (_, (_, maxP)) => maxP
+    | NONE => raise Fail ("lowering: unknown enum `" ^ en ^ "` (maxPayload)")
+
+  fun isEnumCty (n : string) : bool =
+    List.exists (fn (en, _) => en = n) (!enumVariants)
+
+  fun isStructCty (n : string) : bool =
+    List.exists (fn (sn, _) => sn = n) (!structFieldOrder)
+
+  fun boxNewFromValue (ia : Ir.instr list) (va : Ir.value) (cty : string)
+    : Ir.instr list * Ir.value =
+    let val h = freshTmp ()
+    in
+      if isEnumCty cty then
+        let
+          val maxP = enumMaxPayload cty
+          val width = 1 + maxP
+          val allocInstr =
+            Ir.Call (SOME h, "sv0_box_alloc",
+                     [Ir.VInt (IntInf.fromInt width)], "int")
+          val storeTag =
+            Ir.Call (NONE, "sv0_box_store",
+                     [Ir.VVar h, Ir.VInt 0, Ir.VMember (va, "tag")], "void")
+          val storePs =
+            List.tabulate (maxP, fn i =>
+              Ir.Call (NONE, "sv0_box_store",
+                       [Ir.VVar h, Ir.VInt (IntInf.fromInt (i + 1)),
+                        Ir.VMember (va, "p" ^ Int.toString i)], "void"))
+        in
+          (ia @ [allocInstr, storeTag] @ storePs, Ir.VVar h)
+        end
+      else if isStructCty cty then
+        let
+          val fs = structFields cty
+          val width = length fs
+          val allocInstr =
+            Ir.Call (SOME h, "sv0_box_alloc",
+                     [Ir.VInt (IntInf.fromInt width)], "int")
+          val storeFs =
+            List.tabulate (width, fn i =>
+              Ir.Call (NONE, "sv0_box_store",
+                       [Ir.VVar h, Ir.VInt (IntInf.fromInt i),
+                        Ir.VMember (va, List.nth (fs, i))], "void"))
+        in
+          (ia @ [allocInstr] @ storeFs, Ir.VVar h)
+        end
+      else
+        let
+          val allocInstr =
+            Ir.Call (SOME h, "sv0_box_alloc", [Ir.VInt 1], "int")
+          val storeInstr =
+            Ir.Call (NONE, "sv0_box_store",
+                     [Ir.VVar h, Ir.VInt 0, va], "void")
+        in
+          (ia @ [allocInstr, storeInstr], Ir.VVar h)
+        end
+    end
+
+  fun boxDerefFromValue (ia : Ir.instr list) (va : Ir.value) (cty : string)
+    : Ir.instr list * Ir.value =
+    let val out = freshTmp ()
+    in
+      if isEnumCty cty then
+        let
+          val maxP = enumMaxPayload cty
+          val tTag = freshTmp ()
+          val loadTag =
+            Ir.Call (SOME tTag, "sv0_box_load",
+                     [va, Ir.VInt 0], "int")
+          val storeTag = Ir.StoreField (out, "tag", valueToExpr (Ir.VVar tTag))
+          val loadPs =
+            List.concat (List.tabulate (maxP, fn i =>
+              let val tp = freshTmp ()
+              in
+                [ Ir.Call (SOME tp, "sv0_box_load",
+                           [va, Ir.VInt (IntInf.fromInt (i + 1))], "int")
+                , Ir.StoreField (out, "p" ^ Int.toString i,
+                                 valueToExpr (Ir.VVar tp)) ]
+              end))
+        in
+          (ia @ [Ir.DeclNamed (cty, out), loadTag, storeTag] @ loadPs,
+           Ir.VVar out)
+        end
+      else if isStructCty cty then
+        let
+          val fs = structFields cty
+          val loadFs =
+            List.concat (List.tabulate (length fs, fn i =>
+              let val tf = freshTmp ()
+                  val fname = List.nth (fs, i)
+              in
+                [ Ir.Call (SOME tf, "sv0_box_load",
+                           [va, Ir.VInt (IntInf.fromInt i)], "int")
+                , Ir.StoreField (out, fname, valueToExpr (Ir.VVar tf)) ]
+              end))
+        in
+          (ia @ [Ir.DeclNamed (cty, out)] @ loadFs, Ir.VVar out)
+        end
+      else
+        let
+          val loadInstr =
+            Ir.Call (SOME out, "sv0_box_load", [va, Ir.VInt 0], "int")
+        in
+          (ia @ [loadInstr], Ir.VVar out)
+        end
+    end
+
+  fun successPayloadCty (en : string) : string =
+    let val {success, ...} = tryVariantNames en
+    in
+      case findVariantAst en success of
+        Ast.VariantTuple (_, [aty], _) => astTyToCString aty
+      | _ => raise Fail ("lowering: `?` requires " ^ success ^ "(T) with exactly one payload field")
+    end
 
   fun scanLets (stmts : Ast.stmt list) : (string * string) list =
     List.concat (
@@ -387,11 +522,48 @@ structure Lowering :> LOWERING = struct
                      end
                  | Ast.VariantStruct _ =>
                      raise Fail
-                       "lowering: struct enum variants in match not supported yet"
+                       "lowering: struct enum variants in match not supported yet (use struct pattern syntax)"
              in
                ([], cond, bindPre)
              end
          | _ => raise Fail "lowering: bad PatEnum path")
+    | Ast.PatStruct ([en, vn], fieldPats, _) =>
+        let
+          val k = enumTag en vn
+          val cond =
+            Ir.Binop
+              ( "=="
+              , Ir.VMember (Ir.VVar scrVar, "tag")
+              , Ir.VInt (IntInf.fromInt k))
+          val va = findVariantAst en vn
+          val fieldDefs =
+            case va of
+              Ast.VariantStruct (_, fs, _) => fs
+            | _ => raise Fail "lowering: PatStruct on non-struct variant"
+          fun fieldIndex fname =
+            let fun go [] _ = raise Fail ("lowering: unknown struct field `" ^ fname ^ "`")
+                  | go ((n, _) :: rest) i =
+                      if n = fname then i else go rest (i + 1)
+            in go fieldDefs 0 end
+          val bindPre =
+            List.concat
+              (map (fn (fname, pat) =>
+                 case pat of
+                   Ast.PatWild _ => []
+                 | Ast.PatBind (xb, _) =>
+                     let val idx = fieldIndex fname
+                     in
+                       [ Ir.Assign
+                           ( xb
+                           , Ir.Literal
+                               (Ir.VMember (Ir.VVar scrVar, "p" ^ Int.toString idx))
+                           ) ]
+                     end
+                 | _ => raise Fail "lowering: struct field pattern not supported")
+               fieldPats)
+        in
+          ([], cond, bindPre)
+        end
     | _ => raise Fail "lowering: match pattern not supported"
 
   fun lowerExprToValue (e : Ast.expr) : Ir.instr list * Ir.value =
@@ -445,6 +617,9 @@ structure Lowering :> LOWERING = struct
         end
     | Ast.ExprCall (Ast.ExprPath (["println"], _), [Ast.ExprLit (Ast.StringLit s, _)], _) =>
         ([Ir.Call (NONE, "sv0_println", [Ir.VString s], "void")], Ir.VUnit)
+    | Ast.ExprCall (Ast.ExprPath (["println"], _), [arg], _) =>
+        let val (is, v) = lowerExprToValue arg
+        in (is @ [Ir.Call (NONE, "sv0_println", [v], "void")], Ir.VUnit) end
     | Ast.ExprCall (Ast.ExprPath (["old"], _), [Ast.ExprPath ([x], _)], _) =>
         ([], Ir.VVar (oldSlot x))
     | Ast.ExprCall (Ast.ExprPath (["no_alias"], _), [a, b], _) =>
@@ -456,6 +631,59 @@ structure Lowering :> LOWERING = struct
           ( ia @ ib @ [Ir.Call (SOME t, "sv0_no_alias", [va, vb], "bool")]
           , Ir.VVar t)
         end
+    | Ast.ExprCall (Ast.ExprPath (["string_len"], _), [arg], _) =>
+        let val (is, v) = lowerExprToValue arg
+            val t = freshTmp ()
+        in (is @ [Ir.Call (SOME t, "sv0_string_len", [v], "int")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["string_eq"], _), [a, b], _) =>
+        let val (ia, va) = lowerExprToValue a
+            val (ib, vb) = lowerExprToValue b
+            val t = freshTmp ()
+        in (ia @ ib @ [Ir.Call (SOME t, "sv0_string_eq", [va, vb], "int")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["string_concat"], _), [a, b], _) =>
+        let val (ia, va) = lowerExprToValue a
+            val (ib, vb) = lowerExprToValue b
+            val t = freshTmp ()
+        in (ia @ ib @ [Ir.Call (SOME t, "sv0_string_concat", [va, vb], "const char*")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["string_char_at"], _), [s, i], _) =>
+        let val (is, vs) = lowerExprToValue s
+            val (ii, vi) = lowerExprToValue i
+            val t = freshTmp ()
+        in (is @ ii @ [Ir.Call (SOME t, "sv0_string_char_at", [vs, vi], "int")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["string_substr"], _), [s, start, len], _) =>
+        let val (is, vs) = lowerExprToValue s
+            val (ist, vst) = lowerExprToValue start
+            val (il, vl) = lowerExprToValue len
+            val t = freshTmp ()
+        in (is @ ist @ il @ [Ir.Call (SOME t, "sv0_string_substr", [vs, vst, vl], "const char*")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["vec_new"], _), [], _) =>
+        let val t = freshTmp ()
+        in ([Ir.Call (SOME t, "sv0_vec_new", [], "int")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["vec_push"], _), [v, elem], _) =>
+        let val (iv, vv) = lowerExprToValue v
+            val (ie, ve) = lowerExprToValue elem
+        in (iv @ ie @ [Ir.Call (NONE, "sv0_vec_push", [vv, ve], "void")], Ir.VUnit) end
+    | Ast.ExprCall (Ast.ExprPath (["vec_len"], _), [v], _) =>
+        let val (iv, vv) = lowerExprToValue v
+            val t = freshTmp ()
+        in (iv @ [Ir.Call (SOME t, "sv0_vec_len", [vv], "int")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["vec_get"], _), [v, idx], _) =>
+        let val (iv, vv) = lowerExprToValue v
+            val (ii, vi) = lowerExprToValue idx
+            val t = freshTmp ()
+        in (iv @ ii @ [Ir.Call (SOME t, "sv0_vec_get", [vv, vi], "int")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["vec_set"], _), [v, idx, val_], _) =>
+        let val (iv, vv) = lowerExprToValue v
+            val (ii, vi) = lowerExprToValue idx
+            val (ie, ve) = lowerExprToValue val_
+        in (iv @ ii @ ie @ [Ir.Call (NONE, "sv0_vec_set", [vv, vi, ve], "void")], Ir.VUnit) end
+    | Ast.ExprCall (Ast.ExprPath (["box_new"], _), [arg], _) =>
+        let val (ia, va) = lowerExprToValue arg
+            val cty = matchScrutCty arg
+        in boxNewFromValue ia va cty end
+    | Ast.ExprCall (Ast.ExprPath (["box_deref"], _), [arg], _) =>
+        let val (ia, va) = lowerExprToValue arg
+        in boxDerefFromValue ia va "int" end
     | Ast.ExprUnop (Ast.Borrow, Ast.ExprPath ([x], _), _) =>
         ([], Ir.VAddrOf x)
     | Ast.ExprUnop (Ast.BorrowMut, Ast.ExprPath ([x], _), _) =>
@@ -522,21 +750,21 @@ structure Lowering :> LOWERING = struct
               raise Fail "lowering: `?` expected enum-typed expression"
             else
               ()
-          val errK = IntInf.fromInt (enumTag en "Err")
-          val pCty = okPayloadCty en
+          val {failure, ...} = tryVariantNames en
+          val failK = IntInf.fromInt (enumTag en failure)
+          val pCty = successPayloadCty en
           val (i1, ee) = lowerExprWithInstrs e1
           val u = freshTmp ()
           val out = freshTmp ()
           val declOut =
             if pCty = "int" then [Ir.DeclVar out] else [Ir.DeclNamed (pCty, out)]
           val cond =
-            Ir.Binop ("==", Ir.VMember (Ir.VVar u, "tag"), Ir.VInt errK)
-          val retErr = [Ir.Return (SOME (Ir.VVar u))]
-          val takeOk = [Ir.Store (out, Ir.FieldAccess (Ir.VVar u, "p0"))]
+            Ir.Binop ("==", Ir.VMember (Ir.VVar u, "tag"), Ir.VInt failK)
+          val retFail = [Ir.Return (SOME (Ir.VVar u))]
+          val takeSuccess = [Ir.Store (out, Ir.FieldAccess (Ir.VVar u, "p0"))]
         in
-          (* Declare payload slot before if/else so it is in scope after `?`. *)
           ( i1 @ [Ir.DeclNamed (en, u), Ir.Store (u, ee)] @ declOut
-            @ [Ir.IfElse (cond, retErr, takeOk)]
+            @ [Ir.IfElse (cond, retFail, takeSuccess)]
           , Ir.VVar out)
         end
     | Ast.ExprIf (c, th, SOME el, _) =>
@@ -789,6 +1017,44 @@ structure Lowering :> LOWERING = struct
           | Ast.ExprPath ([en, vn], _) =>
               let val (en0, vn0) = resolveEnumCtorPath en vn
               in [Ir.DeclNamed (en0, x)] @ enumConstructInstrs x en0 vn0 [] end
+          | Ast.ExprCall (Ast.ExprPath (["box_deref"], _), [arg], _) =>
+              let
+                val cty =
+                  case to of
+                    SOME at => astTyToCString at
+                  | NONE => "int"
+                val (ia, va) = lowerExprToValue arg
+                val (instrs, v) = boxDerefFromValue ia va cty
+              in
+                if cty = "int" then
+                  instrs @ [Ir.Assign (x, valueToExpr v)]
+                else
+                  let val xDecl = Ir.DeclNamed (cty, x)
+                  in
+                    if isEnumCty cty orelse isStructCty cty then
+                      let
+                        val copyFields =
+                          if isEnumCty cty then
+                            let val maxP = enumMaxPayload cty
+                            in
+                              Ir.StoreField (x, "tag",
+                                Ir.FieldAccess (v, "tag"))
+                              :: List.tabulate (maxP, fn i =>
+                                   let val pn = "p" ^ Int.toString i
+                                   in Ir.StoreField (x, pn,
+                                        Ir.FieldAccess (v, pn))
+                                   end)
+                            end
+                          else
+                            map (fn f =>
+                              Ir.StoreField (x, f, Ir.FieldAccess (v, f)))
+                              (structFields cty)
+                      in
+                        instrs @ [xDecl] @ copyFields
+                      end
+                    else instrs @ [Ir.DeclNamed (cty, x), Ir.Store (x, valueToExpr v)]
+                  end
+              end
           | _ =>
               let
                 val (instrs, rhs) = lowerExprWithInstrs init
@@ -886,12 +1152,13 @@ structure Lowering :> LOWERING = struct
     | e => lowerReturn e
 
   fun retSyntaxIsUnit (r : {
-        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        name : Ast.ident, type_params : Ast.ident list,
+        params : (Ast.pat * Ast.ty) list,
         ret : Ast.ty option, contracts : Ast.contract list,
         body : Ast.expr, span : Span.span
       }) : bool =
     case #ret r of
-      SOME (Ast.TyName (["unit"], _)) => true
+      SOME (Ast.TyName (["unit"], _, _)) => true
     | SOME (Ast.TyUnit _) => true
     | _ => false
 
@@ -948,7 +1215,8 @@ structure Lowering :> LOWERING = struct
       lowerExprWithInstrs e
 
   fun fnRetCty (r : {
-        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        name : Ast.ident, type_params : Ast.ident list,
+        params : (Ast.pat * Ast.ty) list,
         ret : Ast.ty option, contracts : Ast.contract list,
         body : Ast.expr, span : Span.span
       }) : string =
@@ -957,7 +1225,8 @@ structure Lowering :> LOWERING = struct
     | SOME at => astTyToCString at
 
   fun lowerFn (r : {
-        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        name : Ast.ident, type_params : Ast.ident list,
+        params : (Ast.pat * Ast.ty) list,
         ret : Ast.ty option, contracts : Ast.contract list,
         body : Ast.expr, span : Span.span
       }) : Ir.block =
@@ -1040,7 +1309,8 @@ structure Lowering :> LOWERING = struct
     | Ast.VariantStruct (_, fs, _) => length fs
 
   fun emitStructTd (r : {
-        name : Ast.ident, fields : (Ast.ident * Ast.ty) list, span : Span.span
+        name : Ast.ident, type_params : Ast.ident list,
+        fields : (Ast.ident * Ast.ty) list, span : Span.span
       }) : string =
     let
       val lines =
@@ -1050,7 +1320,8 @@ structure Lowering :> LOWERING = struct
     end
 
   fun emitEnumTd (r : {
-        name : Ast.ident, variants : Ast.variant list, span : Span.span
+        name : Ast.ident, type_params : Ast.ident list,
+        variants : Ast.variant list, span : Span.span
       }) : string =
     let
       val maxP =
