@@ -204,3 +204,12 @@ lib/bytecode_insn_size_core.sv0
 lib/bytecode_opcode_map_core.sv0
 lib/lexer_char_class_core.sv0
 lib/lexer_advance_core.sv0
+lib/checker_integral_ty_core.sv0
+lib/checker_stmt_returns_core.sv0
+lib/checker_ctor_ty_core.sv0
+lib/vm_codegen_variant_slots_core.sv0
+lib/vm_codegen_jump_patch_core.sv0
+lib/vm_codegen_bind_param_core.sv0
+lib/main_pipeline_core.sv0
+lib/codegen_escape_core.sv0
+lib/codegen_proto_core.sv0

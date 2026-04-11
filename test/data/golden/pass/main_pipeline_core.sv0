@@ -1,0 +1,97 @@
+/* main_pipeline_core.sv0 — seed for main.sml
+   Transliterates baseNameSv0 (path stem extraction), CLI dispatch
+   (mode routing from args), and compile pipeline stage tags. */
+
+fn base_name_sv0(path: string) -> i32 {
+    let n: i32 = string_len(path);
+    if n > 4 {
+        let suffix: string = string_substr(path, n - 4, 4);
+        if string_eq(suffix, ".sv0") {
+            return n - 4;
+        }
+    }
+    return n;
+}
+
+fn has_sv0_extension(path: string) -> bool {
+    let n: i32 = string_len(path);
+    if n <= 4 { return false; }
+    let suffix: string = string_substr(path, n - 4, 4);
+    return string_eq(suffix, ".sv0");
+}
+
+fn cli_mode(arg0: string) -> i32 {
+    if string_eq(arg0, "--target=vm") { return 1; }
+    if string_eq(arg0, "--project") { return 2; }
+    return 0;
+}
+
+fn pipeline_stage_count() -> i32 {
+    return 7;
+}
+
+fn stage_name_tag(stage: i32) -> i32 {
+    if stage == 0 { return 10; }
+    if stage == 1 { return 11; }
+    if stage == 2 { return 12; }
+    if stage == 3 { return 13; }
+    if stage == 4 { return 14; }
+    if stage == 5 { return 15; }
+    if stage == 6 { return 16; }
+    return 0 - 1;
+}
+
+fn is_valid_stage(stage: i32) -> bool {
+    if stage < 0 { return false; }
+    if stage >= 7 { return false; }
+    return true;
+}
+
+fn test_basename() -> i32 {
+    if base_name_sv0("test.sv0") != 4 { return 1; }
+    if base_name_sv0("hello.sv0") != 5 { return 2; }
+    if base_name_sv0("ab.sv0") != 2 { return 3; }
+    if base_name_sv0(".sv0") != 4 { return 4; }
+    if base_name_sv0("noext") != 5 { return 5; }
+    if base_name_sv0("a.c") != 3 { return 6; }
+    return 0;
+}
+
+fn test_has_ext() -> i32 {
+    if has_sv0_extension("test.sv0") != true { return 1; }
+    if has_sv0_extension("noext") != false { return 2; }
+    if has_sv0_extension(".sv0") != false { return 3; }
+    if has_sv0_extension("ab.sv0") != true { return 4; }
+    return 0;
+}
+
+fn test_cli_mode() -> i32 {
+    if cli_mode("--target=vm") != 1 { return 1; }
+    if cli_mode("--project") != 2 { return 2; }
+    if cli_mode("hello.sv0") != 0 { return 3; }
+    return 0;
+}
+
+fn test_stages() -> i32 {
+    if pipeline_stage_count() != 7 { return 1; }
+    if stage_name_tag(0) != 10 { return 2; }
+    if stage_name_tag(6) != 16 { return 3; }
+    if stage_name_tag(7) != 0 - 1 { return 4; }
+    if is_valid_stage(0) != true { return 5; }
+    if is_valid_stage(6) != true { return 6; }
+    if is_valid_stage(7) != false { return 7; }
+    if is_valid_stage(0 - 1) != false { return 8; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_basename();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_has_ext();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_cli_mode();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_stages();
+    if r4 != 0 { return 400 + r4; }
+    return 0;
+}

@@ -1,0 +1,117 @@
+/* codegen_escape_core.sv0 — seed for backend/c/codegen.sml
+   Transliterates cEscapeString character classification.
+   Uses ASCII code points for escape decision dispatch. */
+
+fn needs_escape(c: i32) -> bool {
+    if c == 34 { return true; }
+    if c == 92 { return true; }
+    if c == 10 { return true; }
+    if c == 9 { return true; }
+    if c == 13 { return true; }
+    if c < 32 { return true; }
+    return false;
+}
+
+fn escape_char_tag(c: i32) -> i32 {
+    if c == 34 { return 1; }
+    if c == 92 { return 2; }
+    if c == 10 { return 3; }
+    if c == 9 { return 4; }
+    if c == 13 { return 5; }
+    if c < 32 { return 6; }
+    return 0;
+}
+
+fn escaped_len(c: i32) -> i32 {
+    let tag: i32 = escape_char_tag(c);
+    if tag == 0 { return 1; }
+    if tag == 1 { return 2; }
+    if tag == 2 { return 2; }
+    if tag == 3 { return 2; }
+    if tag == 4 { return 2; }
+    if tag == 5 { return 2; }
+    if tag == 6 {
+        if c < 10 { return 2; }
+        return 3;
+    }
+    return 1;
+}
+
+fn total_escaped_len(c0: i32, c1: i32, c2: i32, c3: i32) -> i32 {
+    let mut len: i32 = 0;
+    if c0 >= 0 { len = len + escaped_len(c0); }
+    if c1 >= 0 { len = len + escaped_len(c1); }
+    if c2 >= 0 { len = len + escaped_len(c2); }
+    if c3 >= 0 { len = len + escaped_len(c3); }
+    return len;
+}
+
+fn is_printable_ascii(c: i32) -> bool {
+    if c < 32 { return false; }
+    if c > 126 { return false; }
+    return true;
+}
+
+fn test_needs_escape() -> i32 {
+    if needs_escape(34) != true { return 1; }
+    if needs_escape(92) != true { return 2; }
+    if needs_escape(10) != true { return 3; }
+    if needs_escape(9) != true { return 4; }
+    if needs_escape(13) != true { return 5; }
+    if needs_escape(0) != true { return 6; }
+    if needs_escape(65) != false { return 7; }
+    if needs_escape(48) != false { return 8; }
+    if needs_escape(32) != false { return 9; }
+    return 0;
+}
+
+fn test_escape_tag() -> i32 {
+    if escape_char_tag(34) != 1 { return 1; }
+    if escape_char_tag(92) != 2 { return 2; }
+    if escape_char_tag(10) != 3 { return 3; }
+    if escape_char_tag(9) != 4 { return 4; }
+    if escape_char_tag(13) != 5 { return 5; }
+    if escape_char_tag(1) != 6 { return 6; }
+    if escape_char_tag(65) != 0 { return 7; }
+    return 0;
+}
+
+fn test_escaped_len() -> i32 {
+    if escaped_len(65) != 1 { return 1; }
+    if escaped_len(34) != 2 { return 2; }
+    if escaped_len(10) != 2 { return 3; }
+    if escaped_len(1) != 2 { return 4; }
+    if escaped_len(15) != 3 { return 5; }
+    return 0;
+}
+
+fn test_total_len() -> i32 {
+    let t1: i32 = total_escaped_len(65, 66, 67, 0 - 1);
+    if t1 != 3 { return 1; }
+    let t2: i32 = total_escaped_len(34, 65, 10, 0 - 1);
+    if t2 != 5 { return 2; }
+    return 0;
+}
+
+fn test_printable() -> i32 {
+    if is_printable_ascii(65) != true { return 1; }
+    if is_printable_ascii(32) != true { return 2; }
+    if is_printable_ascii(126) != true { return 3; }
+    if is_printable_ascii(31) != false { return 4; }
+    if is_printable_ascii(127) != false { return 5; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_needs_escape();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_escape_tag();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_escaped_len();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_total_len();
+    if r4 != 0 { return 400 + r4; }
+    let r5: i32 = test_printable();
+    if r5 != 0 { return 500 + r5; }
+    return 0;
+}

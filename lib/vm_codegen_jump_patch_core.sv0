@@ -1,0 +1,100 @@
+/* vm_codegen_jump_patch_core.sv0 — seed for backend/vm/vm_codegen.sml
+   Transliterates loop jump patching logic: sentinel constants,
+   patchContinueJumpsFrom, and replaceLoopExitJump.
+   Bytecode sentinels: loopContinueSentinel = 0x7FFFFFFD,
+   loopExitSentinel = 0x7FFFFFFE. */
+
+fn loop_continue_sentinel() -> i32 {
+    return 2147483645;
+}
+
+fn loop_exit_sentinel() -> i32 {
+    return 2147483646;
+}
+
+fn is_continue_sentinel(jump_offset: i32) -> bool {
+    return jump_offset == 2147483645;
+}
+
+fn is_exit_sentinel(jump_offset: i32) -> bool {
+    return jump_offset == 2147483646;
+}
+
+fn patch_continue_jump(jump_offset: i32, current_pos: i32,
+                       insn_len: i32, target_abs: i32) -> i32 {
+    if is_continue_sentinel(jump_offset) {
+        return target_abs - (current_pos + insn_len);
+    }
+    return jump_offset;
+}
+
+fn replace_exit_jump(last_jump_offset: i32, back_edge_delta: i32) -> i32 {
+    if is_exit_sentinel(last_jump_offset) {
+        return back_edge_delta;
+    }
+    return 0 - 1;
+}
+
+fn compute_back_edge(loop_start: i32, body_end: i32, jump_size: i32) -> i32 {
+    return loop_start - (body_end + jump_size);
+}
+
+fn loop_body_offset(cond_width: i32, jifnot_size: i32) -> i32 {
+    return cond_width + jifnot_size;
+}
+
+fn test_sentinels() -> i32 {
+    if is_continue_sentinel(2147483645) != true { return 1; }
+    if is_continue_sentinel(0) != false { return 2; }
+    if is_exit_sentinel(2147483646) != true { return 3; }
+    if is_exit_sentinel(2147483645) != false { return 4; }
+    if loop_continue_sentinel() != 2147483645 { return 5; }
+    if loop_exit_sentinel() != 2147483646 { return 6; }
+    return 0;
+}
+
+fn test_patch_continue() -> i32 {
+    let r1: i32 = patch_continue_jump(2147483645, 10, 5, 0);
+    if r1 != 0 - 15 { return 1; }
+    let r2: i32 = patch_continue_jump(2147483645, 0, 5, 20);
+    if r2 != 15 { return 2; }
+    let r3: i32 = patch_continue_jump(42, 10, 5, 0);
+    if r3 != 42 { return 3; }
+    return 0;
+}
+
+fn test_replace_exit() -> i32 {
+    let r1: i32 = replace_exit_jump(2147483646, 0 - 50);
+    if r1 != 0 - 50 { return 1; }
+    let r2: i32 = replace_exit_jump(99, 0 - 50);
+    if r2 != 0 - 1 { return 2; }
+    return 0;
+}
+
+fn test_back_edge() -> i32 {
+    let r1: i32 = compute_back_edge(0, 20, 5);
+    if r1 != 0 - 25 { return 1; }
+    let r2: i32 = compute_back_edge(10, 30, 5);
+    if r2 != 0 - 25 { return 2; }
+    return 0;
+}
+
+fn test_body_offset() -> i32 {
+    if loop_body_offset(3, 5) != 8 { return 1; }
+    if loop_body_offset(10, 5) != 15 { return 2; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_sentinels();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_patch_continue();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_replace_exit();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_back_edge();
+    if r4 != 0 { return 400 + r4; }
+    let r5: i32 = test_body_offset();
+    if r5 != 0 { return 500 + r5; }
+    return 0;
+}
