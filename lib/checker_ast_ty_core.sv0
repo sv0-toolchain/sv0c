@@ -1,0 +1,82 @@
+// Surrogate for checker.sml astTyToTy: AST type name→Types.ty dispatch.
+// SML reference: sml/type_checker/checker.sml lines 108-176
+// Maps type name strings (via i32 tags) to internal type tags.
+// 0=unit, 1=bool, 2=char, 3-10=int/uint widths, 11=isize, 12=usize,
+// 13-14=float, 15=string, 16=struct, 17=enum, 18=tyvar, -1=unknown.
+
+fn name_to_ty_tag(name_tag: i32) -> i32 {
+    if name_tag == 0 { return 0; }
+    if name_tag == 1 { return 1; }
+    if name_tag == 2 { return 2; }
+    if name_tag == 3 { return 3; }
+    if name_tag == 4 { return 4; }
+    if name_tag == 5 { return 5; }
+    if name_tag == 6 { return 6; }
+    if name_tag == 7 { return 7; }
+    if name_tag == 8 { return 8; }
+    if name_tag == 9 { return 9; }
+    if name_tag == 10 { return 10; }
+    if name_tag == 11 { return 11; }
+    if name_tag == 12 { return 12; }
+    if name_tag == 13 { return 13; }
+    if name_tag == 14 { return 14; }
+    if name_tag == 15 { return 15; }
+    return -1;
+}
+
+fn ast_ty_kind(ast_tag: i32) -> i32 {
+    if ast_tag == 0 { return 0; }
+    if ast_tag == 1 { return 1; }
+    if ast_tag == 2 { return 2; }
+    if ast_tag == 3 { return 3; }
+    if ast_tag == 4 { return 4; }
+    if ast_tag == 5 { return 5; }
+    return -1;
+}
+
+fn is_generic_container(name_tag: i32) -> bool {
+    return name_tag == 30 || name_tag == 31;
+}
+
+fn resolve_named_ty(name_tag: i32, is_struct: bool, is_enum: bool, is_tyvar: bool) -> i32 {
+    let base: i32 = name_to_ty_tag(name_tag);
+    if base >= 0 { return base; }
+    if is_struct { return 16; }
+    if is_enum { return 17; }
+    if is_tyvar { return 18; }
+    return -1;
+}
+
+fn tuple_ty_count(has_elem0: bool, has_elem1: bool, has_elem2: bool) -> i32 {
+    let mut count: i32 = 0;
+    if has_elem0 { count = count + 1; }
+    if has_elem1 { count = count + 1; }
+    if has_elem2 { count = count + 1; }
+    return count;
+}
+
+fn main() -> i32 {
+    if name_to_ty_tag(0) != 0 { return 1; }
+    if name_to_ty_tag(1) != 1 { return 2; }
+    if name_to_ty_tag(15) != 15 { return 3; }
+    if name_to_ty_tag(99) != -1 { return 4; }
+
+    if ast_ty_kind(0) != 0 { return 5; }
+    if ast_ty_kind(5) != 5 { return 6; }
+    if ast_ty_kind(99) != -1 { return 7; }
+
+    if !is_generic_container(30) { return 8; }
+    if !is_generic_container(31) { return 9; }
+    if is_generic_container(0) { return 10; }
+
+    if resolve_named_ty(1, false, false, false) != 1 { return 11; }
+    if resolve_named_ty(99, true, false, false) != 16 { return 12; }
+    if resolve_named_ty(99, false, true, false) != 17 { return 13; }
+    if resolve_named_ty(99, false, false, true) != 18 { return 14; }
+    if resolve_named_ty(99, false, false, false) != -1 { return 15; }
+
+    if tuple_ty_count(true, true, false) != 2 { return 16; }
+    if tuple_ty_count(true, true, true) != 3 { return 17; }
+
+    return 0;
+}

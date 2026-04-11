@@ -1,0 +1,72 @@
+// Surrogate for link.sml stripLinkDirectives + collectTops + mapPathSegs.
+// SML reference: sml/link/link.sml
+// stripLinkDirectives: remove ItemLink from program list.
+// collectTops: gather top-level names for cross-module path rewriting.
+// mapPathSegs: rewrite path segments using module id + tops.
+
+fn is_link_directive(item_kind: i32) -> bool {
+    return item_kind == 7;
+}
+
+fn strip_count(k0: i32, k1: i32, k2: i32, k3: i32) -> i32 {
+    let mut count: i32 = 0;
+    if !is_link_directive(k0) { count = count + 1; }
+    if !is_link_directive(k1) { count = count + 1; }
+    if !is_link_directive(k2) { count = count + 1; }
+    if !is_link_directive(k3) { count = count + 1; }
+    return count;
+}
+
+fn is_top_level_item(item_kind: i32) -> bool {
+    if item_kind == 0 { return true; }
+    if item_kind == 3 { return true; }
+    if item_kind == 4 { return true; }
+    if item_kind == 5 { return true; }
+    return false;
+}
+
+fn collect_tops_count(k0: i32, k1: i32, k2: i32, k3: i32) -> i32 {
+    let mut count: i32 = 0;
+    if is_top_level_item(k0) { count = count + 1; }
+    if is_top_level_item(k1) { count = count + 1; }
+    if is_top_level_item(k2) { count = count + 1; }
+    if is_top_level_item(k3) { count = count + 1; }
+    return count;
+}
+
+fn path_seg_needs_rewrite(seg: i32, t0: i32, t1: i32, t2: i32) -> bool {
+    if seg == t0 { return true; }
+    if seg == t1 { return true; }
+    if seg == t2 { return true; }
+    return false;
+}
+
+fn rewrite_seg(seg: i32, mod_id: i32, t0: i32, t1: i32, t2: i32) -> i32 {
+    if path_seg_needs_rewrite(seg, t0, t1, t2) {
+        return mod_id * 1000 + seg;
+    }
+    return seg;
+}
+
+fn main() -> i32 {
+    if !is_link_directive(7) { return 1; }
+    if is_link_directive(0) { return 2; }
+    if is_link_directive(3) { return 3; }
+
+    if strip_count(0, 7, 3, 7) != 2 { return 4; }
+    if strip_count(0, 0, 0, 0) != 4 { return 5; }
+
+    if !is_top_level_item(0) { return 6; }
+    if !is_top_level_item(3) { return 7; }
+    if is_top_level_item(7) { return 8; }
+
+    if collect_tops_count(0, 3, 7, 4) != 3 { return 9; }
+
+    if !path_seg_needs_rewrite(10, 10, 20, 30) { return 10; }
+    if path_seg_needs_rewrite(15, 10, 20, 30) { return 11; }
+
+    if rewrite_seg(10, 2, 10, 20, 30) != 2010 { return 12; }
+    if rewrite_seg(15, 2, 10, 20, 30) != 15 { return 13; }
+
+    return 0;
+}

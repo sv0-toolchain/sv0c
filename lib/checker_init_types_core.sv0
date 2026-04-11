@@ -1,0 +1,66 @@
+// Surrogate for checker.sml initTypes: struct/enum registration.
+// SML reference: sml/type_checker/checker.sml (initTypes function)
+// Models the pre-pass that registers struct and enum definitions
+// before type checking expressions.
+
+fn item_registers_type(item_kind: i32) -> bool {
+    if item_kind == 3 { return true; }
+    if item_kind == 4 { return true; }
+    return false;
+}
+
+fn is_struct_item(item_kind: i32) -> bool {
+    return item_kind == 3;
+}
+
+fn is_enum_item(item_kind: i32) -> bool {
+    return item_kind == 4;
+}
+
+fn count_type_registrations(k0: i32, k1: i32, k2: i32, k3: i32) -> i32 {
+    let mut count: i32 = 0;
+    if item_registers_type(k0) { count = count + 1; }
+    if item_registers_type(k1) { count = count + 1; }
+    if item_registers_type(k2) { count = count + 1; }
+    if item_registers_type(k3) { count = count + 1; }
+    return count;
+}
+
+fn struct_field_ty_resolves(field_ty_tag: i32) -> bool {
+    return field_ty_tag >= 0;
+}
+
+fn enum_variant_count(v0: bool, v1: bool, v2: bool, v3: bool) -> i32 {
+    let mut count: i32 = 0;
+    if v0 { count = count + 1; }
+    if v1 { count = count + 1; }
+    if v2 { count = count + 1; }
+    if v3 { count = count + 1; }
+    return count;
+}
+
+fn init_order_matters() -> bool { return true; }
+
+fn main() -> i32 {
+    if !item_registers_type(3) { return 1; }
+    if !item_registers_type(4) { return 2; }
+    if item_registers_type(0) { return 3; }
+    if item_registers_type(1) { return 4; }
+
+    if !is_struct_item(3) { return 5; }
+    if is_struct_item(4) { return 6; }
+    if !is_enum_item(4) { return 7; }
+
+    if count_type_registrations(0, 3, 4, 1) != 2 { return 8; }
+    if count_type_registrations(3, 3, 3, 4) != 4 { return 9; }
+
+    if !struct_field_ty_resolves(3) { return 10; }
+    if struct_field_ty_resolves(-1) { return 11; }
+
+    if enum_variant_count(true, true, false, false) != 2 { return 12; }
+    if enum_variant_count(true, true, true, true) != 4 { return 13; }
+
+    if !init_order_matters() { return 14; }
+
+    return 0;
+}

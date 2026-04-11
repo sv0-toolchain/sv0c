@@ -1,0 +1,65 @@
+// Surrogate for codegen.sml emitBlockDefn + emitBlockBody: C function skeleton.
+// SML reference: sml/backend/c/codegen.sml (emitBlockDefn, emitBlockBody)
+// Models the structure of emitted C code blocks.
+
+fn block_has_decls(decl_count: i32) -> bool {
+    return decl_count > 0;
+}
+
+fn block_has_body(stmt_count: i32) -> bool {
+    return stmt_count > 0;
+}
+
+fn block_total_lines(decl_count: i32, stmt_count: i32, has_return: bool) -> i32 {
+    let mut lines: i32 = 2;
+    lines = lines + decl_count;
+    lines = lines + stmt_count;
+    if has_return { lines = lines + 1; }
+    return lines;
+}
+
+fn fn_defn_parts(is_static: bool, has_params: bool, has_body: bool) -> i32 {
+    let mut parts: i32 = 2;
+    if is_static { parts = parts + 1; }
+    if has_params { parts = parts + 1; }
+    return parts;
+}
+
+fn emit_indent_level(nesting: i32) -> i32 {
+    return nesting * 2;
+}
+
+fn needs_semicolon(instr_tag: i32) -> bool {
+    if instr_tag == 0 { return true; }
+    if instr_tag == 1 { return true; }
+    if instr_tag == 2 { return true; }
+    if instr_tag == 3 { return false; }
+    if instr_tag == 4 { return false; }
+    if instr_tag == 5 { return true; }
+    return true;
+}
+
+fn main() -> i32 {
+    if !block_has_decls(1) { return 1; }
+    if block_has_decls(0) { return 2; }
+
+    if !block_has_body(1) { return 3; }
+    if block_has_body(0) { return 4; }
+
+    if block_total_lines(2, 3, true) != 8 { return 5; }
+    if block_total_lines(0, 0, false) != 2 { return 6; }
+    if block_total_lines(1, 1, true) != 5 { return 7; }
+
+    if fn_defn_parts(true, true, true) != 4 { return 8; }
+    if fn_defn_parts(false, false, true) != 2 { return 9; }
+
+    if emit_indent_level(0) != 0 { return 10; }
+    if emit_indent_level(1) != 2 { return 11; }
+    if emit_indent_level(3) != 6 { return 12; }
+
+    if !needs_semicolon(0) { return 13; }
+    if needs_semicolon(3) { return 14; }
+    if !needs_semicolon(5) { return 15; }
+
+    return 0;
+}

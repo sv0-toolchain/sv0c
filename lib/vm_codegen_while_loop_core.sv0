@@ -1,0 +1,61 @@
+// Surrogate for vm_codegen.sml emitWhileLoop: loop codegen structure.
+// SML reference: sml/backend/vm/vm_codegen.sml (emitWhileLoop)
+// Models the bytecode layout for while loops: condition, body, back-edge.
+// Loop structure: [cond_insns] JUMP_IF_NOT(exit) [body_insns] JUMP(cond) [exit]
+
+fn loop_header_insns() -> i32 { return 0; }
+
+fn loop_exit_jump_size() -> i32 { return 5; }
+
+fn loop_back_edge_size() -> i32 { return 5; }
+
+fn loop_total_overhead() -> i32 {
+    return loop_exit_jump_size() + loop_back_edge_size();
+}
+
+fn loop_cond_offset(header_insns: i32) -> i32 {
+    return header_insns;
+}
+
+fn loop_body_offset(header_insns: i32, cond_size: i32) -> i32 {
+    return header_insns + cond_size + loop_exit_jump_size();
+}
+
+fn loop_back_edge_offset(header_insns: i32, cond_size: i32, body_size: i32) -> i32 {
+    return loop_body_offset(header_insns, cond_size) + body_size;
+}
+
+fn loop_exit_target(header_insns: i32, cond_size: i32, body_size: i32) -> i32 {
+    return loop_back_edge_offset(header_insns, cond_size, body_size) + loop_back_edge_size();
+}
+
+fn back_edge_delta(exit_target: i32, cond_offset: i32) -> i32 {
+    return cond_offset - exit_target;
+}
+
+fn exit_jump_delta(exit_target: i32, body_offset: i32) -> i32 {
+    return exit_target - body_offset;
+}
+
+fn main() -> i32 {
+    if loop_total_overhead() != 10 { return 1; }
+
+    let cond: i32 = 3;
+    let body: i32 = 8;
+    let body_off: i32 = loop_body_offset(0, cond);
+    if body_off != 8 { return 2; }
+
+    let back_off: i32 = loop_back_edge_offset(0, cond, body);
+    if back_off != 16 { return 3; }
+
+    let exit: i32 = loop_exit_target(0, cond, body);
+    if exit != 21 { return 4; }
+
+    let back: i32 = back_edge_delta(exit, 0);
+    if back != -21 { return 5; }
+
+    let exit_d: i32 = exit_jump_delta(exit, body_off);
+    if exit_d != 13 { return 6; }
+
+    return 0;
+}

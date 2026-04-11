@@ -1,0 +1,62 @@
+// Surrogate for link.sml mapItem/mapProgramUnit: cross-module item rewriting.
+// SML reference: sml/link/link.sml (mapItem, mapProgramUnit)
+// Models which AST item kinds need cross-module path rewriting.
+
+fn item_needs_rewrite(item_kind: i32) -> bool {
+    if item_kind == 0 { return true; }
+    if item_kind == 3 { return true; }
+    if item_kind == 4 { return true; }
+    if item_kind == 5 { return true; }
+    if item_kind == 6 { return true; }
+    return false;
+}
+
+fn item_has_body(item_kind: i32) -> bool {
+    if item_kind == 0 { return true; }
+    if item_kind == 5 { return true; }
+    if item_kind == 6 { return true; }
+    return false;
+}
+
+fn item_has_fields(item_kind: i32) -> bool {
+    if item_kind == 3 { return true; }
+    if item_kind == 4 { return true; }
+    return false;
+}
+
+fn program_unit_parts(item_count: i32, has_module_wrapper: bool) -> i32 {
+    if has_module_wrapper { return item_count + 1; }
+    return item_count;
+}
+
+fn map_fn_components(has_params: bool, has_body: bool, has_contracts: bool) -> i32 {
+    let mut parts: i32 = 1;
+    if has_params { parts = parts + 1; }
+    if has_body { parts = parts + 1; }
+    if has_contracts { parts = parts + 1; }
+    return parts;
+}
+
+fn main() -> i32 {
+    if !item_needs_rewrite(0) { return 1; }
+    if !item_needs_rewrite(4) { return 2; }
+    if item_needs_rewrite(7) { return 3; }
+    if item_needs_rewrite(2) { return 4; }
+
+    if !item_has_body(0) { return 5; }
+    if item_has_body(3) { return 6; }
+    if !item_has_body(6) { return 7; }
+
+    if !item_has_fields(3) { return 8; }
+    if !item_has_fields(4) { return 9; }
+    if item_has_fields(0) { return 10; }
+
+    if program_unit_parts(5, true) != 6 { return 11; }
+    if program_unit_parts(5, false) != 5 { return 12; }
+
+    if map_fn_components(true, true, true) != 4 { return 13; }
+    if map_fn_components(false, true, false) != 2 { return 14; }
+    if map_fn_components(false, false, false) != 1 { return 15; }
+
+    return 0;
+}
