@@ -288,3 +288,7 @@ lib/parser_if_expr_core.sv0
 lib/parser_match_expr_core.sv0
 lib/parser_struct_item_core.sv0
 lib/parser_unary_expr_core.sv0
+lib/checker_expect_core.sv0
+lib/checker_item_fn_ty_core.sv0
+lib/vm_codegen_enum_layout_core.sv0
+lib/vm_codegen_pool_add_core.sv0

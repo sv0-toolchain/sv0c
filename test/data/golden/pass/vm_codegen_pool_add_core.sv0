@@ -1,0 +1,98 @@
+// Surrogate for vm_codegen.sml poolAdd
+// Models string pool interning: maps string IDs to pool indices,
+// returning existing index for duplicates and assigning new index otherwise.
+
+fn pool_lookup(target: i32, e0: i32, e1: i32, e2: i32) -> i32 {
+    if e0 == target { return 0; }
+    if e1 == target { return 1; }
+    if e2 == target { return 2; }
+    return -1;  // not found
+}
+
+fn pool_add_result(existing_index: i32, pool_size: i32) -> i32 {
+    if existing_index >= 0 { return existing_index; }
+    return pool_size;  // new entry gets next index
+}
+
+fn pool_size_after_add(existing_index: i32, pool_size: i32) -> i32 {
+    if existing_index >= 0 { return pool_size; }
+    return pool_size + 1;
+}
+
+fn pool_is_duplicate(existing_index: i32) -> bool {
+    return existing_index >= 0;
+}
+
+fn pool_index_valid(index: i32, pool_size: i32) -> bool {
+    return index >= 0 && index < pool_size;
+}
+
+fn simulate_pool_adds(s0: i32, s1: i32, s2: i32, s3: i32) -> i32 {
+    // simulate adding 4 strings, some possibly duplicates
+    let mut size: i32 = 0;
+    let mut distinct: i32 = 0;
+
+    // add s0
+    size = size + 1;
+    distinct = distinct + 1;
+
+    // add s1
+    if s1 != s0 {
+        size = size + 1;
+        distinct = distinct + 1;
+    }
+
+    // add s2
+    if s2 != s0 && s2 != s1 {
+        size = size + 1;
+        distinct = distinct + 1;
+    }
+
+    // add s3
+    if s3 != s0 && s3 != s1 && s3 != s2 {
+        size = size + 1;
+        distinct = distinct + 1;
+    }
+
+    return distinct;
+}
+
+fn main() -> i32 {
+    // pool_lookup: found
+    if pool_lookup(20, 10, 20, 30) != 1 { return 1; }
+    // pool_lookup: not found
+    if pool_lookup(99, 10, 20, 30) != -1 { return 2; }
+    // pool_lookup: first
+    if pool_lookup(10, 10, 20, 30) != 0 { return 3; }
+
+    // pool_add_result: existing
+    if pool_add_result(1, 5) != 1 { return 10; }
+    // pool_add_result: new
+    if pool_add_result(-1, 5) != 5 { return 11; }
+
+    // pool_size_after_add: existing
+    if pool_size_after_add(1, 5) != 5 { return 20; }
+    // pool_size_after_add: new
+    if pool_size_after_add(-1, 5) != 6 { return 21; }
+
+    // pool_is_duplicate
+    if !pool_is_duplicate(0) { return 30; }
+    if pool_is_duplicate(-1) { return 31; }
+
+    // pool_index_valid
+    if !pool_index_valid(0, 3) { return 40; }
+    if !pool_index_valid(2, 3) { return 41; }
+    if pool_index_valid(3, 3) { return 42; }
+    if pool_index_valid(-1, 3) { return 43; }
+
+    // simulate: all distinct
+    if simulate_pool_adds(1, 2, 3, 4) != 4 { return 50; }
+    // simulate: all same
+    if simulate_pool_adds(1, 1, 1, 1) != 1 { return 51; }
+    // simulate: two pairs
+    if simulate_pool_adds(1, 2, 1, 2) != 2 { return 52; }
+    // simulate: 3 distinct + 1 dup
+    if simulate_pool_adds(1, 2, 3, 2) != 3 { return 53; }
+
+    return 0;
+}

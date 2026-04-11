@@ -962,6 +962,10 @@ structure TestRunner = struct
                  (goldenPassCompileRun "checker_init_types_core")
       val () = check "golden pass checker_mod_env_core compile+run"
                  (goldenPassCompileRun "checker_mod_env_core")
+      val () = check "golden pass checker_expect_core compile+run"
+                 (goldenPassCompileRun "checker_expect_core")
+      val () = check "golden pass checker_item_fn_ty_core compile+run"
+                 (goldenPassCompileRun "checker_item_fn_ty_core")
       val () = check "golden pass link_strip_directives_core compile+run"
                  (goldenPassCompileRun "link_strip_directives_core")
       val () = check "golden pass link_map_item_core compile+run"
@@ -972,6 +976,10 @@ structure TestRunner = struct
                  (goldenPassCompileRun "resolver_bind_locals_core")
       val () = check "golden pass vm_codegen_while_loop_core compile+run"
                  (goldenPassCompileRun "vm_codegen_while_loop_core")
+      val () = check "golden pass vm_codegen_enum_layout_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_enum_layout_core")
+      val () = check "golden pass vm_codegen_pool_add_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_pool_add_core")
       val () = check "golden pass vm_codegen_value_width_core compile+run"
                  (goldenPassCompileRun "vm_codegen_value_width_core")
       val () = check "golden pass vm_codegen_enc_len_core compile+run"

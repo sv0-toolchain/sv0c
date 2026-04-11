@@ -1,0 +1,83 @@
+// Surrogate for checker.sml itemFnTy + envFind
+// Models extraction of function type signatures from AST items.
+
+fn item_is_fn(item_kind: i32) -> bool {
+    return item_kind == 1;  // ItemFn
+}
+
+fn fn_has_explicit_return(ret_tag: i32) -> bool {
+    return ret_tag != 0;
+}
+
+fn fn_param_count(p0: bool, p1: bool, p2: bool, p3: bool) -> i32 {
+    let mut count: i32 = 0;
+    if p0 { count = count + 1; }
+    if p1 { count = count + 1; }
+    if p2 { count = count + 1; }
+    if p3 { count = count + 1; }
+    return count;
+}
+
+fn fn_ty_tag() -> i32 {
+    return 30;  // TyFn tag
+}
+
+fn fn_ty_error_no_return() -> i32 {
+    return 409;  // E0409
+}
+
+fn fn_ty_error_unknown_type() -> i32 {
+    return 406;  // E0406
+}
+
+fn env_find_result(found: bool, ty_tag: i32) -> i32 {
+    if found { return ty_tag; }
+    return 0;  // NONE
+}
+
+fn env_find_is_some(val: i32) -> bool {
+    return val != 0;
+}
+
+fn mod_env_fn_entry(has_name: bool, has_type: bool) -> bool {
+    return has_name && has_type;
+}
+
+fn main() -> i32 {
+    // item_is_fn
+    if !item_is_fn(1) { return 1; }
+    if item_is_fn(2) { return 2; }
+
+    // fn_has_explicit_return
+    if !fn_has_explicit_return(5) { return 10; }
+    if fn_has_explicit_return(0) { return 11; }
+
+    // fn_param_count
+    if fn_param_count(true, true, false, false) != 2 { return 20; }
+    if fn_param_count(true, true, true, true) != 4 { return 21; }
+    if fn_param_count(false, false, false, false) != 0 { return 22; }
+
+    // fn_ty_tag
+    if fn_ty_tag() != 30 { return 30; }
+
+    // error codes
+    if fn_ty_error_no_return() != 409 { return 40; }
+    if fn_ty_error_unknown_type() != 406 { return 41; }
+
+    // env_find
+    let r1: i32 = env_find_result(true, 5);
+    if r1 != 5 { return 50; }
+    let r2: i32 = env_find_result(false, 5);
+    if r2 != 0 { return 51; }
+
+    // env_find_is_some
+    if !env_find_is_some(5) { return 60; }
+    if env_find_is_some(0) { return 61; }
+
+    // mod_env_fn_entry
+    if !mod_env_fn_entry(true, true) { return 70; }
+    if mod_env_fn_entry(false, true) { return 71; }
+    if mod_env_fn_entry(true, false) { return 72; }
+
+    return 0;
+}

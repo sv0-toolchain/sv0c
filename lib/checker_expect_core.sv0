@@ -1,0 +1,72 @@
+// Surrogate for checker.sml expect + withLoop + withTypeParams
+// Models type unification check, loop depth tracking, and type param scoping.
+
+fn expect_ok(got_tag: i32, want_tag: i32) -> bool {
+    return got_tag == want_tag;
+}
+
+fn expect_error_code() -> i32 {
+    return 400;  // E0400
+}
+
+fn loop_depth_enter(current: i32) -> i32 {
+    return current + 1;
+}
+
+fn loop_depth_exit(current: i32) -> i32 {
+    if current <= 0 { return 0; }
+    return current - 1;
+}
+
+fn in_loop(depth: i32) -> bool {
+    return depth > 0;
+}
+
+fn type_param_scope_size(outer: i32, new_params: i32) -> i32 {
+    return outer + new_params;
+}
+
+fn type_param_restore(outer: i32) -> i32 {
+    return outer;
+}
+
+fn unify_primitives(a: i32, b: i32) -> bool {
+    return a == b;
+}
+
+fn unify_with_var(is_var: bool) -> bool {
+    return is_var;
+}
+
+fn main() -> i32 {
+    // expect: matching types
+    if !expect_ok(1, 1) { return 1; }
+    if expect_ok(1, 2) { return 2; }
+    if expect_error_code() != 400 { return 3; }
+
+    // loop depth
+    if loop_depth_enter(0) != 1 { return 10; }
+    if loop_depth_enter(2) != 3 { return 11; }
+    if loop_depth_exit(1) != 0 { return 12; }
+    if loop_depth_exit(0) != 0 { return 13; }
+
+    // in_loop
+    if in_loop(0) { return 20; }
+    if !in_loop(1) { return 21; }
+    if !in_loop(3) { return 22; }
+
+    // type param scope
+    if type_param_scope_size(0, 2) != 2 { return 30; }
+    if type_param_scope_size(3, 1) != 4 { return 31; }
+    if type_param_restore(3) != 3 { return 32; }
+
+    // unify primitives
+    if !unify_primitives(5, 5) { return 40; }
+    if unify_primitives(5, 6) { return 41; }
+
+    // unify with var
+    if !unify_with_var(true) { return 50; }
+    if unify_with_var(false) { return 51; }
+
+    return 0;
+}
