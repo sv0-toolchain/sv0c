@@ -1,0 +1,104 @@
+/* checker_expr_refs_core.sv0 — seed for type_checker/checker.sml
+   Transliterates exprReferencesResult dispatch (recursive expression
+   walk checking for "result" path) and checkContract helpers.
+   Uses i32 expr tags matching ast.sv0 Expr enum. */
+
+fn expr_is_result_path(expr_tag: i32, path_len: i32,
+                       first_seg: i32) -> bool {
+    if expr_tag != 0 { return false; }
+    if path_len != 1 { return false; }
+    return first_seg == 1;
+}
+
+fn expr_refs_child_count(expr_tag: i32) -> i32 {
+    if expr_tag == 0 { return 0; }
+    if expr_tag == 1 { return 0; }
+    if expr_tag == 2 { return 2; }
+    if expr_tag == 3 { return 1; }
+    if expr_tag == 4 { return 1; }
+    if expr_tag == 5 { return 1; }
+    if expr_tag == 6 { return 3; }
+    if expr_tag == 7 { return 2; }
+    if expr_tag == 8 { return 2; }
+    if expr_tag == 9 { return 1; }
+    if expr_tag == 10 { return 2; }
+    if expr_tag == 11 { return 1; }
+    if expr_tag == 12 { return 1; }
+    if expr_tag == 13 { return 1; }
+    if expr_tag == 14 { return 1; }
+    if expr_tag == 15 { return 0; }
+    if expr_tag == 16 { return 1; }
+    if expr_tag == 17 { return 1; }
+    if expr_tag == 18 { return 2; }
+    if expr_tag == 19 { return 2; }
+    return 0;
+}
+
+fn expr_can_reference_result(expr_tag: i32) -> bool {
+    return expr_refs_child_count(expr_tag) > 0;
+}
+
+fn contract_kind_tag(contract_tag: i32) -> i32 {
+    if contract_tag == 0 { return 1; }
+    if contract_tag == 1 { return 2; }
+    if contract_tag == 2 { return 3; }
+    return 0;
+}
+
+fn is_requires(tag: i32) -> bool {
+    return tag == 0;
+}
+
+fn is_ensures(tag: i32) -> bool {
+    return tag == 1;
+}
+
+fn ensures_needs_result_binding(tag: i32) -> bool {
+    return is_ensures(tag);
+}
+
+fn test_result_path() -> i32 {
+    if expr_is_result_path(0, 1, 1) != true { return 1; }
+    if expr_is_result_path(0, 1, 2) != false { return 2; }
+    if expr_is_result_path(0, 2, 1) != false { return 3; }
+    if expr_is_result_path(1, 1, 1) != false { return 4; }
+    return 0;
+}
+
+fn test_child_count() -> i32 {
+    if expr_refs_child_count(0) != 0 { return 1; }
+    if expr_refs_child_count(2) != 2 { return 2; }
+    if expr_refs_child_count(6) != 3 { return 3; }
+    if expr_refs_child_count(15) != 0 { return 4; }
+    return 0;
+}
+
+fn test_can_ref() -> i32 {
+    if expr_can_reference_result(0) != false { return 1; }
+    if expr_can_reference_result(2) != true { return 2; }
+    if expr_can_reference_result(6) != true { return 3; }
+    return 0;
+}
+
+fn test_contract() -> i32 {
+    if contract_kind_tag(0) != 1 { return 1; }
+    if contract_kind_tag(1) != 2 { return 2; }
+    if contract_kind_tag(2) != 3 { return 3; }
+    if is_requires(0) != true { return 4; }
+    if is_ensures(1) != true { return 5; }
+    if ensures_needs_result_binding(1) != true { return 6; }
+    if ensures_needs_result_binding(0) != false { return 7; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_result_path();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_child_count();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_can_ref();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_contract();
+    if r4 != 0 { return 400 + r4; }
+    return 0;
+}

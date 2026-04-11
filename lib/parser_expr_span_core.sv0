@@ -1,0 +1,92 @@
+/* parser_expr_span_core.sv0 — seed for parser/parser.sml
+   Transliterates exprSpan (AST→span projection) and
+   generic parameter skip depth tracking. */
+
+fn expr_span_tag(expr_tag: i32) -> i32 {
+    return expr_tag;
+}
+
+fn expr_has_span(expr_tag: i32) -> bool {
+    if expr_tag >= 0 {
+        if expr_tag <= 26 { return true; }
+    }
+    return false;
+}
+
+fn merge_spans(s1_line: i32, s1_col: i32,
+               s2_line: i32, s2_col: i32) -> i32 {
+    if s1_line < s2_line { return s1_line * 1000 + s1_col; }
+    if s1_line > s2_line { return s2_line * 1000 + s2_col; }
+    if s1_col < s2_col { return s1_line * 1000 + s1_col; }
+    return s2_line * 1000 + s2_col;
+}
+
+fn skip_generic_depth(depth: i32, token_tag: i32) -> i32 {
+    if token_tag == 31 { return depth + 1; }
+    if token_tag == 32 {
+        if depth > 0 { return depth - 1; }
+    }
+    return depth;
+}
+
+fn skip_generic_done(depth: i32) -> bool {
+    return depth == 0;
+}
+
+fn token_is_comma(token_tag: i32) -> bool {
+    return token_tag == 12;
+}
+
+fn count_generic_params_from_tokens(t0: i32, t1: i32, t2: i32,
+                                     t3: i32, t4: i32) -> i32 {
+    if t0 != 31 { return 0; }
+    let mut count: i32 = 1;
+    if token_is_comma(t1) { count = count + 1; }
+    if token_is_comma(t2) { count = count + 1; }
+    if token_is_comma(t3) { count = count + 1; }
+    return count;
+}
+
+fn test_expr_has_span() -> i32 {
+    if expr_has_span(0) != true { return 1; }
+    if expr_has_span(26) != true { return 2; }
+    if expr_has_span(27) != false { return 3; }
+    if expr_has_span(0 - 1) != false { return 4; }
+    return 0;
+}
+
+fn test_merge_spans() -> i32 {
+    if merge_spans(1, 5, 2, 3) != 1005 { return 1; }
+    if merge_spans(3, 1, 1, 5) != 1005 { return 2; }
+    if merge_spans(1, 1, 1, 5) != 1001 { return 3; }
+    return 0;
+}
+
+fn test_skip_depth() -> i32 {
+    if skip_generic_depth(0, 31) != 1 { return 1; }
+    if skip_generic_depth(1, 32) != 0 { return 2; }
+    if skip_generic_depth(2, 32) != 1 { return 3; }
+    if skip_generic_depth(1, 5) != 1 { return 4; }
+    if skip_generic_done(0) != true { return 5; }
+    if skip_generic_done(1) != false { return 6; }
+    return 0;
+}
+
+fn test_count_params() -> i32 {
+    if count_generic_params_from_tokens(31, 5, 32, 0, 0) != 1 { return 1; }
+    if count_generic_params_from_tokens(31, 12, 5, 32, 0) != 2 { return 2; }
+    if count_generic_params_from_tokens(5, 0, 0, 0, 0) != 0 { return 3; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_expr_has_span();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_merge_spans();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_skip_depth();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_count_params();
+    if r4 != 0 { return 400 + r4; }
+    return 0;
+}

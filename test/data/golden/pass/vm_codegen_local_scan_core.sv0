@@ -1,0 +1,104 @@
+/* vm_codegen_local_scan_core.sv0 — seed for backend/vm/vm_codegen.sml
+   Transliterates localCountAndEnv scan logic: instruction-driven
+   local slot reservation (DeclVar, DeclNamed, Assign, Call). */
+
+fn scan_decl_var(next_slot: i32) -> i32 {
+    return next_slot + 1;
+}
+
+fn scan_decl_named(next_slot: i32, cty_width: i32) -> i32 {
+    return next_slot + cty_width;
+}
+
+fn scan_assign_ensure(has_binding: bool, next_slot: i32) -> i32 {
+    if has_binding { return next_slot; }
+    return next_slot + 1;
+}
+
+fn scan_call_result(next_slot: i32, result_width: i32) -> i32 {
+    if result_width < 1 { return next_slot + 1; }
+    return next_slot + result_width;
+}
+
+fn scan_instr_delta(instr_tag: i32, has_binding: bool,
+                    width: i32) -> i32 {
+    if instr_tag == 0 { return 1; }
+    if instr_tag == 1 { return width; }
+    if instr_tag == 2 {
+        if has_binding { return 0; }
+        return 1;
+    }
+    if instr_tag == 3 {
+        if width < 1 { return 1; }
+        return width;
+    }
+    return 0;
+}
+
+fn total_locals_after_scan(init: i32, d0: i32, d1: i32,
+                           d2: i32, d3: i32) -> i32 {
+    return init + d0 + d1 + d2 + d3;
+}
+
+fn call_nargs(a0_width: i32, a1_width: i32, a2_width: i32) -> i32 {
+    return a0_width + a1_width + a2_width;
+}
+
+fn test_scan_decl() -> i32 {
+    if scan_decl_var(0) != 1 { return 1; }
+    if scan_decl_var(5) != 6 { return 2; }
+    if scan_decl_named(0, 3) != 3 { return 3; }
+    if scan_decl_named(5, 4) != 9 { return 4; }
+    return 0;
+}
+
+fn test_scan_assign() -> i32 {
+    if scan_assign_ensure(true, 5) != 5 { return 1; }
+    if scan_assign_ensure(false, 5) != 6 { return 2; }
+    return 0;
+}
+
+fn test_scan_call() -> i32 {
+    if scan_call_result(0, 1) != 1 { return 1; }
+    if scan_call_result(0, 3) != 3 { return 2; }
+    if scan_call_result(0, 0) != 1 { return 3; }
+    return 0;
+}
+
+fn test_instr_delta() -> i32 {
+    if scan_instr_delta(0, false, 0) != 1 { return 1; }
+    if scan_instr_delta(1, false, 4) != 4 { return 2; }
+    if scan_instr_delta(2, true, 0) != 0 { return 3; }
+    if scan_instr_delta(2, false, 0) != 1 { return 4; }
+    if scan_instr_delta(3, false, 3) != 3 { return 5; }
+    if scan_instr_delta(4, false, 0) != 0 { return 6; }
+    return 0;
+}
+
+fn test_total_locals() -> i32 {
+    if total_locals_after_scan(0, 1, 1, 3, 0) != 5 { return 1; }
+    if total_locals_after_scan(2, 0, 0, 0, 0) != 2 { return 2; }
+    return 0;
+}
+
+fn test_nargs() -> i32 {
+    if call_nargs(1, 1, 1) != 3 { return 1; }
+    if call_nargs(3, 1, 4) != 8 { return 2; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_scan_decl();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_scan_assign();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_scan_call();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_instr_delta();
+    if r4 != 0 { return 400 + r4; }
+    let r5: i32 = test_total_locals();
+    if r5 != 0 { return 500 + r5; }
+    let r6: i32 = test_nargs();
+    if r6 != 0 { return 600 + r6; }
+    return 0;
+}

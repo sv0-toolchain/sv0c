@@ -1,0 +1,88 @@
+/* checker_try_payload_core.sv0 — seed for type_checker/checker.sml
+   Transliterates trySuccessPayloadTy shape detection and cast type
+   checking (isIntegralTy constraint for as-casts). */
+
+fn try_detect_result(has_ok: bool, has_err: bool,
+                     ok_arity: i32) -> bool {
+    if has_ok == false { return false; }
+    if has_err == false { return false; }
+    return ok_arity == 1;
+}
+
+fn try_detect_option(has_some: bool, has_none: bool,
+                     some_arity: i32) -> bool {
+    if has_some == false { return false; }
+    if has_none == false { return false; }
+    return some_arity == 1;
+}
+
+fn try_kind(has_ok: bool, has_err: bool, ok_arity: i32,
+            has_some: bool, has_none: bool, some_arity: i32) -> i32 {
+    if try_detect_result(has_ok, has_err, ok_arity) { return 1; }
+    if try_detect_option(has_some, has_none, some_arity) { return 2; }
+    return 0;
+}
+
+fn cast_allowed(from_tag: i32, to_tag: i32) -> bool {
+    if from_tag == 0 { return false; }
+    if from_tag >= 1 {
+        if from_tag <= 10 {
+            if to_tag >= 1 {
+                if to_tag <= 10 { return true; }
+            }
+        }
+    }
+    return false;
+}
+
+fn cast_is_widening(from_bits: i32, to_bits: i32) -> bool {
+    return to_bits > from_bits;
+}
+
+fn cast_is_narrowing(from_bits: i32, to_bits: i32) -> bool {
+    return to_bits < from_bits;
+}
+
+fn test_try_result() -> i32 {
+    if try_detect_result(true, true, 1) != true { return 1; }
+    if try_detect_result(true, true, 2) != false { return 2; }
+    if try_detect_result(true, false, 1) != false { return 3; }
+    if try_detect_result(false, true, 1) != false { return 4; }
+    return 0;
+}
+
+fn test_try_option() -> i32 {
+    if try_detect_option(true, true, 1) != true { return 1; }
+    if try_detect_option(true, true, 0) != false { return 2; }
+    if try_detect_option(false, true, 1) != false { return 3; }
+    return 0;
+}
+
+fn test_try_kind() -> i32 {
+    if try_kind(true, true, 1, false, false, 0) != 1 { return 1; }
+    if try_kind(false, false, 0, true, true, 1) != 2 { return 2; }
+    if try_kind(false, false, 0, false, false, 0) != 0 { return 3; }
+    return 0;
+}
+
+fn test_cast() -> i32 {
+    if cast_allowed(1, 5) != true { return 1; }
+    if cast_allowed(0, 1) != false { return 2; }
+    if cast_allowed(1, 11) != false { return 3; }
+    if cast_is_widening(8, 32) != true { return 4; }
+    if cast_is_widening(32, 8) != false { return 5; }
+    if cast_is_narrowing(32, 8) != true { return 6; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_try_result();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_try_option();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_try_kind();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_cast();
+    if r4 != 0 { return 400 + r4; }
+    return 0;
+}

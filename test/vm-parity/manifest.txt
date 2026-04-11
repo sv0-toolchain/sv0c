@@ -142,3 +142,9 @@ lib/resolver_register_item_core.sv0
 lib/resolver_use_clause_core.sv0
 lib/link_mangle_core.sv0
 lib/link_split_module_core.sv0
+lib/checker_expr_refs_core.sv0
+lib/checker_try_payload_core.sv0
+lib/vm_codegen_local_scan_core.sv0
+lib/vm_codegen_call_nargs_core.sv0
+lib/parser_expr_span_core.sv0
+lib/parser_prec_core.sv0
