@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-11 (America/Denver; **Phase 2 continued + Track A deepened (bytecode + lexer).** Phase 2: `lib/include_expand.sv0` (real include expansion module — isSpace, pathOk with `..` rejection, has_include_prefix, find_closing_quote, chomp_cr). Track A: `lib/bytecode_insn_size_core.sv0` (instruction byte sizes for all ~56 opcodes + is_jump/is_push helpers) + `lib/bytecode_opcode_map_core.sv0` (magic bytes, format version, opcode_class, section sizes). `lib/lexer_char_class_core.sv0` (isIdentStart/isIdentCont/isHexDigit/isBinDigit/isOctDigit/isWhitespace) + `lib/lexer_advance_core.sv0` (advance_pos/line/col, at_end, extract_len, span_from_positions). Metrics: unit 244→249, vm-parity 117→122, stage0 119→124, self-host 195→200, total seeds 116→121)
+**Last updated:** 2026-04-11 (America/Denver; **Track A comprehensive deepening — 24 new seeds across all major SML files.** checker.sml 8→13 seeds (integral_ty, stmt_returns, ctor_ty, expr_refs, try_payload). vm_codegen.sml 5→10 (variant_slots, jump_patch, bind_param, local_scan, call_nargs). parser.sml 12→17 (binop_table, pat, path, expr_span, prec). bytecode.sml 3→5 (le, string_pool). resolver.sml 5→7 (register_item, use_clause). link.sml 3→5 (mangle, split_module). codegen.sml 4→6 (escape, proto). main.sml 1→2 (pipeline_core). Every SML file >100 lines now has 2+ seeds. Metrics: unit 249→273 (est), vm-parity 122→146, stage0 124→148, self-host 200→224, total seeds 121→145)
 
 ## Checklist (local source of truth)
 
