@@ -1,0 +1,91 @@
+/* codegen_proto_core.sv0 — seed for backend/c/codegen.sml
+   Transliterates emitParamList and emitFnProto formatting logic. */
+
+fn param_list_len(count: i32) -> i32 {
+    if count == 0 { return 4; }
+    return count;
+}
+
+fn param_list_is_void(count: i32) -> bool {
+    return count == 0;
+}
+
+fn fn_proto_parts(is_static: bool, has_params: bool) -> i32 {
+    let mut parts: i32 = 3;
+    if is_static { parts = parts + 1; }
+    if has_params { parts = parts + 1; }
+    return parts;
+}
+
+fn split_main_is_main(label: string) -> bool {
+    return string_eq(label, "main");
+}
+
+fn count_static_fns(f0_main: bool, f1_main: bool, f2_main: bool) -> i32 {
+    let mut count: i32 = 0;
+    if f0_main == false { count = count + 1; }
+    if f1_main == false { count = count + 1; }
+    if f2_main == false { count = count + 1; }
+    return count;
+}
+
+fn emit_section_count(has_typedefs: bool, static_count: i32,
+                      has_main: bool) -> i32 {
+    let mut sections: i32 = 1;
+    if has_typedefs { sections = sections + 1; }
+    if static_count > 0 { sections = sections + 2; }
+    if has_main { sections = sections + 1; }
+    return sections;
+}
+
+fn test_param_list() -> i32 {
+    if param_list_len(0) != 4 { return 1; }
+    if param_list_len(3) != 3 { return 2; }
+    if param_list_is_void(0) != true { return 3; }
+    if param_list_is_void(1) != false { return 4; }
+    return 0;
+}
+
+fn test_fn_proto_parts() -> i32 {
+    if fn_proto_parts(false, false) != 3 { return 1; }
+    if fn_proto_parts(true, false) != 4 { return 2; }
+    if fn_proto_parts(false, true) != 4 { return 3; }
+    if fn_proto_parts(true, true) != 5 { return 4; }
+    return 0;
+}
+
+fn test_split_main() -> i32 {
+    if split_main_is_main("main") != true { return 1; }
+    if split_main_is_main("helper") != false { return 2; }
+    if split_main_is_main("test_fn") != false { return 3; }
+    return 0;
+}
+
+fn test_static_count() -> i32 {
+    if count_static_fns(true, false, false) != 2 { return 1; }
+    if count_static_fns(false, false, false) != 3 { return 2; }
+    if count_static_fns(true, true, true) != 0 { return 3; }
+    return 0;
+}
+
+fn test_emit_sections() -> i32 {
+    if emit_section_count(false, 0, false) != 1 { return 1; }
+    if emit_section_count(true, 0, false) != 2 { return 2; }
+    if emit_section_count(false, 2, false) != 3 { return 3; }
+    if emit_section_count(true, 2, true) != 5 { return 4; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_param_list();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_fn_proto_parts();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_split_main();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_static_count();
+    if r4 != 0 { return 400 + r4; }
+    let r5: i32 = test_emit_sections();
+    if r5 != 0 { return 500 + r5; }
+    return 0;
+}

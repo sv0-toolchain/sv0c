@@ -1,0 +1,91 @@
+/* checker_ctor_ty_core.sv0 — seed for type_checker/checker.sml
+   Transliterates dupVariants (duplicate name detection), canonTyImport
+   (transitive alias chase), and trySuccessPayloadTy dispatch.
+   Uses i32 name handles for string-free surrogate. */
+
+fn has_duplicate(n0: i32, n1: i32, n2: i32, n3: i32) -> bool {
+    if n1 != 0 {
+        if n1 == n0 { return true; }
+    }
+    if n2 != 0 {
+        if n2 == n0 { return true; }
+        if n2 == n1 { return true; }
+    }
+    if n3 != 0 {
+        if n3 == n0 { return true; }
+        if n3 == n1 { return true; }
+        if n3 == n2 { return true; }
+    }
+    return false;
+}
+
+fn canon_ty_import(name: i32, alias_from: i32, alias_to: i32) -> i32 {
+    if name == alias_from {
+        if alias_to == alias_from { return name; }
+        return alias_to;
+    }
+    return name;
+}
+
+fn canon_chain(name: i32, a0_from: i32, a0_to: i32, a1_from: i32, a1_to: i32) -> i32 {
+    let step1: i32 = canon_ty_import(name, a0_from, a0_to);
+    let step2: i32 = canon_ty_import(step1, a1_from, a1_to);
+    return step2;
+}
+
+fn try_success_shape(has_ok: bool, has_err: bool, has_some: bool, has_none: bool) -> i32 {
+    if has_ok {
+        if has_err { return 1; }
+    }
+    if has_some {
+        if has_none { return 2; }
+    }
+    return 0;
+}
+
+fn is_result_shape(shape: i32) -> bool {
+    return shape == 1;
+}
+
+fn is_option_shape(shape: i32) -> bool {
+    return shape == 2;
+}
+
+fn test_dup() -> i32 {
+    if has_duplicate(1, 2, 3, 4) != false { return 1; }
+    if has_duplicate(1, 1, 0, 0) != true { return 2; }
+    if has_duplicate(1, 2, 1, 0) != true { return 3; }
+    if has_duplicate(1, 2, 3, 2) != true { return 4; }
+    if has_duplicate(5, 0, 0, 0) != false { return 5; }
+    return 0;
+}
+
+fn test_canon() -> i32 {
+    if canon_ty_import(10, 10, 20) != 20 { return 1; }
+    if canon_ty_import(10, 10, 10) != 10 { return 2; }
+    if canon_ty_import(10, 30, 40) != 10 { return 3; }
+    if canon_chain(10, 10, 20, 20, 30) != 30 { return 4; }
+    if canon_chain(10, 10, 20, 30, 40) != 20 { return 5; }
+    return 0;
+}
+
+fn test_try_success() -> i32 {
+    if try_success_shape(true, true, false, false) != 1 { return 1; }
+    if try_success_shape(false, false, true, true) != 2 { return 2; }
+    if try_success_shape(true, false, false, false) != 0 { return 3; }
+    if try_success_shape(false, false, false, true) != 0 { return 4; }
+    if is_result_shape(1) != true { return 5; }
+    if is_option_shape(2) != true { return 6; }
+    if is_result_shape(2) != false { return 7; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_dup();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_canon();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_try_success();
+    if r3 != 0 { return 300 + r3; }
+    return 0;
+}

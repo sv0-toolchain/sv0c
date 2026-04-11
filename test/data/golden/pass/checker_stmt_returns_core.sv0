@@ -1,0 +1,79 @@
+/* checker_stmt_returns_core.sv0 — seed for type_checker/checker.sml
+   Transliterates stmtReturns, lastStmtReturns, and classifyAssignLhs.
+   Stmt tags: StmtSemi=0, StmtExpr=1, StmtLet=2, StmtItem=3.
+   Expr tags used: ExprReturn=24, ExprPath=0, ExprField=3. */
+
+fn stmt_returns(stmt_tag: i32, inner_expr_tag: i32) -> bool {
+    if stmt_tag == 0 {
+        return inner_expr_tag == 24;
+    }
+    if stmt_tag == 1 {
+        return inner_expr_tag == 24;
+    }
+    return false;
+}
+
+fn last_stmt_returns(count: i32, last_stmt_tag: i32, last_inner_tag: i32) -> bool {
+    if count == 0 { return false; }
+    return stmt_returns(last_stmt_tag, last_inner_tag);
+}
+
+fn classify_assign_lhs(expr_tag: i32, path_len: i32) -> i32 {
+    if expr_tag == 0 {
+        if path_len == 1 { return 1; }
+        return 0;
+    }
+    if expr_tag == 3 { return 2; }
+    return 0;
+}
+
+fn assign_lhs_is_var(class: i32) -> bool {
+    return class == 1;
+}
+
+fn assign_lhs_is_field(class: i32) -> bool {
+    return class == 2;
+}
+
+fn assign_lhs_is_bad(class: i32) -> bool {
+    return class == 0;
+}
+
+fn test_stmt_returns() -> i32 {
+    if stmt_returns(0, 24) != true { return 1; }
+    if stmt_returns(1, 24) != true { return 2; }
+    if stmt_returns(0, 0) != false { return 3; }
+    if stmt_returns(1, 5) != false { return 4; }
+    if stmt_returns(2, 24) != false { return 5; }
+    if stmt_returns(3, 24) != false { return 6; }
+    return 0;
+}
+
+fn test_last_stmt_returns() -> i32 {
+    if last_stmt_returns(0, 0, 24) != false { return 1; }
+    if last_stmt_returns(1, 0, 24) != true { return 2; }
+    if last_stmt_returns(3, 1, 24) != true { return 3; }
+    if last_stmt_returns(2, 0, 5) != false { return 4; }
+    return 0;
+}
+
+fn test_classify() -> i32 {
+    if classify_assign_lhs(0, 1) != 1 { return 1; }
+    if classify_assign_lhs(0, 2) != 0 { return 2; }
+    if classify_assign_lhs(3, 1) != 2 { return 3; }
+    if classify_assign_lhs(5, 1) != 0 { return 4; }
+    if assign_lhs_is_var(1) != true { return 5; }
+    if assign_lhs_is_field(2) != true { return 6; }
+    if assign_lhs_is_bad(0) != true { return 7; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_stmt_returns();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_last_stmt_returns();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_classify();
+    if r3 != 0 { return 300 + r3; }
+    return 0;
+}

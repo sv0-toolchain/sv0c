@@ -868,6 +868,24 @@ structure TestRunner = struct
                  (goldenPassCompileRun "lexer_char_class_core")
       val () = check "golden pass lexer_advance_core compile+run"
                  (goldenPassCompileRun "lexer_advance_core")
+      val () = check "golden pass checker_integral_ty_core compile+run"
+                 (goldenPassCompileRun "checker_integral_ty_core")
+      val () = check "golden pass checker_stmt_returns_core compile+run"
+                 (goldenPassCompileRun "checker_stmt_returns_core")
+      val () = check "golden pass checker_ctor_ty_core compile+run"
+                 (goldenPassCompileRun "checker_ctor_ty_core")
+      val () = check "golden pass vm_codegen_variant_slots_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_variant_slots_core")
+      val () = check "golden pass vm_codegen_jump_patch_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_jump_patch_core")
+      val () = check "golden pass vm_codegen_bind_param_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_bind_param_core")
+      val () = check "golden pass main_pipeline_core compile+run"
+                 (goldenPassCompileRun "main_pipeline_core")
+      val () = check "golden pass codegen_escape_core compile+run"
+                 (goldenPassCompileRun "codegen_escape_core")
+      val () = check "golden pass codegen_proto_core compile+run"
+                 (goldenPassCompileRun "codegen_proto_core")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"
