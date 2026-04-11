@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-11 (America/Denver; **Track A exhaustive deepening — 25 more seeds (145→170).** bytecode.sml 5→7 (decode_insn, file_layout). lexer.sml 5→9 (skip_comment, scan_number, scan_op, scan_string). parser.sml 17→22 (type_dispatch, primary_expr, postfix_expr, enum_item, block_stmt). checker.sml 13→18 (ast_ty, bind_pat, assign, init_types, mod_env). link.sml 5→7 (strip_directives, map_item). resolver.sml 7→9 (intrinsics, bind_locals). vm_codegen.sml 10→13 (while_loop, value_width, enc_len). codegen.sml 6→7 (block). main.sml 2→3 (argv). Every SML file >100 lines now has 3+ seeds. Metrics: unit 273→298 (est), vm-parity 146→171, stage0 148→173, self-host 224→249, total seeds 145→170)
+**Last updated:** 2026-04-11 (America/Denver; **Track A final deepening — 11 more seeds (170→181), Track A COMPLETE.** lexer.sml 9→12 (keyword, scan_ident, scan_char). parser.sml 22→26 (if_expr, match_expr, struct_item, unary_expr). checker.sml 18→20 (expect, item_fn_ty). vm_codegen.sml 13→15 (enum_layout, pool_add). All non-trivial standalone functions seeded; remaining unseeded are mutual-recursion groups, I/O wrappers, trivial accessors. Metrics: unit 298→309 (est), vm-parity 171→182, stage0 173→184, self-host 249→260, total seeds 170→181)
 
 ## Checklist (local source of truth)
 
