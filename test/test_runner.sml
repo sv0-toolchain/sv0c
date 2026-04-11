@@ -886,6 +886,24 @@ structure TestRunner = struct
                  (goldenPassCompileRun "codegen_escape_core")
       val () = check "golden pass codegen_proto_core compile+run"
                  (goldenPassCompileRun "codegen_proto_core")
+      val () = check "golden pass parser_binop_table_core compile+run"
+                 (goldenPassCompileRun "parser_binop_table_core")
+      val () = check "golden pass parser_pat_core compile+run"
+                 (goldenPassCompileRun "parser_pat_core")
+      val () = check "golden pass parser_path_core compile+run"
+                 (goldenPassCompileRun "parser_path_core")
+      val () = check "golden pass bytecode_le_core compile+run"
+                 (goldenPassCompileRun "bytecode_le_core")
+      val () = check "golden pass bytecode_string_pool_core compile+run"
+                 (goldenPassCompileRun "bytecode_string_pool_core")
+      val () = check "golden pass resolver_register_item_core compile+run"
+                 (goldenPassCompileRun "resolver_register_item_core")
+      val () = check "golden pass resolver_use_clause_core compile+run"
+                 (goldenPassCompileRun "resolver_use_clause_core")
+      val () = check "golden pass link_mangle_core compile+run"
+                 (goldenPassCompileRun "link_mangle_core")
+      val () = check "golden pass link_split_module_core compile+run"
+                 (goldenPassCompileRun "link_split_module_core")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

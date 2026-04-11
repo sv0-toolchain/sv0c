@@ -1,0 +1,84 @@
+/* resolver_use_clause_core.sv0 — seed for name_resolution/resolver.sml
+   Transliterates applyUseClause dispatch: value alias vs type alias
+   vs enum import with per-variant re-export. */
+
+fn use_path_segments(seg_count: i32) -> bool {
+    return seg_count == 2;
+}
+
+fn mangle_target(mod_tag: i32, name_tag: i32) -> i32 {
+    return mod_tag * 1000 + name_tag;
+}
+
+fn use_resolve_kind(has_fn_arity: bool, has_type: bool,
+                    is_enum: bool) -> i32 {
+    if has_fn_arity { return 1; }
+    if has_type {
+        if is_enum { return 3; }
+        return 2;
+    }
+    return 0;
+}
+
+fn is_value_alias(kind: i32) -> bool {
+    return kind == 1;
+}
+
+fn is_type_alias(kind: i32) -> bool {
+    return kind == 2;
+}
+
+fn is_enum_import(kind: i32) -> bool {
+    return kind == 3;
+}
+
+fn is_unknown_use(kind: i32) -> bool {
+    return kind == 0;
+}
+
+fn enum_import_alias_count(variant_count: i32) -> i32 {
+    return 1 + variant_count;
+}
+
+fn test_use_path() -> i32 {
+    if use_path_segments(1) != false { return 1; }
+    if use_path_segments(2) != true { return 2; }
+    if use_path_segments(3) != false { return 3; }
+    return 0;
+}
+
+fn test_mangle() -> i32 {
+    if mangle_target(1, 2) != 1002 { return 1; }
+    if mangle_target(5, 10) != 5010 { return 2; }
+    return 0;
+}
+
+fn test_resolve_kind() -> i32 {
+    if use_resolve_kind(true, false, false) != 1 { return 1; }
+    if use_resolve_kind(false, true, false) != 2 { return 2; }
+    if use_resolve_kind(false, true, true) != 3 { return 3; }
+    if use_resolve_kind(false, false, false) != 0 { return 4; }
+    if is_value_alias(1) != true { return 5; }
+    if is_type_alias(2) != true { return 6; }
+    if is_enum_import(3) != true { return 7; }
+    if is_unknown_use(0) != true { return 8; }
+    return 0;
+}
+
+fn test_enum_alias_count() -> i32 {
+    if enum_import_alias_count(0) != 1 { return 1; }
+    if enum_import_alias_count(3) != 4 { return 2; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_use_path();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_mangle();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_resolve_kind();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_enum_alias_count();
+    if r4 != 0 { return 400 + r4; }
+    return 0;
+}

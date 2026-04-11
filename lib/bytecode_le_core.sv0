@@ -1,0 +1,95 @@
+/* bytecode_le_core.sv0 — seed for backend/vm/bytecode.sml
+   Transliterates little-endian encode/decode helpers.
+   Models byte extraction with bitwise arithmetic. */
+
+fn byte0_of_i32(v: i32) -> i32 {
+    return v - ((v / 256) * 256);
+}
+
+fn byte1_of_i32(v: i32) -> i32 {
+    let shifted: i32 = v / 256;
+    return shifted - ((shifted / 256) * 256);
+}
+
+fn byte2_of_i32(v: i32) -> i32 {
+    let shifted: i32 = v / 65536;
+    return shifted - ((shifted / 256) * 256);
+}
+
+fn byte3_of_i32(v: i32) -> i32 {
+    let shifted: i32 = v / 16777216;
+    return shifted - ((shifted / 256) * 256);
+}
+
+fn reconstruct_i32(b0: i32, b1: i32, b2: i32, b3: i32) -> i32 {
+    return b0 + b1 * 256 + b2 * 65536 + b3 * 16777216;
+}
+
+fn u16_le_byte0(v: i32) -> i32 {
+    return v - ((v / 256) * 256);
+}
+
+fn u16_le_byte1(v: i32) -> i32 {
+    return v / 256;
+}
+
+fn reconstruct_u16(b0: i32, b1: i32) -> i32 {
+    return b0 + b1 * 256;
+}
+
+fn encoded_size_i32() -> i32 { return 4; }
+fn encoded_size_u16() -> i32 { return 2; }
+fn encoded_size_i64() -> i32 { return 8; }
+
+fn test_byte_extract() -> i32 {
+    if byte0_of_i32(0) != 0 { return 1; }
+    if byte0_of_i32(255) != 255 { return 2; }
+    if byte0_of_i32(256) != 0 { return 3; }
+    if byte1_of_i32(256) != 1 { return 4; }
+    if byte1_of_i32(512) != 2 { return 5; }
+    if byte0_of_i32(300) != 44 { return 6; }
+    if byte1_of_i32(300) != 1 { return 7; }
+    return 0;
+}
+
+fn test_reconstruct() -> i32 {
+    if reconstruct_i32(0, 0, 0, 0) != 0 { return 1; }
+    if reconstruct_i32(1, 0, 0, 0) != 1 { return 2; }
+    if reconstruct_i32(0, 1, 0, 0) != 256 { return 3; }
+    if reconstruct_i32(44, 1, 0, 0) != 300 { return 4; }
+    if reconstruct_i32(0, 0, 1, 0) != 65536 { return 5; }
+    return 0;
+}
+
+fn test_roundtrip() -> i32 {
+    let v: i32 = 12345;
+    let b0: i32 = byte0_of_i32(v);
+    let b1: i32 = byte1_of_i32(v);
+    let b2: i32 = byte2_of_i32(v);
+    let b3: i32 = byte3_of_i32(v);
+    if reconstruct_i32(b0, b1, b2, b3) != 12345 { return 1; }
+    let v2: i32 = 1000;
+    let u0: i32 = u16_le_byte0(v2);
+    let u1: i32 = u16_le_byte1(v2);
+    if reconstruct_u16(u0, u1) != 1000 { return 2; }
+    return 0;
+}
+
+fn test_sizes() -> i32 {
+    if encoded_size_i32() != 4 { return 1; }
+    if encoded_size_u16() != 2 { return 2; }
+    if encoded_size_i64() != 8 { return 3; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_byte_extract();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_reconstruct();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_roundtrip();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_sizes();
+    if r4 != 0 { return 400 + r4; }
+    return 0;
+}
