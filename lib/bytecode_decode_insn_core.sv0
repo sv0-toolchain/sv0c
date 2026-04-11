@@ -1,0 +1,101 @@
+/* Surrogate for bytecode.sml decodeInsnVec: opcode→instruction decode dispatch.
+   SML reference: sml/backend/vm/bytecode.sml lines 257-362
+   Models the dual of encodeInsn — given an opcode byte, determine the
+   instruction tag and how many additional bytes the payload consumes.
+   Uses actual SML opcode numbers (not sequential surrogates). */
+
+fn decode_insn_tag(opcode: i32) -> i32 {
+    if opcode == 0 { return 0; }
+    if opcode == 1 { return 1; }
+    if opcode == 2 { return 2; }
+    if opcode == 3 { return 3; }
+    if opcode == 4 { return 4; }
+    if opcode == 5 { return 5; }
+    if opcode == 6 { return 6; }
+    if opcode == 7 { return 7; }
+    if opcode == 8 { return 8; }
+    if opcode >= 16 && opcode <= 21 { return 9; }
+    if opcode >= 32 && opcode <= 37 { return 10; }
+    if opcode >= 48 && opcode <= 52 { return 11; }
+    if opcode >= 64 && opcode <= 69 { return 12; }
+    if opcode >= 80 && opcode <= 82 { return 13; }
+    if opcode >= 88 && opcode <= 93 { return 14; }
+    if opcode == 96 { return 15; }
+    if opcode == 97 { return 16; }
+    if opcode >= 112 && opcode <= 114 { return 17; }
+    if opcode == 115 { return 18; }
+    if opcode == 116 { return 19; }
+    if opcode == 117 { return 20; }
+    if opcode == 118 { return 21; }
+    if opcode == 128 { return 22; }
+    if opcode == 129 { return 23; }
+    if opcode == 130 { return 24; }
+    if opcode == 131 { return 25; }
+    if opcode == 132 { return 26; }
+    if opcode == 133 { return 27; }
+    if opcode == 144 { return 28; }
+    if opcode == 145 { return 29; }
+    if opcode == 146 { return 30; }
+    if opcode == 160 { return 31; }
+    if opcode == 161 { return 32; }
+    return -1;
+}
+
+fn decode_payload_bytes(opcode: i32) -> i32 {
+    if opcode == 4 { return 4; }
+    if opcode == 5 { return 8; }
+    if opcode == 6 { return 8; }
+    if opcode == 7 { return 1; }
+    if opcode == 8 { return 4; }
+    if opcode == 96 || opcode == 97 { return 4; }
+    if opcode >= 112 && opcode <= 114 { return 4; }
+    if opcode == 115 { return 8; }
+    if opcode == 117 { return 4; }
+    if opcode == 118 { return 1; }
+    if opcode == 128 || opcode == 129 || opcode == 130 || opcode == 131 { return 4; }
+    if opcode == 144 { return 12; }
+    if opcode == 146 { return 4; }
+    if opcode == 160 { return 4; }
+    if opcode == 161 { return 4; }
+    return 0;
+}
+
+fn decode_total_bytes(opcode: i32) -> i32 {
+    return 1 + decode_payload_bytes(opcode);
+}
+
+fn decode_is_valid(opcode: i32) -> bool {
+    return decode_insn_tag(opcode) >= 0;
+}
+
+fn main() -> i32 {
+    if decode_insn_tag(0) != 0 { return 1; }
+    if decode_insn_tag(4) != 4 { return 2; }
+    if decode_insn_tag(16) != 9 { return 3; }
+    if decode_insn_tag(64) != 12 { return 4; }
+    if decode_insn_tag(115) != 18 { return 5; }
+    if decode_insn_tag(144) != 28 { return 6; }
+    if decode_insn_tag(161) != 32 { return 7; }
+    if decode_insn_tag(255) != -1 { return 8; }
+
+    if decode_payload_bytes(0) != 0 { return 10; }
+    if decode_payload_bytes(4) != 4 { return 11; }
+    if decode_payload_bytes(5) != 8 { return 12; }
+    if decode_payload_bytes(7) != 1 { return 13; }
+    if decode_payload_bytes(115) != 8 { return 14; }
+    if decode_payload_bytes(144) != 12 { return 15; }
+    if decode_payload_bytes(161) != 4 { return 16; }
+
+    if decode_total_bytes(0) != 1 { return 20; }
+    if decode_total_bytes(4) != 5 { return 21; }
+    if decode_total_bytes(5) != 9 { return 22; }
+    if decode_total_bytes(115) != 9 { return 23; }
+    if decode_total_bytes(144) != 13 { return 24; }
+
+    if !decode_is_valid(0) { return 30; }
+    if !decode_is_valid(116) { return 31; }
+    if decode_is_valid(255) { return 32; }
+    if decode_is_valid(200) { return 33; }
+
+    return 0;
+}
