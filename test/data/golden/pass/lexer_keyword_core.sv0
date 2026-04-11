@@ -1,0 +1,115 @@
+// Surrogate for lexer.sml lookupKeyword
+// Models the keyword table: maps a name tag (interned string id) to a token tag.
+// 42 sv0 keywords; returns IDENT_TAG (0) for non-keywords.
+
+fn keyword_token_tag(name_tag: i32) -> i32 {
+    if name_tag == 1 { return 101; }       // as
+    if name_tag == 2 { return 102; }       // assert
+    if name_tag == 3 { return 103; }       // borrows
+    if name_tag == 4 { return 104; }       // break
+    if name_tag == 5 { return 105; }       // const
+    if name_tag == 6 { return 106; }       // continue
+    if name_tag == 7 { return 107; }       // else
+    if name_tag == 8 { return 108; }       // ensures
+    if name_tag == 9 { return 109; }       // enum
+    if name_tag == 10 { return 110; }      // exists
+    if name_tag == 11 { return 111; }      // false
+    if name_tag == 12 { return 112; }      // fn
+    if name_tag == 13 { return 113; }      // for
+    if name_tag == 14 { return 114; }      // forall
+    if name_tag == 15 { return 115; }      // if
+    if name_tag == 16 { return 116; }      // impl
+    if name_tag == 17 { return 117; }      // in
+    if name_tag == 18 { return 118; }      // let
+    if name_tag == 19 { return 119; }      // loop
+    if name_tag == 20 { return 120; }      // loop_invariant
+    if name_tag == 21 { return 121; }      // match
+    if name_tag == 22 { return 122; }      // module
+    if name_tag == 23 { return 123; }      // move
+    if name_tag == 24 { return 124; }      // mut
+    if name_tag == 25 { return 125; }      // newtype
+    if name_tag == 26 { return 126; }      // no_alias
+    if name_tag == 27 { return 127; }      // old
+    if name_tag == 28 { return 128; }      // project
+    if name_tag == 29 { return 129; }      // pub
+    if name_tag == 30 { return 130; }      // requires
+    if name_tag == 31 { return 131; }      // result
+    if name_tag == 32 { return 132; }      // return
+    if name_tag == 33 { return 133; }      // self
+    if name_tag == 34 { return 134; }      // Self (type)
+    if name_tag == 35 { return 135; }      // static
+    if name_tag == 36 { return 136; }      // struct
+    if name_tag == 37 { return 137; }      // trait
+    if name_tag == 38 { return 138; }      // true
+    if name_tag == 39 { return 139; }      // type
+    if name_tag == 40 { return 140; }      // unsafe
+    if name_tag == 41 { return 141; }      // use
+    if name_tag == 42 { return 142; }      // where
+    if name_tag == 43 { return 143; }      // while
+    return 0;
+}
+
+fn is_keyword(name_tag: i32) -> bool {
+    return name_tag >= 1 && name_tag <= 43;
+}
+
+fn keyword_count() -> i32 {
+    return 43;
+}
+
+fn is_control_flow_keyword(tok_tag: i32) -> bool {
+    // if, else, match, while, for, loop, return, break, continue
+    if tok_tag == 115 { return true; }
+    if tok_tag == 107 { return true; }
+    if tok_tag == 121 { return true; }
+    if tok_tag == 143 { return true; }
+    if tok_tag == 113 { return true; }
+    if tok_tag == 119 { return true; }
+    if tok_tag == 132 { return true; }
+    if tok_tag == 104 { return true; }
+    if tok_tag == 106 { return true; }
+    return false;
+}
+
+fn is_type_keyword(tok_tag: i32) -> bool {
+    // struct, enum, trait, type, impl, newtype
+    if tok_tag == 136 { return true; }
+    if tok_tag == 109 { return true; }
+    if tok_tag == 137 { return true; }
+    if tok_tag == 139 { return true; }
+    if tok_tag == 116 { return true; }
+    if tok_tag == 125 { return true; }
+    return false;
+}
+
+fn main() -> i32 {
+    // keyword lookup
+    if keyword_token_tag(12) != 112 { return 1; }  // fn -> FN
+    if keyword_token_tag(18) != 118 { return 2; }  // let -> LET
+    if keyword_token_tag(15) != 115 { return 3; }  // if -> IF
+    if keyword_token_tag(99) != 0 { return 4; }    // unknown -> IDENT
+    if keyword_token_tag(0) != 0 { return 5; }     // 0 -> IDENT
+    if keyword_token_tag(43) != 143 { return 6; }  // while -> WHILE
+
+    // is_keyword
+    if !is_keyword(1) { return 10; }
+    if !is_keyword(43) { return 11; }
+    if is_keyword(0) { return 12; }
+    if is_keyword(44) { return 13; }
+
+    // count
+    if keyword_count() != 43 { return 20; }
+
+    // control flow
+    if !is_control_flow_keyword(115) { return 30; }  // if
+    if !is_control_flow_keyword(121) { return 31; }  // match
+    if is_control_flow_keyword(112) { return 32; }   // fn is not control flow
+    if is_control_flow_keyword(136) { return 33; }   // struct is not
+
+    // type keywords
+    if !is_type_keyword(136) { return 40; }  // struct
+    if !is_type_keyword(109) { return 41; }  // enum
+    if is_type_keyword(115) { return 42; }   // if is not type kw
+
+    return 0;
+}
