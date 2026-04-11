@@ -1,0 +1,103 @@
+/* parser_binop_table_core.sv0 — seed for parser/parser.sml
+   Transliterates binopOf (token→Ast.binop mapping) and
+   assignBinop (compound assign token→binop).
+   Token tags match token.sv0; Binop tags match ast.sv0. */
+
+fn binop_of(token_tag: i32) -> i32 {
+    if token_tag == 17 { return 0; }
+    if token_tag == 18 { return 1; }
+    if token_tag == 19 { return 2; }
+    if token_tag == 20 { return 3; }
+    if token_tag == 21 { return 4; }
+    if token_tag == 22 { return 5; }
+    if token_tag == 23 { return 6; }
+    if token_tag == 24 { return 7; }
+    if token_tag == 25 { return 8; }
+    if token_tag == 26 { return 9; }
+    if token_tag == 27 { return 10; }
+    if token_tag == 28 { return 11; }
+    if token_tag == 29 { return 12; }
+    if token_tag == 30 { return 13; }
+    if token_tag == 31 { return 14; }
+    if token_tag == 32 { return 15; }
+    if token_tag == 33 { return 16; }
+    if token_tag == 34 { return 17; }
+    return 0 - 1;
+}
+
+fn has_binop(token_tag: i32) -> bool {
+    return binop_of(token_tag) >= 0;
+}
+
+fn assign_binop(token_tag: i32) -> i32 {
+    if token_tag == 35 { return 0; }
+    if token_tag == 36 { return 1; }
+    if token_tag == 37 { return 2; }
+    if token_tag == 38 { return 3; }
+    if token_tag == 39 { return 4; }
+    if token_tag == 40 { return 5; }
+    if token_tag == 41 { return 6; }
+    if token_tag == 42 { return 7; }
+    if token_tag == 43 { return 8; }
+    if token_tag == 44 { return 9; }
+    return 0 - 1;
+}
+
+fn is_compound_assign(token_tag: i32) -> bool {
+    return assign_binop(token_tag) >= 0;
+}
+
+fn lit_from_tok(token_tag: i32) -> i32 {
+    if token_tag == 0 { return 0; }
+    if token_tag == 1 { return 1; }
+    if token_tag == 2 { return 2; }
+    if token_tag == 3 { return 3; }
+    if token_tag == 4 { return 4; }
+    return 0 - 1;
+}
+
+fn has_literal(token_tag: i32) -> bool {
+    return lit_from_tok(token_tag) >= 0;
+}
+
+fn test_binop_of() -> i32 {
+    if binop_of(17) != 0 { return 1; }
+    if binop_of(18) != 1 { return 2; }
+    if binop_of(19) != 2 { return 3; }
+    if binop_of(27) != 10 { return 4; }
+    if binop_of(34) != 17 { return 5; }
+    if binop_of(0) != 0 - 1 { return 6; }
+    if binop_of(99) != 0 - 1 { return 7; }
+    if has_binop(17) != true { return 8; }
+    if has_binop(0) != false { return 9; }
+    return 0;
+}
+
+fn test_assign_binop() -> i32 {
+    if assign_binop(35) != 0 { return 1; }
+    if assign_binop(36) != 1 { return 2; }
+    if assign_binop(44) != 9 { return 3; }
+    if assign_binop(17) != 0 - 1 { return 4; }
+    if is_compound_assign(35) != true { return 5; }
+    if is_compound_assign(17) != false { return 6; }
+    return 0;
+}
+
+fn test_lit_from_tok() -> i32 {
+    if lit_from_tok(0) != 0 { return 1; }
+    if lit_from_tok(4) != 4 { return 2; }
+    if lit_from_tok(17) != 0 - 1 { return 3; }
+    if has_literal(0) != true { return 4; }
+    if has_literal(17) != false { return 5; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_binop_of();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_assign_binop();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_lit_from_tok();
+    if r3 != 0 { return 300 + r3; }
+    return 0;
+}

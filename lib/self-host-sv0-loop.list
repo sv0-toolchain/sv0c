@@ -241,3 +241,12 @@ lib/vm_codegen_bind_param_core.sv0
 lib/main_pipeline_core.sv0
 lib/codegen_escape_core.sv0
 lib/codegen_proto_core.sv0
+lib/parser_binop_table_core.sv0
+lib/parser_pat_core.sv0
+lib/parser_path_core.sv0
+lib/bytecode_le_core.sv0
+lib/bytecode_string_pool_core.sv0
+lib/resolver_register_item_core.sv0
+lib/resolver_use_clause_core.sv0
+lib/link_mangle_core.sv0
+lib/link_split_module_core.sv0

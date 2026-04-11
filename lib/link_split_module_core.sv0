@@ -1,0 +1,90 @@
+/* link_split_module_core.sv0 — seed for link/link.sml
+   Transliterates splitModule (module wrapper extraction) and
+   mapTy (cross-module type path rewriting). */
+
+fn has_module_wrapper(first_item_kind: i32) -> bool {
+    return first_item_kind == 6;
+}
+
+fn split_module_inner_count(total_items: i32, has_wrapper: bool) -> i32 {
+    if has_wrapper { return total_items - 1; }
+    return total_items;
+}
+
+fn map_ty_kind(ty_tag: i32) -> i32 {
+    if ty_tag == 0 { return 1; }
+    if ty_tag == 1 { return 2; }
+    if ty_tag == 2 { return 2; }
+    if ty_tag == 3 { return 2; }
+    if ty_tag == 4 { return 2; }
+    if ty_tag == 5 { return 3; }
+    if ty_tag == 6 { return 0; }
+    if ty_tag == 7 { return 0; }
+    return 0;
+}
+
+fn needs_path_rewrite(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 1;
+}
+
+fn needs_recursive_rewrite(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 2;
+}
+
+fn needs_list_rewrite(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 3;
+}
+
+fn is_leaf_ty(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 0;
+}
+
+fn rewrite_depth(ty_tag: i32, child_depth: i32) -> i32 {
+    if is_leaf_ty(ty_tag) { return 0; }
+    return 1 + child_depth;
+}
+
+fn test_module_wrapper() -> i32 {
+    if has_module_wrapper(6) != true { return 1; }
+    if has_module_wrapper(0) != false { return 2; }
+    if split_module_inner_count(5, true) != 4 { return 3; }
+    if split_module_inner_count(5, false) != 5 { return 4; }
+    return 0;
+}
+
+fn test_map_ty_kind() -> i32 {
+    if map_ty_kind(0) != 1 { return 1; }
+    if map_ty_kind(1) != 2 { return 2; }
+    if map_ty_kind(5) != 3 { return 3; }
+    if map_ty_kind(6) != 0 { return 4; }
+    if map_ty_kind(7) != 0 { return 5; }
+    return 0;
+}
+
+fn test_predicates() -> i32 {
+    if needs_path_rewrite(0) != true { return 1; }
+    if needs_recursive_rewrite(1) != true { return 2; }
+    if needs_list_rewrite(5) != true { return 3; }
+    if is_leaf_ty(6) != true { return 4; }
+    if is_leaf_ty(0) != false { return 5; }
+    return 0;
+}
+
+fn test_rewrite_depth() -> i32 {
+    if rewrite_depth(6, 0) != 0 { return 1; }
+    if rewrite_depth(0, 0) != 1 { return 2; }
+    if rewrite_depth(1, 2) != 3 { return 3; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_module_wrapper();
+    if r1 != 0 { return 100 + r1; }
+    let r2: i32 = test_map_ty_kind();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_predicates();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_rewrite_depth();
+    if r4 != 0 { return 400 + r4; }
+    return 0;
+}
