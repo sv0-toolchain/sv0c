@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-11 (America/Denver; **Track A comprehensive deepening — 24 new seeds across all major SML files.** checker.sml 8→13 seeds (integral_ty, stmt_returns, ctor_ty, expr_refs, try_payload). vm_codegen.sml 5→10 (variant_slots, jump_patch, bind_param, local_scan, call_nargs). parser.sml 12→17 (binop_table, pat, path, expr_span, prec). bytecode.sml 3→5 (le, string_pool). resolver.sml 5→7 (register_item, use_clause). link.sml 3→5 (mangle, split_module). codegen.sml 4→6 (escape, proto). main.sml 1→2 (pipeline_core). Every SML file >100 lines now has 2+ seeds. Metrics: unit 249→273 (est), vm-parity 122→146, stage0 124→148, self-host 200→224, total seeds 121→145)
+**Last updated:** 2026-04-11 (America/Denver; **Track A exhaustive deepening — 25 more seeds (145→170).** bytecode.sml 5→7 (decode_insn, file_layout). lexer.sml 5→9 (skip_comment, scan_number, scan_op, scan_string). parser.sml 17→22 (type_dispatch, primary_expr, postfix_expr, enum_item, block_stmt). checker.sml 13→18 (ast_ty, bind_pat, assign, init_types, mod_env). link.sml 5→7 (strip_directives, map_item). resolver.sml 7→9 (intrinsics, bind_locals). vm_codegen.sml 10→13 (while_loop, value_width, enc_len). codegen.sml 6→7 (block). main.sml 2→3 (argv). Every SML file >100 lines now has 3+ seeds. Metrics: unit 273→298 (est), vm-parity 146→171, stage0 148→173, self-host 224→249, total seeds 145→170)
 
 ## Checklist (local source of truth)
 
