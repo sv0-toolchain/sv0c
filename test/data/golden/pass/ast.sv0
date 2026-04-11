@@ -1,0 +1,391 @@
+/* Phase 1 type definitions: sml/ast/ast.sml -> sv0.
+   All AST types (Literal, Unop, Binop, Ty, Pat, Expr, Arm, Stmt,
+   Contract, AstVariant, Item, and Item-support structs).
+   Cross-type references use i32 box handles (no forward declarations).
+   Self-recursive types (Ty, Expr) use Box<Self>.
+   Span is i32 handle throughout; path is i32 Vec handle. */
+
+enum Literal {
+    IntLit(i32),
+    FloatLit(i32),
+    StringLit(i32),
+    CharLit(i32),
+    BoolLit(bool),
+    UnitLit,
+}
+
+enum Unop { Neg, Not, BitNot, Deref, Borrow, BorrowMut }
+
+enum Binop {
+    Add, Sub, Mul, Div, Rem,
+    BitAnd, BitOr, BitXor, Shl, Shr,
+    And, Or,
+    Eq, Neq, Lt, Gt, Leq, Geq,
+}
+
+enum Ty {
+    TyName(i32, i32, i32),
+    TyRef(Box<Ty>, i32),
+    TyRefMut(Box<Ty>, i32),
+    TyArray(Box<Ty>, i32, i32),
+    TySlice(Box<Ty>, i32),
+    TyTuple(i32, i32),
+    TyUnit(i32),
+    TyInfer(i32),
+}
+
+enum Pat {
+    PatWild(i32),
+    PatBind(i32, i32),
+    PatLit(i32, i32),
+    PatTuple(i32, i32),
+    PatStruct(i32, i32, i32),
+    PatEnum(i32, i32, i32),
+    PatOr(i32, i32),
+}
+
+enum Expr {
+    ExprLit(i32, i32),
+    ExprPath(i32, i32),
+    ExprUnop(i32, Box<Expr>, i32),
+    ExprBinop(i32, Box<Expr>, Box<Expr>, i32),
+    ExprCall(Box<Expr>, i32, i32),
+    ExprMethodCall(Box<Expr>, i32, i32, i32),
+    ExprField(Box<Expr>, i32, i32),
+    ExprTupleField(Box<Expr>, i32, i32),
+    ExprIndex(Box<Expr>, Box<Expr>, i32),
+    ExprBlock(i32, i32, i32),
+    ExprIf(Box<Expr>, Box<Expr>, i32, i32),
+    ExprMatch(Box<Expr>, i32, i32),
+    ExprWhile(Box<Expr>, i32, Box<Expr>, i32),
+    ExprFor(i32, Box<Expr>, Box<Expr>, i32),
+    ExprLoop(Box<Expr>, i32),
+    ExprReturn(i32, i32),
+    ExprBreak(i32, i32),
+    ExprContinue(i32),
+    ExprAssign(Box<Expr>, Box<Expr>, i32),
+    ExprAssignOp(i32, Box<Expr>, Box<Expr>, i32),
+    ExprCast(Box<Expr>, i32, i32),
+    ExprRange(i32, i32, i32),
+    ExprTry(Box<Expr>, i32),
+    ExprAssert(Box<Expr>, i32),
+    ExprStruct(i32, i32, i32),
+    ExprTuple(i32, i32),
+    ExprArray(i32, i32),
+}
+
+struct Arm {
+    pat: i32,
+    guard: i32,
+    body: i32,
+}
+
+enum Stmt {
+    StmtLet(i32, i32, i32, i32),
+    StmtExpr(i32, i32),
+    StmtSemi(i32, i32),
+    StmtItem(i32, i32),
+}
+
+enum Contract {
+    Requires(i32, i32),
+    Ensures(i32, i32),
+    LoopInvariant(i32, i32),
+}
+
+enum AstVariant {
+    VariantUnit(i32, i32),
+    VariantTuple(i32, i32, i32),
+    VariantStruct(i32, i32, i32),
+}
+
+struct FnDef {
+    name: i32,
+    type_params: i32,
+    params: i32,
+    ret_ty: i32,
+    contracts: i32,
+    body: i32,
+    span: i32,
+}
+
+struct StructDef {
+    name: i32,
+    type_params: i32,
+    fields: i32,
+    span: i32,
+}
+
+struct EnumDef {
+    name: i32,
+    type_params: i32,
+    variants: i32,
+    span: i32,
+}
+
+struct TraitDef {
+    name: i32,
+    methods: i32,
+    span: i32,
+}
+
+struct ImplDef {
+    trait_path: i32,
+    self_ty: i32,
+    items: i32,
+    span: i32,
+}
+
+enum Item {
+    ItemFn(i32),
+    ItemStruct(i32),
+    ItemEnum(i32),
+    ItemTrait(i32),
+    ItemImpl(i32),
+    ItemUse(i32, i32),
+    ItemModule(i32, i32),
+    ItemTypeAlias(i32, i32, i32),
+}
+
+fn literal_tag(l: Literal) -> i32 {
+    match l {
+        Literal::IntLit(n) => { return 0; },
+        Literal::FloatLit(h) => { return 1; },
+        Literal::StringLit(h) => { return 2; },
+        Literal::CharLit(c) => { return 3; },
+        Literal::BoolLit(b) => { return 4; },
+        Literal::UnitLit => { return 5; },
+    }
+}
+
+fn unop_tag(u: Unop) -> i32 {
+    match u {
+        Unop::Neg => { return 0; },
+        Unop::Not => { return 1; },
+        Unop::BitNot => { return 2; },
+        Unop::Deref => { return 3; },
+        Unop::Borrow => { return 4; },
+        Unop::BorrowMut => { return 5; },
+    }
+}
+
+fn binop_tag(b: Binop) -> i32 {
+    match b {
+        Binop::Add => { return 0; },
+        Binop::Sub => { return 1; },
+        Binop::Mul => { return 2; },
+        Binop::Div => { return 3; },
+        Binop::Rem => { return 4; },
+        Binop::BitAnd => { return 5; },
+        Binop::BitOr => { return 6; },
+        Binop::BitXor => { return 7; },
+        Binop::Shl => { return 8; },
+        Binop::Shr => { return 9; },
+        Binop::And => { return 10; },
+        Binop::Or => { return 11; },
+        Binop::Eq => { return 12; },
+        Binop::Neq => { return 13; },
+        Binop::Lt => { return 14; },
+        Binop::Gt => { return 15; },
+        Binop::Leq => { return 16; },
+        Binop::Geq => { return 17; },
+    }
+}
+
+fn ty_tag(t: Ty) -> i32 {
+    match t {
+        Ty::TyName(p, a, s) => { return 0; },
+        Ty::TyRef(inner, s) => { return 1; },
+        Ty::TyRefMut(inner, s) => { return 2; },
+        Ty::TyArray(elem, e, s) => { return 3; },
+        Ty::TySlice(elem, s) => { return 4; },
+        Ty::TyTuple(ts, s) => { return 5; },
+        Ty::TyUnit(s) => { return 6; },
+        Ty::TyInfer(s) => { return 7; },
+    }
+}
+
+fn pat_tag(p: Pat) -> i32 {
+    match p {
+        Pat::PatWild(s) => { return 0; },
+        Pat::PatBind(n, s) => { return 1; },
+        Pat::PatLit(l, s) => { return 2; },
+        Pat::PatTuple(ps, s) => { return 3; },
+        Pat::PatStruct(path, fs, s) => { return 4; },
+        Pat::PatEnum(path, ps, s) => { return 5; },
+        Pat::PatOr(ps, s) => { return 6; },
+    }
+}
+
+fn expr_tag(e: Expr) -> i32 {
+    match e {
+        Expr::ExprLit(l, s) => { return 0; },
+        Expr::ExprPath(p, s) => { return 1; },
+        Expr::ExprUnop(op, x, s) => { return 2; },
+        Expr::ExprBinop(op, l, r, s) => { return 3; },
+        Expr::ExprCall(f, a, s) => { return 4; },
+        Expr::ExprMethodCall(o, m, a, s) => { return 5; },
+        Expr::ExprField(o, f, s) => { return 6; },
+        Expr::ExprTupleField(o, i, s) => { return 7; },
+        Expr::ExprIndex(o, i, s) => { return 8; },
+        Expr::ExprBlock(st, tl, s) => { return 9; },
+        Expr::ExprIf(c, th, el, s) => { return 10; },
+        Expr::ExprMatch(sc, ar, s) => { return 11; },
+        Expr::ExprWhile(c, inv, b, s) => { return 12; },
+        Expr::ExprFor(p, it, b, s) => { return 13; },
+        Expr::ExprLoop(b, s) => { return 14; },
+        Expr::ExprReturn(x, s) => { return 15; },
+        Expr::ExprBreak(x, s) => { return 16; },
+        Expr::ExprContinue(s) => { return 17; },
+        Expr::ExprAssign(l, r, s) => { return 18; },
+        Expr::ExprAssignOp(op, l, r, s) => { return 19; },
+        Expr::ExprCast(x, t, s) => { return 20; },
+        Expr::ExprRange(lo, hi, s) => { return 21; },
+        Expr::ExprTry(x, s) => { return 22; },
+        Expr::ExprAssert(x, s) => { return 23; },
+        Expr::ExprStruct(p, fs, s) => { return 24; },
+        Expr::ExprTuple(xs, s) => { return 25; },
+        Expr::ExprArray(xs, s) => { return 26; },
+    }
+}
+
+fn stmt_tag(st: Stmt) -> i32 {
+    match st {
+        Stmt::StmtLet(p, m, t, s) => { return 0; },
+        Stmt::StmtExpr(e, s) => { return 1; },
+        Stmt::StmtSemi(e, s) => { return 2; },
+        Stmt::StmtItem(it, s) => { return 3; },
+    }
+}
+
+fn contract_tag(c: Contract) -> i32 {
+    match c {
+        Contract::Requires(e, s) => { return 0; },
+        Contract::Ensures(e, s) => { return 1; },
+        Contract::LoopInvariant(e, s) => { return 2; },
+    }
+}
+
+fn variant_tag(v: AstVariant) -> i32 {
+    match v {
+        AstVariant::VariantUnit(n, s) => { return 0; },
+        AstVariant::VariantTuple(n, ts, s) => { return 1; },
+        AstVariant::VariantStruct(n, fs, s) => { return 2; },
+    }
+}
+
+fn item_tag(it: Item) -> i32 {
+    match it {
+        Item::ItemFn(h) => { return 0; },
+        Item::ItemStruct(h) => { return 1; },
+        Item::ItemEnum(h) => { return 2; },
+        Item::ItemTrait(h) => { return 3; },
+        Item::ItemImpl(h) => { return 4; },
+        Item::ItemUse(p, s) => { return 5; },
+        Item::ItemModule(p, s) => { return 6; },
+        Item::ItemTypeAlias(n, t, s) => { return 7; },
+    }
+}
+
+fn test_literals() -> i32 {
+    let li: Literal = Literal::IntLit(42);
+    if literal_tag(li) != 0 { return 1; }
+    let lb: Literal = Literal::BoolLit(true);
+    if literal_tag(lb) != 4 { return 2; }
+    let lu: Literal = Literal::UnitLit;
+    if literal_tag(lu) != 5 { return 3; }
+    return 0;
+}
+
+fn test_ops() -> i32 {
+    let n: Unop = Unop::Neg;
+    if unop_tag(n) != 0 { return 1; }
+    let bm: Unop = Unop::BorrowMut;
+    if unop_tag(bm) != 5 { return 2; }
+    let a: Binop = Binop::Add;
+    if binop_tag(a) != 0 { return 3; }
+    let g: Binop = Binop::Geq;
+    if binop_tag(g) != 17 { return 4; }
+    return 0;
+}
+
+fn test_ty() -> i32 {
+    let tu: Ty = Ty::TyUnit(0);
+    if ty_tag(tu) != 6 { return 1; }
+    let tn: Ty = Ty::TyName(10, 11, 0);
+    if ty_tag(tn) != 0 { return 2; }
+    let inner: Ty = Ty::TyUnit(0);
+    let tr: Ty = Ty::TyRef(box_new(inner), 0);
+    if ty_tag(tr) != 1 { return 3; }
+    return 0;
+}
+
+fn test_pat() -> i32 {
+    let pw: Pat = Pat::PatWild(0);
+    if pat_tag(pw) != 0 { return 1; }
+    let pb: Pat = Pat::PatBind(50, 0);
+    if pat_tag(pb) != 1 { return 2; }
+    let pe: Pat = Pat::PatEnum(60, 61, 0);
+    if pat_tag(pe) != 5 { return 3; }
+    return 0;
+}
+
+fn test_expr() -> i32 {
+    let el: Expr = Expr::ExprLit(42, 0);
+    if expr_tag(el) != 0 { return 1; }
+    let ep: Expr = Expr::ExprPath(10, 0);
+    if expr_tag(ep) != 1 { return 2; }
+    let ec: Expr = Expr::ExprContinue(0);
+    if expr_tag(ec) != 17 { return 3; }
+    let lhs: Expr = Expr::ExprLit(1, 0);
+    let rhs: Expr = Expr::ExprLit(2, 0);
+    let eb: Expr = Expr::ExprBinop(0, box_new(lhs), box_new(rhs), 0);
+    if expr_tag(eb) != 3 { return 4; }
+    let ea: Expr = Expr::ExprArray(70, 0);
+    if expr_tag(ea) != 26 { return 5; }
+    return 0;
+}
+
+fn test_stmt() -> i32 {
+    let sl: Stmt = Stmt::StmtLet(10, 0, 0, 0);
+    if stmt_tag(sl) != 0 { return 1; }
+    let se: Stmt = Stmt::StmtExpr(20, 0);
+    if stmt_tag(se) != 1 { return 2; }
+    return 0;
+}
+
+fn test_items() -> i32 {
+    let c: Contract = Contract::Requires(30, 0);
+    if contract_tag(c) != 0 { return 1; }
+    let vu: AstVariant = AstVariant::VariantUnit(40, 0);
+    if variant_tag(vu) != 0 { return 2; }
+    let vt: AstVariant = AstVariant::VariantTuple(41, 42, 0);
+    if variant_tag(vt) != 1 { return 3; }
+    let arm: Arm = Arm { pat: 50, guard: 0, body: 51 };
+    if arm.pat != 50 { return 4; }
+    let fd: FnDef = FnDef { name: 1, type_params: 0, params: 0, ret_ty: 0, contracts: 0, body: 0, span: 0 };
+    if fd.name != 1 { return 5; }
+    let iu: Item = Item::ItemUse(60, 0);
+    if item_tag(iu) != 5 { return 6; }
+    let ia: Item = Item::ItemTypeAlias(70, 71, 0);
+    if item_tag(ia) != 7 { return 7; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_literals();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_ops();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_ty();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_pat();
+    if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_expr();
+    if r5 != 0 { return 40 + r5; }
+    let r6: i32 = test_stmt();
+    if r6 != 0 { return 50 + r6; }
+    let r7: i32 = test_items();
+    if r7 != 0 { return 60 + r7; }
+    return 0;
+}

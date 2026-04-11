@@ -1,0 +1,106 @@
+/* Surrogate for bytecode.sml encodeInsn: instruction byte sizes.
+   SML reference: sml/backend/vm/bytecode.sml lines 188-250+
+     Opcode 0-3: 1 byte (HALT, POP, DUP, PUSH_UNIT)
+     Opcode 4 (PUSH_I32): 5 bytes (1+4)
+     Opcode 5 (PUSH_I64): 9 bytes (1+8)
+     Opcode 6 (PUSH_F64): 9 bytes (1+8)
+     Opcode 7 (PUSH_BOOL): 2 bytes (1+1)
+     Opcode 8 (PUSH_STRING): 5 bytes (1+4)
+     Opcodes 9-35: 1 byte (arithmetic/logic/comparison)
+     Opcodes 36-37 (LOAD/STORE_LOCAL): 2 bytes (1+1)
+     Opcodes 38-40 (JUMP/JUMP_IF/JUMP_IF_NOT): 5 bytes (1+4)
+     Opcode 41 (CALL): 5 bytes (1+2+2)
+     Opcode 42 (RETURN): 1 byte
+     Opcode 43 (RETURN_SLOTS): 2 bytes (1+1)
+     Opcode 44 (CALL_BUILTIN): 2 bytes (1+1) */
+
+fn insn_byte_size(opcode: i32) -> i32 {
+    if opcode == 0 { return 1; }
+    if opcode == 1 { return 1; }
+    if opcode == 2 { return 1; }
+    if opcode == 3 { return 1; }
+    if opcode == 4 { return 5; }
+    if opcode == 5 { return 9; }
+    if opcode == 6 { return 9; }
+    if opcode == 7 { return 2; }
+    if opcode == 8 { return 5; }
+    if opcode >= 9 {
+        if opcode <= 35 { return 1; }
+    }
+    if opcode == 36 { return 2; }
+    if opcode == 37 { return 2; }
+    if opcode == 38 { return 5; }
+    if opcode == 39 { return 5; }
+    if opcode == 40 { return 5; }
+    if opcode == 41 { return 5; }
+    if opcode == 42 { return 1; }
+    if opcode == 43 { return 2; }
+    if opcode == 44 { return 2; }
+    if opcode == 45 { return 2; }
+    if opcode == 46 { return 2; }
+    if opcode == 47 { return 2; }
+    if opcode == 48 { return 2; }
+    if opcode == 49 { return 1; }
+    if opcode == 50 { return 1; }
+    if opcode == 51 { return 4; }
+    if opcode == 52 { return 1; }
+    if opcode == 53 { return 2; }
+    if opcode == 54 { return 2; }
+    if opcode == 55 { return 3; }
+    return 0;
+}
+
+fn is_jump_insn(opcode: i32) -> bool {
+    if opcode == 38 { return true; }
+    if opcode == 39 { return true; }
+    if opcode == 40 { return true; }
+    return false;
+}
+
+fn is_push_insn(opcode: i32) -> bool {
+    if opcode == 3 { return true; }
+    if opcode == 4 { return true; }
+    if opcode == 5 { return true; }
+    if opcode == 6 { return true; }
+    if opcode == 7 { return true; }
+    if opcode == 8 { return true; }
+    return false;
+}
+
+fn main() -> i32 {
+    if insn_byte_size(0) != 1 { return 1; }
+    if insn_byte_size(1) != 1 { return 2; }
+    if insn_byte_size(2) != 1 { return 3; }
+    if insn_byte_size(3) != 1 { return 4; }
+    if insn_byte_size(4) != 5 { return 5; }
+    if insn_byte_size(5) != 9 { return 6; }
+    if insn_byte_size(6) != 9 { return 7; }
+    if insn_byte_size(7) != 2 { return 8; }
+    if insn_byte_size(8) != 5 { return 9; }
+
+    if insn_byte_size(9) != 1 { return 10; }
+    if insn_byte_size(20) != 1 { return 11; }
+    if insn_byte_size(35) != 1 { return 12; }
+
+    if insn_byte_size(36) != 2 { return 13; }
+    if insn_byte_size(37) != 2 { return 14; }
+    if insn_byte_size(38) != 5 { return 15; }
+    if insn_byte_size(41) != 5 { return 16; }
+    if insn_byte_size(42) != 1 { return 17; }
+    if insn_byte_size(43) != 2 { return 18; }
+    if insn_byte_size(44) != 2 { return 19; }
+
+    if is_jump_insn(38) != true { return 20; }
+    if is_jump_insn(39) != true { return 21; }
+    if is_jump_insn(40) != true { return 22; }
+    if is_jump_insn(0) != false { return 23; }
+    if is_jump_insn(42) != false { return 24; }
+
+    if is_push_insn(3) != true { return 25; }
+    if is_push_insn(4) != true { return 26; }
+    if is_push_insn(8) != true { return 27; }
+    if is_push_insn(0) != false { return 28; }
+    if is_push_insn(36) != false { return 29; }
+
+    return 0;
+}

@@ -1,0 +1,42 @@
+/* Surrogate for resolver.sml patBinds: pattern binding count.
+   SML reference: sml/name_resolution/resolver.sml lines 15-24
+     fun patBinds (p : Ast.pat) : string list =
+       case p of
+         Ast.PatWild _ => []
+       | Ast.PatBind (x, _) => [x]
+       | Ast.PatLit _ => []
+       | Ast.PatTuple (ps, _) => List.concat (List.map patBinds ps)
+       | Ast.PatStruct (_, fs, _) => List.concat (List.map (patBinds o #2) fs)
+       | Ast.PatEnum (_, ps, _) => List.concat (List.map patBinds ps)
+       | Ast.PatOr _ => raise Fail "..."
+   Models pat kind as integer tags; returns binding count. */
+
+fn pat_binds_count(pat_kind: i32, child_count: i32) -> i32 {
+    if pat_kind == 0 { return 0; }
+    if pat_kind == 1 { return 1; }
+    if pat_kind == 2 { return 0; }
+    if pat_kind == 3 { return child_count; }
+    if pat_kind == 4 { return child_count; }
+    if pat_kind == 5 { return child_count; }
+    if pat_kind == 6 { return 255; }
+    return 0;
+}
+
+fn main() -> i32 {
+    if pat_binds_count(0, 0) != 0 { return 1; }
+    if pat_binds_count(1, 0) != 1 { return 2; }
+    if pat_binds_count(2, 0) != 0 { return 3; }
+
+    if pat_binds_count(3, 3) != 3 { return 4; }
+    if pat_binds_count(4, 2) != 2 { return 5; }
+    if pat_binds_count(5, 4) != 4 { return 6; }
+
+    if pat_binds_count(6, 0) != 255 { return 7; }
+
+    if pat_binds_count(3, 0) != 0 { return 8; }
+    if pat_binds_count(5, 1) != 1 { return 9; }
+
+    if pat_binds_count(99, 5) != 0 { return 10; }
+
+    return 0;
+}

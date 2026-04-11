@@ -1,0 +1,15 @@
+/* Phase 1 type definitions: sml/contract_analyzer/analyzer.sml -> sv0.
+   Pass-through identity — contract analysis is handled in checker
+   and lowering; this pass is a no-op placeholder. */
+
+fn analyze(prog: i32) -> i32 {
+    return prog;
+}
+
+fn main() -> i32 {
+    let r: i32 = analyze(42);
+    if r != 42 { return 1; }
+    let r2: i32 = analyze(0);
+    if r2 != 0 { return 2; }
+    return 0;
+}

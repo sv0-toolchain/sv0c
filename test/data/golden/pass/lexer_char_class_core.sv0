@@ -1,0 +1,133 @@
+/* Surrogate for lexer.sml character classification functions.
+   SML reference: sml/lexer/lexer.sml lines 76-80
+     fun isIdentStart c = Char.isAlpha c orelse c = #"_"
+     fun isIdentCont c = Char.isAlphaNum c orelse c = #"_"
+     fun isHexDigit c = Char.isHexDigit c
+     fun isBinDigit c = c = #"0" orelse c = #"1"
+     fun isOctDigit c = c >= #"0" andalso c <= #"7"
+   Uses ASCII code points for character tests. */
+
+fn is_ident_start(c: i32) -> bool {
+    if c >= 65 {
+        if c <= 90 { return true; }
+    }
+    if c >= 97 {
+        if c <= 122 { return true; }
+    }
+    if c == 95 { return true; }
+    return false;
+}
+
+fn is_ident_cont(c: i32) -> bool {
+    if is_ident_start(c) { return true; }
+    if c >= 48 {
+        if c <= 57 { return true; }
+    }
+    return false;
+}
+
+fn is_digit(c: i32) -> bool {
+    if c >= 48 {
+        if c <= 57 { return true; }
+    }
+    return false;
+}
+
+fn is_hex_digit(c: i32) -> bool {
+    if is_digit(c) { return true; }
+    if c >= 65 {
+        if c <= 70 { return true; }
+    }
+    if c >= 97 {
+        if c <= 102 { return true; }
+    }
+    return false;
+}
+
+fn is_bin_digit(c: i32) -> bool {
+    if c == 48 { return true; }
+    if c == 49 { return true; }
+    return false;
+}
+
+fn is_oct_digit(c: i32) -> bool {
+    if c >= 48 {
+        if c <= 55 { return true; }
+    }
+    return false;
+}
+
+fn is_whitespace(c: i32) -> bool {
+    if c == 32 { return true; }
+    if c == 9 { return true; }
+    if c == 10 { return true; }
+    if c == 13 { return true; }
+    return false;
+}
+
+fn test_ident_start() -> i32 {
+    if is_ident_start(65) != true { return 1; }
+    if is_ident_start(90) != true { return 2; }
+    if is_ident_start(97) != true { return 3; }
+    if is_ident_start(122) != true { return 4; }
+    if is_ident_start(95) != true { return 5; }
+    if is_ident_start(48) != false { return 6; }
+    if is_ident_start(32) != false { return 7; }
+    if is_ident_start(64) != false { return 8; }
+    return 0;
+}
+
+fn test_ident_cont() -> i32 {
+    if is_ident_cont(65) != true { return 1; }
+    if is_ident_cont(95) != true { return 2; }
+    if is_ident_cont(48) != true { return 3; }
+    if is_ident_cont(57) != true { return 4; }
+    if is_ident_cont(32) != false { return 5; }
+    if is_ident_cont(64) != false { return 6; }
+    return 0;
+}
+
+fn test_hex_digit() -> i32 {
+    if is_hex_digit(48) != true { return 1; }
+    if is_hex_digit(57) != true { return 2; }
+    if is_hex_digit(65) != true { return 3; }
+    if is_hex_digit(70) != true { return 4; }
+    if is_hex_digit(97) != true { return 5; }
+    if is_hex_digit(102) != true { return 6; }
+    if is_hex_digit(103) != false { return 7; }
+    if is_hex_digit(71) != false { return 8; }
+    return 0;
+}
+
+fn test_bin_oct() -> i32 {
+    if is_bin_digit(48) != true { return 1; }
+    if is_bin_digit(49) != true { return 2; }
+    if is_bin_digit(50) != false { return 3; }
+    if is_oct_digit(48) != true { return 4; }
+    if is_oct_digit(55) != true { return 5; }
+    if is_oct_digit(56) != false { return 6; }
+    return 0;
+}
+
+fn test_whitespace() -> i32 {
+    if is_whitespace(32) != true { return 1; }
+    if is_whitespace(9) != true { return 2; }
+    if is_whitespace(10) != true { return 3; }
+    if is_whitespace(13) != true { return 4; }
+    if is_whitespace(65) != false { return 5; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_ident_start();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_ident_cont();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_hex_digit();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_bin_oct();
+    if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_whitespace();
+    if r5 != 0 { return 40 + r5; }
+    return 0;
+}

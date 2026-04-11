@@ -233,6 +233,7 @@ structure Checker :> CHECKER = struct
                "unit" => Types.TyUnit
              | "bool" => Types.TyBool
              | "char" => Types.TyChar
+             | "string" => Types.TyString
              | "i32" => Types.TyInt 32
              | "i8" => Types.TyInt 8
              | "i16" => Types.TyInt 16
@@ -587,7 +588,7 @@ structure Checker :> CHECKER = struct
           case opt of
             SOME e2 => synth retTy envAfter e2
           | NONE =>
-              if lastStmtReturns stmts then retTy else Types.TyUnit
+              if lastStmtReturns stmts then Types.freshVar () else Types.TyUnit
         end
     | Ast.ExprUnop (Ast.Neg, e1, _) =>
         (expect (synth retTy env e1, Types.TyInt 32); Types.TyInt 32)
@@ -765,8 +766,16 @@ structure Checker :> CHECKER = struct
           case armTys of
             [] => raise Fail "E0434: match needs at least one arm"
           | t :: ts =>
-              if List.all (fn u => Unify.unify (t, u)) ts then t
+              let fun isVar (Types.TyVar _) = true
+                    | isVar _ = false
+                  val concrete =
+                    case List.find (fn u => not (isVar u)) (t :: ts) of
+                      SOME c => c
+                    | NONE => t
+              in
+              if List.all (fn u => Unify.unify (concrete, u)) (t :: ts) then concrete
               else raise Fail "E0400: type mismatch"
+              end
         end
     | Ast.ExprCast (e1, tgtAst, _) =>
         let

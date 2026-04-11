@@ -1,0 +1,28 @@
+/* Surrogate for link.sml isSv0: string suffix ".sv0" check.
+   SML reference: sml/link/link.sml lines 3-4
+     fun isSv0 (name : string) : bool = String.isSuffix ".sv0" name
+   Uses string intrinsics: string_len, string_substr, string_eq. */
+
+fn is_sv0(name: string) -> bool {
+    let len: i32 = string_len(name);
+    if len < 4 { return false; }
+    let suffix: string = string_substr(name, len - 4, 4);
+    return string_eq(suffix, ".sv0");
+}
+
+fn main() -> i32 {
+    if is_sv0("hello.sv0") != true { return 1; }
+    if is_sv0("parser.sv0") != true { return 2; }
+    if is_sv0("a.sv0") != true { return 3; }
+    if is_sv0(".sv0") != true { return 4; }
+
+    if is_sv0("hello.txt") != false { return 5; }
+    if is_sv0("sv0") != false { return 6; }
+    if is_sv0("foo") != false { return 7; }
+    if is_sv0("ab") != false { return 8; }
+    if is_sv0("") != false { return 9; }
+    if is_sv0("hello.sv0.bak") != false { return 10; }
+    if is_sv0("file.SV0") != false { return 11; }
+
+    return 0;
+}

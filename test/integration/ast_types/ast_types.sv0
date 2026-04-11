@@ -1,0 +1,110 @@
+enum Literal {
+    IntLit(i32),
+    BoolLit(bool),
+}
+
+enum Ty {
+    TyInt,
+    TyBool,
+    TyUnit,
+    TyRef(Box<Ty>),
+}
+
+enum Expr {
+    Lit(Box<Literal>),
+    Var(i32),
+    Binop(i32, Box<Expr>, Box<Expr>),
+    If(Box<Expr>, Box<Expr>, Box<Expr>),
+    Block(Vec<i32>),
+}
+
+fn eval_lit(lit: Literal) -> i32 {
+    match lit {
+        Literal::IntLit(n) => { return n; },
+        Literal::BoolLit(b) => {
+            if b { return 1; } else { return 0; }
+        },
+    }
+}
+
+fn eval(e: Expr) -> i32 {
+    match e {
+        Expr::Lit(bl) => {
+            let lit: Literal = box_deref(bl);
+            return eval_lit(lit);
+        },
+        Expr::Var(id) => { return id; },
+        Expr::Binop(op, bl, br) => {
+            let le: Expr = box_deref(bl);
+            let re: Expr = box_deref(br);
+            let lv: i32 = eval(le);
+            let rv: i32 = eval(re);
+            if op == 0 { return lv + rv; }
+            else { return lv - rv; }
+        },
+        Expr::If(bc, bt, be) => {
+            let ce: Expr = box_deref(bc);
+            let cv: i32 = eval(ce);
+            if cv != 0 {
+                let te: Expr = box_deref(bt);
+                return eval(te);
+            } else {
+                let ee: Expr = box_deref(be);
+                return eval(ee);
+            }
+        },
+        Expr::Block(stmts) => { return vec_len(stmts); },
+    }
+}
+
+fn main() -> i32 {
+    let lit1: Expr = Expr::Lit(box_new(Literal::IntLit(42)));
+    let r1: i32 = eval(lit1);
+    if r1 != 42 { return 1; }
+
+    let left: Expr = Expr::Lit(box_new(Literal::IntLit(10)));
+    let right: Expr = Expr::Lit(box_new(Literal::IntLit(32)));
+    let add: Expr = Expr::Binop(0, box_new(left), box_new(right));
+    let r2: i32 = eval(add);
+    if r2 != 42 { return 2; }
+
+    let cond: Expr = Expr::Lit(box_new(Literal::BoolLit(true)));
+    let then_e: Expr = Expr::Lit(box_new(Literal::IntLit(42)));
+    let else_e: Expr = Expr::Lit(box_new(Literal::IntLit(0)));
+    let if_e: Expr = Expr::If(box_new(cond), box_new(then_e), box_new(else_e));
+    let r3: i32 = eval(if_e);
+    if r3 != 42 { return 3; }
+
+    let sub: Expr = Expr::Binop(1,
+        box_new(Expr::Lit(box_new(Literal::IntLit(50)))),
+        box_new(Expr::Lit(box_new(Literal::IntLit(8)))));
+    let r4: i32 = eval(sub);
+    if r4 != 42 { return 4; }
+
+    let inner: Ty = Ty::TyInt;
+    let ref_ty: Ty = Ty::TyRef(box_new(inner));
+    match ref_ty {
+        Ty::TyRef(b) => {
+            let t: Ty = box_deref(b);
+            match t {
+                Ty::TyInt => {},
+                Ty::TyBool => { return 5; },
+                Ty::TyUnit => { return 5; },
+                Ty::TyRef(b2) => { return 5; },
+            }
+        },
+        Ty::TyInt => { return 5; },
+        Ty::TyBool => { return 5; },
+        Ty::TyUnit => { return 5; },
+    }
+
+    let nested: Expr = Expr::Binop(0,
+        box_new(Expr::Binop(0,
+            box_new(Expr::Lit(box_new(Literal::IntLit(10)))),
+            box_new(Expr::Lit(box_new(Literal::IntLit(20)))))),
+        box_new(Expr::Lit(box_new(Literal::IntLit(12)))));
+    let r6: i32 = eval(nested);
+    if r6 != 42 { return 6; }
+
+    return 0;
+}

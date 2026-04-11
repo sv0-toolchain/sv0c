@@ -1,0 +1,321 @@
+/* Phase 2 real pipeline module: sml/type_checker/unify.sml -> sv0.
+   Structural type unification with the actual Ty enum (20 variants).
+   Fixes TyVar semantics from unify_core.sv0 surrogate: TyVar matches
+   ANY type (not just TyVar), matching SML lines 10-11.
+   Handles Ref/RefMut cross-matching (SML lines 23-26). */
+
+enum Ty {
+    TyUnit,
+    TyBool,
+    TyChar,
+    TyString,
+    TyIsize,
+    TyUsize,
+    TyError,
+    TyInt(i32),
+    TyUint(i32),
+    TyFloat(i32),
+    TyVar(i32),
+    TyStruct(i32),
+    TyEnum(i32),
+    TyRef(Box<Ty>),
+    TyRefMut(Box<Ty>),
+    TySlice(Box<Ty>),
+    TyArray(Box<Ty>, i32),
+    TyTuple(Vec<i32>),
+    TyFn(Vec<i32>, Box<Ty>),
+    TyNamed(i32, Vec<i32>),
+}
+
+fn ty_tag(t: Ty) -> i32 {
+    match t {
+        Ty::TyUnit => { return 0; },
+        Ty::TyBool => { return 1; },
+        Ty::TyChar => { return 2; },
+        Ty::TyString => { return 3; },
+        Ty::TyIsize => { return 4; },
+        Ty::TyUsize => { return 5; },
+        Ty::TyError => { return 6; },
+        Ty::TyInt(w) => { return 7; },
+        Ty::TyUint(w) => { return 8; },
+        Ty::TyFloat(w) => { return 9; },
+        Ty::TyVar(n) => { return 10; },
+        Ty::TyStruct(id) => { return 11; },
+        Ty::TyEnum(id) => { return 12; },
+        Ty::TyRef(b) => { return 13; },
+        Ty::TyRefMut(b) => { return 14; },
+        Ty::TySlice(b) => { return 15; },
+        Ty::TyArray(b, n) => { return 16; },
+        Ty::TyTuple(v) => { return 17; },
+        Ty::TyFn(ps, rb) => { return 18; },
+        Ty::TyNamed(id, args) => { return 19; },
+    }
+}
+
+fn unify_ref_inner(a: Ty, b: Ty) -> bool {
+    match a {
+        Ty::TyRef(b1) => {
+            match b {
+                Ty::TyRef(b2) => {
+                    let d1: Ty = box_deref(b1);
+                    let d2: Ty = box_deref(b2);
+                    return unify(d1, d2);
+                },
+                Ty::TyRefMut(b2) => {
+                    let d1: Ty = box_deref(b1);
+                    let d2: Ty = box_deref(b2);
+                    return unify(d1, d2);
+                },
+                _ => { return false; },
+            }
+        },
+        Ty::TyRefMut(b1) => {
+            match b {
+                Ty::TyRef(b2) => {
+                    let d1: Ty = box_deref(b1);
+                    let d2: Ty = box_deref(b2);
+                    return unify(d1, d2);
+                },
+                Ty::TyRefMut(b2) => {
+                    let d1: Ty = box_deref(b1);
+                    let d2: Ty = box_deref(b2);
+                    return unify(d1, d2);
+                },
+                _ => { return false; },
+            }
+        },
+        _ => { return false; },
+    }
+}
+
+fn unify_same_tag(a: Ty, b: Ty) -> bool {
+    match a {
+        Ty::TyInt(w1) => {
+            match b {
+                Ty::TyInt(w2) => { return w1 == w2; },
+                _ => { return false; },
+            }
+        },
+        Ty::TyUint(w1) => {
+            match b {
+                Ty::TyUint(w2) => { return w1 == w2; },
+                _ => { return false; },
+            }
+        },
+        Ty::TyFloat(w1) => {
+            match b {
+                Ty::TyFloat(w2) => { return w1 == w2; },
+                _ => { return false; },
+            }
+        },
+        Ty::TyStruct(id1) => {
+            match b {
+                Ty::TyStruct(id2) => { return id1 == id2; },
+                _ => { return false; },
+            }
+        },
+        Ty::TyEnum(id1) => {
+            match b {
+                Ty::TyEnum(id2) => { return id1 == id2; },
+                _ => { return false; },
+            }
+        },
+        Ty::TySlice(b1) => {
+            match b {
+                Ty::TySlice(b2) => {
+                    let d1: Ty = box_deref(b1);
+                    let d2: Ty = box_deref(b2);
+                    return unify(d1, d2);
+                },
+                _ => { return false; },
+            }
+        },
+        Ty::TyArray(b1, n1) => {
+            match b {
+                Ty::TyArray(b2, n2) => {
+                    if n1 != n2 { return false; }
+                    let d1: Ty = box_deref(b1);
+                    let d2: Ty = box_deref(b2);
+                    return unify(d1, d2);
+                },
+                _ => { return false; },
+            }
+        },
+        Ty::TyTuple(v1) => {
+            match b {
+                Ty::TyTuple(v2) => { return vec_len(v1) == vec_len(v2); },
+                _ => { return false; },
+            }
+        },
+        Ty::TyFn(ps1, r1) => {
+            match b {
+                Ty::TyFn(ps2, r2) => {
+                    if vec_len(ps1) != vec_len(ps2) { return false; }
+                    let d1: Ty = box_deref(r1);
+                    let d2: Ty = box_deref(r2);
+                    return unify(d1, d2);
+                },
+                _ => { return false; },
+            }
+        },
+        Ty::TyNamed(n1, g1) => {
+            match b {
+                Ty::TyNamed(n2, g2) => {
+                    if n1 != n2 { return false; }
+                    return vec_len(g1) == vec_len(g2);
+                },
+                _ => { return false; },
+            }
+        },
+        _ => { return true; },
+    }
+}
+
+fn unify(a: Ty, b: Ty) -> bool {
+    let ta: i32 = ty_tag(a);
+    let tb: i32 = ty_tag(b);
+    if ta == 10 { return true; }
+    if tb == 10 { return true; }
+    if ta == 13 { if tb == 13 { return unify_ref_inner(a, b); } }
+    if ta == 13 { if tb == 14 { return unify_ref_inner(a, b); } }
+    if ta == 14 { if tb == 13 { return unify_ref_inner(a, b); } }
+    if ta == 14 { if tb == 14 { return unify_ref_inner(a, b); } }
+    if ta != tb { return false; }
+    if ta <= 6 { return true; }
+    return unify_same_tag(a, b);
+}
+
+fn test_unit_variants() -> i32 {
+    if unify(Ty::TyUnit, Ty::TyUnit) != true { return 1; }
+    if unify(Ty::TyBool, Ty::TyBool) != true { return 2; }
+    if unify(Ty::TyChar, Ty::TyChar) != true { return 3; }
+    if unify(Ty::TyString, Ty::TyString) != true { return 4; }
+    if unify(Ty::TyIsize, Ty::TyIsize) != true { return 5; }
+    if unify(Ty::TyUsize, Ty::TyUsize) != true { return 6; }
+    if unify(Ty::TyError, Ty::TyError) != true { return 7; }
+    if unify(Ty::TyUnit, Ty::TyBool) != false { return 8; }
+    if unify(Ty::TyBool, Ty::TyChar) != false { return 9; }
+    if unify(Ty::TyString, Ty::TyIsize) != false { return 10; }
+    return 0;
+}
+
+fn test_payload_variants() -> i32 {
+    if unify(Ty::TyInt(32), Ty::TyInt(32)) != true { return 1; }
+    if unify(Ty::TyInt(32), Ty::TyInt(64)) != false { return 2; }
+    if unify(Ty::TyUint(8), Ty::TyUint(8)) != true { return 3; }
+    if unify(Ty::TyUint(8), Ty::TyUint(16)) != false { return 4; }
+    if unify(Ty::TyFloat(32), Ty::TyFloat(32)) != true { return 5; }
+    if unify(Ty::TyFloat(32), Ty::TyFloat(64)) != false { return 6; }
+    if unify(Ty::TyStruct(1), Ty::TyStruct(1)) != true { return 7; }
+    if unify(Ty::TyStruct(1), Ty::TyStruct(2)) != false { return 8; }
+    if unify(Ty::TyEnum(5), Ty::TyEnum(5)) != true { return 9; }
+    if unify(Ty::TyEnum(5), Ty::TyEnum(6)) != false { return 10; }
+    if unify(Ty::TyInt(32), Ty::TyUint(32)) != false { return 11; }
+    if unify(Ty::TyStruct(1), Ty::TyEnum(1)) != false { return 12; }
+    return 0;
+}
+
+fn test_recursive() -> i32 {
+    let r1: Ty = Ty::TyRef(box_new(Ty::TyBool));
+    let r2: Ty = Ty::TyRef(box_new(Ty::TyBool));
+    if unify(r1, r2) != true { return 1; }
+    let r3: Ty = Ty::TyRef(box_new(Ty::TyChar));
+    if unify(r1, r3) != false { return 2; }
+    let s1: Ty = Ty::TySlice(box_new(Ty::TyInt(32)));
+    let s2: Ty = Ty::TySlice(box_new(Ty::TyInt(32)));
+    if unify(s1, s2) != true { return 3; }
+    let s3: Ty = Ty::TySlice(box_new(Ty::TyInt(64)));
+    if unify(s1, s3) != false { return 4; }
+    let a1: Ty = Ty::TyArray(box_new(Ty::TyBool), 10);
+    let a2: Ty = Ty::TyArray(box_new(Ty::TyBool), 10);
+    if unify(a1, a2) != true { return 5; }
+    let a3: Ty = Ty::TyArray(box_new(Ty::TyBool), 20);
+    if unify(a1, a3) != false { return 6; }
+    let a4: Ty = Ty::TyArray(box_new(Ty::TyChar), 10);
+    if unify(a1, a4) != false { return 7; }
+    return 0;
+}
+
+fn test_ref_cross_unify() -> i32 {
+    let ref1: Ty = Ty::TyRef(box_new(Ty::TyBool));
+    let mut1: Ty = Ty::TyRefMut(box_new(Ty::TyBool));
+    if unify(ref1, mut1) != true { return 1; }
+    if unify(mut1, ref1) != true { return 2; }
+    let mut2: Ty = Ty::TyRefMut(box_new(Ty::TyBool));
+    if unify(mut1, mut2) != true { return 3; }
+    let ref2: Ty = Ty::TyRef(box_new(Ty::TyChar));
+    if unify(ref1, ref2) != false { return 4; }
+    let mut3: Ty = Ty::TyRefMut(box_new(Ty::TyChar));
+    if unify(ref1, mut3) != false { return 5; }
+    if unify(mut1, ref2) != false { return 6; }
+    return 0;
+}
+
+fn test_tyvar_wildcard() -> i32 {
+    let tv: Ty = Ty::TyVar(0);
+    if unify(tv, Ty::TyInt(32)) != true { return 1; }
+    if unify(tv, Ty::TyBool) != true { return 2; }
+    if unify(tv, Ty::TyUnit) != true { return 3; }
+    if unify(Ty::TyFloat(64), tv) != true { return 4; }
+    if unify(Ty::TyString, tv) != true { return 5; }
+    let tv2: Ty = Ty::TyVar(1);
+    if unify(tv, tv2) != true { return 6; }
+    let deep: Ty = Ty::TyRef(box_new(Ty::TySlice(box_new(Ty::TyChar))));
+    if unify(tv, deep) != true { return 7; }
+    return 0;
+}
+
+fn test_list_len() -> i32 {
+    let mut v1: Vec<i32> = vec_new();
+    vec_push(v1, 0);
+    vec_push(v1, 1);
+    let mut v2: Vec<i32> = vec_new();
+    vec_push(v2, 0);
+    vec_push(v2, 1);
+    let t1: Ty = Ty::TyTuple(v1);
+    let t2: Ty = Ty::TyTuple(v2);
+    if unify(t1, t2) != true { return 1; }
+    let mut v3: Vec<i32> = vec_new();
+    vec_push(v3, 0);
+    let t3: Ty = Ty::TyTuple(v3);
+    if unify(t1, t3) != false { return 2; }
+    let mut p1: Vec<i32> = vec_new();
+    vec_push(p1, 0);
+    let r1: Ty = Ty::TyFn(p1, box_new(Ty::TyBool));
+    let mut p2: Vec<i32> = vec_new();
+    vec_push(p2, 0);
+    let r2: Ty = Ty::TyFn(p2, box_new(Ty::TyBool));
+    if unify(r1, r2) != true { return 3; }
+    let mut p3: Vec<i32> = vec_new();
+    vec_push(p3, 0);
+    let r3: Ty = Ty::TyFn(p3, box_new(Ty::TyChar));
+    if unify(r1, r3) != false { return 4; }
+    let mut g1: Vec<i32> = vec_new();
+    vec_push(g1, 0);
+    let n1: Ty = Ty::TyNamed(42, g1);
+    let mut g2: Vec<i32> = vec_new();
+    vec_push(g2, 0);
+    let n2: Ty = Ty::TyNamed(42, g2);
+    if unify(n1, n2) != true { return 5; }
+    let mut g3: Vec<i32> = vec_new();
+    vec_push(g3, 0);
+    let n3: Ty = Ty::TyNamed(99, g3);
+    if unify(n1, n3) != false { return 6; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_unit_variants();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_payload_variants();
+    if r2 != 0 { return 20 + r2; }
+    let r3: i32 = test_recursive();
+    if r3 != 0 { return 40 + r3; }
+    let r4: i32 = test_ref_cross_unify();
+    if r4 != 0 { return 50 + r4; }
+    let r5: i32 = test_tyvar_wildcard();
+    if r5 != 0 { return 60 + r5; }
+    let r6: i32 = test_list_len();
+    if r6 != 0 { return 70 + r6; }
+    return 0;
+}
