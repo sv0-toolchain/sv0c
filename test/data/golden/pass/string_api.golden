@@ -1,0 +1,20 @@
+#include "sv0_runtime.h"
+
+
+int main(void) {
+  const char* s;
+  s = "hello";
+  const char* _sv0t0 = sv0_string_concat(s, " world");
+  const char* t;
+  t = _sv0t0;
+  sv0_println(s);
+  sv0_println(t);
+  int _sv0t1 = sv0_string_len(s);
+  int len = _sv0t1;
+  const char* _sv0t2 = sv0_string_substr(t, 6, 5);
+  const char* sub;
+  sub = _sv0t2;
+  sv0_println(sub);
+  return 0;
+}
+

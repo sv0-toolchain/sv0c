@@ -1,0 +1,19 @@
+fn main() -> i32 {
+  let v: Vec<i32> = vec_new();
+  vec_push(v, 10);
+  vec_push(v, 20);
+  vec_push(v, 30);
+  let n: i32 = vec_len(v);
+  if n != 3 { return 1; };
+  let x: i32 = vec_get(v, 0);
+  if x != 10 { return 2; };
+  vec_set(v, 1, 99);
+  let w: i32 = vec_get(v, 1);
+  if w != 99 { return 3; };
+  let mut sum: i32 = 0;
+  for i in 0..vec_len(v) {
+    sum = sum + vec_get(v, i);
+  };
+  if sum != 139 { return 4; };
+  return 0;
+}

@@ -46,6 +46,37 @@ structure Parser :> PARSER = struct
         end
     | _ => ts
 
+  fun parseGenericParams ts : Ast.ident list * ts =
+    case ts of
+      (Token.LT, _) :: rest =>
+        let
+          fun params r acc =
+            case r of
+              (Token.GT, _) :: r2 => (rev acc, r2)
+            | (Token.IDENT name, _) :: r2 =>
+                let val r3 = skipOptionalBound r2
+                in
+                  case r3 of
+                    (Token.COMMA, _) :: r4 => params r4 (name :: acc)
+                  | (Token.GT, _) :: _ => params r3 (name :: acc)
+                  | _ => raise Fail "expected , or > in generic params"
+                end
+            | _ => raise Fail "expected type parameter name"
+          and skipOptionalBound r =
+            case r of
+              (Token.COLON, _) :: r2 => skipUntilCommaOrGt r2
+            | _ => r
+          and skipUntilCommaOrGt r =
+            case r of
+              (Token.COMMA, _) :: _ => r
+            | (Token.GT, _) :: _ => r
+            | [] => raise Fail "unterminated generic params"
+            | _ :: r2 => skipUntilCommaOrGt r2
+        in
+          params rest []
+        end
+    | _ => ([], ts)
+
   fun skipWhereClause ts =
     case ts of
       (Token.WHERE, _) :: rest =>
@@ -156,24 +187,39 @@ structure Parser :> PARSER = struct
                    (Token.LT, _) :: _ => skipGenericParams r2
                  | _ => r2
              in
-               (Ast.TyName (["Self", field], merge2 (s, sp r3)), r3)
+               (Ast.TyName (["Self", field], [], merge2 (s, sp r3)), r3)
              end
-         | _ => (Ast.TyName (["Self"], s), rest))
+         | _ => (Ast.TyName (["Self"], [], s), rest))
     | (Token.IDENT name, s) :: rest =>
         if List.exists (fn n => n = name)
              ["i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64",
               "u128", "usize", "isize", "f32", "f64", "bool", "char", "byte",
               "string"] then
-          (Ast.TyName ([name], s), rest)
+          (Ast.TyName ([name], [], s), rest)
         else
           let
             val (p, r0) = parsePath ts
-            val r1 =
+            val (tyArgs, r1) =
               case r0 of
-                (Token.LT, _) :: _ => skipGenericParams r0
-              | _ => r0
+                (Token.LT, _) :: rLt =>
+                  let
+                    fun tyArgLoop r acc =
+                      case r of
+                        (Token.GT, _) :: r2 => (rev acc, r2)
+                      | _ =>
+                          let val (t, r2) = parseType r
+                          in
+                            case r2 of
+                              (Token.COMMA, _) :: r3 => tyArgLoop r3 (t :: acc)
+                            | (Token.GT, _) :: _ => tyArgLoop r2 (t :: acc)
+                            | _ => raise Fail "expected , or > in type args"
+                          end
+                  in
+                    tyArgLoop rLt []
+                  end
+              | _ => ([], r0)
           in
-            (Ast.TyName (p, s), r1)
+            (Ast.TyName (p, tyArgs, s), r1)
           end
     | (_, s) :: _ =>
         raise Fail ("unexpected token in type: " ^ Span.toString s)
@@ -245,7 +291,7 @@ structure Parser :> PARSER = struct
         in
           args (tl r2) []
         end
-    | _ => raise Fail "bad pattern after path"
+    | _ => (Ast.PatEnum (path, [], sp startTs), r2)
 
   and parsePatAtom ts : Ast.pat * ts =
     case ts of
@@ -1064,7 +1110,7 @@ structure Parser :> PARSER = struct
           end) handle Fail _ => NONE)
     | _ => NONE
 
-  fun pathOfTy (Ast.TyName (p, _)) = SOME p
+  fun pathOfTy (Ast.TyName (p, _, _)) = SOME p
     | pathOfTy _ = NONE
 
   fun parseFnBody ts : Ast.item * ts =
@@ -1076,7 +1122,7 @@ structure Parser :> PARSER = struct
         case r0 of
           (Token.IDENT n, _) :: r => (n, r)
         | _ => raise Fail "expected fn name"
-      val r2 = skipGenericParams r1
+      val (typeParams, r2) = parseGenericParams r1
       val r3 = expectTok Token.LPAREN r2
       val (params, r4) = parseParamList r3
       val r5 = expectTok Token.RPAREN r4
@@ -1091,7 +1137,8 @@ structure Parser :> PARSER = struct
       val (body, r9) = parseBlock r8
     in
       (Ast.ItemFn {
-         name = fnName, params = params, ret = ret,
+         name = fnName, type_params = typeParams,
+         params = params, ret = ret,
          contracts = contracts, body = body,
          span = merge2 (sFn, exprSpan body)
        }, r9)
@@ -1181,7 +1228,7 @@ structure Parser :> PARSER = struct
   and parseStructItem ts : Ast.item * ts =
     case ts of
       (Token.STRUCT, s0) :: (Token.IDENT n, _) :: r1 =>
-        let val r2 = skipGenericParams r1
+        let val (typeParams, r2) = parseGenericParams r1
             val r3 = expectTok Token.LBRACE r2
             fun fields acc r =
               case r of
@@ -1204,14 +1251,14 @@ structure Parser :> PARSER = struct
                   end
             val (fs, spanS, rEnd) = fields [] r3
         in
-          (Ast.ItemStruct {name = n, fields = fs, span = spanS}, rEnd)
+          (Ast.ItemStruct {name = n, type_params = typeParams, fields = fs, span = spanS}, rEnd)
         end
     | _ => raise Fail "struct"
 
   and parseEnumItem ts : Ast.item * ts =
     case ts of
       (Token.ENUM, s0) :: (Token.IDENT n, _) :: r1 =>
-        let val r2 = skipGenericParams r1
+        let val (typeParams, r2) = parseGenericParams r1
             val r3 = expectTok Token.LBRACE r2
             fun variants acc r =
               case r of
@@ -1272,7 +1319,7 @@ structure Parser :> PARSER = struct
               | _ => raise Fail "enum variant"
             val (vs, spanE, rEnd) = variants [] r3
         in
-          (Ast.ItemEnum {name = n, variants = vs, span = spanE}, rEnd)
+          (Ast.ItemEnum {name = n, type_params = typeParams, variants = vs, span = spanE}, rEnd)
         end
     | _ => raise Fail "enum"
 

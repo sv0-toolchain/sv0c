@@ -43,10 +43,22 @@ structure Checker :> CHECKER = struct
     | (n, t, m) :: r =>
         if String.compare (n, x) = EQUAL then SOME (t, m) else envEntry r x
 
-  datatype variantShape = VSUnit | VSTuple of Types.ty list
+  datatype variantShape = VSUnit | VSTuple of Types.ty list | VSStruct of (string * Types.ty) list
 
   val structDefs : (string * (string * Types.ty) list) list ref = ref []
   val enumDefs : (string * (string * variantShape) list) list ref = ref []
+
+  val currentTypeParams : (string * Types.ty) list ref = ref []
+
+  fun withTypeParams (tps : Ast.ident list) (f : unit -> 'a) : 'a =
+    let
+      val saved = !currentTypeParams
+      val bindings = map (fn n => (n, Types.freshVar ())) tps
+      val () = currentTypeParams := bindings @ saved
+      val r = f () handle ex => (currentTypeParams := saved; raise ex)
+    in
+      currentTypeParams := saved; r
+    end
 
   (* `use mod::Ty` import aliases (short name -> mangled canonical type name). *)
   val tyImportAliases : (string * string) list ref = ref []
@@ -89,12 +101,21 @@ structure Checker :> CHECKER = struct
     case sh of
       VSUnit => Types.TyFn ([], Types.TyEnum en)
     | VSTuple ts => Types.TyFn (ts, Types.TyEnum en)
+    | VSStruct fs => Types.TyFn (map #2 fs, Types.TyEnum en)
 
   fun pathKey (p : Ast.path) : string = String.concatWith "::" p
 
   fun astTyToTy (t : Ast.ty) : Types.ty option =
     case t of
-      Ast.TyName ([name], _) =>
+      Ast.TyName (["Vec"], [elemTy], _) =>
+        (case astTyToTy elemTy of
+           SOME u => SOME (Types.TyNamed ("Vec", [u]))
+         | NONE => NONE)
+    | Ast.TyName (["Box"], [elemTy], _) =>
+        (case astTyToTy elemTy of
+           SOME u => SOME (Types.TyNamed ("Box", [u]))
+         | NONE => NONE)
+    | Ast.TyName ([name], _, _) =>
         let val name0 = canonTyImport name
         in
           case name0 of
@@ -124,7 +145,9 @@ structure Checker :> CHECKER = struct
               else if List.exists (fn e => String.compare (e, name0) = EQUAL) (enumNames ()) then
                 SOME (Types.TyEnum name0)
               else
-                NONE
+                (case List.find (fn (n, _) => n = name0) (!currentTypeParams) of
+                   SOME (_, tv) => SOME tv
+                 | NONE => NONE)
         end
     | Ast.TyUnit _ => SOME Types.TyUnit
     | Ast.TyRef (t2, _) =>
@@ -164,13 +187,25 @@ structure Checker :> CHECKER = struct
     | Types.TyUsize => true
     | _ => false
 
-  (* `?` on TyEnum en: must match fn return type; Ok/Err each carry one field. *)
-  fun okErrPayloadTys (en : string) : Types.ty * Types.ty =
-    case (variantShapeOf en "Ok", variantShapeOf en "Err") of
-      (VSTuple [tOk], VSTuple [tErr]) => (tOk, tErr)
-    | _ =>
-        raise Fail
-          "E0441: `?` requires variants Ok(T) and Err(E) with exactly one field each"
+  (* `?` on TyEnum en: detect Ok/Err (Result) or Some/None (Option). *)
+  fun trySuccessPayloadTy (en : string) : Types.ty =
+    let
+      val hasOk = (variantShapeOf en "Ok"; true) handle Fail _ => false
+      val hasErr = (variantShapeOf en "Err"; true) handle Fail _ => false
+      val hasSome = (variantShapeOf en "Some"; true) handle Fail _ => false
+      val hasNone = (variantShapeOf en "None"; true) handle Fail _ => false
+    in
+      if hasOk andalso hasErr then
+        case variantShapeOf en "Ok" of
+          VSTuple [tOk] => tOk
+        | _ => raise Fail "E0441: `?` requires Ok(T) with exactly one payload field"
+      else if hasSome andalso hasNone then
+        case variantShapeOf en "Some" of
+          VSTuple [tSome] => tSome
+        | _ => raise Fail "E0441: `?` requires Some(T) with exactly one payload field"
+      else
+        raise Fail "E0441: `?` requires an enum with Ok(T)/Err(E) or Some(T)/None"
+    end
 
   fun initTypes (prog : Ast.program) : unit =
     let
@@ -189,7 +224,11 @@ structure Checker :> CHECKER = struct
         else NONE
       fun resolveFieldTy (t : Ast.ty) : Types.ty =
         case t of
-          Ast.TyName ([name], _) =>
+          Ast.TyName (["Vec"], [elemTy], _) =>
+            Types.TyNamed ("Vec", [resolveFieldTy elemTy])
+        | Ast.TyName (["Box"], [elemTy], _) =>
+            Types.TyNamed ("Box", [resolveFieldTy elemTy])
+        | Ast.TyName ([name], _, _) =>
             (case name of
                "unit" => Types.TyUnit
              | "bool" => Types.TyBool
@@ -205,7 +244,10 @@ structure Checker :> CHECKER = struct
              | _ =>
                  (case namedOnlyTy name of
                     SOME u => u
-                  | NONE => raise Fail "E0406: unknown type in struct/enum field"))
+                  | NONE =>
+                      (case List.find (fn (n, _) => n = name) (!currentTypeParams) of
+                         SOME (_, tv) => tv
+                       | NONE => raise Fail ("E0406: unknown type in struct/enum field: `" ^ name ^ "`"))))
         | Ast.TyUnit _ => Types.TyUnit
         | Ast.TyTuple (ts, _) =>
             Types.TyTuple (map resolveFieldTy ts)
@@ -216,11 +258,12 @@ structure Checker :> CHECKER = struct
         | _ =>
             raise Fail "E0424: type form not supported in struct/enum field"
       fun structOne (r : {
-            name : Ast.ident,
+            name : Ast.ident, type_params : Ast.ident list,
             fields : (Ast.ident * Ast.ty) list,
             span : Span.span
           }) =
-        (#name r, map (fn (f, aty) => (f, resolveFieldTy aty)) (#fields r))
+        withTypeParams (#type_params r) (fn () =>
+          (#name r, map (fn (f, aty) => (f, resolveFieldTy aty)) (#fields r)))
       fun variantName v =
         case v of
           Ast.VariantUnit (n, _) => n
@@ -231,7 +274,7 @@ structure Checker :> CHECKER = struct
           Ast.VariantUnit _ => VSUnit
         | Ast.VariantTuple (_, ts, _) => VSTuple (map resolveFieldTy ts)
         | Ast.VariantStruct (_, fs, _) =>
-            VSTuple (map (resolveFieldTy o #2) fs)
+            VSStruct (map (fn (f, t) => (f, resolveFieldTy t)) fs)
       fun dupVariants names =
         let
           fun go [] _ = ()
@@ -244,15 +287,16 @@ structure Checker :> CHECKER = struct
           go names []
         end
       fun enumOne (r : {
-            name : Ast.ident,
+            name : Ast.ident, type_params : Ast.ident list,
             variants : Ast.variant list,
             span : Span.span
           }) =
+        withTypeParams (#type_params r) (fn () =>
         let val vnames = map variantName (#variants r)
         in
           dupVariants vnames;
           (#name r, map (fn v => (variantName v, variantShape v)) (#variants r))
-        end
+        end)
       val sd = map structOne structs
       val ed = map enumOne enums
     in
@@ -304,7 +348,13 @@ structure Checker :> CHECKER = struct
     | Ast.PatBind (x, _) =>
         if
           Unify.unify (scrutTy, Types.TyInt 32) orelse Unify.unify (scrutTy, Types.TyBool)
-          orelse (case scrutTy of Types.TyEnum _ => true | _ => false)
+          orelse (case scrutTy of
+                    Types.TyEnum _ => true
+                  | Types.TyStruct _ => true
+                  | Types.TyNamed _ => true
+                  | Types.TyString => true
+                  | Types.TyVar _ => true
+                  | _ => false)
         then
           extend env x scrutTy false
         else
@@ -335,6 +385,24 @@ structure Checker :> CHECKER = struct
                    end
              end
          | _ => raise Fail "E0427: bad enum pattern path")
+    | Ast.PatStruct ([en, vn], fieldPats, _) =>
+        let val () = expect (scrutTy, Types.TyEnum en)
+        in
+          case variantShapeOf en vn of
+            VSStruct fs =>
+              let
+                fun bindField env (fieldName, fieldPat) =
+                  case List.find (fn (n, _) => n = fieldName) fs of
+                    SOME (_, fieldTy) => bindPat fieldTy fieldPat env
+                  | NONE =>
+                      raise Fail ("E0429: unknown field `" ^ fieldName
+                                  ^ "` in struct pattern `" ^ en ^ "::" ^ vn ^ "`")
+              in
+                List.foldl (fn (fp, e) => bindField e fp) env fieldPats
+              end
+          | _ => raise Fail ("E0429: struct pattern on non-struct variant `"
+                             ^ en ^ "::" ^ vn ^ "`")
+        end
     | _ => raise Fail "E0428: pattern form not supported in match"
 
   (* Multi-segment path calls: builtins, quantifiers, println, user fns. *)
@@ -440,11 +508,16 @@ structure Checker :> CHECKER = struct
     | [nm] =>
         if String.compare (nm, "println") = EQUAL then
           case args of
-            [Ast.ExprLit (Ast.StringLit _, _)] =>
-              (ignore (synth retTy env (List.hd args)); Types.TyUnit)
+            [arg] =>
+              let val argTy = synth retTy env arg
+              in
+                if Unify.unify (argTy, Types.TyString) then Types.TyUnit
+                else raise Fail
+                  "E0444: println expects a string argument (hint: println(\"text\") or println(s) where s: string)"
+              end
           | _ =>
               raise Fail
-                "E0444: println expects a single string literal argument (hint: println(\"text\"))"
+                "E0444: println expects exactly one argument"
         else
           let val k = pathKey segs
           in
@@ -722,11 +795,10 @@ structure Checker :> CHECKER = struct
                   | _ =>
                       raise Fail
                         "E0443: `?` requires the enclosing function to return the same enum type"
-                val (tOk, _) = okErrPayloadTys en
               in
-                tOk
+                trySuccessPayloadTy en
               end
-          | _ => raise Fail "E0445: `?` operand must be an enum (Ok/Err shape)"
+          | _ => raise Fail "E0445: `?` operand must be an enum (Ok/Err or Some/None shape)"
         end
     | _ =>
         raise Fail "E0402: expression form not supported in type checker slice"
@@ -901,10 +973,12 @@ structure Checker :> CHECKER = struct
     | _ => expect (synth retTy env body, retTy)
 
   fun itemFnTy (r : {
-        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        name : Ast.ident, type_params : Ast.ident list,
+        params : (Ast.pat * Ast.ty) list,
         ret : Ast.ty option, contracts : Ast.contract list,
         body : Ast.expr, span : Span.span
       }) : Types.ty =
+    withTypeParams (#type_params r) (fn () =>
     let
       val retTy =
         case #ret r of
@@ -922,7 +996,7 @@ structure Checker :> CHECKER = struct
           (#params r)
     in
       Types.TyFn (paramTys, retTy)
-    end
+    end)
 
   fun envFind (env : venv) (x : string) : Types.ty option =
     case envEntry env x of
@@ -937,12 +1011,25 @@ structure Checker :> CHECKER = struct
         | _ => acc
       val acc0 = List.foldl one [] prog
       val acc1 = extend acc0 "println" (Types.TyFn ([Types.TyString], Types.TyUnit)) false
+      val acc1a = extend acc1 "string_len" (Types.TyFn ([Types.TyString], Types.TyInt 32)) false
+      val acc1b = extend acc1a "string_eq" (Types.TyFn ([Types.TyString, Types.TyString], Types.TyBool)) false
+      val acc1c = extend acc1b "string_concat" (Types.TyFn ([Types.TyString, Types.TyString], Types.TyString)) false
+      val acc1d = extend acc1c "string_char_at" (Types.TyFn ([Types.TyString, Types.TyInt 32], Types.TyInt 32)) false
+      val acc1e = extend acc1d "string_substr" (Types.TyFn ([Types.TyString, Types.TyInt 32, Types.TyInt 32], Types.TyString)) false
+      val vecElem = Types.freshVar ()
+      val acc1f = extend acc1e "vec_new" (Types.TyFn ([], Types.TyNamed ("Vec", [vecElem]))) false
+      val acc1g = extend acc1f "vec_push" (Types.TyFn ([Types.TyNamed ("Vec", [Types.freshVar ()]), Types.freshVar ()], Types.TyUnit)) false
+      val acc1h = extend acc1g "vec_len" (Types.TyFn ([Types.TyNamed ("Vec", [Types.freshVar ()])], Types.TyInt 32)) false
+      val acc1i = extend acc1h "vec_get" (Types.TyFn ([Types.TyNamed ("Vec", [Types.freshVar ()]), Types.TyInt 32], Types.freshVar ())) false
+      val acc1j = extend acc1i "vec_set" (Types.TyFn ([Types.TyNamed ("Vec", [Types.freshVar ()]), Types.TyInt 32, Types.freshVar ()], Types.TyUnit)) false
+      val acc1k = extend acc1j "box_new" (Types.TyFn ([Types.freshVar ()], Types.TyNamed ("Box", [Types.freshVar ()]))) false
+      val acc1l = extend acc1k "box_deref" (Types.TyFn ([Types.TyNamed ("Box", [Types.freshVar ()])], Types.freshVar ())) false
       val acc2 =
         List.foldl
           (fn ((en, vars), acc) =>
              List.foldl
                (fn ((vn, sh), a) =>
-                  extend a (pathKey [en, vn]) (ctorTy en sh) false) acc vars) acc1
+                  extend a (pathKey [en, vn]) (ctorTy en sh) false) acc vars) acc1l
           (!enumDefs)
       fun oneUse (it : Ast.item, acc : venv) : venv =
         case it of
@@ -975,10 +1062,12 @@ structure Checker :> CHECKER = struct
 
   fun checkFn (modEnv : venv)
     (r : {
-        name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+        name : Ast.ident, type_params : Ast.ident list,
+        params : (Ast.pat * Ast.ty) list,
         ret : Ast.ty option, contracts : Ast.contract list,
         body : Ast.expr, span : Span.span
       }) : unit =
+    withTypeParams (#type_params r) (fn () =>
     let
       val retTy =
         case #ret r of
@@ -1007,7 +1096,7 @@ structure Checker :> CHECKER = struct
         handle ex => (contractParamNames := []; raise ex)
     in
       checkExprAsBody env1 retTy (#body r)
-    end
+    end)
 
   fun check (prog : Ast.program) : Ast.program =
     let

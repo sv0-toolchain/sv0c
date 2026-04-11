@@ -1,0 +1,27 @@
+enum Shape {
+    Circle(i32),
+    Rect { w: i32, h: i32 },
+    Point,
+}
+
+fn describe(s: Shape) -> i32 {
+    match s {
+        Shape::Circle(r) => r,
+        Shape::Rect { w, h } => w + h,
+        Shape::Point => 0,
+    }
+}
+
+fn main() -> i32 {
+    let r: Shape = Shape::Rect(3, 4);
+    let d: i32 = describe(r);
+    if d != 7 {
+        return 1;
+    }
+    let p: Shape = Shape::Point;
+    let d2: i32 = describe(p);
+    if d2 != 0 {
+        return 2;
+    }
+    return 0;
+}

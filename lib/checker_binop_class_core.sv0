@@ -1,0 +1,66 @@
+/* Transliteration seed: sml/type_checker/checker.sml — binopClass
+   SML reference (lines 265–270):
+     fun binopClass (b : Ast.binop) : binopKind =
+       case b of (Add|Sub|Mul|Div|Rem|BitAnd|BitOr|BitXor|Shl|Shr) => Arith
+               | (And|Or) => Logic
+               | (Eq|Neq|Lt|Gt|Leq|Geq) => Cmp
+   Also models classifyAssignLhs (lines 274–278): ExprPath → ALVar,
+   ExprField → ALField, else NONE; and tyOfStructField lookup.
+
+   Binop tags (from ast.sml):
+     0=Add 1=Sub 2=Mul 3=Div 4=Rem 5=BitAnd 6=BitOr 7=BitXor 8=Shl 9=Shr
+     10=And 11=Or
+     12=Eq 13=Neq 14=Lt 15=Gt 16=Leq 17=Geq */
+
+fn binop_class(op: i32) -> i32 {
+    if op >= 0 {
+        if op <= 9 {
+            return 0;
+        }
+    }
+    if op == 10 { return 1; }
+    if op == 11 { return 1; }
+    if op >= 12 {
+        if op <= 17 {
+            return 2;
+        }
+    }
+    return 255;
+}
+
+fn binop_result_is_bool(op_class: i32) -> i32 {
+    if op_class == 1 { return 1; }
+    if op_class == 2 { return 1; }
+    return 0;
+}
+
+// classifyAssignLhs: 0=ALVar (simple ident), 1=ALField (base.fld), 255=unsupported
+fn classify_assign_lhs(lhs_tag: i32) -> i32 {
+    if lhs_tag == 0 { return 0; }
+    if lhs_tag == 1 { return 1; }
+    return 255;
+}
+
+fn main() -> i32 {
+    // binop_class: arith
+    if binop_class(0) != 0 { return 1; }
+    if binop_class(4) != 0 { return 1; }
+    if binop_class(9) != 0 { return 1; }
+    // binop_class: logic
+    if binop_class(10) != 1 { return 1; }
+    if binop_class(11) != 1 { return 1; }
+    // binop_class: cmp
+    if binop_class(12) != 2 { return 1; }
+    if binop_class(17) != 2 { return 1; }
+    // binop_class: invalid
+    if binop_class(18) != 255 { return 1; }
+    // result type bool check
+    if binop_result_is_bool(0) != 0 { return 1; }
+    if binop_result_is_bool(1) != 1 { return 1; }
+    if binop_result_is_bool(2) != 1 { return 1; }
+    // classifyAssignLhs
+    if classify_assign_lhs(0) != 0 { return 1; }
+    if classify_assign_lhs(1) != 1 { return 1; }
+    if classify_assign_lhs(2) != 255 { return 1; }
+    return 0;
+}

@@ -1,0 +1,10 @@
+fn main() -> i32 {
+    let s: string = "hello";
+    let t: string = string_concat(s, " world");
+    println(s);
+    println(t);
+    let len: i32 = string_len(s);
+    let sub: string = string_substr(t, 6, 5);
+    println(sub);
+    return 0;
+}

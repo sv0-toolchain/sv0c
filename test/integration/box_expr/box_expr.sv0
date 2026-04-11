@@ -1,0 +1,29 @@
+enum Expr { Lit(i32), Add(Box<Expr>, Box<Expr>) }
+
+fn eval(e: Expr) -> i32 {
+    match e {
+        Expr::Lit(n) => n,
+        Expr::Add(l, r) => {
+            let le: Expr = box_deref(l);
+            let re: Expr = box_deref(r);
+            return eval(le) + eval(re);
+        },
+    }
+}
+
+fn main() -> i32 {
+    let lit1: Expr = Expr::Lit(10);
+    let lit2: Expr = Expr::Lit(20);
+    let lit3: Expr = Expr::Lit(5);
+    let b1: Box<Expr> = box_new(lit1);
+    let b2: Box<Expr> = box_new(lit2);
+    let add1: Expr = Expr::Add(b1, b2);
+    if eval(add1) != 30 { return 1; };
+
+    let b3: Box<Expr> = box_new(add1);
+    let b4: Box<Expr> = box_new(lit3);
+    let add2: Expr = Expr::Add(b3, b4);
+    if eval(add2) != 35 { return 2; };
+
+    return 0;
+}

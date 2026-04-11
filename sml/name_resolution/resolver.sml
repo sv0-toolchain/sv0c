@@ -28,12 +28,13 @@ structure Resolver :> RESOLVER = struct
 
   fun resolveTy (ctx : ctx) (env : Env.env) (t : Ast.ty) : unit =
     case t of
-      Ast.TyName (path, sp) =>
-        if Env.lookupType env ctx path then ()
-        else
-          raise Diagnostic.Diag
-            (Diagnostic.error
-               ("E0301", "unknown type `" ^ pathToString path ^ "`", sp))
+      Ast.TyName (path, tyArgs, sp) =>
+        (if Env.lookupType env ctx path then ()
+         else
+           raise Diagnostic.Diag
+             (Diagnostic.error
+                ("E0301", "unknown type `" ^ pathToString path ^ "`", sp));
+         app (resolveTy ctx env) tyArgs)
     | Ast.TyRef (t2, _) => resolveTy ctx env t2
     | Ast.TyRefMut (t2, _) => resolveTy ctx env t2
     | Ast.TyArray (t2, e, _) =>
@@ -215,10 +216,12 @@ structure Resolver :> RESOLVER = struct
     | Ast.LoopInvariant (e1, _) => resolveExpr ctx env e1
 
   and resolveFn (ctx : ctx) (env : Env.env)
-    (r : {name : Ast.ident, params : (Ast.pat * Ast.ty) list,
+    (r : {name : Ast.ident, type_params : Ast.ident list,
+          params : (Ast.pat * Ast.ty) list,
           ret : Ast.ty option, contracts : Ast.contract list,
           body : Ast.expr, span : Span.span}) : unit =
     let
+      val env = List.foldl (fn (tp, e) => Env.registerModuleType e tp) env (#type_params r)
       val () = app (fn (_, t) => resolveTy ctx env t) (#params r)
       val () =
         case #ret r of
@@ -235,13 +238,17 @@ structure Resolver :> RESOLVER = struct
     end
 
   and resolveStruct (ctx : ctx) (env : Env.env)
-    (r : {name : Ast.ident, fields : (Ast.ident * Ast.ty) list,
+    (r : {name : Ast.ident, type_params : Ast.ident list,
+          fields : (Ast.ident * Ast.ty) list,
           span : Span.span}) : unit =
-    app (fn (_, t) => resolveTy ctx env t) (#fields r)
+    let val env = List.foldl (fn (tp, e) => Env.registerModuleType e tp) env (#type_params r)
+    in app (fn (_, t) => resolveTy ctx env t) (#fields r) end
 
   and resolveEnum (ctx : ctx) (env : Env.env)
-    (r : {name : Ast.ident, variants : Ast.variant list, span : Span.span}) : unit =
+    (r : {name : Ast.ident, type_params : Ast.ident list,
+          variants : Ast.variant list, span : Span.span}) : unit =
     let
+      val env = List.foldl (fn (tp, e) => Env.registerModuleType e tp) env (#type_params r)
       fun variant v =
         case v of
           Ast.VariantUnit _ => ()
@@ -384,8 +391,20 @@ structure Resolver :> RESOLVER = struct
       val e2 = Env.registerFnArity (Env.registerModuleValue e1 "old") "old" 1
       val e3 = Env.registerFnArity (Env.registerModuleValue e2 "forall") "forall" 3
       val e4 = Env.registerFnArity (Env.registerModuleValue e3 "exists") "exists" 3
+      val e5 = Env.registerFnArity (Env.registerModuleValue e4 "no_alias") "no_alias" 2
+      val e6 = Env.registerFnArity (Env.registerModuleValue e5 "string_len") "string_len" 1
+      val e7 = Env.registerFnArity (Env.registerModuleValue e6 "string_eq") "string_eq" 2
+      val e8 = Env.registerFnArity (Env.registerModuleValue e7 "string_concat") "string_concat" 2
+      val e9 = Env.registerFnArity (Env.registerModuleValue e8 "string_char_at") "string_char_at" 2
+      val e10 = Env.registerFnArity (Env.registerModuleValue e9 "string_substr") "string_substr" 3
+      val e11 = Env.registerFnArity (Env.registerModuleValue e10 "vec_new") "vec_new" 0
+      val e12 = Env.registerFnArity (Env.registerModuleValue e11 "vec_push") "vec_push" 2
+      val e13 = Env.registerFnArity (Env.registerModuleValue e12 "vec_len") "vec_len" 1
+      val e14 = Env.registerFnArity (Env.registerModuleValue e13 "vec_get") "vec_get" 2
+      val e15 = Env.registerFnArity (Env.registerModuleValue e14 "vec_set") "vec_set" 3
+      val e16 = Env.registerFnArity (Env.registerModuleValue e15 "box_new") "box_new" 1
     in
-      Env.registerFnArity (Env.registerModuleValue e4 "no_alias") "no_alias" 2
+      Env.registerFnArity (Env.registerModuleValue e16 "box_deref") "box_deref" 1
     end
 
   fun resolve (prog : Ast.program) : Ast.program =
