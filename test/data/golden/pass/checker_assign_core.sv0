@@ -1,0 +1,77 @@
+// Surrogate for checker.sml checkPlainAssign + checkCompoundAssign.
+// SML reference: sml/type_checker/checker.sml (checkPlainAssign, checkCompoundAssign)
+// Models assignment LHS classification and compound assign validation.
+
+fn assign_lhs_kind(expr_tag: i32) -> i32 {
+    if expr_tag == 0 { return 0; }
+    if expr_tag == 3 { return 1; }
+    if expr_tag == 24 { return 2; }
+    if expr_tag == 7 { return 3; }
+    if expr_tag == 8 { return 4; }
+    return -1;
+}
+
+fn assign_is_valid_lhs(kind: i32) -> bool {
+    return kind >= 0 && kind <= 4;
+}
+
+fn assign_needs_mut_check(kind: i32) -> bool {
+    return kind == 0;
+}
+
+fn compound_assign_result_ty(lhs_ty_tag: i32, op_tag: i32) -> i32 {
+    if lhs_ty_tag >= 0 && lhs_ty_tag <= 10 {
+        if op_tag >= 0 && op_tag <= 4 { return lhs_ty_tag; }
+        if op_tag >= 5 && op_tag <= 9 { return lhs_ty_tag; }
+    }
+    return -1;
+}
+
+fn is_numeric_ty(ty_tag: i32) -> bool {
+    return ty_tag >= 0 && ty_tag <= 10;
+}
+
+fn is_bitwise_op(op_tag: i32) -> bool {
+    return op_tag >= 5 && op_tag <= 9;
+}
+
+fn is_arith_op(op_tag: i32) -> bool {
+    return op_tag >= 0 && op_tag <= 4;
+}
+
+fn assign_error_code(kind: i32) -> i32 {
+    if kind == -1 { return 448; }
+    return 0;
+}
+
+fn main() -> i32 {
+    if assign_lhs_kind(0) != 0 { return 1; }
+    if assign_lhs_kind(3) != 1 { return 2; }
+    if assign_lhs_kind(24) != 2 { return 3; }
+    if assign_lhs_kind(99) != -1 { return 4; }
+
+    if !assign_is_valid_lhs(0) { return 5; }
+    if !assign_is_valid_lhs(4) { return 6; }
+    if assign_is_valid_lhs(-1) { return 7; }
+
+    if !assign_needs_mut_check(0) { return 8; }
+    if assign_needs_mut_check(1) { return 9; }
+
+    if compound_assign_result_ty(3, 0) != 3 { return 10; }
+    if compound_assign_result_ty(3, 7) != 3 { return 11; }
+    if compound_assign_result_ty(99, 0) != -1 { return 12; }
+
+    if !is_numeric_ty(3) { return 13; }
+    if is_numeric_ty(99) { return 14; }
+
+    if !is_bitwise_op(5) { return 15; }
+    if is_bitwise_op(0) { return 16; }
+
+    if !is_arith_op(0) { return 17; }
+    if is_arith_op(5) { return 18; }
+
+    if assign_error_code(-1) != 448 { return 19; }
+    if assign_error_code(0) != 0 { return 20; }
+
+    return 0;
+}

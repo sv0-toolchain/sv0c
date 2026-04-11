@@ -1,0 +1,51 @@
+// Surrogate for vm_codegen.sml encLen/encLens: bytecode length accounting.
+// SML reference: sml/backend/vm/vm_codegen.sml (encLen, encLens)
+// Maps IR instruction tags to their encoded byte length in bytecode.
+
+fn enc_len(instr_tag: i32, payload_slots: i32) -> i32 {
+    if instr_tag == 0 { return 5; }
+    if instr_tag == 1 { return 5; }
+    if instr_tag == 2 { return 5; }
+    if instr_tag == 3 { return 1; }
+    if instr_tag == 4 { return 1; }
+    if instr_tag == 5 { return 5; }
+    if instr_tag == 6 { return 5; }
+    if instr_tag == 7 { return 5; }
+    if instr_tag == 8 { return 9; }
+    if instr_tag == 9 { return 5; }
+    if instr_tag == 10 { return 1 + payload_slots; }
+    return 1;
+}
+
+fn enc_lens(i0: i32, p0: i32, i1: i32, p1: i32, i2: i32, p2: i32) -> i32 {
+    return enc_len(i0, p0) + enc_len(i1, p1) + enc_len(i2, p2);
+}
+
+fn is_fixed_len(instr_tag: i32) -> bool {
+    if instr_tag == 10 { return false; }
+    return true;
+}
+
+fn max_enc_len() -> i32 { return 13; }
+
+fn min_enc_len() -> i32 { return 1; }
+
+fn main() -> i32 {
+    if enc_len(0, 0) != 5 { return 1; }
+    if enc_len(3, 0) != 1 { return 2; }
+    if enc_len(8, 0) != 9 { return 3; }
+    if enc_len(10, 3) != 4 { return 4; }
+    if enc_len(10, 0) != 1 { return 5; }
+
+    if enc_lens(0, 0, 3, 0, 8, 0) != 15 { return 6; }
+    if enc_lens(3, 0, 3, 0, 3, 0) != 3 { return 7; }
+
+    if !is_fixed_len(0) { return 8; }
+    if !is_fixed_len(3) { return 9; }
+    if is_fixed_len(10) { return 10; }
+
+    if max_enc_len() != 13 { return 11; }
+    if min_enc_len() != 1 { return 12; }
+
+    return 0;
+}

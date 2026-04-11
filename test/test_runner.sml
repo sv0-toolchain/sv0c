@@ -928,6 +928,44 @@ structure TestRunner = struct
                  (goldenPassCompileRun "lexer_scan_op_core")
       val () = check "golden pass lexer_scan_string_core compile+run"
                  (goldenPassCompileRun "lexer_scan_string_core")
+      val () = check "golden pass parser_type_dispatch_core compile+run"
+                 (goldenPassCompileRun "parser_type_dispatch_core")
+      val () = check "golden pass parser_primary_expr_core compile+run"
+                 (goldenPassCompileRun "parser_primary_expr_core")
+      val () = check "golden pass parser_postfix_expr_core compile+run"
+                 (goldenPassCompileRun "parser_postfix_expr_core")
+      val () = check "golden pass parser_enum_item_core compile+run"
+                 (goldenPassCompileRun "parser_enum_item_core")
+      val () = check "golden pass parser_block_stmt_core compile+run"
+                 (goldenPassCompileRun "parser_block_stmt_core")
+      val () = check "golden pass checker_ast_ty_core compile+run"
+                 (goldenPassCompileRun "checker_ast_ty_core")
+      val () = check "golden pass checker_bind_pat_core compile+run"
+                 (goldenPassCompileRun "checker_bind_pat_core")
+      val () = check "golden pass checker_assign_core compile+run"
+                 (goldenPassCompileRun "checker_assign_core")
+      val () = check "golden pass checker_init_types_core compile+run"
+                 (goldenPassCompileRun "checker_init_types_core")
+      val () = check "golden pass checker_mod_env_core compile+run"
+                 (goldenPassCompileRun "checker_mod_env_core")
+      val () = check "golden pass link_strip_directives_core compile+run"
+                 (goldenPassCompileRun "link_strip_directives_core")
+      val () = check "golden pass link_map_item_core compile+run"
+                 (goldenPassCompileRun "link_map_item_core")
+      val () = check "golden pass resolver_intrinsics_core compile+run"
+                 (goldenPassCompileRun "resolver_intrinsics_core")
+      val () = check "golden pass resolver_bind_locals_core compile+run"
+                 (goldenPassCompileRun "resolver_bind_locals_core")
+      val () = check "golden pass vm_codegen_while_loop_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_while_loop_core")
+      val () = check "golden pass vm_codegen_value_width_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_value_width_core")
+      val () = check "golden pass vm_codegen_enc_len_core compile+run"
+                 (goldenPassCompileRun "vm_codegen_enc_len_core")
+      val () = check "golden pass codegen_block_core compile+run"
+                 (goldenPassCompileRun "codegen_block_core")
+      val () = check "golden pass main_argv_core compile+run"
+                 (goldenPassCompileRun "main_argv_core")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

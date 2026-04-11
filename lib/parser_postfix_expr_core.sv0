@@ -1,0 +1,75 @@
+// Surrogate for parser.sml parsePostfixExpr: postfix operator classification.
+// SML reference: sml/parser/parser.sml lines 543-580
+// After parsing a primary expr, the parser loops checking for postfix
+// operators: call(), .method(), .field, .0, [index], ?.
+
+fn postfix_kind(token_tag: i32, next_tag: i32, third_tag: i32) -> i32 {
+    if token_tag == 40 { return 0; }
+    if token_tag == 46 && next_tag == 1 && third_tag == 40 { return 1; }
+    if token_tag == 46 && next_tag == 1 { return 2; }
+    if token_tag == 46 && next_tag == 7 { return 3; }
+    if token_tag == 91 { return 4; }
+    if token_tag == 63 { return 5; }
+    return -1;
+}
+
+fn is_postfix_start(token_tag: i32) -> bool {
+    if token_tag == 40 { return true; }
+    if token_tag == 46 { return true; }
+    if token_tag == 91 { return true; }
+    if token_tag == 63 { return true; }
+    return false;
+}
+
+fn postfix_consumes_tokens(kind: i32) -> i32 {
+    if kind == 0 { return 1; }
+    if kind == 1 { return 3; }
+    if kind == 2 { return 2; }
+    if kind == 3 { return 2; }
+    if kind == 4 { return 1; }
+    if kind == 5 { return 1; }
+    return 0;
+}
+
+fn postfix_needs_closing(kind: i32) -> bool {
+    if kind == 0 { return true; }
+    if kind == 1 { return true; }
+    if kind == 4 { return true; }
+    return false;
+}
+
+fn closing_token_for(kind: i32) -> i32 {
+    if kind == 0 { return 41; }
+    if kind == 1 { return 41; }
+    if kind == 4 { return 93; }
+    return 0;
+}
+
+fn main() -> i32 {
+    if postfix_kind(40, 0, 0) != 0 { return 1; }
+    if postfix_kind(46, 1, 40) != 1 { return 2; }
+    if postfix_kind(46, 1, 0) != 2 { return 3; }
+    if postfix_kind(46, 7, 0) != 3 { return 4; }
+    if postfix_kind(91, 0, 0) != 4 { return 5; }
+    if postfix_kind(63, 0, 0) != 5 { return 6; }
+    if postfix_kind(44, 0, 0) != -1 { return 7; }
+
+    if !is_postfix_start(40) { return 8; }
+    if !is_postfix_start(46) { return 9; }
+    if !is_postfix_start(63) { return 10; }
+    if is_postfix_start(44) { return 11; }
+
+    if postfix_consumes_tokens(0) != 1 { return 12; }
+    if postfix_consumes_tokens(1) != 3 { return 13; }
+    if postfix_consumes_tokens(2) != 2 { return 14; }
+
+    if !postfix_needs_closing(0) { return 15; }
+    if !postfix_needs_closing(4) { return 16; }
+    if postfix_needs_closing(2) { return 17; }
+    if postfix_needs_closing(5) { return 18; }
+
+    if closing_token_for(0) != 41 { return 19; }
+    if closing_token_for(4) != 93 { return 20; }
+
+    return 0;
+}

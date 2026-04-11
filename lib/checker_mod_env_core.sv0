@@ -1,0 +1,65 @@
+// Surrogate for checker.sml modEnvFromProg: builtin function registration.
+// SML reference: sml/type_checker/checker.sml (modEnvFromProg function)
+// Models the initial environment population: intrinsic functions,
+// use-clause imports, and enum constructor registration.
+
+fn builtin_fn_count() -> i32 { return 11; }
+
+fn is_intrinsic_fn(fn_tag: i32) -> bool {
+    return fn_tag >= 0 && fn_tag < builtin_fn_count();
+}
+
+fn intrinsic_arg_count(fn_tag: i32) -> i32 {
+    if fn_tag == 0 { return 1; }
+    if fn_tag == 1 { return 1; }
+    if fn_tag == 2 { return 2; }
+    if fn_tag == 3 { return 2; }
+    if fn_tag == 4 { return 2; }
+    if fn_tag == 5 { return 3; }
+    if fn_tag == 6 { return 0; }
+    if fn_tag == 7 { return 2; }
+    if fn_tag == 8 { return 1; }
+    if fn_tag == 9 { return 2; }
+    if fn_tag == 10 { return 3; }
+    return -1;
+}
+
+fn use_clause_kind(has_module: bool, has_name: bool) -> i32 {
+    if has_module && has_name { return 0; }
+    if has_module { return 1; }
+    return -1;
+}
+
+fn ctor_env_entries(variant_count: i32) -> i32 {
+    return variant_count;
+}
+
+fn total_env_entries(builtins: i32, use_imports: i32, ctors: i32, fns: i32) -> i32 {
+    return builtins + use_imports + ctors + fns;
+}
+
+fn main() -> i32 {
+    if builtin_fn_count() != 11 { return 1; }
+
+    if !is_intrinsic_fn(0) { return 2; }
+    if !is_intrinsic_fn(10) { return 3; }
+    if is_intrinsic_fn(11) { return 4; }
+    if is_intrinsic_fn(-1) { return 5; }
+
+    if intrinsic_arg_count(0) != 1 { return 6; }
+    if intrinsic_arg_count(2) != 2 { return 7; }
+    if intrinsic_arg_count(6) != 0 { return 8; }
+    if intrinsic_arg_count(99) != -1 { return 9; }
+
+    if use_clause_kind(true, true) != 0 { return 10; }
+    if use_clause_kind(true, false) != 1 { return 11; }
+    if use_clause_kind(false, false) != -1 { return 12; }
+
+    if ctor_env_entries(3) != 3 { return 13; }
+    if ctor_env_entries(0) != 0 { return 14; }
+
+    if total_env_entries(11, 2, 5, 3) != 21 { return 15; }
+    if total_env_entries(0, 0, 0, 0) != 0 { return 16; }
+
+    return 0;
+}

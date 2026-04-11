@@ -1,0 +1,88 @@
+// Surrogate for parser.sml parseBlock + tryStmt: block/statement classification.
+// SML reference: sml/parser/parser.sml (parseBlock, tryStmt, parseLetStmt)
+// Models how the parser classifies the next token as a statement kind.
+
+fn stmt_kind_from_token(token_tag: i32) -> i32 {
+    if token_tag == 20 { return 0; }
+    if token_tag == 10 { return 1; }
+    if token_tag == 12 { return 2; }
+    if token_tag == 13 { return 3; }
+    if token_tag == 14 { return 4; }
+    if token_tag == 16 { return 5; }
+    if token_tag == 59 { return 6; }
+    return 7;
+}
+
+fn is_let_stmt(token_tag: i32) -> bool {
+    return token_tag == 20;
+}
+
+fn let_has_mut(next_tag: i32) -> bool {
+    return next_tag == 21;
+}
+
+fn let_has_type_annotation(colon_tag: i32) -> bool {
+    return colon_tag == 58;
+}
+
+fn let_has_initializer(eq_tag: i32) -> bool {
+    return eq_tag == 61;
+}
+
+fn block_trailing_expr(last_has_semi: bool) -> bool {
+    return !last_has_semi;
+}
+
+fn is_block_end(token_tag: i32) -> bool {
+    return token_tag == 125;
+}
+
+fn stmt_needs_semicolon(kind: i32) -> bool {
+    if kind == 0 { return true; }
+    if kind == 6 { return false; }
+    if kind == 7 { return true; }
+    return false;
+}
+
+fn count_stmts_in_block(s0: bool, s1: bool, s2: bool, s3: bool) -> i32 {
+    let mut count: i32 = 0;
+    if s0 { count = count + 1; }
+    if s1 { count = count + 1; }
+    if s2 { count = count + 1; }
+    if s3 { count = count + 1; }
+    return count;
+}
+
+fn main() -> i32 {
+    if stmt_kind_from_token(20) != 0 { return 1; }
+    if stmt_kind_from_token(10) != 1 { return 2; }
+    if stmt_kind_from_token(59) != 6 { return 3; }
+    if stmt_kind_from_token(99) != 7 { return 4; }
+
+    if !is_let_stmt(20) { return 5; }
+    if is_let_stmt(10) { return 6; }
+
+    if !let_has_mut(21) { return 7; }
+    if let_has_mut(20) { return 8; }
+
+    if !let_has_type_annotation(58) { return 9; }
+    if let_has_type_annotation(61) { return 10; }
+
+    if !let_has_initializer(61) { return 11; }
+    if let_has_initializer(59) { return 12; }
+
+    if !block_trailing_expr(false) { return 13; }
+    if block_trailing_expr(true) { return 14; }
+
+    if !is_block_end(125) { return 15; }
+    if is_block_end(123) { return 16; }
+
+    if !stmt_needs_semicolon(0) { return 17; }
+    if stmt_needs_semicolon(6) { return 18; }
+    if !stmt_needs_semicolon(7) { return 19; }
+
+    if count_stmts_in_block(true, true, false, false) != 2 { return 20; }
+    if count_stmts_in_block(true, true, true, true) != 4 { return 21; }
+
+    return 0;
+}

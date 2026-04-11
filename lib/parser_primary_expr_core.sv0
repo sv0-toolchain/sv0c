@@ -1,0 +1,73 @@
+// Surrogate for parser.sml parsePrimaryExpr: token→expression kind dispatch.
+// SML reference: sml/parser/parser.sml lines 599-714
+// Maps leading token to ExprXxx constructor tag based on keyword/punct.
+
+fn primary_expr_tag(token_tag: i32) -> i32 {
+    if token_tag == 1 { return 0; }
+    if token_tag == 2 { return 0; }
+    if token_tag == 3 { return 1; }
+    if token_tag == 4 { return 1; }
+    if token_tag == 5 { return 1; }
+    if token_tag == 6 { return 2; }
+    if token_tag == 40 { return 3; }
+    if token_tag == 91 { return 4; }
+    if token_tag == 123 { return 5; }
+    if token_tag == 10 { return 6; }
+    if token_tag == 11 { return 7; }
+    if token_tag == 12 { return 8; }
+    if token_tag == 13 { return 9; }
+    if token_tag == 14 { return 10; }
+    if token_tag == 15 { return 11; }
+    if token_tag == 16 { return 12; }
+    if token_tag == 17 { return 13; }
+    return -1;
+}
+
+fn is_literal_token(token_tag: i32) -> bool {
+    if token_tag >= 1 && token_tag <= 6 { return true; }
+    return false;
+}
+
+fn is_block_starter(token_tag: i32) -> bool {
+    return token_tag == 123;
+}
+
+fn is_control_flow(token_tag: i32) -> bool {
+    if token_tag == 10 { return true; }
+    if token_tag == 11 { return true; }
+    if token_tag == 12 { return true; }
+    if token_tag == 13 { return true; }
+    if token_tag == 14 { return true; }
+    if token_tag == 15 { return true; }
+    if token_tag == 16 { return true; }
+    return false;
+}
+
+fn struct_or_path(allow_struct: bool, next_is_lbrace: bool) -> i32 {
+    if allow_struct && next_is_lbrace { return 0; }
+    return 1;
+}
+
+fn main() -> i32 {
+    if primary_expr_tag(1) != 0 { return 1; }
+    if primary_expr_tag(123) != 5 { return 2; }
+    if primary_expr_tag(10) != 6 { return 3; }
+    if primary_expr_tag(99) != -1 { return 4; }
+
+    if !is_literal_token(1) { return 5; }
+    if !is_literal_token(6) { return 6; }
+    if is_literal_token(7) { return 7; }
+
+    if !is_block_starter(123) { return 8; }
+    if is_block_starter(40) { return 9; }
+
+    if !is_control_flow(10) { return 10; }
+    if !is_control_flow(16) { return 11; }
+    if is_control_flow(1) { return 12; }
+
+    if struct_or_path(true, true) != 0 { return 13; }
+    if struct_or_path(false, true) != 1 { return 14; }
+    if struct_or_path(true, false) != 1 { return 15; }
+
+    return 0;
+}

@@ -1,0 +1,72 @@
+// Surrogate for parser.sml parseEnumItem: variant parsing and structure.
+// SML reference: sml/parser/parser.sml (parseEnumItem function)
+// Models variant kind detection (unit / tuple / struct) and counting.
+
+fn variant_kind_from_token(after_name_tag: i32) -> i32 {
+    if after_name_tag == 40 { return 1; }
+    if after_name_tag == 123 { return 2; }
+    return 0;
+}
+
+fn variant_has_payload(kind: i32) -> bool {
+    return kind != 0;
+}
+
+fn variant_field_count(kind: i32, tuple_fields: i32, struct_fields: i32) -> i32 {
+    if kind == 0 { return 0; }
+    if kind == 1 { return tuple_fields; }
+    if kind == 2 { return struct_fields; }
+    return 0;
+}
+
+fn count_variants(v0: bool, v1: bool, v2: bool, v3: bool, v4: bool, v5: bool) -> i32 {
+    let mut count: i32 = 0;
+    if v0 { count = count + 1; }
+    if v1 { count = count + 1; }
+    if v2 { count = count + 1; }
+    if v3 { count = count + 1; }
+    if v4 { count = count + 1; }
+    if v5 { count = count + 1; }
+    return count;
+}
+
+fn is_variant_separator(token_tag: i32) -> bool {
+    return token_tag == 44;
+}
+
+fn is_enum_end(token_tag: i32) -> bool {
+    return token_tag == 125;
+}
+
+fn enum_needs_generic_params(has_lt: bool) -> bool {
+    return has_lt;
+}
+
+fn main() -> i32 {
+    if variant_kind_from_token(40) != 1 { return 1; }
+    if variant_kind_from_token(123) != 2 { return 2; }
+    if variant_kind_from_token(44) != 0 { return 3; }
+    if variant_kind_from_token(125) != 0 { return 4; }
+
+    if !variant_has_payload(1) { return 5; }
+    if !variant_has_payload(2) { return 6; }
+    if variant_has_payload(0) { return 7; }
+
+    if variant_field_count(0, 3, 2) != 0 { return 8; }
+    if variant_field_count(1, 3, 2) != 3 { return 9; }
+    if variant_field_count(2, 3, 2) != 2 { return 10; }
+
+    if count_variants(true, true, true, false, false, false) != 3 { return 11; }
+    if count_variants(true, true, true, true, true, true) != 6 { return 12; }
+
+    if !is_variant_separator(44) { return 13; }
+    if is_variant_separator(59) { return 14; }
+
+    if !is_enum_end(125) { return 15; }
+    if is_enum_end(44) { return 16; }
+
+    if !enum_needs_generic_params(true) { return 17; }
+    if enum_needs_generic_params(false) { return 18; }
+
+    return 0;
+}
