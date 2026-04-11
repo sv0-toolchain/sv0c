@@ -1,0 +1,89 @@
+/* Surrogate for lexer.sml scanOp: operator character→token classification.
+   SML reference: sml/lexer/lexer.sml lines 291-384
+   Maps first character + optional lookahead to token tag and width (1/2/3).
+   Character codes: '('=40, ')'=41, '{'=123, '}'=125, '['=91, ']'=93,
+   ','=44, ';'=59, '#'=35, '~'=126, '?'=63, ':'=58, '.'=46,
+   '+'=43, '-'=45, '*'=42, '/'=47, '%'=37, '='=61, '!'=33,
+   '<'=60, '>'=62, '&'=38, '|'=124, '^'=94 */
+
+fn is_single_char_op(c: i32) -> bool {
+    if c == 40 || c == 41 { return true; }
+    if c == 123 || c == 125 { return true; }
+    if c == 91 || c == 93 { return true; }
+    if c == 44 || c == 59 { return true; }
+    if c == 35 || c == 126 || c == 63 { return true; }
+    return false;
+}
+
+fn can_have_second(c: i32) -> bool {
+    if c == 58 || c == 46 { return true; }
+    if c == 43 || c == 45 || c == 42 || c == 47 || c == 37 { return true; }
+    if c == 61 || c == 33 { return true; }
+    if c == 60 || c == 62 { return true; }
+    if c == 38 || c == 124 || c == 94 { return true; }
+    return false;
+}
+
+fn op_width(c1: i32, c2: i32, c3: i32) -> i32 {
+    if is_single_char_op(c1) { return 1; }
+    if c1 == 46 && c2 == 46 && c3 == 61 { return 3; }
+    if c1 == 46 && c2 == 46 { return 2; }
+    if c1 == 60 && c2 == 60 && c3 == 61 { return 3; }
+    if c1 == 62 && c2 == 62 && c3 == 61 { return 3; }
+    if c1 == 60 && c2 == 60 { return 2; }
+    if c1 == 62 && c2 == 62 { return 2; }
+    if c1 == 58 && c2 == 58 { return 2; }
+    if c1 == 45 && c2 == 62 { return 2; }
+    if c1 == 61 && c2 == 61 { return 2; }
+    if c1 == 61 && c2 == 62 { return 2; }
+    if c1 == 33 && c2 == 61 { return 2; }
+    if c1 == 60 && c2 == 61 { return 2; }
+    if c1 == 62 && c2 == 61 { return 2; }
+    if c1 == 38 && c2 == 38 { return 2; }
+    if c1 == 124 && c2 == 124 { return 2; }
+    if c2 == 61 && can_have_second(c1) { return 2; }
+    return 1;
+}
+
+fn single_char_token_tag(c: i32) -> i32 {
+    if c == 40 { return 1; }
+    if c == 41 { return 2; }
+    if c == 123 { return 3; }
+    if c == 125 { return 4; }
+    if c == 91 { return 5; }
+    if c == 93 { return 6; }
+    if c == 44 { return 7; }
+    if c == 59 { return 8; }
+    if c == 35 { return 9; }
+    if c == 126 { return 10; }
+    if c == 63 { return 11; }
+    return 0;
+}
+
+fn main() -> i32 {
+    if !is_single_char_op(40) { return 1; }
+    if !is_single_char_op(93) { return 2; }
+    if is_single_char_op(61) { return 3; }
+
+    if !can_have_second(61) { return 4; }
+    if !can_have_second(60) { return 5; }
+    if can_have_second(40) { return 6; }
+
+    if op_width(40, 0, 0) != 1 { return 10; }
+    if op_width(58, 58, 0) != 2 { return 11; }
+    if op_width(46, 46, 61) != 3 { return 12; }
+    if op_width(46, 46, 0) != 2 { return 13; }
+    if op_width(45, 62, 0) != 2 { return 14; }
+    if op_width(61, 61, 0) != 2 { return 15; }
+    if op_width(60, 60, 61) != 3 { return 16; }
+    if op_width(60, 60, 0) != 2 { return 17; }
+    if op_width(43, 61, 0) != 2 { return 18; }
+    if op_width(43, 0, 0) != 1 { return 19; }
+
+    if single_char_token_tag(40) != 1 { return 20; }
+    if single_char_token_tag(125) != 4 { return 21; }
+    if single_char_token_tag(63) != 11 { return 22; }
+    if single_char_token_tag(61) != 0 { return 23; }
+
+    return 0;
+}

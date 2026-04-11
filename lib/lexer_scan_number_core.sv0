@@ -1,0 +1,88 @@
+/* Surrogate for lexer.sml scanNumber: numeric literal base/float classification.
+   SML reference: sml/lexer/lexer.sml lines 143-235
+   Detects base from prefix (0x=Hex, 0b=Bin, 0o=Oct, else Dec).
+   Detects float from '.' or 'e'/'E' exponent. */
+
+fn detect_base(first: i32, second: i32) -> i32 {
+    if first != 48 { return 0; }
+    if second == 120 || second == 88 { return 1; }
+    if second == 98 || second == 66 { return 2; }
+    if second == 111 || second == 79 { return 3; }
+    return 0;
+}
+
+fn base_prefix_len(base: i32) -> i32 {
+    if base == 0 { return 0; }
+    return 2;
+}
+
+fn is_digit_for_base(base: i32, c: i32) -> bool {
+    if base == 1 {
+        if c >= 48 && c <= 57 { return true; }
+        if c >= 65 && c <= 70 { return true; }
+        if c >= 97 && c <= 102 { return true; }
+        return false;
+    }
+    if base == 2 { return c == 48 || c == 49; }
+    if base == 3 { return c >= 48 && c <= 55; }
+    return c >= 48 && c <= 57;
+}
+
+fn is_float_dot(base: i32, dot_char: i32, next_after_dot: i32) -> bool {
+    if base != 0 { return false; }
+    if dot_char != 46 { return false; }
+    return next_after_dot >= 48 && next_after_dot <= 57;
+}
+
+fn is_exponent_start(base: i32, c: i32) -> bool {
+    if base != 0 { return false; }
+    return c == 101 || c == 69;
+}
+
+fn is_sign_char(c: i32) -> bool {
+    return c == 43 || c == 45;
+}
+
+fn number_result_tag(is_float: bool) -> i32 {
+    if is_float { return 1; }
+    return 0;
+}
+
+fn main() -> i32 {
+    if detect_base(48, 120) != 1 { return 1; }
+    if detect_base(48, 88) != 1 { return 2; }
+    if detect_base(48, 98) != 2 { return 3; }
+    if detect_base(48, 111) != 3 { return 4; }
+    if detect_base(48, 48) != 0 { return 5; }
+    if detect_base(49, 120) != 0 { return 6; }
+
+    if base_prefix_len(0) != 0 { return 7; }
+    if base_prefix_len(1) != 2 { return 8; }
+
+    if !is_digit_for_base(0, 53) { return 10; }
+    if is_digit_for_base(0, 65) { return 11; }
+    if !is_digit_for_base(1, 65) { return 12; }
+    if !is_digit_for_base(1, 102) { return 13; }
+    if is_digit_for_base(2, 50) { return 14; }
+    if !is_digit_for_base(2, 49) { return 15; }
+    if !is_digit_for_base(3, 55) { return 16; }
+    if is_digit_for_base(3, 56) { return 17; }
+
+    if !is_float_dot(0, 46, 53) { return 20; }
+    if is_float_dot(1, 46, 53) { return 21; }
+    if is_float_dot(0, 46, 65) { return 22; }
+    if is_float_dot(0, 44, 53) { return 23; }
+
+    if !is_exponent_start(0, 101) { return 25; }
+    if !is_exponent_start(0, 69) { return 26; }
+    if is_exponent_start(1, 101) { return 27; }
+
+    if !is_sign_char(43) { return 28; }
+    if !is_sign_char(45) { return 29; }
+    if is_sign_char(48) { return 30; }
+
+    if number_result_tag(true) != 1 { return 31; }
+    if number_result_tag(false) != 0 { return 32; }
+
+    return 0;
+}

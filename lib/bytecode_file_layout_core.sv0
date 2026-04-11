@@ -1,0 +1,75 @@
+/* Surrogate for bytecode.sml encodeFile/decodeFile: .sv0b container layout math.
+   SML reference: sml/backend/vm/bytecode.sml lines 421-501
+   Container format: [header 6B] [strSection] [funcSection] [codeSection]
+   Each section is prefixed by a u32 length. Func record = 5 x u32 = 20B. */
+
+fn header_size() -> i32 { return 6; }
+
+fn func_record_bytes() -> i32 { return 20; }
+
+fn string_section_size(pool_payload_bytes: i32) -> i32 {
+    return 4 + pool_payload_bytes;
+}
+
+fn func_section_size(func_count: i32) -> i32 {
+    return 4 + 4 + func_count * func_record_bytes();
+}
+
+fn code_section_size(code_blob_bytes: i32) -> i32 {
+    return 4 + code_blob_bytes;
+}
+
+fn total_file_size(pool_bytes: i32, func_count: i32, code_bytes: i32) -> i32 {
+    return header_size()
+         + string_section_size(pool_bytes)
+         + func_section_size(func_count)
+         + code_section_size(code_bytes);
+}
+
+fn str_section_offset() -> i32 { return header_size(); }
+
+fn func_section_offset(pool_bytes: i32) -> i32 {
+    return header_size() + string_section_size(pool_bytes);
+}
+
+fn code_section_offset(pool_bytes: i32, func_count: i32) -> i32 {
+    return func_section_offset(pool_bytes) + func_section_size(func_count);
+}
+
+fn func_record_offset(base: i32, index: i32) -> i32 {
+    return base + 4 + 4 + index * func_record_bytes();
+}
+
+fn func_code_end_offset(func_offset: i32, func_code_len: i32) -> i32 {
+    return func_offset + func_code_len;
+}
+
+fn main() -> i32 {
+    if header_size() != 6 { return 1; }
+    if func_record_bytes() != 20 { return 2; }
+
+    if string_section_size(0) != 4 { return 3; }
+    if string_section_size(100) != 104 { return 4; }
+
+    if func_section_size(0) != 8 { return 5; }
+    if func_section_size(1) != 28 { return 6; }
+    if func_section_size(3) != 68 { return 7; }
+
+    if code_section_size(0) != 4 { return 8; }
+    if code_section_size(50) != 54 { return 9; }
+
+    if total_file_size(0, 0, 0) != 18 { return 10; }
+    if total_file_size(100, 3, 50) != 232 { return 11; }
+
+    if str_section_offset() != 6 { return 12; }
+    if func_section_offset(100) != 110 { return 13; }
+    if code_section_offset(100, 3) != 178 { return 14; }
+
+    if func_record_offset(110, 0) != 118 { return 15; }
+    if func_record_offset(110, 1) != 138 { return 16; }
+    if func_record_offset(110, 2) != 158 { return 17; }
+
+    if func_code_end_offset(0, 25) != 25 { return 18; }
+
+    return 0;
+}

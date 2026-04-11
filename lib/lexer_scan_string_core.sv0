@@ -1,0 +1,86 @@
+/* Surrogate for lexer.sml scanEscape + scanString: escape character dispatch.
+   SML reference: sml/lexer/lexer.sml lines 237-278
+   Maps escape char after '\' to result: n→10, t→9, r→13, \\→92, "→34,
+   '→39, 0→0. Hex escape \xHH → 2 extra chars consumed. */
+
+fn escape_result(c: i32) -> i32 {
+    if c == 110 { return 10; }
+    if c == 116 { return 9; }
+    if c == 114 { return 13; }
+    if c == 92 { return 92; }
+    if c == 34 { return 34; }
+    if c == 39 { return 39; }
+    if c == 48 { return 0; }
+    if c == 120 { return -1; }
+    return c;
+}
+
+fn escape_is_hex(c: i32) -> bool {
+    return c == 120;
+}
+
+fn escape_chars_consumed(c: i32) -> i32 {
+    if c == 120 { return 4; }
+    return 2;
+}
+
+fn hex_digit_value(c: i32) -> i32 {
+    if c >= 48 && c <= 57 { return c - 48; }
+    if c >= 65 && c <= 70 { return c - 55; }
+    if c >= 97 && c <= 102 { return c - 87; }
+    return 0;
+}
+
+fn hex_escape_value(d1: i32, d2: i32) -> i32 {
+    return hex_digit_value(d1) * 16 + hex_digit_value(d2);
+}
+
+fn string_scan_advance(c: i32) -> i32 {
+    if c == 34 { return 0; }
+    if c == 92 { return 2; }
+    return 1;
+}
+
+fn count_string_chars(c0: i32, c1: i32, c2: i32, c3: i32) -> i32 {
+    let mut count: i32 = 0;
+    if c0 != 34 && c0 != 0 { count = count + 1; }
+    if c1 != 34 && c1 != 0 { count = count + 1; }
+    if c2 != 34 && c2 != 0 { count = count + 1; }
+    if c3 != 34 && c3 != 0 { count = count + 1; }
+    return count;
+}
+
+fn main() -> i32 {
+    if escape_result(110) != 10 { return 1; }
+    if escape_result(116) != 9 { return 2; }
+    if escape_result(114) != 13 { return 3; }
+    if escape_result(92) != 92 { return 4; }
+    if escape_result(34) != 34 { return 5; }
+    if escape_result(48) != 0 { return 6; }
+    if escape_result(120) != -1 { return 7; }
+    if escape_result(65) != 65 { return 8; }
+
+    if !escape_is_hex(120) { return 10; }
+    if escape_is_hex(110) { return 11; }
+
+    if escape_chars_consumed(110) != 2 { return 12; }
+    if escape_chars_consumed(120) != 4 { return 13; }
+
+    if hex_digit_value(48) != 0 { return 14; }
+    if hex_digit_value(57) != 9 { return 15; }
+    if hex_digit_value(65) != 10 { return 16; }
+    if hex_digit_value(70) != 15 { return 17; }
+    if hex_digit_value(97) != 10 { return 18; }
+
+    if hex_escape_value(52, 49) != 65 { return 19; }
+    if hex_escape_value(48, 65) != 10 { return 20; }
+
+    if string_scan_advance(34) != 0 { return 21; }
+    if string_scan_advance(92) != 2 { return 22; }
+    if string_scan_advance(65) != 1 { return 23; }
+
+    if count_string_chars(72, 105, 34, 0) != 2 { return 24; }
+    if count_string_chars(65, 66, 67, 68) != 4 { return 25; }
+
+    return 0;
+}

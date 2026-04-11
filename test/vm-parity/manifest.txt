@@ -148,3 +148,9 @@ lib/vm_codegen_local_scan_core.sv0
 lib/vm_codegen_call_nargs_core.sv0
 lib/parser_expr_span_core.sv0
 lib/parser_prec_core.sv0
+lib/bytecode_decode_insn_core.sv0
+lib/bytecode_file_layout_core.sv0
+lib/lexer_skip_comment_core.sv0
+lib/lexer_scan_number_core.sv0
+lib/lexer_scan_op_core.sv0
+lib/lexer_scan_string_core.sv0

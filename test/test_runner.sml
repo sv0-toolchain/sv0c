@@ -916,6 +916,18 @@ structure TestRunner = struct
                  (goldenPassCompileRun "parser_expr_span_core")
       val () = check "golden pass parser_prec_core compile+run"
                  (goldenPassCompileRun "parser_prec_core")
+      val () = check "golden pass bytecode_decode_insn_core compile+run"
+                 (goldenPassCompileRun "bytecode_decode_insn_core")
+      val () = check "golden pass bytecode_file_layout_core compile+run"
+                 (goldenPassCompileRun "bytecode_file_layout_core")
+      val () = check "golden pass lexer_skip_comment_core compile+run"
+                 (goldenPassCompileRun "lexer_skip_comment_core")
+      val () = check "golden pass lexer_scan_number_core compile+run"
+                 (goldenPassCompileRun "lexer_scan_number_core")
+      val () = check "golden pass lexer_scan_op_core compile+run"
+                 (goldenPassCompileRun "lexer_scan_op_core")
+      val () = check "golden pass lexer_scan_string_core compile+run"
+                 (goldenPassCompileRun "lexer_scan_string_core")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

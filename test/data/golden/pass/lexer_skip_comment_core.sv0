@@ -1,0 +1,55 @@
+// Surrogate for lexer.sml skipBlockComment: nested block comment depth tracking.
+// SML reference: sml/lexer/lexer.sml lines 93-108
+// Block comments nest: /x ... /x ... x/ ... x/ is valid (x=*).
+// Depth increases on '/' '*', decreases on '*' '/'.
+
+fn update_depth(cur_char: i32, next_char: i32, depth: i32) -> i32 {
+    if cur_char == 47 && next_char == 42 { return depth + 1; }
+    if cur_char == 42 && next_char == 47 { return depth - 1; }
+    return depth;
+}
+
+fn chars_consumed(cur_char: i32, next_char: i32) -> i32 {
+    if cur_char == 47 && next_char == 42 { return 2; }
+    if cur_char == 42 && next_char == 47 { return 2; }
+    return 1;
+}
+
+fn is_comment_done(depth: i32) -> bool {
+    return depth == 0;
+}
+
+fn simulate_comment(c0: i32, n0: i32, c1: i32, n1: i32, c2: i32, n2: i32, c3: i32, n3: i32) -> i32 {
+    let mut depth: i32 = 1;
+    depth = update_depth(c0, n0, depth);
+    if is_comment_done(depth) { return 1; }
+    depth = update_depth(c1, n1, depth);
+    if is_comment_done(depth) { return 2; }
+    depth = update_depth(c2, n2, depth);
+    if is_comment_done(depth) { return 3; }
+    depth = update_depth(c3, n3, depth);
+    if is_comment_done(depth) { return 4; }
+    return 0;
+}
+
+fn main() -> i32 {
+    if update_depth(47, 42, 1) != 2 { return 1; }
+    if update_depth(42, 47, 2) != 1 { return 2; }
+    if update_depth(42, 47, 1) != 0 { return 3; }
+    if update_depth(65, 66, 1) != 1 { return 4; }
+
+    if chars_consumed(47, 42) != 2 { return 5; }
+    if chars_consumed(42, 47) != 2 { return 6; }
+    if chars_consumed(65, 66) != 1 { return 7; }
+
+    if !is_comment_done(0) { return 8; }
+    if is_comment_done(1) { return 9; }
+
+    let r1: i32 = simulate_comment(65, 66, 42, 47, 0, 0, 0, 0);
+    if r1 != 2 { return 10; }
+
+    let r2: i32 = simulate_comment(47, 42, 65, 66, 42, 47, 42, 47);
+    if r2 != 4 { return 11; }
+
+    return 0;
+}
