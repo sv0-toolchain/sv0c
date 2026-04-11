@@ -940,6 +940,14 @@ structure TestRunner = struct
                  (goldenPassCompileRun "parser_primary_expr_core")
       val () = check "golden pass parser_postfix_expr_core compile+run"
                  (goldenPassCompileRun "parser_postfix_expr_core")
+      val () = check "golden pass parser_if_expr_core compile+run"
+                 (goldenPassCompileRun "parser_if_expr_core")
+      val () = check "golden pass parser_match_expr_core compile+run"
+                 (goldenPassCompileRun "parser_match_expr_core")
+      val () = check "golden pass parser_struct_item_core compile+run"
+                 (goldenPassCompileRun "parser_struct_item_core")
+      val () = check "golden pass parser_unary_expr_core compile+run"
+                 (goldenPassCompileRun "parser_unary_expr_core")
       val () = check "golden pass parser_enum_item_core compile+run"
                  (goldenPassCompileRun "parser_enum_item_core")
       val () = check "golden pass parser_block_stmt_core compile+run"

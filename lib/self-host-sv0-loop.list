@@ -284,3 +284,7 @@ lib/main_argv_core.sv0
 lib/lexer_keyword_core.sv0
 lib/lexer_scan_ident_core.sv0
 lib/lexer_scan_char_core.sv0
+lib/parser_if_expr_core.sv0
+lib/parser_match_expr_core.sv0
+lib/parser_struct_item_core.sv0
+lib/parser_unary_expr_core.sv0

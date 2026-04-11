@@ -1,0 +1,75 @@
+// Surrogate for parser.sml parseMatchExpr + parseMatchArms
+// Models the match expression structure: scrutinee, arm list, and arm components.
+
+fn match_arm_parts(has_guard: bool) -> i32 {
+    if has_guard { return 3; }   // pattern + guard + body
+    return 2;                     // pattern + body
+}
+
+fn match_arm_body_kind(starts_with_lbrace: bool) -> i32 {
+    if starts_with_lbrace { return 1; }   // block body
+    return 0;                              // expression body
+}
+
+fn match_arm_needs_comma(next_is_rbrace: bool) -> bool {
+    return !next_is_rbrace;
+}
+
+fn count_arms(a0: bool, a1: bool, a2: bool, a3: bool, a4: bool) -> i32 {
+    let mut count: i32 = 0;
+    if a0 { count = count + 1; }
+    if a1 { count = count + 1; }
+    if a2 { count = count + 1; }
+    if a3 { count = count + 1; }
+    if a4 { count = count + 1; }
+    return count;
+}
+
+fn match_expects_lbrace() -> bool {
+    return true;
+}
+
+fn match_expects_rbrace() -> bool {
+    return true;
+}
+
+fn match_ast_tag() -> i32 {
+    return 11;  // ExprMatch tag
+}
+
+fn is_fatarrow(token_tag: i32) -> bool {
+    return token_tag == 60;  // => token
+}
+
+fn main() -> i32 {
+    // arm parts
+    if match_arm_parts(false) != 2 { return 1; }
+    if match_arm_parts(true) != 3 { return 2; }
+
+    // body kind
+    if match_arm_body_kind(true) != 1 { return 10; }
+    if match_arm_body_kind(false) != 0 { return 11; }
+
+    // comma needed
+    if !match_arm_needs_comma(false) { return 20; }
+    if match_arm_needs_comma(true) { return 21; }
+
+    // count arms
+    if count_arms(true, true, true, false, false) != 3 { return 30; }
+    if count_arms(true, true, true, true, true) != 5 { return 31; }
+    if count_arms(false, false, false, false, false) != 0 { return 32; }
+    if count_arms(true, false, false, false, false) != 1 { return 33; }
+
+    // expectations
+    if !match_expects_lbrace() { return 40; }
+    if !match_expects_rbrace() { return 41; }
+
+    // ast tag
+    if match_ast_tag() != 11 { return 50; }
+
+    // fatarrow check
+    if !is_fatarrow(60) { return 60; }
+    if is_fatarrow(61) { return 61; }
+
+    return 0;
+}
