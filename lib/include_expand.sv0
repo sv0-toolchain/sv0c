@@ -1,0 +1,114 @@
+/* Phase 2 real pipeline module: sml/include_expand.sml -> sv0.
+   Textual include expansion helpers: character classification, path
+   validation, include-line parsing. SML reference: 102 lines —
+   isSpace, trim, chompCR, pathOk, parseIncludeLine, expand. */
+
+fn is_space(c: i32) -> bool {
+    if c == 32 { return true; }
+    if c == 9 { return true; }
+    if c == 10 { return true; }
+    if c == 11 { return true; }
+    if c == 12 { return true; }
+    return false;
+}
+
+fn path_ok(rel: string) -> bool {
+    let len: i32 = string_len(rel);
+    if len == 0 { return false; }
+    let first: i32 = string_char_at(rel, 0);
+    if first == 47 { return false; }
+    let mut i: i32 = 0;
+    while i < len - 1 {
+        let c0: i32 = string_char_at(rel, i);
+        let c1: i32 = string_char_at(rel, i + 1);
+        if c0 == 46 {
+            if c1 == 46 { return false; }
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn has_include_prefix(line: string) -> bool {
+    let len: i32 = string_len(line);
+    if len < 10 { return false; }
+    let prefix: string = string_substr(line, 0, 9);
+    return string_eq(prefix, "include \"");
+}
+
+fn find_closing_quote(s: string, start: i32) -> i32 {
+    let len: i32 = string_len(s);
+    let mut i: i32 = start;
+    while i < len {
+        let c: i32 = string_char_at(s, i);
+        if c == 34 { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn chomp_cr(line: string) -> i32 {
+    let len: i32 = string_len(line);
+    if len == 0 { return len; }
+    let last: i32 = string_char_at(line, len - 1);
+    if last == 13 { return len - 1; }
+    return len;
+}
+
+fn test_is_space() -> i32 {
+    if is_space(32) != true { return 1; }
+    if is_space(9) != true { return 2; }
+    if is_space(10) != true { return 3; }
+    if is_space(11) != true { return 4; }
+    if is_space(12) != true { return 5; }
+    if is_space(65) != false { return 6; }
+    if is_space(0) != false { return 7; }
+    if is_space(48) != false { return 8; }
+    return 0;
+}
+
+fn test_path_ok() -> i32 {
+    if path_ok("foo.sv0") != true { return 1; }
+    if path_ok("src/foo.sv0") != true { return 2; }
+    if path_ok("") != false { return 3; }
+    if path_ok("/abs/path") != false { return 4; }
+    if path_ok("../escape") != false { return 5; }
+    if path_ok("foo/../bar") != false { return 6; }
+    if path_ok("a.b") != true { return 7; }
+    return 0;
+}
+
+fn test_has_include_prefix() -> i32 {
+    if has_include_prefix("include \"foo.sv0\";") != true { return 1; }
+    if has_include_prefix("let x = 1;") != false { return 2; }
+    if has_include_prefix("include") != false { return 3; }
+    if has_include_prefix("") != false { return 4; }
+    return 0;
+}
+
+fn test_find_closing_quote() -> i32 {
+    if find_closing_quote("hello\"world", 0) != 5 { return 1; }
+    if find_closing_quote("noquote", 0) != 0 - 1 { return 2; }
+    if find_closing_quote("a\"b\"c", 2) != 3 { return 3; }
+    return 0;
+}
+
+fn test_chomp_cr() -> i32 {
+    if chomp_cr("hello") != 5 { return 1; }
+    if chomp_cr("") != 0 { return 2; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_is_space();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_path_ok();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_has_include_prefix();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_find_closing_quote();
+    if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_chomp_cr();
+    if r5 != 0 { return 40 + r5; }
+    return 0;
+}

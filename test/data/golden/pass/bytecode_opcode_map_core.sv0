@@ -1,0 +1,85 @@
+/* Surrogate for bytecode.sml opcode mapping and container format.
+   SML reference: sml/backend/vm/bytecode.sml
+     Magic bytes: S(83) V(86) 0(48) B(66)
+     Format version: 1
+     Section counts: header(8) + string_pool_header(4) + func_table_header(4)
+     Arithmetic opcodes: ADD_I32(9)..NEG_F64(24)
+     Comparison: EQ(25)..GTE(30)
+     Logic: AND(31) OR(32) NOT(33) */
+
+fn magic_byte(idx: i32) -> i32 {
+    if idx == 0 { return 83; }
+    if idx == 1 { return 86; }
+    if idx == 2 { return 48; }
+    if idx == 3 { return 66; }
+    return 0;
+}
+
+fn format_version() -> i32 {
+    return 1;
+}
+
+fn header_size() -> i32 {
+    return 8;
+}
+
+fn opcode_class(op: i32) -> i32 {
+    if op >= 9 {
+        if op <= 24 { return 0; }
+    }
+    if op >= 25 {
+        if op <= 30 { return 1; }
+    }
+    if op >= 31 {
+        if op <= 33 { return 2; }
+    }
+    if op >= 34 {
+        if op <= 35 { return 3; }
+    }
+    if op == 36 { return 4; }
+    if op == 37 { return 4; }
+    return 255;
+}
+
+fn arith_op_count() -> i32 { return 16; }
+fn cmp_op_count() -> i32 { return 6; }
+fn logic_op_count() -> i32 { return 3; }
+fn bitwise_op_count() -> i32 { return 2; }
+
+fn string_pool_entry_size(str_len: i32) -> i32 {
+    return 4 + str_len;
+}
+
+fn func_entry_header_size() -> i32 {
+    return 4 + 2 + 2 + 4;
+}
+
+fn main() -> i32 {
+    if magic_byte(0) != 83 { return 1; }
+    if magic_byte(1) != 86 { return 2; }
+    if magic_byte(2) != 48 { return 3; }
+    if magic_byte(3) != 66 { return 4; }
+    if magic_byte(4) != 0 { return 5; }
+
+    if format_version() != 1 { return 6; }
+    if header_size() != 8 { return 7; }
+
+    if opcode_class(9) != 0 { return 8; }
+    if opcode_class(15) != 0 { return 9; }
+    if opcode_class(24) != 0 { return 10; }
+    if opcode_class(25) != 1 { return 11; }
+    if opcode_class(30) != 1 { return 12; }
+    if opcode_class(31) != 2 { return 13; }
+    if opcode_class(33) != 2 { return 14; }
+    if opcode_class(34) != 3 { return 15; }
+    if opcode_class(36) != 4 { return 16; }
+    if opcode_class(37) != 4 { return 17; }
+    if opcode_class(0) != 255 { return 18; }
+
+    if string_pool_entry_size(5) != 9 { return 19; }
+    if string_pool_entry_size(0) != 4 { return 20; }
+
+    if func_entry_header_size() != 12 { return 21; }
+
+    return 0;
+}

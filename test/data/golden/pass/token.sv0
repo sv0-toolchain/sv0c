@@ -1,0 +1,190 @@
+/* Phase 1 type definitions: sml/lexer/token.sml -> sv0.
+   Token enum with all 98 variants (5 literal payloads, 1 ident payload,
+   92 unit variants for delimiters, operators, keywords, and EOF).
+   String payloads use i32 interned handles (same as ast.sv0).
+   Largest enum by variant count in the compiler (Expr has 27). */
+
+enum Token {
+    INT_LIT(i32),
+    FLOAT_LIT(i32),
+    STRING_LIT(i32),
+    CHAR_LIT(i32),
+    BOOL_LIT(bool),
+    IDENT(i32),
+    LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
+    COMMA, SEMICOLON, COLON, COLONCOLON, DOT, DOTDOT, DOTDOTEQ,
+    ARROW, FATARROW, HASH,
+    PLUS, MINUS, STAR, SLASH, PERCENT,
+    AMP, AMPAMP, PIPE, PIPEPIPE, CARET, TILDE,
+    BANG, QUESTION,
+    EQ, EQEQ, BANGEQ, LT, GT, LTEQ, GTEQ,
+    LTLT, GTGT,
+    PLUSEQ, MINUSEQ, STAREQ, SLASHEQ, PERCENTEQ,
+    AMPEQ, PIPEEQ, CARETEQ, LTLTEQ, GTGTEQ,
+    AS, ASSERT, BORROWS, BREAK, CONST, CONTINUE,
+    ELSE, ENSURES, ENUM, EXISTS, FALSE, FN,
+    FOR, FORALL, IF, IMPL, IN, LET,
+    LOOP, LOOP_INVARIANT, MATCH, MODULE, MOVE,
+    MUT, NEWTYPE, NO_ALIAS, OLD, PROJECT, PUB,
+    REQUIRES, RESULT, RETURN, SELF, SELF_TYPE,
+    STATIC, STRUCT, TRAIT, TRUE, TYPE, UNSAFE, USE,
+    WHERE, WHILE,
+    EOF,
+}
+
+fn token_tag(t: Token) -> i32 {
+    match t {
+        Token::INT_LIT(v) => { return 0; },
+        Token::FLOAT_LIT(v) => { return 1; },
+        Token::STRING_LIT(v) => { return 2; },
+        Token::CHAR_LIT(v) => { return 3; },
+        Token::BOOL_LIT(v) => { return 4; },
+        Token::IDENT(v) => { return 5; },
+        Token::LPAREN => { return 6; },
+        Token::RPAREN => { return 7; },
+        Token::LBRACE => { return 8; },
+        Token::RBRACE => { return 9; },
+        Token::LBRACKET => { return 10; },
+        Token::RBRACKET => { return 11; },
+        Token::COMMA => { return 12; },
+        Token::SEMICOLON => { return 13; },
+        Token::COLON => { return 14; },
+        Token::COLONCOLON => { return 15; },
+        Token::DOT => { return 16; },
+        Token::DOTDOT => { return 17; },
+        Token::DOTDOTEQ => { return 18; },
+        Token::ARROW => { return 19; },
+        Token::FATARROW => { return 20; },
+        Token::HASH => { return 21; },
+        Token::PLUS => { return 22; },
+        Token::MINUS => { return 23; },
+        Token::STAR => { return 24; },
+        Token::SLASH => { return 25; },
+        Token::PERCENT => { return 26; },
+        Token::AMP => { return 27; },
+        Token::AMPAMP => { return 28; },
+        Token::PIPE => { return 29; },
+        Token::PIPEPIPE => { return 30; },
+        Token::CARET => { return 31; },
+        Token::TILDE => { return 32; },
+        Token::BANG => { return 33; },
+        Token::QUESTION => { return 34; },
+        Token::EQ => { return 35; },
+        Token::EQEQ => { return 36; },
+        Token::BANGEQ => { return 37; },
+        Token::LT => { return 38; },
+        Token::GT => { return 39; },
+        Token::LTEQ => { return 40; },
+        Token::GTEQ => { return 41; },
+        Token::LTLT => { return 42; },
+        Token::GTGT => { return 43; },
+        Token::PLUSEQ => { return 44; },
+        Token::MINUSEQ => { return 45; },
+        Token::STAREQ => { return 46; },
+        Token::SLASHEQ => { return 47; },
+        Token::PERCENTEQ => { return 48; },
+        Token::AMPEQ => { return 49; },
+        Token::PIPEEQ => { return 50; },
+        Token::CARETEQ => { return 51; },
+        Token::LTLTEQ => { return 52; },
+        Token::GTGTEQ => { return 53; },
+        Token::AS => { return 54; },
+        Token::ASSERT => { return 55; },
+        Token::BORROWS => { return 56; },
+        Token::BREAK => { return 57; },
+        Token::CONST => { return 58; },
+        Token::CONTINUE => { return 59; },
+        Token::ELSE => { return 60; },
+        Token::ENSURES => { return 61; },
+        Token::ENUM => { return 62; },
+        Token::EXISTS => { return 63; },
+        Token::FALSE => { return 64; },
+        Token::FN => { return 65; },
+        Token::FOR => { return 66; },
+        Token::FORALL => { return 67; },
+        Token::IF => { return 68; },
+        Token::IMPL => { return 69; },
+        Token::IN => { return 70; },
+        Token::LET => { return 71; },
+        Token::LOOP => { return 72; },
+        Token::LOOP_INVARIANT => { return 73; },
+        Token::MATCH => { return 74; },
+        Token::MODULE => { return 75; },
+        Token::MOVE => { return 76; },
+        Token::MUT => { return 77; },
+        Token::NEWTYPE => { return 78; },
+        Token::NO_ALIAS => { return 79; },
+        Token::OLD => { return 80; },
+        Token::PROJECT => { return 81; },
+        Token::PUB => { return 82; },
+        Token::REQUIRES => { return 83; },
+        Token::RESULT => { return 84; },
+        Token::RETURN => { return 85; },
+        Token::SELF => { return 86; },
+        Token::SELF_TYPE => { return 87; },
+        Token::STATIC => { return 88; },
+        Token::STRUCT => { return 89; },
+        Token::TRAIT => { return 90; },
+        Token::TRUE => { return 91; },
+        Token::TYPE => { return 92; },
+        Token::UNSAFE => { return 93; },
+        Token::USE => { return 94; },
+        Token::WHERE => { return 95; },
+        Token::WHILE => { return 96; },
+        Token::EOF => { return 97; },
+    }
+}
+
+fn test_literals() -> i32 {
+    let ti: Token = Token::INT_LIT(42);
+    if token_tag(ti) != 0 { return 1; }
+    let ts: Token = Token::STRING_LIT(100);
+    if token_tag(ts) != 2 { return 2; }
+    let tb: Token = Token::BOOL_LIT(true);
+    if token_tag(tb) != 4 { return 3; }
+    let id: Token = Token::IDENT(200);
+    if token_tag(id) != 5 { return 4; }
+    return 0;
+}
+
+fn test_delimiters() -> i32 {
+    let lp: Token = Token::LPAREN;
+    if token_tag(lp) != 6 { return 1; }
+    let rb: Token = Token::RBRACE;
+    if token_tag(rb) != 9 { return 2; }
+    let ar: Token = Token::ARROW;
+    if token_tag(ar) != 19 { return 3; }
+    return 0;
+}
+
+fn test_operators() -> i32 {
+    let pl: Token = Token::PLUS;
+    if token_tag(pl) != 22 { return 1; }
+    let eq: Token = Token::EQEQ;
+    if token_tag(eq) != 36 { return 2; }
+    let ge: Token = Token::GTGTEQ;
+    if token_tag(ge) != 53 { return 3; }
+    return 0;
+}
+
+fn test_keywords() -> i32 {
+    let kl: Token = Token::LET;
+    if token_tag(kl) != 71 { return 1; }
+    let kw: Token = Token::WHILE;
+    if token_tag(kw) != 96 { return 2; }
+    let eof: Token = Token::EOF;
+    if token_tag(eof) != 97 { return 3; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_literals();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_delimiters();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_operators();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_keywords();
+    if r4 != 0 { return 30 + r4; }
+    return 0;
+}

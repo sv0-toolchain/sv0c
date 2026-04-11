@@ -1,0 +1,358 @@
+/* Phase 1 type definitions: sml/type_checker/types.sml -> sv0.
+   String fields use i32 interned name IDs because sv0 enum payloads
+   do not yet support const char*. Recursive variants via Box<Ty>;
+   type lists via Vec<i32> (box handles). */
+
+enum Ty {
+    TyUnit,
+    TyBool,
+    TyChar,
+    TyString,
+    TyIsize,
+    TyUsize,
+    TyError,
+    TyInt(i32),
+    TyUint(i32),
+    TyFloat(i32),
+    TyVar(i32),
+    TyStruct(i32),
+    TyEnum(i32),
+    TyRef(Box<Ty>),
+    TyRefMut(Box<Ty>),
+    TySlice(Box<Ty>),
+    TyArray(Box<Ty>, i32),
+    TyTuple(Vec<i32>),
+    TyFn(Vec<i32>, Box<Ty>),
+    TyNamed(i32, Vec<i32>),
+}
+
+fn fresh_var(ctr: i32) -> Ty {
+    return Ty::TyVar(ctr);
+}
+
+fn ty_tag(t: Ty) -> i32 {
+    match t {
+        Ty::TyUnit => { return 0; },
+        Ty::TyBool => { return 1; },
+        Ty::TyChar => { return 2; },
+        Ty::TyString => { return 3; },
+        Ty::TyIsize => { return 4; },
+        Ty::TyUsize => { return 5; },
+        Ty::TyError => { return 6; },
+        Ty::TyInt(w) => { return 7; },
+        Ty::TyUint(w) => { return 8; },
+        Ty::TyFloat(w) => { return 9; },
+        Ty::TyVar(n) => { return 10; },
+        Ty::TyStruct(id) => { return 11; },
+        Ty::TyEnum(id) => { return 12; },
+        Ty::TyRef(b) => { return 13; },
+        Ty::TyRefMut(b) => { return 14; },
+        Ty::TySlice(b) => { return 15; },
+        Ty::TyArray(b, n) => { return 16; },
+        Ty::TyTuple(v) => { return 17; },
+        Ty::TyFn(ps, rb) => { return 18; },
+        Ty::TyNamed(id, args) => { return 19; },
+    }
+}
+
+fn main() -> i32 {
+    let u: Ty = Ty::TyUnit;
+    if ty_tag(u) != 0 { return 1; }
+    let b: Ty = Ty::TyBool;
+    if ty_tag(b) != 1 { return 2; }
+    let ch: Ty = Ty::TyChar;
+    if ty_tag(ch) != 2 { return 3; }
+    let s: Ty = Ty::TyString;
+    if ty_tag(s) != 3 { return 4; }
+    let is: Ty = Ty::TyIsize;
+    if ty_tag(is) != 4 { return 5; }
+    let us: Ty = Ty::TyUsize;
+    if ty_tag(us) != 5 { return 6; }
+    let e: Ty = Ty::TyError;
+    if ty_tag(e) != 6 { return 7; }
+
+    let i32t: Ty = Ty::TyInt(32);
+    if ty_tag(i32t) != 7 { return 8; }
+    match i32t {
+        Ty::TyInt(w) => {
+            if w != 32 { return 9; }
+        },
+        Ty::TyUnit => { return 9; },
+        Ty::TyBool => { return 9; },
+        Ty::TyChar => { return 9; },
+        Ty::TyString => { return 9; },
+        Ty::TyIsize => { return 9; },
+        Ty::TyUsize => { return 9; },
+        Ty::TyError => { return 9; },
+        Ty::TyUint(w) => { return 9; },
+        Ty::TyFloat(w) => { return 9; },
+        Ty::TyVar(n) => { return 9; },
+        Ty::TyStruct(id) => { return 9; },
+        Ty::TyEnum(id) => { return 9; },
+        Ty::TyRef(bt) => { return 9; },
+        Ty::TyRefMut(bt) => { return 9; },
+        Ty::TySlice(bt) => { return 9; },
+        Ty::TyArray(bt, n) => { return 9; },
+        Ty::TyTuple(v) => { return 9; },
+        Ty::TyFn(ps, rb) => { return 9; },
+        Ty::TyNamed(id, args) => { return 9; },
+    }
+
+    let tv: Ty = fresh_var(42);
+    if ty_tag(tv) != 10 { return 10; }
+    match tv {
+        Ty::TyVar(n) => {
+            if n != 42 { return 11; }
+        },
+        Ty::TyUnit => { return 11; },
+        Ty::TyBool => { return 11; },
+        Ty::TyChar => { return 11; },
+        Ty::TyString => { return 11; },
+        Ty::TyIsize => { return 11; },
+        Ty::TyUsize => { return 11; },
+        Ty::TyError => { return 11; },
+        Ty::TyInt(w) => { return 11; },
+        Ty::TyUint(w) => { return 11; },
+        Ty::TyFloat(w) => { return 11; },
+        Ty::TyStruct(id) => { return 11; },
+        Ty::TyEnum(id) => { return 11; },
+        Ty::TyRef(bt) => { return 11; },
+        Ty::TyRefMut(bt) => { return 11; },
+        Ty::TySlice(bt) => { return 11; },
+        Ty::TyArray(bt, n) => { return 11; },
+        Ty::TyTuple(v) => { return 11; },
+        Ty::TyFn(ps, rb) => { return 11; },
+        Ty::TyNamed(id, args) => { return 11; },
+    }
+
+    let inner: Ty = Ty::TyBool;
+    let ref_t: Ty = Ty::TyRef(box_new(inner));
+    if ty_tag(ref_t) != 13 { return 12; }
+    match ref_t {
+        Ty::TyRef(bt) => {
+            let deref: Ty = box_deref(bt);
+            if ty_tag(deref) != 1 { return 13; }
+        },
+        Ty::TyUnit => { return 13; },
+        Ty::TyBool => { return 13; },
+        Ty::TyChar => { return 13; },
+        Ty::TyString => { return 13; },
+        Ty::TyIsize => { return 13; },
+        Ty::TyUsize => { return 13; },
+        Ty::TyError => { return 13; },
+        Ty::TyInt(w) => { return 13; },
+        Ty::TyUint(w) => { return 13; },
+        Ty::TyFloat(w) => { return 13; },
+        Ty::TyVar(n) => { return 13; },
+        Ty::TyStruct(id) => { return 13; },
+        Ty::TyEnum(id) => { return 13; },
+        Ty::TyRefMut(bt) => { return 13; },
+        Ty::TySlice(bt) => { return 13; },
+        Ty::TyArray(bt, n) => { return 13; },
+        Ty::TyTuple(v) => { return 13; },
+        Ty::TyFn(ps, rb) => { return 13; },
+        Ty::TyNamed(id, args) => { return 13; },
+    }
+
+    let elem: Ty = Ty::TyInt(64);
+    let arr: Ty = Ty::TyArray(box_new(elem), 10);
+    if ty_tag(arr) != 16 { return 14; }
+    match arr {
+        Ty::TyArray(bt, len) => {
+            if len != 10 { return 15; }
+            let et: Ty = box_deref(bt);
+            if ty_tag(et) != 7 { return 16; }
+        },
+        Ty::TyUnit => { return 15; },
+        Ty::TyBool => { return 15; },
+        Ty::TyChar => { return 15; },
+        Ty::TyString => { return 15; },
+        Ty::TyIsize => { return 15; },
+        Ty::TyUsize => { return 15; },
+        Ty::TyError => { return 15; },
+        Ty::TyInt(w) => { return 15; },
+        Ty::TyUint(w) => { return 15; },
+        Ty::TyFloat(w) => { return 15; },
+        Ty::TyVar(n) => { return 15; },
+        Ty::TyStruct(id) => { return 15; },
+        Ty::TyEnum(id) => { return 15; },
+        Ty::TyRef(bt) => { return 15; },
+        Ty::TyRefMut(bt) => { return 15; },
+        Ty::TySlice(bt) => { return 15; },
+        Ty::TyTuple(v) => { return 15; },
+        Ty::TyFn(ps, rb) => { return 15; },
+        Ty::TyNamed(id, args) => { return 15; },
+    }
+
+    let mut tup_elems: Vec<i32> = vec_new();
+    vec_push(tup_elems, 0);
+    vec_push(tup_elems, 1);
+    vec_push(tup_elems, 2);
+    let tup: Ty = Ty::TyTuple(tup_elems);
+    if ty_tag(tup) != 17 { return 17; }
+    match tup {
+        Ty::TyTuple(v) => {
+            if vec_len(v) != 3 { return 18; }
+        },
+        Ty::TyUnit => { return 18; },
+        Ty::TyBool => { return 18; },
+        Ty::TyChar => { return 18; },
+        Ty::TyString => { return 18; },
+        Ty::TyIsize => { return 18; },
+        Ty::TyUsize => { return 18; },
+        Ty::TyError => { return 18; },
+        Ty::TyInt(w) => { return 18; },
+        Ty::TyUint(w) => { return 18; },
+        Ty::TyFloat(w) => { return 18; },
+        Ty::TyVar(n) => { return 18; },
+        Ty::TyStruct(id) => { return 18; },
+        Ty::TyEnum(id) => { return 18; },
+        Ty::TyRef(bt) => { return 18; },
+        Ty::TyRefMut(bt) => { return 18; },
+        Ty::TySlice(bt) => { return 18; },
+        Ty::TyArray(bt, n) => { return 18; },
+        Ty::TyFn(ps, rb) => { return 18; },
+        Ty::TyNamed(id, args) => { return 18; },
+    }
+
+    let mut params: Vec<i32> = vec_new();
+    vec_push(params, 0);
+    vec_push(params, 1);
+    let ret: Ty = Ty::TyBool;
+    let fn_t: Ty = Ty::TyFn(params, box_new(ret));
+    if ty_tag(fn_t) != 18 { return 19; }
+    match fn_t {
+        Ty::TyFn(ps, rb) => {
+            if vec_len(ps) != 2 { return 20; }
+            let rt: Ty = box_deref(rb);
+            if ty_tag(rt) != 1 { return 21; }
+        },
+        Ty::TyUnit => { return 20; },
+        Ty::TyBool => { return 20; },
+        Ty::TyChar => { return 20; },
+        Ty::TyString => { return 20; },
+        Ty::TyIsize => { return 20; },
+        Ty::TyUsize => { return 20; },
+        Ty::TyError => { return 20; },
+        Ty::TyInt(w) => { return 20; },
+        Ty::TyUint(w) => { return 20; },
+        Ty::TyFloat(w) => { return 20; },
+        Ty::TyVar(n) => { return 20; },
+        Ty::TyStruct(id) => { return 20; },
+        Ty::TyEnum(id) => { return 20; },
+        Ty::TyRef(bt) => { return 20; },
+        Ty::TyRefMut(bt) => { return 20; },
+        Ty::TySlice(bt) => { return 20; },
+        Ty::TyArray(bt, n) => { return 20; },
+        Ty::TyTuple(v) => { return 20; },
+        Ty::TyNamed(id, args) => { return 20; },
+    }
+
+    let mut args: Vec<i32> = vec_new();
+    vec_push(args, 5);
+    let named: Ty = Ty::TyNamed(99, args);
+    if ty_tag(named) != 19 { return 22; }
+    match named {
+        Ty::TyNamed(name_id, type_args) => {
+            if name_id != 99 { return 23; }
+            if vec_len(type_args) != 1 { return 24; }
+        },
+        Ty::TyUnit => { return 23; },
+        Ty::TyBool => { return 23; },
+        Ty::TyChar => { return 23; },
+        Ty::TyString => { return 23; },
+        Ty::TyIsize => { return 23; },
+        Ty::TyUsize => { return 23; },
+        Ty::TyError => { return 23; },
+        Ty::TyInt(w) => { return 23; },
+        Ty::TyUint(w) => { return 23; },
+        Ty::TyFloat(w) => { return 23; },
+        Ty::TyVar(n) => { return 23; },
+        Ty::TyStruct(id) => { return 23; },
+        Ty::TyEnum(id) => { return 23; },
+        Ty::TyRef(bt) => { return 23; },
+        Ty::TyRefMut(bt) => { return 23; },
+        Ty::TySlice(bt) => { return 23; },
+        Ty::TyArray(bt, n) => { return 23; },
+        Ty::TyTuple(v) => { return 23; },
+        Ty::TyFn(ps, rb) => { return 23; },
+    }
+
+    let leaf: Ty = Ty::TyInt(8);
+    let mid: Ty = Ty::TyRef(box_new(leaf));
+    let outer: Ty = Ty::TyRef(box_new(mid));
+    match outer {
+        Ty::TyRef(b1) => {
+            let m: Ty = box_deref(b1);
+            match m {
+                Ty::TyRef(b2) => {
+                    let l: Ty = box_deref(b2);
+                    match l {
+                        Ty::TyInt(w) => {
+                            if w != 8 { return 25; }
+                        },
+                        Ty::TyUnit => { return 25; },
+                        Ty::TyBool => { return 25; },
+                        Ty::TyChar => { return 25; },
+                        Ty::TyString => { return 25; },
+                        Ty::TyIsize => { return 25; },
+                        Ty::TyUsize => { return 25; },
+                        Ty::TyError => { return 25; },
+                        Ty::TyUint(w2) => { return 25; },
+                        Ty::TyFloat(w2) => { return 25; },
+                        Ty::TyVar(n) => { return 25; },
+                        Ty::TyStruct(id) => { return 25; },
+                        Ty::TyEnum(id) => { return 25; },
+                        Ty::TyRef(bt) => { return 25; },
+                        Ty::TyRefMut(bt) => { return 25; },
+                        Ty::TySlice(bt) => { return 25; },
+                        Ty::TyArray(bt, n) => { return 25; },
+                        Ty::TyTuple(v) => { return 25; },
+                        Ty::TyFn(ps, rb) => { return 25; },
+                        Ty::TyNamed(id, ag) => { return 25; },
+                    }
+                },
+                Ty::TyUnit => { return 25; },
+                Ty::TyBool => { return 25; },
+                Ty::TyChar => { return 25; },
+                Ty::TyString => { return 25; },
+                Ty::TyIsize => { return 25; },
+                Ty::TyUsize => { return 25; },
+                Ty::TyError => { return 25; },
+                Ty::TyInt(w) => { return 25; },
+                Ty::TyUint(w) => { return 25; },
+                Ty::TyFloat(w) => { return 25; },
+                Ty::TyVar(n) => { return 25; },
+                Ty::TyStruct(id) => { return 25; },
+                Ty::TyEnum(id) => { return 25; },
+                Ty::TyRefMut(bt) => { return 25; },
+                Ty::TySlice(bt) => { return 25; },
+                Ty::TyArray(bt, n) => { return 25; },
+                Ty::TyTuple(v) => { return 25; },
+                Ty::TyFn(ps, rb) => { return 25; },
+                Ty::TyNamed(id, ag) => { return 25; },
+            }
+        },
+        Ty::TyUnit => { return 25; },
+        Ty::TyBool => { return 25; },
+        Ty::TyChar => { return 25; },
+        Ty::TyString => { return 25; },
+        Ty::TyIsize => { return 25; },
+        Ty::TyUsize => { return 25; },
+        Ty::TyError => { return 25; },
+        Ty::TyInt(w) => { return 25; },
+        Ty::TyUint(w) => { return 25; },
+        Ty::TyFloat(w) => { return 25; },
+        Ty::TyVar(n) => { return 25; },
+        Ty::TyStruct(id) => { return 25; },
+        Ty::TyEnum(id) => { return 25; },
+        Ty::TyRefMut(bt) => { return 25; },
+        Ty::TySlice(bt) => { return 25; },
+        Ty::TyArray(bt, n) => { return 25; },
+        Ty::TyTuple(v) => { return 25; },
+        Ty::TyFn(ps, rb) => { return 25; },
+        Ty::TyNamed(id, ag) => { return 25; },
+    }
+
+    return 0;
+}

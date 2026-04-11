@@ -826,6 +826,48 @@ structure TestRunner = struct
                  (goldenPassCompileRun "option_result")
       val () = check "golden pass box_expr compile+run"
                  (goldenPassCompileRun "box_expr")
+      val () = check "golden pass ast_types compile+run"
+                 (goldenPassCompileRun "ast_types")
+      val () = check "golden pass types compile+run"
+                 (goldenPassCompileRun "types")
+      val () = check "golden pass span compile+run"
+                 (goldenPassCompileRun "span")
+      val () = check "golden pass ir compile+run"
+                 (goldenPassCompileRun "ir")
+      val () = check "golden pass ast compile+run"
+                 (goldenPassCompileRun "ast")
+      val () = check "golden pass token compile+run"
+                 (goldenPassCompileRun "token")
+      val () = check "golden pass contract_analyzer compile+run"
+                 (goldenPassCompileRun "contract_analyzer")
+      val () = check "golden pass link_is_sv0_core compile+run"
+                 (goldenPassCompileRun "link_is_sv0_core")
+      val () = check "golden pass link_is_hidden_core compile+run"
+                 (goldenPassCompileRun "link_is_hidden_core")
+      val () = check "golden pass resolver_pat_binds_core compile+run"
+                 (goldenPassCompileRun "resolver_pat_binds_core")
+      val () = check "golden pass resolver_enum_variant_reg_core compile+run"
+                 (goldenPassCompileRun "resolver_enum_variant_reg_core")
+      val () = check "golden pass unify compile+run"
+                 (goldenPassCompileRun "unify")
+      val () = check "golden pass diagnostic compile+run"
+                 (goldenPassCompileRun "diagnostic")
+      val () = check "golden pass env compile+run"
+                 (goldenPassCompileRun "env")
+      val () = check "golden pass checker_binop_class_core compile+run"
+                 (goldenPassCompileRun "checker_binop_class_core")
+      val () = check "golden pass checker_variant_shape_core compile+run"
+                 (goldenPassCompileRun "checker_variant_shape_core")
+      val () = check "golden pass include_expand compile+run"
+                 (goldenPassCompileRun "include_expand")
+      val () = check "golden pass bytecode_insn_size_core compile+run"
+                 (goldenPassCompileRun "bytecode_insn_size_core")
+      val () = check "golden pass bytecode_opcode_map_core compile+run"
+                 (goldenPassCompileRun "bytecode_opcode_map_core")
+      val () = check "golden pass lexer_char_class_core compile+run"
+                 (goldenPassCompileRun "lexer_char_class_core")
+      val () = check "golden pass lexer_advance_core compile+run"
+                 (goldenPassCompileRun "lexer_advance_core")
 
       (* --- pipeline stubs --- *)
       val () = print "\n[pipeline]\n"

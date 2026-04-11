@@ -1,0 +1,66 @@
+/* Surrogate for checker.sml variantShape dispatch.
+   SML reference: sml/type_checker/checker.sml lines 273-278
+     fun variantShape v =
+       case v of
+         Ast.VariantUnit _ => VSUnit
+       | Ast.VariantTuple (_, ts, _) => VSTuple (map resolveFieldTy ts)
+       | Ast.VariantStruct (_, fs, _) => VSStruct (...)
+   Models variant kind and shape tag; returns field count for tuple/struct. */
+
+fn variant_shape_tag(kind: i32) -> i32 {
+    if kind == 0 { return 0; }
+    if kind == 1 { return 1; }
+    if kind == 2 { return 2; }
+    return 255;
+}
+
+fn variant_field_count(kind: i32, tuple_fields: i32, struct_fields: i32) -> i32 {
+    if kind == 0 { return 0; }
+    if kind == 1 { return tuple_fields; }
+    if kind == 2 { return struct_fields; }
+    return 0;
+}
+
+fn variant_needs_payload_slots(kind: i32, tuple_fields: i32, struct_fields: i32) -> bool {
+    let fc: i32 = variant_field_count(kind, tuple_fields, struct_fields);
+    return fc > 0;
+}
+
+fn variant_shape_name_tag(kind: i32) -> i32 {
+    if kind == 0 { return 0; }
+    if kind == 1 { return 1; }
+    if kind == 2 { return 2; }
+    return 0 - 1;
+}
+
+fn max_payload_across(k0: i32, f0: i32, k1: i32, f1: i32, k2: i32, f2: i32) -> i32 {
+    let c0: i32 = variant_field_count(k0, f0, f0);
+    let c1: i32 = variant_field_count(k1, f1, f1);
+    let c2: i32 = variant_field_count(k2, f2, f2);
+    let mut mx: i32 = c0;
+    if c1 > mx { mx = c1; }
+    if c2 > mx { mx = c2; }
+    return mx;
+}
+
+fn main() -> i32 {
+    if variant_shape_tag(0) != 0 { return 1; }
+    if variant_shape_tag(1) != 1 { return 2; }
+    if variant_shape_tag(2) != 2 { return 3; }
+    if variant_shape_tag(99) != 255 { return 4; }
+
+    if variant_field_count(0, 3, 2) != 0 { return 5; }
+    if variant_field_count(1, 3, 2) != 3 { return 6; }
+    if variant_field_count(2, 3, 2) != 2 { return 7; }
+
+    if variant_needs_payload_slots(0, 0, 0) != false { return 8; }
+    if variant_needs_payload_slots(1, 3, 0) != true { return 9; }
+    if variant_needs_payload_slots(2, 0, 2) != true { return 10; }
+    if variant_needs_payload_slots(1, 0, 0) != false { return 11; }
+
+    if max_payload_across(0, 0, 1, 3, 2, 2) != 3 { return 12; }
+    if max_payload_across(0, 0, 0, 0, 0, 0) != 0 { return 13; }
+    if max_payload_across(1, 5, 1, 2, 1, 7) != 7 { return 14; }
+
+    return 0;
+}

@@ -152,6 +152,8 @@ structure Lowering :> LOWERING = struct
              (case List.find (fn (n, _) => n = x) (!currentFnParams) of
                 SOME (_, aty) => astTyToCString aty
               | NONE => "int"))
+    | Ast.ExprCall (Ast.ExprPath ([en, vn], _), _, _) =>
+        #1 (resolveEnumCtorPath en vn)
     | Ast.ExprCall (Ast.ExprPath ([f], _), _, _) => calleeRetCty f
     | Ast.ExprTuple ([e1], _) => matchScrutCty e1
     | Ast.ExprLit (Ast.BoolLit _, _) => "int"
