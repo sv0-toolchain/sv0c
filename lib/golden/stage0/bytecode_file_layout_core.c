@@ -129,7 +129,7 @@ int main(void) {
   } else {
   }
   int _sv0t9 = total_file_size(0, 0, 0);
-  if ((_sv0t9 != 18)) {
+  if ((_sv0t9 != 22)) {
     return 10;
   } else {
   }
