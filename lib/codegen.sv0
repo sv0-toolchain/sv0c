@@ -1,0 +1,798 @@
+/* Phase 2 real pipeline module: sml/backend/c/codegen.sml -> sv0.
+   C99 code emission from flat IR values, expressions, and instructions.
+   Covers: emitValue, emitExpr, cEscapeString, intToString, emitInstr
+   (17 instruction kinds including IfElse/While/Block with recursive
+   Vec<i32> + Box<Instr> iteration), emitParamList, emitFnProto,
+   emitBlockDefn, emit_instrs.
+   Deferred: emitCallArgs (needs Vec<Value> iteration for argument
+   lists), top-level emit/splitMain (needs block/program structs). */
+
+enum Value {
+    VInt(i32),
+    VBoolTrue,
+    VBoolFalse,
+    VVar(i32),
+    VUnit,
+    VString(i32),
+    VMember(Box<Value>, i32),
+    VAddrOf(i32),
+}
+
+enum Expr {
+    Literal(Box<Value>),
+    Load(i32),
+    Binop(i32, Box<Value>, Box<Value>),
+    Unop(i32, Box<Value>),
+    FieldAccess(Box<Value>, i32),
+}
+
+fn value_tag(v: Value) -> i32 {
+    match v {
+        Value::VInt(_) => { return 0; },
+        Value::VBoolTrue => { return 1; },
+        Value::VBoolFalse => { return 2; },
+        Value::VVar(_) => { return 3; },
+        Value::VUnit => { return 4; },
+        Value::VString(_) => { return 5; },
+        Value::VMember(_, _) => { return 6; },
+        Value::VAddrOf(_) => { return 7; },
+    }
+}
+
+fn expr_tag(e: Expr) -> i32 {
+    match e {
+        Expr::Literal(_) => { return 0; },
+        Expr::Load(_) => { return 1; },
+        Expr::Binop(_, _, _) => { return 2; },
+        Expr::Unop(_, _) => { return 3; },
+        Expr::FieldAccess(_, _) => { return 4; },
+    }
+}
+
+fn name_of(h: i32) -> string {
+    if h == 1 { return "x"; }
+    if h == 2 { return "y"; }
+    if h == 3 { return "n"; }
+    if h == 4 { return "tmp"; }
+    if h == 5 { return "count"; }
+    if h == 6 { return "val"; }
+    if h == 7 { return "hello"; }
+    if h == 8 { return "data"; }
+    if h == 9 { return "int"; }
+    if h == 10 { return "void"; }
+    if h == 11 { return "main"; }
+    if h == 12 { return "foo"; }
+    if h == 13 { return "bar"; }
+    if h == 14 { return "result"; }
+    if h == 15 { return "i"; }
+    return "?";
+}
+
+fn op_of(h: i32) -> string {
+    if h == 1 { return "+"; }
+    if h == 2 { return "-"; }
+    if h == 3 { return "*"; }
+    if h == 4 { return "=="; }
+    if h == 5 { return "!="; }
+    if h == 6 { return "!"; }
+    if h == 7 { return "<"; }
+    if h == 8 { return "&&"; }
+    return "?";
+}
+
+fn digit_char(d: i32) -> string {
+    if d == 0 { return "0"; }
+    if d == 1 { return "1"; }
+    if d == 2 { return "2"; }
+    if d == 3 { return "3"; }
+    if d == 4 { return "4"; }
+    if d == 5 { return "5"; }
+    if d == 6 { return "6"; }
+    if d == 7 { return "7"; }
+    if d == 8 { return "8"; }
+    if d == 9 { return "9"; }
+    return "?";
+}
+
+fn int_to_str_pos(n: i32) -> string {
+    if n < 10 { return digit_char(n); }
+    let rest: i32 = n / 10;
+    let d: i32 = n % 10;
+    return string_concat(int_to_str_pos(rest), digit_char(d));
+}
+
+fn int_to_string(n: i32) -> string {
+    if n == 0 { return "0"; }
+    if n < 0 { return string_concat("-", int_to_str_pos(0 - n)); }
+    return int_to_str_pos(n);
+}
+
+fn c_escape_one(c: i32, src: string, pos: i32) -> string {
+    if c == 34 { return "\\\""; }
+    if c == 92 { return "\\\\"; }
+    if c == 10 { return "\\n"; }
+    if c == 9 { return "\\t"; }
+    if c == 13 { return "\\r"; }
+    return string_substr(src, pos, 1);
+}
+
+fn c_escape_from(src: string, pos: i32, acc: string) -> string {
+    if pos >= string_len(src) { return acc; }
+    let c: i32 = string_char_at(src, pos);
+    let esc: string = c_escape_one(c, src, pos);
+    return c_escape_from(src, pos + 1, string_concat(acc, esc));
+}
+
+fn c_escape_string(s: string) -> string {
+    return c_escape_from(s, 0, "");
+}
+
+fn emit_value(v: Value) -> string {
+    match v {
+        Value::VInt(i) => { return int_to_string(i); },
+        Value::VBoolTrue => { return "1"; },
+        Value::VBoolFalse => { return "0"; },
+        Value::VVar(h) => { return name_of(h); },
+        Value::VUnit => { return "0"; },
+        Value::VString(h) => {
+            let raw: string = name_of(h);
+            let escaped: string = c_escape_string(raw);
+            let a: string = string_concat("\"", escaped);
+            return string_concat(a, "\"");
+        },
+        Value::VMember(bv, fh) => {
+            let inner: Value = box_deref(bv);
+            let field: string = name_of(fh);
+            let tag: i32 = value_tag(inner);
+            if tag == 3 {
+                let prefix: string = emit_value(inner);
+                return string_concat(string_concat(prefix, "."), field);
+            }
+            let prefix: string = string_concat("(", emit_value(inner));
+            return string_concat(string_concat(prefix, ")."), field);
+        },
+        Value::VAddrOf(h) => {
+            return string_concat(string_concat("(&", name_of(h)), ")");
+        },
+    }
+    return "";
+}
+
+fn emit_expr(e: Expr) -> string {
+    match e {
+        Expr::Literal(bv) => {
+            let v: Value = box_deref(bv);
+            return emit_value(v);
+        },
+        Expr::Load(h) => {
+            return name_of(h);
+        },
+        Expr::Binop(op_h, bv1, bv2) => {
+            let v1: Value = box_deref(bv1);
+            let v2: Value = box_deref(bv2);
+            let s1: string = emit_value(v1);
+            let s2: string = emit_value(v2);
+            let op: string = op_of(op_h);
+            let a: string = string_concat("(", s1);
+            let b: string = string_concat(a, " ");
+            let c: string = string_concat(b, op);
+            let d: string = string_concat(c, " ");
+            let f: string = string_concat(d, s2);
+            return string_concat(f, ")");
+        },
+        Expr::Unop(op_h, bv) => {
+            let v: Value = box_deref(bv);
+            let op: string = op_of(op_h);
+            let inner: string = emit_value(v);
+            let a: string = string_concat("(", op);
+            return string_concat(a, string_concat(inner, ")"));
+        },
+        Expr::FieldAccess(bv, fh) => {
+            let v: Value = box_deref(bv);
+            let a: string = string_concat("(", emit_value(v));
+            return string_concat(string_concat(a, ")."), name_of(fh));
+        },
+    }
+    return "";
+}
+
+enum Instr {
+    Nop,
+    DeclVar(i32),
+    DeclNamed(i32, i32),
+    Assign(i32, Box<Expr>),
+    Store(i32, Box<Expr>),
+    StoreField(i32, i32, Box<Expr>),
+    IfElse(Box<Expr>, Vec<i32>, Vec<i32>),
+    WhileLoop(Box<Expr>, Vec<i32>),
+    BlockInstr(Vec<i32>),
+    Break,
+    Continue,
+    CallVoid(i32),
+    CallDest(i32, i32, i32),
+    Requires(Box<Expr>, i32),
+    Ensures(Box<Expr>, i32),
+    ReturnVoid,
+    ReturnVal(Box<Value>),
+}
+
+fn instr_tag(ins: Instr) -> i32 {
+    match ins {
+        Instr::Nop => { return 0; },
+        Instr::DeclVar(h) => { return 1; },
+        Instr::DeclNamed(ct, h) => { return 2; },
+        Instr::Assign(h, be) => { return 3; },
+        Instr::Store(h, be) => { return 4; },
+        Instr::StoreField(b, f, be) => { return 5; },
+        Instr::IfElse(be, th, el) => { return 6; },
+        Instr::WhileLoop(be, body) => { return 7; },
+        Instr::BlockInstr(body) => { return 8; },
+        Instr::Break => { return 9; },
+        Instr::Continue => { return 10; },
+        Instr::CallVoid(fh) => { return 11; },
+        Instr::CallDest(dh, fh, rh) => { return 12; },
+        Instr::Requires(be, fh) => { return 13; },
+        Instr::Ensures(be, fh) => { return 14; },
+        Instr::ReturnVoid => { return 15; },
+        Instr::ReturnVal(bv) => { return 16; },
+    }
+}
+
+fn emit_instr(indent: string, ret_ty: string, ins: Instr) -> string {
+    match ins {
+        Instr::Nop => { return ""; },
+        Instr::DeclVar(h) => {
+            let a: string = string_concat(indent, "int ");
+            let b: string = string_concat(a, name_of(h));
+            return string_concat(b, ";\n");
+        },
+        Instr::DeclNamed(ct, h) => {
+            let a: string = string_concat(indent, name_of(ct));
+            let b: string = string_concat(a, " ");
+            let c: string = string_concat(b, name_of(h));
+            return string_concat(c, ";\n");
+        },
+        Instr::Assign(h, be) => {
+            let e: Expr = box_deref(be);
+            let a: string = string_concat(indent, "int ");
+            let b: string = string_concat(a, name_of(h));
+            let c: string = string_concat(b, " = ");
+            let d: string = string_concat(c, emit_expr(e));
+            return string_concat(d, ";\n");
+        },
+        Instr::Store(h, be) => {
+            let e: Expr = box_deref(be);
+            let a: string = string_concat(indent, name_of(h));
+            let b: string = string_concat(a, " = ");
+            let c: string = string_concat(b, emit_expr(e));
+            return string_concat(c, ";\n");
+        },
+        Instr::StoreField(bh, fh, be) => {
+            let e: Expr = box_deref(be);
+            let a: string = string_concat(indent, name_of(bh));
+            let b: string = string_concat(a, ".");
+            let c: string = string_concat(b, name_of(fh));
+            let d: string = string_concat(c, " = ");
+            let f: string = string_concat(d, emit_expr(e));
+            return string_concat(f, ";\n");
+        },
+        Instr::IfElse(be, th, el) => {
+            let e: Expr = box_deref(be);
+            let deeper: string = string_concat(indent, "  ");
+            let a: string = string_concat(indent, "if (");
+            let b: string = string_concat(a, emit_expr(e));
+            let c: string = string_concat(b, ") {\n");
+            let d: string = string_concat(c, emit_instrs(th, deeper, ret_ty));
+            let f: string = string_concat(d, indent);
+            let g: string = string_concat(f, "} else {\n");
+            let h: string = string_concat(g, emit_instrs(el, deeper, ret_ty));
+            let j: string = string_concat(h, indent);
+            return string_concat(j, "}\n");
+        },
+        Instr::WhileLoop(be, body) => {
+            let e: Expr = box_deref(be);
+            let deeper: string = string_concat(indent, "  ");
+            let a: string = string_concat(indent, "while (");
+            let b: string = string_concat(a, emit_expr(e));
+            let c: string = string_concat(b, ") {\n");
+            let d: string = string_concat(c, emit_instrs(body, deeper, ret_ty));
+            let f: string = string_concat(d, indent);
+            return string_concat(f, "}\n");
+        },
+        Instr::BlockInstr(body) => {
+            let deeper: string = string_concat(indent, "  ");
+            let a: string = string_concat(indent, "{\n");
+            let b: string = string_concat(a, emit_instrs(body, deeper, ret_ty));
+            let c: string = string_concat(b, indent);
+            return string_concat(c, "}\n");
+        },
+        Instr::Break => {
+            return string_concat(indent, "break;\n");
+        },
+        Instr::Continue => {
+            return string_concat(indent, "continue;\n");
+        },
+        Instr::CallVoid(fh) => {
+            let a: string = string_concat(indent, name_of(fh));
+            return string_concat(a, "();\n");
+        },
+        Instr::CallDest(dh, fh, rh) => {
+            let a: string = string_concat(indent, name_of(rh));
+            let b: string = string_concat(a, " ");
+            let c: string = string_concat(b, name_of(dh));
+            let d: string = string_concat(c, " = ");
+            let f: string = string_concat(d, name_of(fh));
+            return string_concat(f, "();\n");
+        },
+        Instr::Requires(be, fh) => {
+            let e: Expr = box_deref(be);
+            let a: string = string_concat(indent, "sv0_requires(");
+            let b: string = string_concat(a, emit_expr(e));
+            let c: string = string_concat(b, ", \"");
+            let d: string = string_concat(c, name_of(fh));
+            return string_concat(d, "\");\n");
+        },
+        Instr::Ensures(be, fh) => {
+            let e: Expr = box_deref(be);
+            let a: string = string_concat(indent, "sv0_ensures(");
+            let b: string = string_concat(a, emit_expr(e));
+            let c: string = string_concat(b, ", \"");
+            let d: string = string_concat(c, name_of(fh));
+            return string_concat(d, "\");\n");
+        },
+        Instr::ReturnVoid => {
+            return string_concat(indent, "return;\n");
+        },
+        Instr::ReturnVal(bv) => {
+            if string_eq(ret_ty, "void") {
+                return string_concat(indent, "return;\n");
+            }
+            let v: Value = box_deref(bv);
+            let a: string = string_concat(indent, "return ");
+            let b: string = string_concat(a, emit_value(v));
+            return string_concat(b, ";\n");
+        },
+    }
+    return "";
+}
+
+fn emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string) -> string {
+    let count: i32 = vec_len(instrs);
+    if count == 0 { return ""; }
+    let mut out: string = "";
+    let mut idx: i32 = 0;
+    while idx < count {
+        let bh: Box<Instr> = vec_get(instrs, idx);
+        let ins: Instr = box_deref(bh);
+        out = string_concat(out, emit_instr(indent, ret_ty, ins));
+        idx = idx + 1;
+    }
+    return out;
+}
+
+fn emit_param_pair(cty_h: i32, name_h: i32) -> string {
+    let a: string = string_concat(name_of(cty_h), " ");
+    return string_concat(a, name_of(name_h));
+}
+
+fn emit_param_list_0() -> string {
+    return "void";
+}
+
+fn emit_param_list_1(cty1: i32, n1: i32) -> string {
+    return emit_param_pair(cty1, n1);
+}
+
+fn emit_param_list_2(cty1: i32, n1: i32, cty2: i32, n2: i32) -> string {
+    let a: string = emit_param_pair(cty1, n1);
+    let b: string = string_concat(a, ", ");
+    return string_concat(b, emit_param_pair(cty2, n2));
+}
+
+fn emit_fn_proto(is_static: i32, ret_cty_h: i32, label_h: i32, params_str: string) -> string {
+    let ret: string = name_of(ret_cty_h);
+    let label: string = name_of(label_h);
+    if is_static == 1 {
+        let a: string = string_concat("static ", ret);
+        let b: string = string_concat(a, " ");
+        let c: string = string_concat(b, label);
+        let d: string = string_concat(c, "(");
+        return string_concat(d, string_concat(params_str, ")"));
+    }
+    let a: string = string_concat(ret, " ");
+    let b: string = string_concat(a, label);
+    let c: string = string_concat(b, "(");
+    return string_concat(c, string_concat(params_str, ")"));
+}
+
+fn emit_block_defn(proto: string, body: string) -> string {
+    let a: string = string_concat(proto, " {\n");
+    let b: string = string_concat(a, body);
+    return string_concat(b, "}\n\n");
+}
+
+fn test_int_format() -> i32 {
+    if !string_eq(int_to_string(0), "0") { return 1; }
+    if !string_eq(int_to_string(1), "1") { return 2; }
+    if !string_eq(int_to_string(42), "42") { return 3; }
+    if !string_eq(int_to_string(100), "100") { return 4; }
+    if !string_eq(int_to_string(9999), "9999") { return 5; }
+    if !string_eq(int_to_string(-1), "-1") { return 6; }
+    if !string_eq(int_to_string(-42), "-42") { return 7; }
+    return 0;
+}
+
+fn test_escape() -> i32 {
+    if !string_eq(c_escape_string("hello"), "hello") { return 1; }
+    if !string_eq(c_escape_string(""), "") { return 2; }
+    if !string_eq(c_escape_string("ab"), "ab") { return 3; }
+    return 0;
+}
+
+fn test_emit_value_basic() -> i32 {
+    let v1: Value = Value::VInt(42);
+    if !string_eq(emit_value(v1), "42") { return 1; }
+    let v2: Value = Value::VBoolTrue;
+    if !string_eq(emit_value(v2), "1") { return 2; }
+    let v3: Value = Value::VBoolFalse;
+    if !string_eq(emit_value(v3), "0") { return 3; }
+    let v4: Value = Value::VVar(1);
+    if !string_eq(emit_value(v4), "x") { return 4; }
+    let v5: Value = Value::VUnit;
+    if !string_eq(emit_value(v5), "0") { return 5; }
+    return 0;
+}
+
+fn test_emit_value_string() -> i32 {
+    let v: Value = Value::VString(7);
+    let s: string = emit_value(v);
+    if !string_eq(s, "\"hello\"") { return 1; }
+    return 0;
+}
+
+fn test_emit_value_addr() -> i32 {
+    let v: Value = Value::VAddrOf(1);
+    if !string_eq(emit_value(v), "(&x)") { return 1; }
+    return 0;
+}
+
+fn test_emit_member() -> i32 {
+    let inner: Value = Value::VVar(1);
+    let bv: Box<Value> = box_new(inner);
+    let v: Value = Value::VMember(bv, 2);
+    if !string_eq(emit_value(v), "x.y") { return 1; }
+    return 0;
+}
+
+fn test_emit_expr_lit() -> i32 {
+    let v: Value = Value::VInt(7);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::Literal(bv);
+    if !string_eq(emit_expr(e), "7") { return 1; }
+    return 0;
+}
+
+fn test_emit_expr_load() -> i32 {
+    let e: Expr = Expr::Load(1);
+    if !string_eq(emit_expr(e), "x") { return 1; }
+    return 0;
+}
+
+fn test_emit_expr_binop() -> i32 {
+    let v1: Value = Value::VVar(1);
+    let v2: Value = Value::VVar(2);
+    let bv1: Box<Value> = box_new(v1);
+    let bv2: Box<Value> = box_new(v2);
+    let e: Expr = Expr::Binop(1, bv1, bv2);
+    if !string_eq(emit_expr(e), "(x + y)") { return 1; }
+    return 0;
+}
+
+fn test_emit_expr_unop() -> i32 {
+    let v: Value = Value::VVar(1);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::Unop(6, bv);
+    if !string_eq(emit_expr(e), "(!x)") { return 1; }
+    return 0;
+}
+
+fn test_emit_expr_field() -> i32 {
+    let v: Value = Value::VVar(1);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::FieldAccess(bv, 2);
+    if !string_eq(emit_expr(e), "(x).y") { return 1; }
+    return 0;
+}
+
+fn test_instr_nop() -> i32 {
+    let ins: Instr = Instr::Nop;
+    if instr_tag(ins) != 0 { return 1; }
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "") { return 2; }
+    return 0;
+}
+
+fn test_instr_declvar() -> i32 {
+    let ins: Instr = Instr::DeclVar(1);
+    if instr_tag(ins) != 1 { return 1; }
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  int x;\n") { return 2; }
+    return 0;
+}
+
+fn test_instr_declnamed() -> i32 {
+    let ins: Instr = Instr::DeclNamed(9, 4);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  int tmp;\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_assign() -> i32 {
+    let v: Value = Value::VInt(42);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::Literal(bv);
+    let be: Box<Expr> = box_new(e);
+    let ins: Instr = Instr::Assign(1, be);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  int x = 42;\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_store() -> i32 {
+    let v: Value = Value::VVar(2);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::Literal(bv);
+    let be: Box<Expr> = box_new(e);
+    let ins: Instr = Instr::Store(1, be);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  x = y;\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_storefield() -> i32 {
+    let v: Value = Value::VInt(10);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::Literal(bv);
+    let be: Box<Expr> = box_new(e);
+    let ins: Instr = Instr::StoreField(1, 2, be);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  x.y = 10;\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_ifelse() -> i32 {
+    let cv: Value = Value::VVar(1);
+    let cbv: Box<Value> = box_new(cv);
+    let ce: Expr = Expr::Literal(cbv);
+    let cbe: Box<Expr> = box_new(ce);
+    let then_i: Instr = Instr::ReturnVal(box_new(Value::VInt(1)));
+    let else_i: Instr = Instr::ReturnVal(box_new(Value::VInt(0)));
+    let mut th: Vec<i32> = vec_new();
+    let mut el: Vec<i32> = vec_new();
+    vec_push(th, box_new(then_i));
+    vec_push(el, box_new(else_i));
+    let ins: Instr = Instr::IfElse(cbe, th, el);
+    let s: string = emit_instr("  ", "int", ins);
+    let expected: string = "  if (x) {\n    return 1;\n  } else {\n    return 0;\n  }\n";
+    if !string_eq(s, expected) { return 1; }
+    return 0;
+}
+
+fn test_instr_while() -> i32 {
+    let cv: Value = Value::VVar(1);
+    let cbv: Box<Value> = box_new(cv);
+    let ce: Expr = Expr::Literal(cbv);
+    let cbe: Box<Expr> = box_new(ce);
+    let body_i: Instr = Instr::Break;
+    let mut body: Vec<i32> = vec_new();
+    vec_push(body, box_new(body_i));
+    let ins: Instr = Instr::WhileLoop(cbe, body);
+    let s: string = emit_instr("  ", "int", ins);
+    let expected: string = "  while (x) {\n    break;\n  }\n";
+    if !string_eq(s, expected) { return 1; }
+    return 0;
+}
+
+fn test_instr_block() -> i32 {
+    let i1: Instr = Instr::DeclVar(1);
+    let i2: Instr = Instr::DeclVar(2);
+    let mut body: Vec<i32> = vec_new();
+    vec_push(body, box_new(i1));
+    vec_push(body, box_new(i2));
+    let ins: Instr = Instr::BlockInstr(body);
+    let s: string = emit_instr("  ", "int", ins);
+    let expected: string = "  {\n    int x;\n    int y;\n  }\n";
+    if !string_eq(s, expected) { return 1; }
+    return 0;
+}
+
+fn test_instr_break_continue() -> i32 {
+    let b: Instr = Instr::Break;
+    if !string_eq(emit_instr("  ", "int", b), "  break;\n") { return 1; }
+    let c: Instr = Instr::Continue;
+    if !string_eq(emit_instr("  ", "int", c), "  continue;\n") { return 2; }
+    return 0;
+}
+
+fn test_instr_call_void() -> i32 {
+    let ins: Instr = Instr::CallVoid(12);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  foo();\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_call_dest() -> i32 {
+    let ins: Instr = Instr::CallDest(14, 12, 9);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  int result = foo();\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_requires() -> i32 {
+    let v: Value = Value::VVar(1);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::Literal(bv);
+    let be: Box<Expr> = box_new(e);
+    let ins: Instr = Instr::Requires(be, 12);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  sv0_requires(x, \"foo\");\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_ensures() -> i32 {
+    let v: Value = Value::VVar(2);
+    let bv: Box<Value> = box_new(v);
+    let e: Expr = Expr::Literal(bv);
+    let be: Box<Expr> = box_new(e);
+    let ins: Instr = Instr::Ensures(be, 13);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  sv0_ensures(y, \"bar\");\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_return_void() -> i32 {
+    let ins: Instr = Instr::ReturnVoid;
+    let s: string = emit_instr("  ", "void", ins);
+    if !string_eq(s, "  return;\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_return_val() -> i32 {
+    let v: Value = Value::VInt(0);
+    let bv: Box<Value> = box_new(v);
+    let ins: Instr = Instr::ReturnVal(bv);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  return 0;\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_return_val_void() -> i32 {
+    let v: Value = Value::VInt(0);
+    let bv: Box<Value> = box_new(v);
+    let ins: Instr = Instr::ReturnVal(bv);
+    let s: string = emit_instr("  ", "void", ins);
+    if !string_eq(s, "  return;\n") { return 1; }
+    return 0;
+}
+
+fn test_param_list() -> i32 {
+    if !string_eq(emit_param_list_0(), "void") { return 1; }
+    if !string_eq(emit_param_list_1(9, 1), "int x") { return 2; }
+    if !string_eq(emit_param_list_2(9, 1, 9, 2), "int x, int y") { return 3; }
+    return 0;
+}
+
+fn test_fn_proto() -> i32 {
+    let s1: string = emit_fn_proto(1, 9, 12, "void");
+    if !string_eq(s1, "static int foo(void)") { return 1; }
+    let s2: string = emit_fn_proto(0, 9, 11, "int x, int y");
+    if !string_eq(s2, "int main(int x, int y)") { return 2; }
+    let s3: string = emit_fn_proto(1, 10, 13, "int n");
+    if !string_eq(s3, "static void bar(int n)") { return 3; }
+    return 0;
+}
+
+fn test_block_defn() -> i32 {
+    let proto: string = emit_fn_proto(0, 9, 11, "void");
+    let body: string = "  return 0;\n";
+    let s: string = emit_block_defn(proto, body);
+    if !string_eq(s, "int main(void) {\n  return 0;\n}\n\n") { return 1; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_int_format();
+    if r1 != 0 { return r1; }
+    println("PASS test_int_format");
+    let r2: i32 = test_escape();
+    if r2 != 0 { return 10 + r2; }
+    println("PASS test_escape");
+    let r3: i32 = test_emit_value_basic();
+    if r3 != 0 { return 20 + r3; }
+    println("PASS test_emit_value_basic");
+    let r4: i32 = test_emit_value_string();
+    if r4 != 0 { return 30 + r4; }
+    println("PASS test_emit_value_string");
+    let r5: i32 = test_emit_value_addr();
+    if r5 != 0 { return 40 + r5; }
+    println("PASS test_emit_value_addr");
+    let r6: i32 = test_emit_member();
+    if r6 != 0 { return 50 + r6; }
+    println("PASS test_emit_member");
+    let r7: i32 = test_emit_expr_lit();
+    if r7 != 0 { return 60 + r7; }
+    println("PASS test_emit_expr_lit");
+    let r8: i32 = test_emit_expr_load();
+    if r8 != 0 { return 70 + r8; }
+    println("PASS test_emit_expr_load");
+    let r9: i32 = test_emit_expr_binop();
+    if r9 != 0 { return 80 + r9; }
+    println("PASS test_emit_expr_binop");
+    let r10: i32 = test_emit_expr_unop();
+    if r10 != 0 { return 90 + r10; }
+    println("PASS test_emit_expr_unop");
+    let r11: i32 = test_emit_expr_field();
+    if r11 != 0 { return 100 + r11; }
+    println("PASS test_emit_expr_field");
+    let r12: i32 = test_instr_nop();
+    if r12 != 0 { return 110 + r12; }
+    println("PASS test_instr_nop");
+    let r13: i32 = test_instr_declvar();
+    if r13 != 0 { return 120 + r13; }
+    println("PASS test_instr_declvar");
+    let r14: i32 = test_instr_declnamed();
+    if r14 != 0 { return 130 + r14; }
+    println("PASS test_instr_declnamed");
+    let r15: i32 = test_instr_assign();
+    if r15 != 0 { return 140 + r15; }
+    println("PASS test_instr_assign");
+    let r16: i32 = test_instr_store();
+    if r16 != 0 { return 150 + r16; }
+    println("PASS test_instr_store");
+    let r17: i32 = test_instr_storefield();
+    if r17 != 0 { return 160 + r17; }
+    println("PASS test_instr_storefield");
+    let r18a: i32 = test_instr_ifelse();
+    if r18a != 0 { return 170 + r18a; }
+    println("PASS test_instr_ifelse");
+    let r18b: i32 = test_instr_while();
+    if r18b != 0 { return 175 + r18b; }
+    println("PASS test_instr_while");
+    let r18c: i32 = test_instr_block();
+    if r18c != 0 { return 178 + r18c; }
+    println("PASS test_instr_block");
+    let r18: i32 = test_instr_break_continue();
+    if r18 != 0 { return 180 + r18; }
+    println("PASS test_instr_break_continue");
+    let r19: i32 = test_instr_call_void();
+    if r19 != 0 { return 180 + r19; }
+    println("PASS test_instr_call_void");
+    let r20: i32 = test_instr_call_dest();
+    if r20 != 0 { return 190 + r20; }
+    println("PASS test_instr_call_dest");
+    let r21: i32 = test_instr_requires();
+    if r21 != 0 { return 200 + r21; }
+    println("PASS test_instr_requires");
+    let r22: i32 = test_instr_ensures();
+    if r22 != 0 { return 210 + r22; }
+    println("PASS test_instr_ensures");
+    let r23: i32 = test_instr_return_void();
+    if r23 != 0 { return 220 + r23; }
+    println("PASS test_instr_return_void");
+    let r24: i32 = test_instr_return_val();
+    if r24 != 0 { return 230 + r24; }
+    println("PASS test_instr_return_val");
+    let r25: i32 = test_instr_return_val_void();
+    if r25 != 0 { return 240 + r25; }
+    println("PASS test_instr_return_val_void");
+    let r26: i32 = test_param_list();
+    if r26 != 0 { return 250 + r26; }
+    println("PASS test_param_list");
+    let r27: i32 = test_fn_proto();
+    if r27 != 0 { return 260 + r27; }
+    println("PASS test_fn_proto");
+    let r28: i32 = test_block_defn();
+    if r28 != 0 { return 270 + r28; }
+    println("PASS test_block_defn");
+    return 0;
+}

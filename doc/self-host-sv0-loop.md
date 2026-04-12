@@ -16,7 +16,7 @@ The meta-repo wires the **full mechanical loop** except swapping the bootstrap c
 | Leg | What runs in `./scripts/sv0 test` |
 |-----|-----------------------------------|
 | SML → C (×2) | Byte-identical check (determinism). |
-| C → native | `cc` + run each pilot `main` (**`lib/self-host-sv0-loop.list`** — **172** programs: all bootstrap-listed sources; parser / lexer / lib / IR / C-backend / VM-backend / bytecode / driver / include-expansion / type-checker / unify / pipeline-composition seeds + golden-pass / integration / vm-parity tests that link as a single TU today). |
+| C → native | `cc` + run each pilot `main` (**`lib/self-host-sv0-loop.list`** — **261** programs: all bootstrap-listed sources; parser / lexer / lib / IR / C-backend / VM-backend / bytecode / driver / include-expansion / type-checker / unify / pipeline-composition seeds + golden-pass / integration / vm-parity tests that link as a single TU today). |
 | “Second compiler” → C | **`diff`** vs SML: by default **`scripts/sv0-self-host-emit-c.sh`** (delegates to the SML heap — proves the hook and stdout contract). |
 
 When you have a real compiler built from sv0, set **`SV0_SELF_HOST_COMPILER`** to that binary (or a wrapper). The script is invoked as:
