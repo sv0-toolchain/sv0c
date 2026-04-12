@@ -374,16 +374,17 @@ structure VmCodegen :> VM_CODEGEN = struct
           I.Block xs => emitLoopSeq env retTy xs cont exitTail
         | I.IfElse (ec, th, el) =>
             let
-              val mergeCont = cont
-              val elC = emitLoopSeq env retTy el mergeCont exitTail
-              val offEnd = encLens elC
-              val breakSuffixFromThen = elC
-              val thC =
-                emitLoopSeqWithBreakSuffix env retTy th (fn () => [B.JUMP offEnd]) breakSuffixFromThen
+              val contCode = cont ()
+              val exitTailForElse = contCode @ exitTail
+              val elCode = emitLoopSeq env retTy el (fn () => []) exitTailForElse
+              val offEnd = encLens elCode
+              val jumpEnd = B.JUMP offEnd
+              val exitTailForThen = [jumpEnd] @ elCode @ contCode @ exitTail
+              val thCode = emitLoopSeq env retTy th (fn () => []) exitTailForThen
               val c = emitExpr structs enums env pool ec
-              val offElse = encLens thC
+              val offElse = encLens thCode + encLen jumpEnd
             in
-              c @ [B.JUMP_IF_NOT offElse] @ thC @ elC
+              c @ [B.JUMP_IF_NOT offElse] @ thCode @ [jumpEnd] @ elCode @ contCode
             end
         | I.While (ec, innerBody) => emitWhileLoop env retTy ec innerBody @ cont ()
         | _ => emitInstr env retTy ins @ cont ()
