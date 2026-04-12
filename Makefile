@@ -6,14 +6,14 @@ CC       ?= cc
 .PHONY: build test check heap clean e2e test-contract-runtime integration integration-vm
 
 build:
-	echo 'CM.make "sources.cm";' | $(SML)
+	echo 'CM.make "sources.cm"; OS.Process.exit OS.Process.success;' | $(SML)
 
 test:
 	mkdir -p build
-	echo 'CM.make "sources.cm"; use "test/test_runner.sml";' | $(SML)
+	echo 'CM.make "sources.cm"; use "test/test_runner.sml"; OS.Process.exit OS.Process.success;' | $(SML)
 
 check:
-	@tmp=$$(mktemp); echo 'CM.make "sources.cm";' | $(SML) >$$tmp 2>&1; \
+	@tmp=$$(mktemp); echo 'CM.make "sources.cm"; OS.Process.exit OS.Process.success;' | $(SML) >$$tmp 2>&1; \
 	  if grep -q 'Error:' $$tmp; then tail -40 $$tmp; rm -f $$tmp; exit 1; fi; \
 	  rm -f $$tmp
 
