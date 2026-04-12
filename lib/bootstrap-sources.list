@@ -161,6 +161,7 @@ test/data/golden/pass/println_ok.sv0
 test/data/golden/pass/forall_requires.sv0
 test/data/golden/pass/exists_requires.sv0
 test/data/golden/pass/old_ensures.sv0
+lib/codegen.sv0
 lib/codegen_emit_value_core.sv0
 lib/codegen_emit_expr_core.sv0
 lib/codegen_emit_instr_core.sv0

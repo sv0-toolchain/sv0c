@@ -79,6 +79,7 @@ parser/expr_prec_ladder_core.sv0
 parser/expr_cast_core.sv0
 parser/expr_unary_stub_core.sv0
 parser/try_assign_stmt_core.sv0
+lib/codegen.sv0
 lib/codegen_emit_value_core.sv0
 lib/codegen_emit_expr_core.sv0
 lib/codegen_emit_instr_core.sv0

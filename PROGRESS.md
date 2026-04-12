@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-11 (America/Denver; **Track A final deepening — 11 more seeds (170→181), Track A COMPLETE.** lexer.sml 9→12 (keyword, scan_ident, scan_char). parser.sml 22→26 (if_expr, match_expr, struct_item, unary_expr). checker.sml 18→20 (expect, item_fn_ty). vm_codegen.sml 13→15 (enum_layout, pool_add). All non-trivial standalone functions seeded; remaining unseeded are mutual-recursion groups, I/O wrappers, trivial accessors. Metrics: unit 298→309 (est), vm-parity 171→182, stage0 173→184, self-host 249→260, total seeds 170→181)
+**Last updated:** 2026-04-12 (America/Denver; **Phase 2 codegen.sv0 — full instruction emission (17 kinds) including recursive IfElse/While/Block.** Extended real pipeline module `lib/codegen.sv0` from leaf emission to full instruction dispatch: added Instr enum (17 variants), emitInstr for all kinds, emit_instrs with Vec<i32> + Box<Instr> round-trip for recursive instruction lists, emitParamList, emitFnProto, emitBlockDefn. 31 tests total. Added to bootstrap + self-host lists + stage0 golden. Stale doc metrics reconciled. README sv0c SHA fixed. Metrics: bootstrap 260→261, self-host 260→261, stage0 183→184, vm-parity 186 unchanged)
 
 ## Checklist (local source of truth)
 
