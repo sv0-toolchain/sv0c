@@ -9,6 +9,11 @@ static int has_include_prefix(const char* line);
 static int find_closing_quote(const char* s, int start);
 static const char* chomp_cr(const char* line);
 static const char* parse_include_line(const char* line);
+static int split_lines(const char* source, int starts, int lens);
+static const char* get_split_line(const char* source, int starts, int lens, int idx);
+static int include_cycle_check(int visited, int path_handle);
+static const char* path_dir(const char* path);
+static const char* path_join(const char* dir, const char* rel);
 static int test_is_space(void);
 static int test_path_ok(void);
 static int test_has_include_prefix(void);
@@ -16,6 +21,10 @@ static int test_find_closing_quote(void);
 static int test_trim(void);
 static int test_chomp_cr(void);
 static int test_parse_include_line(void);
+static int test_split_lines(void);
+static int test_cycle_check(void);
+static int test_path_dir(void);
+static int test_path_join(void);
 
 static int is_space(int c) {
   if ((c == 32)) {
@@ -218,6 +227,98 @@ static const char* parse_include_line(const char* line) {
   } else {
   }
   return p;
+}
+
+static int split_lines(const char* source, int starts, int lens) {
+  int _sv0t0 = sv0_string_len(source);
+  int slen = _sv0t0;
+  int line_start = 0;
+  int i = 0;
+  int count = 0;
+  while ((i < slen)) {
+    int _sv0t1 = sv0_string_char_at(source, i);
+    int c = _sv0t1;
+    if ((c == 10)) {
+      sv0_vec_push(starts, line_start);
+      int _sv0t2 = (i - line_start);
+      sv0_vec_push(lens, _sv0t2);
+      count = (count + 1);
+      line_start = (i + 1);
+    } else {
+    }
+    i = (i + 1);
+  }
+  sv0_vec_push(starts, line_start);
+  int _sv0t3 = (slen - line_start);
+  sv0_vec_push(lens, _sv0t3);
+  count = (count + 1);
+  return count;
+}
+
+static const char* get_split_line(const char* source, int starts, int lens, int idx) {
+  int _sv0t0 = sv0_vec_get(starts, idx);
+  int s = _sv0t0;
+  int _sv0t1 = sv0_vec_get(lens, idx);
+  int l = _sv0t1;
+  if ((l == 0)) {
+    return "";
+  } else {
+  }
+  const char* _sv0t2 = sv0_string_substr(source, s, l);
+  return _sv0t2;
+}
+
+static int include_cycle_check(int visited, int path_handle) {
+  int _sv0t0 = sv0_vec_len(visited);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(visited, i);
+    if ((_sv0t1 == path_handle)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static const char* path_dir(const char* path) {
+  int _sv0t0 = sv0_string_len(path);
+  int len = _sv0t0;
+  int last_slash = (0 - 1);
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_string_char_at(path, i);
+    int c = _sv0t1;
+    if ((c == 47)) {
+      last_slash = i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  if ((last_slash < 0)) {
+    return "";
+  } else {
+  }
+  const char* _sv0t2 = sv0_string_substr(path, 0, last_slash);
+  return _sv0t2;
+}
+
+static const char* path_join(const char* dir, const char* rel) {
+  int _sv0t0 = sv0_string_len(dir);
+  int dlen = _sv0t0;
+  if ((dlen == 0)) {
+    return rel;
+  } else {
+  }
+  const char* out;
+  out = dir;
+  const char* _sv0t1 = sv0_string_concat(out, "/");
+  out = _sv0t1;
+  const char* _sv0t2 = sv0_string_concat(out, rel);
+  out = _sv0t2;
+  return out;
 }
 
 static int test_is_space(void) {
@@ -457,6 +558,141 @@ static int test_parse_include_line(void) {
   return 0;
 }
 
+static int test_split_lines(void) {
+  const char* src;
+  src = "alpha\nbeta\ngamma";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int lens = _sv0t1;
+  int _sv0t2 = split_lines(src, starts, lens);
+  int count = _sv0t2;
+  if ((count != 3)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t3 = get_split_line(src, starts, lens, 0);
+  const char* l1;
+  l1 = _sv0t3;
+  int _sv0t4 = sv0_string_eq(l1, "alpha");
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t5 = get_split_line(src, starts, lens, 1);
+  const char* l2;
+  l2 = _sv0t5;
+  int _sv0t6 = sv0_string_eq(l2, "beta");
+  if ((_sv0t6 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t7 = get_split_line(src, starts, lens, 2);
+  const char* l3;
+  l3 = _sv0t7;
+  int _sv0t8 = sv0_string_eq(l3, "gamma");
+  if ((_sv0t8 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int s2 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int l2v = _sv0t10;
+  int _sv0t11 = split_lines("single", s2, l2v);
+  int c2 = _sv0t11;
+  if ((c2 != 1)) {
+    return 5;
+  } else {
+  }
+  const char* _sv0t12 = get_split_line("single", s2, l2v, 0);
+  int _sv0t13 = sv0_string_eq(_sv0t12, "single");
+  if ((_sv0t13 != 1)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_cycle_check(void) {
+  int _sv0t0 = sv0_vec_new();
+  int visited = _sv0t0;
+  int _sv0t1 = include_cycle_check(visited, 42);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(visited, 10);
+  sv0_vec_push(visited, 20);
+  sv0_vec_push(visited, 30);
+  int _sv0t2 = include_cycle_check(visited, 20);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = include_cycle_check(visited, 42);
+  if ((_sv0t3 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = include_cycle_check(visited, 10);
+  if ((_sv0t4 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_path_dir(void) {
+  const char* _sv0t0 = path_dir("src/foo.sv0");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "src");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = path_dir("a/b/c.sv0");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "a/b");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = path_dir("foo.sv0");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = path_dir("");
+  int _sv0t7 = sv0_string_eq(_sv0t6, "");
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_path_join(void) {
+  const char* _sv0t0 = path_join("src", "foo.sv0");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "src/foo.sv0");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = path_join("", "foo.sv0");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "foo.sv0");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = path_join("a/b", "c.sv0");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "a/b/c.sv0");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_is_space();
   int r1 = _sv0t0;
@@ -504,6 +740,34 @@ int main(void) {
   if ((r7 != 0)) {
     int _sv0t12 = (60 + r7);
     return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_split_lines();
+  int r8 = _sv0t13;
+  if ((r8 != 0)) {
+    int _sv0t14 = (70 + r8);
+    return _sv0t14;
+  } else {
+  }
+  int _sv0t15 = test_cycle_check();
+  int r9 = _sv0t15;
+  if ((r9 != 0)) {
+    int _sv0t16 = (80 + r9);
+    return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = test_path_dir();
+  int r10 = _sv0t17;
+  if ((r10 != 0)) {
+    int _sv0t18 = (90 + r10);
+    return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_path_join();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (100 + r11);
+    return _sv0t20;
   } else {
   }
   return 0;

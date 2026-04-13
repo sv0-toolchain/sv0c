@@ -1,14 +1,10 @@
 /* Phase 2 real pipeline module: sml/parser/parser.sml -> sv0.
-   Parser utilities: token→binop mapping (18 tokens → Ast.binop tags),
-   token→assign-binop mapping (10 compound-assign tokens → binop tags),
-   literal classification from token tags (INT_LIT/FLOAT_LIT/STRING_LIT/
-   CHAR_LIT/TRUE/FALSE → Ast.literal tags), expr span extraction by
-   expr tag (28 expression kinds), skip helpers (skipOptionalPub,
-   skipOptionalUnsafe, skipGenericParams depth tracking,
-   skipWhereClause/skipAttributes by token tag), pathOfTy check,
-   span merge (min/max), precedence helpers.
-   Full recursive-descent parser deferred — needs token-stream state
-   with mutual recursion (parseExpr/parseType/parsePat/parseItem). */
+   Token stream navigation (peek/advance/expect/match on parallel Vecs
+   from lexer tokenize), parsePath, skipOptionalPub/skipOptionalUnsafe/
+   skipGenericParams/skipWhereClause/skipAttributes on token stream,
+   token→binop/assign-binop/literal mapping, Pratt precedence, span
+   merge. Full recursive-descent parser (parseExpr/parseType/parsePat/
+   parseItem) deferred — needs mutual recursion over AST construction. */
 
 /* ── token tag constants (from token.sv0) ───────────────────── */
 
@@ -63,14 +59,169 @@ fn TK_PIPEEQ() -> i32 { return 50; }
 fn TK_CARETEQ() -> i32 { return 51; }
 fn TK_LTLTEQ() -> i32 { return 52; }
 fn TK_GTGTEQ() -> i32 { return 53; }
-fn TK_PUB() -> i32 { return 79; }
-fn TK_PROJECT() -> i32 { return 79; }
-fn TK_UNSAFE() -> i32 { return 90; }
+fn TK_PUB() -> i32 { return 82; }
+fn TK_PROJECT() -> i32 { return 81; }
+fn TK_UNSAFE() -> i32 { return 93; }
 fn TK_FN() -> i32 { return 65; }
-fn TK_WHERE() -> i32 { return 91; }
-fn TK_TRUE() -> i32 { return 89; }
+fn TK_WHERE() -> i32 { return 95; }
+fn TK_TRUE() -> i32 { return 91; }
 fn TK_FALSE() -> i32 { return 64; }
-fn TK_EOF() -> i32 { return 96; }
+fn TK_EOF() -> i32 { return 97; }
+fn TK_SELF_TYPE() -> i32 { return 87; }
+fn TK_MUT() -> i32 { return 77; }
+fn TK_LET() -> i32 { return 71; }
+fn TK_IF() -> i32 { return 68; }
+fn TK_ELSE() -> i32 { return 60; }
+fn TK_MATCH() -> i32 { return 74; }
+fn TK_RETURN() -> i32 { return 85; }
+fn TK_WHILE() -> i32 { return 96; }
+fn TK_LOOP() -> i32 { return 72; }
+fn TK_FOR() -> i32 { return 66; }
+fn TK_BREAK() -> i32 { return 57; }
+fn TK_CONTINUE() -> i32 { return 59; }
+fn TK_STRUCT() -> i32 { return 89; }
+fn TK_ENUM() -> i32 { return 62; }
+fn TK_IMPL() -> i32 { return 69; }
+fn TK_TRAIT() -> i32 { return 90; }
+fn TK_TYPE() -> i32 { return 92; }
+fn TK_USE() -> i32 { return 94; }
+fn TK_AS() -> i32 { return 54; }
+fn TK_IN() -> i32 { return 70; }
+
+/* ── token stream navigation ───────────────────────────────────
+   Works on the parallel Vec<i32> triplet (tags, starts, ends)
+   produced by lexer tokenize. pos is the current index.
+   Convention: functions return the new pos; error → return -1. */
+
+fn ps_peek(tags: Vec<i32>, pos: i32) -> i32 {
+    if pos >= vec_len(tags) { return 97; }
+    return vec_get(tags, pos);
+}
+
+fn ps_at_end(tags: Vec<i32>, pos: i32) -> bool {
+    return ps_peek(tags, pos) == 97;
+}
+
+fn ps_start(starts: Vec<i32>, pos: i32) -> i32 {
+    return vec_get(starts, pos);
+}
+
+fn ps_end(ends: Vec<i32>, pos: i32) -> i32 {
+    return vec_get(ends, pos);
+}
+
+fn ps_advance(pos: i32) -> i32 {
+    return pos + 1;
+}
+
+fn ps_expect(tags: Vec<i32>, pos: i32, expected: i32) -> i32 {
+    if ps_peek(tags, pos) != expected { return 0 - 1; }
+    return pos + 1;
+}
+
+fn ps_match(tags: Vec<i32>, pos: i32, expected: i32) -> i32 {
+    if ps_peek(tags, pos) == expected { return pos + 1; }
+    return pos;
+}
+
+fn ps_tok_text(source: string, starts: Vec<i32>, ends: Vec<i32>, pos: i32) -> string {
+    let s: i32 = vec_get(starts, pos);
+    let e: i32 = vec_get(ends, pos);
+    return string_substr(source, s, e - s);
+}
+
+/* ── parsePath ─────────────────────────────────────────────────
+   Parses a path like `foo`, `Foo::Bar`, `Foo::Bar::Baz`.
+   Stores token indices of path segments in path_out.
+   Returns new pos, or -1 on error. */
+
+fn parse_path(tags: Vec<i32>, pos: i32, path_out: Vec<i32>) -> i32 {
+    let tag: i32 = ps_peek(tags, pos);
+    if tag != 5 { return 0 - 1; }
+    vec_push(path_out, pos);
+    let mut p: i32 = pos + 1;
+    let mut done: bool = false;
+    while done != true {
+        if ps_peek(tags, p) == 15 {
+            let next: i32 = ps_peek(tags, p + 1);
+            if next == 5 {
+                vec_push(path_out, p + 1);
+                p = p + 2;
+            } else { done = true; }
+        } else { done = true; }
+    }
+    return p;
+}
+
+/* ── skip helpers on token stream ──────────────────────────────
+   These operate on (tags, pos) and return new pos. */
+
+fn ps_skip_optional_pub(tags: Vec<i32>, pos: i32) -> i32 {
+    if ps_peek(tags, pos) != 82 { return pos; }
+    if ps_peek(tags, pos + 1) == 6 {
+        if ps_peek(tags, pos + 2) == 81 {
+            if ps_peek(tags, pos + 3) == 7 {
+                return pos + 4;
+            }
+        }
+    }
+    return pos + 1;
+}
+
+fn ps_skip_optional_unsafe(tags: Vec<i32>, pos: i32) -> i32 {
+    if ps_peek(tags, pos) == 93 { return pos + 1; }
+    return pos;
+}
+
+fn ps_skip_generic_params(tags: Vec<i32>, pos: i32) -> i32 {
+    if ps_peek(tags, pos) != 38 { return pos; }
+    let mut p: i32 = pos + 1;
+    let mut depth: i32 = 1;
+    while depth > 0 {
+        let t: i32 = ps_peek(tags, p);
+        if t == 97 { return p; }
+        if t == 38 { depth = depth + 1; }
+        if t == 39 { depth = depth - 1; }
+        p = p + 1;
+    }
+    return p;
+}
+
+fn ps_skip_where_clause(tags: Vec<i32>, pos: i32) -> i32 {
+    if ps_peek(tags, pos) != 95 { return pos; }
+    let mut p: i32 = pos + 1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t == 97 { return p; }
+        if t == 8 { return p; }
+        if t == 65 { return p; }
+        if t == 13 { return p + 1; }
+        p = p + 1;
+    }
+    return p;
+}
+
+fn ps_skip_attributes(tags: Vec<i32>, pos: i32) -> i32 {
+    let mut p: i32 = pos;
+    let mut scanning: bool = true;
+    while scanning {
+        if ps_peek(tags, p) == 21 {
+            if ps_peek(tags, p + 1) == 10 {
+                p = p + 2;
+                let mut depth: i32 = 1;
+                while depth > 0 {
+                    let t: i32 = ps_peek(tags, p);
+                    if t == 97 { return p; }
+                    if t == 10 { depth = depth + 1; }
+                    if t == 11 { depth = depth - 1; }
+                    p = p + 1;
+                }
+            } else { scanning = false; }
+        } else { scanning = false; }
+    }
+    return p;
+}
 
 /* ── AST binop tags (matching ast.sv0) ──────────────────────── */
 
@@ -162,7 +313,7 @@ fn lit_from_tok(tok_tag: i32) -> i32 {
     if tok_tag == 1 { return 1; }
     if tok_tag == 2 { return 3; }
     if tok_tag == 3 { return 4; }
-    if tok_tag == 89 { return 5; }
+    if tok_tag == 91 { return 5; }
     if tok_tag == 64 { return 5; }
     return 0 - 1;
 }
@@ -183,15 +334,15 @@ fn expr_has_span(expr_tag: i32) -> bool {
 /* ── skip helpers ───────────────────────────────────────────── */
 
 fn is_pub_token(tok_tag: i32) -> bool {
-    return tok_tag == 79;
+    return tok_tag == 82;
 }
 
 fn is_unsafe_token(tok_tag: i32) -> bool {
-    return tok_tag == 90;
+    return tok_tag == 93;
 }
 
 fn is_where_token(tok_tag: i32) -> bool {
-    return tok_tag == 91;
+    return tok_tag == 95;
 }
 
 fn is_hash_token(tok_tag: i32) -> bool {
@@ -222,7 +373,7 @@ fn where_clause_stop(tok_tag: i32) -> bool {
     if tok_tag == 8 { return true; }
     if tok_tag == 65 { return true; }
     if tok_tag == 13 { return true; }
-    if tok_tag == 96 { return true; }
+    if tok_tag == 97 { return true; }
     return false;
 }
 
@@ -401,7 +552,7 @@ fn test_lit_from_tok() -> i32 {
     if lit_from_tok(1) != 1 { return 2; }
     if lit_from_tok(2) != 3 { return 3; }
     if lit_from_tok(3) != 4 { return 4; }
-    if lit_from_tok(89) != 5 { return 5; }
+    if lit_from_tok(91) != 5 { return 5; }
     if lit_from_tok(64) != 5 { return 6; }
     if lit_from_tok(5) != 0 - 1 { return 7; }
     if is_literal_tok(0) != true { return 8; }
@@ -418,10 +569,10 @@ fn test_expr_span() -> i32 {
 }
 
 fn test_skip_helpers() -> i32 {
-    if is_pub_token(79) != true { return 1; }
+    if is_pub_token(82) != true { return 1; }
     if is_pub_token(0) != false { return 2; }
-    if is_unsafe_token(90) != true { return 3; }
-    if is_where_token(91) != true { return 4; }
+    if is_unsafe_token(93) != true { return 3; }
+    if is_where_token(95) != true { return 4; }
     if is_hash_token(21) != true { return 5; }
     if is_lt_token(38) != true { return 6; }
     if is_gt_token(39) != true { return 7; }
@@ -433,7 +584,7 @@ fn test_skip_helpers() -> i32 {
     if where_clause_stop(8) != true { return 13; }
     if where_clause_stop(65) != true { return 14; }
     if where_clause_stop(13) != true { return 15; }
-    if where_clause_stop(96) != true { return 16; }
+    if where_clause_stop(97) != true { return 16; }
     if where_clause_stop(0) != false { return 17; }
     return 0;
 }
@@ -504,6 +655,122 @@ fn test_attr_bracket() -> i32 {
     return 0;
 }
 
+fn test_ps_nav() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 5);
+    vec_push(tags, 22);
+    vec_push(tags, 5);
+    vec_push(tags, 97);
+    if ps_peek(tags, 0) != 5 { return 1; }
+    if ps_peek(tags, 1) != 22 { return 2; }
+    if ps_peek(tags, 3) != 97 { return 3; }
+    if ps_peek(tags, 10) != 97 { return 4; }
+    if ps_at_end(tags, 3) != true { return 5; }
+    if ps_at_end(tags, 0) != false { return 6; }
+    if ps_advance(0) != 1 { return 7; }
+    if ps_expect(tags, 0, 5) != 1 { return 8; }
+    if ps_expect(tags, 0, 22) != 0 - 1 { return 9; }
+    if ps_match(tags, 0, 5) != 1 { return 10; }
+    if ps_match(tags, 0, 22) != 0 { return 11; }
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(starts, 3);
+    vec_push(ends, 3);
+    vec_push(ends, 4);
+    if ps_start(starts, 0) != 0 { return 12; }
+    if ps_end(ends, 0) != 3 { return 13; }
+    let src: string = "foo+bar";
+    let txt: string = ps_tok_text(src, starts, ends, 0);
+    if string_len(txt) != 3 { return 14; }
+    return 0;
+}
+
+fn test_parse_path() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 5);
+    vec_push(tags, 15);
+    vec_push(tags, 5);
+    vec_push(tags, 15);
+    vec_push(tags, 5);
+    vec_push(tags, 22);
+    vec_push(tags, 97);
+    let path: Vec<i32> = vec_new();
+    let end_pos: i32 = parse_path(tags, 0, path);
+    if vec_len(path) != 3 { return 1; }
+    if vec_get(path, 0) != 0 { return 2; }
+    if vec_get(path, 1) != 2 { return 3; }
+    if vec_get(path, 2) != 4 { return 4; }
+    if end_pos != 5 { return 5; }
+    let path2: Vec<i32> = vec_new();
+    let end2: i32 = parse_path(tags, 0, path2);
+    if vec_len(path2) != 3 { return 6; }
+    let single: Vec<i32> = vec_new();
+    let tags2: Vec<i32> = vec_new();
+    vec_push(tags2, 5);
+    vec_push(tags2, 22);
+    vec_push(tags2, 97);
+    let end3: i32 = parse_path(tags2, 0, single);
+    if vec_len(single) != 1 { return 7; }
+    if end3 != 1 { return 8; }
+    let empty: Vec<i32> = vec_new();
+    let fail: i32 = parse_path(tags2, 1, empty);
+    if fail != 0 - 1 { return 9; }
+    return 0;
+}
+
+fn test_ps_skip() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 82);
+    vec_push(tags, 65);
+    vec_push(tags, 97);
+    if ps_skip_optional_pub(tags, 0) != 1 { return 1; }
+    if ps_skip_optional_pub(tags, 1) != 1 { return 2; }
+    let tags2: Vec<i32> = vec_new();
+    vec_push(tags2, 82);
+    vec_push(tags2, 6);
+    vec_push(tags2, 81);
+    vec_push(tags2, 7);
+    vec_push(tags2, 65);
+    vec_push(tags2, 97);
+    if ps_skip_optional_pub(tags2, 0) != 4 { return 3; }
+    let tags3: Vec<i32> = vec_new();
+    vec_push(tags3, 93);
+    vec_push(tags3, 65);
+    vec_push(tags3, 97);
+    if ps_skip_optional_unsafe(tags3, 0) != 1 { return 4; }
+    if ps_skip_optional_unsafe(tags3, 1) != 1 { return 5; }
+    let tags4: Vec<i32> = vec_new();
+    vec_push(tags4, 38);
+    vec_push(tags4, 5);
+    vec_push(tags4, 12);
+    vec_push(tags4, 5);
+    vec_push(tags4, 39);
+    vec_push(tags4, 8);
+    vec_push(tags4, 97);
+    if ps_skip_generic_params(tags4, 0) != 5 { return 6; }
+    if ps_skip_generic_params(tags4, 5) != 5 { return 7; }
+    let tags5: Vec<i32> = vec_new();
+    vec_push(tags5, 95);
+    vec_push(tags5, 5);
+    vec_push(tags5, 14);
+    vec_push(tags5, 5);
+    vec_push(tags5, 8);
+    vec_push(tags5, 97);
+    if ps_skip_where_clause(tags5, 0) != 4 { return 8; }
+    if ps_skip_where_clause(tags5, 4) != 4 { return 9; }
+    let tags6: Vec<i32> = vec_new();
+    vec_push(tags6, 21);
+    vec_push(tags6, 10);
+    vec_push(tags6, 5);
+    vec_push(tags6, 11);
+    vec_push(tags6, 65);
+    vec_push(tags6, 97);
+    if ps_skip_attributes(tags6, 0) != 4 { return 10; }
+    if ps_skip_attributes(tags6, 4) != 4 { return 11; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_of();
     if r1 != 0 { return r1; }
@@ -525,5 +792,11 @@ fn main() -> i32 {
     if r9 != 0 { return 130 + r9; }
     let r10: i32 = test_pratt_prec();
     if r10 != 0 { return 140 + r10; }
+    let r11: i32 = test_ps_nav();
+    if r11 != 0 { return 160 + r11; }
+    let r12: i32 = test_parse_path();
+    if r12 != 0 { return 180 + r12; }
+    let r13: i32 = test_ps_skip();
+    if r13 != 0 { return 200 + r13; }
     return 0;
 }

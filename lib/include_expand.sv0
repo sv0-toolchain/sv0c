@@ -1,8 +1,8 @@
 /* Phase 2 real pipeline module: sml/include_expand.sml -> sv0.
    Textual include expansion: character classification, whitespace
-   trimming, path validation, include-line parsing. Covers the pure
-   function surface of include_expand.sml (isSpace, trim, chompCR,
-   pathOk, parseIncludeLine). expand/expandFile deferred (file I/O). */
+   trimming, path validation, include-line parsing, line splitting/
+   joining, cycle detection (Vec-based visited list).
+   expand/expandFile deferred (file I/O via host). */
 
 fn is_space(c: i32) -> bool {
     if c == 32 { return true; }
@@ -94,6 +94,77 @@ fn parse_include_line(line: string) -> string {
     return p;
 }
 
+/* ── line splitting/joining ─────────────────────────────────────
+   split_lines: stores (start, len) pairs in out Vec, returns count.
+   join_lines: reconstructs string from substrings with newlines. */
+
+fn split_lines(source: string, starts: Vec<i32>, lens: Vec<i32>) -> i32 {
+    let slen: i32 = string_len(source);
+    let mut line_start: i32 = 0;
+    let mut i: i32 = 0;
+    let mut count: i32 = 0;
+    while i < slen {
+        let c: i32 = string_char_at(source, i);
+        if c == 10 {
+            vec_push(starts, line_start);
+            vec_push(lens, i - line_start);
+            count = count + 1;
+            line_start = i + 1;
+        }
+        i = i + 1;
+    }
+    vec_push(starts, line_start);
+    vec_push(lens, slen - line_start);
+    count = count + 1;
+    return count;
+}
+
+fn get_split_line(source: string, starts: Vec<i32>, lens: Vec<i32>, idx: i32) -> string {
+    let s: i32 = vec_get(starts, idx);
+    let l: i32 = vec_get(lens, idx);
+    if l == 0 { return ""; }
+    return string_substr(source, s, l);
+}
+
+/* ── cycle detection ───────────────────────────────────────────
+   visited is a Vec<i32> of interned path handles.
+   Returns true if handle is already in the list. */
+
+fn include_cycle_check(visited: Vec<i32>, path_handle: i32) -> bool {
+    let n: i32 = vec_len(visited);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(visited, i) == path_handle { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* ── path directory extraction ─────────────────────────────────
+   Returns prefix up to last '/' (exclusive), or "" if no slash. */
+
+fn path_dir(path: string) -> string {
+    let len: i32 = string_len(path);
+    let mut last_slash: i32 = 0 - 1;
+    let mut i: i32 = 0;
+    while i < len {
+        let c: i32 = string_char_at(path, i);
+        if c == 47 { last_slash = i; }
+        i = i + 1;
+    }
+    if last_slash < 0 { return ""; }
+    return string_substr(path, 0, last_slash);
+}
+
+fn path_join(dir: string, rel: string) -> string {
+    let dlen: i32 = string_len(dir);
+    if dlen == 0 { return rel; }
+    let mut out: string = dir;
+    out = string_concat(out, "/");
+    out = string_concat(out, rel);
+    return out;
+}
+
 fn test_is_space() -> i32 {
     if is_space(32) != true { return 1; }
     if is_space(9) != true { return 2; }
@@ -165,6 +236,53 @@ fn test_parse_include_line() -> i32 {
     return 0;
 }
 
+fn test_split_lines() -> i32 {
+    let src: string = "alpha\nbeta\ngamma";
+    let starts: Vec<i32> = vec_new();
+    let lens: Vec<i32> = vec_new();
+    let count: i32 = split_lines(src, starts, lens);
+    if count != 3 { return 1; }
+    let l1: string = get_split_line(src, starts, lens, 0);
+    if string_eq(l1, "alpha") != true { return 2; }
+    let l2: string = get_split_line(src, starts, lens, 1);
+    if string_eq(l2, "beta") != true { return 3; }
+    let l3: string = get_split_line(src, starts, lens, 2);
+    if string_eq(l3, "gamma") != true { return 4; }
+    let s2: Vec<i32> = vec_new();
+    let l2v: Vec<i32> = vec_new();
+    let c2: i32 = split_lines("single", s2, l2v);
+    if c2 != 1 { return 5; }
+    if string_eq(get_split_line("single", s2, l2v, 0), "single") != true { return 6; }
+    return 0;
+}
+
+fn test_cycle_check() -> i32 {
+    let visited: Vec<i32> = vec_new();
+    if include_cycle_check(visited, 42) != false { return 1; }
+    vec_push(visited, 10);
+    vec_push(visited, 20);
+    vec_push(visited, 30);
+    if include_cycle_check(visited, 20) != true { return 2; }
+    if include_cycle_check(visited, 42) != false { return 3; }
+    if include_cycle_check(visited, 10) != true { return 4; }
+    return 0;
+}
+
+fn test_path_dir() -> i32 {
+    if string_eq(path_dir("src/foo.sv0"), "src") != true { return 1; }
+    if string_eq(path_dir("a/b/c.sv0"), "a/b") != true { return 2; }
+    if string_eq(path_dir("foo.sv0"), "") != true { return 3; }
+    if string_eq(path_dir(""), "") != true { return 4; }
+    return 0;
+}
+
+fn test_path_join() -> i32 {
+    if string_eq(path_join("src", "foo.sv0"), "src/foo.sv0") != true { return 1; }
+    if string_eq(path_join("", "foo.sv0"), "foo.sv0") != true { return 2; }
+    if string_eq(path_join("a/b", "c.sv0"), "a/b/c.sv0") != true { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_space();
     if r1 != 0 { return r1; }
@@ -180,5 +298,13 @@ fn main() -> i32 {
     if r6 != 0 { return 50 + r6; }
     let r7: i32 = test_parse_include_line();
     if r7 != 0 { return 60 + r7; }
+    let r8: i32 = test_split_lines();
+    if r8 != 0 { return 70 + r8; }
+    let r9: i32 = test_cycle_check();
+    if r9 != 0 { return 80 + r9; }
+    let r10: i32 = test_path_dir();
+    if r10 != 0 { return 90 + r10; }
+    let r11: i32 = test_path_join();
+    if r11 != 0 { return 100 + r11; }
     return 0;
 }
