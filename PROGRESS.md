@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: lexer.sv0 + link.sv0.** `lib/lexer.sv0` new real module covering lexer.sml pure-function surface: character classification (7 functions), string-based keyword lookup (43 keywords → canonical token tags), escape-sequence handling, lexer state management (peek/advance on real strings), whitespace + nested block-comment skipping (skip_ws/skip_line_comment/skip_block_comment/skip_all), identifier and digit scan helpers (dec/hex/bin/oct with underscore support), operator-character → token tag mapping (single/double/fallback). 11 test groups. `lib/link.sv0` new real module covering link.sml pure-function surface (11 tests). Metrics: bootstrap 263, self-host 263, stage0 187, vm-parity 182)
+**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: resolver.sv0 + lexer.sv0 + link.sv0.** `lib/resolver.sv0` new real module covering resolver.sml pure-function surface: string-based intrinsic registry (17 builtins, name→arity lookup, string/vec/box classification), item registration dispatch (fn/type/variant classification by tag), pattern-bind counting, variant-arity extraction, qualified path generation, context rules (allowSelf for trait/impl), error code classification, arity checking. 11 test groups. `lib/lexer.sv0` new real module (11 test groups). `lib/link.sv0` new real module (11 tests). Metrics: bootstrap 264, self-host 264, stage0 188, vm-parity 182)
 
 ## Checklist (local source of truth)
 

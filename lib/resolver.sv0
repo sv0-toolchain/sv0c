@@ -1,0 +1,335 @@
+/* Phase 2 real pipeline module: sml/name_resolution/resolver.sml -> sv0.
+   Name resolution utilities: path-to-string joining, intrinsic
+   function registration (17 builtins with string-based name+arity
+   lookup), item registration dispatch (by item tag → value/type/
+   variant classification), pattern-bind counting, variant-arity
+   extraction, context rules (allowSelf for trait/impl), resolution
+   error code classification.
+   AST traversal functions (resolveTy, resolveExpr, resolveStmt,
+   resolveTopItem) and applyUseClause deferred — need full AST enum
+   pattern matching with Box handles. */
+
+/* ── path joining ───────────────────────────────────────────── */
+
+fn path_join2(a: string, b: string) -> string {
+    let ab: string = string_concat(a, "::");
+    return string_concat(ab, b);
+}
+
+fn mangle_use_target(mod_name: string, item_name: string) -> string {
+    let a: string = string_concat(mod_name, "__");
+    return string_concat(a, item_name);
+}
+
+/* ── intrinsic function registry (string-based) ─────────────── */
+
+/* 17 intrinsics from withIntrinsics in resolver.sml:
+   println(1), old(1), forall(3), exists(3), no_alias(2),
+   string_len(1), string_eq(2), string_concat(2),
+   string_char_at(2), string_substr(3),
+   vec_new(0), vec_push(2), vec_len(1), vec_get(2), vec_set(3),
+   box_new(1), box_deref(1). */
+
+fn is_intrinsic(name: string) -> bool {
+    if string_eq(name, "println") { return true; }
+    if string_eq(name, "old") { return true; }
+    if string_eq(name, "forall") { return true; }
+    if string_eq(name, "exists") { return true; }
+    if string_eq(name, "no_alias") { return true; }
+    if string_eq(name, "string_len") { return true; }
+    if string_eq(name, "string_eq") { return true; }
+    if string_eq(name, "string_concat") { return true; }
+    if string_eq(name, "string_char_at") { return true; }
+    if string_eq(name, "string_substr") { return true; }
+    if string_eq(name, "vec_new") { return true; }
+    if string_eq(name, "vec_push") { return true; }
+    if string_eq(name, "vec_len") { return true; }
+    if string_eq(name, "vec_get") { return true; }
+    if string_eq(name, "vec_set") { return true; }
+    if string_eq(name, "box_new") { return true; }
+    if string_eq(name, "box_deref") { return true; }
+    return false;
+}
+
+fn intrinsic_arity(name: string) -> i32 {
+    if string_eq(name, "println") { return 1; }
+    if string_eq(name, "old") { return 1; }
+    if string_eq(name, "forall") { return 3; }
+    if string_eq(name, "exists") { return 3; }
+    if string_eq(name, "no_alias") { return 2; }
+    if string_eq(name, "string_len") { return 1; }
+    if string_eq(name, "string_eq") { return 2; }
+    if string_eq(name, "string_concat") { return 2; }
+    if string_eq(name, "string_char_at") { return 2; }
+    if string_eq(name, "string_substr") { return 3; }
+    if string_eq(name, "vec_new") { return 0; }
+    if string_eq(name, "vec_push") { return 2; }
+    if string_eq(name, "vec_len") { return 1; }
+    if string_eq(name, "vec_get") { return 2; }
+    if string_eq(name, "vec_set") { return 3; }
+    if string_eq(name, "box_new") { return 1; }
+    if string_eq(name, "box_deref") { return 1; }
+    return 0 - 1;
+}
+
+fn intrinsic_count() -> i32 {
+    return 17;
+}
+
+fn is_string_intrinsic(name: string) -> bool {
+    if string_eq(name, "string_len") { return true; }
+    if string_eq(name, "string_eq") { return true; }
+    if string_eq(name, "string_concat") { return true; }
+    if string_eq(name, "string_char_at") { return true; }
+    if string_eq(name, "string_substr") { return true; }
+    return false;
+}
+
+fn is_vec_intrinsic(name: string) -> bool {
+    if string_eq(name, "vec_new") { return true; }
+    if string_eq(name, "vec_push") { return true; }
+    if string_eq(name, "vec_len") { return true; }
+    if string_eq(name, "vec_get") { return true; }
+    if string_eq(name, "vec_set") { return true; }
+    return false;
+}
+
+fn is_box_intrinsic(name: string) -> bool {
+    if string_eq(name, "box_new") { return true; }
+    if string_eq(name, "box_deref") { return true; }
+    return false;
+}
+
+/* ── item registration classification ───────────────────────── */
+
+/* Item tags from ast.sv0: 0=ItemFn, 1=ItemStruct, 2=ItemEnum,
+   3=ItemTrait, 4=ItemImpl, 5=ItemUse, 6=ItemModule, 7=ItemTypeAlias. */
+
+fn item_registers_fn(tag: i32) -> bool {
+    return tag == 0;
+}
+
+fn item_registers_type(tag: i32) -> bool {
+    if tag == 1 { return true; }
+    if tag == 2 { return true; }
+    if tag == 3 { return true; }
+    if tag == 7 { return true; }
+    return false;
+}
+
+fn item_registers_variants(tag: i32) -> bool {
+    return tag == 2;
+}
+
+fn item_is_use(tag: i32) -> bool {
+    return tag == 5;
+}
+
+fn item_is_module(tag: i32) -> bool {
+    return tag == 6;
+}
+
+fn item_needs_registration(tag: i32) -> bool {
+    if item_registers_fn(tag) { return true; }
+    if item_registers_type(tag) { return true; }
+    return false;
+}
+
+/* ── variant arity extraction ───────────────────────────────── */
+
+/* Variant kinds: 0=VariantUnit, 1=VariantTuple, 2=VariantStruct. */
+fn enum_variant_arity(variant_kind: i32, tuple_fields: i32,
+                      struct_fields: i32) -> i32 {
+    if variant_kind == 0 { return 0; }
+    if variant_kind == 1 { return tuple_fields; }
+    if variant_kind == 2 { return struct_fields; }
+    return 0;
+}
+
+fn enum_variant_qualified_path(enum_name: string,
+                               variant_name: string) -> string {
+    return path_join2(enum_name, variant_name);
+}
+
+/* ── pattern-bind counting ──────────────────────────────────── */
+
+/* Pat tags: 0=PatWild, 1=PatBind, 2=PatLit, 3=PatTuple,
+   4=PatStruct, 5=PatEnum, 6=PatOr. */
+fn pat_binds_count(pat_tag: i32, child_count: i32) -> i32 {
+    if pat_tag == 0 { return 0; }
+    if pat_tag == 1 { return 1; }
+    if pat_tag == 2 { return 0; }
+    if pat_tag == 3 { return child_count; }
+    if pat_tag == 4 { return child_count; }
+    if pat_tag == 5 { return child_count; }
+    if pat_tag == 6 { return 255; }
+    return 0;
+}
+
+fn pat_is_or(pat_tag: i32) -> bool {
+    return pat_tag == 6;
+}
+
+/* ── context rules (allowSelf) ──────────────────────────────── */
+
+fn should_allow_self(item_tag: i32) -> bool {
+    if item_tag == 3 { return true; }
+    if item_tag == 4 { return true; }
+    return false;
+}
+
+/* ── resolution error codes ─────────────────────────────────── */
+
+fn error_code_unbound_ident() -> string { return "E0300"; }
+fn error_code_unknown_type() -> string { return "E0301"; }
+fn error_code_pat_or_unsupported() -> string { return "E0306"; }
+fn error_code_wrong_arity() -> string { return "E0307"; }
+fn error_code_use_clause() -> string { return "E0309"; }
+
+/* ── arity checking ─────────────────────────────────────────── */
+
+fn arity_matches(expected: i32, actual: i32) -> bool {
+    return expected == actual;
+}
+
+fn check_call_arity(expected: i32, actual: i32) -> i32 {
+    if expected == actual { return 0; }
+    if expected < 0 { return 0; }
+    return 1;
+}
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_path_join() -> i32 {
+    if string_eq(path_join2("Foo", "Bar"), "Foo::Bar") != true { return 1; }
+    if string_eq(path_join2("mod", "fn"), "mod::fn") != true { return 2; }
+    return 0;
+}
+
+fn test_mangle_use() -> i32 {
+    if string_eq(mangle_use_target("mymod", "foo"), "mymod__foo") != true { return 1; }
+    if string_eq(mangle_use_target("a", "b"), "a__b") != true { return 2; }
+    return 0;
+}
+
+fn test_is_intrinsic() -> i32 {
+    if is_intrinsic("println") != true { return 1; }
+    if is_intrinsic("vec_new") != true { return 2; }
+    if is_intrinsic("box_deref") != true { return 3; }
+    if is_intrinsic("foo") != false { return 4; }
+    if is_intrinsic("main") != false { return 5; }
+    return 0;
+}
+
+fn test_intrinsic_arity() -> i32 {
+    if intrinsic_arity("println") != 1 { return 1; }
+    if intrinsic_arity("forall") != 3 { return 2; }
+    if intrinsic_arity("vec_new") != 0 { return 3; }
+    if intrinsic_arity("string_substr") != 3 { return 4; }
+    if intrinsic_arity("unknown") != 0 - 1 { return 5; }
+    return 0;
+}
+
+fn test_intrinsic_classify() -> i32 {
+    if is_string_intrinsic("string_len") != true { return 1; }
+    if is_string_intrinsic("string_substr") != true { return 2; }
+    if is_string_intrinsic("println") != false { return 3; }
+    if is_vec_intrinsic("vec_new") != true { return 4; }
+    if is_vec_intrinsic("vec_set") != true { return 5; }
+    if is_vec_intrinsic("println") != false { return 6; }
+    if is_box_intrinsic("box_new") != true { return 7; }
+    if is_box_intrinsic("vec_new") != false { return 8; }
+    if intrinsic_count() != 17 { return 9; }
+    return 0;
+}
+
+fn test_item_classify() -> i32 {
+    if item_registers_fn(0) != true { return 1; }
+    if item_registers_fn(1) != false { return 2; }
+    if item_registers_type(1) != true { return 3; }
+    if item_registers_type(2) != true { return 4; }
+    if item_registers_type(3) != true { return 5; }
+    if item_registers_type(7) != true { return 6; }
+    if item_registers_type(0) != false { return 7; }
+    if item_registers_type(4) != false { return 8; }
+    if item_registers_variants(2) != true { return 9; }
+    if item_registers_variants(1) != false { return 10; }
+    if item_is_use(5) != true { return 11; }
+    if item_is_use(0) != false { return 12; }
+    if item_is_module(6) != true { return 13; }
+    if item_needs_registration(0) != true { return 14; }
+    if item_needs_registration(5) != false { return 15; }
+    return 0;
+}
+
+fn test_variant_arity() -> i32 {
+    if enum_variant_arity(0, 0, 0) != 0 { return 1; }
+    if enum_variant_arity(1, 3, 0) != 3 { return 2; }
+    if enum_variant_arity(2, 0, 5) != 5 { return 3; }
+    let qp: string = enum_variant_qualified_path("Color", "Red");
+    if string_eq(qp, "Color::Red") != true { return 4; }
+    return 0;
+}
+
+fn test_pat_binds() -> i32 {
+    if pat_binds_count(0, 0) != 0 { return 1; }
+    if pat_binds_count(1, 0) != 1 { return 2; }
+    if pat_binds_count(2, 0) != 0 { return 3; }
+    if pat_binds_count(3, 3) != 3 { return 4; }
+    if pat_binds_count(5, 2) != 2 { return 5; }
+    if pat_binds_count(6, 0) != 255 { return 6; }
+    if pat_is_or(6) != true { return 7; }
+    if pat_is_or(1) != false { return 8; }
+    return 0;
+}
+
+fn test_context() -> i32 {
+    if should_allow_self(3) != true { return 1; }
+    if should_allow_self(4) != true { return 2; }
+    if should_allow_self(0) != false { return 3; }
+    if should_allow_self(1) != false { return 4; }
+    return 0;
+}
+
+fn test_error_codes() -> i32 {
+    if string_eq(error_code_unbound_ident(), "E0300") != true { return 1; }
+    if string_eq(error_code_unknown_type(), "E0301") != true { return 2; }
+    if string_eq(error_code_wrong_arity(), "E0307") != true { return 3; }
+    if string_eq(error_code_use_clause(), "E0309") != true { return 4; }
+    return 0;
+}
+
+fn test_arity_check() -> i32 {
+    if arity_matches(3, 3) != true { return 1; }
+    if arity_matches(3, 2) != false { return 2; }
+    if check_call_arity(3, 3) != 0 { return 3; }
+    if check_call_arity(3, 2) != 1 { return 4; }
+    if check_call_arity(0 - 1, 5) != 0 { return 5; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_path_join();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_mangle_use();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_is_intrinsic();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_intrinsic_arity();
+    if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_intrinsic_classify();
+    if r5 != 0 { return 40 + r5; }
+    let r6: i32 = test_item_classify();
+    if r6 != 0 { return 50 + r6; }
+    let r7: i32 = test_variant_arity();
+    if r7 != 0 { return 70 + r7; }
+    let r8: i32 = test_pat_binds();
+    if r8 != 0 { return 80 + r8; }
+    let r9: i32 = test_context();
+    if r9 != 0 { return 90 + r9; }
+    let r10: i32 = test_error_codes();
+    if r10 != 0 { return 100 + r10; }
+    let r11: i32 = test_arity_check();
+    if r11 != 0 { return 110 + r11; }
+    return 0;
+}
