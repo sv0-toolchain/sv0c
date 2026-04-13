@@ -88,6 +88,7 @@ static int ps_expect(int tags, int pos, int expected);
 static int ps_match(int tags, int pos, int expected);
 static const char* ps_tok_text(const char* source, int starts, int ends, int pos);
 static int parse_path(int tags, int pos, int path_out);
+static int parse_generic_params(int tags, int pos, int names_out);
 static int ps_skip_optional_pub(int tags, int pos);
 static int ps_skip_optional_unsafe(int tags, int pos);
 static int ps_skip_generic_params(int tags, int pos);
@@ -164,6 +165,7 @@ static int test_attr_bracket(void);
 static int test_ps_nav(void);
 static int test_parse_path(void);
 static int test_ps_skip(void);
+static int test_parse_generic_params(void);
 
 static int TK_INT_LIT(void) {
   return 0;
@@ -569,6 +571,65 @@ static int parse_path(int tags, int pos, int path_out) {
       }
     } else {
       done = 1;
+    }
+  }
+  return p;
+}
+
+static int parse_generic_params(int tags, int pos, int names_out) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != 38)) {
+    return pos;
+  } else {
+  }
+  int p = (pos + 1);
+  int done = 0;
+  while ((done != 1)) {
+    int _sv0t1 = ps_peek(tags, p);
+    int t = _sv0t1;
+    if ((t == 39)) {
+      p = (p + 1);
+      done = 1;
+    } else {
+      if ((t == 97)) {
+        done = 1;
+      } else {
+        if ((t == 5)) {
+          sv0_vec_push(names_out, p);
+          p = (p + 1);
+          int _sv0t2 = ps_peek(tags, p);
+          int after = _sv0t2;
+          if ((after == 14)) {
+            p = (p + 1);
+            int skipping = 1;
+            while (skipping) {
+              int _sv0t3 = ps_peek(tags, p);
+              int st = _sv0t3;
+              if ((st == 12)) {
+                skipping = 0;
+              } else {
+                if ((st == 39)) {
+                  skipping = 0;
+                } else {
+                  if ((st == 97)) {
+                    skipping = 0;
+                  } else {
+                    p = (p + 1);
+                  }
+                }
+              }
+            }
+          } else {
+          }
+          int _sv0t4 = ps_peek(tags, p);
+          if ((_sv0t4 == 12)) {
+            p = (p + 1);
+          } else {
+          }
+        } else {
+          p = (p + 1);
+        }
+      }
     }
   }
   return p;
@@ -2205,6 +2266,88 @@ static int test_ps_skip(void) {
   return 0;
 }
 
+static int test_parse_generic_params(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(tags, 97);
+  int _sv0t1 = sv0_vec_new();
+  int names = _sv0t1;
+  int _sv0t2 = parse_generic_params(tags, 0, names);
+  int end_pos = _sv0t2;
+  int _sv0t3 = sv0_vec_len(names);
+  if ((_sv0t3 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(names, 0);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(names, 1);
+  if ((_sv0t5 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(names, 2);
+  if ((_sv0t6 != 5)) {
+    return 4;
+  } else {
+  }
+  if ((end_pos != 7)) {
+    return 5;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_new();
+  int names2 = _sv0t7;
+  int _sv0t8 = parse_generic_params(tags, 7, names2);
+  int no_gen = _sv0t8;
+  int _sv0t9 = sv0_vec_len(names2);
+  if ((_sv0t9 != 0)) {
+    return 6;
+  } else {
+  }
+  if ((no_gen != 7)) {
+    return 7;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_new();
+  int tags2 = _sv0t10;
+  sv0_vec_push(tags2, 38);
+  sv0_vec_push(tags2, 5);
+  sv0_vec_push(tags2, 14);
+  sv0_vec_push(tags2, 5);
+  sv0_vec_push(tags2, 39);
+  sv0_vec_push(tags2, 97);
+  int _sv0t11 = sv0_vec_new();
+  int bounded = _sv0t11;
+  int _sv0t12 = parse_generic_params(tags2, 0, bounded);
+  int end2 = _sv0t12;
+  int _sv0t13 = sv0_vec_len(bounded);
+  if ((_sv0t13 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(bounded, 0);
+  if ((_sv0t14 != 1)) {
+    return 9;
+  } else {
+  }
+  if ((end2 != 5)) {
+    return 10;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_of();
   int r1 = _sv0t0;
@@ -2294,6 +2437,13 @@ int main(void) {
   if ((r13 != 0)) {
     int _sv0t24 = (200 + r13);
     return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_parse_generic_params();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (220 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;
