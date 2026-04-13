@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Phase 2 complete: all 20 SML files have real sv0 counterparts.** `lib/main.sv0` new real module covering main.sml pure-function surface: baseNameSv0 path helpers (find_last_slash, find_last_dot, path_has_sv0_ext, base_name_stem_end), VM output path construction, pipeline phase ordering constants (7 phases), CLI arg parsing helpers (classify_cli, is_target_vm_flag, is_project_flag), error prefix constants. 5 test groups. Metrics: bootstrap 270, self-host 270, stage0 194, vm-parity 182)
+**Last updated:** 2026-04-13 (America/Denver; **Seed consolidation batch 1: absorbed 16 superseded seeds into real modules.** Added to `lowering.sv0`: `use_ret_slot`, `lower_lit_supported`. Added to `checker.sv0`: `binop_returns_bool`, `is_bool_ty`, `is_unit_ty`, `is_string_ty`, `is_numeric_ty`, `assign_lhs_is_var`, `assign_lhs_is_field`. Added to `parser.sv0`: `prec_of_binop`, `is_right_assoc`, `next_prec`, `binop_is_comparison`, `binop_is_arithmetic`, `binop_is_logical`. Removed 16 seed files: span_core, 9 lower_*_core, 3 checker_*_core, 3 parser_*_core. Seeds remaining: 141 `*_core.sv0`. Metrics: bootstrap 253, self-host 253, stage0 177, vm-parity 173)
 
 ## Checklist (local source of truth)
 

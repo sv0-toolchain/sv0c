@@ -111,6 +111,12 @@ static int is_additive_token(int tok_tag);
 static int is_multiplicative_token(int tok_tag);
 static int is_shift_token(int tok_tag);
 static int is_unary_prefix(int tok_tag);
+static int prec_of_binop(int binop_tag);
+static int is_right_assoc(int binop_tag);
+static int next_prec(int current, int right_assoc);
+static int binop_is_comparison(int binop_tag);
+static int binop_is_arithmetic(int binop_tag);
+static int binop_is_logical(int binop_tag);
 static int test_binop_of(void);
 static int test_assign_binop(void);
 static int test_lit_from_tok(void);
@@ -119,6 +125,7 @@ static int test_skip_helpers(void);
 static int test_span_merge(void);
 static int test_precedence(void);
 static int test_ty_name(void);
+static int test_pratt_prec(void);
 static int test_attr_bracket(void);
 
 static int TK_INT_LIT(void) {
@@ -847,6 +854,129 @@ static int is_unary_prefix(int tok_tag) {
   return 0;
 }
 
+static int prec_of_binop(int binop_tag) {
+  if ((binop_tag == 12)) {
+    return 1;
+  } else {
+  }
+  if ((binop_tag == 11)) {
+    return 2;
+  } else {
+  }
+  if ((binop_tag == 5)) {
+    return 3;
+  } else {
+  }
+  if ((binop_tag == 6)) {
+    return 3;
+  } else {
+  }
+  if ((binop_tag == 7)) {
+    return 3;
+  } else {
+  }
+  if ((binop_tag == 8)) {
+    return 3;
+  } else {
+  }
+  if ((binop_tag == 9)) {
+    return 3;
+  } else {
+  }
+  if ((binop_tag == 10)) {
+    return 3;
+  } else {
+  }
+  if ((binop_tag == 14)) {
+    return 4;
+  } else {
+  }
+  if ((binop_tag == 15)) {
+    return 5;
+  } else {
+  }
+  if ((binop_tag == 13)) {
+    return 6;
+  } else {
+  }
+  if ((binop_tag == 16)) {
+    return 7;
+  } else {
+  }
+  if ((binop_tag == 17)) {
+    return 7;
+  } else {
+  }
+  if ((binop_tag == 0)) {
+    return 8;
+  } else {
+  }
+  if ((binop_tag == 1)) {
+    return 8;
+  } else {
+  }
+  if ((binop_tag == 2)) {
+    return 9;
+  } else {
+  }
+  if ((binop_tag == 3)) {
+    return 9;
+  } else {
+  }
+  if ((binop_tag == 4)) {
+    return 9;
+  } else {
+  }
+  return 0;
+}
+
+static int is_right_assoc(int binop_tag) {
+  return 0;
+}
+
+static int next_prec(int current, int right_assoc) {
+  if (right_assoc) {
+    return current;
+  } else {
+  }
+  int _sv0t0 = (current + 1);
+  return _sv0t0;
+}
+
+static int binop_is_comparison(int binop_tag) {
+  int _sv0t0 = prec_of_binop(binop_tag);
+  int _sv0t1 = (_sv0t0 == 3);
+  return _sv0t1;
+}
+
+static int binop_is_arithmetic(int binop_tag) {
+  int _sv0t0 = prec_of_binop(binop_tag);
+  int p = _sv0t0;
+  if ((p == 8)) {
+    return 1;
+  } else {
+  }
+  if ((p == 9)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int binop_is_logical(int binop_tag) {
+  int _sv0t0 = prec_of_binop(binop_tag);
+  int p = _sv0t0;
+  if ((p == 1)) {
+    return 1;
+  } else {
+  }
+  if ((p == 2)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_binop_of(void) {
   int _sv0t0 = binop_of(22);
   if ((_sv0t0 != 0)) {
@@ -1343,6 +1473,100 @@ static int test_ty_name(void) {
   return 0;
 }
 
+static int test_pratt_prec(void) {
+  int _sv0t0 = prec_of_binop(12);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = prec_of_binop(11);
+  if ((_sv0t1 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = prec_of_binop(5);
+  if ((_sv0t2 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = prec_of_binop(10);
+  if ((_sv0t3 != 3)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = prec_of_binop(0);
+  if ((_sv0t4 != 8)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = prec_of_binop(2);
+  if ((_sv0t5 != 9)) {
+    return 6;
+  } else {
+  }
+  int _sv0t6 = prec_of_binop(16);
+  if ((_sv0t6 != 7)) {
+    return 7;
+  } else {
+  }
+  int _sv0t7 = is_right_assoc(0);
+  if ((_sv0t7 != 0)) {
+    return 8;
+  } else {
+  }
+  int _sv0t8 = next_prec(3, 0);
+  if ((_sv0t8 != 4)) {
+    return 9;
+  } else {
+  }
+  int _sv0t9 = next_prec(3, 1);
+  if ((_sv0t9 != 3)) {
+    return 10;
+  } else {
+  }
+  int _sv0t10 = binop_is_comparison(5);
+  if ((_sv0t10 != 1)) {
+    return 11;
+  } else {
+  }
+  int _sv0t11 = binop_is_comparison(0);
+  if ((_sv0t11 != 0)) {
+    return 12;
+  } else {
+  }
+  int _sv0t12 = binop_is_arithmetic(0);
+  if ((_sv0t12 != 1)) {
+    return 13;
+  } else {
+  }
+  int _sv0t13 = binop_is_arithmetic(2);
+  if ((_sv0t13 != 1)) {
+    return 14;
+  } else {
+  }
+  int _sv0t14 = binop_is_arithmetic(5);
+  if ((_sv0t14 != 0)) {
+    return 15;
+  } else {
+  }
+  int _sv0t15 = binop_is_logical(11);
+  if ((_sv0t15 != 1)) {
+    return 16;
+  } else {
+  }
+  int _sv0t16 = binop_is_logical(12);
+  if ((_sv0t16 != 1)) {
+    return 17;
+  } else {
+  }
+  int _sv0t17 = binop_is_logical(0);
+  if ((_sv0t17 != 0)) {
+    return 18;
+  } else {
+  }
+  return 0;
+}
+
 static int test_attr_bracket(void) {
   int _sv0t0 = attr_bracket_update(10, 0);
   if ((_sv0t0 != 1)) {
@@ -1423,6 +1647,13 @@ int main(void) {
   if ((r9 != 0)) {
     int _sv0t16 = (130 + r9);
     return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = test_pratt_prec();
+  int r10 = _sv0t17;
+  if ((r10 != 0)) {
+    int _sv0t18 = (140 + r10);
+    return _sv0t18;
   } else {
   }
   return 0;
