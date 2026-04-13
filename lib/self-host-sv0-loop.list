@@ -21,9 +21,6 @@ lib/lower_ast_binop_to_c_core.sv0
 lib/lower_expr_init_cty_core.sv0
 lib/lower_match_scrut_cty_core.sv0
 lib/lower_callee_ret_cty_core.sv0
-lib/lower_enum_tag_core.sv0
-lib/lower_resolve_enum_ctor_path_core.sv0
-lib/lower_enum_store_payload_core.sv0
 lib/lower_find_variant_ast_core.sv0
 lib/lower_ok_payload_cty_core.sv0
 lib/lower_scan_lets_core.sv0
@@ -31,26 +28,13 @@ lib/lower_mentions_result_core.sv0
 lib/lower_all_old_names_core.sv0
 lib/lower_uniq_old_names_core.sv0
 lib/lower_old_targets_core.sv0
-lib/lower_old_instrs_core.sv0
-lib/lower_req_instrs_core.sv0
 lib/lower_ens_glue_inject_core.sv0
-lib/lower_store_value_to_slot_core.sv0
 lib/lower_return_body_core.sv0
-lib/lower_fn_prefix_core.sv0
 lib/lower_body_dispatch_core.sv0
-lib/lower_stmt_dispatch_core.sv0
-lib/lower_stmt_let_init_core.sv0
 lib/lower_expr_wi_tv_cluster_core.sv0
 lib/lower_expr_effect_iv_cluster_core.sv0
-lib/lower_bind_scrut_core.sv0
-lib/lower_match_one_arm_core.sv0
 lib/lower_match_arm_setup_core.sv0
-lib/lower_expr_call_core.sv0
-lib/lower_expr_try_core.sv0
-lib/lower_fn_ret_cty_core.sv0
-lib/lower_variant_slots_core.sv0
 lib/lower_build_enum_variants_core.sv0
-lib/lower_entry_core.sv0
 parser/expr_rhs_stub_core.sv0
 parser/expr_pratt_stub_core.sv0
 parser/expr_prec_ladder_core.sv0
@@ -145,7 +129,6 @@ test/vm-parity/programs/vm_while_false.sv0
 test/vm-parity/programs/vm_while_once_break.sv0
 
 # Struct-return seeds (emit-c + cc + run verified 2026-04-10, restructured to let mut)
-lib/env_core.sv0
 lib/env_scope_core.sv0
 lib/lookup_type_core.sv0
 lib/lookup_type_alias_core.sv0
@@ -159,7 +142,6 @@ lib/type_alias_core.sv0
 lib/codegen_split_main_emit_core.sv0
 
 # VM backend: vm_codegen.sml seeds (emit-c + cc + run verified 2026-04-10)
-lib/vm_codegen_binop_core.sv0
 lib/vm_codegen_width_core.sv0
 lib/vm_codegen_emit_value_core.sv0
 lib/vm_codegen_emit_instr_core.sv0
@@ -198,8 +180,6 @@ lexer/token.sv0
 lib/contract_analyzer.sv0
 
 # Track A deepening + Phase 2 (2026-04-11)
-lib/resolver_pat_binds_core.sv0
-lib/resolver_enum_variant_reg_core.sv0
 lib/unify.sv0
 lib/diagnostic.sv0
 lib/env.sv0
@@ -228,7 +208,6 @@ lib/vm_codegen_local_scan_core.sv0
 lib/vm_codegen_call_nargs_core.sv0
 lib/bytecode_decode_insn_core.sv0
 lib/bytecode_file_layout_core.sv0
-lib/lexer_skip_comment_core.sv0
 lib/lexer_scan_number_core.sv0
 lib/lexer_scan_op_core.sv0
 lib/lexer_scan_string_core.sv0
@@ -242,10 +221,6 @@ lib/checker_assign_core.sv0
 lib/checker_init_types_core.sv0
 lib/checker_mod_env_core.sv0
 lib/resolver_intrinsics_core.sv0
-lib/resolver_bind_locals_core.sv0
-lib/vm_codegen_while_loop_core.sv0
-lib/vm_codegen_value_width_core.sv0
-lib/vm_codegen_enc_len_core.sv0
 lib/codegen_block_core.sv0
 lib/main_argv_core.sv0
 lib/lexer_keyword_core.sv0
