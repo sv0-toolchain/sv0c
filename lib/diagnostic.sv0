@@ -3,8 +3,10 @@
    errorCount, ordering, string formatting helpers (spaces, carets,
    padLeft, getLine), Vec-based diagnostic list (parallel Vecs for sev/
    line/col/message), sort-by-span (insertion sort on line+col),
-   format_header, format_snippet. Remaining: full report/reportAll
-   (I/O output), related and help text fields. */
+   format_header, format_snippet, format_diagnostic (combines header +
+   location + snippet into a single formatted string, matching SML's
+   `format source d`), int_to_str for line/col rendering. Remaining:
+   full report/reportAll (I/O output), related and help text fields. */
 
 enum Severity { Error, Warning, Note }
 
@@ -235,6 +237,58 @@ fn format_snippet(source: string, line_no: i32, col: i32, span_len: i32) -> stri
     return out;
 }
 
+fn digit_char(d: i32) -> string {
+    if d == 0 { return "0"; }
+    if d == 1 { return "1"; }
+    if d == 2 { return "2"; }
+    if d == 3 { return "3"; }
+    if d == 4 { return "4"; }
+    if d == 5 { return "5"; }
+    if d == 6 { return "6"; }
+    if d == 7 { return "7"; }
+    if d == 8 { return "8"; }
+    return "9";
+}
+
+fn diag_int_to_str(n: i32) -> string {
+    if n < 0 {
+        let pos: i32 = 0 - n;
+        return string_concat("-", diag_int_to_str(pos));
+    }
+    if n < 10 { return digit_char(n); }
+    let rest: i32 = n / 10;
+    let last: i32 = n - rest * 10;
+    return string_concat(diag_int_to_str(rest), digit_char(last));
+}
+
+fn format_location(file: string, line: i32, col: i32) -> string {
+    let mut out: string = "  --> ";
+    if string_len(file) > 0 {
+        out = string_concat(out, file);
+        out = string_concat(out, ":");
+    }
+    out = string_concat(out, diag_int_to_str(line));
+    out = string_concat(out, ":");
+    out = string_concat(out, diag_int_to_str(col));
+    return out;
+}
+
+fn format_diagnostic(sev_tag: i32, message: string, file: string,
+                     source: string, line: i32, col: i32,
+                     span_len: i32) -> string {
+    let header: string = format_header(sev_tag, message);
+    let loc: string = format_location(file, line, col);
+    let mut out: string = string_concat(header, "\n");
+    out = string_concat(out, loc);
+    out = string_concat(out, "\n");
+    let snippet: string = format_snippet(source, line, col, span_len);
+    if string_len(snippet) > 0 {
+        out = string_concat(out, snippet);
+        out = string_concat(out, "\n");
+    }
+    return out;
+}
+
 fn test_severity_tags() -> i32 {
     if severity_tag(Severity::Error) != 0 { return 1; }
     if severity_tag(Severity::Warning) != 1 { return 2; }
@@ -371,6 +425,32 @@ fn test_format_snippet() -> i32 {
     return 0;
 }
 
+fn test_diag_int_to_str() -> i32 {
+    if string_eq(diag_int_to_str(0), "0") != true { return 1; }
+    if string_eq(diag_int_to_str(42), "42") != true { return 2; }
+    if string_eq(diag_int_to_str(100), "100") != true { return 3; }
+    if string_eq(diag_int_to_str(7), "7") != true { return 4; }
+    return 0;
+}
+
+fn test_format_location() -> i32 {
+    let loc1: string = format_location("test.sv0", 5, 3);
+    if string_eq(loc1, "  --> test.sv0:5:3") != true { return 1; }
+    let loc2: string = format_location("", 10, 1);
+    if string_eq(loc2, "  --> 10:1") != true { return 2; }
+    return 0;
+}
+
+fn test_format_diagnostic() -> i32 {
+    let src: string = "let x = 42;";
+    let fd: string = format_diagnostic(0, "undeclared variable", "test.sv0",
+                                       src, 1, 5, 1);
+    if string_len(fd) == 0 { return 1; }
+    let fd_empty: string = format_diagnostic(1, "unused", "f.sv0", "", 99, 1, 1);
+    if string_len(fd_empty) == 0 { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_severity_tags();
     if r1 != 0 { return r1; }
@@ -400,5 +480,11 @@ fn main() -> i32 {
     if r13 != 0 { return 120 + r13; }
     let r14: i32 = test_format_snippet();
     if r14 != 0 { return 130 + r14; }
+    let r15: i32 = test_diag_int_to_str();
+    if r15 != 0 { return 140 + r15; }
+    let r16: i32 = test_format_location();
+    if r16 != 0 { return 150 + r16; }
+    let r17: i32 = test_format_diagnostic();
+    if r17 != 0 { return 160 + r17; }
     return 0;
 }

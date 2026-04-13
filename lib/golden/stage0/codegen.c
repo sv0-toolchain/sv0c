@@ -45,6 +45,8 @@ static const char* emit_fn_proto(int is_static, int ret_cty_h, int label_h, cons
 static const char* emit_block_defn(const char* proto, const char* body);
 static const char* emit_param_list(int params);
 static const char* emit_fn_proto_ex(int is_static, int ret_cty_h, int label_h, int params);
+static int is_main_block(int label_h);
+static const char* emit_block_body(int instrs, const char* ret_name);
 static const char* emit_program(const char* typedefs, int blocks);
 static int test_int_format(void);
 static int test_escape(void);
@@ -77,6 +79,8 @@ static int test_instr_return_val_void(void);
 static int test_param_list(void);
 static int test_fn_proto(void);
 static int test_param_list_general(void);
+static int test_is_main_block(void);
+static int test_emit_block_body(void);
 static int test_emit_program_empty(void);
 static int test_emit_program_main_only(void);
 static int test_emit_program_with_helper(void);
@@ -1426,6 +1430,16 @@ static const char* emit_fn_proto_ex(int is_static, int ret_cty_h, int label_h, i
   return _sv0t13;
 }
 
+static int is_main_block(int label_h) {
+  int _sv0t0 = (label_h == 11);
+  return _sv0t0;
+}
+
+static const char* emit_block_body(int instrs, const char* ret_name) {
+  const char* _sv0t0 = emit_instrs(instrs, "  ", ret_name);
+  return _sv0t0;
+}
+
 static const char* emit_program(const char* typedefs, int blocks) {
   int _sv0t0 = sv0_vec_len(blocks);
   int num_blocks = (_sv0t0 / 4);
@@ -2385,6 +2399,56 @@ static int test_param_list_general(void) {
   return 0;
 }
 
+static int test_is_main_block(void) {
+  int _sv0t0 = is_main_block(11);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = is_main_block(12);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = is_main_block(0);
+  if ((_sv0t2 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_emit_block_body(void) {
+  int _sv0t0 = sv0_vec_new();
+  int instrs = _sv0t0;
+  Instr _sv0t1;
+  Value _sv0t2;
+  _sv0t2.tag = 0;
+  _sv0t2.p0 = 0;
+  int _sv0t3 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t3, 0, _sv0t2.tag);
+  sv0_box_store(_sv0t3, 1, _sv0t2.p0);
+  sv0_box_store(_sv0t3, 2, _sv0t2.p1);
+  _sv0t1.tag = 15;
+  _sv0t1.p0 = _sv0t3;
+  int _sv0t4 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t4, 0, _sv0t1.tag);
+  sv0_box_store(_sv0t4, 1, _sv0t1.p0);
+  sv0_box_store(_sv0t4, 2, _sv0t1.p1);
+  sv0_box_store(_sv0t4, 3, _sv0t1.p2);
+  sv0_box_store(_sv0t4, 4, _sv0t1.p3);
+  sv0_vec_push(instrs, _sv0t4);
+  const char* _sv0t5 = emit_block_body(instrs, "int");
+  const char* body;
+  body = _sv0t5;
+  int _sv0t6 = sv0_string_eq(body, "  return 0;\n");
+  if ((!_sv0t6)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_emit_program_empty(void) {
   int _sv0t0 = sv0_vec_new();
   int blocks = _sv0t0;
@@ -3151,43 +3215,59 @@ int main(void) {
   } else {
   }
   sv0_println("PASS test_fn_proto_ex");
-  int _sv0t77 = test_emit_program_empty();
-  int r37 = _sv0t77;
-  if ((r37 != 0)) {
-    int _sv0t78 = (360 + r37);
+  int _sv0t77 = test_is_main_block();
+  int r37a = _sv0t77;
+  if ((r37a != 0)) {
+    int _sv0t78 = (354 + r37a);
     return _sv0t78;
   } else {
   }
-  sv0_println("PASS test_emit_program_empty");
-  int _sv0t79 = test_emit_program_main_only();
-  int r38 = _sv0t79;
-  if ((r38 != 0)) {
-    int _sv0t80 = (370 + r38);
+  sv0_println("PASS test_is_main_block");
+  int _sv0t79 = test_emit_block_body();
+  int r37b = _sv0t79;
+  if ((r37b != 0)) {
+    int _sv0t80 = (357 + r37b);
     return _sv0t80;
   } else {
   }
-  sv0_println("PASS test_emit_program_main_only");
-  int _sv0t81 = test_emit_program_with_helper();
-  int r39 = _sv0t81;
-  if ((r39 != 0)) {
-    int _sv0t82 = (380 + r39);
+  sv0_println("PASS test_emit_block_body");
+  int _sv0t81 = test_emit_program_empty();
+  int r37 = _sv0t81;
+  if ((r37 != 0)) {
+    int _sv0t82 = (360 + r37);
     return _sv0t82;
   } else {
   }
-  sv0_println("PASS test_emit_program_with_helper");
-  int _sv0t83 = test_emit_program_typedefs();
-  int r40 = _sv0t83;
-  if ((r40 != 0)) {
-    int _sv0t84 = (390 + r40);
+  sv0_println("PASS test_emit_program_empty");
+  int _sv0t83 = test_emit_program_main_only();
+  int r38 = _sv0t83;
+  if ((r38 != 0)) {
+    int _sv0t84 = (370 + r38);
     return _sv0t84;
   } else {
   }
-  sv0_println("PASS test_emit_program_typedefs");
-  int _sv0t85 = test_emit_program_no_main();
-  int r41 = _sv0t85;
-  if ((r41 != 0)) {
-    int _sv0t86 = (400 + r41);
+  sv0_println("PASS test_emit_program_main_only");
+  int _sv0t85 = test_emit_program_with_helper();
+  int r39 = _sv0t85;
+  if ((r39 != 0)) {
+    int _sv0t86 = (380 + r39);
     return _sv0t86;
+  } else {
+  }
+  sv0_println("PASS test_emit_program_with_helper");
+  int _sv0t87 = test_emit_program_typedefs();
+  int r40 = _sv0t87;
+  if ((r40 != 0)) {
+    int _sv0t88 = (390 + r40);
+    return _sv0t88;
+  } else {
+  }
+  sv0_println("PASS test_emit_program_typedefs");
+  int _sv0t89 = test_emit_program_no_main();
+  int r41 = _sv0t89;
+  if ((r41 != 0)) {
+    int _sv0t90 = (400 + r41);
+    return _sv0t90;
   } else {
   }
   sv0_println("PASS test_emit_program_no_main");

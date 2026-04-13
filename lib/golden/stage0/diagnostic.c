@@ -25,6 +25,10 @@ static int diag_span_less(int lines, int cols, int a, int b);
 static int diag_sort_by_span(int sevs, int lines, int cols, int msgs, int order);
 static const char* format_header(int sev_tag, const char* message);
 static const char* format_snippet(const char* source, int line_no, int col, int span_len);
+static const char* digit_char(int d);
+static const char* diag_int_to_str(int n);
+static const char* format_location(const char* file, int line, int col);
+static const char* format_diagnostic(int sev_tag, const char* message, const char* file, const char* source, int line, int col, int span_len);
 static int test_severity_tags(void);
 static int test_constructors(void);
 static int test_has_errors(void);
@@ -39,6 +43,9 @@ static int test_diag_list(void);
 static int test_diag_sort(void);
 static int test_format_header(void);
 static int test_format_snippet(void);
+static int test_diag_int_to_str(void);
+static int test_format_location(void);
+static int test_format_diagnostic(void);
 
 static int severity_tag(Severity s) {
   int _sv0t0;
@@ -400,6 +407,118 @@ static const char* format_snippet(const char* source, int line_no, int col, int 
   const char* _sv0t7 = carets(effective_span);
   const char* _sv0t8 = sv0_string_concat(out, _sv0t7);
   out = _sv0t8;
+  return out;
+}
+
+static const char* digit_char(int d) {
+  if ((d == 0)) {
+    return "0";
+  } else {
+  }
+  if ((d == 1)) {
+    return "1";
+  } else {
+  }
+  if ((d == 2)) {
+    return "2";
+  } else {
+  }
+  if ((d == 3)) {
+    return "3";
+  } else {
+  }
+  if ((d == 4)) {
+    return "4";
+  } else {
+  }
+  if ((d == 5)) {
+    return "5";
+  } else {
+  }
+  if ((d == 6)) {
+    return "6";
+  } else {
+  }
+  if ((d == 7)) {
+    return "7";
+  } else {
+  }
+  if ((d == 8)) {
+    return "8";
+  } else {
+  }
+  return "9";
+}
+
+static const char* diag_int_to_str(int n) {
+  if ((n < 0)) {
+    int pos = (0 - n);
+    const char* _sv0t0 = diag_int_to_str(pos);
+    const char* _sv0t1 = sv0_string_concat("-", _sv0t0);
+    return _sv0t1;
+  } else {
+  }
+  if ((n < 10)) {
+    const char* _sv0t2 = digit_char(n);
+    return _sv0t2;
+  } else {
+  }
+  int rest = (n / 10);
+  int _sv0t3 = (rest * 10);
+  int last = (n - _sv0t3);
+  const char* _sv0t4 = diag_int_to_str(rest);
+  const char* _sv0t5 = digit_char(last);
+  const char* _sv0t6 = sv0_string_concat(_sv0t4, _sv0t5);
+  return _sv0t6;
+}
+
+static const char* format_location(const char* file, int line, int col) {
+  const char* out;
+  out = "  --> ";
+  int _sv0t0 = sv0_string_len(file);
+  if ((_sv0t0 > 0)) {
+    const char* _sv0t1 = sv0_string_concat(out, file);
+    out = _sv0t1;
+    const char* _sv0t2 = sv0_string_concat(out, ":");
+    out = _sv0t2;
+  } else {
+  }
+  const char* _sv0t3 = diag_int_to_str(line);
+  const char* _sv0t4 = sv0_string_concat(out, _sv0t3);
+  out = _sv0t4;
+  const char* _sv0t5 = sv0_string_concat(out, ":");
+  out = _sv0t5;
+  const char* _sv0t6 = diag_int_to_str(col);
+  const char* _sv0t7 = sv0_string_concat(out, _sv0t6);
+  out = _sv0t7;
+  return out;
+}
+
+static const char* format_diagnostic(int sev_tag, const char* message, const char* file, const char* source, int line, int col, int span_len) {
+  const char* _sv0t0 = format_header(sev_tag, message);
+  const char* header;
+  header = _sv0t0;
+  const char* _sv0t1 = format_location(file, line, col);
+  const char* loc;
+  loc = _sv0t1;
+  const char* _sv0t2 = sv0_string_concat(header, "\n");
+  const char* out;
+  out = _sv0t2;
+  const char* _sv0t3 = sv0_string_concat(out, loc);
+  out = _sv0t3;
+  const char* _sv0t4 = sv0_string_concat(out, "\n");
+  out = _sv0t4;
+  const char* _sv0t5 = format_snippet(source, line, col, span_len);
+  const char* snippet;
+  snippet = _sv0t5;
+  int _sv0t6 = sv0_string_len(snippet);
+  if ((_sv0t6 > 0)) {
+    const char* _sv0t7 = sv0_string_concat(out, snippet);
+    out = _sv0t7;
+    const char* _sv0t8 = sv0_string_concat(out, "\n");
+    out = _sv0t8;
+  } else {
+  }
   return out;
 }
 
@@ -825,6 +944,76 @@ static int test_format_snippet(void) {
   return 0;
 }
 
+static int test_diag_int_to_str(void) {
+  const char* _sv0t0 = diag_int_to_str(0);
+  int _sv0t1 = sv0_string_eq(_sv0t0, "0");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = diag_int_to_str(42);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "42");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = diag_int_to_str(100);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "100");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = diag_int_to_str(7);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "7");
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_format_location(void) {
+  const char* _sv0t0 = format_location("test.sv0", 5, 3);
+  const char* loc1;
+  loc1 = _sv0t0;
+  int _sv0t1 = sv0_string_eq(loc1, "  --> test.sv0:5:3");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = format_location("", 10, 1);
+  const char* loc2;
+  loc2 = _sv0t2;
+  int _sv0t3 = sv0_string_eq(loc2, "  --> 10:1");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_format_diagnostic(void) {
+  const char* src;
+  src = "let x = 42;";
+  const char* _sv0t0 = format_diagnostic(0, "undeclared variable", "test.sv0", src, 1, 5, 1);
+  const char* fd;
+  fd = _sv0t0;
+  int _sv0t1 = sv0_string_len(fd);
+  if ((_sv0t1 == 0)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = format_diagnostic(1, "unused", "f.sv0", "", 99, 1, 1);
+  const char* fd_empty;
+  fd_empty = _sv0t2;
+  int _sv0t3 = sv0_string_len(fd_empty);
+  if ((_sv0t3 == 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_severity_tags();
   int r1 = _sv0t0;
@@ -921,6 +1110,27 @@ int main(void) {
   if ((r14 != 0)) {
     int _sv0t26 = (130 + r14);
     return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_diag_int_to_str();
+  int r15 = _sv0t27;
+  if ((r15 != 0)) {
+    int _sv0t28 = (140 + r15);
+    return _sv0t28;
+  } else {
+  }
+  int _sv0t29 = test_format_location();
+  int r16 = _sv0t29;
+  if ((r16 != 0)) {
+    int _sv0t30 = (150 + r16);
+    return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_format_diagnostic();
+  int r17 = _sv0t31;
+  if ((r17 != 0)) {
+    int _sv0t32 = (160 + r17);
+    return _sv0t32;
   } else {
   }
   return 0;

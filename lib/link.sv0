@@ -1,7 +1,8 @@
 /* Phase 2 real pipeline module: sml/link/link.sml -> sv0.
    Link-time utilities: file classification (isSv0, isHidden),
-   name extraction (fileStem), name mangling (mangle), top-level
-   name collection (collectTops by item tag), link directive
+   name extraction (fileStem), name mangling (mangle), fn_name_for_link
+   (main exemption), link_dir_from_entry (directory extraction),
+   top-level name collection (collectTops by item tag), link directive
    stripping (stripLinkDirectives), split-module detection.
    AST map functions (mapTy/mapPat/mapExpr/mapItem) and I/O
    (walkSv0, parseFile, linkProjectDir) deferred — need full AST
@@ -31,6 +32,7 @@ fn find_last_slash(path: string) -> i32 {
     while i >= 0 {
         let c: i32 = string_char_at(path, i);
         if c == 47 { return i; }
+        if c == 92 { return i; }
         i = i - 1;
     }
     return 0 - 1;
@@ -63,6 +65,18 @@ fn file_stem(path: string) -> string {
 fn mangle(mod_id: string, x: string) -> string {
     let a: string = string_concat(mod_id, "__");
     return string_concat(a, x);
+}
+
+fn fn_name_for_link(mod_id: string, name: string) -> string {
+    if string_eq(name, "main") { return "main"; }
+    return mangle(mod_id, name);
+}
+
+fn link_dir_from_entry(entry_path: string) -> string {
+    let slash: i32 = find_last_slash(entry_path);
+    if slash < 0 { return "."; }
+    if slash == 0 { return "/"; }
+    return string_substr(entry_path, 0, slash);
 }
 
 /* ── top-level name collection ──────────────────────────────── */
@@ -249,6 +263,21 @@ fn test_mangle() -> i32 {
     return 0;
 }
 
+fn test_fn_name_for_link() -> i32 {
+    if string_eq(fn_name_for_link("mymod", "main"), "main") != true { return 1; }
+    if string_eq(fn_name_for_link("mymod", "foo"), "mymod__foo") != true { return 2; }
+    if string_eq(fn_name_for_link("utils", "helper"), "utils__helper") != true { return 3; }
+    return 0;
+}
+
+fn test_link_dir_from_entry() -> i32 {
+    if string_eq(link_dir_from_entry("src/foo.sv0"), "src") != true { return 1; }
+    if string_eq(link_dir_from_entry("foo.sv0"), ".") != true { return 2; }
+    if string_eq(link_dir_from_entry("/a/b/c.sv0"), "/a/b") != true { return 3; }
+    if string_eq(link_dir_from_entry("/foo.sv0"), "/") != true { return 4; }
+    return 0;
+}
+
 fn test_is_top_defining() -> i32 {
     if is_top_defining(0) != true { return 1; }
     if is_top_defining(1) != true { return 2; }
@@ -391,5 +420,9 @@ fn main() -> i32 {
     if r13 != 0 { return 120 + r13; }
     let r14: i32 = test_item_rewrite();
     if r14 != 0 { return 140 + r14; }
+    let r15: i32 = test_fn_name_for_link();
+    if r15 != 0 { return 150 + r15; }
+    let r16: i32 = test_link_dir_from_entry();
+    if r16 != 0 { return 160 + r16; }
     return 0;
 }
