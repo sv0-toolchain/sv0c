@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: vm_codegen.sv0 + bytecode.sv0 + resolver.sv0 + lexer.sv0 + link.sv0.** `lib/vm_codegen.sv0` new real module covering vm_codegen.sml pure-function surface: variant slot counting, cty classification (void/scalar/struct/enum), field index lookup (Vec-based), binop/unop→opcode dispatch (19 binary + 2 unary), instruction encoding length (insn_size — inlined from bytecode.sv0), loop sentinel constants, Vec-based string pool management, builtin function→CALL_BUILTIN id map (15 builtins), store slot ordering. 10 test groups. `lib/bytecode.sv0` new real module (6 test groups). Metrics: bootstrap 266, self-host 266, stage0 190, vm-parity 182)
+**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: checker.sv0 + vm_codegen.sv0 + bytecode.sv0.** `lib/checker.sv0` new real module covering checker.sml pure-function surface: binop classification (Arith/Logic/Cmp), integral type detection, AST type name→tag mapping (22 primitives), assignment LHS classification, statement return detection, path→string joining, type import alias canonicalization (Vec-based), env lookup/extend helpers, variant shape classification, try operator helpers, error code constants (E0400–E0449), struct field lookup. 13 test groups. Metrics: bootstrap 267, self-host 267, stage0 191, vm-parity 182)
 
 ## Checklist (local source of truth)
 
