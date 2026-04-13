@@ -1,10 +1,10 @@
 /* Phase 2 real pipeline module: sml/backend/vm/vm_codegen.sml -> sv0.
-   VM code generation utilities: variant slot counting, struct/enum
-   layout extraction (widthOfCty, indexOfField, enumFieldNames),
-   binop/unop -> opcode dispatch, instruction encoding length
-   (encLen/encLens via bytecode.sv0 insn_encoded_size), string pool
-   management (Vec-based poolInit/poolAdd), loop sentinel constants,
-   value width classification, builtin function -> CALL_BUILTIN id map.
+   VM code generation utilities: variant slot counting, enum field
+   names/payload indexing, struct/enum layout lookup, widthOfCty
+   (Vec-based struct/enum layout width with proper name comparison),
+   indexOfField, binop/unop → opcode dispatch, instruction encoding
+   length (encLen/encLens), string pool management (Vec-based), loop
+   sentinels, value width classification, builtin function dispatch.
    Full emit (emitValue/emitExpr/emitInstr/emitBlock/emitWhileLoop)
    deferred — needs IR+AST traversal with slot_env management. */
 
@@ -17,6 +17,35 @@ fn variant_slots_struct(field_count: i32) -> i32 { return field_count; }
 fn variant_slots(variant_kind: i32, field_count: i32) -> i32 {
     if variant_kind == 0 { return 0; }
     return field_count;
+}
+
+/* ── enum field names ──────────────────────────────────────────
+   enumFieldNames: for an enum with width w (= 1 + maxPayload),
+   the "fields" are tag, p0, p1, ..., p(w-2).
+   Field count = width; index 0 is always the tag. */
+
+fn enum_field_count_from_width(width: i32) -> i32 {
+    return width;
+}
+
+fn enum_field_is_tag(idx: i32) -> bool {
+    return idx == 0;
+}
+
+fn enum_payload_field_index(field_idx: i32) -> i32 {
+    return field_idx - 1;
+}
+
+/* ── struct/enum layout lookup ──────────────────────────────── */
+
+fn layout_lookup(names: Vec<i32>, widths: Vec<i32>, name: i32) -> i32 {
+    let n: i32 = vec_len(names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(names, i) == name { return vec_get(widths, i); }
+        i = i + 1;
+    }
+    return 0 - 1;
 }
 
 /* ── width of C type ────────────────────────────────────────── */
@@ -50,31 +79,30 @@ fn is_scalar_cty(cty: string) -> bool {
    structs_field_counts: Vec of field counts (parallel)
    enums_names: Vec of enum name handles
    enums_widths: Vec of enum widths (1 + maxPayload, parallel) */
-fn width_of_cty(cty: string,
+fn width_of_cty(cty_handle: i32,
                 structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
                 enums_names: Vec<i32>, enums_widths: Vec<i32>) -> i32 {
-    if is_void_cty(cty) { return 0; }
-    if is_scalar_cty(cty) { return 1; }
     let sn: i32 = vec_len(structs_names);
     let mut si: i32 = 0;
     while si < sn {
-        let name_h: i32 = vec_get(structs_names, si);
-        if name_h == 0 {
-            si = si + 1;
-        } else {
-            si = sn;
+        if vec_get(structs_names, si) == cty_handle {
+            return vec_get(structs_field_counts, si);
         }
+        si = si + 1;
     }
     let en: i32 = vec_len(enums_names);
     let mut ei: i32 = 0;
     while ei < en {
-        let name_h: i32 = vec_get(enums_names, ei);
-        if name_h == 0 {
-            ei = ei + 1;
-        } else {
-            ei = en;
+        if vec_get(enums_names, ei) == cty_handle {
+            return vec_get(enums_widths, ei);
         }
+        ei = ei + 1;
     }
+    return 1;
+}
+
+fn width_of_cty_scalar(cty: string) -> i32 {
+    if is_void_cty(cty) { return 0; }
     return 1;
 }
 
@@ -325,9 +353,44 @@ fn test_cty_classify() -> i32 {
     if is_scalar_cty("int32_t") != true { return 4; }
     if is_scalar_cty("uint8_t") != true { return 5; }
     if is_scalar_cty("MyStruct") != false { return 6; }
-    if width_of_cty_simple("void") != 0 { return 7; }
-    if width_of_cty_simple("int32_t") != 1 { return 8; }
-    if width_of_cty_simple("bool") != 1 { return 9; }
+    if width_of_cty_scalar("void") != 0 { return 7; }
+    if width_of_cty_scalar("int32_t") != 1 { return 8; }
+    if width_of_cty_scalar("bool") != 1 { return 9; }
+    return 0;
+}
+
+fn test_width_of_cty() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let sf: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    vec_push(sn, 100); vec_push(sf, 3);
+    vec_push(sn, 200); vec_push(sf, 5);
+    vec_push(en, 300); vec_push(ew, 4);
+    if width_of_cty(100, sn, sf, en, ew) != 3 { return 1; }
+    if width_of_cty(200, sn, sf, en, ew) != 5 { return 2; }
+    if width_of_cty(300, sn, sf, en, ew) != 4 { return 3; }
+    if width_of_cty(999, sn, sf, en, ew) != 1 { return 4; }
+    return 0;
+}
+
+fn test_enum_field_helpers() -> i32 {
+    if enum_field_count_from_width(4) != 4 { return 1; }
+    if enum_field_is_tag(0) != true { return 2; }
+    if enum_field_is_tag(1) != false { return 3; }
+    if enum_payload_field_index(1) != 0 { return 4; }
+    if enum_payload_field_index(3) != 2 { return 5; }
+    return 0;
+}
+
+fn test_layout_lookup() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let widths: Vec<i32> = vec_new();
+    vec_push(names, 10); vec_push(widths, 3);
+    vec_push(names, 20); vec_push(widths, 7);
+    if layout_lookup(names, widths, 10) != 3 { return 1; }
+    if layout_lookup(names, widths, 20) != 7 { return 2; }
+    if layout_lookup(names, widths, 99) != 0 - 1 { return 3; }
     return 0;
 }
 
@@ -444,5 +507,11 @@ fn main() -> i32 {
     if r9 != 0 { return 90 + r9; }
     let r10: i32 = test_store_ordering();
     if r10 != 0 { return 110 + r10; }
+    let r11: i32 = test_width_of_cty();
+    if r11 != 0 { return 120 + r11; }
+    let r12: i32 = test_enum_field_helpers();
+    if r12 != 0 { return 130 + r12; }
+    let r13: i32 = test_layout_lookup();
+    if r13 != 0 { return 140 + r13; }
     return 0;
 }

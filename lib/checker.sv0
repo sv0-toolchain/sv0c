@@ -2,10 +2,12 @@
    Type checker utilities: binop classification (Arith/Logic/Cmp),
    integral type detection, AST type name → type tag mapping (22
    primitive names), assignment LHS classification (ALVar/ALField),
-   statement return detection, path→string joining, error code
-   constants (E0400–E0449), type import alias canonicalization
+   statement return detection, path→string joining (2/3/Vec-based),
+   error code constants (E0400–E0449), type import alias canon
    (Vec-based), env lookup/extend helpers, variant shape classification,
-   constructor arity from shape, struct field lookup by name.
+   constructor arity from shape, struct/enum name extraction from
+   program tables, contract parameter classification, struct field
+   lookup by name.
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -166,6 +168,75 @@ fn path_key_2(a: string, b: string) -> string {
 
 fn path_key_3(a: string, b: string, c: string) -> string {
     return string_concat(path_key_2(a, b), string_concat("::", c));
+}
+
+/* ── generalized path key (Vec-based) ──────────────────────────
+   Joins a Vec<i32> of string handles into a "::"-delimited key.
+   Needs source+starts+ends from the token stream. */
+
+fn path_key_vec(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                segs: Vec<i32>) -> string {
+    let n: i32 = vec_len(segs);
+    if n == 0 { return ""; }
+    let p0: i32 = vec_get(segs, 0);
+    let s0: i32 = vec_get(starts, p0);
+    let e0: i32 = vec_get(ends, p0);
+    let mut out: string = string_substr(source, s0, e0 - s0);
+    let mut i: i32 = 1;
+    while i < n {
+        out = string_concat(out, "::");
+        let p: i32 = vec_get(segs, i);
+        let s: i32 = vec_get(starts, p);
+        let e: i32 = vec_get(ends, p);
+        out = string_concat(out, string_substr(source, s, e - s));
+        i = i + 1;
+    }
+    return out;
+}
+
+/* ── contract parameter classification ─────────────────────────
+   is_contract_param: checks if a name handle appears in the
+   contract parameter list (Vec<i32> of name handles). */
+
+fn is_contract_param(params: Vec<i32>, name: i32) -> bool {
+    let n: i32 = vec_len(params);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(params, i) == name { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* ── struct/enum name extraction from program tables ───────────
+   structNames / enumNames: extract just the name handles from
+   the program's struct/enum definition tables.
+   Input is interleaved [name, field_count, ...] or [name, variant_count, ...]. */
+
+fn struct_names_count(struct_table: Vec<i32>, stride: i32) -> i32 {
+    return vec_len(struct_table) / stride;
+}
+
+fn struct_name_at(struct_table: Vec<i32>, stride: i32, idx: i32) -> i32 {
+    return vec_get(struct_table, idx * stride);
+}
+
+fn enum_names_count(enum_table: Vec<i32>, stride: i32) -> i32 {
+    return vec_len(enum_table) / stride;
+}
+
+fn enum_name_at(enum_table: Vec<i32>, stride: i32, idx: i32) -> i32 {
+    return vec_get(enum_table, idx * stride);
+}
+
+fn name_in_table(table: Vec<i32>, stride: i32, name: i32) -> bool {
+    let n: i32 = vec_len(table) / stride;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(table, i * stride) == name { return true; }
+        i = i + 1;
+    }
+    return false;
 }
 
 /* ── type import alias canonicalization ──────────────────────── */
@@ -462,6 +533,53 @@ fn test_extra_classifiers() -> i32 {
     return 0;
 }
 
+fn test_path_key_vec() -> i32 {
+    let src: string = "Foo::Bar::Baz";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 5); vec_push(ends, 8);
+    vec_push(starts, 10); vec_push(ends, 13);
+    let segs: Vec<i32> = vec_new();
+    vec_push(segs, 0); vec_push(segs, 1); vec_push(segs, 2);
+    let k: string = path_key_vec(src, starts, ends, segs);
+    if string_eq(k, "Foo::Bar::Baz") != true { return 1; }
+    let one: Vec<i32> = vec_new();
+    vec_push(one, 0);
+    if string_eq(path_key_vec(src, starts, ends, one), "Foo") != true { return 2; }
+    let empty: Vec<i32> = vec_new();
+    if string_eq(path_key_vec(src, starts, ends, empty), "") != true { return 3; }
+    return 0;
+}
+
+fn test_contract_param() -> i32 {
+    let params: Vec<i32> = vec_new();
+    vec_push(params, 10);
+    vec_push(params, 20);
+    vec_push(params, 30);
+    if is_contract_param(params, 10) != true { return 1; }
+    if is_contract_param(params, 20) != true { return 2; }
+    if is_contract_param(params, 99) != false { return 3; }
+    let empty: Vec<i32> = vec_new();
+    if is_contract_param(empty, 10) != false { return 4; }
+    return 0;
+}
+
+fn test_struct_enum_names() -> i32 {
+    let tbl: Vec<i32> = vec_new();
+    vec_push(tbl, 100); vec_push(tbl, 3);
+    vec_push(tbl, 200); vec_push(tbl, 5);
+    if struct_names_count(tbl, 2) != 2 { return 1; }
+    if struct_name_at(tbl, 2, 0) != 100 { return 2; }
+    if struct_name_at(tbl, 2, 1) != 200 { return 3; }
+    if name_in_table(tbl, 2, 100) != true { return 4; }
+    if name_in_table(tbl, 2, 200) != true { return 5; }
+    if name_in_table(tbl, 2, 999) != false { return 6; }
+    if enum_names_count(tbl, 2) != 2 { return 7; }
+    if enum_name_at(tbl, 2, 0) != 100 { return 8; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -491,5 +609,11 @@ fn main() -> i32 {
     if r13 != 0 { return 140 + r13; }
     let r14: i32 = test_extra_classifiers();
     if r14 != 0 { return 150 + r14; }
+    let r15: i32 = test_path_key_vec();
+    if r15 != 0 { return 160 + r15; }
+    let r16: i32 = test_contract_param();
+    if r16 != 0 { return 170 + r16; }
+    let r17: i32 = test_struct_enum_names();
+    if r17 != 0 { return 180 + r17; }
     return 0;
 }

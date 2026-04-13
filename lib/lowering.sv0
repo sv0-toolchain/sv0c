@@ -1,12 +1,13 @@
 /* Phase 2 real pipeline module: sml/ir/lowering.sml -> sv0.
    Lowering utilities: splitQName (qualified name splitting on ::),
-   AST binop/unop → C operator strings, AST type → C type string
-   mapping (22 primitives), freshTmp counter management, oldSlot
-   naming, retSyntaxIsUnit, storeValueToSlot classification,
-   assignment LHS classification, enum tag lookup (Vec-based),
-   struct field list lookup, enum/struct type detection, variant
-   slot counting, enum max payload, tryVariantNames (Result/Option),
-   literal lowering classification, paramName extraction.
+   AST binop/unop → C operator strings (full 6-variant unop table),
+   AST type → C type string mapping (22 primitives), freshTmp counter
+   management, oldSlot naming (old_slot_name full string concat),
+   retSyntaxIsUnit, storeValueToSlot classification, paramName
+   extraction, uniqOldNames (Vec dedup), assignment LHS classification,
+   enum tag lookup (Vec-based), struct field list lookup, enum/struct
+   type detection, variant slot counting, enum max payload,
+   tryVariantNames (Result/Option), literal lowering classification.
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -83,15 +84,23 @@ fn ast_binop_to_c(tag: i32) -> string {
 
 /* ── AST unop → C operator string ───────────────────────────── */
 
+/* Ast.unop: Neg=0, Not=1, BitNot=2, Deref=3, Borrow=4, BorrowMut=5 */
 fn ast_unop_to_c(tag: i32) -> string {
     if tag == 0 { return "-"; }
     if tag == 1 { return "!"; }
+    if tag == 2 { return "~"; }
+    if tag == 3 { return "*"; }
+    if tag == 4 { return "&"; }
+    if tag == 5 { return "&"; }
     return "?";
 }
 
 fn is_supported_unop(tag: i32) -> bool {
     if tag == 0 { return true; }
     if tag == 1 { return true; }
+    if tag == 2 { return true; }
+    if tag == 4 { return true; }
+    if tag == 5 { return true; }
     return false;
 }
 
@@ -135,6 +144,52 @@ fn old_slot_prefix() -> string {
 
 fn old_slot_name_len(name_len: i32) -> i32 {
     return 8 + name_len;
+}
+
+fn old_slot_name(name: string) -> string {
+    return string_concat("_sv0old_", name);
+}
+
+/* ── paramName ─────────────────────────────────────────────────
+   PatBind → name. In sv0, pattern tags: 0=Wild, 1=Bind, ...
+   paramName returns the name handle (token index) for a Bind pat,
+   or -1 for non-Bind patterns. */
+
+fn param_name_tag(pat_tag: i32) -> bool {
+    return pat_tag == 1;
+}
+
+/* ── uniqOldNames (dedup) ──────────────────────────────────────
+   Given a Vec<i32> of name handles, return how many unique entries
+   there are. Also provides a helper to check membership and add
+   if not present. */
+
+fn old_name_seen(seen: Vec<i32>, name: i32) -> bool {
+    let n: i32 = vec_len(seen);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(seen, i) == name { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn old_names_add_unique(seen: Vec<i32>, name: i32) -> bool {
+    if old_name_seen(seen, name) { return false; }
+    vec_push(seen, name);
+    return true;
+}
+
+fn uniq_old_names(names: Vec<i32>) -> Vec<i32> {
+    let out: Vec<i32> = vec_new();
+    let n: i32 = vec_len(names);
+    let mut i: i32 = 0;
+    while i < n {
+        let name: i32 = vec_get(names, i);
+        old_names_add_unique(out, name);
+        i = i + 1;
+    }
+    return out;
 }
 
 /* ── retSyntaxIsUnit ────────────────────────────────────────── */
@@ -386,9 +441,16 @@ fn test_binop_to_c() -> i32 {
 fn test_unop_to_c() -> i32 {
     if string_eq(ast_unop_to_c(0), "-") != true { return 1; }
     if string_eq(ast_unop_to_c(1), "!") != true { return 2; }
-    if is_supported_unop(0) != true { return 3; }
-    if is_supported_unop(1) != true { return 4; }
-    if is_supported_unop(5) != false { return 5; }
+    if string_eq(ast_unop_to_c(2), "~") != true { return 3; }
+    if string_eq(ast_unop_to_c(3), "*") != true { return 4; }
+    if string_eq(ast_unop_to_c(4), "&") != true { return 5; }
+    if string_eq(ast_unop_to_c(5), "&") != true { return 6; }
+    if is_supported_unop(0) != true { return 7; }
+    if is_supported_unop(1) != true { return 8; }
+    if is_supported_unop(2) != true { return 9; }
+    if is_supported_unop(4) != true { return 10; }
+    if is_supported_unop(5) != true { return 11; }
+    if is_supported_unop(3) != false { return 12; }
     return 0;
 }
 
@@ -412,6 +474,8 @@ fn test_ty_to_c() -> i32 {
 fn test_old_slot() -> i32 {
     if string_eq(old_slot_prefix(), "_sv0old_") != true { return 1; }
     if old_slot_name_len(3) != 11 { return 2; }
+    if string_eq(old_slot_name("x"), "_sv0old_x") != true { return 3; }
+    if string_eq(old_slot_name("count"), "_sv0old_count") != true { return 4; }
     return 0;
 }
 
@@ -543,6 +607,29 @@ fn test_lit_supported() -> i32 {
     return 0;
 }
 
+fn test_param_name_tag() -> i32 {
+    if param_name_tag(1) != true { return 1; }
+    if param_name_tag(0) != false { return 2; }
+    if param_name_tag(2) != false { return 3; }
+    return 0;
+}
+
+fn test_uniq_old_names() -> i32 {
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 10); vec_push(names, 20); vec_push(names, 10); vec_push(names, 30); vec_push(names, 20);
+    let uniq: Vec<i32> = uniq_old_names(names);
+    if vec_len(uniq) != 3 { return 1; }
+    if vec_get(uniq, 0) != 10 { return 2; }
+    if vec_get(uniq, 1) != 20 { return 3; }
+    if vec_get(uniq, 2) != 30 { return 4; }
+    let empty: Vec<i32> = vec_new();
+    let uniq2: Vec<i32> = uniq_old_names(empty);
+    if vec_len(uniq2) != 0 { return 5; }
+    if old_name_seen(uniq, 10) != true { return 6; }
+    if old_name_seen(uniq, 99) != false { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -584,5 +671,9 @@ fn main() -> i32 {
     if r19 != 0 { return 210 + r19; }
     let r20: i32 = test_lit_supported();
     if r20 != 0 { return 220 + r20; }
+    let r21: i32 = test_param_name_tag();
+    if r21 != 0 { return 230 + r21; }
+    let r22: i32 = test_uniq_old_names();
+    if r22 != 0 { return 240 + r22; }
     return 0;
 }

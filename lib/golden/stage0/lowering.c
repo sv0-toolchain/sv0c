@@ -13,6 +13,11 @@ static int is_void_cty(const char* name);
 static int ast_ty_is_unit(const char* name);
 static const char* old_slot_prefix(void);
 static int old_slot_name_len(int name_len);
+static const char* old_slot_name(const char* name);
+static int param_name_tag(int pat_tag);
+static int old_name_seen(int seen, int name);
+static int old_names_add_unique(int seen, int name);
+static int uniq_old_names(int names);
 static int ret_syntax_is_unit(int has_ret, const char* ret_ty_name);
 static int use_ret_slot(int is_unit, int ens_mentions_result);
 static int lower_lit_supported(int lit_tag);
@@ -67,6 +72,8 @@ static int test_enum_alloc(void);
 static int test_ret_value_slot(void);
 static int test_use_ret_slot(void);
 static int test_lit_supported(void);
+static int test_param_name_tag(void);
+static int test_uniq_old_names(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -219,6 +226,22 @@ static const char* ast_unop_to_c(int tag) {
     return "!";
   } else {
   }
+  if ((tag == 2)) {
+    return "~";
+  } else {
+  }
+  if ((tag == 3)) {
+    return "*";
+  } else {
+  }
+  if ((tag == 4)) {
+    return "&";
+  } else {
+  }
+  if ((tag == 5)) {
+    return "&";
+  } else {
+  }
   return "?";
 }
 
@@ -228,6 +251,18 @@ static int is_supported_unop(int tag) {
   } else {
   }
   if ((tag == 1)) {
+    return 1;
+  } else {
+  }
+  if ((tag == 2)) {
+    return 1;
+  } else {
+  }
+  if ((tag == 4)) {
+    return 1;
+  } else {
+  }
+  if ((tag == 5)) {
     return 1;
   } else {
   }
@@ -344,6 +379,56 @@ static const char* old_slot_prefix(void) {
 static int old_slot_name_len(int name_len) {
   int _sv0t0 = (8 + name_len);
   return _sv0t0;
+}
+
+static const char* old_slot_name(const char* name) {
+  const char* _sv0t0 = sv0_string_concat("_sv0old_", name);
+  return _sv0t0;
+}
+
+static int param_name_tag(int pat_tag) {
+  int _sv0t0 = (pat_tag == 1);
+  return _sv0t0;
+}
+
+static int old_name_seen(int seen, int name) {
+  int _sv0t0 = sv0_vec_len(seen);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(seen, i);
+    if ((_sv0t1 == name)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int old_names_add_unique(int seen, int name) {
+  int _sv0t0 = old_name_seen(seen, name);
+  if (_sv0t0) {
+    return 0;
+  } else {
+  }
+  sv0_vec_push(seen, name);
+  return 1;
+}
+
+static int uniq_old_names(int names) {
+  int _sv0t0 = sv0_vec_new();
+  int out = _sv0t0;
+  int _sv0t1 = sv0_vec_len(names);
+  int n = _sv0t1;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t2 = sv0_vec_get(names, i);
+    int name = _sv0t2;
+    int _sv0t3 = old_names_add_unique(out, name);
+    i = (i + 1);
+  }
+  return out;
 }
 
 static int ret_syntax_is_unit(int has_ret, const char* ret_ty_name) {
@@ -809,19 +894,58 @@ static int test_unop_to_c(void) {
     return 2;
   } else {
   }
-  int _sv0t4 = is_supported_unop(0);
-  if ((_sv0t4 != 1)) {
+  const char* _sv0t4 = ast_unop_to_c(2);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "~");
+  if ((_sv0t5 != 1)) {
     return 3;
   } else {
   }
-  int _sv0t5 = is_supported_unop(1);
-  if ((_sv0t5 != 1)) {
+  const char* _sv0t6 = ast_unop_to_c(3);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "*");
+  if ((_sv0t7 != 1)) {
     return 4;
   } else {
   }
-  int _sv0t6 = is_supported_unop(5);
-  if ((_sv0t6 != 0)) {
+  const char* _sv0t8 = ast_unop_to_c(4);
+  int _sv0t9 = sv0_string_eq(_sv0t8, "&");
+  if ((_sv0t9 != 1)) {
     return 5;
+  } else {
+  }
+  const char* _sv0t10 = ast_unop_to_c(5);
+  int _sv0t11 = sv0_string_eq(_sv0t10, "&");
+  if ((_sv0t11 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t12 = is_supported_unop(0);
+  if ((_sv0t12 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t13 = is_supported_unop(1);
+  if ((_sv0t13 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t14 = is_supported_unop(2);
+  if ((_sv0t14 != 1)) {
+    return 9;
+  } else {
+  }
+  int _sv0t15 = is_supported_unop(4);
+  if ((_sv0t15 != 1)) {
+    return 10;
+  } else {
+  }
+  int _sv0t16 = is_supported_unop(5);
+  if ((_sv0t16 != 1)) {
+    return 11;
+  } else {
+  }
+  int _sv0t17 = is_supported_unop(3);
+  if ((_sv0t17 != 0)) {
+    return 12;
   } else {
   }
   return 0;
@@ -916,6 +1040,18 @@ static int test_old_slot(void) {
   int _sv0t2 = old_slot_name_len(3);
   if ((_sv0t2 != 11)) {
     return 2;
+  } else {
+  }
+  const char* _sv0t3 = old_slot_name("x");
+  int _sv0t4 = sv0_string_eq(_sv0t3, "_sv0old_x");
+  if ((_sv0t4 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t5 = old_slot_name("count");
+  int _sv0t6 = sv0_string_eq(_sv0t5, "_sv0old_count");
+  if ((_sv0t6 != 1)) {
+    return 4;
   } else {
   }
   return 0;
@@ -1273,6 +1409,77 @@ static int test_lit_supported(void) {
   return 0;
 }
 
+static int test_param_name_tag(void) {
+  int _sv0t0 = param_name_tag(1);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = param_name_tag(0);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = param_name_tag(2);
+  if ((_sv0t2 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_uniq_old_names(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(names, 10);
+  sv0_vec_push(names, 30);
+  sv0_vec_push(names, 20);
+  int _sv0t1 = uniq_old_names(names);
+  int uniq = _sv0t1;
+  int _sv0t2 = sv0_vec_len(uniq);
+  if ((_sv0t2 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(uniq, 0);
+  if ((_sv0t3 != 10)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(uniq, 1);
+  if ((_sv0t4 != 20)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(uniq, 2);
+  if ((_sv0t5 != 30)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int empty = _sv0t6;
+  int _sv0t7 = uniq_old_names(empty);
+  int uniq2 = _sv0t7;
+  int _sv0t8 = sv0_vec_len(uniq2);
+  if ((_sv0t8 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = old_name_seen(uniq, 10);
+  if ((_sv0t9 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t10 = old_name_seen(uniq, 99);
+  if ((_sv0t10 != 0)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -1411,6 +1618,20 @@ int main(void) {
   if ((r20 != 0)) {
     int _sv0t38 = (220 + r20);
     return _sv0t38;
+  } else {
+  }
+  int _sv0t39 = test_param_name_tag();
+  int r21 = _sv0t39;
+  if ((r21 != 0)) {
+    int _sv0t40 = (230 + r21);
+    return _sv0t40;
+  } else {
+  }
+  int _sv0t41 = test_uniq_old_names();
+  int r22 = _sv0t41;
+  if ((r22 != 0)) {
+    int _sv0t42 = (240 + r22);
+    return _sv0t42;
   } else {
   }
   return 0;
