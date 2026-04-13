@@ -4,7 +4,6 @@
 # still emit C that is golden-checked but not yet ABI-clean for cc — see doc).
 # Expand this list as the C backend hardens; keep CI time reasonable.
 
-lib/diagnostic_core.sv0
 lexer/token_keyword_core.sv0
 lexer/token_delim_core.sv0
 lexer/token_op_core.sv0
@@ -16,18 +15,6 @@ parser/stmt_entry_core.sv0
 parser/type_parse_core.sv0
 
 # IR / checker / link + additional parser slices (single-TU cc+run smoke; 2026-04-07)
-lib/lower_ast_ty_cstring_core.sv0
-lib/lower_ast_binop_to_c_core.sv0
-lib/lower_match_scrut_cty_core.sv0
-lib/lower_ok_payload_cty_core.sv0
-lib/lower_scan_lets_core.sv0
-lib/lower_mentions_result_core.sv0
-lib/lower_all_old_names_core.sv0
-lib/lower_uniq_old_names_core.sv0
-lib/lower_old_targets_core.sv0
-lib/lower_expr_wi_tv_cluster_core.sv0
-lib/lower_expr_effect_iv_cluster_core.sv0
-lib/lower_match_arm_setup_core.sv0
 parser/expr_rhs_stub_core.sv0
 parser/expr_pratt_stub_core.sv0
 parser/expr_prec_ladder_core.sv0
@@ -35,8 +22,6 @@ parser/expr_cast_core.sv0
 parser/expr_unary_stub_core.sv0
 parser/try_assign_stmt_core.sv0
 lib/codegen.sv0
-lib/codegen_emit_value_core.sv0
-lib/codegen_emit_instr_core.sv0
 
 # Golden pass programs (emit-c + cc + run verified 2026-04-10)
 test/data/golden/pass/exists_requires.sv0
@@ -52,8 +37,6 @@ test/integration/generics/generics.sv0
 test/integration/hello/hello.sv0
 test/integration/patterns/patterns.sv0
 test/integration/enum_tuple_match/enum_tuple_match.sv0
-lib/checker_synth_expr_core.sv0
-lib/checker_call_path_core.sv0
 test/integration/structs/structs.sv0
 
 # VM-parity programs (emit-c + cc + run verified 2026-04-10)
@@ -120,27 +103,14 @@ test/vm-parity/programs/vm_while_false.sv0
 test/vm-parity/programs/vm_while_once_break.sv0
 
 # Struct-return seeds (emit-c + cc + run verified 2026-04-10, restructured to let mut)
-lib/env_scope_core.sv0
-lib/lookup_type_core.sv0
-lib/lookup_type_alias_core.sv0
-lib/lookup_value_core.sv0
-lib/resolver_call_core.sv0
-lib/type_alias_core.sv0
 
 # C backend: splitMain / emit / intLit seed (emit-c + cc + run verified 2026-04-10)
-lib/codegen_split_main_emit_core.sv0
 
 # VM backend: vm_codegen.sml seeds (emit-c + cc + run verified 2026-04-10)
-lib/vm_codegen_emit_instr_core.sv0
 
 # Driver, include expansion, bytecode seeds (emit-c + cc + run verified 2026-04-10)
-lib/driver_pipeline_core.sv0
 
 # Type checker, unify, pipeline composition (emit-c + cc + run verified 2026-04-10)
-lib/types_core.sv0
-lib/unify_core.sv0
-lib/checker_dispatch_core.sv0
-lib/pipeline_compose_core.sv0
 
 # Continue-loops integration test (emit-c + cc + run verified 2026-04-10, lowering.sml fix)
 test/integration/continue_loops/continue_loops.sv0
@@ -168,22 +138,6 @@ lib/unify.sv0
 lib/diagnostic.sv0
 lib/env.sv0
 lib/include_expand.sv0
-lib/bytecode_insn_size_core.sv0
-lib/lexer_char_class_core.sv0
-lib/lexer_advance_core.sv0
-lib/vm_codegen_jump_patch_core.sv0
-lib/vm_codegen_bind_param_core.sv0
-lib/main_pipeline_core.sv0
-lib/codegen_escape_core.sv0
-lib/parser_pat_core.sv0
-lib/parser_path_core.sv0
-lib/bytecode_le_core.sv0
-lib/resolver_register_item_core.sv0
-lib/checker_expr_refs_core.sv0
-lib/vm_codegen_local_scan_core.sv0
-lib/bytecode_decode_insn_core.sv0
-lib/lexer_keyword_core.sv0
-lib/vm_codegen_pool_add_core.sv0
 lib/bytecode.sv0
 lib/vm_codegen.sv0
 lib/checker.sv0
