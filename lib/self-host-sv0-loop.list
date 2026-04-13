@@ -215,6 +215,7 @@ lib/types.sv0
 lib/span.sv0
 lib/ir.sv0
 lib/link.sv0
+lib/lexer.sv0
 lib/ast.sv0
 lexer/token.sv0
 lib/contract_analyzer.sv0
