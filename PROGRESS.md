@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **All seeds removed — including subdirectory seeds.** Batch 6 removed the final 15 seeds from `parser/` (12) and `lexer/` (3) subdirectories. All were surrogates or superseded by `lib/parser.sv0` and `lib/lexer.sv0` + `lexer/token.sv0`. Seeds remaining: **0** (all directories). Bootstrap 97 (20 real modules + 77 tests). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity 84)
+**Last updated:** 2026-04-13 (America/Denver; **Deep-function transliteration started.** `env.sv0`: all 6 deferred SML functions implemented (fnArity, tyAlias, registerValueAlias, registerTypeAlias, lookupType, resolveCanonicalTy) — env.sml parity complete. `lexer.sv0`: full `tokenize` pipeline added (scan_string_end, scan_char_end, scan_number_full, scan_op_full, tokenize with parallel Vec output) — lexer.sml pipeline parity. Metrics unchanged: bootstrap 97, self-host 97, stage0 21, vm-parity 84)
 
 ## Checklist (local source of truth)
 
