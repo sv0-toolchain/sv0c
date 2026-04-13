@@ -1,0 +1,454 @@
+/* Phase 2 real pipeline module: sml/parser/parser.sml -> sv0.
+   Parser utilities: token→binop mapping (18 tokens → Ast.binop tags),
+   token→assign-binop mapping (10 compound-assign tokens → binop tags),
+   literal classification from token tags (INT_LIT/FLOAT_LIT/STRING_LIT/
+   CHAR_LIT/TRUE/FALSE → Ast.literal tags), expr span extraction by
+   expr tag (28 expression kinds), skip helpers (skipOptionalPub,
+   skipOptionalUnsafe, skipGenericParams depth tracking,
+   skipWhereClause/skipAttributes by token tag), pathOfTy check,
+   span merge (min/max), precedence helpers.
+   Full recursive-descent parser deferred — needs token-stream state
+   with mutual recursion (parseExpr/parseType/parsePat/parseItem). */
+
+/* ── token tag constants (from token.sv0) ───────────────────── */
+
+fn TK_INT_LIT() -> i32 { return 0; }
+fn TK_FLOAT_LIT() -> i32 { return 1; }
+fn TK_STRING_LIT() -> i32 { return 2; }
+fn TK_CHAR_LIT() -> i32 { return 3; }
+fn TK_BOOL_LIT() -> i32 { return 4; }
+fn TK_IDENT() -> i32 { return 5; }
+fn TK_LPAREN() -> i32 { return 6; }
+fn TK_RPAREN() -> i32 { return 7; }
+fn TK_LBRACE() -> i32 { return 8; }
+fn TK_RBRACE() -> i32 { return 9; }
+fn TK_LBRACKET() -> i32 { return 10; }
+fn TK_RBRACKET() -> i32 { return 11; }
+fn TK_COMMA() -> i32 { return 12; }
+fn TK_SEMICOLON() -> i32 { return 13; }
+fn TK_COLON() -> i32 { return 14; }
+fn TK_COLONCOLON() -> i32 { return 15; }
+fn TK_DOT() -> i32 { return 16; }
+fn TK_DOTDOT() -> i32 { return 17; }
+fn TK_ARROW() -> i32 { return 19; }
+fn TK_FATARROW() -> i32 { return 20; }
+fn TK_HASH() -> i32 { return 21; }
+fn TK_PLUS() -> i32 { return 22; }
+fn TK_MINUS() -> i32 { return 23; }
+fn TK_STAR() -> i32 { return 24; }
+fn TK_SLASH() -> i32 { return 25; }
+fn TK_PERCENT() -> i32 { return 26; }
+fn TK_AMP() -> i32 { return 27; }
+fn TK_AMPAMP() -> i32 { return 28; }
+fn TK_PIPE() -> i32 { return 29; }
+fn TK_PIPEPIPE() -> i32 { return 30; }
+fn TK_CARET() -> i32 { return 31; }
+fn TK_BANG() -> i32 { return 33; }
+fn TK_EQ() -> i32 { return 35; }
+fn TK_EQEQ() -> i32 { return 36; }
+fn TK_BANGEQ() -> i32 { return 37; }
+fn TK_LT() -> i32 { return 38; }
+fn TK_GT() -> i32 { return 39; }
+fn TK_LTEQ() -> i32 { return 40; }
+fn TK_GTEQ() -> i32 { return 41; }
+fn TK_LTLT() -> i32 { return 42; }
+fn TK_GTGT() -> i32 { return 43; }
+fn TK_PLUSEQ() -> i32 { return 44; }
+fn TK_MINUSEQ() -> i32 { return 45; }
+fn TK_STAREQ() -> i32 { return 46; }
+fn TK_SLASHEQ() -> i32 { return 47; }
+fn TK_PERCENTEQ() -> i32 { return 48; }
+fn TK_AMPEQ() -> i32 { return 49; }
+fn TK_PIPEEQ() -> i32 { return 50; }
+fn TK_CARETEQ() -> i32 { return 51; }
+fn TK_LTLTEQ() -> i32 { return 52; }
+fn TK_GTGTEQ() -> i32 { return 53; }
+fn TK_PUB() -> i32 { return 79; }
+fn TK_PROJECT() -> i32 { return 79; }
+fn TK_UNSAFE() -> i32 { return 90; }
+fn TK_FN() -> i32 { return 65; }
+fn TK_WHERE() -> i32 { return 91; }
+fn TK_TRUE() -> i32 { return 89; }
+fn TK_FALSE() -> i32 { return 64; }
+fn TK_EOF() -> i32 { return 96; }
+
+/* ── AST binop tags (matching ast.sv0) ──────────────────────── */
+
+fn AST_ADD() -> i32 { return 0; }
+fn AST_SUB() -> i32 { return 1; }
+fn AST_MUL() -> i32 { return 2; }
+fn AST_DIV() -> i32 { return 3; }
+fn AST_REM() -> i32 { return 4; }
+fn AST_EQ() -> i32 { return 5; }
+fn AST_NEQ() -> i32 { return 6; }
+fn AST_LT() -> i32 { return 7; }
+fn AST_GT() -> i32 { return 8; }
+fn AST_LEQ() -> i32 { return 9; }
+fn AST_GEQ() -> i32 { return 10; }
+fn AST_AND() -> i32 { return 11; }
+fn AST_OR() -> i32 { return 12; }
+fn AST_BITAND() -> i32 { return 13; }
+fn AST_BITOR() -> i32 { return 14; }
+fn AST_BITXOR() -> i32 { return 15; }
+fn AST_SHL() -> i32 { return 16; }
+fn AST_SHR() -> i32 { return 17; }
+
+/* ── token → binop mapping ──────────────────────────────────── */
+
+fn binop_of(tok_tag: i32) -> i32 {
+    if tok_tag == 22 { return 0; }
+    if tok_tag == 23 { return 1; }
+    if tok_tag == 24 { return 2; }
+    if tok_tag == 25 { return 3; }
+    if tok_tag == 26 { return 4; }
+    if tok_tag == 27 { return 13; }
+    if tok_tag == 29 { return 14; }
+    if tok_tag == 31 { return 15; }
+    if tok_tag == 42 { return 16; }
+    if tok_tag == 43 { return 17; }
+    if tok_tag == 28 { return 11; }
+    if tok_tag == 30 { return 12; }
+    if tok_tag == 36 { return 5; }
+    if tok_tag == 37 { return 6; }
+    if tok_tag == 38 { return 7; }
+    if tok_tag == 39 { return 8; }
+    if tok_tag == 40 { return 9; }
+    if tok_tag == 41 { return 10; }
+    return 0 - 1;
+}
+
+fn has_binop(tok_tag: i32) -> bool {
+    return binop_of(tok_tag) >= 0;
+}
+
+/* ── token → assign binop mapping ───────────────────────────── */
+
+fn assign_binop(tok_tag: i32) -> i32 {
+    if tok_tag == 44 { return 0; }
+    if tok_tag == 45 { return 1; }
+    if tok_tag == 46 { return 2; }
+    if tok_tag == 47 { return 3; }
+    if tok_tag == 48 { return 4; }
+    if tok_tag == 49 { return 13; }
+    if tok_tag == 50 { return 14; }
+    if tok_tag == 51 { return 15; }
+    if tok_tag == 52 { return 16; }
+    if tok_tag == 53 { return 17; }
+    return 0 - 1;
+}
+
+fn has_assign_binop(tok_tag: i32) -> bool {
+    return assign_binop(tok_tag) >= 0;
+}
+
+fn is_compound_assign(tok_tag: i32) -> bool {
+    if tok_tag >= 44 {
+        if tok_tag <= 53 { return true; }
+    }
+    return false;
+}
+
+/* ── literal classification from token ──────────────────────── */
+
+fn LIT_TAG_INT() -> i32 { return 0; }
+fn LIT_TAG_FLOAT() -> i32 { return 1; }
+fn LIT_TAG_STRING() -> i32 { return 3; }
+fn LIT_TAG_CHAR() -> i32 { return 4; }
+fn LIT_TAG_BOOL() -> i32 { return 5; }
+fn LIT_TAG_NONE() -> i32 { return 0 - 1; }
+
+fn lit_from_tok(tok_tag: i32) -> i32 {
+    if tok_tag == 0 { return 0; }
+    if tok_tag == 1 { return 1; }
+    if tok_tag == 2 { return 3; }
+    if tok_tag == 3 { return 4; }
+    if tok_tag == 89 { return 5; }
+    if tok_tag == 64 { return 5; }
+    return 0 - 1;
+}
+
+fn is_literal_tok(tok_tag: i32) -> bool {
+    return lit_from_tok(tok_tag) >= 0;
+}
+
+/* ── expr span extraction ───────────────────────────────────── */
+
+fn expr_has_span(expr_tag: i32) -> bool {
+    if expr_tag >= 0 {
+        if expr_tag <= 27 { return true; }
+    }
+    return false;
+}
+
+/* ── skip helpers ───────────────────────────────────────────── */
+
+fn is_pub_token(tok_tag: i32) -> bool {
+    return tok_tag == 79;
+}
+
+fn is_unsafe_token(tok_tag: i32) -> bool {
+    return tok_tag == 90;
+}
+
+fn is_where_token(tok_tag: i32) -> bool {
+    return tok_tag == 91;
+}
+
+fn is_hash_token(tok_tag: i32) -> bool {
+    return tok_tag == 21;
+}
+
+fn is_lt_token(tok_tag: i32) -> bool {
+    return tok_tag == 38;
+}
+
+fn is_gt_token(tok_tag: i32) -> bool {
+    return tok_tag == 39;
+}
+
+/* skipGenericParams: track angle-bracket depth */
+fn generic_params_update_depth(tok_tag: i32, depth: i32) -> i32 {
+    if tok_tag == 38 { return depth + 1; }
+    if tok_tag == 39 { return depth - 1; }
+    return depth;
+}
+
+fn generic_params_done(depth: i32) -> bool {
+    return depth <= 0;
+}
+
+/* skipWhereClause stop tokens */
+fn where_clause_stop(tok_tag: i32) -> bool {
+    if tok_tag == 8 { return true; }
+    if tok_tag == 65 { return true; }
+    if tok_tag == 13 { return true; }
+    if tok_tag == 96 { return true; }
+    return false;
+}
+
+/* skipAttributes: track bracket depth */
+fn attr_bracket_update(tok_tag: i32, depth: i32) -> i32 {
+    if tok_tag == 10 { return depth + 1; }
+    if tok_tag == 11 { return depth - 1; }
+    return depth;
+}
+
+/* ── pathOfTy ───────────────────────────────────────────────── */
+
+fn ty_is_name(ty_tag: i32) -> bool {
+    return ty_tag == 0;
+}
+
+/* ── span merge (min start, max end) ────────────────────────── */
+
+fn span_min(a: i32, b: i32) -> i32 {
+    if a <= b { return a; }
+    return b;
+}
+
+fn span_max(a: i32, b: i32) -> i32 {
+    if a >= b { return a; }
+    return b;
+}
+
+fn span_merge_start(s1: i32, s2: i32) -> i32 {
+    return span_min(s1, s2);
+}
+
+fn span_merge_end(e1: i32, e2: i32) -> i32 {
+    return span_max(e1, e2);
+}
+
+/* ── precedence helpers ─────────────────────────────────────── */
+
+fn is_cmp_token(tok_tag: i32) -> bool {
+    if tok_tag == 36 { return true; }
+    if tok_tag == 37 { return true; }
+    if tok_tag == 38 { return true; }
+    if tok_tag == 39 { return true; }
+    if tok_tag == 40 { return true; }
+    if tok_tag == 41 { return true; }
+    return false;
+}
+
+fn is_additive_token(tok_tag: i32) -> bool {
+    if tok_tag == 22 { return true; }
+    if tok_tag == 23 { return true; }
+    return false;
+}
+
+fn is_multiplicative_token(tok_tag: i32) -> bool {
+    if tok_tag == 24 { return true; }
+    if tok_tag == 25 { return true; }
+    if tok_tag == 26 { return true; }
+    return false;
+}
+
+fn is_shift_token(tok_tag: i32) -> bool {
+    if tok_tag == 42 { return true; }
+    if tok_tag == 43 { return true; }
+    return false;
+}
+
+fn is_unary_prefix(tok_tag: i32) -> bool {
+    if tok_tag == 23 { return true; }
+    if tok_tag == 33 { return true; }
+    if tok_tag == 27 { return true; }
+    if tok_tag == 24 { return true; }
+    return false;
+}
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_binop_of() -> i32 {
+    if binop_of(22) != 0 { return 1; }
+    if binop_of(23) != 1 { return 2; }
+    if binop_of(24) != 2 { return 3; }
+    if binop_of(25) != 3 { return 4; }
+    if binop_of(26) != 4 { return 5; }
+    if binop_of(27) != 13 { return 6; }
+    if binop_of(29) != 14 { return 7; }
+    if binop_of(31) != 15 { return 8; }
+    if binop_of(42) != 16 { return 9; }
+    if binop_of(43) != 17 { return 10; }
+    if binop_of(28) != 11 { return 11; }
+    if binop_of(30) != 12 { return 12; }
+    if binop_of(36) != 5 { return 13; }
+    if binop_of(37) != 6 { return 14; }
+    if binop_of(38) != 7 { return 15; }
+    if binop_of(39) != 8 { return 16; }
+    if binop_of(40) != 9 { return 17; }
+    if binop_of(41) != 10 { return 18; }
+    if binop_of(0) != 0 - 1 { return 19; }
+    if has_binop(22) != true { return 20; }
+    if has_binop(0) != false { return 21; }
+    return 0;
+}
+
+fn test_assign_binop() -> i32 {
+    if assign_binop(44) != 0 { return 1; }
+    if assign_binop(45) != 1 { return 2; }
+    if assign_binop(46) != 2 { return 3; }
+    if assign_binop(47) != 3 { return 4; }
+    if assign_binop(48) != 4 { return 5; }
+    if assign_binop(49) != 13 { return 6; }
+    if assign_binop(50) != 14 { return 7; }
+    if assign_binop(51) != 15 { return 8; }
+    if assign_binop(52) != 16 { return 9; }
+    if assign_binop(53) != 17 { return 10; }
+    if assign_binop(0) != 0 - 1 { return 11; }
+    if has_assign_binop(44) != true { return 12; }
+    if has_assign_binop(0) != false { return 13; }
+    if is_compound_assign(44) != true { return 14; }
+    if is_compound_assign(53) != true { return 15; }
+    if is_compound_assign(22) != false { return 16; }
+    return 0;
+}
+
+fn test_lit_from_tok() -> i32 {
+    if lit_from_tok(0) != 0 { return 1; }
+    if lit_from_tok(1) != 1 { return 2; }
+    if lit_from_tok(2) != 3 { return 3; }
+    if lit_from_tok(3) != 4 { return 4; }
+    if lit_from_tok(89) != 5 { return 5; }
+    if lit_from_tok(64) != 5 { return 6; }
+    if lit_from_tok(5) != 0 - 1 { return 7; }
+    if is_literal_tok(0) != true { return 8; }
+    if is_literal_tok(5) != false { return 9; }
+    return 0;
+}
+
+fn test_expr_span() -> i32 {
+    if expr_has_span(0) != true { return 1; }
+    if expr_has_span(27) != true { return 2; }
+    if expr_has_span(28) != false { return 3; }
+    if expr_has_span(0 - 1) != false { return 4; }
+    return 0;
+}
+
+fn test_skip_helpers() -> i32 {
+    if is_pub_token(79) != true { return 1; }
+    if is_pub_token(0) != false { return 2; }
+    if is_unsafe_token(90) != true { return 3; }
+    if is_where_token(91) != true { return 4; }
+    if is_hash_token(21) != true { return 5; }
+    if is_lt_token(38) != true { return 6; }
+    if is_gt_token(39) != true { return 7; }
+    if generic_params_update_depth(38, 1) != 2 { return 8; }
+    if generic_params_update_depth(39, 2) != 1 { return 9; }
+    if generic_params_update_depth(0, 1) != 1 { return 10; }
+    if generic_params_done(0) != true { return 11; }
+    if generic_params_done(1) != false { return 12; }
+    if where_clause_stop(8) != true { return 13; }
+    if where_clause_stop(65) != true { return 14; }
+    if where_clause_stop(13) != true { return 15; }
+    if where_clause_stop(96) != true { return 16; }
+    if where_clause_stop(0) != false { return 17; }
+    return 0;
+}
+
+fn test_span_merge() -> i32 {
+    if span_min(3, 5) != 3 { return 1; }
+    if span_min(5, 3) != 3 { return 2; }
+    if span_max(3, 5) != 5 { return 3; }
+    if span_max(5, 3) != 5 { return 4; }
+    if span_merge_start(10, 5) != 5 { return 5; }
+    if span_merge_end(10, 20) != 20 { return 6; }
+    return 0;
+}
+
+fn test_precedence() -> i32 {
+    if is_cmp_token(36) != true { return 1; }
+    if is_cmp_token(41) != true { return 2; }
+    if is_cmp_token(22) != false { return 3; }
+    if is_additive_token(22) != true { return 4; }
+    if is_additive_token(23) != true { return 5; }
+    if is_additive_token(24) != false { return 6; }
+    if is_multiplicative_token(24) != true { return 7; }
+    if is_multiplicative_token(25) != true { return 8; }
+    if is_multiplicative_token(26) != true { return 9; }
+    if is_multiplicative_token(22) != false { return 10; }
+    if is_shift_token(42) != true { return 11; }
+    if is_shift_token(43) != true { return 12; }
+    if is_shift_token(22) != false { return 13; }
+    if is_unary_prefix(23) != true { return 14; }
+    if is_unary_prefix(33) != true { return 15; }
+    if is_unary_prefix(27) != true { return 16; }
+    if is_unary_prefix(0) != false { return 17; }
+    return 0;
+}
+
+fn test_ty_name() -> i32 {
+    if ty_is_name(0) != true { return 1; }
+    if ty_is_name(1) != false { return 2; }
+    return 0;
+}
+
+fn test_attr_bracket() -> i32 {
+    if attr_bracket_update(10, 0) != 1 { return 1; }
+    if attr_bracket_update(11, 2) != 1 { return 2; }
+    if attr_bracket_update(5, 1) != 1 { return 3; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_binop_of();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_assign_binop();
+    if r2 != 0 { return 30 + r2; }
+    let r3: i32 = test_lit_from_tok();
+    if r3 != 0 { return 50 + r3; }
+    let r4: i32 = test_expr_span();
+    if r4 != 0 { return 60 + r4; }
+    let r5: i32 = test_skip_helpers();
+    if r5 != 0 { return 70 + r5; }
+    let r6: i32 = test_span_merge();
+    if r6 != 0 { return 90 + r6; }
+    let r7: i32 = test_precedence();
+    if r7 != 0 { return 100 + r7; }
+    let r8: i32 = test_ty_name();
+    if r8 != 0 { return 120 + r8; }
+    let r9: i32 = test_attr_bracket();
+    if r9 != 0 { return 130 + r9; }
+    return 0;
+}
