@@ -3,7 +3,6 @@
 # Order is arbitrary today (each program is compiled separately).
 
 lib/diagnostic_core.sv0
-lib/diagnostic_batch_core.sv0
 lib/env_core.sv0
 lib/resolver_value_core.sv0
 lib/resolver_arity_core.sv0
@@ -19,14 +18,11 @@ lib/lower_expr_init_cty_core.sv0
 lib/lower_match_scrut_cty_core.sv0
 lib/lower_callee_ret_cty_core.sv0
 lib/lower_enum_tag_core.sv0
-lib/lower_struct_fields_core.sv0
-lib/lower_resolve_fn_callee_core.sv0
 lib/lower_resolve_enum_ctor_path_core.sv0
 lib/lower_enum_store_payload_core.sv0
 lib/lower_find_variant_ast_core.sv0
 lib/lower_ok_payload_cty_core.sv0
 lib/lower_scan_lets_core.sv0
-lib/lower_with_scrut_locals_core.sv0
 lib/lower_mentions_result_core.sv0
 lib/lower_all_old_names_core.sv0
 lib/lower_uniq_old_names_core.sv0
@@ -42,25 +38,15 @@ lib/lower_stmt_dispatch_core.sv0
 lib/lower_stmt_let_init_core.sv0
 lib/lower_expr_wi_tv_cluster_core.sv0
 lib/lower_expr_effect_iv_cluster_core.sv0
-lib/lower_quant_core.sv0
 lib/lower_bind_scrut_core.sv0
 lib/lower_match_one_arm_core.sv0
 lib/lower_match_arm_setup_core.sv0
-lib/lower_enum_construct_instrs_core.sv0
-lib/lower_expr_match_core.sv0
 lib/lower_expr_call_core.sv0
 lib/lower_expr_try_core.sv0
 lib/lower_fn_ret_cty_core.sv0
-lib/lower_param_name_core.sv0
 lib/lower_variant_slots_core.sv0
-lib/lower_emit_struct_td_core.sv0
-lib/lower_emit_enum_td_core.sv0
-lib/lower_collect_typedefs_core.sv0
-lib/lower_build_struct_order_core.sv0
 lib/lower_build_enum_variants_core.sv0
 lib/lower_entry_core.sv0
-lib/checker_mut_assign_core.sv0
-lib/link_strip_core.sv0
 lexer/token_keyword_core.sv0
 lexer/token_delim_core.sv0
 lexer/token_op_core.sv0
@@ -184,8 +170,6 @@ lib/resolver.sv0
 lib/ast.sv0
 lexer/token.sv0
 lib/contract_analyzer.sv0
-lib/link_is_sv0_core.sv0
-lib/link_is_hidden_core.sv0
 lib/resolver_pat_binds_core.sv0
 lib/resolver_enum_variant_reg_core.sv0
 lib/unify.sv0
@@ -210,8 +194,6 @@ lib/bytecode_le_core.sv0
 lib/bytecode_string_pool_core.sv0
 lib/resolver_register_item_core.sv0
 lib/resolver_use_clause_core.sv0
-lib/link_mangle_core.sv0
-lib/link_split_module_core.sv0
 lib/checker_expr_refs_core.sv0
 lib/checker_try_payload_core.sv0
 lib/vm_codegen_local_scan_core.sv0
@@ -231,8 +213,6 @@ lib/checker_bind_pat_core.sv0
 lib/checker_assign_core.sv0
 lib/checker_init_types_core.sv0
 lib/checker_mod_env_core.sv0
-lib/link_strip_directives_core.sv0
-lib/link_map_item_core.sv0
 lib/resolver_intrinsics_core.sv0
 lib/resolver_bind_locals_core.sv0
 lib/vm_codegen_while_loop_core.sv0

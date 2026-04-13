@@ -11,6 +11,17 @@ static int collect_tops_count(int item_tags);
 static int is_link_directive(int tag);
 static int strip_directives_count(int item_tags);
 static int has_module_prefix(int first_tag);
+static int split_module_inner_count(int total_items, int has_wrapper);
+static int map_ty_kind(int ty_tag);
+static int needs_path_rewrite(int ty_tag);
+static int needs_recursive_rewrite(int ty_tag);
+static int needs_list_rewrite(int ty_tag);
+static int is_leaf_ty(int ty_tag);
+static int rewrite_depth(int ty_tag, int child_depth);
+static int item_needs_rewrite(int item_kind);
+static int item_has_body(int item_kind);
+static int item_has_fields(int item_kind);
+static int map_fn_components(int has_params, int has_body, int has_contracts);
 static int in_tops(int tops, int name);
 static int path_seg_needs_mangle(int tops, int name);
 static int test_is_sv0(void);
@@ -24,6 +35,9 @@ static int test_strip_directives_count(void);
 static int test_has_module_prefix(void);
 static int test_in_tops(void);
 static int test_path_seg_needs_mangle(void);
+static int test_split_module(void);
+static int test_map_ty_kind(void);
+static int test_item_rewrite(void);
 
 static int is_sv0(const char* name) {
   int _sv0t0 = sv0_string_len(name);
@@ -189,6 +203,154 @@ static int strip_directives_count(int item_tags) {
 static int has_module_prefix(int first_tag) {
   int _sv0t0 = (first_tag == 6);
   return _sv0t0;
+}
+
+static int split_module_inner_count(int total_items, int has_wrapper) {
+  if (has_wrapper) {
+    int _sv0t0 = (total_items - 1);
+    return _sv0t0;
+  } else {
+  }
+  return total_items;
+}
+
+static int map_ty_kind(int ty_tag) {
+  if ((ty_tag == 0)) {
+    return 1;
+  } else {
+  }
+  if ((ty_tag == 1)) {
+    return 2;
+  } else {
+  }
+  if ((ty_tag == 2)) {
+    return 2;
+  } else {
+  }
+  if ((ty_tag == 3)) {
+    return 2;
+  } else {
+  }
+  if ((ty_tag == 4)) {
+    return 2;
+  } else {
+  }
+  if ((ty_tag == 5)) {
+    return 3;
+  } else {
+  }
+  if ((ty_tag == 6)) {
+    return 0;
+  } else {
+  }
+  if ((ty_tag == 7)) {
+    return 0;
+  } else {
+  }
+  return 0;
+}
+
+static int needs_path_rewrite(int ty_tag) {
+  int _sv0t0 = map_ty_kind(ty_tag);
+  int _sv0t1 = (_sv0t0 == 1);
+  return _sv0t1;
+}
+
+static int needs_recursive_rewrite(int ty_tag) {
+  int _sv0t0 = map_ty_kind(ty_tag);
+  int _sv0t1 = (_sv0t0 == 2);
+  return _sv0t1;
+}
+
+static int needs_list_rewrite(int ty_tag) {
+  int _sv0t0 = map_ty_kind(ty_tag);
+  int _sv0t1 = (_sv0t0 == 3);
+  return _sv0t1;
+}
+
+static int is_leaf_ty(int ty_tag) {
+  int _sv0t0 = map_ty_kind(ty_tag);
+  int _sv0t1 = (_sv0t0 == 0);
+  return _sv0t1;
+}
+
+static int rewrite_depth(int ty_tag, int child_depth) {
+  int _sv0t0 = is_leaf_ty(ty_tag);
+  if (_sv0t0) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = (1 + child_depth);
+  return _sv0t1;
+}
+
+static int item_needs_rewrite(int item_kind) {
+  if ((item_kind == 0)) {
+    return 1;
+  } else {
+  }
+  if ((item_kind == 3)) {
+    return 1;
+  } else {
+  }
+  if ((item_kind == 4)) {
+    return 1;
+  } else {
+  }
+  if ((item_kind == 5)) {
+    return 1;
+  } else {
+  }
+  if ((item_kind == 6)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int item_has_body(int item_kind) {
+  if ((item_kind == 0)) {
+    return 1;
+  } else {
+  }
+  if ((item_kind == 5)) {
+    return 1;
+  } else {
+  }
+  if ((item_kind == 6)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int item_has_fields(int item_kind) {
+  if ((item_kind == 3)) {
+    return 1;
+  } else {
+  }
+  if ((item_kind == 4)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int map_fn_components(int has_params, int has_body, int has_contracts) {
+  int parts = 1;
+  if (has_params) {
+    parts = (parts + 1);
+  } else {
+  }
+  if (has_body) {
+    parts = (parts + 1);
+  } else {
+  }
+  if (has_contracts) {
+    parts = (parts + 1);
+  } else {
+  }
+  return parts;
 }
 
 static int in_tops(int tops, int name) {
@@ -500,6 +662,163 @@ static int test_path_seg_needs_mangle(void) {
   return 0;
 }
 
+static int test_split_module(void) {
+  int _sv0t0 = has_module_prefix(6);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = has_module_prefix(0);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = split_module_inner_count(5, 1);
+  if ((_sv0t2 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = split_module_inner_count(5, 0);
+  if ((_sv0t3 != 5)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_map_ty_kind(void) {
+  int _sv0t0 = map_ty_kind(0);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = map_ty_kind(1);
+  if ((_sv0t1 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = map_ty_kind(5);
+  if ((_sv0t2 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = map_ty_kind(6);
+  if ((_sv0t3 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = needs_path_rewrite(0);
+  if ((_sv0t4 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = needs_recursive_rewrite(1);
+  if ((_sv0t5 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t6 = needs_list_rewrite(5);
+  if ((_sv0t6 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t7 = is_leaf_ty(6);
+  if ((_sv0t7 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t8 = is_leaf_ty(0);
+  if ((_sv0t8 != 0)) {
+    return 9;
+  } else {
+  }
+  int _sv0t9 = rewrite_depth(6, 0);
+  if ((_sv0t9 != 0)) {
+    return 10;
+  } else {
+  }
+  int _sv0t10 = rewrite_depth(0, 0);
+  if ((_sv0t10 != 1)) {
+    return 11;
+  } else {
+  }
+  int _sv0t11 = rewrite_depth(1, 2);
+  if ((_sv0t11 != 3)) {
+    return 12;
+  } else {
+  }
+  return 0;
+}
+
+static int test_item_rewrite(void) {
+  int _sv0t0 = item_needs_rewrite(0);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = item_needs_rewrite(4);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = item_needs_rewrite(7);
+  if ((_sv0t2 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = item_needs_rewrite(2);
+  if ((_sv0t3 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = item_has_body(0);
+  if ((_sv0t4 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = item_has_body(3);
+  if ((_sv0t5 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t6 = item_has_body(6);
+  if ((_sv0t6 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t7 = item_has_fields(3);
+  if ((_sv0t7 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t8 = item_has_fields(4);
+  if ((_sv0t8 != 1)) {
+    return 9;
+  } else {
+  }
+  int _sv0t9 = item_has_fields(0);
+  if ((_sv0t9 != 0)) {
+    return 10;
+  } else {
+  }
+  int _sv0t10 = map_fn_components(1, 1, 1);
+  if ((_sv0t10 != 4)) {
+    return 11;
+  } else {
+  }
+  int _sv0t11 = map_fn_components(0, 1, 0);
+  if ((_sv0t11 != 2)) {
+    return 12;
+  } else {
+  }
+  int _sv0t12 = map_fn_components(0, 0, 0);
+  if ((_sv0t12 != 1)) {
+    return 13;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_is_sv0();
   int r1 = _sv0t0;
@@ -575,6 +894,27 @@ int main(void) {
   if ((r11 != 0)) {
     int _sv0t20 = (100 + r11);
     return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_split_module();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (110 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_map_ty_kind();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (120 + r13);
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_item_rewrite();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (140 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;

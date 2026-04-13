@@ -115,11 +115,80 @@ fn strip_directives_count(item_tags: Vec<i32>) -> i32 {
 
 /* ── split module ───────────────────────────────────────────── */
 
-/* splitModule: if first item is ItemModule (tag 6), the module
-   name handle is in the payload and the remaining items form the
-   body. Returns 1 if module found, 0 otherwise. */
 fn has_module_prefix(first_tag: i32) -> bool {
     return first_tag == 6;
+}
+
+fn split_module_inner_count(total_items: i32, has_wrapper: bool) -> i32 {
+    if has_wrapper { return total_items - 1; }
+    return total_items;
+}
+
+/* ── type rewrite classification (mapTy dispatch) ────────────── */
+
+fn map_ty_kind(ty_tag: i32) -> i32 {
+    if ty_tag == 0 { return 1; }
+    if ty_tag == 1 { return 2; }
+    if ty_tag == 2 { return 2; }
+    if ty_tag == 3 { return 2; }
+    if ty_tag == 4 { return 2; }
+    if ty_tag == 5 { return 3; }
+    if ty_tag == 6 { return 0; }
+    if ty_tag == 7 { return 0; }
+    return 0;
+}
+
+fn needs_path_rewrite(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 1;
+}
+
+fn needs_recursive_rewrite(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 2;
+}
+
+fn needs_list_rewrite(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 3;
+}
+
+fn is_leaf_ty(ty_tag: i32) -> bool {
+    return map_ty_kind(ty_tag) == 0;
+}
+
+fn rewrite_depth(ty_tag: i32, child_depth: i32) -> i32 {
+    if is_leaf_ty(ty_tag) { return 0; }
+    return 1 + child_depth;
+}
+
+/* ── item rewrite classification (mapItem dispatch) ──────────── */
+
+fn item_needs_rewrite(item_kind: i32) -> bool {
+    if item_kind == 0 { return true; }
+    if item_kind == 3 { return true; }
+    if item_kind == 4 { return true; }
+    if item_kind == 5 { return true; }
+    if item_kind == 6 { return true; }
+    return false;
+}
+
+fn item_has_body(item_kind: i32) -> bool {
+    if item_kind == 0 { return true; }
+    if item_kind == 5 { return true; }
+    if item_kind == 6 { return true; }
+    return false;
+}
+
+fn item_has_fields(item_kind: i32) -> bool {
+    if item_kind == 3 { return true; }
+    if item_kind == 4 { return true; }
+    return false;
+}
+
+fn map_fn_components(has_params: bool, has_body: bool, has_contracts: bool) -> i32 {
+    let mut parts: i32 = 1;
+    if has_params { parts = parts + 1; }
+    if has_body { parts = parts + 1; }
+    if has_contracts { parts = parts + 1; }
+    return parts;
 }
 
 /* ── in-tops membership (Vec-based) ─────────────────────────── */
@@ -252,6 +321,47 @@ fn test_path_seg_needs_mangle() -> i32 {
     return 0;
 }
 
+fn test_split_module() -> i32 {
+    if has_module_prefix(6) != true { return 1; }
+    if has_module_prefix(0) != false { return 2; }
+    if split_module_inner_count(5, true) != 4 { return 3; }
+    if split_module_inner_count(5, false) != 5 { return 4; }
+    return 0;
+}
+
+fn test_map_ty_kind() -> i32 {
+    if map_ty_kind(0) != 1 { return 1; }
+    if map_ty_kind(1) != 2 { return 2; }
+    if map_ty_kind(5) != 3 { return 3; }
+    if map_ty_kind(6) != 0 { return 4; }
+    if needs_path_rewrite(0) != true { return 5; }
+    if needs_recursive_rewrite(1) != true { return 6; }
+    if needs_list_rewrite(5) != true { return 7; }
+    if is_leaf_ty(6) != true { return 8; }
+    if is_leaf_ty(0) != false { return 9; }
+    if rewrite_depth(6, 0) != 0 { return 10; }
+    if rewrite_depth(0, 0) != 1 { return 11; }
+    if rewrite_depth(1, 2) != 3 { return 12; }
+    return 0;
+}
+
+fn test_item_rewrite() -> i32 {
+    if item_needs_rewrite(0) != true { return 1; }
+    if item_needs_rewrite(4) != true { return 2; }
+    if item_needs_rewrite(7) != false { return 3; }
+    if item_needs_rewrite(2) != false { return 4; }
+    if item_has_body(0) != true { return 5; }
+    if item_has_body(3) != false { return 6; }
+    if item_has_body(6) != true { return 7; }
+    if item_has_fields(3) != true { return 8; }
+    if item_has_fields(4) != true { return 9; }
+    if item_has_fields(0) != false { return 10; }
+    if map_fn_components(true, true, true) != 4 { return 11; }
+    if map_fn_components(false, true, false) != 2 { return 12; }
+    if map_fn_components(false, false, false) != 1 { return 13; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_sv0();
     if r1 != 0 { return r1; }
@@ -275,5 +385,11 @@ fn main() -> i32 {
     if r10 != 0 { return 90 + r10; }
     let r11: i32 = test_path_seg_needs_mangle();
     if r11 != 0 { return 100 + r11; }
+    let r12: i32 = test_split_module();
+    if r12 != 0 { return 110 + r12; }
+    let r13: i32 = test_map_ty_kind();
+    if r13 != 0 { return 120 + r13; }
+    let r14: i32 = test_item_rewrite();
+    if r14 != 0 { return 140 + r14; }
     return 0;
 }

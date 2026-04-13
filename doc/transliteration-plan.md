@@ -18,10 +18,10 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 
 | Metric | Source | Count (this revision) |
 |--------|--------|-------------------------|
-| Bootstrap-listed programs | `lib/bootstrap-sources.list` (non-comment, non-empty lines) | 253 |
-| Self-host pilots | `lib/self-host-sv0-loop.list` | 253 |
-| Stage0 C golden files | `lib/golden/stage0/*.c` | 177 |
-| VM parity allowlist | `test/vm-parity/manifest.txt` | 173 |
+| Bootstrap-listed programs | `lib/bootstrap-sources.list` (non-comment, non-empty lines) | 233 |
+| Self-host pilots | `lib/self-host-sv0-loop.list` | 233 |
+| Stage0 C golden files | `lib/golden/stage0/*.c` | 157 |
+| VM parity allowlist | `test/vm-parity/manifest.txt` | 166 |
 
 ## Definition of done (milestone 3)
 
