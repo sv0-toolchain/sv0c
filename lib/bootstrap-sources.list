@@ -273,3 +273,4 @@ lib/vm_codegen.sv0
 lib/checker.sv0
 lib/lowering.sv0
 lib/parser.sv0
+lib/main.sv0
