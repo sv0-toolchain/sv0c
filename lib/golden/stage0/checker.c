@@ -44,6 +44,13 @@ static int stmt_returns(int stmt_tag, int inner_expr_tag);
 static int last_stmt_returns(int count, int last_stmt_tag, int last_expr_tag);
 static const char* path_key_2(const char* a, const char* b);
 static const char* path_key_3(const char* a, const char* b, const char* c);
+static const char* path_key_vec(const char* source, int starts, int ends, int segs);
+static int is_contract_param(int params, int name);
+static int struct_names_count(int struct_table, int stride);
+static int struct_name_at(int struct_table, int stride, int idx);
+static int enum_names_count(int enum_table, int stride);
+static int enum_name_at(int enum_table, int stride, int idx);
+static int name_in_table(int table, int stride, int name);
 static int alias_lookup(int names, int targets, int name);
 static int canon_ty_import(int names, int targets, int name);
 static int env_lookup(int env_names, int env_types, int name);
@@ -89,6 +96,9 @@ static int test_error_codes(void);
 static int test_struct_field(void);
 static int test_loop_depth(void);
 static int test_extra_classifiers(void);
+static int test_path_key_vec(void);
+static int test_contract_param(void);
+static int test_struct_enum_names(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -527,6 +537,97 @@ static const char* path_key_3(const char* a, const char* b, const char* c) {
   const char* _sv0t1 = sv0_string_concat("::", c);
   const char* _sv0t2 = sv0_string_concat(_sv0t0, _sv0t1);
   return _sv0t2;
+}
+
+static const char* path_key_vec(const char* source, int starts, int ends, int segs) {
+  int _sv0t0 = sv0_vec_len(segs);
+  int n = _sv0t0;
+  if ((n == 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(segs, 0);
+  int p0 = _sv0t1;
+  int _sv0t2 = sv0_vec_get(starts, p0);
+  int s0 = _sv0t2;
+  int _sv0t3 = sv0_vec_get(ends, p0);
+  int e0 = _sv0t3;
+  int _sv0t4 = (e0 - s0);
+  const char* _sv0t5 = sv0_string_substr(source, s0, _sv0t4);
+  const char* out;
+  out = _sv0t5;
+  int i = 1;
+  while ((i < n)) {
+    const char* _sv0t6 = sv0_string_concat(out, "::");
+    out = _sv0t6;
+    int _sv0t7 = sv0_vec_get(segs, i);
+    int p = _sv0t7;
+    int _sv0t8 = sv0_vec_get(starts, p);
+    int s = _sv0t8;
+    int _sv0t9 = sv0_vec_get(ends, p);
+    int e = _sv0t9;
+    int _sv0t10 = (e - s);
+    const char* _sv0t11 = sv0_string_substr(source, s, _sv0t10);
+    const char* _sv0t12 = sv0_string_concat(out, _sv0t11);
+    out = _sv0t12;
+    i = (i + 1);
+  }
+  return out;
+}
+
+static int is_contract_param(int params, int name) {
+  int _sv0t0 = sv0_vec_len(params);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(params, i);
+    if ((_sv0t1 == name)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int struct_names_count(int struct_table, int stride) {
+  int _sv0t0 = sv0_vec_len(struct_table);
+  int _sv0t1 = (_sv0t0 / stride);
+  return _sv0t1;
+}
+
+static int struct_name_at(int struct_table, int stride, int idx) {
+  int _sv0t0 = (idx * stride);
+  int _sv0t1 = sv0_vec_get(struct_table, _sv0t0);
+  return _sv0t1;
+}
+
+static int enum_names_count(int enum_table, int stride) {
+  int _sv0t0 = sv0_vec_len(enum_table);
+  int _sv0t1 = (_sv0t0 / stride);
+  return _sv0t1;
+}
+
+static int enum_name_at(int enum_table, int stride, int idx) {
+  int _sv0t0 = (idx * stride);
+  int _sv0t1 = sv0_vec_get(enum_table, _sv0t0);
+  return _sv0t1;
+}
+
+static int name_in_table(int table, int stride, int name) {
+  int _sv0t0 = sv0_vec_len(table);
+  int n = (_sv0t0 / stride);
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = (i * stride);
+    int _sv0t2 = sv0_vec_get(table, _sv0t1);
+    if ((_sv0t2 == name)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
 }
 
 static int alias_lookup(int names, int targets, int name) {
@@ -1274,6 +1375,133 @@ static int test_extra_classifiers(void) {
   return 0;
 }
 
+static int test_path_key_vec(void) {
+  const char* src;
+  src = "Foo::Bar::Baz";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 5);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 10);
+  sv0_vec_push(ends, 13);
+  int _sv0t2 = sv0_vec_new();
+  int segs = _sv0t2;
+  sv0_vec_push(segs, 0);
+  sv0_vec_push(segs, 1);
+  sv0_vec_push(segs, 2);
+  const char* _sv0t3 = path_key_vec(src, starts, ends, segs);
+  const char* k;
+  k = _sv0t3;
+  int _sv0t4 = sv0_string_eq(k, "Foo::Bar::Baz");
+  if ((_sv0t4 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int one = _sv0t5;
+  sv0_vec_push(one, 0);
+  const char* _sv0t6 = path_key_vec(src, starts, ends, one);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "Foo");
+  if ((_sv0t7 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int empty = _sv0t8;
+  const char* _sv0t9 = path_key_vec(src, starts, ends, empty);
+  int _sv0t10 = sv0_string_eq(_sv0t9, "");
+  if ((_sv0t10 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_contract_param(void) {
+  int _sv0t0 = sv0_vec_new();
+  int params = _sv0t0;
+  sv0_vec_push(params, 10);
+  sv0_vec_push(params, 20);
+  sv0_vec_push(params, 30);
+  int _sv0t1 = is_contract_param(params, 10);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = is_contract_param(params, 20);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = is_contract_param(params, 99);
+  if ((_sv0t3 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_new();
+  int empty = _sv0t4;
+  int _sv0t5 = is_contract_param(empty, 10);
+  if ((_sv0t5 != 0)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_struct_enum_names(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tbl = _sv0t0;
+  sv0_vec_push(tbl, 100);
+  sv0_vec_push(tbl, 3);
+  sv0_vec_push(tbl, 200);
+  sv0_vec_push(tbl, 5);
+  int _sv0t1 = struct_names_count(tbl, 2);
+  if ((_sv0t1 != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = struct_name_at(tbl, 2, 0);
+  if ((_sv0t2 != 100)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = struct_name_at(tbl, 2, 1);
+  if ((_sv0t3 != 200)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = name_in_table(tbl, 2, 100);
+  if ((_sv0t4 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t5 = name_in_table(tbl, 2, 200);
+  if ((_sv0t5 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t6 = name_in_table(tbl, 2, 999);
+  if ((_sv0t6 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t7 = enum_names_count(tbl, 2);
+  if ((_sv0t7 != 2)) {
+    return 7;
+  } else {
+  }
+  int _sv0t8 = enum_name_at(tbl, 2, 0);
+  if ((_sv0t8 != 100)) {
+    return 8;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -1370,6 +1598,27 @@ int main(void) {
   if ((r14 != 0)) {
     int _sv0t26 = (150 + r14);
     return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_path_key_vec();
+  int r15 = _sv0t27;
+  if ((r15 != 0)) {
+    int _sv0t28 = (160 + r15);
+    return _sv0t28;
+  } else {
+  }
+  int _sv0t29 = test_contract_param();
+  int r16 = _sv0t29;
+  if ((r16 != 0)) {
+    int _sv0t30 = (170 + r16);
+    return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_struct_enum_names();
+  int r17 = _sv0t31;
+  if ((r17 != 0)) {
+    int _sv0t32 = (180 + r17);
+    return _sv0t32;
   } else {
   }
   return 0;

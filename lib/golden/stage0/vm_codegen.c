@@ -4,9 +4,14 @@ static int variant_slots_unit(void);
 static int variant_slots_tuple(int field_count);
 static int variant_slots_struct(int field_count);
 static int variant_slots(int variant_kind, int field_count);
+static int enum_field_count_from_width(int width);
+static int enum_field_is_tag(int idx);
+static int enum_payload_field_index(int field_idx);
+static int layout_lookup(int names, int widths, int name);
 static int is_void_cty(const char* cty);
 static int is_scalar_cty(const char* cty);
-static int width_of_cty(const char* cty, int structs_names, int structs_field_counts, int enums_names, int enums_widths);
+static int width_of_cty(int cty_handle, int structs_names, int structs_field_counts, int enums_names, int enums_widths);
+static int width_of_cty_scalar(const char* cty);
 static int width_of_cty_simple(const char* cty);
 static int index_of_field(int fields, int field_name);
 static int enum_field_count(int width);
@@ -31,6 +36,9 @@ static int value_is_var(int value_tag);
 static int store_slot_offset(int base, int width, int k);
 static int test_variant_slots(void);
 static int test_cty_classify(void);
+static int test_width_of_cty(void);
+static int test_enum_field_helpers(void);
+static int test_layout_lookup(void);
 static int test_index_of_field(void);
 static int test_binop_to_insn(void);
 static int test_unop_to_insn(void);
@@ -58,6 +66,37 @@ static int variant_slots(int variant_kind, int field_count) {
   } else {
   }
   return field_count;
+}
+
+static int enum_field_count_from_width(int width) {
+  return width;
+}
+
+static int enum_field_is_tag(int idx) {
+  int _sv0t0 = (idx == 0);
+  return _sv0t0;
+}
+
+static int enum_payload_field_index(int field_idx) {
+  int _sv0t0 = (field_idx - 1);
+  return _sv0t0;
+}
+
+static int layout_lookup(int names, int widths, int name) {
+  int _sv0t0 = sv0_vec_len(names);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(names, i);
+    if ((_sv0t1 == name)) {
+      int _sv0t2 = sv0_vec_get(widths, i);
+      return _sv0t2;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t3 = (0 - 1);
+  return _sv0t3;
 }
 
 static int is_void_cty(const char* cty) {
@@ -104,40 +143,39 @@ static int is_scalar_cty(const char* cty) {
   return 0;
 }
 
-static int width_of_cty(const char* cty, int structs_names, int structs_field_counts, int enums_names, int enums_widths) {
+static int width_of_cty(int cty_handle, int structs_names, int structs_field_counts, int enums_names, int enums_widths) {
+  int _sv0t0 = sv0_vec_len(structs_names);
+  int sn = _sv0t0;
+  int si = 0;
+  while ((si < sn)) {
+    int _sv0t1 = sv0_vec_get(structs_names, si);
+    if ((_sv0t1 == cty_handle)) {
+      int _sv0t2 = sv0_vec_get(structs_field_counts, si);
+      return _sv0t2;
+    } else {
+    }
+    si = (si + 1);
+  }
+  int _sv0t3 = sv0_vec_len(enums_names);
+  int en = _sv0t3;
+  int ei = 0;
+  while ((ei < en)) {
+    int _sv0t4 = sv0_vec_get(enums_names, ei);
+    if ((_sv0t4 == cty_handle)) {
+      int _sv0t5 = sv0_vec_get(enums_widths, ei);
+      return _sv0t5;
+    } else {
+    }
+    ei = (ei + 1);
+  }
+  return 1;
+}
+
+static int width_of_cty_scalar(const char* cty) {
   int _sv0t0 = is_void_cty(cty);
   if (_sv0t0) {
     return 0;
   } else {
-  }
-  int _sv0t1 = is_scalar_cty(cty);
-  if (_sv0t1) {
-    return 1;
-  } else {
-  }
-  int _sv0t2 = sv0_vec_len(structs_names);
-  int sn = _sv0t2;
-  int si = 0;
-  while ((si < sn)) {
-    int _sv0t3 = sv0_vec_get(structs_names, si);
-    int name_h = _sv0t3;
-    if ((name_h == 0)) {
-      si = (si + 1);
-    } else {
-      si = sn;
-    }
-  }
-  int _sv0t4 = sv0_vec_len(enums_names);
-  int en = _sv0t4;
-  int ei = 0;
-  while ((ei < en)) {
-    int _sv0t5 = sv0_vec_get(enums_names, ei);
-    int name_h = _sv0t5;
-    if ((name_h == 0)) {
-      ei = (ei + 1);
-    } else {
-      ei = en;
-    }
   }
   return 1;
 }
@@ -779,19 +817,114 @@ static int test_cty_classify(void) {
     return 6;
   } else {
   }
-  int _sv0t6 = width_of_cty_simple("void");
+  int _sv0t6 = width_of_cty_scalar("void");
   if ((_sv0t6 != 0)) {
     return 7;
   } else {
   }
-  int _sv0t7 = width_of_cty_simple("int32_t");
+  int _sv0t7 = width_of_cty_scalar("int32_t");
   if ((_sv0t7 != 1)) {
     return 8;
   } else {
   }
-  int _sv0t8 = width_of_cty_simple("bool");
+  int _sv0t8 = width_of_cty_scalar("bool");
   if ((_sv0t8 != 1)) {
     return 9;
+  } else {
+  }
+  return 0;
+}
+
+static int test_width_of_cty(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int sf = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ew = _sv0t3;
+  sv0_vec_push(sn, 100);
+  sv0_vec_push(sf, 3);
+  sv0_vec_push(sn, 200);
+  sv0_vec_push(sf, 5);
+  sv0_vec_push(en, 300);
+  sv0_vec_push(ew, 4);
+  int _sv0t4 = width_of_cty(100, sn, sf, en, ew);
+  if ((_sv0t4 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = width_of_cty(200, sn, sf, en, ew);
+  if ((_sv0t5 != 5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = width_of_cty(300, sn, sf, en, ew);
+  if ((_sv0t6 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = width_of_cty(999, sn, sf, en, ew);
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_enum_field_helpers(void) {
+  int _sv0t0 = enum_field_count_from_width(4);
+  if ((_sv0t0 != 4)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = enum_field_is_tag(0);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = enum_field_is_tag(1);
+  if ((_sv0t2 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = enum_payload_field_index(1);
+  if ((_sv0t3 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = enum_payload_field_index(3);
+  if ((_sv0t4 != 2)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_layout_lookup(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int widths = _sv0t1;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(widths, 3);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(widths, 7);
+  int _sv0t2 = layout_lookup(names, widths, 10);
+  if ((_sv0t2 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = layout_lookup(names, widths, 20);
+  if ((_sv0t3 != 7)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = layout_lookup(names, widths, 99);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 3;
   } else {
   }
   return 0;
@@ -1159,6 +1292,27 @@ int main(void) {
   if ((r10 != 0)) {
     int _sv0t18 = (110 + r10);
     return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_width_of_cty();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (120 + r11);
+    return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_enum_field_helpers();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (130 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_layout_lookup();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (140 + r13);
+    return _sv0t24;
   } else {
   }
   return 0;

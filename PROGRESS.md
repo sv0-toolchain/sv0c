@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Deep-function transliteration continued.** `resolver.sv0`: path_join_vec (Vec-based generalized path→string joining), register_all_intrinsics (env fn_arities/mod_values registration for all 17 builtins), import alias management (add/lookup/count with interleaved Vec). `parser.sv0`: parseGenericParams (extract type param names from `<T, U: Bound>` tokens). Goldens refreshed for resolver + parser (C + VM parity). Metrics unchanged: bootstrap 97, self-host 97, stage0 21, vm-parity 84)
+**Last updated:** 2026-04-13 (America/Denver; **Deep-function transliteration continued.** `checker.sv0`: path_key_vec (Vec-based n-segment path join), is_contract_param (membership check), struct/enum name extraction from program tables (stride-based). `lowering.sv0`: old_slot_name (full string concat), complete unop_to_c (all 6 variants: Neg/Not/BitNot/Deref/Borrow/BorrowMut), param_name_tag, uniq_old_names (Vec dedup with old_name_seen/old_names_add_unique). `vm_codegen.sv0`: **fixed width_of_cty** (proper struct/enum name comparison instead of broken loop), enum_field_count_from_width/enum_field_is_tag/enum_payload_field_index, layout_lookup, width_of_cty_scalar. Goldens refreshed for all three (C + VM parity). Metrics unchanged: bootstrap 97, self-host 97, stage0 21, vm-parity 84)
 
 ## Checklist (local source of truth)
 
