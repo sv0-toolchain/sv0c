@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: resolver.sv0 + lexer.sv0 + link.sv0.** `lib/resolver.sv0` new real module covering resolver.sml pure-function surface: string-based intrinsic registry (17 builtins, name→arity lookup, string/vec/box classification), item registration dispatch (fn/type/variant classification by tag), pattern-bind counting, variant-arity extraction, qualified path generation, context rules (allowSelf for trait/impl), error code classification, arity checking. 11 test groups. `lib/lexer.sv0` new real module (11 test groups). `lib/link.sv0` new real module (11 tests). Metrics: bootstrap 264, self-host 264, stage0 188, vm-parity 182)
+**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: bytecode.sv0 + resolver.sv0 + lexer.sv0 + link.sv0.** `lib/bytecode.sv0` new real module covering bytecode.sml wire format: all 50 wire opcode constants (matching encodeInsn/decodeInsnVec), per-opcode encoding sizes, opcode classification (simple/arithmetic/compare/logic/bitwise/control-flow/struct/variant), division-based LE byte extraction/reconstruction (u16/u32), .sv0b file layout constants (6-byte header, 20-byte func entry, string pool overhead). 6 test groups. `lib/resolver.sv0` new real module (11 test groups). `lib/lexer.sv0` new real module (11 test groups). `lib/link.sv0` new real module (11 tests). Metrics: bootstrap 265, self-host 265, stage0 189, vm-parity 182)
 
 ## Checklist (local source of truth)
 
