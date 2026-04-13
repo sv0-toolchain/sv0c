@@ -1,11 +1,11 @@
 /* Phase 2 real pipeline module: sml/backend/c/codegen.sml -> sv0.
    C99 code emission from flat IR values, expressions, and instructions.
-   Covers: emitValue, emitExpr, cEscapeString, intToString, emitInstr
-   (17 instruction kinds including IfElse/While/Block with recursive
-   Vec<i32> + Box<Instr> iteration), emitParamList, emitFnProto,
-   emitBlockDefn, emit_instrs.
-   Deferred: emitCallArgs (needs Vec<Value> iteration for argument
-   lists), top-level emit/splitMain (needs block/program structs). */
+   Covers the full codegen.sml surface: emitValue, emitExpr,
+   cEscapeString, intToString, emitCallArgs, emitInstr (16 kinds
+   including IfElse/While/Block with recursive Vec<i32> + Box<Instr>
+   iteration and Call with Vec<i32> + Box<Value> arguments),
+   emitParamList (general over Vec<Param>), emitFnProto,
+   emitBlockBody, emitBlockDefn, splitMain, emit (top-level). */
 
 enum Value {
     VInt(i32),
@@ -208,8 +208,7 @@ enum Instr {
     BlockInstr(Vec<i32>),
     Break,
     Continue,
-    CallVoid(i32),
-    CallDest(i32, i32, i32),
+    Call(i32, i32, Vec<i32>, i32),
     Requires(Box<Expr>, i32),
     Ensures(Box<Expr>, i32),
     ReturnVoid,
@@ -229,13 +228,51 @@ fn instr_tag(ins: Instr) -> i32 {
         Instr::BlockInstr(body) => { return 8; },
         Instr::Break => { return 9; },
         Instr::Continue => { return 10; },
-        Instr::CallVoid(fh) => { return 11; },
-        Instr::CallDest(dh, fh, rh) => { return 12; },
-        Instr::Requires(be, fh) => { return 13; },
-        Instr::Ensures(be, fh) => { return 14; },
-        Instr::ReturnVoid => { return 15; },
-        Instr::ReturnVal(bv) => { return 16; },
+        Instr::Call(dh, fh, args, rh) => { return 11; },
+        Instr::Requires(be, fh) => { return 12; },
+        Instr::Ensures(be, fh) => { return 13; },
+        Instr::ReturnVoid => { return 14; },
+        Instr::ReturnVal(bv) => { return 15; },
     }
+}
+
+fn emit_call_args(args: Vec<i32>) -> string {
+    let count: i32 = vec_len(args);
+    if count == 0 { return ""; }
+    let mut out: string = "";
+    let mut idx: i32 = 0;
+    while idx < count {
+        if idx > 0 {
+            out = string_concat(out, ", ");
+        }
+        let bv: Box<Value> = vec_get(args, idx);
+        let v: Value = box_deref(bv);
+        out = string_concat(out, emit_value(v));
+        idx = idx + 1;
+    }
+    return out;
+}
+
+fn emit_call_void(indent: string, fn_h: i32, args: Vec<i32>) -> string {
+    let arg_str: string = emit_call_args(args);
+    let a: string = string_concat(indent, name_of(fn_h));
+    let b: string = string_concat(a, "(");
+    let c: string = string_concat(b, arg_str);
+    return string_concat(c, ");\n");
+}
+
+fn emit_call_dest(indent: string, dst_h: i32, fn_h: i32, args: Vec<i32>, rt_h: i32) -> string {
+    let arg_str: string = emit_call_args(args);
+    let fn_name: string = name_of(fn_h);
+    let ret_name: string = name_of(rt_h);
+    let a: string = string_concat(indent, ret_name);
+    let b: string = string_concat(a, " ");
+    let c: string = string_concat(b, name_of(dst_h));
+    let d: string = string_concat(c, " = ");
+    let e: string = string_concat(d, fn_name);
+    let f: string = string_concat(e, "(");
+    let g: string = string_concat(f, arg_str);
+    return string_concat(g, ");\n");
 }
 
 fn emit_instr(indent: string, ret_ty: string, ins: Instr) -> string {
@@ -312,17 +349,11 @@ fn emit_instr(indent: string, ret_ty: string, ins: Instr) -> string {
         Instr::Continue => {
             return string_concat(indent, "continue;\n");
         },
-        Instr::CallVoid(fh) => {
-            let a: string = string_concat(indent, name_of(fh));
-            return string_concat(a, "();\n");
-        },
-        Instr::CallDest(dh, fh, rh) => {
-            let a: string = string_concat(indent, name_of(rh));
-            let b: string = string_concat(a, " ");
-            let c: string = string_concat(b, name_of(dh));
-            let d: string = string_concat(c, " = ");
-            let f: string = string_concat(d, name_of(fh));
-            return string_concat(f, "();\n");
+        Instr::Call(dst_h, fn_h, args, rt_h) => {
+            if dst_h == 0 {
+                return emit_call_void(indent, fn_h, args);
+            }
+            return emit_call_dest(indent, dst_h, fn_h, args, rt_h);
         },
         Instr::Requires(be, fh) => {
             let e: Expr = box_deref(be);
@@ -409,6 +440,97 @@ fn emit_block_defn(proto: string, body: string) -> string {
     let a: string = string_concat(proto, " {\n");
     let b: string = string_concat(a, body);
     return string_concat(b, "}\n\n");
+}
+
+/* emit_param_list takes a Vec<i32> of interleaved pairs:
+   [ctype_h, name_h, ctype_h, name_h, ...].
+   Param count = vec_len / 2. Structs cannot be boxed in sv0, so we
+   store params as flat i32 pairs rather than Box<Param>. */
+fn emit_param_list(params: Vec<i32>) -> string {
+    let total: i32 = vec_len(params);
+    if total == 0 { return "void"; }
+    let count: i32 = total / 2;
+    let mut out: string = "";
+    let mut idx: i32 = 0;
+    while idx < count {
+        if idx > 0 {
+            out = string_concat(out, ", ");
+        }
+        let ct_h: i32 = vec_get(params, idx * 2);
+        let nm_h: i32 = vec_get(params, idx * 2 + 1);
+        let pair: string = string_concat(name_of(ct_h), " ");
+        out = string_concat(out, string_concat(pair, name_of(nm_h)));
+        idx = idx + 1;
+    }
+    return out;
+}
+
+fn emit_fn_proto_ex(is_static: i32, ret_cty_h: i32, label_h: i32, params: Vec<i32>) -> string {
+    let ret: string = name_of(ret_cty_h);
+    let label: string = name_of(label_h);
+    let pstr: string = emit_param_list(params);
+    if is_static == 1 {
+        let a: string = string_concat("static ", ret);
+        let b: string = string_concat(a, " ");
+        let c: string = string_concat(b, label);
+        let d: string = string_concat(c, "(");
+        return string_concat(d, string_concat(pstr, ")"));
+    }
+    let a: string = string_concat(ret, " ");
+    let b: string = string_concat(a, label);
+    let c: string = string_concat(b, "(");
+    return string_concat(c, string_concat(pstr, ")"));
+}
+
+/* emit_program: top-level C file generation from a flat IR program.
+   blocks is a Vec<i32> in 4-stride layout:
+     blocks[i*4]   = label name handle
+     blocks[i*4+1] = return C type name handle
+     blocks[i*4+2] = params Vec handle (interleaved ctype_h, name_h pairs)
+     blocks[i*4+3] = instrs Vec handle (Box<Instr> handles)
+   Block count = vec_len(blocks) / 4.
+   Label handle 11 ("main") is emitted non-static; all others are
+   static with forward declarations, mirroring codegen.sml's emit. */
+fn emit_program(typedefs: string, blocks: Vec<i32>) -> string {
+    let num_blocks: i32 = vec_len(blocks) / 4;
+    if num_blocks == 0 {
+        return "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
+    }
+    let prelude: string = "#include \"sv0_runtime.h\"\n\n";
+    let mut td_part: string = "";
+    if !string_eq(typedefs, "") {
+        td_part = string_concat(typedefs, "\n");
+    }
+    let mut fwd_decls: string = "";
+    let mut statics: string = "";
+    let mut main_part: string = "";
+    let mut idx: i32 = 0;
+    while idx < num_blocks {
+        let label_h: i32 = vec_get(blocks, idx * 4);
+        let ret_h: i32 = vec_get(blocks, idx * 4 + 1);
+        let params: Vec<i32> = vec_get(blocks, idx * 4 + 2);
+        let instrs: Vec<i32> = vec_get(blocks, idx * 4 + 3);
+        let ret_name: string = name_of(ret_h);
+        if label_h == 11 {
+            let proto: string = emit_fn_proto_ex(0, ret_h, label_h, params);
+            let body: string = emit_instrs(instrs, "  ", ret_name);
+            main_part = emit_block_defn(proto, body);
+        } else {
+            let proto: string = emit_fn_proto_ex(1, ret_h, label_h, params);
+            fwd_decls = string_concat(fwd_decls, string_concat(proto, ";\n"));
+            let body: string = emit_instrs(instrs, "  ", ret_name);
+            statics = string_concat(statics, emit_block_defn(proto, body));
+        }
+        idx = idx + 1;
+    }
+    if string_eq(main_part, "") {
+        main_part = "int main(void) { return 0; }\n";
+    }
+    let mut out: string = string_concat(prelude, td_part);
+    out = string_concat(out, fwd_decls);
+    out = string_concat(out, "\n");
+    out = string_concat(out, statics);
+    return string_concat(out, main_part);
 }
 
 fn test_int_format() -> i32 {
@@ -615,14 +737,16 @@ fn test_instr_break_continue() -> i32 {
 }
 
 fn test_instr_call_void() -> i32 {
-    let ins: Instr = Instr::CallVoid(12);
+    let mut args: Vec<i32> = vec_new();
+    let ins: Instr = Instr::Call(0, 12, args, 0);
     let s: string = emit_instr("  ", "int", ins);
     if !string_eq(s, "  foo();\n") { return 1; }
     return 0;
 }
 
 fn test_instr_call_dest() -> i32 {
-    let ins: Instr = Instr::CallDest(14, 12, 9);
+    let mut args: Vec<i32> = vec_new();
+    let ins: Instr = Instr::Call(14, 12, args, 9);
     let s: string = emit_instr("  ", "int", ins);
     if !string_eq(s, "  int result = foo();\n") { return 1; }
     return 0;
@@ -689,6 +813,190 @@ fn test_fn_proto() -> i32 {
     if !string_eq(s2, "int main(int x, int y)") { return 2; }
     let s3: string = emit_fn_proto(1, 10, 13, "int n");
     if !string_eq(s3, "static void bar(int n)") { return 3; }
+    return 0;
+}
+
+fn test_param_list_general() -> i32 {
+    let mut p0: Vec<i32> = vec_new();
+    if !string_eq(emit_param_list(p0), "void") { return 1; }
+    let mut p1: Vec<i32> = vec_new();
+    vec_push(p1, 9);
+    vec_push(p1, 1);
+    if !string_eq(emit_param_list(p1), "int x") { return 2; }
+    let mut p2: Vec<i32> = vec_new();
+    vec_push(p2, 9);
+    vec_push(p2, 1);
+    vec_push(p2, 9);
+    vec_push(p2, 2);
+    if !string_eq(emit_param_list(p2), "int x, int y") { return 3; }
+    let mut p3: Vec<i32> = vec_new();
+    vec_push(p3, 9);
+    vec_push(p3, 1);
+    vec_push(p3, 10);
+    vec_push(p3, 2);
+    vec_push(p3, 9);
+    vec_push(p3, 3);
+    if !string_eq(emit_param_list(p3), "int x, void y, int n") { return 4; }
+    return 0;
+}
+
+fn test_emit_program_empty() -> i32 {
+    let mut blocks: Vec<i32> = vec_new();
+    let s: string = emit_program("", blocks);
+    let expected: string = "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
+    if !string_eq(s, expected) { return 1; }
+    return 0;
+}
+
+fn test_emit_program_main_only() -> i32 {
+    let mut blocks: Vec<i32> = vec_new();
+    let mut params: Vec<i32> = vec_new();
+    let mut instrs: Vec<i32> = vec_new();
+    vec_push(instrs, box_new(Instr::ReturnVal(box_new(Value::VInt(0)))));
+    vec_push(blocks, 11);
+    vec_push(blocks, 9);
+    vec_push(blocks, params);
+    vec_push(blocks, instrs);
+    let s: string = emit_program("", blocks);
+    let expected: string = "#include \"sv0_runtime.h\"\n\n\nint main(void) {\n  return 0;\n}\n\n";
+    if !string_eq(s, expected) { return 1; }
+    return 0;
+}
+
+fn test_emit_program_with_helper() -> i32 {
+    let mut blocks: Vec<i32> = vec_new();
+    let mut foo_params: Vec<i32> = vec_new();
+    vec_push(foo_params, 9);
+    vec_push(foo_params, 3);
+    let mut foo_instrs: Vec<i32> = vec_new();
+    vec_push(foo_instrs, box_new(Instr::ReturnVal(box_new(Value::VVar(3)))));
+    vec_push(blocks, 12);
+    vec_push(blocks, 9);
+    vec_push(blocks, foo_params);
+    vec_push(blocks, foo_instrs);
+    let mut main_params: Vec<i32> = vec_new();
+    let mut main_instrs: Vec<i32> = vec_new();
+    vec_push(main_instrs, box_new(Instr::ReturnVal(box_new(Value::VInt(0)))));
+    vec_push(blocks, 11);
+    vec_push(blocks, 9);
+    vec_push(blocks, main_params);
+    vec_push(blocks, main_instrs);
+    let s: string = emit_program("", blocks);
+    let mut exp: string = "#include \"sv0_runtime.h\"\n\n";
+    exp = string_concat(exp, "static int foo(int n);\n");
+    exp = string_concat(exp, "\n");
+    exp = string_concat(exp, "static int foo(int n) {\n  return n;\n}\n\n");
+    exp = string_concat(exp, "int main(void) {\n  return 0;\n}\n\n");
+    if !string_eq(s, exp) { return 1; }
+    return 0;
+}
+
+fn test_emit_program_typedefs() -> i32 {
+    let mut blocks: Vec<i32> = vec_new();
+    let mut params: Vec<i32> = vec_new();
+    let mut instrs: Vec<i32> = vec_new();
+    vec_push(instrs, box_new(Instr::ReturnVal(box_new(Value::VInt(0)))));
+    vec_push(blocks, 11);
+    vec_push(blocks, 9);
+    vec_push(blocks, params);
+    vec_push(blocks, instrs);
+    let s: string = emit_program("typedef int sv0_int;", blocks);
+    let mut exp: string = "#include \"sv0_runtime.h\"\n\n";
+    exp = string_concat(exp, "typedef int sv0_int;\n");
+    exp = string_concat(exp, "\n");
+    exp = string_concat(exp, "int main(void) {\n  return 0;\n}\n\n");
+    if !string_eq(s, exp) { return 1; }
+    return 0;
+}
+
+fn test_emit_program_no_main() -> i32 {
+    let mut blocks: Vec<i32> = vec_new();
+    let mut foo_params: Vec<i32> = vec_new();
+    let mut foo_instrs: Vec<i32> = vec_new();
+    vec_push(foo_instrs, box_new(Instr::ReturnVal(box_new(Value::VInt(1)))));
+    vec_push(blocks, 12);
+    vec_push(blocks, 9);
+    vec_push(blocks, foo_params);
+    vec_push(blocks, foo_instrs);
+    let s: string = emit_program("", blocks);
+    let mut exp: string = "#include \"sv0_runtime.h\"\n\n";
+    exp = string_concat(exp, "static int foo(void);\n");
+    exp = string_concat(exp, "\n");
+    exp = string_concat(exp, "static int foo(void) {\n  return 1;\n}\n\n");
+    exp = string_concat(exp, "int main(void) { return 0; }\n");
+    if !string_eq(s, exp) { return 1; }
+    return 0;
+}
+
+fn test_fn_proto_ex() -> i32 {
+    let mut p0: Vec<i32> = vec_new();
+    let s1: string = emit_fn_proto_ex(1, 9, 12, p0);
+    if !string_eq(s1, "static int foo(void)") { return 1; }
+    let mut p2: Vec<i32> = vec_new();
+    vec_push(p2, 9);
+    vec_push(p2, 1);
+    vec_push(p2, 9);
+    vec_push(p2, 2);
+    let s2: string = emit_fn_proto_ex(0, 9, 11, p2);
+    if !string_eq(s2, "int main(int x, int y)") { return 2; }
+    let mut p3: Vec<i32> = vec_new();
+    vec_push(p3, 9);
+    vec_push(p3, 3);
+    let s3: string = emit_fn_proto_ex(1, 10, 13, p3);
+    if !string_eq(s3, "static void bar(int n)") { return 3; }
+    return 0;
+}
+
+fn test_call_args_empty() -> i32 {
+    let mut args: Vec<i32> = vec_new();
+    let s: string = emit_call_args(args);
+    if !string_eq(s, "") { return 1; }
+    return 0;
+}
+
+fn test_call_args_one() -> i32 {
+    let mut args: Vec<i32> = vec_new();
+    vec_push(args, box_new(Value::VInt(42)));
+    let s: string = emit_call_args(args);
+    if !string_eq(s, "42") { return 1; }
+    return 0;
+}
+
+fn test_call_args_two() -> i32 {
+    let mut args: Vec<i32> = vec_new();
+    vec_push(args, box_new(Value::VVar(1)));
+    vec_push(args, box_new(Value::VInt(10)));
+    let s: string = emit_call_args(args);
+    if !string_eq(s, "x, 10") { return 1; }
+    return 0;
+}
+
+fn test_call_args_three() -> i32 {
+    let mut args: Vec<i32> = vec_new();
+    vec_push(args, box_new(Value::VVar(1)));
+    vec_push(args, box_new(Value::VVar(2)));
+    vec_push(args, box_new(Value::VInt(0)));
+    let s: string = emit_call_args(args);
+    if !string_eq(s, "x, y, 0") { return 1; }
+    return 0;
+}
+
+fn test_instr_call_with_args() -> i32 {
+    let mut args: Vec<i32> = vec_new();
+    vec_push(args, box_new(Value::VVar(1)));
+    vec_push(args, box_new(Value::VInt(5)));
+    let ins: Instr = Instr::Call(14, 12, args, 9);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  int result = foo(x, 5);\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_call_void_with_args() -> i32 {
+    let mut args: Vec<i32> = vec_new();
+    vec_push(args, box_new(Value::VVar(3)));
+    let ins: Instr = Instr::Call(0, 12, args, 0);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  foo(n);\n") { return 1; }
     return 0;
 }
 
@@ -794,5 +1102,44 @@ fn main() -> i32 {
     let r28: i32 = test_block_defn();
     if r28 != 0 { return 270 + r28; }
     println("PASS test_block_defn");
+    let r29: i32 = test_call_args_empty();
+    if r29 != 0 { return 280 + r29; }
+    println("PASS test_call_args_empty");
+    let r30: i32 = test_call_args_one();
+    if r30 != 0 { return 290 + r30; }
+    println("PASS test_call_args_one");
+    let r31: i32 = test_call_args_two();
+    if r31 != 0 { return 300 + r31; }
+    println("PASS test_call_args_two");
+    let r32: i32 = test_call_args_three();
+    if r32 != 0 { return 310 + r32; }
+    println("PASS test_call_args_three");
+    let r33: i32 = test_instr_call_with_args();
+    if r33 != 0 { return 320 + r33; }
+    println("PASS test_instr_call_with_args");
+    let r34: i32 = test_instr_call_void_with_args();
+    if r34 != 0 { return 330 + r34; }
+    println("PASS test_instr_call_void_with_args");
+    let r35: i32 = test_param_list_general();
+    if r35 != 0 { return 340 + r35; }
+    println("PASS test_param_list_general");
+    let r36: i32 = test_fn_proto_ex();
+    if r36 != 0 { return 350 + r36; }
+    println("PASS test_fn_proto_ex");
+    let r37: i32 = test_emit_program_empty();
+    if r37 != 0 { return 360 + r37; }
+    println("PASS test_emit_program_empty");
+    let r38: i32 = test_emit_program_main_only();
+    if r38 != 0 { return 370 + r38; }
+    println("PASS test_emit_program_main_only");
+    let r39: i32 = test_emit_program_with_helper();
+    if r39 != 0 { return 380 + r39; }
+    println("PASS test_emit_program_with_helper");
+    let r40: i32 = test_emit_program_typedefs();
+    if r40 != 0 { return 390 + r40; }
+    println("PASS test_emit_program_typedefs");
+    let r41: i32 = test_emit_program_no_main();
+    if r41 != 0 { return 400 + r41; }
+    println("PASS test_emit_program_no_main");
     return 0;
 }

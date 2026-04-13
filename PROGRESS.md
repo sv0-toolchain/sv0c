@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Phase 2 codegen.sv0 — full instruction emission (17 kinds) including recursive IfElse/While/Block.** Extended real pipeline module `lib/codegen.sv0` from leaf emission to full instruction dispatch: added Instr enum (17 variants), emitInstr for all kinds, emit_instrs with Vec<i32> + Box<Instr> round-trip for recursive instruction lists, emitParamList, emitFnProto, emitBlockDefn. 31 tests total. Added to bootstrap + self-host lists + stage0 golden. Stale doc metrics reconciled. README sv0c SHA fixed. Metrics: bootstrap 260→261, self-host 260→261, stage0 183→184, vm-parity 186 unchanged)
+**Last updated:** 2026-04-12 (America/Denver; **Phase 2 codegen.sv0 — complete codegen.sml surface.** `lib/codegen.sv0` now covers the full SML `codegen.sml` surface: emitCallArgs (Vec<Value> iteration via Box<Value> in Vec<i32>), unified Call(dst,fn,args,rt) variant replacing CallVoid/CallDest, general emitParamList (interleaved ctype/name pairs in Vec<i32>), emitFnProtoEx, and top-level emitProgram with forward declarations, static/main split, and typedef support (4-stride block Vec representation). 44 tests total. VM stack underflow fixed by extracting emit_call_void/emit_call_dest helpers. All backends pass: C emit+run, VM compile+run, full bootstrap-build on VM. Metrics: bootstrap 261, self-host 261, stage0 184, vm-parity 182)
 
 ## Checklist (local source of truth)
 
