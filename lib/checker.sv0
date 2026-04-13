@@ -1,0 +1,458 @@
+/* Phase 2 real pipeline module: sml/type_checker/checker.sml -> sv0.
+   Type checker utilities: binop classification (Arith/Logic/Cmp),
+   integral type detection, AST type name → type tag mapping (22
+   primitive names), assignment LHS classification (ALVar/ALField),
+   statement return detection, path→string joining, error code
+   constants (E0400–E0449), type import alias canonicalization
+   (Vec-based), env lookup/extend helpers, variant shape classification,
+   constructor arity from shape, struct field lookup by name.
+   Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
+   needs deep AST traversal and unification. */
+
+/* ── binop classification ───────────────────────────────────── */
+
+fn BINOP_ARITH() -> i32 { return 0; }
+fn BINOP_LOGIC() -> i32 { return 1; }
+fn BINOP_CMP() -> i32 { return 2; }
+
+/* Ast.binop tags: Add=0, Sub=1, Mul=2, Div=3, Rem=4,
+   Eq=5, Neq=6, Lt=7, Gt=8, Leq=9, Geq=10,
+   And=11, Or=12, BitAnd=13, BitOr=14, BitXor=15, Shl=16, Shr=17 */
+fn binop_class(tag: i32) -> i32 {
+    if tag <= 4 { return 0; }
+    if tag >= 5 {
+        if tag <= 10 { return 2; }
+    }
+    if tag == 11 { return 1; }
+    if tag == 12 { return 1; }
+    if tag >= 13 {
+        if tag <= 17 { return 0; }
+    }
+    return 0;
+}
+
+fn is_arith_binop(tag: i32) -> bool { return binop_class(tag) == 0; }
+fn is_logic_binop(tag: i32) -> bool { return binop_class(tag) == 1; }
+fn is_cmp_binop(tag: i32) -> bool { return binop_class(tag) == 2; }
+
+/* ── integral type detection ────────────────────────────────── */
+
+/* Types.ty tags: TyInt=0, TyUint=1, TyIsize=8, TyUsize=9 */
+fn is_integral_ty(ty_tag: i32) -> bool {
+    if ty_tag == 0 { return true; }
+    if ty_tag == 1 { return true; }
+    if ty_tag == 8 { return true; }
+    if ty_tag == 9 { return true; }
+    return false;
+}
+
+/* ── AST type name → type tag ───────────────────────────────── */
+
+fn TY_UNIT() -> i32 { return 2; }
+fn TY_BOOL() -> i32 { return 3; }
+fn TY_CHAR() -> i32 { return 4; }
+fn TY_INT() -> i32 { return 0; }
+fn TY_UINT() -> i32 { return 1; }
+fn TY_ISIZE() -> i32 { return 8; }
+fn TY_USIZE() -> i32 { return 9; }
+fn TY_FLOAT() -> i32 { return 10; }
+fn TY_STRING() -> i32 { return 5; }
+fn TY_STRUCT() -> i32 { return 6; }
+fn TY_ENUM() -> i32 { return 7; }
+fn TY_FN() -> i32 { return 11; }
+fn TY_REF() -> i32 { return 12; }
+fn TY_REFMUT() -> i32 { return 13; }
+fn TY_TUPLE() -> i32 { return 14; }
+fn TY_NAMED() -> i32 { return 15; }
+fn TY_VAR() -> i32 { return 16; }
+fn TY_UNKNOWN() -> i32 { return 0 - 1; }
+
+fn ast_type_name_to_tag(name: string) -> i32 {
+    if string_eq(name, "unit") { return 2; }
+    if string_eq(name, "bool") { return 3; }
+    if string_eq(name, "char") { return 4; }
+    if string_eq(name, "i32") { return 0; }
+    if string_eq(name, "u32") { return 1; }
+    if string_eq(name, "i64") { return 0; }
+    if string_eq(name, "u64") { return 1; }
+    if string_eq(name, "i128") { return 0; }
+    if string_eq(name, "u128") { return 1; }
+    if string_eq(name, "i8") { return 0; }
+    if string_eq(name, "u8") { return 1; }
+    if string_eq(name, "i16") { return 0; }
+    if string_eq(name, "u16") { return 1; }
+    if string_eq(name, "isize") { return 8; }
+    if string_eq(name, "usize") { return 9; }
+    if string_eq(name, "f32") { return 10; }
+    if string_eq(name, "f64") { return 10; }
+    if string_eq(name, "str") { return 5; }
+    if string_eq(name, "string") { return 5; }
+    if string_eq(name, "String") { return 5; }
+    return 0 - 1;
+}
+
+fn is_primitive_type_name(name: string) -> bool {
+    return ast_type_name_to_tag(name) >= 0;
+}
+
+fn int_width_from_name(name: string) -> i32 {
+    if string_eq(name, "i8") { return 8; }
+    if string_eq(name, "u8") { return 8; }
+    if string_eq(name, "i16") { return 16; }
+    if string_eq(name, "u16") { return 16; }
+    if string_eq(name, "i32") { return 32; }
+    if string_eq(name, "u32") { return 32; }
+    if string_eq(name, "i64") { return 64; }
+    if string_eq(name, "u64") { return 64; }
+    if string_eq(name, "i128") { return 128; }
+    if string_eq(name, "u128") { return 128; }
+    if string_eq(name, "f32") { return 32; }
+    if string_eq(name, "f64") { return 64; }
+    return 0;
+}
+
+/* ── assignment LHS classification ──────────────────────────── */
+
+fn AL_VAR() -> i32 { return 0; }
+fn AL_FIELD() -> i32 { return 1; }
+fn AL_INVALID() -> i32 { return 0 - 1; }
+
+/* ExprPath tag=2, ExprField tag=11 in ast.sv0 */
+fn classify_assign_lhs(expr_tag: i32) -> i32 {
+    if expr_tag == 2 { return 0; }
+    if expr_tag == 11 { return 1; }
+    return 0 - 1;
+}
+
+/* ── statement return detection ─────────────────────────────── */
+
+/* StmtSemi tag=0, StmtExpr tag=1; ExprReturn tag=14 */
+fn stmt_returns(stmt_tag: i32, inner_expr_tag: i32) -> bool {
+    if stmt_tag == 0 {
+        if inner_expr_tag == 14 { return true; }
+    }
+    if stmt_tag == 1 {
+        if inner_expr_tag == 14 { return true; }
+    }
+    return false;
+}
+
+fn last_stmt_returns(count: i32, last_stmt_tag: i32, last_expr_tag: i32) -> bool {
+    if count == 0 { return false; }
+    return stmt_returns(last_stmt_tag, last_expr_tag);
+}
+
+/* ── path → string ──────────────────────────────────────────── */
+
+fn path_key_2(a: string, b: string) -> string {
+    return string_concat(string_concat(a, "::"), b);
+}
+
+fn path_key_3(a: string, b: string, c: string) -> string {
+    return string_concat(path_key_2(a, b), string_concat("::", c));
+}
+
+/* ── type import alias canonicalization ──────────────────────── */
+
+fn alias_lookup(names: Vec<i32>, targets: Vec<i32>, name: i32) -> i32 {
+    let n: i32 = vec_len(names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(names, i) == name {
+            return vec_get(targets, i);
+        }
+        i = i + 1;
+    }
+    return name;
+}
+
+fn canon_ty_import(names: Vec<i32>, targets: Vec<i32>, name: i32) -> i32 {
+    let resolved: i32 = alias_lookup(names, targets, name);
+    if resolved == name { return name; }
+    return canon_ty_import(names, targets, resolved);
+}
+
+/* ── env helpers ────────────────────────────────────────────── */
+
+fn env_lookup(env_names: Vec<i32>, env_types: Vec<i32>, name: i32) -> i32 {
+    let n: i32 = vec_len(env_names);
+    let mut i: i32 = n - 1;
+    while i >= 0 {
+        if vec_get(env_names, i) == name {
+            return vec_get(env_types, i);
+        }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+fn env_extend(env_names: Vec<i32>, env_types: Vec<i32>, env_muts: Vec<i32>,
+              name: i32, ty: i32, is_mut: i32) -> i32 {
+    vec_push(env_names, name);
+    vec_push(env_types, ty);
+    vec_push(env_muts, is_mut);
+    return vec_len(env_names) - 1;
+}
+
+fn env_is_mut(env_muts: Vec<i32>, idx: i32) -> bool {
+    if idx < 0 { return false; }
+    return vec_get(env_muts, idx) != 0;
+}
+
+/* ── variant shape classification ───────────────────────────── */
+
+fn VS_UNIT() -> i32 { return 0; }
+fn VS_TUPLE() -> i32 { return 1; }
+fn VS_STRUCT() -> i32 { return 2; }
+
+fn ctor_arity(shape: i32, field_count: i32) -> i32 {
+    if shape == 0 { return 0; }
+    return field_count;
+}
+
+fn ctor_is_unit(shape: i32) -> bool {
+    return shape == 0;
+}
+
+fn ctor_is_tuple(shape: i32) -> bool {
+    return shape == 1;
+}
+
+/* ── try (?) operator helpers ───────────────────────────────── */
+
+fn is_result_enum(has_ok: bool, has_err: bool) -> bool {
+    if has_ok {
+        if has_err { return true; }
+    }
+    return false;
+}
+
+fn is_option_enum(has_some: bool, has_none: bool) -> bool {
+    if has_some {
+        if has_none { return true; }
+    }
+    return false;
+}
+
+fn try_success_shape_valid(shape: i32, field_count: i32) -> bool {
+    if shape == 1 {
+        if field_count == 1 { return true; }
+    }
+    return false;
+}
+
+/* ── error code constants ───────────────────────────────────── */
+
+fn error_type_mismatch() -> string { return "E0400"; }
+fn error_unbound_value() -> string { return "E0401"; }
+fn error_stmt_no_effect() -> string { return "E0405"; }
+fn error_unknown_type() -> string { return "E0406"; }
+fn error_no_return_type() -> string { return "E0409"; }
+fn error_duplicate_struct_enum() -> string { return "E0417"; }
+fn error_unknown_struct() -> string { return "E0420"; }
+fn error_unknown_variant() -> string { return "E0421"; }
+fn error_unknown_enum() -> string { return "E0422"; }
+fn error_enum_tuple_arity() -> string { return "E0426"; }
+fn error_unknown_field() -> string { return "E0429"; }
+fn error_try_payload() -> string { return "E0441"; }
+fn error_immutable_assign() -> string { return "E0448"; }
+fn error_bad_assign_lhs() -> string { return "E0449"; }
+
+/* ── struct field lookup ────────────────────────────────────── */
+
+fn struct_field_index(field_names: Vec<i32>, name: i32) -> i32 {
+    let n: i32 = vec_len(field_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(field_names, i) == name {
+            return i;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn struct_has_field(field_names: Vec<i32>, name: i32) -> bool {
+    return struct_field_index(field_names, name) >= 0;
+}
+
+/* ── loop depth tracking ────────────────────────────────────── */
+
+fn in_loop(depth: i32) -> bool {
+    return depth > 0;
+}
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_binop_class() -> i32 {
+    if binop_class(0) != 0 { return 1; }
+    if binop_class(1) != 0 { return 2; }
+    if binop_class(4) != 0 { return 3; }
+    if binop_class(5) != 2 { return 4; }
+    if binop_class(10) != 2 { return 5; }
+    if binop_class(11) != 1 { return 6; }
+    if binop_class(12) != 1 { return 7; }
+    if binop_class(13) != 0 { return 8; }
+    if binop_class(17) != 0 { return 9; }
+    if is_arith_binop(0) != true { return 10; }
+    if is_logic_binop(11) != true { return 11; }
+    if is_cmp_binop(5) != true { return 12; }
+    return 0;
+}
+
+fn test_integral_ty() -> i32 {
+    if is_integral_ty(0) != true { return 1; }
+    if is_integral_ty(1) != true { return 2; }
+    if is_integral_ty(8) != true { return 3; }
+    if is_integral_ty(9) != true { return 4; }
+    if is_integral_ty(3) != false { return 5; }
+    if is_integral_ty(5) != false { return 6; }
+    return 0;
+}
+
+fn test_ast_type_names() -> i32 {
+    if ast_type_name_to_tag("i32") != 0 { return 1; }
+    if ast_type_name_to_tag("u32") != 1 { return 2; }
+    if ast_type_name_to_tag("bool") != 3 { return 3; }
+    if ast_type_name_to_tag("unit") != 2 { return 4; }
+    if ast_type_name_to_tag("string") != 5 { return 5; }
+    if ast_type_name_to_tag("String") != 5 { return 6; }
+    if ast_type_name_to_tag("isize") != 8 { return 7; }
+    if ast_type_name_to_tag("f64") != 10 { return 8; }
+    if ast_type_name_to_tag("MyStruct") != 0 - 1 { return 9; }
+    if is_primitive_type_name("i32") != true { return 10; }
+    if is_primitive_type_name("Foo") != false { return 11; }
+    if int_width_from_name("i32") != 32 { return 12; }
+    if int_width_from_name("u8") != 8 { return 13; }
+    if int_width_from_name("f64") != 64 { return 14; }
+    if int_width_from_name("bool") != 0 { return 15; }
+    return 0;
+}
+
+fn test_assign_lhs() -> i32 {
+    if classify_assign_lhs(2) != 0 { return 1; }
+    if classify_assign_lhs(11) != 1 { return 2; }
+    if classify_assign_lhs(99) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_stmt_returns() -> i32 {
+    if stmt_returns(0, 14) != true { return 1; }
+    if stmt_returns(1, 14) != true { return 2; }
+    if stmt_returns(0, 0) != false { return 3; }
+    if last_stmt_returns(0, 0, 0) != false { return 4; }
+    if last_stmt_returns(1, 0, 14) != true { return 5; }
+    return 0;
+}
+
+fn test_path_key() -> i32 {
+    let r: string = path_key_2("Foo", "bar");
+    if string_eq(r, "Foo::bar") != true { return 1; }
+    let r3: string = path_key_3("a", "b", "c");
+    if string_eq(r3, "a::b::c") != true { return 2; }
+    return 0;
+}
+
+fn test_alias_lookup() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let targets: Vec<i32> = vec_new();
+    vec_push(names, 10);
+    vec_push(targets, 20);
+    vec_push(names, 30);
+    vec_push(targets, 40);
+    if alias_lookup(names, targets, 10) != 20 { return 1; }
+    if alias_lookup(names, targets, 30) != 40 { return 2; }
+    if alias_lookup(names, targets, 99) != 99 { return 3; }
+    return 0;
+}
+
+fn test_env_helpers() -> i32 {
+    let en: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let em: Vec<i32> = vec_new();
+    env_extend(en, et, em, 10, 100, 0);
+    env_extend(en, et, em, 20, 200, 1);
+    if env_lookup(en, et, 10) != 100 { return 1; }
+    if env_lookup(en, et, 20) != 200 { return 2; }
+    if env_lookup(en, et, 99) != 0 - 1 { return 3; }
+    if env_is_mut(em, 0) != false { return 4; }
+    if env_is_mut(em, 1) != true { return 5; }
+    return 0;
+}
+
+fn test_variant_shape() -> i32 {
+    if ctor_arity(0, 0) != 0 { return 1; }
+    if ctor_arity(1, 3) != 3 { return 2; }
+    if ctor_arity(2, 2) != 2 { return 3; }
+    if ctor_is_unit(0) != true { return 4; }
+    if ctor_is_tuple(1) != true { return 5; }
+    return 0;
+}
+
+fn test_try_helpers() -> i32 {
+    if is_result_enum(true, true) != true { return 1; }
+    if is_result_enum(true, false) != false { return 2; }
+    if is_option_enum(true, true) != true { return 3; }
+    if try_success_shape_valid(1, 1) != true { return 4; }
+    if try_success_shape_valid(0, 0) != false { return 5; }
+    if try_success_shape_valid(1, 2) != false { return 6; }
+    return 0;
+}
+
+fn test_error_codes() -> i32 {
+    if string_eq(error_type_mismatch(), "E0400") != true { return 1; }
+    if string_eq(error_unbound_value(), "E0401") != true { return 2; }
+    if string_eq(error_unknown_struct(), "E0420") != true { return 3; }
+    if string_eq(error_bad_assign_lhs(), "E0449") != true { return 4; }
+    return 0;
+}
+
+fn test_struct_field() -> i32 {
+    let fnames: Vec<i32> = vec_new();
+    vec_push(fnames, 10);
+    vec_push(fnames, 20);
+    vec_push(fnames, 30);
+    if struct_field_index(fnames, 10) != 0 { return 1; }
+    if struct_field_index(fnames, 20) != 1 { return 2; }
+    if struct_field_index(fnames, 99) != 0 - 1 { return 3; }
+    if struct_has_field(fnames, 20) != true { return 4; }
+    if struct_has_field(fnames, 99) != false { return 5; }
+    return 0;
+}
+
+fn test_loop_depth() -> i32 {
+    if in_loop(0) != false { return 1; }
+    if in_loop(1) != true { return 2; }
+    if in_loop(3) != true { return 3; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_binop_class();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_integral_ty();
+    if r2 != 0 { return 20 + r2; }
+    let r3: i32 = test_ast_type_names();
+    if r3 != 0 { return 30 + r3; }
+    let r4: i32 = test_assign_lhs();
+    if r4 != 0 { return 50 + r4; }
+    let r5: i32 = test_stmt_returns();
+    if r5 != 0 { return 60 + r5; }
+    let r6: i32 = test_path_key();
+    if r6 != 0 { return 70 + r6; }
+    let r7: i32 = test_alias_lookup();
+    if r7 != 0 { return 80 + r7; }
+    let r8: i32 = test_env_helpers();
+    if r8 != 0 { return 90 + r8; }
+    let r9: i32 = test_variant_shape();
+    if r9 != 0 { return 100 + r9; }
+    let r10: i32 = test_try_helpers();
+    if r10 != 0 { return 110 + r10; }
+    let r11: i32 = test_error_codes();
+    if r11 != 0 { return 120 + r11; }
+    let r12: i32 = test_struct_field();
+    if r12 != 0 { return 130 + r12; }
+    let r13: i32 = test_loop_depth();
+    if r13 != 0 { return 140 + r13; }
+    return 0;
+}
