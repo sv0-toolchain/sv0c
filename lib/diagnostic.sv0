@@ -1,7 +1,8 @@
 /* Phase 2 real pipeline module: sml/error/diagnostic.sml -> sv0.
-   Diagnostic severity classification, constructor dispatch, error counting.
-   SML reference: 149 lines — severity datatype, error/warning/note
-   constructors, hasErrors, errorCount, severityToString. */
+   Covers: severity datatype, constructors, severityToString, hasErrors,
+   errorCount, ordering, string formatting helpers (spaces, carets,
+   padLeft, getLine). Remaining: full format with Span integration,
+   report/reportAll/sortBySpan (I/O + list sorting). */
 
 enum Severity { Error, Warning, Note }
 
@@ -43,6 +44,75 @@ fn error_count(e0: i32, e1: i32, e2: i32, e3: i32) -> i32 {
     if e2 == 0 { count = count + 1; }
     if e3 == 0 { count = count + 1; }
     return count;
+}
+
+fn severity_to_string(s: Severity) -> string {
+    let tag: i32 = severity_tag(s);
+    if tag == 0 { return "error"; }
+    if tag == 1 { return "warning"; }
+    return "note";
+}
+
+fn spaces(n: i32) -> string {
+    if n <= 0 { return ""; }
+    let mut out: string = "";
+    let mut i: i32 = 0;
+    while i < n {
+        out = string_concat(out, " ");
+        i = i + 1;
+    }
+    return out;
+}
+
+fn carets(n: i32) -> string {
+    let mut effective: i32 = n;
+    if effective < 1 { effective = 1; }
+    let mut out: string = "";
+    let mut i: i32 = 0;
+    while i < effective {
+        out = string_concat(out, "^");
+        i = i + 1;
+    }
+    return out;
+}
+
+fn pad_left(s: string, width: i32) -> string {
+    let slen: i32 = string_len(s);
+    let pad: i32 = width - slen;
+    if pad <= 0 { return s; }
+    let prefix: string = spaces(pad);
+    return string_concat(prefix, s);
+}
+
+fn get_line(source: string, line_no: i32) -> string {
+    if line_no < 1 { return ""; }
+    let slen: i32 = string_len(source);
+    let mut i: i32 = 0;
+    let mut start: i32 = 0;
+    let mut cur_line: i32 = 1;
+    while i <= slen {
+        let at_end: bool = i == slen;
+        let mut is_nl: bool = false;
+        if at_end != true {
+            let c: i32 = string_char_at(source, i);
+            if c == 10 { is_nl = true; }
+        }
+        if at_end == true {
+            if cur_line == line_no {
+                return string_substr(source, start, i - start);
+            }
+            return "";
+        }
+        if is_nl == true {
+            if cur_line == line_no {
+                return string_substr(source, start, i - start);
+            }
+            cur_line = cur_line + 1;
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return "";
 }
 
 fn severity_ord(a: Severity, b: Severity) -> i32 {
@@ -94,6 +164,46 @@ fn test_severity_ord() -> i32 {
     return 0;
 }
 
+fn test_severity_to_string() -> i32 {
+    if string_eq(severity_to_string(Severity::Error), "error") != true { return 1; }
+    if string_eq(severity_to_string(Severity::Warning), "warning") != true { return 2; }
+    if string_eq(severity_to_string(Severity::Note), "note") != true { return 3; }
+    return 0;
+}
+
+fn test_spaces() -> i32 {
+    if string_eq(spaces(0), "") != true { return 1; }
+    if string_len(spaces(3)) != 3 { return 2; }
+    if string_eq(spaces(1), " ") != true { return 3; }
+    return 0;
+}
+
+fn test_carets() -> i32 {
+    if string_eq(carets(3), "^^^") != true { return 1; }
+    if string_eq(carets(1), "^") != true { return 2; }
+    if string_eq(carets(0), "^") != true { return 3; }
+    return 0;
+}
+
+fn test_pad_left() -> i32 {
+    let r1: string = pad_left("42", 5);
+    if string_len(r1) != 5 { return 1; }
+    if string_eq(pad_left("hello", 3), "hello") != true { return 2; }
+    if string_eq(pad_left("x", 1), "x") != true { return 3; }
+    return 0;
+}
+
+fn test_get_line() -> i32 {
+    let src: string = "alpha\nbeta\ngamma";
+    if string_eq(get_line(src, 1), "alpha") != true { return 1; }
+    if string_eq(get_line(src, 2), "beta") != true { return 2; }
+    if string_eq(get_line(src, 3), "gamma") != true { return 3; }
+    if string_eq(get_line(src, 4), "") != true { return 4; }
+    if string_eq(get_line(src, 0), "") != true { return 5; }
+    if string_eq(get_line("single", 1), "single") != true { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_severity_tags();
     if r1 != 0 { return r1; }
@@ -105,5 +215,15 @@ fn main() -> i32 {
     if r4 != 0 { return 30 + r4; }
     let r5: i32 = test_severity_ord();
     if r5 != 0 { return 40 + r5; }
+    let r6: i32 = test_severity_to_string();
+    if r6 != 0 { return 50 + r6; }
+    let r7: i32 = test_spaces();
+    if r7 != 0 { return 60 + r7; }
+    let r8: i32 = test_carets();
+    if r8 != 0 { return 70 + r8; }
+    let r9: i32 = test_pad_left();
+    if r9 != 0 { return 80 + r9; }
+    let r10: i32 = test_get_line();
+    if r10 != 0 { return 90 + r10; }
     return 0;
 }

@@ -1,7 +1,8 @@
 /* Phase 2 real pipeline module: sml/include_expand.sml -> sv0.
-   Textual include expansion helpers: character classification, path
-   validation, include-line parsing. SML reference: 102 lines —
-   isSpace, trim, chompCR, pathOk, parseIncludeLine, expand. */
+   Textual include expansion: character classification, whitespace
+   trimming, path validation, include-line parsing. Covers the pure
+   function surface of include_expand.sml (isSpace, trim, chompCR,
+   pathOk, parseIncludeLine). expand/expandFile deferred (file I/O). */
 
 fn is_space(c: i32) -> bool {
     if c == 32 { return true; }
@@ -10,6 +11,28 @@ fn is_space(c: i32) -> bool {
     if c == 11 { return true; }
     if c == 12 { return true; }
     return false;
+}
+
+fn trim_left(s: string, i: i32, len: i32) -> i32 {
+    if i >= len { return i; }
+    let c: i32 = string_char_at(s, i);
+    if is_space(c) { return trim_left(s, i + 1, len); }
+    return i;
+}
+
+fn trim_right(s: string, j: i32) -> i32 {
+    if j <= 0 { return j; }
+    let c: i32 = string_char_at(s, j - 1);
+    if is_space(c) { return trim_right(s, j - 1); }
+    return j;
+}
+
+fn trim(s: string) -> string {
+    let len: i32 = string_len(s);
+    let lo: i32 = trim_left(s, 0, len);
+    let hi: i32 = trim_right(s, len);
+    if lo >= hi { return ""; }
+    return string_substr(s, lo, hi - lo);
 }
 
 fn path_ok(rel: string) -> bool {
@@ -47,12 +70,28 @@ fn find_closing_quote(s: string, start: i32) -> i32 {
     return 0 - 1;
 }
 
-fn chomp_cr(line: string) -> i32 {
+fn chomp_cr(line: string) -> string {
     let len: i32 = string_len(line);
-    if len == 0 { return len; }
+    if len == 0 { return line; }
     let last: i32 = string_char_at(line, len - 1);
-    if last == 13 { return len - 1; }
-    return len;
+    if last == 13 { return string_substr(line, 0, len - 1); }
+    return line;
+}
+
+/* parse_include_line: returns the relative path if the line matches
+   `include "relpath";`, or empty string if no include. Trims, chomps
+   CR, checks prefix, closing quote, trailing semicolon, pathOk. */
+fn parse_include_line(line: string) -> string {
+    let s: string = trim(chomp_cr(line));
+    if has_include_prefix(s) != true { return ""; }
+    let after: string = string_substr(s, 9, string_len(s) - 9);
+    let q: i32 = find_closing_quote(after, 0);
+    if q < 0 { return ""; }
+    let p: string = string_substr(after, 0, q);
+    let rest: string = trim(string_substr(after, q + 1, string_len(after) - q - 1));
+    if string_eq(rest, ";") != true { return ""; }
+    if path_ok(p) != true { return ""; }
+    return p;
 }
 
 fn test_is_space() -> i32 {
@@ -93,22 +132,53 @@ fn test_find_closing_quote() -> i32 {
     return 0;
 }
 
+fn test_trim() -> i32 {
+    if string_eq(trim("hello"), "hello") != true { return 1; }
+    if string_eq(trim("  hello  "), "hello") != true { return 2; }
+    if string_eq(trim(""), "") != true { return 3; }
+    if string_eq(trim("   "), "") != true { return 4; }
+    if string_eq(trim("  a b  "), "a b") != true { return 5; }
+    return 0;
+}
+
 fn test_chomp_cr() -> i32 {
-    if chomp_cr("hello") != 5 { return 1; }
-    if chomp_cr("") != 0 { return 2; }
+    if string_eq(chomp_cr("hello"), "hello") != true { return 1; }
+    if string_eq(chomp_cr(""), "") != true { return 2; }
+    return 0;
+}
+
+fn test_parse_include_line() -> i32 {
+    let r1: string = parse_include_line("include \"foo.sv0\";");
+    if string_eq(r1, "foo.sv0") != true { return 1; }
+    let r2: string = parse_include_line("  include \"bar.sv0\" ;  ");
+    if string_eq(r2, "bar.sv0") != true { return 2; }
+    let r3: string = parse_include_line("let x = 1;");
+    if string_eq(r3, "") != true { return 3; }
+    let r4: string = parse_include_line("include \"../escape\";");
+    if string_eq(r4, "") != true { return 4; }
+    let r5: string = parse_include_line("include \"/abs/path\";");
+    if string_eq(r5, "") != true { return 5; }
+    let r6: string = parse_include_line("include \"foo.sv0\"");
+    if string_eq(r6, "") != true { return 6; }
+    let r7: string = parse_include_line("include \"sub/mod.sv0\";");
+    if string_eq(r7, "sub/mod.sv0") != true { return 7; }
     return 0;
 }
 
 fn main() -> i32 {
     let r1: i32 = test_is_space();
     if r1 != 0 { return r1; }
-    let r2: i32 = test_path_ok();
+    let r2: i32 = test_trim();
     if r2 != 0 { return 10 + r2; }
-    let r3: i32 = test_has_include_prefix();
+    let r3: i32 = test_path_ok();
     if r3 != 0 { return 20 + r3; }
-    let r4: i32 = test_find_closing_quote();
+    let r4: i32 = test_has_include_prefix();
     if r4 != 0 { return 30 + r4; }
-    let r5: i32 = test_chomp_cr();
+    let r5: i32 = test_find_closing_quote();
     if r5 != 0 { return 40 + r5; }
+    let r6: i32 = test_chomp_cr();
+    if r6 != 0 { return 50 + r6; }
+    let r7: i32 = test_parse_include_line();
+    if r7 != 0 { return 60 + r7; }
     return 0;
 }
