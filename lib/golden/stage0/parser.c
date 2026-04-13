@@ -59,6 +59,40 @@ static int TK_WHERE(void);
 static int TK_TRUE(void);
 static int TK_FALSE(void);
 static int TK_EOF(void);
+static int TK_SELF_TYPE(void);
+static int TK_MUT(void);
+static int TK_LET(void);
+static int TK_IF(void);
+static int TK_ELSE(void);
+static int TK_MATCH(void);
+static int TK_RETURN(void);
+static int TK_WHILE(void);
+static int TK_LOOP(void);
+static int TK_FOR(void);
+static int TK_BREAK(void);
+static int TK_CONTINUE(void);
+static int TK_STRUCT(void);
+static int TK_ENUM(void);
+static int TK_IMPL(void);
+static int TK_TRAIT(void);
+static int TK_TYPE(void);
+static int TK_USE(void);
+static int TK_AS(void);
+static int TK_IN(void);
+static int ps_peek(int tags, int pos);
+static int ps_at_end(int tags, int pos);
+static int ps_start(int starts, int pos);
+static int ps_end(int ends, int pos);
+static int ps_advance(int pos);
+static int ps_expect(int tags, int pos, int expected);
+static int ps_match(int tags, int pos, int expected);
+static const char* ps_tok_text(const char* source, int starts, int ends, int pos);
+static int parse_path(int tags, int pos, int path_out);
+static int ps_skip_optional_pub(int tags, int pos);
+static int ps_skip_optional_unsafe(int tags, int pos);
+static int ps_skip_generic_params(int tags, int pos);
+static int ps_skip_where_clause(int tags, int pos);
+static int ps_skip_attributes(int tags, int pos);
 static int AST_ADD(void);
 static int AST_SUB(void);
 static int AST_MUL(void);
@@ -127,6 +161,9 @@ static int test_precedence(void);
 static int test_ty_name(void);
 static int test_pratt_prec(void);
 static int test_attr_bracket(void);
+static int test_ps_nav(void);
+static int test_parse_path(void);
+static int test_ps_skip(void);
 
 static int TK_INT_LIT(void) {
   return 0;
@@ -333,15 +370,15 @@ static int TK_GTGTEQ(void) {
 }
 
 static int TK_PUB(void) {
-  return 79;
+  return 82;
 }
 
 static int TK_PROJECT(void) {
-  return 79;
+  return 81;
 }
 
 static int TK_UNSAFE(void) {
-  return 90;
+  return 93;
 }
 
 static int TK_FN(void) {
@@ -349,11 +386,11 @@ static int TK_FN(void) {
 }
 
 static int TK_WHERE(void) {
-  return 91;
+  return 95;
 }
 
 static int TK_TRUE(void) {
-  return 89;
+  return 91;
 }
 
 static int TK_FALSE(void) {
@@ -361,7 +398,316 @@ static int TK_FALSE(void) {
 }
 
 static int TK_EOF(void) {
+  return 97;
+}
+
+static int TK_SELF_TYPE(void) {
+  return 87;
+}
+
+static int TK_MUT(void) {
+  return 77;
+}
+
+static int TK_LET(void) {
+  return 71;
+}
+
+static int TK_IF(void) {
+  return 68;
+}
+
+static int TK_ELSE(void) {
+  return 60;
+}
+
+static int TK_MATCH(void) {
+  return 74;
+}
+
+static int TK_RETURN(void) {
+  return 85;
+}
+
+static int TK_WHILE(void) {
   return 96;
+}
+
+static int TK_LOOP(void) {
+  return 72;
+}
+
+static int TK_FOR(void) {
+  return 66;
+}
+
+static int TK_BREAK(void) {
+  return 57;
+}
+
+static int TK_CONTINUE(void) {
+  return 59;
+}
+
+static int TK_STRUCT(void) {
+  return 89;
+}
+
+static int TK_ENUM(void) {
+  return 62;
+}
+
+static int TK_IMPL(void) {
+  return 69;
+}
+
+static int TK_TRAIT(void) {
+  return 90;
+}
+
+static int TK_TYPE(void) {
+  return 92;
+}
+
+static int TK_USE(void) {
+  return 94;
+}
+
+static int TK_AS(void) {
+  return 54;
+}
+
+static int TK_IN(void) {
+  return 70;
+}
+
+static int ps_peek(int tags, int pos) {
+  int _sv0t0 = sv0_vec_len(tags);
+  if ((pos >= _sv0t0)) {
+    return 97;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(tags, pos);
+  return _sv0t1;
+}
+
+static int ps_at_end(int tags, int pos) {
+  int _sv0t0 = ps_peek(tags, pos);
+  int _sv0t1 = (_sv0t0 == 97);
+  return _sv0t1;
+}
+
+static int ps_start(int starts, int pos) {
+  int _sv0t0 = sv0_vec_get(starts, pos);
+  return _sv0t0;
+}
+
+static int ps_end(int ends, int pos) {
+  int _sv0t0 = sv0_vec_get(ends, pos);
+  return _sv0t0;
+}
+
+static int ps_advance(int pos) {
+  int _sv0t0 = (pos + 1);
+  return _sv0t0;
+}
+
+static int ps_expect(int tags, int pos, int expected) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != expected)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = (pos + 1);
+  return _sv0t2;
+}
+
+static int ps_match(int tags, int pos, int expected) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 == expected)) {
+    int _sv0t1 = (pos + 1);
+    return _sv0t1;
+  } else {
+  }
+  return pos;
+}
+
+static const char* ps_tok_text(const char* source, int starts, int ends, int pos) {
+  int _sv0t0 = sv0_vec_get(starts, pos);
+  int s = _sv0t0;
+  int _sv0t1 = sv0_vec_get(ends, pos);
+  int e = _sv0t1;
+  int _sv0t2 = (e - s);
+  const char* _sv0t3 = sv0_string_substr(source, s, _sv0t2);
+  return _sv0t3;
+}
+
+static int parse_path(int tags, int pos, int path_out) {
+  int _sv0t0 = ps_peek(tags, pos);
+  int tag = _sv0t0;
+  if ((tag != 5)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  sv0_vec_push(path_out, pos);
+  int p = (pos + 1);
+  int done = 0;
+  while ((done != 1)) {
+    int _sv0t2 = ps_peek(tags, p);
+    if ((_sv0t2 == 15)) {
+      int _sv0t3 = (p + 1);
+      int _sv0t4 = ps_peek(tags, _sv0t3);
+      int next = _sv0t4;
+      if ((next == 5)) {
+        int _sv0t5 = (p + 1);
+        sv0_vec_push(path_out, _sv0t5);
+        p = (p + 2);
+      } else {
+        done = 1;
+      }
+    } else {
+      done = 1;
+    }
+  }
+  return p;
+}
+
+static int ps_skip_optional_pub(int tags, int pos) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != 82)) {
+    return pos;
+  } else {
+  }
+  int _sv0t1 = (pos + 1);
+  int _sv0t2 = ps_peek(tags, _sv0t1);
+  if ((_sv0t2 == 6)) {
+    int _sv0t3 = (pos + 2);
+    int _sv0t4 = ps_peek(tags, _sv0t3);
+    if ((_sv0t4 == 81)) {
+      int _sv0t5 = (pos + 3);
+      int _sv0t6 = ps_peek(tags, _sv0t5);
+      if ((_sv0t6 == 7)) {
+        int _sv0t7 = (pos + 4);
+        return _sv0t7;
+      } else {
+      }
+    } else {
+    }
+  } else {
+  }
+  int _sv0t8 = (pos + 1);
+  return _sv0t8;
+}
+
+static int ps_skip_optional_unsafe(int tags, int pos) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 == 93)) {
+    int _sv0t1 = (pos + 1);
+    return _sv0t1;
+  } else {
+  }
+  return pos;
+}
+
+static int ps_skip_generic_params(int tags, int pos) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != 38)) {
+    return pos;
+  } else {
+  }
+  int p = (pos + 1);
+  int depth = 1;
+  while ((depth > 0)) {
+    int _sv0t1 = ps_peek(tags, p);
+    int t = _sv0t1;
+    if ((t == 97)) {
+      return p;
+    } else {
+    }
+    if ((t == 38)) {
+      depth = (depth + 1);
+    } else {
+    }
+    if ((t == 39)) {
+      depth = (depth - 1);
+    } else {
+    }
+    p = (p + 1);
+  }
+  return p;
+}
+
+static int ps_skip_where_clause(int tags, int pos) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != 95)) {
+    return pos;
+  } else {
+  }
+  int p = (pos + 1);
+  int done = 0;
+  while ((done != 1)) {
+    int _sv0t1 = ps_peek(tags, p);
+    int t = _sv0t1;
+    if ((t == 97)) {
+      return p;
+    } else {
+    }
+    if ((t == 8)) {
+      return p;
+    } else {
+    }
+    if ((t == 65)) {
+      return p;
+    } else {
+    }
+    if ((t == 13)) {
+      int _sv0t2 = (p + 1);
+      return _sv0t2;
+    } else {
+    }
+    p = (p + 1);
+  }
+  return p;
+}
+
+static int ps_skip_attributes(int tags, int pos) {
+  int p = pos;
+  int scanning = 1;
+  while (scanning) {
+    int _sv0t0 = ps_peek(tags, p);
+    if ((_sv0t0 == 21)) {
+      int _sv0t1 = (p + 1);
+      int _sv0t2 = ps_peek(tags, _sv0t1);
+      if ((_sv0t2 == 10)) {
+        p = (p + 2);
+        int depth = 1;
+        while ((depth > 0)) {
+          int _sv0t3 = ps_peek(tags, p);
+          int t = _sv0t3;
+          if ((t == 97)) {
+            return p;
+          } else {
+          }
+          if ((t == 10)) {
+            depth = (depth + 1);
+          } else {
+          }
+          if ((t == 11)) {
+            depth = (depth - 1);
+          } else {
+          }
+          p = (p + 1);
+        }
+      } else {
+        scanning = 0;
+      }
+    } else {
+      scanning = 0;
+    }
+  }
+  return p;
 }
 
 static int AST_ADD(void) {
@@ -623,7 +969,7 @@ static int lit_from_tok(int tok_tag) {
     return 4;
   } else {
   }
-  if ((tok_tag == 89)) {
+  if ((tok_tag == 91)) {
     return 5;
   } else {
   }
@@ -653,17 +999,17 @@ static int expr_has_span(int expr_tag) {
 }
 
 static int is_pub_token(int tok_tag) {
-  int _sv0t0 = (tok_tag == 79);
+  int _sv0t0 = (tok_tag == 82);
   return _sv0t0;
 }
 
 static int is_unsafe_token(int tok_tag) {
-  int _sv0t0 = (tok_tag == 90);
+  int _sv0t0 = (tok_tag == 93);
   return _sv0t0;
 }
 
 static int is_where_token(int tok_tag) {
-  int _sv0t0 = (tok_tag == 91);
+  int _sv0t0 = (tok_tag == 95);
   return _sv0t0;
 }
 
@@ -714,7 +1060,7 @@ static int where_clause_stop(int tok_tag) {
     return 1;
   } else {
   }
-  if ((tok_tag == 96)) {
+  if ((tok_tag == 97)) {
     return 1;
   } else {
   }
@@ -1193,7 +1539,7 @@ static int test_lit_from_tok(void) {
     return 4;
   } else {
   }
-  int _sv0t4 = lit_from_tok(89);
+  int _sv0t4 = lit_from_tok(91);
   if ((_sv0t4 != 5)) {
     return 5;
   } else {
@@ -1248,7 +1594,7 @@ static int test_expr_span(void) {
 }
 
 static int test_skip_helpers(void) {
-  int _sv0t0 = is_pub_token(79);
+  int _sv0t0 = is_pub_token(82);
   if ((_sv0t0 != 1)) {
     return 1;
   } else {
@@ -1258,12 +1604,12 @@ static int test_skip_helpers(void) {
     return 2;
   } else {
   }
-  int _sv0t2 = is_unsafe_token(90);
+  int _sv0t2 = is_unsafe_token(93);
   if ((_sv0t2 != 1)) {
     return 3;
   } else {
   }
-  int _sv0t3 = is_where_token(91);
+  int _sv0t3 = is_where_token(95);
   if ((_sv0t3 != 1)) {
     return 4;
   } else {
@@ -1323,7 +1669,7 @@ static int test_skip_helpers(void) {
     return 15;
   } else {
   }
-  int _sv0t15 = where_clause_stop(96);
+  int _sv0t15 = where_clause_stop(97);
   if ((_sv0t15 != 1)) {
     return 16;
   } else {
@@ -1586,6 +1932,279 @@ static int test_attr_bracket(void) {
   return 0;
 }
 
+static int test_ps_nav(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 22);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 97);
+  int _sv0t1 = ps_peek(tags, 0);
+  if ((_sv0t1 != 5)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = ps_peek(tags, 1);
+  if ((_sv0t2 != 22)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = ps_peek(tags, 3);
+  if ((_sv0t3 != 97)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = ps_peek(tags, 10);
+  if ((_sv0t4 != 97)) {
+    return 4;
+  } else {
+  }
+  int _sv0t5 = ps_at_end(tags, 3);
+  if ((_sv0t5 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t6 = ps_at_end(tags, 0);
+  if ((_sv0t6 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t7 = ps_advance(0);
+  if ((_sv0t7 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t8 = ps_expect(tags, 0, 5);
+  if ((_sv0t8 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t9 = ps_expect(tags, 0, 22);
+  int _sv0t10 = (0 - 1);
+  if ((_sv0t9 != _sv0t10)) {
+    return 9;
+  } else {
+  }
+  int _sv0t11 = ps_match(tags, 0, 5);
+  if ((_sv0t11 != 1)) {
+    return 10;
+  } else {
+  }
+  int _sv0t12 = ps_match(tags, 0, 22);
+  if ((_sv0t12 != 0)) {
+    return 11;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_new();
+  int starts = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int ends = _sv0t14;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(starts, 3);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(ends, 4);
+  int _sv0t15 = ps_start(starts, 0);
+  if ((_sv0t15 != 0)) {
+    return 12;
+  } else {
+  }
+  int _sv0t16 = ps_end(ends, 0);
+  if ((_sv0t16 != 3)) {
+    return 13;
+  } else {
+  }
+  const char* src;
+  src = "foo+bar";
+  const char* _sv0t17 = ps_tok_text(src, starts, ends, 0);
+  const char* txt;
+  txt = _sv0t17;
+  int _sv0t18 = sv0_string_len(txt);
+  if ((_sv0t18 != 3)) {
+    return 14;
+  } else {
+  }
+  return 0;
+}
+
+static int test_parse_path(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 15);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 15);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 22);
+  sv0_vec_push(tags, 97);
+  int _sv0t1 = sv0_vec_new();
+  int path = _sv0t1;
+  int _sv0t2 = parse_path(tags, 0, path);
+  int end_pos = _sv0t2;
+  int _sv0t3 = sv0_vec_len(path);
+  if ((_sv0t3 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(path, 0);
+  if ((_sv0t4 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(path, 1);
+  if ((_sv0t5 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(path, 2);
+  if ((_sv0t6 != 4)) {
+    return 4;
+  } else {
+  }
+  if ((end_pos != 5)) {
+    return 5;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_new();
+  int path2 = _sv0t7;
+  int _sv0t8 = parse_path(tags, 0, path2);
+  int end2 = _sv0t8;
+  int _sv0t9 = sv0_vec_len(path2);
+  if ((_sv0t9 != 3)) {
+    return 6;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_new();
+  int single = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int tags2 = _sv0t11;
+  sv0_vec_push(tags2, 5);
+  sv0_vec_push(tags2, 22);
+  sv0_vec_push(tags2, 97);
+  int _sv0t12 = parse_path(tags2, 0, single);
+  int end3 = _sv0t12;
+  int _sv0t13 = sv0_vec_len(single);
+  if ((_sv0t13 != 1)) {
+    return 7;
+  } else {
+  }
+  if ((end3 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_new();
+  int empty = _sv0t14;
+  int _sv0t15 = parse_path(tags2, 1, empty);
+  int fail = _sv0t15;
+  int _sv0t16 = (0 - 1);
+  if ((fail != _sv0t16)) {
+    return 9;
+  } else {
+  }
+  return 0;
+}
+
+static int test_ps_skip(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  sv0_vec_push(tags, 82);
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(tags, 97);
+  int _sv0t1 = ps_skip_optional_pub(tags, 0);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = ps_skip_optional_pub(tags, 1);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_new();
+  int tags2 = _sv0t3;
+  sv0_vec_push(tags2, 82);
+  sv0_vec_push(tags2, 6);
+  sv0_vec_push(tags2, 81);
+  sv0_vec_push(tags2, 7);
+  sv0_vec_push(tags2, 65);
+  sv0_vec_push(tags2, 97);
+  int _sv0t4 = ps_skip_optional_pub(tags2, 0);
+  if ((_sv0t4 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int tags3 = _sv0t5;
+  sv0_vec_push(tags3, 93);
+  sv0_vec_push(tags3, 65);
+  sv0_vec_push(tags3, 97);
+  int _sv0t6 = ps_skip_optional_unsafe(tags3, 0);
+  if ((_sv0t6 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = ps_skip_optional_unsafe(tags3, 1);
+  if ((_sv0t7 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int tags4 = _sv0t8;
+  sv0_vec_push(tags4, 38);
+  sv0_vec_push(tags4, 5);
+  sv0_vec_push(tags4, 12);
+  sv0_vec_push(tags4, 5);
+  sv0_vec_push(tags4, 39);
+  sv0_vec_push(tags4, 8);
+  sv0_vec_push(tags4, 97);
+  int _sv0t9 = ps_skip_generic_params(tags4, 0);
+  if ((_sv0t9 != 5)) {
+    return 6;
+  } else {
+  }
+  int _sv0t10 = ps_skip_generic_params(tags4, 5);
+  if ((_sv0t10 != 5)) {
+    return 7;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int tags5 = _sv0t11;
+  sv0_vec_push(tags5, 95);
+  sv0_vec_push(tags5, 5);
+  sv0_vec_push(tags5, 14);
+  sv0_vec_push(tags5, 5);
+  sv0_vec_push(tags5, 8);
+  sv0_vec_push(tags5, 97);
+  int _sv0t12 = ps_skip_where_clause(tags5, 0);
+  if ((_sv0t12 != 4)) {
+    return 8;
+  } else {
+  }
+  int _sv0t13 = ps_skip_where_clause(tags5, 4);
+  if ((_sv0t13 != 4)) {
+    return 9;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_new();
+  int tags6 = _sv0t14;
+  sv0_vec_push(tags6, 21);
+  sv0_vec_push(tags6, 10);
+  sv0_vec_push(tags6, 5);
+  sv0_vec_push(tags6, 11);
+  sv0_vec_push(tags6, 65);
+  sv0_vec_push(tags6, 97);
+  int _sv0t15 = ps_skip_attributes(tags6, 0);
+  if ((_sv0t15 != 4)) {
+    return 10;
+  } else {
+  }
+  int _sv0t16 = ps_skip_attributes(tags6, 4);
+  if ((_sv0t16 != 4)) {
+    return 11;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_of();
   int r1 = _sv0t0;
@@ -1654,6 +2273,27 @@ int main(void) {
   if ((r10 != 0)) {
     int _sv0t18 = (140 + r10);
     return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_ps_nav();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (160 + r11);
+    return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_parse_path();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (180 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_ps_skip();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (200 + r13);
+    return _sv0t24;
   } else {
   }
   return 0;

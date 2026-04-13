@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Deep-function transliteration started.** `env.sv0`: all 6 deferred SML functions implemented (fnArity, tyAlias, registerValueAlias, registerTypeAlias, lookupType, resolveCanonicalTy) — env.sml parity complete. `lexer.sv0`: full `tokenize` pipeline added (scan_string_end, scan_char_end, scan_number_full, scan_op_full, tokenize with parallel Vec output) — lexer.sml pipeline parity. Metrics unchanged: bootstrap 97, self-host 97, stage0 21, vm-parity 84)
+**Last updated:** 2026-04-13 (America/Denver; **Deep-function transliteration continued.** `parser.sv0`: token stream navigation (peek/advance/expect/match on parallel Vecs), parsePath, skip helpers on token stream (skipOptionalPub/Unsafe, skipGenericParams, skipWhereClause, skipAttributes), 20+ keyword token tag constants added, **6 wrong keyword tags fixed** (PUB 79→82, PROJECT 79→81, UNSAFE 90→93, WHERE 91→95, TRUE 89→91, EOF 96→97) to align with canonical token.sv0. `diagnostic.sv0`: Vec-based diagnostic list (parallel sevs/lines/cols/msgs), sort-by-span (insertion sort on line+col), format_header, format_snippet. `include_expand.sv0`: split_lines/get_split_line, cycle detection, path_dir, path_join. Metrics unchanged: bootstrap 97, self-host 97, stage0 21, vm-parity 84)
 
 ## Checklist (local source of truth)
 

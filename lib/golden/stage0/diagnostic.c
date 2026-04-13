@@ -17,6 +17,14 @@ static const char* carets(int n);
 static const char* pad_left(const char* s, int width);
 static const char* get_line(const char* source, int line_no);
 static int severity_ord(Severity a, Severity b);
+static int diag_list_len(int sevs);
+static int diag_list_push(int sevs, int lines, int cols, int msgs, int sev, int line, int col, int msg);
+static int diag_list_has_errors(int sevs);
+static int diag_list_error_count(int sevs);
+static int diag_span_less(int lines, int cols, int a, int b);
+static int diag_sort_by_span(int sevs, int lines, int cols, int msgs, int order);
+static const char* format_header(int sev_tag, const char* message);
+static const char* format_snippet(const char* source, int line_no, int col, int span_len);
 static int test_severity_tags(void);
 static int test_constructors(void);
 static int test_has_errors(void);
@@ -27,6 +35,10 @@ static int test_spaces(void);
 static int test_carets(void);
 static int test_pad_left(void);
 static int test_get_line(void);
+static int test_diag_list(void);
+static int test_diag_sort(void);
+static int test_format_header(void);
+static int test_format_snippet(void);
 
 static int severity_tag(Severity s) {
   int _sv0t0;
@@ -231,6 +243,164 @@ static int severity_ord(Severity a, Severity b) {
   } else {
   }
   return 2;
+}
+
+static int diag_list_len(int sevs) {
+  int _sv0t0 = sv0_vec_len(sevs);
+  return _sv0t0;
+}
+
+static int diag_list_push(int sevs, int lines, int cols, int msgs, int sev, int line, int col, int msg) {
+  sv0_vec_push(sevs, sev);
+  sv0_vec_push(lines, line);
+  sv0_vec_push(cols, col);
+  sv0_vec_push(msgs, msg);
+  int _sv0t0 = sv0_vec_len(sevs);
+  return _sv0t0;
+}
+
+static int diag_list_has_errors(int sevs) {
+  int _sv0t0 = sv0_vec_len(sevs);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(sevs, i);
+    if ((_sv0t1 == 0)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int diag_list_error_count(int sevs) {
+  int _sv0t0 = sv0_vec_len(sevs);
+  int n = _sv0t0;
+  int count = 0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(sevs, i);
+    if ((_sv0t1 == 0)) {
+      count = (count + 1);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return count;
+}
+
+static int diag_span_less(int lines, int cols, int a, int b) {
+  int _sv0t0 = sv0_vec_get(lines, a);
+  int la = _sv0t0;
+  int _sv0t1 = sv0_vec_get(lines, b);
+  int lb = _sv0t1;
+  if ((la < lb)) {
+    return 1;
+  } else {
+  }
+  if ((la > lb)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(cols, a);
+  int _sv0t3 = sv0_vec_get(cols, b);
+  int _sv0t4 = (_sv0t2 < _sv0t3);
+  return _sv0t4;
+}
+
+static int diag_sort_by_span(int sevs, int lines, int cols, int msgs, int order) {
+  int _sv0t0 = sv0_vec_len(sevs);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    sv0_vec_push(order, i);
+    i = (i + 1);
+  }
+  int i2 = 1;
+  while ((i2 < n)) {
+    int _sv0t1 = sv0_vec_get(order, i2);
+    int key = _sv0t1;
+    int j = (i2 - 1);
+    int shifting = 1;
+    while (shifting) {
+      if ((j < 0)) {
+        shifting = 0;
+      } else {
+        int _sv0t2 = sv0_vec_get(order, j);
+        int cur = _sv0t2;
+        int _sv0t3 = diag_span_less(lines, cols, key, cur);
+        if (_sv0t3) {
+          int _sv0t4 = (j + 1);
+          sv0_vec_set(order, _sv0t4, cur);
+          j = (j - 1);
+        } else {
+          shifting = 0;
+        }
+      }
+    }
+    int _sv0t5 = (j + 1);
+    sv0_vec_set(order, _sv0t5, key);
+    i2 = (i2 + 1);
+  }
+  return n;
+}
+
+static const char* format_header(int sev_tag, const char* message) {
+  const char* out;
+  out = "";
+  if ((sev_tag == 0)) {
+    out = "error";
+  } else {
+  }
+  if ((sev_tag == 1)) {
+    out = "warning";
+  } else {
+  }
+  if ((sev_tag == 2)) {
+    out = "note";
+  } else {
+  }
+  const char* _sv0t0 = sv0_string_concat(out, ": ");
+  out = _sv0t0;
+  const char* _sv0t1 = sv0_string_concat(out, message);
+  out = _sv0t1;
+  return out;
+}
+
+static const char* format_snippet(const char* source, int line_no, int col, int span_len) {
+  const char* _sv0t0 = get_line(source, line_no);
+  const char* line_text;
+  line_text = _sv0t0;
+  int _sv0t1 = sv0_string_len(line_text);
+  if ((_sv0t1 == 0)) {
+    return "";
+  } else {
+  }
+  int effective_span = span_len;
+  if ((effective_span < 1)) {
+    effective_span = 1;
+  } else {
+  }
+  const char* out;
+  out = "  | ";
+  const char* _sv0t2 = sv0_string_concat(out, line_text);
+  out = _sv0t2;
+  const char* _sv0t3 = sv0_string_concat(out, "\n");
+  out = _sv0t3;
+  const char* _sv0t4 = sv0_string_concat(out, "  | ");
+  out = _sv0t4;
+  int col_offset = (col - 1);
+  if ((col_offset > 0)) {
+    const char* _sv0t5 = spaces(col_offset);
+    const char* _sv0t6 = sv0_string_concat(out, _sv0t5);
+    out = _sv0t6;
+  } else {
+  }
+  const char* _sv0t7 = carets(effective_span);
+  const char* _sv0t8 = sv0_string_concat(out, _sv0t7);
+  out = _sv0t8;
+  return out;
 }
 
 static int test_severity_tags(void) {
@@ -516,6 +686,145 @@ static int test_get_line(void) {
   return 0;
 }
 
+static int test_diag_list(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sevs = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int lines = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int cols = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int msgs = _sv0t3;
+  int _sv0t4 = diag_list_has_errors(sevs);
+  if ((_sv0t4 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = diag_list_error_count(sevs);
+  if ((_sv0t5 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = diag_list_push(sevs, lines, cols, msgs, 1, 5, 3, 100);
+  int _sv0t7 = diag_list_has_errors(sevs);
+  if ((_sv0t7 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t8 = diag_list_push(sevs, lines, cols, msgs, 0, 2, 10, 200);
+  int _sv0t9 = diag_list_has_errors(sevs);
+  if ((_sv0t9 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t10 = diag_list_error_count(sevs);
+  if ((_sv0t10 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t11 = diag_list_push(sevs, lines, cols, msgs, 0, 8, 1, 300);
+  int _sv0t12 = diag_list_error_count(sevs);
+  if ((_sv0t12 != 2)) {
+    return 6;
+  } else {
+  }
+  int _sv0t13 = diag_list_len(sevs);
+  if ((_sv0t13 != 3)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
+static int test_diag_sort(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sevs = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int lines = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int cols = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int msgs = _sv0t3;
+  int _sv0t4 = diag_list_push(sevs, lines, cols, msgs, 0, 10, 5, 1);
+  int _sv0t5 = diag_list_push(sevs, lines, cols, msgs, 1, 2, 3, 2);
+  int _sv0t6 = diag_list_push(sevs, lines, cols, msgs, 0, 2, 1, 3);
+  int _sv0t7 = diag_list_push(sevs, lines, cols, msgs, 0, 10, 2, 4);
+  int _sv0t8 = sv0_vec_new();
+  int order = _sv0t8;
+  int _sv0t9 = diag_sort_by_span(sevs, lines, cols, msgs, order);
+  int _sv0t10 = sv0_vec_get(order, 0);
+  if ((_sv0t10 != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(order, 1);
+  if ((_sv0t11 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(order, 2);
+  if ((_sv0t12 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(order, 3);
+  if ((_sv0t13 != 0)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_format_header(void) {
+  const char* _sv0t0 = format_header(0, "undeclared variable");
+  const char* h1;
+  h1 = _sv0t0;
+  int _sv0t1 = sv0_string_eq(h1, "error: undeclared variable");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = format_header(1, "unused import");
+  const char* h2;
+  h2 = _sv0t2;
+  int _sv0t3 = sv0_string_eq(h2, "warning: unused import");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = format_header(2, "defined here");
+  const char* h3;
+  h3 = _sv0t4;
+  int _sv0t5 = sv0_string_eq(h3, "note: defined here");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_format_snippet(void) {
+  const char* src;
+  src = "let x = 42;\nlet y = x + 1;";
+  const char* _sv0t0 = format_snippet(src, 1, 5, 1);
+  const char* snip;
+  snip = _sv0t0;
+  int _sv0t1 = sv0_string_len(snip);
+  if ((_sv0t1 == 0)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = format_snippet(src, 99, 1, 1);
+  const char* empty;
+  empty = _sv0t2;
+  int _sv0t3 = sv0_string_len(empty);
+  if ((_sv0t3 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_severity_tags();
   int r1 = _sv0t0;
@@ -584,6 +893,34 @@ int main(void) {
   if ((r10 != 0)) {
     int _sv0t18 = (90 + r10);
     return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_diag_list();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (100 + r11);
+    return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_diag_sort();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (110 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_format_header();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (120 + r13);
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_format_snippet();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (130 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;

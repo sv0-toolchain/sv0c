@@ -33,9 +33,9 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 
 | Area | SML path | sv0 today | Next focus |
 |------|-----------|-----------|------------|
-| Span / diagnostics | `sml/error/` | `lib/span.sv0` (flattened Pos/Span), `lib/diagnostic.sv0` (severity, getLine, spaces/carets/padLeft, hasErrors, errorCount) | `format` with Span integration, `sortBySpan`, `report` I/O |
+| Span / diagnostics | `sml/error/` | `lib/span.sv0` (flattened Pos/Span), `lib/diagnostic.sv0` (severity, getLine, spaces/carets/padLeft, hasErrors, errorCount, **Vec-based diag list**, **sort-by-span**, **format_header**, **format_snippet**) | `format` with full Span/related/help, `report`/`reportAll` I/O |
 | Lexer | `sml/lexer/` | `lib/lexer.sv0` (**full tokenize pipeline**: char class, keywords, escape, scan string/char/number/op, `tokenize` → parallel Vec output), `lexer/token.sv0` (98-variant enum) | **Pipeline parity reached** — remaining: integrate with parser token stream consumption |
-| Parser | `sml/parser/` | `lib/parser.sv0` (binop/prec maps, token helpers, skip functions) | **Full recursive descent** (`parseExpr`/`parseType`/`parsePat`/`parseItem`) — largest deferred piece |
+| Parser | `sml/parser/` | `lib/parser.sv0` (binop/prec maps, token helpers, skip functions, **token stream nav** (peek/advance/expect/match), **parsePath**, **skip helpers on token stream** (pub/unsafe/generics/where/attrs), 28 keyword constants — **tags fixed** to match token.sv0) | **Full recursive descent** (`parseExpr`/`parseType`/`parsePat`/`parseItem`) — largest deferred piece |
 | Name resolution | `sml/name_resolution/` | `lib/env.sv0` (**SML parity**: scope mgmt, mod val/ty, fnArity, tyAlias, registerValueAlias, registerTypeAlias, lookupType), `lib/resolver.sv0` (intrinsics, path join, helpers) | **Full resolver** (`resolveTy`/`resolveExpr`/`resolveStmt`, `applyUseClause`) |
 | Types | `sml/type_checker/types.sml` | `lib/types.sv0` (20-variant Ty enum, Box, Vec, ty_tag, fresh_var) | Mostly complete; string payloads pending |
 | Unification | `sml/type_checker/unify.sml` | `lib/unify.sv0` (full structural unify over Ty) | **Parity reached** per header |
@@ -46,7 +46,7 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 | Link | `sml/link/` | `lib/link.sv0` (is_sv0, mangling, strip, rewrite predicates) | **`mapTy`/`mapExpr`/`mapItem`**, **`walkSv0`/`parseFile`/`linkProjectDir`** |
 | C backend | `sml/backend/c/` | `lib/codegen.sv0` (**full** `emitValue`/`emitExpr`/`emitInstr`/`emitFn`/top `emit`) | **Parity reached** per header |
 | VM backend | `sml/backend/vm/` | `lib/vm_codegen.sv0` (layout, opcodes, pool, builtins map), `lib/bytecode.sv0` (50 opcodes, sizes, LE helpers, file layout) | **`emitValue`/`emitExpr`/`emitInstr`/`emitBlock`** + byte-vector encode/decode |
-| Include expansion | `sml/include_expand.sml` | `lib/include_expand.sv0` (trim, parse_include_line, path_ok) | **`expand`/`expandFile`** — file I/O dependent |
+| Include expansion | `sml/include_expand.sml` | `lib/include_expand.sv0` (trim, parse_include_line, path_ok, **split_lines**, **cycle detection**, **path_dir/path_join**) | **`expand`/`expandFile`** — file I/O dependent (all non-I/O building blocks done) |
 
 ## Suggested sequencing (high level)
 
