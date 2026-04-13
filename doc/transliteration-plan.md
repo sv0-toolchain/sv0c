@@ -18,8 +18,8 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 
 | Metric | Source | Count (this revision) |
 |--------|--------|-------------------------|
-| Bootstrap-listed programs | `lib/bootstrap-sources.list` (non-comment, non-empty lines) | 262 |
-| Self-host pilots | `lib/self-host-sv0-loop.list` | 262 |
+| Bootstrap-listed programs | `lib/bootstrap-sources.list` (non-comment, non-empty lines) | 263 |
+| Self-host pilots | `lib/self-host-sv0-loop.list` | 263 |
 | Stage0 C golden files | `lib/golden/stage0/*.c` | 184 |
 | VM parity allowlist | `test/vm-parity/manifest.txt` | 186 |
 
