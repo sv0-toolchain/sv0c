@@ -1,10 +1,10 @@
 /* Phase 2 real pipeline module: sml/name_resolution/resolver.sml -> sv0.
-   Name resolution utilities: path-to-string joining, intrinsic
-   function registration (17 builtins with string-based name+arity
-   lookup), item registration dispatch (by item tag → value/type/
-   variant classification), pattern-bind counting, variant-arity
-   extraction, context rules (allowSelf for trait/impl), resolution
-   error code classification.
+   Name resolution utilities: path-to-string joining (2-seg and Vec),
+   intrinsic registration (17 builtins with string+arity lookup +
+   register_all_intrinsics into env fn_arities/mod_values), import
+   alias management (Vec-based add/lookup/reset), item registration
+   dispatch (by item tag), pattern-bind counting, variant-arity
+   extraction, context rules (allowSelf), error codes, arity checks.
    AST traversal functions (resolveTy, resolveExpr, resolveStmt,
    resolveTopItem) and applyUseClause deferred — need full AST enum
    pattern matching with Box handles. */
@@ -20,6 +20,66 @@ fn mangle_use_target(mod_name: string, item_name: string) -> string {
     let a: string = string_concat(mod_name, "__");
     return string_concat(a, item_name);
 }
+
+/* ── generalized path → string ─────────────────────────────────
+   path_join_vec: joins token-stream path segments with "::".
+   path_indices is the Vec<i32> of token positions from parse_path.
+   Extracts each segment's text via source/starts/ends. */
+
+fn path_join_vec(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                 path_indices: Vec<i32>) -> string {
+    let n: i32 = vec_len(path_indices);
+    if n == 0 { return ""; }
+    let first_pos: i32 = vec_get(path_indices, 0);
+    let fs: i32 = vec_get(starts, first_pos);
+    let fe: i32 = vec_get(ends, first_pos);
+    let mut out: string = string_substr(source, fs, fe - fs);
+    let mut i: i32 = 1;
+    while i < n {
+        out = string_concat(out, "::");
+        let pos: i32 = vec_get(path_indices, i);
+        let s: i32 = vec_get(starts, pos);
+        let e: i32 = vec_get(ends, pos);
+        let seg: string = string_substr(source, s, e - s);
+        out = string_concat(out, seg);
+        i = i + 1;
+    }
+    return out;
+}
+
+/* ── import alias management ───────────────────────────────────
+   Interleaved Vec<i32>: [from0, to0, from1, to1, ...].
+   from/to are interned string handles. */
+
+fn import_alias_new() -> Vec<i32> {
+    return vec_new();
+}
+
+fn import_alias_add(aliases: Vec<i32>, from_handle: i32, to_handle: i32) -> i32 {
+    vec_push(aliases, from_handle);
+    vec_push(aliases, to_handle);
+    return vec_len(aliases) / 2;
+}
+
+fn import_alias_count(aliases: Vec<i32>) -> i32 {
+    return vec_len(aliases) / 2;
+}
+
+fn import_alias_lookup(aliases: Vec<i32>, name_handle: i32) -> i32 {
+    let n: i32 = vec_len(aliases);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(aliases, i) == name_handle {
+            return vec_get(aliases, i + 1);
+        }
+        i = i + 2;
+    }
+    return 0 - 1;
+}
+
+/* import_alias_reset: in SML this is `recordedImportAliases := []`.
+   In sv0, the caller discards the old Vec and calls import_alias_new()
+   for a fresh list. No in-place clear needed. */
 
 /* ── intrinsic function registry (string-based) ─────────────── */
 
@@ -98,6 +158,46 @@ fn is_box_intrinsic(name: string) -> bool {
     if string_eq(name, "box_new") { return true; }
     if string_eq(name, "box_deref") { return true; }
     return false;
+}
+
+/* ── register all intrinsics into env ───────────────────────── */
+
+fn register_one_intrinsic(fn_arities: Vec<i32>, mod_values: Vec<i32>,
+                          name: i32, arity: i32) -> i32 {
+    vec_push(fn_arities, name);
+    vec_push(fn_arities, arity);
+    vec_push(mod_values, name);
+    return 0;
+}
+
+fn register_all_intrinsics(fn_arities: Vec<i32>, mod_values: Vec<i32>,
+                           println_h: i32, old_h: i32, forall_h: i32,
+                           exists_h: i32, no_alias_h: i32,
+                           str_len_h: i32, str_eq_h: i32,
+                           str_concat_h: i32, str_char_at_h: i32,
+                           str_substr_h: i32,
+                           vec_new_h: i32, vec_push_h: i32,
+                           vec_len_h: i32, vec_get_h: i32,
+                           vec_set_h: i32,
+                           box_new_h: i32, box_deref_h: i32) -> i32 {
+    register_one_intrinsic(fn_arities, mod_values, println_h, 1);
+    register_one_intrinsic(fn_arities, mod_values, old_h, 1);
+    register_one_intrinsic(fn_arities, mod_values, forall_h, 3);
+    register_one_intrinsic(fn_arities, mod_values, exists_h, 3);
+    register_one_intrinsic(fn_arities, mod_values, no_alias_h, 2);
+    register_one_intrinsic(fn_arities, mod_values, str_len_h, 1);
+    register_one_intrinsic(fn_arities, mod_values, str_eq_h, 2);
+    register_one_intrinsic(fn_arities, mod_values, str_concat_h, 2);
+    register_one_intrinsic(fn_arities, mod_values, str_char_at_h, 2);
+    register_one_intrinsic(fn_arities, mod_values, str_substr_h, 3);
+    register_one_intrinsic(fn_arities, mod_values, vec_new_h, 0);
+    register_one_intrinsic(fn_arities, mod_values, vec_push_h, 2);
+    register_one_intrinsic(fn_arities, mod_values, vec_len_h, 1);
+    register_one_intrinsic(fn_arities, mod_values, vec_get_h, 2);
+    register_one_intrinsic(fn_arities, mod_values, vec_set_h, 3);
+    register_one_intrinsic(fn_arities, mod_values, box_new_h, 1);
+    register_one_intrinsic(fn_arities, mod_values, box_deref_h, 1);
+    return 17;
 }
 
 /* ── item registration classification ───────────────────────── */
@@ -308,6 +408,68 @@ fn test_arity_check() -> i32 {
     return 0;
 }
 
+fn test_path_join_vec() -> i32 {
+    let src: string = "Foo::Bar::Baz";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 3);
+    vec_push(starts, 5);
+    vec_push(ends, 8);
+    vec_push(starts, 10);
+    vec_push(ends, 13);
+    let indices: Vec<i32> = vec_new();
+    vec_push(indices, 0);
+    vec_push(indices, 1);
+    vec_push(indices, 2);
+    let joined: string = path_join_vec(src, starts, ends, indices);
+    if string_eq(joined, "Foo::Bar::Baz") != true { return 1; }
+    let single: Vec<i32> = vec_new();
+    vec_push(single, 0);
+    let r2: string = path_join_vec(src, starts, ends, single);
+    if string_eq(r2, "Foo") != true { return 2; }
+    let empty: Vec<i32> = vec_new();
+    let r3: string = path_join_vec(src, starts, ends, empty);
+    if string_eq(r3, "") != true { return 3; }
+    return 0;
+}
+
+fn test_import_alias() -> i32 {
+    let aliases: Vec<i32> = import_alias_new();
+    if import_alias_count(aliases) != 0 { return 1; }
+    if import_alias_lookup(aliases, 10) != 0 - 1 { return 2; }
+    import_alias_add(aliases, 10, 20);
+    import_alias_add(aliases, 30, 40);
+    if import_alias_count(aliases) != 2 { return 3; }
+    if import_alias_lookup(aliases, 10) != 20 { return 4; }
+    if import_alias_lookup(aliases, 30) != 40 { return 5; }
+    if import_alias_lookup(aliases, 50) != 0 - 1 { return 6; }
+    let aliases2: Vec<i32> = import_alias_new();
+    if import_alias_count(aliases2) != 0 { return 7; }
+    if import_alias_lookup(aliases2, 10) != 0 - 1 { return 8; }
+    return 0;
+}
+
+fn test_register_intrinsics() -> i32 {
+    let fn_ar: Vec<i32> = vec_new();
+    let mod_v: Vec<i32> = vec_new();
+    let count: i32 = register_all_intrinsics(fn_ar, mod_v,
+        100, 101, 102, 103, 104,
+        105, 106, 107, 108, 109,
+        110, 111, 112, 113, 114,
+        115, 116);
+    if count != 17 { return 1; }
+    if vec_len(fn_ar) != 34 { return 2; }
+    if vec_len(mod_v) != 17 { return 3; }
+    if vec_get(fn_ar, 0) != 100 { return 4; }
+    if vec_get(fn_ar, 1) != 1 { return 5; }
+    if vec_get(fn_ar, 4) != 102 { return 6; }
+    if vec_get(fn_ar, 5) != 3 { return 7; }
+    if vec_get(mod_v, 0) != 100 { return 8; }
+    if vec_get(mod_v, 16) != 116 { return 9; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_join();
     if r1 != 0 { return r1; }
@@ -331,5 +493,11 @@ fn main() -> i32 {
     if r10 != 0 { return 100 + r10; }
     let r11: i32 = test_arity_check();
     if r11 != 0 { return 110 + r11; }
+    let r12: i32 = test_path_join_vec();
+    if r12 != 0 { return 120 + r12; }
+    let r13: i32 = test_import_alias();
+    if r13 != 0 { return 130 + r13; }
+    let r14: i32 = test_register_intrinsics();
+    if r14 != 0 { return 140 + r14; }
     return 0;
 }

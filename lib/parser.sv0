@@ -1,6 +1,7 @@
 /* Phase 2 real pipeline module: sml/parser/parser.sml -> sv0.
    Token stream navigation (peek/advance/expect/match on parallel Vecs
-   from lexer tokenize), parsePath, skipOptionalPub/skipOptionalUnsafe/
+   from lexer tokenize), parsePath, parseGenericParams (extracts type
+   param names from <T, U: Bound>), skipOptionalPub/skipOptionalUnsafe/
    skipGenericParams/skipWhereClause/skipAttributes on token stream,
    token→binop/assign-binop/literal mapping, Pratt precedence, span
    merge. Full recursive-descent parser (parseExpr/parseType/parsePat/
@@ -149,6 +150,53 @@ fn parse_path(tags: Vec<i32>, pos: i32, path_out: Vec<i32>) -> i32 {
                 p = p + 2;
             } else { done = true; }
         } else { done = true; }
+    }
+    return p;
+}
+
+/* ── parseGenericParams ────────────────────────────────────────
+   Parses `<T, U, V>` where each param is an IDENT, optionally
+   followed by `: Bound` (skipped until `,` or `>`).
+   Stores token indices of param names in names_out.
+   Returns new pos after `>`, or same pos if no `<`. */
+
+fn parse_generic_params(tags: Vec<i32>, pos: i32,
+                        names_out: Vec<i32>) -> i32 {
+    if ps_peek(tags, pos) != 38 { return pos; }
+    let mut p: i32 = pos + 1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t == 39 {
+            p = p + 1;
+            done = true;
+        } else {
+            if t == 97 {
+                done = true;
+            } else {
+                if t == 5 {
+                    vec_push(names_out, p);
+                    p = p + 1;
+                    let after: i32 = ps_peek(tags, p);
+                    if after == 14 {
+                        p = p + 1;
+                        let mut skipping: bool = true;
+                        while skipping {
+                            let st: i32 = ps_peek(tags, p);
+                            if st == 12 { skipping = false; }
+                            else {
+                                if st == 39 { skipping = false; }
+                                else {
+                                    if st == 97 { skipping = false; }
+                                    else { p = p + 1; }
+                                }
+                            }
+                        }
+                    }
+                    if ps_peek(tags, p) == 12 { p = p + 1; }
+                } else { p = p + 1; }
+            }
+        }
     }
     return p;
 }
@@ -771,6 +819,43 @@ fn test_ps_skip() -> i32 {
     return 0;
 }
 
+fn test_parse_generic_params() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 38);
+    vec_push(tags, 5);
+    vec_push(tags, 12);
+    vec_push(tags, 5);
+    vec_push(tags, 12);
+    vec_push(tags, 5);
+    vec_push(tags, 39);
+    vec_push(tags, 8);
+    vec_push(tags, 97);
+    let names: Vec<i32> = vec_new();
+    let end_pos: i32 = parse_generic_params(tags, 0, names);
+    if vec_len(names) != 3 { return 1; }
+    if vec_get(names, 0) != 1 { return 2; }
+    if vec_get(names, 1) != 3 { return 3; }
+    if vec_get(names, 2) != 5 { return 4; }
+    if end_pos != 7 { return 5; }
+    let names2: Vec<i32> = vec_new();
+    let no_gen: i32 = parse_generic_params(tags, 7, names2);
+    if vec_len(names2) != 0 { return 6; }
+    if no_gen != 7 { return 7; }
+    let tags2: Vec<i32> = vec_new();
+    vec_push(tags2, 38);
+    vec_push(tags2, 5);
+    vec_push(tags2, 14);
+    vec_push(tags2, 5);
+    vec_push(tags2, 39);
+    vec_push(tags2, 97);
+    let bounded: Vec<i32> = vec_new();
+    let end2: i32 = parse_generic_params(tags2, 0, bounded);
+    if vec_len(bounded) != 1 { return 8; }
+    if vec_get(bounded, 0) != 1 { return 9; }
+    if end2 != 5 { return 10; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_of();
     if r1 != 0 { return r1; }
@@ -798,5 +883,7 @@ fn main() -> i32 {
     if r12 != 0 { return 180 + r12; }
     let r13: i32 = test_ps_skip();
     if r13 != 0 { return 200 + r13; }
+    let r14: i32 = test_parse_generic_params();
+    if r14 != 0 { return 220 + r14; }
     return 0;
 }

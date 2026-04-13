@@ -2,12 +2,19 @@
 
 static const char* path_join2(const char* a, const char* b);
 static const char* mangle_use_target(const char* mod_name, const char* item_name);
+static const char* path_join_vec(const char* source, int starts, int ends, int path_indices);
+static int import_alias_new(void);
+static int import_alias_add(int aliases, int from_handle, int to_handle);
+static int import_alias_count(int aliases);
+static int import_alias_lookup(int aliases, int name_handle);
 static int is_intrinsic(const char* name);
 static int intrinsic_arity(const char* name);
 static int intrinsic_count(void);
 static int is_string_intrinsic(const char* name);
 static int is_vec_intrinsic(const char* name);
 static int is_box_intrinsic(const char* name);
+static int register_one_intrinsic(int fn_arities, int mod_values, int name, int arity);
+static int register_all_intrinsics(int fn_arities, int mod_values, int println_h, int old_h, int forall_h, int exists_h, int no_alias_h, int str_len_h, int str_eq_h, int str_concat_h, int str_char_at_h, int str_substr_h, int vec_new_h, int vec_push_h, int vec_len_h, int vec_get_h, int vec_set_h, int box_new_h, int box_deref_h);
 static int item_registers_fn(int tag);
 static int item_registers_type(int tag);
 static int item_registers_variants(int tag);
@@ -37,6 +44,9 @@ static int test_pat_binds(void);
 static int test_context(void);
 static int test_error_codes(void);
 static int test_arity_check(void);
+static int test_path_join_vec(void);
+static int test_import_alias(void);
+static int test_register_intrinsics(void);
 
 static const char* path_join2(const char* a, const char* b) {
   const char* _sv0t0 = sv0_string_concat(a, "::");
@@ -52,6 +62,81 @@ static const char* mangle_use_target(const char* mod_name, const char* item_name
   a = _sv0t0;
   const char* _sv0t1 = sv0_string_concat(a, item_name);
   return _sv0t1;
+}
+
+static const char* path_join_vec(const char* source, int starts, int ends, int path_indices) {
+  int _sv0t0 = sv0_vec_len(path_indices);
+  int n = _sv0t0;
+  if ((n == 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(path_indices, 0);
+  int first_pos = _sv0t1;
+  int _sv0t2 = sv0_vec_get(starts, first_pos);
+  int fs = _sv0t2;
+  int _sv0t3 = sv0_vec_get(ends, first_pos);
+  int fe = _sv0t3;
+  int _sv0t4 = (fe - fs);
+  const char* _sv0t5 = sv0_string_substr(source, fs, _sv0t4);
+  const char* out;
+  out = _sv0t5;
+  int i = 1;
+  while ((i < n)) {
+    const char* _sv0t6 = sv0_string_concat(out, "::");
+    out = _sv0t6;
+    int _sv0t7 = sv0_vec_get(path_indices, i);
+    int pos = _sv0t7;
+    int _sv0t8 = sv0_vec_get(starts, pos);
+    int s = _sv0t8;
+    int _sv0t9 = sv0_vec_get(ends, pos);
+    int e = _sv0t9;
+    int _sv0t10 = (e - s);
+    const char* _sv0t11 = sv0_string_substr(source, s, _sv0t10);
+    const char* seg;
+    seg = _sv0t11;
+    const char* _sv0t12 = sv0_string_concat(out, seg);
+    out = _sv0t12;
+    i = (i + 1);
+  }
+  return out;
+}
+
+static int import_alias_new(void) {
+  int _sv0t0 = sv0_vec_new();
+  return _sv0t0;
+}
+
+static int import_alias_add(int aliases, int from_handle, int to_handle) {
+  sv0_vec_push(aliases, from_handle);
+  sv0_vec_push(aliases, to_handle);
+  int _sv0t0 = sv0_vec_len(aliases);
+  int _sv0t1 = (_sv0t0 / 2);
+  return _sv0t1;
+}
+
+static int import_alias_count(int aliases) {
+  int _sv0t0 = sv0_vec_len(aliases);
+  int _sv0t1 = (_sv0t0 / 2);
+  return _sv0t1;
+}
+
+static int import_alias_lookup(int aliases, int name_handle) {
+  int _sv0t0 = sv0_vec_len(aliases);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(aliases, i);
+    if ((_sv0t1 == name_handle)) {
+      int _sv0t2 = (i + 1);
+      int _sv0t3 = sv0_vec_get(aliases, _sv0t2);
+      return _sv0t3;
+    } else {
+    }
+    i = (i + 2);
+  }
+  int _sv0t4 = (0 - 1);
+  return _sv0t4;
 }
 
 static int is_intrinsic(const char* name) {
@@ -307,6 +392,34 @@ static int is_box_intrinsic(const char* name) {
   } else {
   }
   return 0;
+}
+
+static int register_one_intrinsic(int fn_arities, int mod_values, int name, int arity) {
+  sv0_vec_push(fn_arities, name);
+  sv0_vec_push(fn_arities, arity);
+  sv0_vec_push(mod_values, name);
+  return 0;
+}
+
+static int register_all_intrinsics(int fn_arities, int mod_values, int println_h, int old_h, int forall_h, int exists_h, int no_alias_h, int str_len_h, int str_eq_h, int str_concat_h, int str_char_at_h, int str_substr_h, int vec_new_h, int vec_push_h, int vec_len_h, int vec_get_h, int vec_set_h, int box_new_h, int box_deref_h) {
+  int _sv0t0 = register_one_intrinsic(fn_arities, mod_values, println_h, 1);
+  int _sv0t1 = register_one_intrinsic(fn_arities, mod_values, old_h, 1);
+  int _sv0t2 = register_one_intrinsic(fn_arities, mod_values, forall_h, 3);
+  int _sv0t3 = register_one_intrinsic(fn_arities, mod_values, exists_h, 3);
+  int _sv0t4 = register_one_intrinsic(fn_arities, mod_values, no_alias_h, 2);
+  int _sv0t5 = register_one_intrinsic(fn_arities, mod_values, str_len_h, 1);
+  int _sv0t6 = register_one_intrinsic(fn_arities, mod_values, str_eq_h, 2);
+  int _sv0t7 = register_one_intrinsic(fn_arities, mod_values, str_concat_h, 2);
+  int _sv0t8 = register_one_intrinsic(fn_arities, mod_values, str_char_at_h, 2);
+  int _sv0t9 = register_one_intrinsic(fn_arities, mod_values, str_substr_h, 3);
+  int _sv0t10 = register_one_intrinsic(fn_arities, mod_values, vec_new_h, 0);
+  int _sv0t11 = register_one_intrinsic(fn_arities, mod_values, vec_push_h, 2);
+  int _sv0t12 = register_one_intrinsic(fn_arities, mod_values, vec_len_h, 1);
+  int _sv0t13 = register_one_intrinsic(fn_arities, mod_values, vec_get_h, 2);
+  int _sv0t14 = register_one_intrinsic(fn_arities, mod_values, vec_set_h, 3);
+  int _sv0t15 = register_one_intrinsic(fn_arities, mod_values, box_new_h, 1);
+  int _sv0t16 = register_one_intrinsic(fn_arities, mod_values, box_deref_h, 1);
+  return 17;
 }
 
 static int item_registers_fn(int tag) {
@@ -842,6 +955,163 @@ static int test_arity_check(void) {
   return 0;
 }
 
+static int test_path_join_vec(void) {
+  const char* src;
+  src = "Foo::Bar::Baz";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 5);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 10);
+  sv0_vec_push(ends, 13);
+  int _sv0t2 = sv0_vec_new();
+  int indices = _sv0t2;
+  sv0_vec_push(indices, 0);
+  sv0_vec_push(indices, 1);
+  sv0_vec_push(indices, 2);
+  const char* _sv0t3 = path_join_vec(src, starts, ends, indices);
+  const char* joined;
+  joined = _sv0t3;
+  int _sv0t4 = sv0_string_eq(joined, "Foo::Bar::Baz");
+  if ((_sv0t4 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int single = _sv0t5;
+  sv0_vec_push(single, 0);
+  const char* _sv0t6 = path_join_vec(src, starts, ends, single);
+  const char* r2;
+  r2 = _sv0t6;
+  int _sv0t7 = sv0_string_eq(r2, "Foo");
+  if ((_sv0t7 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int empty = _sv0t8;
+  const char* _sv0t9 = path_join_vec(src, starts, ends, empty);
+  const char* r3;
+  r3 = _sv0t9;
+  int _sv0t10 = sv0_string_eq(r3, "");
+  if ((_sv0t10 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_import_alias(void) {
+  int _sv0t0 = import_alias_new();
+  int aliases = _sv0t0;
+  int _sv0t1 = import_alias_count(aliases);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = import_alias_lookup(aliases, 10);
+  int _sv0t3 = (0 - 1);
+  if ((_sv0t2 != _sv0t3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = import_alias_add(aliases, 10, 20);
+  int _sv0t5 = import_alias_add(aliases, 30, 40);
+  int _sv0t6 = import_alias_count(aliases);
+  if ((_sv0t6 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = import_alias_lookup(aliases, 10);
+  if ((_sv0t7 != 20)) {
+    return 4;
+  } else {
+  }
+  int _sv0t8 = import_alias_lookup(aliases, 30);
+  if ((_sv0t8 != 40)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = import_alias_lookup(aliases, 50);
+  int _sv0t10 = (0 - 1);
+  if ((_sv0t9 != _sv0t10)) {
+    return 6;
+  } else {
+  }
+  int _sv0t11 = import_alias_new();
+  int aliases2 = _sv0t11;
+  int _sv0t12 = import_alias_count(aliases2);
+  if ((_sv0t12 != 0)) {
+    return 7;
+  } else {
+  }
+  int _sv0t13 = import_alias_lookup(aliases2, 10);
+  int _sv0t14 = (0 - 1);
+  if ((_sv0t13 != _sv0t14)) {
+    return 8;
+  } else {
+  }
+  return 0;
+}
+
+static int test_register_intrinsics(void) {
+  int _sv0t0 = sv0_vec_new();
+  int fn_ar = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int mod_v = _sv0t1;
+  int _sv0t2 = register_all_intrinsics(fn_ar, mod_v, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116);
+  int count = _sv0t2;
+  if ((count != 17)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(fn_ar);
+  if ((_sv0t3 != 34)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_len(mod_v);
+  if ((_sv0t4 != 17)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(fn_ar, 0);
+  if ((_sv0t5 != 100)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(fn_ar, 1);
+  if ((_sv0t6 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(fn_ar, 4);
+  if ((_sv0t7 != 102)) {
+    return 6;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(fn_ar, 5);
+  if ((_sv0t8 != 3)) {
+    return 7;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(mod_v, 0);
+  if ((_sv0t9 != 100)) {
+    return 8;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(mod_v, 16);
+  if ((_sv0t10 != 116)) {
+    return 9;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_join();
   int r1 = _sv0t0;
@@ -917,6 +1187,27 @@ int main(void) {
   if ((r11 != 0)) {
     int _sv0t20 = (110 + r11);
     return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_path_join_vec();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (120 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_import_alias();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (130 + r13);
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_register_intrinsics();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (140 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;
