@@ -3,8 +3,10 @@
    constants (matching encodeInsn/decodeInsnVec), per-opcode encoding
    sizes, opcode classification (simple/u32-arg/i32-arg/multi-arg),
    little-endian byte extraction helpers (division-based for u16/u32/
-   i32 without bitwise ops), .sv0b file layout constants (6-byte
-   header, 20-byte func entry, string pool overhead).
+   i32 without bitwise ops), Vec-based LE encoding (encode_u16_le,
+   encode_u32_le, encode_i32_le push bytes into Vec<i32>),
+   file header encoding (encode_header), .sv0b file layout constants
+   (6-byte header, 20-byte func entry, string pool overhead).
    Full byte-vector encode/decode deferred — needs Word8Vector. */
 
 /* ── magic and version ──────────────────────────────────────── */
@@ -263,6 +265,62 @@ fn from_le_u32(b0: i32, b1: i32, b2: i32, b3: i32) -> i32 {
     return b0 + b1 * 256 + b2 * 256 * 256 + b3 * 256 * 256 * 256;
 }
 
+/* ── Vec-based LE encoding ─────────────────────────────────── */
+
+fn encode_u16_le(val: i32, out: Vec<i32>) -> i32 {
+    vec_push(out, le_byte0(val));
+    vec_push(out, le_byte1(val));
+    return 2;
+}
+
+fn encode_u32_le(val: i32, out: Vec<i32>) -> i32 {
+    vec_push(out, le_byte0(val));
+    vec_push(out, le_byte1(val));
+    vec_push(out, le_byte2(val));
+    vec_push(out, le_byte3(val));
+    return 4;
+}
+
+fn encode_i32_le(val: i32, out: Vec<i32>) -> i32 {
+    vec_push(out, le_byte0(val));
+    vec_push(out, le_byte1(val));
+    vec_push(out, le_byte2(val));
+    vec_push(out, le_byte3(val));
+    return 4;
+}
+
+fn encode_header(version: i32, out: Vec<i32>) -> i32 {
+    vec_push(out, magic_byte_0());
+    vec_push(out, magic_byte_1());
+    vec_push(out, magic_byte_2());
+    vec_push(out, magic_byte_3());
+    encode_u16_le(version, out);
+    return 6;
+}
+
+fn decode_u16_at(buf: Vec<i32>, pos: i32) -> i32 {
+    let b0: i32 = vec_get(buf, pos);
+    let b1: i32 = vec_get(buf, pos + 1);
+    return from_le_u16(b0, b1);
+}
+
+fn decode_u32_at(buf: Vec<i32>, pos: i32) -> i32 {
+    let b0: i32 = vec_get(buf, pos);
+    let b1: i32 = vec_get(buf, pos + 1);
+    let b2: i32 = vec_get(buf, pos + 2);
+    let b3: i32 = vec_get(buf, pos + 3);
+    return from_le_u32(b0, b1, b2, b3);
+}
+
+fn verify_magic(buf: Vec<i32>) -> bool {
+    if vec_len(buf) < 6 { return false; }
+    if vec_get(buf, 0) != magic_byte_0() { return false; }
+    if vec_get(buf, 1) != magic_byte_1() { return false; }
+    if vec_get(buf, 2) != magic_byte_2() { return false; }
+    if vec_get(buf, 3) != magic_byte_3() { return false; }
+    return true;
+}
+
 /* ── .sv0b file layout constants ────────────────────────────── */
 
 fn file_header_size() -> i32 { return 6; }
@@ -377,6 +435,71 @@ fn test_file_layout() -> i32 {
     return 0;
 }
 
+fn test_encode_le() -> i32 {
+    let buf: Vec<i32> = vec_new();
+    encode_u16_le(258, buf);
+    if vec_len(buf) != 2 { return 1; }
+    if vec_get(buf, 0) != 2 { return 2; }
+    if vec_get(buf, 1) != 1 { return 3; }
+    let buf2: Vec<i32> = vec_new();
+    encode_u32_le(65537, buf2);
+    if vec_len(buf2) != 4 { return 4; }
+    if vec_get(buf2, 0) != 1 { return 5; }
+    if vec_get(buf2, 1) != 0 { return 6; }
+    if vec_get(buf2, 2) != 1 { return 7; }
+    if vec_get(buf2, 3) != 0 { return 8; }
+    let buf3: Vec<i32> = vec_new();
+    encode_i32_le(256, buf3);
+    if vec_len(buf3) != 4 { return 9; }
+    if vec_get(buf3, 0) != 0 { return 10; }
+    if vec_get(buf3, 1) != 1 { return 11; }
+    return 0;
+}
+
+fn test_encode_header() -> i32 {
+    let buf: Vec<i32> = vec_new();
+    let sz: i32 = encode_header(1, buf);
+    if sz != 6 { return 1; }
+    if vec_len(buf) != 6 { return 2; }
+    if vec_get(buf, 0) != 83 { return 3; }
+    if vec_get(buf, 1) != 86 { return 4; }
+    if vec_get(buf, 2) != 48 { return 5; }
+    if vec_get(buf, 3) != 66 { return 6; }
+    if vec_get(buf, 4) != 1 { return 7; }
+    if vec_get(buf, 5) != 0 { return 8; }
+    return 0;
+}
+
+fn test_decode_at() -> i32 {
+    let buf: Vec<i32> = vec_new();
+    encode_u32_le(65537, buf);
+    let decoded: i32 = decode_u32_at(buf, 0);
+    if decoded != 65537 { return 1; }
+    let buf2: Vec<i32> = vec_new();
+    encode_u16_le(258, buf2);
+    let d2: i32 = decode_u16_at(buf2, 0);
+    if d2 != 258 { return 2; }
+    return 0;
+}
+
+fn test_verify_magic() -> i32 {
+    let buf: Vec<i32> = vec_new();
+    encode_header(1, buf);
+    if verify_magic(buf) != true { return 1; }
+    let bad: Vec<i32> = vec_new();
+    vec_push(bad, 0);
+    vec_push(bad, 0);
+    vec_push(bad, 0);
+    vec_push(bad, 0);
+    vec_push(bad, 0);
+    vec_push(bad, 0);
+    if verify_magic(bad) != false { return 2; }
+    let tiny: Vec<i32> = vec_new();
+    vec_push(tiny, 83);
+    if verify_magic(tiny) != false { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_magic();
     if r1 != 0 { return r1; }
@@ -390,5 +513,13 @@ fn main() -> i32 {
     if r5 != 0 { return 70 + r5; }
     let r6: i32 = test_file_layout();
     if r6 != 0 { return 80 + r6; }
+    let r7: i32 = test_encode_le();
+    if r7 != 0 { return 90 + r7; }
+    let r8: i32 = test_encode_header();
+    if r8 != 0 { return 110 + r8; }
+    let r9: i32 = test_decode_at();
+    if r9 != 0 { return 120 + r9; }
+    let r10: i32 = test_verify_magic();
+    if r10 != 0 { return 130 + r10; }
     return 0;
 }

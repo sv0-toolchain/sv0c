@@ -5,7 +5,7 @@
    including IfElse/While/Block with recursive Vec<i32> + Box<Instr>
    iteration and Call with Vec<i32> + Box<Value> arguments),
    emitParamList (general over Vec<Param>), emitFnProto,
-   emitBlockBody, emitBlockDefn, splitMain, emit (top-level). */
+   is_main_block, emit_block_body, emitBlockDefn, emit (top-level). */
 
 enum Value {
     VInt(i32),
@@ -482,6 +482,14 @@ fn emit_fn_proto_ex(is_static: i32, ret_cty_h: i32, label_h: i32, params: Vec<i3
     return string_concat(c, string_concat(pstr, ")"));
 }
 
+fn is_main_block(label_h: i32) -> bool {
+    return label_h == 11;
+}
+
+fn emit_block_body(instrs: Vec<i32>, ret_name: string) -> string {
+    return emit_instrs(instrs, "  ", ret_name);
+}
+
 /* emit_program: top-level C file generation from a flat IR program.
    blocks is a Vec<i32> in 4-stride layout:
      blocks[i*4]   = label name handle
@@ -840,6 +848,21 @@ fn test_param_list_general() -> i32 {
     return 0;
 }
 
+fn test_is_main_block() -> i32 {
+    if is_main_block(11) != true { return 1; }
+    if is_main_block(12) != false { return 2; }
+    if is_main_block(0) != false { return 3; }
+    return 0;
+}
+
+fn test_emit_block_body() -> i32 {
+    let mut instrs: Vec<i32> = vec_new();
+    vec_push(instrs, box_new(Instr::ReturnVal(box_new(Value::VInt(0)))));
+    let body: string = emit_block_body(instrs, "int");
+    if !string_eq(body, "  return 0;\n") { return 1; }
+    return 0;
+}
+
 fn test_emit_program_empty() -> i32 {
     let mut blocks: Vec<i32> = vec_new();
     let s: string = emit_program("", blocks);
@@ -1126,6 +1149,12 @@ fn main() -> i32 {
     let r36: i32 = test_fn_proto_ex();
     if r36 != 0 { return 350 + r36; }
     println("PASS test_fn_proto_ex");
+    let r37a: i32 = test_is_main_block();
+    if r37a != 0 { return 354 + r37a; }
+    println("PASS test_is_main_block");
+    let r37b: i32 = test_emit_block_body();
+    if r37b != 0 { return 357 + r37b; }
+    println("PASS test_emit_block_body");
     let r37: i32 = test_emit_program_empty();
     if r37 != 0 { return 360 + r37; }
     println("PASS test_emit_program_empty");

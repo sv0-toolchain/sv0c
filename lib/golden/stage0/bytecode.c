@@ -83,6 +83,13 @@ static int le_byte2(int val);
 static int le_byte3(int val);
 static int from_le_u16(int b0, int b1);
 static int from_le_u32(int b0, int b1, int b2, int b3);
+static int encode_u16_le(int val, int out);
+static int encode_u32_le(int val, int out);
+static int encode_i32_le(int val, int out);
+static int encode_header(int version, int out);
+static int decode_u16_at(int buf, int pos);
+static int decode_u32_at(int buf, int pos);
+static int verify_magic(int buf);
 static int file_header_size(void);
 static int func_entry_size(void);
 static int string_entry_overhead(void);
@@ -96,6 +103,10 @@ static int test_insn_sizes(void);
 static int test_opcode_classify(void);
 static int test_le_bytes(void);
 static int test_file_layout(void);
+static int test_encode_le(void);
+static int test_encode_header(void);
+static int test_decode_at(void);
+static int test_verify_magic(void);
 
 static int magic_byte_0(void) {
   return 83;
@@ -766,6 +777,110 @@ static int from_le_u32(int b0, int b1, int b2, int b3) {
   return _sv0t8;
 }
 
+static int encode_u16_le(int val, int out) {
+  int _sv0t0 = le_byte0(val);
+  sv0_vec_push(out, _sv0t0);
+  int _sv0t1 = le_byte1(val);
+  sv0_vec_push(out, _sv0t1);
+  return 2;
+}
+
+static int encode_u32_le(int val, int out) {
+  int _sv0t0 = le_byte0(val);
+  sv0_vec_push(out, _sv0t0);
+  int _sv0t1 = le_byte1(val);
+  sv0_vec_push(out, _sv0t1);
+  int _sv0t2 = le_byte2(val);
+  sv0_vec_push(out, _sv0t2);
+  int _sv0t3 = le_byte3(val);
+  sv0_vec_push(out, _sv0t3);
+  return 4;
+}
+
+static int encode_i32_le(int val, int out) {
+  int _sv0t0 = le_byte0(val);
+  sv0_vec_push(out, _sv0t0);
+  int _sv0t1 = le_byte1(val);
+  sv0_vec_push(out, _sv0t1);
+  int _sv0t2 = le_byte2(val);
+  sv0_vec_push(out, _sv0t2);
+  int _sv0t3 = le_byte3(val);
+  sv0_vec_push(out, _sv0t3);
+  return 4;
+}
+
+static int encode_header(int version, int out) {
+  int _sv0t0 = magic_byte_0();
+  sv0_vec_push(out, _sv0t0);
+  int _sv0t1 = magic_byte_1();
+  sv0_vec_push(out, _sv0t1);
+  int _sv0t2 = magic_byte_2();
+  sv0_vec_push(out, _sv0t2);
+  int _sv0t3 = magic_byte_3();
+  sv0_vec_push(out, _sv0t3);
+  int _sv0t4 = encode_u16_le(version, out);
+  return 6;
+}
+
+static int decode_u16_at(int buf, int pos) {
+  int _sv0t0 = sv0_vec_get(buf, pos);
+  int b0 = _sv0t0;
+  int _sv0t1 = (pos + 1);
+  int _sv0t2 = sv0_vec_get(buf, _sv0t1);
+  int b1 = _sv0t2;
+  int _sv0t3 = from_le_u16(b0, b1);
+  return _sv0t3;
+}
+
+static int decode_u32_at(int buf, int pos) {
+  int _sv0t0 = sv0_vec_get(buf, pos);
+  int b0 = _sv0t0;
+  int _sv0t1 = (pos + 1);
+  int _sv0t2 = sv0_vec_get(buf, _sv0t1);
+  int b1 = _sv0t2;
+  int _sv0t3 = (pos + 2);
+  int _sv0t4 = sv0_vec_get(buf, _sv0t3);
+  int b2 = _sv0t4;
+  int _sv0t5 = (pos + 3);
+  int _sv0t6 = sv0_vec_get(buf, _sv0t5);
+  int b3 = _sv0t6;
+  int _sv0t7 = from_le_u32(b0, b1, b2, b3);
+  return _sv0t7;
+}
+
+static int verify_magic(int buf) {
+  int _sv0t0 = sv0_vec_len(buf);
+  if ((_sv0t0 < 6)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(buf, 0);
+  int _sv0t2 = magic_byte_0();
+  if ((_sv0t1 != _sv0t2)) {
+    return 0;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(buf, 1);
+  int _sv0t4 = magic_byte_1();
+  if ((_sv0t3 != _sv0t4)) {
+    return 0;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(buf, 2);
+  int _sv0t6 = magic_byte_2();
+  if ((_sv0t5 != _sv0t6)) {
+    return 0;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(buf, 3);
+  int _sv0t8 = magic_byte_3();
+  if ((_sv0t7 != _sv0t8)) {
+    return 0;
+  } else {
+  }
+  return 1;
+}
+
 static int file_header_size(void) {
   return 6;
 }
@@ -1180,6 +1295,176 @@ static int test_file_layout(void) {
   return 0;
 }
 
+static int test_encode_le(void) {
+  int _sv0t0 = sv0_vec_new();
+  int buf = _sv0t0;
+  int _sv0t1 = encode_u16_le(258, buf);
+  int _sv0t2 = sv0_vec_len(buf);
+  if ((_sv0t2 != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(buf, 0);
+  if ((_sv0t3 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(buf, 1);
+  if ((_sv0t4 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int buf2 = _sv0t5;
+  int _sv0t6 = encode_u32_le(65537, buf2);
+  int _sv0t7 = sv0_vec_len(buf2);
+  if ((_sv0t7 != 4)) {
+    return 4;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(buf2, 0);
+  if ((_sv0t8 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(buf2, 1);
+  if ((_sv0t9 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(buf2, 2);
+  if ((_sv0t10 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(buf2, 3);
+  if ((_sv0t11 != 0)) {
+    return 8;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int buf3 = _sv0t12;
+  int _sv0t13 = encode_i32_le(256, buf3);
+  int _sv0t14 = sv0_vec_len(buf3);
+  if ((_sv0t14 != 4)) {
+    return 9;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_get(buf3, 0);
+  if ((_sv0t15 != 0)) {
+    return 10;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_get(buf3, 1);
+  if ((_sv0t16 != 1)) {
+    return 11;
+  } else {
+  }
+  return 0;
+}
+
+static int test_encode_header(void) {
+  int _sv0t0 = sv0_vec_new();
+  int buf = _sv0t0;
+  int _sv0t1 = encode_header(1, buf);
+  int sz = _sv0t1;
+  if ((sz != 6)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_len(buf);
+  if ((_sv0t2 != 6)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(buf, 0);
+  if ((_sv0t3 != 83)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(buf, 1);
+  if ((_sv0t4 != 86)) {
+    return 4;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(buf, 2);
+  if ((_sv0t5 != 48)) {
+    return 5;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(buf, 3);
+  if ((_sv0t6 != 66)) {
+    return 6;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(buf, 4);
+  if ((_sv0t7 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(buf, 5);
+  if ((_sv0t8 != 0)) {
+    return 8;
+  } else {
+  }
+  return 0;
+}
+
+static int test_decode_at(void) {
+  int _sv0t0 = sv0_vec_new();
+  int buf = _sv0t0;
+  int _sv0t1 = encode_u32_le(65537, buf);
+  int _sv0t2 = decode_u32_at(buf, 0);
+  int decoded = _sv0t2;
+  if ((decoded != 65537)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_new();
+  int buf2 = _sv0t3;
+  int _sv0t4 = encode_u16_le(258, buf2);
+  int _sv0t5 = decode_u16_at(buf2, 0);
+  int d2 = _sv0t5;
+  if ((d2 != 258)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_verify_magic(void) {
+  int _sv0t0 = sv0_vec_new();
+  int buf = _sv0t0;
+  int _sv0t1 = encode_header(1, buf);
+  int _sv0t2 = verify_magic(buf);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_new();
+  int bad = _sv0t3;
+  sv0_vec_push(bad, 0);
+  sv0_vec_push(bad, 0);
+  sv0_vec_push(bad, 0);
+  sv0_vec_push(bad, 0);
+  sv0_vec_push(bad, 0);
+  sv0_vec_push(bad, 0);
+  int _sv0t4 = verify_magic(bad);
+  if ((_sv0t4 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int tiny = _sv0t5;
+  sv0_vec_push(tiny, 83);
+  int _sv0t6 = verify_magic(tiny);
+  if ((_sv0t6 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_magic();
   int r1 = _sv0t0;
@@ -1220,6 +1505,34 @@ int main(void) {
   if ((r6 != 0)) {
     int _sv0t10 = (80 + r6);
     return _sv0t10;
+  } else {
+  }
+  int _sv0t11 = test_encode_le();
+  int r7 = _sv0t11;
+  if ((r7 != 0)) {
+    int _sv0t12 = (90 + r7);
+    return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_encode_header();
+  int r8 = _sv0t13;
+  if ((r8 != 0)) {
+    int _sv0t14 = (110 + r8);
+    return _sv0t14;
+  } else {
+  }
+  int _sv0t15 = test_decode_at();
+  int r9 = _sv0t15;
+  if ((r9 != 0)) {
+    int _sv0t16 = (120 + r9);
+    return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = test_verify_magic();
+  int r10 = _sv0t17;
+  if ((r10 != 0)) {
+    int _sv0t18 = (130 + r10);
+    return _sv0t18;
   } else {
   }
   return 0;

@@ -6,6 +6,8 @@ static int find_last_slash(const char* path);
 static int find_last_dot(const char* s, int start);
 static const char* file_stem(const char* path);
 static const char* mangle(const char* mod_id, const char* x);
+static const char* fn_name_for_link(const char* mod_id, const char* name);
+static const char* link_dir_from_entry(const char* entry_path);
 static int is_top_defining(int tag);
 static int collect_tops_count(int item_tags);
 static int is_link_directive(int tag);
@@ -28,6 +30,8 @@ static int test_is_sv0(void);
 static int test_is_hidden(void);
 static int test_file_stem(void);
 static int test_mangle(void);
+static int test_fn_name_for_link(void);
+static int test_link_dir_from_entry(void);
 static int test_is_top_defining(void);
 static int test_collect_tops_count(void);
 static int test_is_link_directive(void);
@@ -78,6 +82,10 @@ static int find_last_slash(const char* path) {
       return i;
     } else {
     }
+    if ((c == 92)) {
+      return i;
+    } else {
+    }
     i = (i - 1);
   }
   int _sv0t2 = (0 - 1);
@@ -125,6 +133,31 @@ static const char* mangle(const char* mod_id, const char* x) {
   const char* a;
   a = _sv0t0;
   const char* _sv0t1 = sv0_string_concat(a, x);
+  return _sv0t1;
+}
+
+static const char* fn_name_for_link(const char* mod_id, const char* name) {
+  int _sv0t0 = sv0_string_eq(name, "main");
+  if (_sv0t0) {
+    return "main";
+  } else {
+  }
+  const char* _sv0t1 = mangle(mod_id, name);
+  return _sv0t1;
+}
+
+static const char* link_dir_from_entry(const char* entry_path) {
+  int _sv0t0 = find_last_slash(entry_path);
+  int slash = _sv0t0;
+  if ((slash < 0)) {
+    return ".";
+  } else {
+  }
+  if ((slash == 0)) {
+    return "/";
+  } else {
+  }
+  const char* _sv0t1 = sv0_string_substr(entry_path, 0, slash);
   return _sv0t1;
 }
 
@@ -487,6 +520,56 @@ static int test_mangle(void) {
   int _sv0t3 = sv0_string_eq(_sv0t2, "a__b");
   if ((_sv0t3 != 1)) {
     return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_fn_name_for_link(void) {
+  const char* _sv0t0 = fn_name_for_link("mymod", "main");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "main");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = fn_name_for_link("mymod", "foo");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "mymod__foo");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = fn_name_for_link("utils", "helper");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "utils__helper");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_dir_from_entry(void) {
+  const char* _sv0t0 = link_dir_from_entry("src/foo.sv0");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "src");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = link_dir_from_entry("foo.sv0");
+  int _sv0t3 = sv0_string_eq(_sv0t2, ".");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = link_dir_from_entry("/a/b/c.sv0");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "/a/b");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = link_dir_from_entry("/foo.sv0");
+  int _sv0t7 = sv0_string_eq(_sv0t6, "/");
+  if ((_sv0t7 != 1)) {
+    return 4;
   } else {
   }
   return 0;
@@ -915,6 +998,20 @@ int main(void) {
   if ((r14 != 0)) {
     int _sv0t26 = (140 + r14);
     return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_fn_name_for_link();
+  int r15 = _sv0t27;
+  if ((r15 != 0)) {
+    int _sv0t28 = (150 + r15);
+    return _sv0t28;
+  } else {
+  }
+  int _sv0t29 = test_link_dir_from_entry();
+  int r16 = _sv0t29;
+  if ((r16 != 0)) {
+    int _sv0t30 = (160 + r16);
+    return _sv0t30;
   } else {
   }
   return 0;
