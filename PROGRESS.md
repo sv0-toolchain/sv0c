@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Seed consolidation batch 3: removed 25 superseded seeds (no absorption needed).** Removed 16 lower_*_core (old_instrs, store_value_to_slot, enum_tag, stmt_dispatch, fn_prefix, expr_try, variant_slots, fn_ret_cty, bind_scrut, match_one_arm, req_instrs, resolve_enum_ctor_path, stmt_let_init, entry, expr_call, enum_store_payload), 3 resolver_*_core (pat_binds, enum_variant_reg, bind_locals), 4 vm_codegen_*_core (enc_len, value_width, binop, while_loop), lexer_skip_comment_core, env_core. All pure arithmetic surrogates or superseded by real module implementations. Seeds remaining: 96 `*_core.sv0`. Metrics: bootstrap 208, self-host 208, stage0 132, vm-parity 158)
+**Last updated:** 2026-04-13 (America/Denver; **Seed consolidation batch 4: removed 50 more seeds.** Removed surrogates and superseded seeds across all module families: 10 lower_*_core, 10 checker_*_core, 8 parser_*_core, 6 vm_codegen_*_core, 5 lexer_scan_*_core, 4 bytecode_*_core, 3 codegen_*_core, 2 resolver_*_core, include_expand_core, main_argv_core. All were pure i32/tag surrogates or already implemented in real modules. Seeds remaining: 46 `*_core.sv0`. Metrics: bootstrap 158, self-host 158, stage0 82, vm-parity 122)
 
 ## Checklist (local source of truth)
 
