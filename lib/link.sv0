@@ -1,0 +1,279 @@
+/* Phase 2 real pipeline module: sml/link/link.sml -> sv0.
+   Link-time utilities: file classification (isSv0, isHidden),
+   name extraction (fileStem), name mangling (mangle), top-level
+   name collection (collectTops by item tag), link directive
+   stripping (stripLinkDirectives), split-module detection.
+   AST map functions (mapTy/mapPat/mapExpr/mapItem) and I/O
+   (walkSv0, parseFile, linkProjectDir) deferred — need full AST
+   enum traversal with Box support and host filesystem. */
+
+/* ── file classification ────────────────────────────────────── */
+
+fn is_sv0(name: string) -> bool {
+    let len: i32 = string_len(name);
+    if len < 4 { return false; }
+    let suffix: string = string_substr(name, len - 4, 4);
+    return string_eq(suffix, ".sv0");
+}
+
+fn is_hidden(name: string) -> bool {
+    let len: i32 = string_len(name);
+    if len == 0 { return false; }
+    let first: i32 = string_char_at(name, 0);
+    return first == 46;
+}
+
+/* ── name extraction ────────────────────────────────────────── */
+
+fn find_last_slash(path: string) -> i32 {
+    let len: i32 = string_len(path);
+    let mut i: i32 = len - 1;
+    while i >= 0 {
+        let c: i32 = string_char_at(path, i);
+        if c == 47 { return i; }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+fn find_last_dot(s: string, start: i32) -> i32 {
+    let len: i32 = string_len(s);
+    let mut i: i32 = len - 1;
+    while i >= start {
+        let c: i32 = string_char_at(s, i);
+        if c == 46 { return i; }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+fn file_stem(path: string) -> string {
+    let len: i32 = string_len(path);
+    let slash: i32 = find_last_slash(path);
+    let base_start: i32 = slash + 1;
+    let dot: i32 = find_last_dot(path, base_start);
+    if dot <= base_start {
+        return string_substr(path, base_start, len - base_start);
+    }
+    return string_substr(path, base_start, dot - base_start);
+}
+
+/* ── name mangling ──────────────────────────────────────────── */
+
+fn mangle(mod_id: string, x: string) -> string {
+    let a: string = string_concat(mod_id, "__");
+    return string_concat(a, x);
+}
+
+/* ── top-level name collection ──────────────────────────────── */
+
+/* Item tags from ast.sv0: 0=ItemFn, 1=ItemStruct, 2=ItemEnum,
+   3=ItemTrait, 4=ItemImpl, 5=ItemUse, 6=ItemModule, 7=ItemTypeAlias.
+   collectTops collects names from ItemFn, ItemStruct, ItemEnum,
+   ItemTrait, ItemTypeAlias — tags 0,1,2,3,7. */
+fn is_top_defining(tag: i32) -> bool {
+    if tag == 0 { return true; }
+    if tag == 1 { return true; }
+    if tag == 2 { return true; }
+    if tag == 3 { return true; }
+    if tag == 7 { return true; }
+    return false;
+}
+
+fn collect_tops_count(item_tags: Vec<i32>) -> i32 {
+    let len: i32 = vec_len(item_tags);
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < len {
+        let tag: i32 = vec_get(item_tags, i);
+        if is_top_defining(tag) { count = count + 1; }
+        i = i + 1;
+    }
+    return count;
+}
+
+/* ── link directive stripping ───────────────────────────────── */
+
+/* stripLinkDirectives removes ItemUse (5) and ItemModule (6). */
+fn is_link_directive(tag: i32) -> bool {
+    if tag == 5 { return true; }
+    if tag == 6 { return true; }
+    return false;
+}
+
+fn strip_directives_count(item_tags: Vec<i32>) -> i32 {
+    let len: i32 = vec_len(item_tags);
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < len {
+        let tag: i32 = vec_get(item_tags, i);
+        if is_link_directive(tag) != true { count = count + 1; }
+        i = i + 1;
+    }
+    return count;
+}
+
+/* ── split module ───────────────────────────────────────────── */
+
+/* splitModule: if first item is ItemModule (tag 6), the module
+   name handle is in the payload and the remaining items form the
+   body. Returns 1 if module found, 0 otherwise. */
+fn has_module_prefix(first_tag: i32) -> bool {
+    return first_tag == 6;
+}
+
+/* ── in-tops membership (Vec-based) ─────────────────────────── */
+
+fn in_tops(tops: Vec<i32>, name: i32) -> bool {
+    let len: i32 = vec_len(tops);
+    let mut i: i32 = 0;
+    while i < len {
+        let t: i32 = vec_get(tops, i);
+        if t == name { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* map_path_seg: if name handle is in tops, mangle it with mod_id
+   string. Returns the original or mangled name handle. Since we
+   can only return i32 and mangled names need string operations, this
+   surrogate returns 1 (rewritten) or 0 (unchanged) as a flag. */
+fn path_seg_needs_mangle(tops: Vec<i32>, name: i32) -> bool {
+    return in_tops(tops, name);
+}
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_is_sv0() -> i32 {
+    if is_sv0("hello.sv0") != true { return 1; }
+    if is_sv0("parser.sv0") != true { return 2; }
+    if is_sv0(".sv0") != true { return 3; }
+    if is_sv0("hello.txt") != false { return 4; }
+    if is_sv0("sv0") != false { return 5; }
+    if is_sv0("") != false { return 6; }
+    return 0;
+}
+
+fn test_is_hidden() -> i32 {
+    if is_hidden(".git") != true { return 1; }
+    if is_hidden(".") != true { return 2; }
+    if is_hidden("..") != true { return 3; }
+    if is_hidden(".hidden") != true { return 4; }
+    if is_hidden("visible") != false { return 5; }
+    if is_hidden("src") != false { return 6; }
+    return 0;
+}
+
+fn test_file_stem() -> i32 {
+    if string_eq(file_stem("test.sv0"), "test") != true { return 1; }
+    if string_eq(file_stem("src/foo.sv0"), "foo") != true { return 2; }
+    if string_eq(file_stem("bar"), "bar") != true { return 3; }
+    if string_eq(file_stem("/a/b/c.txt"), "c") != true { return 4; }
+    if string_eq(file_stem("noext"), "noext") != true { return 5; }
+    return 0;
+}
+
+fn test_mangle() -> i32 {
+    if string_eq(mangle("mymod", "foo"), "mymod__foo") != true { return 1; }
+    if string_eq(mangle("a", "b"), "a__b") != true { return 2; }
+    return 0;
+}
+
+fn test_is_top_defining() -> i32 {
+    if is_top_defining(0) != true { return 1; }
+    if is_top_defining(1) != true { return 2; }
+    if is_top_defining(2) != true { return 3; }
+    if is_top_defining(3) != true { return 4; }
+    if is_top_defining(7) != true { return 5; }
+    if is_top_defining(4) != false { return 6; }
+    if is_top_defining(5) != false { return 7; }
+    if is_top_defining(6) != false { return 8; }
+    return 0;
+}
+
+fn test_collect_tops_count() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 0);
+    vec_push(tags, 5);
+    vec_push(tags, 1);
+    vec_push(tags, 6);
+    vec_push(tags, 7);
+    if collect_tops_count(tags) != 3 { return 1; }
+    let empty: Vec<i32> = vec_new();
+    if collect_tops_count(empty) != 0 { return 2; }
+    return 0;
+}
+
+fn test_is_link_directive() -> i32 {
+    if is_link_directive(5) != true { return 1; }
+    if is_link_directive(6) != true { return 2; }
+    if is_link_directive(0) != false { return 3; }
+    if is_link_directive(7) != false { return 4; }
+    return 0;
+}
+
+fn test_strip_directives_count() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 0);
+    vec_push(tags, 5);
+    vec_push(tags, 1);
+    vec_push(tags, 6);
+    vec_push(tags, 2);
+    if strip_directives_count(tags) != 3 { return 1; }
+    return 0;
+}
+
+fn test_has_module_prefix() -> i32 {
+    if has_module_prefix(6) != true { return 1; }
+    if has_module_prefix(0) != false { return 2; }
+    if has_module_prefix(5) != false { return 3; }
+    return 0;
+}
+
+fn test_in_tops() -> i32 {
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 10);
+    vec_push(tops, 20);
+    vec_push(tops, 30);
+    if in_tops(tops, 20) != true { return 1; }
+    if in_tops(tops, 99) != false { return 2; }
+    let empty: Vec<i32> = vec_new();
+    if in_tops(empty, 1) != false { return 3; }
+    return 0;
+}
+
+fn test_path_seg_needs_mangle() -> i32 {
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 100);
+    vec_push(tops, 200);
+    if path_seg_needs_mangle(tops, 100) != true { return 1; }
+    if path_seg_needs_mangle(tops, 999) != false { return 2; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_is_sv0();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_is_hidden();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_file_stem();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_mangle();
+    if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_is_top_defining();
+    if r5 != 0 { return 40 + r5; }
+    let r6: i32 = test_collect_tops_count();
+    if r6 != 0 { return 50 + r6; }
+    let r7: i32 = test_is_link_directive();
+    if r7 != 0 { return 60 + r7; }
+    let r8: i32 = test_strip_directives_count();
+    if r8 != 0 { return 70 + r8; }
+    let r9: i32 = test_has_module_prefix();
+    if r9 != 0 { return 80 + r9; }
+    let r10: i32 = test_in_tops();
+    if r10 != 0 { return 90 + r10; }
+    let r11: i32 = test_path_seg_needs_mangle();
+    if r11 != 0 { return 100 + r11; }
+    return 0;
+}
