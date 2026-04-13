@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Seed consolidation complete: all seeds removed.** Batch 5 removed the final 46 `*_core.sv0` seeds (12 lower, 5 vm_codegen, 4 checker, 4 codegen, 3 bytecode, 3 lexer, 3 lookup, 2 parser, 2 resolver, plus diagnostic_core, driver_pipeline_core, env_scope_core, main_pipeline_core, pipeline_compose_core, type_alias_core, types_core, unify_core). Seeds remaining: **0**. All were pure surrogates or superseded by real module implementations. Metrics: bootstrap 112, self-host 112, stage0 36, vm-parity 99)
+**Last updated:** 2026-04-13 (America/Denver; **All seeds removed — including subdirectory seeds.** Batch 6 removed the final 15 seeds from `parser/` (12) and `lexer/` (3) subdirectories. All were surrogates or superseded by `lib/parser.sv0` and `lib/lexer.sv0` + `lexer/token.sv0`. Seeds remaining: **0** (all directories). Bootstrap 97 (20 real modules + 77 tests). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity 84)
 
 ## Checklist (local source of truth)
 
