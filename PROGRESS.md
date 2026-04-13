@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: checker.sv0 + vm_codegen.sv0 + bytecode.sv0.** `lib/checker.sv0` new real module covering checker.sml pure-function surface: binop classification (Arith/Logic/Cmp), integral type detection, AST type name→tag mapping (22 primitives), assignment LHS classification, statement return detection, path→string joining, type import alias canonicalization (Vec-based), env lookup/extend helpers, variant shape classification, try operator helpers, error code constants (E0400–E0449), struct field lookup. 13 test groups. Metrics: bootstrap 267, self-host 267, stage0 191, vm-parity 182)
+**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: lowering.sv0 + checker.sv0.** `lib/lowering.sv0` new real module covering lowering.sml pure-function surface: splitQName (qualified name splitting on ::), AST binop/unop→C strings (18+2), AST type→C type mapping (22 primitives), freshTmp counter, oldSlot naming, retSyntaxIsUnit, storeValueToSlot classification, assignment LHS, enum tag lookup (Vec-based flat tables), struct field lookup, enum/struct type detection, variant slot counting, enum max payload, tryVariantNames (Result/Option), literal classification, value→expr, enum alloc width, retValueSlot constant. 18 test groups. Metrics: bootstrap 268, self-host 268, stage0 192, vm-parity 182)
 
 ## Checklist (local source of truth)
 

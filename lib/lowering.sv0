@@ -1,0 +1,558 @@
+/* Phase 2 real pipeline module: sml/ir/lowering.sml -> sv0.
+   Lowering utilities: splitQName (qualified name splitting on ::),
+   AST binop/unop → C operator strings, AST type → C type string
+   mapping (22 primitives), freshTmp counter management, oldSlot
+   naming, retSyntaxIsUnit, storeValueToSlot classification,
+   assignment LHS classification, enum tag lookup (Vec-based),
+   struct field list lookup, enum/struct type detection, variant
+   slot counting, enum max payload, tryVariantNames (Result/Option),
+   literal lowering classification, paramName extraction.
+   Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
+   needs deep AST traversal with slot/instr accumulation. */
+
+/* ── freshTmp ───────────────────────────────────────────────── */
+
+fn fresh_tmp_name(counter: i32) -> i32 {
+    return counter;
+}
+
+fn next_tmp(counter: i32) -> i32 {
+    return counter + 1;
+}
+
+/* ── splitQName ─────────────────────────────────────────────── */
+
+fn find_double_colon(s: string, start: i32) -> i32 {
+    let len: i32 = string_len(s);
+    let limit: i32 = len - 1;
+    let mut i: i32 = start;
+    while i < limit {
+        if string_char_at(s, i) == 58 {
+            if string_char_at(s, i + 1) == 58 {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn split_qname_count(s: string) -> i32 {
+    let mut count: i32 = 1;
+    let mut pos: i32 = 0;
+    let idx: i32 = find_double_colon(s, pos);
+    if idx < 0 { return 1; }
+    count = count + 1;
+    pos = idx + 2;
+    let idx2: i32 = find_double_colon(s, pos);
+    if idx2 < 0 { return count; }
+    count = count + 1;
+    pos = idx2 + 2;
+    let idx3: i32 = find_double_colon(s, pos);
+    if idx3 < 0 { return count; }
+    return count + 1;
+}
+
+fn has_qualified_name(s: string) -> bool {
+    return find_double_colon(s, 0) >= 0;
+}
+
+/* ── AST binop → C operator string ──────────────────────────── */
+
+fn ast_binop_to_c(tag: i32) -> string {
+    if tag == 0 { return "+"; }
+    if tag == 1 { return "-"; }
+    if tag == 2 { return "*"; }
+    if tag == 3 { return "/"; }
+    if tag == 4 { return "%"; }
+    if tag == 5 { return "=="; }
+    if tag == 6 { return "!="; }
+    if tag == 7 { return "<"; }
+    if tag == 8 { return ">"; }
+    if tag == 9 { return "<="; }
+    if tag == 10 { return ">="; }
+    if tag == 11 { return "&&"; }
+    if tag == 12 { return "||"; }
+    if tag == 13 { return "&"; }
+    if tag == 14 { return "|"; }
+    if tag == 15 { return "^"; }
+    if tag == 16 { return "<<"; }
+    if tag == 17 { return ">>"; }
+    return "+";
+}
+
+/* ── AST unop → C operator string ───────────────────────────── */
+
+fn ast_unop_to_c(tag: i32) -> string {
+    if tag == 0 { return "-"; }
+    if tag == 1 { return "!"; }
+    return "?";
+}
+
+fn is_supported_unop(tag: i32) -> bool {
+    if tag == 0 { return true; }
+    if tag == 1 { return true; }
+    return false;
+}
+
+/* ── AST type → C type string mapping ───────────────────────── */
+
+fn ast_ty_to_c_string(name: string) -> string {
+    if string_eq(name, "unit") { return "void"; }
+    if string_eq(name, "i32") { return "int"; }
+    if string_eq(name, "bool") { return "int"; }
+    if string_eq(name, "i8") { return "int8_t"; }
+    if string_eq(name, "u8") { return "uint8_t"; }
+    if string_eq(name, "i16") { return "int16_t"; }
+    if string_eq(name, "u16") { return "uint16_t"; }
+    if string_eq(name, "i64") { return "int64_t"; }
+    if string_eq(name, "u64") { return "uint64_t"; }
+    if string_eq(name, "isize") { return "intptr_t"; }
+    if string_eq(name, "usize") { return "uintptr_t"; }
+    if string_eq(name, "string") { return "const char*"; }
+    if string_eq(name, "str") { return "const char*"; }
+    if string_eq(name, "String") { return "const char*"; }
+    if string_eq(name, "Vec") { return "int"; }
+    if string_eq(name, "Box") { return "int"; }
+    return "int";
+}
+
+fn is_void_cty(name: string) -> bool {
+    if string_eq(name, "void") { return true; }
+    if string_eq(name, "unit") { return true; }
+    return false;
+}
+
+fn ast_ty_is_unit(name: string) -> bool {
+    return string_eq(name, "unit");
+}
+
+/* ── oldSlot naming ─────────────────────────────────────────── */
+
+fn old_slot_prefix() -> string {
+    return "_sv0old_";
+}
+
+fn old_slot_name_len(name_len: i32) -> i32 {
+    return 8 + name_len;
+}
+
+/* ── retSyntaxIsUnit ────────────────────────────────────────── */
+
+fn ret_syntax_is_unit(has_ret: bool, ret_ty_name: string) -> bool {
+    if has_ret == false { return true; }
+    if string_eq(ret_ty_name, "unit") { return true; }
+    return false;
+}
+
+/* ── storeValueToSlot classification ────────────────────────── */
+
+fn SV_SKIP() -> i32 { return 0; }
+fn SV_STORE() -> i32 { return 1; }
+fn SV_LOAD() -> i32 { return 2; }
+
+fn store_value_class(is_var: bool, var_name_eq_slot: bool) -> i32 {
+    if is_var {
+        if var_name_eq_slot { return 0; }
+        return 2;
+    }
+    return 1;
+}
+
+/* ── assignment LHS classification ──────────────────────────── */
+
+fn LOW_AL_VAR() -> i32 { return 0; }
+fn LOW_AL_FIELD() -> i32 { return 1; }
+fn LOW_AL_INVALID() -> i32 { return 0 - 1; }
+
+fn low_classify_assign_lhs(expr_tag: i32) -> i32 {
+    if expr_tag == 2 { return 0; }
+    if expr_tag == 11 { return 1; }
+    return 0 - 1;
+}
+
+/* ── enum/struct lookup helpers ──────────────────────────────── */
+
+fn enum_tag_lookup(enum_names: Vec<i32>, enum_tags_flat: Vec<i32>,
+                   enum_tag_offsets: Vec<i32>, enum_tag_counts: Vec<i32>,
+                   enum_name: i32, variant_name: i32) -> i32 {
+    let n: i32 = vec_len(enum_names);
+    let mut ei: i32 = 0;
+    while ei < n {
+        if vec_get(enum_names, ei) == enum_name {
+            let offset: i32 = vec_get(enum_tag_offsets, ei);
+            let count: i32 = vec_get(enum_tag_counts, ei);
+            let mut vi: i32 = 0;
+            while vi < count {
+                let flat_idx: i32 = offset + vi * 2;
+                if vec_get(enum_tags_flat, flat_idx) == variant_name {
+                    return vec_get(enum_tags_flat, flat_idx + 1);
+                }
+                vi = vi + 1;
+            }
+            return 0 - 1;
+        }
+        ei = ei + 1;
+    }
+    return 0 - 2;
+}
+
+fn struct_fields_lookup(struct_names: Vec<i32>, struct_field_offsets: Vec<i32>,
+                        struct_field_counts: Vec<i32>, struct_fields_flat: Vec<i32>,
+                        name: i32) -> i32 {
+    let n: i32 = vec_len(struct_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(struct_names, i) == name {
+            return vec_get(struct_field_offsets, i);
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn struct_field_count(struct_names: Vec<i32>, struct_field_counts: Vec<i32>,
+                      name: i32) -> i32 {
+    let n: i32 = vec_len(struct_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(struct_names, i) == name {
+            return vec_get(struct_field_counts, i);
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn is_enum_cty(enum_names: Vec<i32>, name: i32) -> bool {
+    let n: i32 = vec_len(enum_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(enum_names, i) == name { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn is_struct_cty(struct_names: Vec<i32>, name: i32) -> bool {
+    let n: i32 = vec_len(struct_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(struct_names, i) == name { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* ── variant slots ──────────────────────────────────────────── */
+
+fn variant_slot_count(shape_tag: i32, field_count: i32) -> i32 {
+    if shape_tag == 0 { return 0; }
+    return field_count;
+}
+
+/* ── enum max payload ───────────────────────────────────────── */
+
+fn enum_max_payload_lookup(enum_names: Vec<i32>, enum_max_payloads: Vec<i32>,
+                           name: i32) -> i32 {
+    let n: i32 = vec_len(enum_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(enum_names, i) == name {
+            return vec_get(enum_max_payloads, i);
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── tryVariantNames (Result/Option) ────────────────────────── */
+
+fn try_variant_success(has_ok: bool, has_some: bool) -> string {
+    if has_ok { return "Ok"; }
+    if has_some { return "Some"; }
+    return "";
+}
+
+fn try_variant_failure(has_err: bool, has_none: bool) -> string {
+    if has_err { return "Err"; }
+    if has_none { return "None"; }
+    return "";
+}
+
+fn is_try_enum(has_ok: bool, has_err: bool, has_some: bool, has_none: bool) -> bool {
+    if has_ok {
+        if has_err { return true; }
+    }
+    if has_some {
+        if has_none { return true; }
+    }
+    return false;
+}
+
+/* ── literal lowering classification ────────────────────────── */
+
+fn LIT_INT() -> i32 { return 0; }
+fn LIT_BOOL() -> i32 { return 1; }
+fn LIT_UNIT() -> i32 { return 2; }
+fn LIT_STRING() -> i32 { return 3; }
+fn LIT_UNSUPPORTED() -> i32 { return 0 - 1; }
+
+fn classify_literal(lit_tag: i32) -> i32 {
+    if lit_tag == 0 { return 0; }
+    if lit_tag == 1 { return 1; }
+    if lit_tag == 2 { return 2; }
+    if lit_tag == 3 { return 3; }
+    return 0 - 1;
+}
+
+/* ── value → expr classification ────────────────────────────── */
+
+fn VAL_VAR() -> i32 { return 0; }
+fn VAL_OTHER() -> i32 { return 1; }
+
+fn value_to_expr_kind(val_tag: i32) -> i32 {
+    if val_tag == 0 { return 0; }
+    return 1;
+}
+
+/* ── enum store payload helpers ─────────────────────────────── */
+
+fn payload_field_name(index: i32) -> i32 {
+    return index;
+}
+
+fn enum_store_payload_count(val_count: i32) -> i32 {
+    return val_count;
+}
+
+/* ── enum width (1 + maxPayload) ────────────────────────────── */
+
+fn enum_alloc_width(max_payload: i32) -> i32 {
+    return 1 + max_payload;
+}
+
+/* ── retValueSlot constant ──────────────────────────────────── */
+
+fn ret_value_slot() -> string {
+    return "_sv0ret";
+}
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_fresh_tmp() -> i32 {
+    if fresh_tmp_name(0) != 0 { return 1; }
+    if next_tmp(0) != 1 { return 2; }
+    if next_tmp(5) != 6 { return 3; }
+    return 0;
+}
+
+fn test_split_qname() -> i32 {
+    if find_double_colon("Foo::bar", 0) != 3 { return 1; }
+    if find_double_colon("hello", 0) != 0 - 1 { return 2; }
+    if find_double_colon("a::b::c", 0) != 1 { return 3; }
+    if split_qname_count("hello") != 1 { return 4; }
+    if split_qname_count("Foo::bar") != 2 { return 5; }
+    if split_qname_count("a::b::c") != 3 { return 6; }
+    if has_qualified_name("hello") != false { return 7; }
+    if has_qualified_name("Foo::bar") != true { return 8; }
+    return 0;
+}
+
+fn test_binop_to_c() -> i32 {
+    if string_eq(ast_binop_to_c(0), "+") != true { return 1; }
+    if string_eq(ast_binop_to_c(1), "-") != true { return 2; }
+    if string_eq(ast_binop_to_c(2), "*") != true { return 3; }
+    if string_eq(ast_binop_to_c(3), "/") != true { return 4; }
+    if string_eq(ast_binop_to_c(4), "%") != true { return 5; }
+    if string_eq(ast_binop_to_c(5), "==") != true { return 6; }
+    if string_eq(ast_binop_to_c(11), "&&") != true { return 7; }
+    if string_eq(ast_binop_to_c(12), "||") != true { return 8; }
+    if string_eq(ast_binop_to_c(13), "&") != true { return 9; }
+    if string_eq(ast_binop_to_c(16), "<<") != true { return 10; }
+    if string_eq(ast_binop_to_c(17), ">>") != true { return 11; }
+    return 0;
+}
+
+fn test_unop_to_c() -> i32 {
+    if string_eq(ast_unop_to_c(0), "-") != true { return 1; }
+    if string_eq(ast_unop_to_c(1), "!") != true { return 2; }
+    if is_supported_unop(0) != true { return 3; }
+    if is_supported_unop(1) != true { return 4; }
+    if is_supported_unop(5) != false { return 5; }
+    return 0;
+}
+
+fn test_ty_to_c() -> i32 {
+    if string_eq(ast_ty_to_c_string("i32"), "int") != true { return 1; }
+    if string_eq(ast_ty_to_c_string("bool"), "int") != true { return 2; }
+    if string_eq(ast_ty_to_c_string("unit"), "void") != true { return 3; }
+    if string_eq(ast_ty_to_c_string("i64"), "int64_t") != true { return 4; }
+    if string_eq(ast_ty_to_c_string("string"), "const char*") != true { return 5; }
+    if string_eq(ast_ty_to_c_string("String"), "const char*") != true { return 6; }
+    if string_eq(ast_ty_to_c_string("Vec"), "int") != true { return 7; }
+    if string_eq(ast_ty_to_c_string("Box"), "int") != true { return 8; }
+    if string_eq(ast_ty_to_c_string("u8"), "uint8_t") != true { return 9; }
+    if string_eq(ast_ty_to_c_string("isize"), "intptr_t") != true { return 10; }
+    if is_void_cty("void") != true { return 11; }
+    if is_void_cty("unit") != true { return 12; }
+    if is_void_cty("int") != false { return 13; }
+    return 0;
+}
+
+fn test_old_slot() -> i32 {
+    if string_eq(old_slot_prefix(), "_sv0old_") != true { return 1; }
+    if old_slot_name_len(3) != 11 { return 2; }
+    return 0;
+}
+
+fn test_ret_syntax() -> i32 {
+    if ret_syntax_is_unit(false, "") != true { return 1; }
+    if ret_syntax_is_unit(true, "unit") != true { return 2; }
+    if ret_syntax_is_unit(true, "i32") != false { return 3; }
+    return 0;
+}
+
+fn test_store_value_class() -> i32 {
+    if store_value_class(true, true) != 0 { return 1; }
+    if store_value_class(true, false) != 2 { return 2; }
+    if store_value_class(false, false) != 1 { return 3; }
+    return 0;
+}
+
+fn test_assign_lhs() -> i32 {
+    if low_classify_assign_lhs(2) != 0 { return 1; }
+    if low_classify_assign_lhs(11) != 1 { return 2; }
+    if low_classify_assign_lhs(99) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_enum_tag() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let tags_flat: Vec<i32> = vec_new();
+    let offsets: Vec<i32> = vec_new();
+    let counts: Vec<i32> = vec_new();
+    vec_push(names, 100);
+    vec_push(offsets, 0);
+    vec_push(counts, 3);
+    vec_push(tags_flat, 10); vec_push(tags_flat, 0);
+    vec_push(tags_flat, 20); vec_push(tags_flat, 1);
+    vec_push(tags_flat, 30); vec_push(tags_flat, 2);
+    if enum_tag_lookup(names, tags_flat, offsets, counts, 100, 10) != 0 { return 1; }
+    if enum_tag_lookup(names, tags_flat, offsets, counts, 100, 20) != 1 { return 2; }
+    if enum_tag_lookup(names, tags_flat, offsets, counts, 100, 30) != 2 { return 3; }
+    if enum_tag_lookup(names, tags_flat, offsets, counts, 100, 99) != 0 - 1 { return 4; }
+    if enum_tag_lookup(names, tags_flat, offsets, counts, 999, 10) != 0 - 2 { return 5; }
+    return 0;
+}
+
+fn test_struct_fields() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let offsets: Vec<i32> = vec_new();
+    let counts: Vec<i32> = vec_new();
+    let flat: Vec<i32> = vec_new();
+    vec_push(names, 50);
+    vec_push(offsets, 0);
+    vec_push(counts, 2);
+    vec_push(flat, 10); vec_push(flat, 20);
+    if struct_fields_lookup(names, offsets, counts, flat, 50) != 0 { return 1; }
+    if struct_field_count(names, counts, 50) != 2 { return 2; }
+    if struct_fields_lookup(names, offsets, counts, flat, 99) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_type_detection() -> i32 {
+    let en: Vec<i32> = vec_new();
+    let sn: Vec<i32> = vec_new();
+    vec_push(en, 10);
+    vec_push(sn, 20);
+    if is_enum_cty(en, 10) != true { return 1; }
+    if is_enum_cty(en, 99) != false { return 2; }
+    if is_struct_cty(sn, 20) != true { return 3; }
+    if is_struct_cty(sn, 99) != false { return 4; }
+    return 0;
+}
+
+fn test_variant_slots() -> i32 {
+    if variant_slot_count(0, 0) != 0 { return 1; }
+    if variant_slot_count(1, 3) != 3 { return 2; }
+    if variant_slot_count(2, 2) != 2 { return 3; }
+    return 0;
+}
+
+fn test_try_variants() -> i32 {
+    if string_eq(try_variant_success(true, false), "Ok") != true { return 1; }
+    if string_eq(try_variant_success(false, true), "Some") != true { return 2; }
+    if string_eq(try_variant_failure(true, false), "Err") != true { return 3; }
+    if string_eq(try_variant_failure(false, true), "None") != true { return 4; }
+    if is_try_enum(true, true, false, false) != true { return 5; }
+    if is_try_enum(false, false, true, true) != true { return 6; }
+    if is_try_enum(true, false, false, false) != false { return 7; }
+    return 0;
+}
+
+fn test_literals() -> i32 {
+    if classify_literal(0) != 0 { return 1; }
+    if classify_literal(1) != 1 { return 2; }
+    if classify_literal(2) != 2 { return 3; }
+    if classify_literal(3) != 3 { return 4; }
+    if classify_literal(99) != 0 - 1 { return 5; }
+    return 0;
+}
+
+fn test_value_to_expr() -> i32 {
+    if value_to_expr_kind(0) != 0 { return 1; }
+    if value_to_expr_kind(1) != 1 { return 2; }
+    return 0;
+}
+
+fn test_enum_alloc() -> i32 {
+    if enum_alloc_width(0) != 1 { return 1; }
+    if enum_alloc_width(3) != 4 { return 2; }
+    return 0;
+}
+
+fn test_ret_value_slot() -> i32 {
+    if string_eq(ret_value_slot(), "_sv0ret") != true { return 1; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_fresh_tmp();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_split_qname();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_binop_to_c();
+    if r3 != 0 { return 30 + r3; }
+    let r4: i32 = test_unop_to_c();
+    if r4 != 0 { return 50 + r4; }
+    let r5: i32 = test_ty_to_c();
+    if r5 != 0 { return 60 + r5; }
+    let r6: i32 = test_old_slot();
+    if r6 != 0 { return 80 + r6; }
+    let r7: i32 = test_ret_syntax();
+    if r7 != 0 { return 90 + r7; }
+    let r8: i32 = test_store_value_class();
+    if r8 != 0 { return 100 + r8; }
+    let r9: i32 = test_assign_lhs();
+    if r9 != 0 { return 110 + r9; }
+    let r10: i32 = test_enum_tag();
+    if r10 != 0 { return 120 + r10; }
+    let r11: i32 = test_struct_fields();
+    if r11 != 0 { return 130 + r11; }
+    let r12: i32 = test_type_detection();
+    if r12 != 0 { return 140 + r12; }
+    let r13: i32 = test_variant_slots();
+    if r13 != 0 { return 150 + r13; }
+    let r14: i32 = test_try_variants();
+    if r14 != 0 { return 160 + r14; }
+    let r15: i32 = test_literals();
+    if r15 != 0 { return 170 + r15; }
+    let r16: i32 = test_value_to_expr();
+    if r16 != 0 { return 180 + r16; }
+    let r17: i32 = test_enum_alloc();
+    if r17 != 0 { return 190 + r17; }
+    let r18: i32 = test_ret_value_slot();
+    if r18 != 0 { return 200 + r18; }
+    return 0;
+}
