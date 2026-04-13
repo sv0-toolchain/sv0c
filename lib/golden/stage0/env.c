@@ -1,327 +1,428 @@
 #include "sv0_runtime.h"
 
-static int is_prelude_type(int tag);
-static int scope_depth_after_enter(int depth);
-static int scope_depth_after_exit(int depth);
-static int frame_has_name(int name, int f0, int f1, int f2, int f3);
-static int lookup_value(int name, int frame0, int frame1, int mod0, int mod1);
-static int dup_mod_val(int name, int existing0, int existing1, int existing2);
-static int bind_local_new_size(int frame_size);
+static int is_prelude_type(const char* name);
+static int vec_contains(int v, int name);
+static int env_new_mod_vals(void);
+static int env_new_mod_tys(void);
+static int env_new_frames(void);
+static int dup_mod_val(int name, int mod_vals);
+static int dup_mod_ty(int name, int mod_tys);
+static int register_module_value(int mod_vals, int name);
+static int register_module_type(int mod_tys, int name);
+static int type_is_registered_by_handle(int name_h, int mod_tys);
+static int enter_scope(int frames);
+static int exit_scope(int frames);
+static int bind_local(int frames, int name);
+static int in_frame_vec(int name, int frame);
+static int lookup_in_frames(int frames, int name);
+static int lookup_value(int mod_vals, int frames, int name);
 static int test_prelude_types(void);
-static int test_scope_depth(void);
-static int test_lookup(void);
-static int test_dup_detection(void);
-static int test_bind_local(void);
+static int test_vec_contains(void);
+static int test_dup_mod_val(void);
+static int test_register_module_value(void);
+static int test_scope_enter_exit(void);
+static int test_bind_and_lookup(void);
 
-static int is_prelude_type(int tag) {
-  if ((tag == 0)) {
+static int is_prelude_type(const char* name) {
+  int _sv0t0 = sv0_string_eq(name, "i8");
+  if (_sv0t0) {
     return 1;
   } else {
   }
-  if ((tag == 1)) {
+  int _sv0t1 = sv0_string_eq(name, "i16");
+  if (_sv0t1) {
     return 1;
   } else {
   }
-  if ((tag == 2)) {
+  int _sv0t2 = sv0_string_eq(name, "i32");
+  if (_sv0t2) {
     return 1;
   } else {
   }
-  if ((tag == 3)) {
+  int _sv0t3 = sv0_string_eq(name, "i64");
+  if (_sv0t3) {
     return 1;
   } else {
   }
-  if ((tag == 4)) {
+  int _sv0t4 = sv0_string_eq(name, "i128");
+  if (_sv0t4) {
     return 1;
   } else {
   }
-  if ((tag == 5)) {
+  int _sv0t5 = sv0_string_eq(name, "u8");
+  if (_sv0t5) {
     return 1;
   } else {
   }
-  if ((tag == 6)) {
+  int _sv0t6 = sv0_string_eq(name, "u16");
+  if (_sv0t6) {
     return 1;
   } else {
   }
-  if ((tag == 7)) {
+  int _sv0t7 = sv0_string_eq(name, "u32");
+  if (_sv0t7) {
     return 1;
   } else {
   }
-  if ((tag == 8)) {
+  int _sv0t8 = sv0_string_eq(name, "u64");
+  if (_sv0t8) {
     return 1;
   } else {
   }
-  if ((tag == 9)) {
+  int _sv0t9 = sv0_string_eq(name, "u128");
+  if (_sv0t9) {
     return 1;
   } else {
   }
-  if ((tag == 10)) {
+  int _sv0t10 = sv0_string_eq(name, "isize");
+  if (_sv0t10) {
     return 1;
   } else {
   }
-  if ((tag == 11)) {
+  int _sv0t11 = sv0_string_eq(name, "usize");
+  if (_sv0t11) {
     return 1;
   } else {
   }
-  if ((tag == 12)) {
+  int _sv0t12 = sv0_string_eq(name, "f32");
+  if (_sv0t12) {
     return 1;
   } else {
   }
-  if ((tag == 13)) {
+  int _sv0t13 = sv0_string_eq(name, "f64");
+  if (_sv0t13) {
     return 1;
   } else {
   }
-  if ((tag == 14)) {
+  int _sv0t14 = sv0_string_eq(name, "bool");
+  if (_sv0t14) {
     return 1;
   } else {
   }
-  if ((tag == 15)) {
+  int _sv0t15 = sv0_string_eq(name, "char");
+  if (_sv0t15) {
     return 1;
   } else {
   }
-  if ((tag == 16)) {
+  int _sv0t16 = sv0_string_eq(name, "str");
+  if (_sv0t16) {
     return 1;
   } else {
   }
-  if ((tag == 17)) {
+  int _sv0t17 = sv0_string_eq(name, "string");
+  if (_sv0t17) {
     return 1;
   } else {
   }
-  if ((tag == 18)) {
+  int _sv0t18 = sv0_string_eq(name, "String");
+  if (_sv0t18) {
     return 1;
   } else {
   }
-  if ((tag == 19)) {
+  int _sv0t19 = sv0_string_eq(name, "unit");
+  if (_sv0t19) {
     return 1;
   } else {
   }
-  if ((tag == 20)) {
+  int _sv0t20 = sv0_string_eq(name, "Vec");
+  if (_sv0t20) {
     return 1;
   } else {
   }
-  if ((tag == 21)) {
+  int _sv0t21 = sv0_string_eq(name, "Box");
+  if (_sv0t21) {
     return 1;
   } else {
   }
   return 0;
 }
 
-static int scope_depth_after_enter(int depth) {
-  int _sv0t0 = (depth + 1);
+static int vec_contains(int v, int name) {
+  int _sv0t0 = sv0_vec_len(v);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(v, i);
+    int n = _sv0t1;
+    if ((n == name)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int env_new_mod_vals(void) {
+  int _sv0t0 = sv0_vec_new();
   return _sv0t0;
 }
 
-static int scope_depth_after_exit(int depth) {
-  if ((depth <= 0)) {
+static int env_new_mod_tys(void) {
+  int _sv0t0 = sv0_vec_new();
+  return _sv0t0;
+}
+
+static int env_new_frames(void) {
+  int _sv0t0 = sv0_vec_new();
+  return _sv0t0;
+}
+
+static int dup_mod_val(int name, int mod_vals) {
+  int _sv0t0 = vec_contains(mod_vals, name);
+  return _sv0t0;
+}
+
+static int dup_mod_ty(int name, int mod_tys) {
+  int _sv0t0 = vec_contains(mod_tys, name);
+  return _sv0t0;
+}
+
+static int register_module_value(int mod_vals, int name) {
+  sv0_vec_push(mod_vals, name);
+  return 0;
+}
+
+static int register_module_type(int mod_tys, int name) {
+  sv0_vec_push(mod_tys, name);
+  return 0;
+}
+
+static int type_is_registered_by_handle(int name_h, int mod_tys) {
+  int _sv0t0 = vec_contains(mod_tys, name_h);
+  return _sv0t0;
+}
+
+static int enter_scope(int frames) {
+  int _sv0t0 = sv0_vec_new();
+  int new_frame = _sv0t0;
+  sv0_vec_push(frames, new_frame);
+  return 0;
+}
+
+static int exit_scope(int frames) {
+  int _sv0t0 = sv0_vec_len(frames);
+  int len = _sv0t0;
+  if ((len == 0)) {
     return 0;
   } else {
   }
-  int _sv0t0 = (depth - 1);
+  int _sv0t1 = (len - 1);
+  sv0_vec_set(frames, _sv0t1, 0);
+  return 0;
+}
+
+static int bind_local(int frames, int name) {
+  int _sv0t0 = sv0_vec_len(frames);
+  int len = _sv0t0;
+  if ((len == 0)) {
+    int _sv0t1 = sv0_vec_new();
+    int new_frame = _sv0t1;
+    sv0_vec_push(new_frame, name);
+    sv0_vec_push(frames, new_frame);
+    return 0;
+  } else {
+  }
+  int _sv0t2 = (len - 1);
+  int _sv0t3 = sv0_vec_get(frames, _sv0t2);
+  int top = _sv0t3;
+  sv0_vec_push(top, name);
+  return 0;
+}
+
+static int in_frame_vec(int name, int frame) {
+  int _sv0t0 = vec_contains(frame, name);
   return _sv0t0;
 }
 
-static int frame_has_name(int name, int f0, int f1, int f2, int f3) {
-  if ((f0 == name)) {
-    return 1;
-  } else {
-  }
-  if ((f1 == name)) {
-    return 1;
-  } else {
-  }
-  if ((f2 == name)) {
-    return 1;
-  } else {
-  }
-  if ((f3 == name)) {
-    return 1;
-  } else {
+static int lookup_in_frames(int frames, int name) {
+  int _sv0t0 = sv0_vec_len(frames);
+  int len = _sv0t0;
+  int i = (len - 1);
+  while ((i >= 0)) {
+    int _sv0t1 = sv0_vec_get(frames, i);
+    int frame = _sv0t1;
+    int _sv0t2 = in_frame_vec(name, frame);
+    if (_sv0t2) {
+      return 1;
+    } else {
+    }
+    i = (i - 1);
   }
   return 0;
 }
 
-static int lookup_value(int name, int frame0, int frame1, int mod0, int mod1) {
-  if ((frame0 == name)) {
+static int lookup_value(int mod_vals, int frames, int name) {
+  int _sv0t0 = lookup_in_frames(frames, name);
+  if (_sv0t0) {
     return 1;
   } else {
   }
-  if ((frame1 == name)) {
-    return 1;
-  } else {
-  }
-  if ((mod0 == name)) {
-    return 1;
-  } else {
-  }
-  if ((mod1 == name)) {
-    return 1;
-  } else {
-  }
-  return 0;
-}
-
-static int dup_mod_val(int name, int existing0, int existing1, int existing2) {
-  if ((existing0 == name)) {
-    return 1;
-  } else {
-  }
-  if ((existing1 == name)) {
-    return 1;
-  } else {
-  }
-  if ((existing2 == name)) {
-    return 1;
-  } else {
-  }
-  return 0;
-}
-
-static int bind_local_new_size(int frame_size) {
-  int _sv0t0 = (frame_size + 1);
-  return _sv0t0;
+  int _sv0t1 = vec_contains(mod_vals, name);
+  return _sv0t1;
 }
 
 static int test_prelude_types(void) {
-  int _sv0t0 = is_prelude_type(0);
+  int _sv0t0 = is_prelude_type("i32");
   if ((_sv0t0 != 1)) {
     return 1;
   } else {
   }
-  int _sv0t1 = is_prelude_type(10);
+  int _sv0t1 = is_prelude_type("bool");
   if ((_sv0t1 != 1)) {
     return 2;
   } else {
   }
-  int _sv0t2 = is_prelude_type(21);
+  int _sv0t2 = is_prelude_type("Vec");
   if ((_sv0t2 != 1)) {
     return 3;
   } else {
   }
-  int _sv0t3 = is_prelude_type(22);
-  if ((_sv0t3 != 0)) {
-    return 4;
-  } else {
-  }
-  int _sv0t4 = is_prelude_type(100);
-  if ((_sv0t4 != 0)) {
-    return 5;
-  } else {
-  }
-  int _sv0t5 = (0 - 1);
-  int _sv0t6 = is_prelude_type(_sv0t5);
-  if ((_sv0t6 != 0)) {
-    return 6;
-  } else {
-  }
-  return 0;
-}
-
-static int test_scope_depth(void) {
-  int d0 = 0;
-  int _sv0t0 = scope_depth_after_enter(d0);
-  int d1 = _sv0t0;
-  if ((d1 != 1)) {
-    return 1;
-  } else {
-  }
-  int _sv0t1 = scope_depth_after_enter(d1);
-  int d2 = _sv0t1;
-  if ((d2 != 2)) {
-    return 2;
-  } else {
-  }
-  int _sv0t2 = scope_depth_after_exit(d2);
-  int d3 = _sv0t2;
-  if ((d3 != 1)) {
-    return 3;
-  } else {
-  }
-  int _sv0t3 = scope_depth_after_exit(d3);
-  int d4 = _sv0t3;
-  if ((d4 != 0)) {
-    return 4;
-  } else {
-  }
-  int _sv0t4 = scope_depth_after_exit(d4);
-  int d5 = _sv0t4;
-  if ((d5 != 0)) {
-    return 5;
-  } else {
-  }
-  return 0;
-}
-
-static int test_lookup(void) {
-  int _sv0t0 = lookup_value(42, 42, 0, 0, 0);
-  if ((_sv0t0 != 1)) {
-    return 1;
-  } else {
-  }
-  int _sv0t1 = lookup_value(42, 0, 42, 0, 0);
-  if ((_sv0t1 != 1)) {
-    return 2;
-  } else {
-  }
-  int _sv0t2 = lookup_value(42, 0, 0, 42, 0);
-  if ((_sv0t2 != 1)) {
-    return 3;
-  } else {
-  }
-  int _sv0t3 = lookup_value(42, 0, 0, 0, 42);
+  int _sv0t3 = is_prelude_type("Box");
   if ((_sv0t3 != 1)) {
     return 4;
   } else {
   }
-  int _sv0t4 = lookup_value(42, 0, 0, 0, 0);
-  if ((_sv0t4 != 0)) {
+  int _sv0t4 = is_prelude_type("String");
+  if ((_sv0t4 != 1)) {
     return 5;
   } else {
   }
-  int _sv0t5 = lookup_value(99, 1, 2, 3, 4);
+  int _sv0t5 = is_prelude_type("FooBar");
   if ((_sv0t5 != 0)) {
     return 6;
   } else {
   }
+  int _sv0t6 = is_prelude_type("");
+  if ((_sv0t6 != 0)) {
+    return 7;
+  } else {
+  }
   return 0;
 }
 
-static int test_dup_detection(void) {
-  int _sv0t0 = dup_mod_val(5, 5, 0, 0);
-  if ((_sv0t0 != 1)) {
+static int test_vec_contains(void) {
+  int _sv0t0 = sv0_vec_new();
+  int v = _sv0t0;
+  int _sv0t1 = vec_contains(v, 42);
+  if ((_sv0t1 != 0)) {
     return 1;
   } else {
   }
-  int _sv0t1 = dup_mod_val(5, 0, 5, 0);
-  if ((_sv0t1 != 1)) {
+  sv0_vec_push(v, 10);
+  sv0_vec_push(v, 20);
+  sv0_vec_push(v, 30);
+  int _sv0t2 = vec_contains(v, 20);
+  if ((_sv0t2 != 1)) {
     return 2;
   } else {
   }
-  int _sv0t2 = dup_mod_val(5, 0, 0, 5);
-  if ((_sv0t2 != 1)) {
+  int _sv0t3 = vec_contains(v, 99);
+  if ((_sv0t3 != 0)) {
     return 3;
   } else {
   }
-  int _sv0t3 = dup_mod_val(5, 1, 2, 3);
-  if ((_sv0t3 != 0)) {
+  return 0;
+}
+
+static int test_dup_mod_val(void) {
+  int _sv0t0 = sv0_vec_new();
+  int mv = _sv0t0;
+  sv0_vec_push(mv, 100);
+  sv0_vec_push(mv, 200);
+  int _sv0t1 = dup_mod_val(100, mv);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = dup_mod_val(300, mv);
+  if ((_sv0t2 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_register_module_value(void) {
+  int _sv0t0 = sv0_vec_new();
+  int mv = _sv0t0;
+  int _sv0t1 = register_module_value(mv, 42);
+  int _sv0t2 = sv0_vec_len(mv);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = vec_contains(mv, 42);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = register_module_value(mv, 43);
+  int _sv0t5 = sv0_vec_len(mv);
+  if ((_sv0t5 != 2)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_scope_enter_exit(void) {
+  int _sv0t0 = sv0_vec_new();
+  int frames = _sv0t0;
+  int _sv0t1 = enter_scope(frames);
+  int _sv0t2 = sv0_vec_len(frames);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = enter_scope(frames);
+  int _sv0t4 = sv0_vec_len(frames);
+  if ((_sv0t4 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = exit_scope(frames);
+  return 0;
+}
+
+static int test_bind_and_lookup(void) {
+  int _sv0t0 = sv0_vec_new();
+  int mv = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int frames = _sv0t1;
+  int _sv0t2 = register_module_value(mv, 100);
+  int _sv0t3 = lookup_value(mv, frames, 100);
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = lookup_value(mv, frames, 200);
+  if ((_sv0t4 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = enter_scope(frames);
+  int _sv0t6 = bind_local(frames, 200);
+  int _sv0t7 = lookup_value(mv, frames, 200);
+  if ((_sv0t7 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t8 = enter_scope(frames);
+  int _sv0t9 = bind_local(frames, 300);
+  int _sv0t10 = lookup_value(mv, frames, 300);
+  if ((_sv0t10 != 1)) {
     return 4;
   } else {
   }
-  return 0;
-}
-
-static int test_bind_local(void) {
-  int _sv0t0 = bind_local_new_size(0);
-  if ((_sv0t0 != 1)) {
-    return 1;
+  int _sv0t11 = lookup_value(mv, frames, 200);
+  if ((_sv0t11 != 1)) {
+    return 5;
   } else {
   }
-  int _sv0t1 = bind_local_new_size(3);
-  if ((_sv0t1 != 4)) {
-    return 2;
-  } else {
-  }
-  int _sv0t2 = bind_local_new_size(10);
-  if ((_sv0t2 != 11)) {
-    return 3;
+  int _sv0t12 = lookup_value(mv, frames, 999);
+  if ((_sv0t12 != 0)) {
+    return 6;
   } else {
   }
   return 0;
@@ -334,32 +435,39 @@ int main(void) {
     return r1;
   } else {
   }
-  int _sv0t1 = test_scope_depth();
+  int _sv0t1 = test_vec_contains();
   int r2 = _sv0t1;
   if ((r2 != 0)) {
     int _sv0t2 = (10 + r2);
     return _sv0t2;
   } else {
   }
-  int _sv0t3 = test_lookup();
+  int _sv0t3 = test_dup_mod_val();
   int r3 = _sv0t3;
   if ((r3 != 0)) {
     int _sv0t4 = (20 + r3);
     return _sv0t4;
   } else {
   }
-  int _sv0t5 = test_dup_detection();
+  int _sv0t5 = test_register_module_value();
   int r4 = _sv0t5;
   if ((r4 != 0)) {
     int _sv0t6 = (30 + r4);
     return _sv0t6;
   } else {
   }
-  int _sv0t7 = test_bind_local();
+  int _sv0t7 = test_scope_enter_exit();
   int r5 = _sv0t7;
   if ((r5 != 0)) {
     int _sv0t8 = (40 + r5);
     return _sv0t8;
+  } else {
+  }
+  int _sv0t9 = test_bind_and_lookup();
+  int r6 = _sv0t9;
+  if ((r6 != 0)) {
+    int _sv0t10 = (50 + r6);
+    return _sv0t10;
   } else {
   }
   return 0;
