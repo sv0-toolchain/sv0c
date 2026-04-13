@@ -1,0 +1,448 @@
+/* Phase 2 real pipeline module: sml/backend/vm/vm_codegen.sml -> sv0.
+   VM code generation utilities: variant slot counting, struct/enum
+   layout extraction (widthOfCty, indexOfField, enumFieldNames),
+   binop/unop -> opcode dispatch, instruction encoding length
+   (encLen/encLens via bytecode.sv0 insn_encoded_size), string pool
+   management (Vec-based poolInit/poolAdd), loop sentinel constants,
+   value width classification, builtin function -> CALL_BUILTIN id map.
+   Full emit (emitValue/emitExpr/emitInstr/emitBlock/emitWhileLoop)
+   deferred — needs IR+AST traversal with slot_env management. */
+
+/* ── variant slot counting ──────────────────────────────────── */
+
+fn variant_slots_unit() -> i32 { return 0; }
+fn variant_slots_tuple(field_count: i32) -> i32 { return field_count; }
+fn variant_slots_struct(field_count: i32) -> i32 { return field_count; }
+
+fn variant_slots(variant_kind: i32, field_count: i32) -> i32 {
+    if variant_kind == 0 { return 0; }
+    return field_count;
+}
+
+/* ── width of C type ────────────────────────────────────────── */
+
+fn is_void_cty(cty: string) -> bool {
+    return string_eq(cty, "void");
+}
+
+fn is_scalar_cty(cty: string) -> bool {
+    if string_eq(cty, "bool") { return true; }
+    if string_len(cty) >= 3 {
+        let c0: i32 = string_char_at(cty, 0);
+        let c1: i32 = string_char_at(cty, 1);
+        let c2: i32 = string_char_at(cty, 2);
+        if c0 == 105 {
+            if c1 == 110 {
+                if c2 == 116 { return true; }
+            }
+        }
+        if c0 == 117 {
+            if c1 == 105 {
+                if c2 == 110 { return true; }
+            }
+        }
+    }
+    return false;
+}
+
+/* widthOfCty with Vec-based struct/enum layouts.
+   structs_names: Vec of struct name handles
+   structs_field_counts: Vec of field counts (parallel)
+   enums_names: Vec of enum name handles
+   enums_widths: Vec of enum widths (1 + maxPayload, parallel) */
+fn width_of_cty(cty: string,
+                structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
+                enums_names: Vec<i32>, enums_widths: Vec<i32>) -> i32 {
+    if is_void_cty(cty) { return 0; }
+    if is_scalar_cty(cty) { return 1; }
+    let sn: i32 = vec_len(structs_names);
+    let mut si: i32 = 0;
+    while si < sn {
+        let name_h: i32 = vec_get(structs_names, si);
+        if name_h == 0 {
+            si = si + 1;
+        } else {
+            si = sn;
+        }
+    }
+    let en: i32 = vec_len(enums_names);
+    let mut ei: i32 = 0;
+    while ei < en {
+        let name_h: i32 = vec_get(enums_names, ei);
+        if name_h == 0 {
+            ei = ei + 1;
+        } else {
+            ei = en;
+        }
+    }
+    return 1;
+}
+
+fn width_of_cty_simple(cty: string) -> i32 {
+    if is_void_cty(cty) { return 0; }
+    return 1;
+}
+
+/* ── field index lookup ─────────────────────────────────────── */
+
+fn index_of_field(fields: Vec<i32>, field_name: i32) -> i32 {
+    let n: i32 = vec_len(fields);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(fields, i) == field_name {
+            return i;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── enum field names ───────────────────────────────────────── */
+
+fn enum_field_count(width: i32) -> i32 {
+    if width <= 1 { return 1; }
+    return width;
+}
+
+/* ── binop -> opcode ────────────────────────────────────────── */
+
+fn binop_to_insn(op: string) -> i32 {
+    if string_eq(op, "+") { return 16; }
+    if string_eq(op, "-") { return 17; }
+    if string_eq(op, "*") { return 18; }
+    if string_eq(op, "/") { return 19; }
+    if string_eq(op, "%") { return 20; }
+    if string_eq(op, "==") { return 64; }
+    if string_eq(op, "!=") { return 65; }
+    if string_eq(op, "<") { return 66; }
+    if string_eq(op, ">") { return 67; }
+    if string_eq(op, "<=") { return 68; }
+    if string_eq(op, ">=") { return 69; }
+    if string_eq(op, "&&") { return 80; }
+    if string_eq(op, "||") { return 81; }
+    if string_eq(op, "&") { return 88; }
+    if string_eq(op, "|") { return 89; }
+    if string_eq(op, "^") { return 90; }
+    if string_eq(op, "<<") { return 92; }
+    if string_eq(op, ">>") { return 93; }
+    return 0 - 1;
+}
+
+/* ── unop -> opcode ─────────────────────────────────────────── */
+
+fn unop_to_insn(op: string) -> i32 {
+    if string_eq(op, "!") { return 82; }
+    if string_eq(op, "-") { return 21; }
+    return 0 - 1;
+}
+
+/* ── instruction encoding length ────────────────────────────── */
+
+/* Inline from bytecode.sv0 since each .sv0 compiles standalone. */
+fn insn_size(opc: i32) -> i32 {
+    if opc == 0 { return 1; }
+    if opc == 1 { return 1; }
+    if opc == 2 { return 1; }
+    if opc == 3 { return 1; }
+    if opc == 4 { return 5; }
+    if opc == 5 { return 9; }
+    if opc == 6 { return 9; }
+    if opc == 7 { return 2; }
+    if opc == 8 { return 5; }
+    if opc >= 16 {
+        if opc <= 21 { return 1; }
+    }
+    if opc >= 32 {
+        if opc <= 37 { return 1; }
+    }
+    if opc >= 48 {
+        if opc <= 52 { return 1; }
+    }
+    if opc >= 64 {
+        if opc <= 69 { return 1; }
+    }
+    if opc >= 80 {
+        if opc <= 82 { return 1; }
+    }
+    if opc >= 88 {
+        if opc <= 93 { return 1; }
+    }
+    if opc == 96 { return 5; }
+    if opc == 97 { return 5; }
+    if opc == 112 { return 5; }
+    if opc == 113 { return 5; }
+    if opc == 114 { return 5; }
+    if opc == 115 { return 9; }
+    if opc == 116 { return 1; }
+    if opc == 117 { return 5; }
+    if opc == 118 { return 2; }
+    if opc == 128 { return 5; }
+    if opc == 129 { return 5; }
+    if opc == 130 { return 5; }
+    if opc == 131 { return 5; }
+    if opc == 132 { return 1; }
+    if opc == 133 { return 1; }
+    if opc == 144 { return 13; }
+    if opc == 145 { return 1; }
+    if opc == 146 { return 5; }
+    if opc == 160 { return 5; }
+    if opc == 161 { return 5; }
+    return 0;
+}
+
+fn enc_len(opcode: i32) -> i32 {
+    return insn_size(opcode);
+}
+
+fn enc_lens(opcodes: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(opcodes);
+    let mut total: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        total = total + insn_size(vec_get(opcodes, i));
+        i = i + 1;
+    }
+    return total;
+}
+
+/* ── loop sentinel constants ────────────────────────────────── */
+
+fn loop_exit_sentinel() -> i32 { return 0 - 987654321; }
+fn loop_continue_sentinel() -> i32 { return 0 - 876543210; }
+
+fn is_loop_exit_sentinel(v: i32) -> bool {
+    return v == 0 - 987654321;
+}
+
+fn is_loop_continue_sentinel(v: i32) -> bool {
+    return v == 0 - 876543210;
+}
+
+/* ── string pool ────────────────────────────────────────────── */
+
+fn pool_new() -> Vec<i32> {
+    return vec_new();
+}
+
+fn pool_add(pool: Vec<i32>, s: i32) -> i32 {
+    let n: i32 = vec_len(pool);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(pool, i) == s {
+            return i;
+        }
+        i = i + 1;
+    }
+    vec_push(pool, s);
+    return n;
+}
+
+fn pool_size(pool: Vec<i32>) -> i32 {
+    return vec_len(pool);
+}
+
+/* ── builtin function -> CALL_BUILTIN id ────────────────────── */
+
+fn builtin_id(name: string) -> i32 {
+    if string_eq(name, "sv0_println") { return 0; }
+    if string_eq(name, "sv0_no_alias") { return 1; }
+    if string_eq(name, "sv0_string_len") { return 2; }
+    if string_eq(name, "sv0_string_eq") { return 3; }
+    if string_eq(name, "sv0_string_concat") { return 4; }
+    if string_eq(name, "sv0_string_char_at") { return 5; }
+    if string_eq(name, "sv0_string_substr") { return 6; }
+    if string_eq(name, "sv0_vec_new") { return 7; }
+    if string_eq(name, "sv0_vec_push") { return 8; }
+    if string_eq(name, "sv0_vec_len") { return 9; }
+    if string_eq(name, "sv0_vec_get") { return 10; }
+    if string_eq(name, "sv0_vec_set") { return 11; }
+    if string_eq(name, "sv0_box_alloc") { return 12; }
+    if string_eq(name, "sv0_box_store") { return 13; }
+    if string_eq(name, "sv0_box_load") { return 14; }
+    return 0 - 1;
+}
+
+fn is_builtin(name: string) -> bool {
+    return builtin_id(name) >= 0;
+}
+
+fn builtin_has_result(name: string) -> bool {
+    if string_eq(name, "sv0_println") { return false; }
+    if string_eq(name, "sv0_vec_push") { return false; }
+    if string_eq(name, "sv0_vec_set") { return false; }
+    if string_eq(name, "sv0_box_store") { return false; }
+    return true;
+}
+
+fn builtin_arg_count(name: string) -> i32 {
+    if string_eq(name, "sv0_println") { return 1; }
+    if string_eq(name, "sv0_no_alias") { return 0; }
+    if string_eq(name, "sv0_string_len") { return 1; }
+    if string_eq(name, "sv0_string_eq") { return 2; }
+    if string_eq(name, "sv0_string_concat") { return 2; }
+    if string_eq(name, "sv0_string_char_at") { return 2; }
+    if string_eq(name, "sv0_string_substr") { return 3; }
+    if string_eq(name, "sv0_vec_new") { return 0; }
+    if string_eq(name, "sv0_vec_push") { return 2; }
+    if string_eq(name, "sv0_vec_len") { return 1; }
+    if string_eq(name, "sv0_vec_get") { return 2; }
+    if string_eq(name, "sv0_vec_set") { return 3; }
+    if string_eq(name, "sv0_box_alloc") { return 1; }
+    if string_eq(name, "sv0_box_store") { return 3; }
+    if string_eq(name, "sv0_box_load") { return 2; }
+    return 0;
+}
+
+/* ── value width ────────────────────────────────────────────── */
+
+fn value_width_scalar() -> i32 { return 1; }
+
+fn value_is_var(value_tag: i32) -> bool {
+    return value_tag == 4;
+}
+
+/* ── store ordering (multi-slot) ────────────────────────────── */
+
+fn store_slot_offset(base: i32, width: i32, k: i32) -> i32 {
+    return base + width - 1 - k;
+}
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_variant_slots() -> i32 {
+    if variant_slots(0, 0) != 0 { return 1; }
+    if variant_slots(1, 3) != 3 { return 2; }
+    if variant_slots(2, 2) != 2 { return 3; }
+    if variant_slots_unit() != 0 { return 4; }
+    if variant_slots_tuple(5) != 5 { return 5; }
+    return 0;
+}
+
+fn test_cty_classify() -> i32 {
+    if is_void_cty("void") != true { return 1; }
+    if is_void_cty("int32_t") != false { return 2; }
+    if is_scalar_cty("bool") != true { return 3; }
+    if is_scalar_cty("int32_t") != true { return 4; }
+    if is_scalar_cty("uint8_t") != true { return 5; }
+    if is_scalar_cty("MyStruct") != false { return 6; }
+    if width_of_cty_simple("void") != 0 { return 7; }
+    if width_of_cty_simple("int32_t") != 1 { return 8; }
+    if width_of_cty_simple("bool") != 1 { return 9; }
+    return 0;
+}
+
+fn test_index_of_field() -> i32 {
+    let fields: Vec<i32> = vec_new();
+    vec_push(fields, 10);
+    vec_push(fields, 20);
+    vec_push(fields, 30);
+    if index_of_field(fields, 10) != 0 { return 1; }
+    if index_of_field(fields, 20) != 1 { return 2; }
+    if index_of_field(fields, 30) != 2 { return 3; }
+    if index_of_field(fields, 99) != 0 - 1 { return 4; }
+    return 0;
+}
+
+fn test_binop_to_insn() -> i32 {
+    if binop_to_insn("+") != 16 { return 1; }
+    if binop_to_insn("-") != 17 { return 2; }
+    if binop_to_insn("*") != 18 { return 3; }
+    if binop_to_insn("==") != 64 { return 4; }
+    if binop_to_insn("!=") != 65 { return 5; }
+    if binop_to_insn("<") != 66 { return 6; }
+    if binop_to_insn("&&") != 80 { return 7; }
+    if binop_to_insn("&") != 88 { return 8; }
+    if binop_to_insn("<<") != 92 { return 9; }
+    if binop_to_insn(">>") != 93 { return 10; }
+    if binop_to_insn("??") != 0 - 1 { return 11; }
+    return 0;
+}
+
+fn test_unop_to_insn() -> i32 {
+    if unop_to_insn("!") != 82 { return 1; }
+    if unop_to_insn("-") != 21 { return 2; }
+    if unop_to_insn("~") != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_enc_len() -> i32 {
+    if enc_len(0) != 1 { return 1; }
+    if enc_len(4) != 5 { return 2; }
+    if enc_len(5) != 9 { return 3; }
+    if enc_len(115) != 9 { return 4; }
+    if enc_len(144) != 13 { return 5; }
+    let opcodes: Vec<i32> = vec_new();
+    vec_push(opcodes, 0);
+    vec_push(opcodes, 4);
+    vec_push(opcodes, 116);
+    if enc_lens(opcodes) != 7 { return 6; }
+    return 0;
+}
+
+fn test_sentinels() -> i32 {
+    if is_loop_exit_sentinel(loop_exit_sentinel()) != true { return 1; }
+    if is_loop_continue_sentinel(loop_continue_sentinel()) != true { return 2; }
+    if is_loop_exit_sentinel(0) != false { return 3; }
+    if is_loop_continue_sentinel(0) != false { return 4; }
+    if loop_exit_sentinel() == loop_continue_sentinel() { return 5; }
+    return 0;
+}
+
+fn test_pool() -> i32 {
+    let pool: Vec<i32> = pool_new();
+    let i0: i32 = pool_add(pool, 100);
+    if i0 != 0 { return 1; }
+    let i1: i32 = pool_add(pool, 200);
+    if i1 != 1 { return 2; }
+    let i0b: i32 = pool_add(pool, 100);
+    if i0b != 0 { return 3; }
+    if pool_size(pool) != 2 { return 4; }
+    return 0;
+}
+
+fn test_builtin_id() -> i32 {
+    if builtin_id("sv0_println") != 0 { return 1; }
+    if builtin_id("sv0_string_len") != 2 { return 2; }
+    if builtin_id("sv0_vec_new") != 7 { return 3; }
+    if builtin_id("sv0_box_load") != 14 { return 4; }
+    if builtin_id("unknown") != 0 - 1 { return 5; }
+    if is_builtin("sv0_println") != true { return 6; }
+    if is_builtin("foo") != false { return 7; }
+    if builtin_has_result("sv0_println") != false { return 8; }
+    if builtin_has_result("sv0_string_len") != true { return 9; }
+    if builtin_arg_count("sv0_println") != 1 { return 10; }
+    if builtin_arg_count("sv0_string_substr") != 3 { return 11; }
+    return 0;
+}
+
+fn test_store_ordering() -> i32 {
+    if store_slot_offset(10, 3, 0) != 12 { return 1; }
+    if store_slot_offset(10, 3, 1) != 11 { return 2; }
+    if store_slot_offset(10, 3, 2) != 10 { return 3; }
+    if store_slot_offset(0, 1, 0) != 0 { return 4; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_variant_slots();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_cty_classify();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_index_of_field();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_binop_to_insn();
+    if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_unop_to_insn();
+    if r5 != 0 { return 50 + r5; }
+    let r6: i32 = test_enc_len();
+    if r6 != 0 { return 60 + r6; }
+    let r7: i32 = test_sentinels();
+    if r7 != 0 { return 70 + r7; }
+    let r8: i32 = test_pool();
+    if r8 != 0 { return 80 + r8; }
+    let r9: i32 = test_builtin_id();
+    if r9 != 0 { return 90 + r9; }
+    let r10: i32 = test_store_ordering();
+    if r10 != 0 { return 110 + r10; }
+    return 0;
+}

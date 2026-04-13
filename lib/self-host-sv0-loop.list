@@ -297,3 +297,4 @@ lib/checker_item_fn_ty_core.sv0
 lib/vm_codegen_enum_layout_core.sv0
 lib/vm_codegen_pool_add_core.sv0
 lib/bytecode.sv0
+lib/vm_codegen.sv0
