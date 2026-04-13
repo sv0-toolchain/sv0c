@@ -145,6 +145,15 @@ fn ret_syntax_is_unit(has_ret: bool, ret_ty_name: string) -> bool {
     return false;
 }
 
+fn use_ret_slot(is_unit: bool, ens_mentions_result: bool) -> bool {
+    if is_unit { return false; }
+    return ens_mentions_result;
+}
+
+fn lower_lit_supported(lit_tag: i32) -> bool {
+    return classify_literal(lit_tag) >= 0;
+}
+
 /* ── storeValueToSlot classification ────────────────────────── */
 
 fn SV_SKIP() -> i32 { return 0; }
@@ -517,6 +526,23 @@ fn test_ret_value_slot() -> i32 {
     return 0;
 }
 
+fn test_use_ret_slot() -> i32 {
+    if use_ret_slot(true, true) != false { return 1; }
+    if use_ret_slot(true, false) != false { return 2; }
+    if use_ret_slot(false, false) != false { return 3; }
+    if use_ret_slot(false, true) != true { return 4; }
+    return 0;
+}
+
+fn test_lit_supported() -> i32 {
+    if lower_lit_supported(0) != true { return 1; }
+    if lower_lit_supported(1) != true { return 2; }
+    if lower_lit_supported(2) != true { return 3; }
+    if lower_lit_supported(3) != true { return 4; }
+    if lower_lit_supported(99) != false { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -554,5 +580,9 @@ fn main() -> i32 {
     if r17 != 0 { return 190 + r17; }
     let r18: i32 = test_ret_value_slot();
     if r18 != 0 { return 200 + r18; }
+    let r19: i32 = test_use_ret_slot();
+    if r19 != 0 { return 210 + r19; }
+    let r20: i32 = test_lit_supported();
+    if r20 != 0 { return 220 + r20; }
     return 0;
 }

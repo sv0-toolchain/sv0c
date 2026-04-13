@@ -7,7 +7,14 @@ static int binop_class(int tag);
 static int is_arith_binop(int tag);
 static int is_logic_binop(int tag);
 static int is_cmp_binop(int tag);
+static int binop_returns_bool(int tag);
 static int is_integral_ty(int ty_tag);
+static int is_bool_ty(int ty_tag);
+static int is_unit_ty(int ty_tag);
+static int is_string_ty(int ty_tag);
+static int is_numeric_ty(int ty_tag);
+static int assign_lhs_is_var(int class);
+static int assign_lhs_is_field(int class);
 static int TY_UNIT(void);
 static int TY_BOOL(void);
 static int TY_CHAR(void);
@@ -81,6 +88,7 @@ static int test_try_helpers(void);
 static int test_error_codes(void);
 static int test_struct_field(void);
 static int test_loop_depth(void);
+static int test_extra_classifiers(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -142,6 +150,16 @@ static int is_cmp_binop(int tag) {
   return _sv0t1;
 }
 
+static int binop_returns_bool(int tag) {
+  int _sv0t0 = is_cmp_binop(tag);
+  if (_sv0t0) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = is_logic_binop(tag);
+  return _sv0t1;
+}
+
 static int is_integral_ty(int ty_tag) {
   if ((ty_tag == 0)) {
     return 1;
@@ -160,6 +178,41 @@ static int is_integral_ty(int ty_tag) {
   } else {
   }
   return 0;
+}
+
+static int is_bool_ty(int ty_tag) {
+  int _sv0t0 = (ty_tag == 3);
+  return _sv0t0;
+}
+
+static int is_unit_ty(int ty_tag) {
+  int _sv0t0 = (ty_tag == 2);
+  return _sv0t0;
+}
+
+static int is_string_ty(int ty_tag) {
+  int _sv0t0 = (ty_tag == 5);
+  return _sv0t0;
+}
+
+static int is_numeric_ty(int ty_tag) {
+  int _sv0t0 = is_integral_ty(ty_tag);
+  if (_sv0t0) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = (ty_tag == 10);
+  return _sv0t1;
+}
+
+static int assign_lhs_is_var(int class) {
+  int _sv0t0 = (class == 0);
+  return _sv0t0;
+}
+
+static int assign_lhs_is_field(int class) {
+  int _sv0t0 = (class == 1);
+  return _sv0t0;
 }
 
 static int TY_UNIT(void) {
@@ -1142,6 +1195,85 @@ static int test_loop_depth(void) {
   return 0;
 }
 
+static int test_extra_classifiers(void) {
+  int _sv0t0 = binop_returns_bool(5);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = binop_returns_bool(11);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = binop_returns_bool(0);
+  if ((_sv0t2 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = is_bool_ty(3);
+  if ((_sv0t3 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = is_bool_ty(0);
+  if ((_sv0t4 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = is_unit_ty(2);
+  if ((_sv0t5 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t6 = is_unit_ty(0);
+  if ((_sv0t6 != 0)) {
+    return 7;
+  } else {
+  }
+  int _sv0t7 = is_string_ty(5);
+  if ((_sv0t7 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t8 = is_string_ty(0);
+  if ((_sv0t8 != 0)) {
+    return 9;
+  } else {
+  }
+  int _sv0t9 = is_numeric_ty(0);
+  if ((_sv0t9 != 1)) {
+    return 10;
+  } else {
+  }
+  int _sv0t10 = is_numeric_ty(10);
+  if ((_sv0t10 != 1)) {
+    return 11;
+  } else {
+  }
+  int _sv0t11 = is_numeric_ty(3);
+  if ((_sv0t11 != 0)) {
+    return 12;
+  } else {
+  }
+  int _sv0t12 = assign_lhs_is_var(0);
+  if ((_sv0t12 != 1)) {
+    return 13;
+  } else {
+  }
+  int _sv0t13 = assign_lhs_is_field(1);
+  if ((_sv0t13 != 1)) {
+    return 14;
+  } else {
+  }
+  int _sv0t14 = assign_lhs_is_var(1);
+  if ((_sv0t14 != 0)) {
+    return 15;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -1231,6 +1363,13 @@ int main(void) {
   if ((r13 != 0)) {
     int _sv0t24 = (140 + r13);
     return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_extra_classifiers();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (150 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;

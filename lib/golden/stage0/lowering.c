@@ -14,6 +14,8 @@ static int ast_ty_is_unit(const char* name);
 static const char* old_slot_prefix(void);
 static int old_slot_name_len(int name_len);
 static int ret_syntax_is_unit(int has_ret, const char* ret_ty_name);
+static int use_ret_slot(int is_unit, int ens_mentions_result);
+static int lower_lit_supported(int lit_tag);
 static int SV_SKIP(void);
 static int SV_STORE(void);
 static int SV_LOAD(void);
@@ -63,6 +65,8 @@ static int test_literals(void);
 static int test_value_to_expr(void);
 static int test_enum_alloc(void);
 static int test_ret_value_slot(void);
+static int test_use_ret_slot(void);
+static int test_lit_supported(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -353,6 +357,20 @@ static int ret_syntax_is_unit(int has_ret, const char* ret_ty_name) {
   } else {
   }
   return 0;
+}
+
+static int use_ret_slot(int is_unit, int ens_mentions_result) {
+  if (is_unit) {
+    return 0;
+  } else {
+  }
+  return ens_mentions_result;
+}
+
+static int lower_lit_supported(int lit_tag) {
+  int _sv0t0 = classify_literal(lit_tag);
+  int _sv0t1 = (_sv0t0 >= 0);
+  return _sv0t1;
 }
 
 static int SV_SKIP(void) {
@@ -1202,6 +1220,59 @@ static int test_ret_value_slot(void) {
   return 0;
 }
 
+static int test_use_ret_slot(void) {
+  int _sv0t0 = use_ret_slot(1, 1);
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = use_ret_slot(1, 0);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = use_ret_slot(0, 0);
+  if ((_sv0t2 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = use_ret_slot(0, 1);
+  if ((_sv0t3 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lit_supported(void) {
+  int _sv0t0 = lower_lit_supported(0);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = lower_lit_supported(1);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = lower_lit_supported(2);
+  if ((_sv0t2 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = lower_lit_supported(3);
+  if ((_sv0t3 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = lower_lit_supported(99);
+  if ((_sv0t4 != 0)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -1326,6 +1397,20 @@ int main(void) {
   if ((r18 != 0)) {
     int _sv0t34 = (200 + r18);
     return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_use_ret_slot();
+  int r19 = _sv0t35;
+  if ((r19 != 0)) {
+    int _sv0t36 = (210 + r19);
+    return _sv0t36;
+  } else {
+  }
+  int _sv0t37 = test_lit_supported();
+  int r20 = _sv0t37;
+  if ((r20 != 0)) {
+    int _sv0t38 = (220 + r20);
+    return _sv0t38;
   } else {
   }
   return 0;

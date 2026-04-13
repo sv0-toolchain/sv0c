@@ -298,6 +298,57 @@ fn is_unary_prefix(tok_tag: i32) -> bool {
     return false;
 }
 
+/* ── Pratt precedence (binop tag → level) ──────────────────── */
+
+fn prec_of_binop(binop_tag: i32) -> i32 {
+    if binop_tag == 12 { return 1; }
+    if binop_tag == 11 { return 2; }
+    if binop_tag == 5 { return 3; }
+    if binop_tag == 6 { return 3; }
+    if binop_tag == 7 { return 3; }
+    if binop_tag == 8 { return 3; }
+    if binop_tag == 9 { return 3; }
+    if binop_tag == 10 { return 3; }
+    if binop_tag == 14 { return 4; }
+    if binop_tag == 15 { return 5; }
+    if binop_tag == 13 { return 6; }
+    if binop_tag == 16 { return 7; }
+    if binop_tag == 17 { return 7; }
+    if binop_tag == 0 { return 8; }
+    if binop_tag == 1 { return 8; }
+    if binop_tag == 2 { return 9; }
+    if binop_tag == 3 { return 9; }
+    if binop_tag == 4 { return 9; }
+    return 0;
+}
+
+fn is_right_assoc(binop_tag: i32) -> bool {
+    return false;
+}
+
+fn next_prec(current: i32, right_assoc: bool) -> i32 {
+    if right_assoc { return current; }
+    return current + 1;
+}
+
+fn binop_is_comparison(binop_tag: i32) -> bool {
+    return prec_of_binop(binop_tag) == 3;
+}
+
+fn binop_is_arithmetic(binop_tag: i32) -> bool {
+    let p: i32 = prec_of_binop(binop_tag);
+    if p == 8 { return true; }
+    if p == 9 { return true; }
+    return false;
+}
+
+fn binop_is_logical(binop_tag: i32) -> bool {
+    let p: i32 = prec_of_binop(binop_tag);
+    if p == 1 { return true; }
+    if p == 2 { return true; }
+    return false;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_of() -> i32 {
@@ -424,6 +475,28 @@ fn test_ty_name() -> i32 {
     return 0;
 }
 
+fn test_pratt_prec() -> i32 {
+    if prec_of_binop(12) != 1 { return 1; }
+    if prec_of_binop(11) != 2 { return 2; }
+    if prec_of_binop(5) != 3 { return 3; }
+    if prec_of_binop(10) != 3 { return 4; }
+    if prec_of_binop(0) != 8 { return 5; }
+    if prec_of_binop(2) != 9 { return 6; }
+    if prec_of_binop(16) != 7 { return 7; }
+    if is_right_assoc(0) != false { return 8; }
+    if next_prec(3, false) != 4 { return 9; }
+    if next_prec(3, true) != 3 { return 10; }
+    if binop_is_comparison(5) != true { return 11; }
+    if binop_is_comparison(0) != false { return 12; }
+    if binop_is_arithmetic(0) != true { return 13; }
+    if binop_is_arithmetic(2) != true { return 14; }
+    if binop_is_arithmetic(5) != false { return 15; }
+    if binop_is_logical(11) != true { return 16; }
+    if binop_is_logical(12) != true { return 17; }
+    if binop_is_logical(0) != false { return 18; }
+    return 0;
+}
+
 fn test_attr_bracket() -> i32 {
     if attr_bracket_update(10, 0) != 1 { return 1; }
     if attr_bracket_update(11, 2) != 1 { return 2; }
@@ -450,5 +523,7 @@ fn main() -> i32 {
     if r8 != 0 { return 120 + r8; }
     let r9: i32 = test_attr_bracket();
     if r9 != 0 { return 130 + r9; }
+    let r10: i32 = test_pratt_prec();
+    if r10 != 0 { return 140 + r10; }
     return 0;
 }

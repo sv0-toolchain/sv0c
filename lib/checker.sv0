@@ -35,6 +35,11 @@ fn is_arith_binop(tag: i32) -> bool { return binop_class(tag) == 0; }
 fn is_logic_binop(tag: i32) -> bool { return binop_class(tag) == 1; }
 fn is_cmp_binop(tag: i32) -> bool { return binop_class(tag) == 2; }
 
+fn binop_returns_bool(tag: i32) -> bool {
+    if is_cmp_binop(tag) { return true; }
+    return is_logic_binop(tag);
+}
+
 /* ── integral type detection ────────────────────────────────── */
 
 /* Types.ty tags: TyInt=0, TyUint=1, TyIsize=8, TyUsize=9 */
@@ -45,6 +50,17 @@ fn is_integral_ty(ty_tag: i32) -> bool {
     if ty_tag == 9 { return true; }
     return false;
 }
+
+fn is_bool_ty(ty_tag: i32) -> bool { return ty_tag == 3; }
+fn is_unit_ty(ty_tag: i32) -> bool { return ty_tag == 2; }
+fn is_string_ty(ty_tag: i32) -> bool { return ty_tag == 5; }
+fn is_numeric_ty(ty_tag: i32) -> bool {
+    if is_integral_ty(ty_tag) { return true; }
+    return ty_tag == 10;
+}
+
+fn assign_lhs_is_var(class: i32) -> bool { return class == 0; }
+fn assign_lhs_is_field(class: i32) -> bool { return class == 1; }
 
 /* ── AST type name → type tag ───────────────────────────────── */
 
@@ -427,6 +443,25 @@ fn test_loop_depth() -> i32 {
     return 0;
 }
 
+fn test_extra_classifiers() -> i32 {
+    if binop_returns_bool(5) != true { return 1; }
+    if binop_returns_bool(11) != true { return 2; }
+    if binop_returns_bool(0) != false { return 3; }
+    if is_bool_ty(3) != true { return 4; }
+    if is_bool_ty(0) != false { return 5; }
+    if is_unit_ty(2) != true { return 6; }
+    if is_unit_ty(0) != false { return 7; }
+    if is_string_ty(5) != true { return 8; }
+    if is_string_ty(0) != false { return 9; }
+    if is_numeric_ty(0) != true { return 10; }
+    if is_numeric_ty(10) != true { return 11; }
+    if is_numeric_ty(3) != false { return 12; }
+    if assign_lhs_is_var(0) != true { return 13; }
+    if assign_lhs_is_field(1) != true { return 14; }
+    if assign_lhs_is_var(1) != false { return 15; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -454,5 +489,7 @@ fn main() -> i32 {
     if r12 != 0 { return 130 + r12; }
     let r13: i32 = test_loop_depth();
     if r13 != 0 { return 140 + r13; }
+    let r14: i32 = test_extra_classifiers();
+    if r14 != 0 { return 150 + r14; }
     return 0;
 }
