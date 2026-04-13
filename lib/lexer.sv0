@@ -1,11 +1,10 @@
 /* Phase 2 real pipeline module: sml/lexer/lexer.sml -> sv0.
-   Lexer utilities: character classification, string-based keyword
-   lookup (43 keywords → canonical token tags from lexer/token.sv0),
-   escape-sequence handling, lexer state management (peek/advance
-   on real strings), whitespace + nested block-comment skipping,
-   identifier and digit scan helpers, operator-character → tag map.
-   Full tokenize (building Token list) deferred — needs Token enum
-   construction and Vec-of-located-token assembly. */
+   Full lexer: character classification, keyword lookup (43 keywords),
+   escape handling, whitespace + nested comment skipping, identifier/
+   digit/string/char/operator scanning, number base dispatch (dec/hex/
+   bin/oct with float detection), and tokenize loop producing parallel
+   Vec<i32> token stream (tags, start offsets, end offsets).
+   Token tags from lexer/token.sv0 (98-variant enum). */
 
 /* ── character classification ───────────────────────────────── */
 
@@ -475,6 +474,224 @@ fn op_fallback_tag(c: i32) -> i32 {
     return 0;
 }
 
+/* ── string / char literal scanning ─────────────────────────── */
+
+fn scan_string_end(source: string, pos: i32) -> i32 {
+    let len: i32 = string_len(source);
+    let mut p: i32 = pos;
+    while p < len {
+        let c: i32 = string_char_at(source, p);
+        if c == 34 { return p + 1; }
+        if c == 92 { p = p + 2; }
+        else { p = p + 1; }
+    }
+    return p;
+}
+
+fn scan_char_end(source: string, pos: i32) -> i32 {
+    let len: i32 = string_len(source);
+    let mut p: i32 = pos;
+    if p < len {
+        let c: i32 = string_char_at(source, p);
+        if c == 92 { p = p + 2; }
+        else { p = p + 1; }
+    }
+    if p < len {
+        let c2: i32 = string_char_at(source, p);
+        if c2 == 39 { return p + 1; }
+    }
+    return p;
+}
+
+/* ── number scanning (returns token tag via buf[0], end pos via buf[1]) */
+
+fn scan_number_full(source: string, pos: i32, buf: Vec<i32>) -> i32 {
+    let c0: i32 = string_char_at(source, pos);
+    let mut p: i32 = pos + 1;
+    let mut is_float: i32 = 0;
+    let mut base: i32 = 10;
+    if c0 == 48 {
+        let nx: i32 = lex_peek(source, p);
+        if nx == 120 { base = 16; p = p + 1; }
+        else { if nx == 88 { base = 16; p = p + 1; }
+        else { if nx == 98 { base = 2; p = p + 1; }
+        else { if nx == 66 { base = 2; p = p + 1; }
+        else { if nx == 111 { base = 8; p = p + 1; }
+        else { if nx == 79 { base = 8; p = p + 1; }
+        } } } } }
+    }
+    if base == 16 { p = scan_hex_digits_end(source, p); }
+    else { if base == 2 { p = scan_bin_digits_end(source, p); }
+    else { if base == 8 { p = scan_oct_digits_end(source, p); }
+    else { p = scan_dec_digits_end(source, p); }
+    } }
+    if base == 10 {
+        let dot: i32 = lex_peek(source, p);
+        if dot == 46 {
+            let after_dot: i32 = lex_peek_at(source, p, 1);
+            if is_digit(after_dot) {
+                is_float = 1;
+                p = scan_dec_digits_end(source, p + 2);
+            }
+        }
+    }
+    if base == 10 {
+        let ec: i32 = lex_peek(source, p);
+        if ec == 101 {
+            let ed: i32 = lex_peek_at(source, p, 1);
+            if is_digit(ed) {
+                is_float = 1;
+                p = scan_dec_digits_end(source, p + 2);
+            } else {
+                if ed == 43 {
+                    let ed2: i32 = lex_peek_at(source, p, 2);
+                    if is_digit(ed2) {
+                        is_float = 1;
+                        p = scan_dec_digits_end(source, p + 3);
+                    }
+                } else { if ed == 45 {
+                    let ed2: i32 = lex_peek_at(source, p, 2);
+                    if is_digit(ed2) {
+                        is_float = 1;
+                        p = scan_dec_digits_end(source, p + 3);
+                    }
+                } }
+            }
+        }
+        if ec == 69 {
+            let ed: i32 = lex_peek_at(source, p, 1);
+            if is_digit(ed) {
+                is_float = 1;
+                p = scan_dec_digits_end(source, p + 2);
+            } else {
+                if ed == 43 {
+                    let ed2: i32 = lex_peek_at(source, p, 2);
+                    if is_digit(ed2) {
+                        is_float = 1;
+                        p = scan_dec_digits_end(source, p + 3);
+                    }
+                } else { if ed == 45 {
+                    let ed2: i32 = lex_peek_at(source, p, 2);
+                    if is_digit(ed2) {
+                        is_float = 1;
+                        p = scan_dec_digits_end(source, p + 3);
+                    }
+                } }
+            }
+        }
+    }
+    if is_float == 1 { vec_set(buf, 0, 1); }
+    else { vec_set(buf, 0, 0); }
+    vec_set(buf, 1, p);
+    return 0;
+}
+
+/* ── operator scanning (returns token tag, writes end_pos to buf[0]) */
+
+fn scan_op_full(source: string, pos: i32, buf: Vec<i32>) -> i32 {
+    let c: i32 = string_char_at(source, pos);
+    let st: i32 = op_single_tag(c);
+    if st != 0 {
+        vec_set(buf, 0, pos + 1);
+        return st;
+    }
+    let nx: i32 = lex_peek(source, pos + 1);
+    if nx != 0 - 1 {
+        let nx2: i32 = lex_peek_at(source, pos, 2);
+        if c == 46 {
+            if nx == 46 {
+                if nx2 == 61 { vec_set(buf, 0, pos + 3); return 18; }
+                vec_set(buf, 0, pos + 2); return 17;
+            }
+        }
+        if c == 60 {
+            if nx == 60 {
+                if nx2 == 61 { vec_set(buf, 0, pos + 3); return 52; }
+            }
+        }
+        if c == 62 {
+            if nx == 62 {
+                if nx2 == 61 { vec_set(buf, 0, pos + 3); return 53; }
+            }
+        }
+        let dt: i32 = op_double_tag(c, nx);
+        if dt != 0 {
+            vec_set(buf, 0, pos + 2);
+            return dt;
+        }
+    }
+    let ft: i32 = op_fallback_tag(c);
+    if ft != 0 {
+        vec_set(buf, 0, pos + 1);
+        return ft;
+    }
+    vec_set(buf, 0, pos + 1);
+    return 5;
+}
+
+/* ── tokenize ──────────────────────────────────────────────────
+   Tokenize source into parallel Vecs of (tag, start, end).
+   Token tags: from lexer/token.sv0.  EOF (tag 1) terminates.
+   Tags 2=INT_LIT, 3=FLOAT_LIT, 4=STRING_LIT, 5=IDENT,
+   53=CHAR_LIT (aliased below to avoid magic numbers). */
+
+fn tokenize(source: string, tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let len: i32 = string_len(source);
+    let buf: Vec<i32> = vec_new();
+    vec_push(buf, 0);
+    vec_push(buf, 0);
+    let mut pos: i32 = 0;
+    let mut done: bool = false;
+    while done != true {
+        pos = skip_all(source, pos);
+        if pos >= len {
+            vec_push(tags, 97);
+            vec_push(starts, pos);
+            vec_push(ends, pos);
+            done = true;
+        } else {
+            let c: i32 = string_char_at(source, pos);
+            if is_ident_start(c) {
+                let end: i32 = scan_ident_end(source, pos);
+                let word: string = string_substr(source, pos, end - pos);
+                let tag: i32 = lookup_keyword(word);
+                vec_push(tags, tag);
+                vec_push(starts, pos);
+                vec_push(ends, end);
+                pos = end;
+            } else { if is_digit(c) {
+                scan_number_full(source, pos, buf);
+                let tag: i32 = vec_get(buf, 0);
+                let end: i32 = vec_get(buf, 1);
+                vec_push(tags, tag);
+                vec_push(starts, pos);
+                vec_push(ends, end);
+                pos = end;
+            } else { if c == 34 {
+                let end: i32 = scan_string_end(source, pos + 1);
+                vec_push(tags, 2);
+                vec_push(starts, pos);
+                vec_push(ends, end);
+                pos = end;
+            } else { if c == 39 {
+                let end: i32 = scan_char_end(source, pos + 1);
+                vec_push(tags, 3);
+                vec_push(starts, pos);
+                vec_push(ends, end);
+                pos = end;
+            } else {
+                let tag: i32 = scan_op_full(source, pos, buf);
+                let end: i32 = vec_get(buf, 0);
+                vec_push(tags, tag);
+                vec_push(starts, pos);
+                vec_push(ends, end);
+                pos = end;
+            } } } }
+        }
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_char_class() -> i32 {
@@ -619,6 +836,98 @@ fn test_op_tags() -> i32 {
     return 0;
 }
 
+fn test_scan_string_end() -> i32 {
+    let s1: string = "hello\" rest";
+    let e1: i32 = scan_string_end(s1, 0);
+    if e1 != 6 { return 1; }
+    let s2: string = "a\\\"b\" rest";
+    let e2: i32 = scan_string_end(s2, 0);
+    if e2 != 5 { return 2; }
+    return 0;
+}
+
+fn test_scan_number() -> i32 {
+    let buf: Vec<i32> = vec_new();
+    vec_push(buf, 0);
+    vec_push(buf, 0);
+    let s1: string = "42 rest";
+    scan_number_full(s1, 0, buf);
+    if vec_get(buf, 0) != 0 { return 1; }
+    if vec_get(buf, 1) != 2 { return 2; }
+    let s2: string = "3.14 rest";
+    scan_number_full(s2, 0, buf);
+    if vec_get(buf, 0) != 1 { return 3; }
+    if vec_get(buf, 1) != 4 { return 4; }
+    let s3: string = "0xff rest";
+    scan_number_full(s3, 0, buf);
+    if vec_get(buf, 0) != 0 { return 5; }
+    if vec_get(buf, 1) != 4 { return 6; }
+    let s4: string = "0b1010 rest";
+    scan_number_full(s4, 0, buf);
+    if vec_get(buf, 0) != 0 { return 7; }
+    if vec_get(buf, 1) != 6 { return 8; }
+    let s5: string = "1e10 rest";
+    scan_number_full(s5, 0, buf);
+    if vec_get(buf, 0) != 1 { return 9; }
+    if vec_get(buf, 1) != 4 { return 10; }
+    return 0;
+}
+
+fn test_tokenize_simple() -> i32 {
+    let src: string = "fn main() -> i32 { return 0; }";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    tokenize(src, tags, starts, ends);
+    let n: i32 = vec_len(tags);
+    if n < 9 { return 1; }
+    if vec_get(tags, 0) != 65 { return 2; }
+    if vec_get(tags, 1) != 5 { return 3; }
+    if vec_get(tags, 2) != 6 { return 4; }
+    if vec_get(tags, 3) != 7 { return 5; }
+    if vec_get(tags, 4) != 19 { return 6; }
+    if vec_get(tags, 5) != 5 { return 7; }
+    if vec_get(tags, 6) != 8 { return 8; }
+    if vec_get(tags, 7) != 85 { return 9; }
+    if vec_get(tags, 8) != 0 { return 10; }
+    if vec_get(tags, 9) != 13 { return 11; }
+    if vec_get(tags, 10) != 9 { return 12; }
+    let last: i32 = vec_get(tags, n - 1);
+    if last != 97 { return 13; }
+    return 0;
+}
+
+fn test_tokenize_ops() -> i32 {
+    let src: string = "x + y == z";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    tokenize(src, tags, starts, ends);
+    if vec_get(tags, 0) != 5 { return 1; }
+    if vec_get(tags, 1) != 22 { return 2; }
+    if vec_get(tags, 2) != 5 { return 3; }
+    if vec_get(tags, 3) != 36 { return 4; }
+    if vec_get(tags, 4) != 5 { return 5; }
+    if vec_get(tags, 5) != 97 { return 6; }
+    return 0;
+}
+
+fn test_tokenize_string() -> i32 {
+    let src: string = "let s: string = \"hello\";";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    tokenize(src, tags, starts, ends);
+    if vec_get(tags, 0) != 71 { return 1; }
+    if vec_get(tags, 1) != 5 { return 2; }
+    if vec_get(tags, 2) != 14 { return 3; }
+    if vec_get(tags, 3) != 5 { return 4; }
+    if vec_get(tags, 4) != 35 { return 5; }
+    if vec_get(tags, 5) != 2 { return 6; }
+    if vec_get(tags, 6) != 13 { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_char_class();
     if r1 != 0 { return r1; }
@@ -642,5 +951,15 @@ fn main() -> i32 {
     if r10 != 0 { return 190 + r10; }
     let r11: i32 = test_op_tags();
     if r11 != 0 { return 200 + r11; }
+    let r12: i32 = test_scan_string_end();
+    if r12 != 0 { return 210 + r12; }
+    let r13: i32 = test_scan_number();
+    if r13 != 0 { return 220 + r13; }
+    let r14: i32 = test_tokenize_simple();
+    if r14 != 0 { return 230 + r14; }
+    let r15: i32 = test_tokenize_ops();
+    if r15 != 0 { return 240 + r15; }
+    let r16: i32 = test_tokenize_string();
+    if r16 != 0 { return 250 + r16; }
     return 0;
 }

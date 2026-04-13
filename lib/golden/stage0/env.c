@@ -10,6 +10,17 @@ static int dup_mod_ty(int name, int mod_tys);
 static int register_module_value(int mod_vals, int name);
 static int register_module_type(int mod_tys, int name);
 static int type_is_registered_by_handle(int name_h, int mod_tys);
+static int env_new_fn_arities(void);
+static int dup_fn_arity(int fn_arities, int name);
+static int register_fn_arity(int fn_arities, int name, int arity);
+static int lookup_fn_arity(int fn_arities, int name);
+static int env_new_ty_aliases(void);
+static int has_ty_alias_name(int ty_aliases, int from);
+static int find_ty_alias_target(int ty_aliases, int from);
+static int resolve_canonical_ty(int ty_aliases, int name);
+static int register_type_alias(int ty_aliases, int from, int to);
+static int register_value_alias(int mod_vals, int fn_arities, int local_name, int target_name);
+static int lookup_type(int mod_tys, int ty_aliases, int name_h, const char* name_str, int allow_self, int self_h);
 static int enter_scope(int frames);
 static int exit_scope(int frames);
 static int bind_local(int frames, int name);
@@ -22,6 +33,10 @@ static int test_dup_mod_val(void);
 static int test_register_module_value(void);
 static int test_scope_enter_exit(void);
 static int test_bind_and_lookup(void);
+static int test_fn_arity(void);
+static int test_ty_alias(void);
+static int test_value_alias(void);
+static int test_lookup_type(void);
 
 static int is_prelude_type(const char* name) {
   int _sv0t0 = sv0_string_eq(name, "i8");
@@ -191,6 +206,146 @@ static int register_module_type(int mod_tys, int name) {
 static int type_is_registered_by_handle(int name_h, int mod_tys) {
   int _sv0t0 = vec_contains(mod_tys, name_h);
   return _sv0t0;
+}
+
+static int env_new_fn_arities(void) {
+  int _sv0t0 = sv0_vec_new();
+  return _sv0t0;
+}
+
+static int dup_fn_arity(int fn_arities, int name) {
+  int _sv0t0 = sv0_vec_len(fn_arities);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(fn_arities, i);
+    if ((_sv0t1 == name)) {
+      return 1;
+    } else {
+    }
+    i = (i + 2);
+  }
+  return 0;
+}
+
+static int register_fn_arity(int fn_arities, int name, int arity) {
+  sv0_vec_push(fn_arities, name);
+  sv0_vec_push(fn_arities, arity);
+  return 0;
+}
+
+static int lookup_fn_arity(int fn_arities, int name) {
+  int _sv0t0 = sv0_vec_len(fn_arities);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(fn_arities, i);
+    if ((_sv0t1 == name)) {
+      int _sv0t2 = (i + 1);
+      int _sv0t3 = sv0_vec_get(fn_arities, _sv0t2);
+      return _sv0t3;
+    } else {
+    }
+    i = (i + 2);
+  }
+  int _sv0t4 = (-1);
+  return _sv0t4;
+}
+
+static int env_new_ty_aliases(void) {
+  int _sv0t0 = sv0_vec_new();
+  return _sv0t0;
+}
+
+static int has_ty_alias_name(int ty_aliases, int from) {
+  int _sv0t0 = sv0_vec_len(ty_aliases);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(ty_aliases, i);
+    if ((_sv0t1 == from)) {
+      return 1;
+    } else {
+    }
+    i = (i + 2);
+  }
+  return 0;
+}
+
+static int find_ty_alias_target(int ty_aliases, int from) {
+  int _sv0t0 = sv0_vec_len(ty_aliases);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(ty_aliases, i);
+    if ((_sv0t1 == from)) {
+      int _sv0t2 = (i + 1);
+      int _sv0t3 = sv0_vec_get(ty_aliases, _sv0t2);
+      return _sv0t3;
+    } else {
+    }
+    i = (i + 2);
+  }
+  int _sv0t4 = (-1);
+  return _sv0t4;
+}
+
+static int resolve_canonical_ty(int ty_aliases, int name) {
+  int _sv0t0 = find_ty_alias_target(ty_aliases, name);
+  int target = _sv0t0;
+  int _sv0t1 = (-1);
+  if ((target == _sv0t1)) {
+    return name;
+  } else {
+  }
+  if ((target == name)) {
+    return name;
+  } else {
+  }
+  int _sv0t2 = resolve_canonical_ty(ty_aliases, target);
+  return _sv0t2;
+}
+
+static int register_type_alias(int ty_aliases, int from, int to) {
+  sv0_vec_push(ty_aliases, from);
+  sv0_vec_push(ty_aliases, to);
+  return 0;
+}
+
+static int register_value_alias(int mod_vals, int fn_arities, int local_name, int target_name) {
+  int _sv0t0 = lookup_fn_arity(fn_arities, target_name);
+  int ar = _sv0t0;
+  int _sv0t1 = (-1);
+  if ((ar == _sv0t1)) {
+    int _sv0t2 = (-1);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = register_module_value(mod_vals, local_name);
+  int _sv0t4 = register_fn_arity(fn_arities, local_name, ar);
+  return 0;
+}
+
+static int lookup_type(int mod_tys, int ty_aliases, int name_h, const char* name_str, int allow_self, int self_h) {
+  if ((name_h == self_h)) {
+    int _sv0t0 = (allow_self == 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = resolve_canonical_ty(ty_aliases, name_h);
+  int canon = _sv0t1;
+  if ((canon != name_h)) {
+    int _sv0t2 = vec_contains(mod_tys, canon);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = is_prelude_type(name_str);
+  if (_sv0t3) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = vec_contains(mod_tys, name_h);
+  return _sv0t4;
 }
 
 static int enter_scope(int frames) {
@@ -428,6 +583,163 @@ static int test_bind_and_lookup(void) {
   return 0;
 }
 
+static int test_fn_arity(void) {
+  int _sv0t0 = env_new_fn_arities();
+  int fa = _sv0t0;
+  int _sv0t1 = lookup_fn_arity(fa, 10);
+  int _sv0t2 = (-1);
+  if ((_sv0t1 != _sv0t2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = register_fn_arity(fa, 10, 2);
+  int _sv0t4 = register_fn_arity(fa, 20, 3);
+  int _sv0t5 = lookup_fn_arity(fa, 10);
+  if ((_sv0t5 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = lookup_fn_arity(fa, 20);
+  if ((_sv0t6 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = lookup_fn_arity(fa, 99);
+  int _sv0t8 = (-1);
+  if ((_sv0t7 != _sv0t8)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = dup_fn_arity(fa, 10);
+  if ((_sv0t9 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t10 = dup_fn_arity(fa, 99);
+  if ((_sv0t10 != 0)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_ty_alias(void) {
+  int _sv0t0 = env_new_ty_aliases();
+  int ta = _sv0t0;
+  int _sv0t1 = has_ty_alias_name(ta, 100);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = register_type_alias(ta, 100, 200);
+  int _sv0t3 = has_ty_alias_name(ta, 100);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = find_ty_alias_target(ta, 100);
+  if ((_sv0t4 != 200)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = find_ty_alias_target(ta, 999);
+  int _sv0t6 = (-1);
+  if ((_sv0t5 != _sv0t6)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = resolve_canonical_ty(ta, 100);
+  if ((_sv0t7 != 200)) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = resolve_canonical_ty(ta, 999);
+  if ((_sv0t8 != 999)) {
+    return 6;
+  } else {
+  }
+  int _sv0t9 = register_type_alias(ta, 200, 300);
+  int _sv0t10 = resolve_canonical_ty(ta, 100);
+  if ((_sv0t10 != 300)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
+static int test_value_alias(void) {
+  int _sv0t0 = env_new_mod_vals();
+  int mv = _sv0t0;
+  int _sv0t1 = env_new_fn_arities();
+  int fa = _sv0t1;
+  int _sv0t2 = register_fn_arity(fa, 50, 4);
+  int _sv0t3 = register_value_alias(mv, fa, 60, 50);
+  int rc = _sv0t3;
+  if ((rc != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = vec_contains(mv, 60);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = lookup_fn_arity(fa, 60);
+  if ((_sv0t5 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = register_value_alias(mv, fa, 70, 999);
+  int bad = _sv0t6;
+  int _sv0t7 = (-1);
+  if ((bad != _sv0t7)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lookup_type(void) {
+  int _sv0t0 = env_new_mod_tys();
+  int mt = _sv0t0;
+  int _sv0t1 = env_new_ty_aliases();
+  int ta = _sv0t1;
+  int _sv0t2 = lookup_type(mt, ta, 1, "i32", 0, 0);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = lookup_type(mt, ta, 2, "Foo", 0, 0);
+  if ((_sv0t3 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = register_module_type(mt, 3);
+  int _sv0t5 = lookup_type(mt, ta, 3, "MyStruct", 0, 0);
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  int self_h = 77;
+  int _sv0t6 = lookup_type(mt, ta, self_h, "Self", 1, self_h);
+  if ((_sv0t6 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = lookup_type(mt, ta, self_h, "Self", 0, self_h);
+  if ((_sv0t7 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = register_type_alias(ta, 500, 3);
+  int _sv0t9 = lookup_type(mt, ta, 500, "Alias", 0, 0);
+  if ((_sv0t9 != 1)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_prelude_types();
   int r1 = _sv0t0;
@@ -468,6 +780,34 @@ int main(void) {
   if ((r6 != 0)) {
     int _sv0t10 = (50 + r6);
     return _sv0t10;
+  } else {
+  }
+  int _sv0t11 = test_fn_arity();
+  int r7 = _sv0t11;
+  if ((r7 != 0)) {
+    int _sv0t12 = (60 + r7);
+    return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_ty_alias();
+  int r8 = _sv0t13;
+  if ((r8 != 0)) {
+    int _sv0t14 = (70 + r8);
+    return _sv0t14;
+  } else {
+  }
+  int _sv0t15 = test_value_alias();
+  int r9 = _sv0t15;
+  if ((r9 != 0)) {
+    int _sv0t16 = (80 + r9);
+    return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = test_lookup_type();
+  int r10 = _sv0t17;
+  if ((r10 != 0)) {
+    int _sv0t18 = (90 + r10);
+    return _sv0t18;
   } else {
   }
   return 0;
