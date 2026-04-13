@@ -1,0 +1,208 @@
+/* Phase 2 real pipeline module: sml/main.sml -> sv0.
+   Driver/main utilities: baseNameSv0 (path → stem by stripping .sv0
+   extension via find_last_slash + suffix check), pipeline phase ordering
+   constants (resolve → check → analyze → strip → lower → emit),
+   VM output path construction, CLI arg parsing helpers (target tag,
+   project flag, usage), error prefix constants.
+   Full I/O (readFile, writeBytes, compileFile, compileFileVm,
+   compileProjectDir) deferred — needs filesystem runtime. */
+
+/* ── path helpers ───────────────────────────────────────────── */
+
+fn find_last_slash(path: string) -> i32 {
+    let len: i32 = string_len(path);
+    let mut i: i32 = len - 1;
+    while i >= 0 {
+        let c: i32 = string_char_at(path, i);
+        if c == 47 { return i; }
+        if c == 92 { return i; }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+fn find_last_dot(s: string, start: i32) -> i32 {
+    let len: i32 = string_len(s);
+    let mut i: i32 = len - 1;
+    while i >= start {
+        if string_char_at(s, i) == 46 { return i; }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+fn path_has_sv0_ext(path: string) -> bool {
+    let len: i32 = string_len(path);
+    if len < 5 { return false; }
+    let dot: i32 = len - 4;
+    if string_char_at(path, dot) != 46 { return false; }
+    if string_char_at(path, dot + 1) != 115 { return false; }
+    if string_char_at(path, dot + 2) != 118 { return false; }
+    if string_char_at(path, dot + 3) != 48 { return false; }
+    return true;
+}
+
+fn sv0_ext_len() -> i32 { return 4; }
+
+fn base_name_stem_end(path: string) -> i32 {
+    let len: i32 = string_len(path);
+    if path_has_sv0_ext(path) { return len - 4; }
+    return len;
+}
+
+/* ── VM output path construction ────────────────────────────── */
+
+fn vm_build_dir() -> string { return "build/vm/"; }
+
+fn sv0b_ext() -> string { return ".sv0b"; }
+
+fn vm_entry_stem_main() -> string { return "main"; }
+
+fn vm_entry_stem_program() -> string { return "program"; }
+
+fn has_main_sv0(has_main_file: bool) -> string {
+    if has_main_file { return "main"; }
+    return "program";
+}
+
+/* ── pipeline phase ordering ────────────────────────────────── */
+
+fn PHASE_RESOLVE() -> i32 { return 0; }
+fn PHASE_CHECK() -> i32 { return 1; }
+fn PHASE_ANALYZE() -> i32 { return 2; }
+fn PHASE_STRIP() -> i32 { return 3; }
+fn PHASE_LOWER() -> i32 { return 4; }
+fn PHASE_EMIT_C() -> i32 { return 5; }
+fn PHASE_EMIT_VM() -> i32 { return 6; }
+fn PHASE_COUNT() -> i32 { return 7; }
+
+fn phase_name(phase: i32) -> string {
+    if phase == 0 { return "resolve"; }
+    if phase == 1 { return "check"; }
+    if phase == 2 { return "analyze"; }
+    if phase == 3 { return "strip"; }
+    if phase == 4 { return "lower"; }
+    if phase == 5 { return "emit-c"; }
+    if phase == 6 { return "emit-vm"; }
+    return "unknown";
+}
+
+fn is_backend_phase(phase: i32) -> bool {
+    if phase == 5 { return true; }
+    if phase == 6 { return true; }
+    return false;
+}
+
+/* ── CLI arg parsing helpers ────────────────────────────────── */
+
+fn CLI_FILE() -> i32 { return 0; }
+fn CLI_VM_FILE() -> i32 { return 1; }
+fn CLI_PROJECT() -> i32 { return 2; }
+fn CLI_VM_PROJECT() -> i32 { return 3; }
+fn CLI_USAGE() -> i32 { return 4; }
+
+fn is_target_vm_flag(arg: string) -> bool {
+    return string_eq(arg, "--target=vm");
+}
+
+fn is_project_flag(arg: string) -> bool {
+    return string_eq(arg, "--project");
+}
+
+fn classify_cli(argc: i32, has_vm: bool, has_project: bool) -> i32 {
+    if argc == 1 {
+        if has_vm == false {
+            if has_project == false { return 0; }
+        }
+    }
+    if argc == 2 {
+        if has_vm {
+            if has_project == false { return 1; }
+        }
+        if has_project {
+            if has_vm == false { return 2; }
+        }
+    }
+    if argc == 3 {
+        if has_vm {
+            if has_project { return 3; }
+        }
+    }
+    return 4;
+}
+
+/* ── error prefix constants ─────────────────────────────────── */
+
+fn error_prefix() -> string { return "sv0c error: "; }
+
+fn error_cannot_open() -> string { return "sv0c error: cannot open "; }
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_path_helpers() -> i32 {
+    if find_last_slash("foo/bar.sv0") != 3 { return 1; }
+    if find_last_slash("bar.sv0") != 0 - 1 { return 2; }
+    if find_last_slash("a/b/c.sv0") != 3 { return 3; }
+    if find_last_dot("bar.sv0", 0) != 3 { return 4; }
+    if find_last_dot("noext", 0) != 0 - 1 { return 5; }
+    if path_has_sv0_ext("test.sv0") != true { return 6; }
+    if path_has_sv0_ext("test.c") != false { return 7; }
+    if path_has_sv0_ext("a.sv0") != true { return 8; }
+    if path_has_sv0_ext(".sv0") != false { return 9; }
+    if base_name_stem_end("test.sv0") != 4 { return 10; }
+    if base_name_stem_end("test.c") != 6 { return 11; }
+    return 0;
+}
+
+fn test_vm_output() -> i32 {
+    if string_eq(vm_build_dir(), "build/vm/") != true { return 1; }
+    if string_eq(sv0b_ext(), ".sv0b") != true { return 2; }
+    if string_eq(has_main_sv0(true), "main") != true { return 3; }
+    if string_eq(has_main_sv0(false), "program") != true { return 4; }
+    return 0;
+}
+
+fn test_phases() -> i32 {
+    if PHASE_RESOLVE() != 0 { return 1; }
+    if PHASE_EMIT_C() != 5 { return 2; }
+    if PHASE_EMIT_VM() != 6 { return 3; }
+    if PHASE_COUNT() != 7 { return 4; }
+    if string_eq(phase_name(0), "resolve") != true { return 5; }
+    if string_eq(phase_name(5), "emit-c") != true { return 6; }
+    if is_backend_phase(4) != false { return 7; }
+    if is_backend_phase(5) != true { return 8; }
+    if is_backend_phase(6) != true { return 9; }
+    return 0;
+}
+
+fn test_cli() -> i32 {
+    if is_target_vm_flag("--target=vm") != true { return 1; }
+    if is_target_vm_flag("--project") != false { return 2; }
+    if is_project_flag("--project") != true { return 3; }
+    if classify_cli(1, false, false) != 0 { return 4; }
+    if classify_cli(2, true, false) != 1 { return 5; }
+    if classify_cli(2, false, true) != 2 { return 6; }
+    if classify_cli(3, true, true) != 3 { return 7; }
+    if classify_cli(0, false, false) != 4 { return 8; }
+    return 0;
+}
+
+fn test_error_prefix() -> i32 {
+    if string_eq(error_prefix(), "sv0c error: ") != true { return 1; }
+    if string_eq(error_cannot_open(), "sv0c error: cannot open ") != true { return 2; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_path_helpers();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_vm_output();
+    if r2 != 0 { return 20 + r2; }
+    let r3: i32 = test_phases();
+    if r3 != 0 { return 30 + r3; }
+    let r4: i32 = test_cli();
+    if r4 != 0 { return 40 + r4; }
+    let r5: i32 = test_error_prefix();
+    if r5 != 0 { return 50 + r5; }
+    return 0;
+}

@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Phase 2 real modules: parser.sv0 + lowering.sv0 + checker.sv0.** `lib/parser.sv0` new real module covering parser.sml pure-function surface: token→binop (18 tokens), token→assign-binop (10 compound-assign tokens), literal classification (6 token kinds), expr span by tag (28 kinds), skip helpers (pub/unsafe/generic params depth/where clause/attributes), span merge (min/max), precedence classification (cmp/additive/multiplicative/shift/unary), pathOfTy check. 9 test groups. Metrics: bootstrap 269, self-host 269, stage0 193, vm-parity 182)
+**Last updated:** 2026-04-13 (America/Denver; **Phase 2 complete: all 20 SML files have real sv0 counterparts.** `lib/main.sv0` new real module covering main.sml pure-function surface: baseNameSv0 path helpers (find_last_slash, find_last_dot, path_has_sv0_ext, base_name_stem_end), VM output path construction, pipeline phase ordering constants (7 phases), CLI arg parsing helpers (classify_cli, is_target_vm_flag, is_project_flag), error prefix constants. 5 test groups. Metrics: bootstrap 270, self-host 270, stage0 194, vm-parity 182)
 
 ## Checklist (local source of truth)
 
