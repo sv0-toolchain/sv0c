@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-13 (America/Denver; **Seed consolidation batch 4: removed 50 more seeds.** Removed surrogates and superseded seeds across all module families: 10 lower_*_core, 10 checker_*_core, 8 parser_*_core, 6 vm_codegen_*_core, 5 lexer_scan_*_core, 4 bytecode_*_core, 3 codegen_*_core, 2 resolver_*_core, include_expand_core, main_argv_core. All were pure i32/tag surrogates or already implemented in real modules. Seeds remaining: 46 `*_core.sv0`. Metrics: bootstrap 158, self-host 158, stage0 82, vm-parity 122)
+**Last updated:** 2026-04-13 (America/Denver; **Seed consolidation complete: all seeds removed.** Batch 5 removed the final 46 `*_core.sv0` seeds (12 lower, 5 vm_codegen, 4 checker, 4 codegen, 3 bytecode, 3 lexer, 3 lookup, 2 parser, 2 resolver, plus diagnostic_core, driver_pipeline_core, env_scope_core, main_pipeline_core, pipeline_compose_core, type_alias_core, types_core, unify_core). Seeds remaining: **0**. All were pure surrogates or superseded by real module implementations. Metrics: bootstrap 112, self-host 112, stage0 36, vm-parity 99)
 
 ## Checklist (local source of truth)
 
