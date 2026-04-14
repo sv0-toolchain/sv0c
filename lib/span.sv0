@@ -1,9 +1,11 @@
-/* Phase 1 type definitions: sml/error/span.sml -> sv0.
+/* Phase 2 real pipeline module: sml/error/span.sml -> sv0.
    Pos holds source position (line, column, byte offset).
    Span holds file path + start/stop positions.
    Span fields are flattened (no nested Pos struct) because the VM
    codegen does not yet support multi-slot sub-struct fields. The
-   accessor functions preserve the Pos abstraction for callers. */
+   accessor functions preserve the Pos abstraction for callers.
+   span_merge: combine two spans (SML merge). pos_to_string, span_to_string:
+   formatted location strings matching SML posToString / toString. */
 
 struct Pos {
     line: i32,
@@ -66,12 +68,54 @@ fn span_length(sp: Span) -> i32 {
     return sp.stop_offset - sp.start_offset;
 }
 
-fn main() -> i32 {
+fn span_merge(a: Span, b: Span) -> Span {
+    return Span {
+        file: a.file,
+        start_line: a.start_line, start_col: a.start_col, start_offset: a.start_offset,
+        stop_line: b.stop_line, stop_col: b.stop_col, stop_offset: b.stop_offset,
+    };
+}
+
+fn span_digit_char(d: i32) -> string {
+    if d == 0 { return "0"; }
+    if d == 1 { return "1"; }
+    if d == 2 { return "2"; }
+    if d == 3 { return "3"; }
+    if d == 4 { return "4"; }
+    if d == 5 { return "5"; }
+    if d == 6 { return "6"; }
+    if d == 7 { return "7"; }
+    if d == 8 { return "8"; }
+    return "9";
+}
+
+fn span_int_to_str(n: i32) -> string {
+    if n < 0 { return string_concat("-", span_int_to_str(0 - n)); }
+    if n < 10 { return span_digit_char(n); }
+    let rest: string = span_int_to_str(n / 10);
+    let last: string = span_digit_char(n - (n / 10) * 10);
+    return string_concat(rest, last);
+}
+
+fn pos_to_string(p: Pos) -> string {
+    let l: string = span_int_to_str(p.line);
+    let c: string = span_int_to_str(p.col);
+    return string_concat(string_concat(l, ":"), c);
+}
+
+fn span_to_string(sp: Span) -> string {
+    let s: Pos = span_start(sp);
+    let e: Pos = span_stop(sp);
+    let loc: string = string_concat(string_concat(pos_to_string(s), "-"), pos_to_string(e));
+    if string_len(sp.file) == 0 { return loc; }
+    return string_concat(string_concat(sp.file, ":"), loc);
+}
+
+fn test_basics() -> i32 {
     let p1: Pos = pos_new(1, 5, 10);
     if pos_line(p1) != 1 { return 1; }
     if pos_col(p1) != 5 { return 2; }
     if pos_offset(p1) != 10 { return 3; }
-
     let p2: Pos = pos_new(3, 12, 45);
     let sp: Span = span_new("test.sv0", p1, p2);
     let s: Pos = span_start(sp);
@@ -80,18 +124,72 @@ fn main() -> i32 {
     let e: Pos = span_stop(sp);
     if pos_line(e) != 3 { return 6; }
     if pos_col(e) != 12 { return 7; }
-
     let len: i32 = span_length(sp);
     if len != 35 { return 8; }
-
     let bog: Span = span_bogus();
     let bs: Pos = span_start(bog);
     if pos_line(bs) != 0 { return 9; }
     if pos_col(bs) != 0 { return 10; }
     if pos_offset(bs) != 0 { return 11; }
-    let be: Pos = span_stop(bog);
-    if pos_line(be) != 0 { return 12; }
+    let be_pos: Pos = span_stop(bog);
+    if pos_line(be_pos) != 0 { return 12; }
     if span_length(bog) != 0 { return 13; }
+    return 0;
+}
 
+fn test_merge() -> i32 {
+    let pa: Pos = pos_new(1, 5, 10);
+    let pb: Pos = pos_new(3, 12, 45);
+    let spa: Span = span_new("test.sv0", pa, pb);
+    let pc: Pos = pos_new(5, 20, 80);
+    let spb: Span = span_new("test.sv0", pb, pc);
+    let merged: Span = span_merge(spa, spb);
+    if merged.start_line != 1 { return 1; }
+    if merged.start_col != 5 { return 2; }
+    if merged.stop_line != 5 { return 3; }
+    if merged.stop_col != 20 { return 4; }
+    if merged.stop_offset != 80 { return 5; }
+    return 0;
+}
+
+fn test_pos_to_string() -> i32 {
+    let p1: Pos = pos_new(10, 5, 0);
+    if string_eq(pos_to_string(p1), "10:5") != true { return 1; }
+    let p2: Pos = pos_new(1, 1, 0);
+    if string_eq(pos_to_string(p2), "1:1") != true { return 2; }
+    let p3: Pos = pos_new(100, 42, 0);
+    if string_eq(pos_to_string(p3), "100:42") != true { return 3; }
+    return 0;
+}
+
+fn test_span_to_string() -> i32 {
+    let s: Pos = pos_new(1, 5, 10);
+    let e: Pos = pos_new(3, 12, 45);
+    let sp1: Span = span_new("foo.sv0", s, e);
+    if string_eq(span_to_string(sp1), "foo.sv0:1:5-3:12") != true { return 1; }
+    let sp2: Span = span_new("", s, e);
+    if string_eq(span_to_string(sp2), "1:5-3:12") != true { return 2; }
+    return 0;
+}
+
+fn test_int_to_str() -> i32 {
+    if string_eq(span_int_to_str(0), "0") != true { return 1; }
+    if string_eq(span_int_to_str(7), "7") != true { return 2; }
+    if string_eq(span_int_to_str(42), "42") != true { return 3; }
+    if string_eq(span_int_to_str(100), "100") != true { return 4; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_basics();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_merge();
+    if r2 != 0 { return 20 + r2; }
+    let r3: i32 = test_pos_to_string();
+    if r3 != 0 { return 30 + r3; }
+    let r4: i32 = test_span_to_string();
+    if r4 != 0 { return 40 + r4; }
+    let r5: i32 = test_int_to_str();
+    if r5 != 0 { return 50 + r5; }
     return 0;
 }

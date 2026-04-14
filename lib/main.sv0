@@ -1,7 +1,7 @@
 /* Phase 2 real pipeline module: sml/main.sml -> sv0.
-   Driver/main utilities: baseNameSv0 (path → stem by stripping .sv0
-   extension via find_last_slash + suffix check), pipeline phase ordering
-   constants (resolve → check → analyze → strip → lower → emit),
+   Driver/main utilities: base_name_sv0 (path → stem string matching
+   SML baseNameSv0: strip directory + .sv0 extension), pipeline phase
+   ordering constants (resolve → check → analyze → strip → lower → emit),
    VM output path construction, CLI arg parsing helpers (target tag,
    project flag, usage), error prefix constants.
    Full I/O (readFile, writeBytes, compileFile, compileFileVm,
@@ -48,6 +48,28 @@ fn base_name_stem_end(path: string) -> i32 {
     let len: i32 = string_len(path);
     if path_has_sv0_ext(path) { return len - 4; }
     return len;
+}
+
+fn base_name_sv0(path: string) -> string {
+    let len: i32 = string_len(path);
+    let slash: i32 = find_last_slash(path);
+    let start: i32 = slash + 1;
+    let flen: i32 = len - start;
+    let fname: string = string_substr(path, start, flen);
+    let fnlen: i32 = string_len(fname);
+    if fnlen > 4 {
+        let dot: i32 = fnlen - 4;
+        if string_char_at(fname, dot) == 46 {
+            if string_char_at(fname, dot + 1) == 115 {
+                if string_char_at(fname, dot + 2) == 118 {
+                    if string_char_at(fname, dot + 3) == 48 {
+                        return string_substr(fname, 0, dot);
+                    }
+                }
+            }
+        }
+    }
+    return fname;
 }
 
 /* ── VM output path construction ────────────────────────────── */
@@ -193,6 +215,16 @@ fn test_error_prefix() -> i32 {
     return 0;
 }
 
+fn test_base_name_sv0() -> i32 {
+    if string_eq(base_name_sv0("foo/bar.sv0"), "bar") != true { return 1; }
+    if string_eq(base_name_sv0("bar.sv0"), "bar") != true { return 2; }
+    if string_eq(base_name_sv0("a/b/main.sv0"), "main") != true { return 3; }
+    if string_eq(base_name_sv0("test.c"), "test.c") != true { return 4; }
+    if string_eq(base_name_sv0("noext"), "noext") != true { return 5; }
+    if string_eq(base_name_sv0("/abs/path/lib.sv0"), "lib") != true { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_helpers();
     if r1 != 0 { return r1; }
@@ -204,5 +236,7 @@ fn main() -> i32 {
     if r4 != 0 { return 40 + r4; }
     let r5: i32 = test_error_prefix();
     if r5 != 0 { return 50 + r5; }
+    let r6: i32 = test_base_name_sv0();
+    if r6 != 0 { return 60 + r6; }
     return 0;
 }
