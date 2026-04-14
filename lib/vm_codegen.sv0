@@ -7,7 +7,10 @@
    sentinels, value width classification, builtin function dispatch.
    lookup_slot (SML lookupSlot — name→slot_info in Vec env),
    alloc_local (SML allocLocal — bindParam wrapper), replace_loop_exit_jump
-   (SML replaceLoopExitJump — patches trailing JUMP placeholder).
+   (SML replaceLoopExitJump — patches trailing JUMP placeholder),
+   enum_field_names (SML enumFieldNames — "tag","p0","p1"... Vec),
+   value_width (SML valueWidth — slot-based width for VVar, else 1),
+   bind_param (SML bindParam — slot_info with struct/enum fields).
    Full emit (emitValue/emitExpr/emitInstr/emitBlock/emitWhileLoop)
    deferred — needs IR+AST traversal with slot_env management. */
 
@@ -133,6 +136,24 @@ fn index_of_field(fields: Vec<i32>, field_name: i32) -> i32 {
 fn enum_field_count(width: i32) -> i32 {
     if width <= 1 { return 1; }
     return width;
+}
+
+/* SML enumFieldNames: builds Vec of field-name handles for an enum
+   with the given width.  Index 0 is always the tag handle; indices
+   1..width-1 are payload slots "p0","p1",... represented as interned
+   name handles.  Caller passes the interned handles for "tag" and
+   "p0".."p<max>" directly since sv0 bootstrap cannot call an intern
+   function across compilation units; this version builds a Vec of
+   *indices* 0..width-1 where 0 = tag position and k>0 = payload k-1.
+   The real field names are resolved by the caller using its pool. */
+fn enum_field_names(width: i32) -> Vec<i32> {
+    let out: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < width {
+        vec_push(out, i);
+        i = i + 1;
+    }
+    return out;
 }
 
 /* ── binop -> opcode ────────────────────────────────────────── */
@@ -324,12 +345,22 @@ fn builtin_arg_count(name: string) -> i32 {
     return 0;
 }
 
-/* ── value width ────────────────────────────────────────────── */
+/* ── value width (SML valueWidth) ──────────────────────────── */
 
 fn value_width_scalar() -> i32 { return 1; }
 
 fn value_is_var(value_tag: i32) -> bool {
     return value_tag == 4;
+}
+
+fn value_width(value_tag: i32, var_name: i32,
+               env_names: Vec<i32>, env_bases: Vec<i32>,
+               env_widths: Vec<i32>) -> i32 {
+    if value_tag == 4 {
+        let idx: i32 = lookup_slot(env_names, env_bases, env_widths, var_name);
+        if idx >= 0 { return slot_width(env_widths, idx); }
+    }
+    return 1;
 }
 
 /* ── store ordering (multi-slot) ────────────────────────────── */
@@ -369,6 +400,27 @@ fn alloc_local(env_names: Vec<i32>, env_bases: Vec<i32>,
     vec_push(env_bases, slot);
     vec_push(env_widths, width);
     return slot + width;
+}
+
+/* ── bind_param (SML bindParam) ──────────────────────────────
+   Returns the new slot after binding.  Pushes name/base/width/fields
+   into the env Vecs.  `fields` is a Vec<i32> of struct field handles
+   (from struct layout) or enum synthetic field indices (from
+   enum_field_names).  If cty matches neither struct nor enum, fields
+   is empty. */
+fn bind_param(name: i32, cty_handle: i32, slot: i32,
+              env_names: Vec<i32>, env_bases: Vec<i32>,
+              env_widths: Vec<i32>, env_fields: Vec<i32>,
+              structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
+              enums_names: Vec<i32>, enums_widths: Vec<i32>) -> i32 {
+    let w: i32 = width_of_cty(cty_handle, structs_names,
+                               structs_field_counts, enums_names,
+                               enums_widths);
+    vec_push(env_names, name);
+    vec_push(env_bases, slot);
+    vec_push(env_widths, w);
+    vec_push(env_fields, vec_len(env_fields));
+    return slot + w;
 }
 
 /* ── replace_loop_exit_jump (SML replaceLoopExitJump) ──────── */
@@ -578,6 +630,56 @@ fn test_replace_loop_exit() -> i32 {
     return 0;
 }
 
+fn test_enum_field_names() -> i32 {
+    let f0: Vec<i32> = enum_field_names(0);
+    if vec_len(f0) != 0 { return 1; }
+    let f1: Vec<i32> = enum_field_names(1);
+    if vec_len(f1) != 1 { return 2; }
+    if vec_get(f1, 0) != 0 { return 3; }
+    let f4: Vec<i32> = enum_field_names(4);
+    if vec_len(f4) != 4 { return 4; }
+    if vec_get(f4, 0) != 0 { return 5; }
+    if vec_get(f4, 3) != 3 { return 6; }
+    return 0;
+}
+
+fn test_value_width() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let bases: Vec<i32> = vec_new();
+    let widths: Vec<i32> = vec_new();
+    vec_push(names, 10); vec_push(bases, 0); vec_push(widths, 1);
+    vec_push(names, 20); vec_push(bases, 1); vec_push(widths, 3);
+    if value_width(4, 20, names, bases, widths) != 3 { return 1; }
+    if value_width(4, 10, names, bases, widths) != 1 { return 2; }
+    if value_width(4, 99, names, bases, widths) != 1 { return 3; }
+    if value_width(0, 10, names, bases, widths) != 1 { return 4; }
+    return 0;
+}
+
+fn test_bind_param() -> i32 {
+    let en: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    let ef: Vec<i32> = vec_new();
+    let sn: Vec<i32> = vec_new();
+    let sf: Vec<i32> = vec_new();
+    let enn: Vec<i32> = vec_new();
+    let enw: Vec<i32> = vec_new();
+    vec_push(sn, 100); vec_push(sf, 3);
+    vec_push(enn, 200); vec_push(enw, 4);
+    let s1: i32 = bind_param(10, 100, 0, en, eb, ew, ef, sn, sf, enn, enw);
+    if s1 != 3 { return 1; }
+    let s2: i32 = bind_param(20, 200, 3, en, eb, ew, ef, sn, sf, enn, enw);
+    if s2 != 7 { return 2; }
+    let s3: i32 = bind_param(30, 999, 7, en, eb, ew, ef, sn, sf, enn, enw);
+    if s3 != 8 { return 3; }
+    if vec_len(en) != 3 { return 4; }
+    if vec_get(ew, 0) != 3 { return 5; }
+    if vec_get(ew, 1) != 4 { return 6; }
+    if vec_get(ew, 2) != 1 { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -611,5 +713,11 @@ fn main() -> i32 {
     if r15 != 0 { return 160 + r15; }
     let r16: i32 = test_replace_loop_exit();
     if r16 != 0 { return 170 + r16; }
+    let r17: i32 = test_enum_field_names();
+    if r17 != 0 { return 180 + r17; }
+    let r18: i32 = test_value_width();
+    if r18 != 0 { return 190 + r18; }
+    let r19: i32 = test_bind_param();
+    if r19 != 0 { return 200 + r19; }
     return 0;
 }

@@ -15,6 +15,7 @@ static int width_of_cty_scalar(const char* cty);
 static int width_of_cty_simple(const char* cty);
 static int index_of_field(int fields, int field_name);
 static int enum_field_count(int width);
+static int enum_field_names(int width);
 static int binop_to_insn(const char* op);
 static int unop_to_insn(const char* op);
 static int insn_size(int opc);
@@ -33,11 +34,13 @@ static int builtin_has_result(const char* name);
 static int builtin_arg_count(const char* name);
 static int value_width_scalar(void);
 static int value_is_var(int value_tag);
+static int value_width(int value_tag, int var_name, int env_names, int env_bases, int env_widths);
 static int store_slot_offset(int base, int width, int k);
 static int lookup_slot(int env_names, int env_bases, int env_widths, int name);
 static int slot_base(int env_bases, int idx);
 static int slot_width(int env_widths, int idx);
 static int alloc_local(int env_names, int env_bases, int env_widths, int name, int width, int slot);
+static int bind_param(int name, int cty_handle, int slot, int env_names, int env_bases, int env_widths, int env_fields, int structs_names, int structs_field_counts, int enums_names, int enums_widths);
 static int replace_loop_exit_jump(int instrs, int back_offset);
 static int test_variant_slots(void);
 static int test_cty_classify(void);
@@ -55,6 +58,9 @@ static int test_store_ordering(void);
 static int test_lookup_slot(void);
 static int test_alloc_local(void);
 static int test_replace_loop_exit(void);
+static int test_enum_field_names(void);
+static int test_value_width(void);
+static int test_bind_param(void);
 
 static int variant_slots_unit(void) {
   return 0;
@@ -219,6 +225,17 @@ static int enum_field_count(int width) {
   } else {
   }
   return width;
+}
+
+static int enum_field_names(int width) {
+  int _sv0t0 = sv0_vec_new();
+  int out = _sv0t0;
+  int i = 0;
+  while ((i < width)) {
+    sv0_vec_push(out, i);
+    i = (i + 1);
+  }
+  return out;
 }
 
 static int binop_to_insn(const char* op) {
@@ -758,6 +775,20 @@ static int value_is_var(int value_tag) {
   return _sv0t0;
 }
 
+static int value_width(int value_tag, int var_name, int env_names, int env_bases, int env_widths) {
+  if ((value_tag == 4)) {
+    int _sv0t0 = lookup_slot(env_names, env_bases, env_widths, var_name);
+    int idx = _sv0t0;
+    if ((idx >= 0)) {
+      int _sv0t1 = slot_width(env_widths, idx);
+      return _sv0t1;
+    } else {
+    }
+  } else {
+  }
+  return 1;
+}
+
 static int store_slot_offset(int base, int width, int k) {
   int _sv0t0 = (base + width);
   int _sv0t1 = (_sv0t0 - 1);
@@ -797,6 +828,18 @@ static int alloc_local(int env_names, int env_bases, int env_widths, int name, i
   sv0_vec_push(env_widths, width);
   int _sv0t0 = (slot + width);
   return _sv0t0;
+}
+
+static int bind_param(int name, int cty_handle, int slot, int env_names, int env_bases, int env_widths, int env_fields, int structs_names, int structs_field_counts, int enums_names, int enums_widths) {
+  int _sv0t0 = width_of_cty(cty_handle, structs_names, structs_field_counts, enums_names, enums_widths);
+  int w = _sv0t0;
+  sv0_vec_push(env_names, name);
+  sv0_vec_push(env_bases, slot);
+  sv0_vec_push(env_widths, w);
+  int _sv0t1 = sv0_vec_len(env_fields);
+  sv0_vec_push(env_fields, _sv0t1);
+  int _sv0t2 = (slot + w);
+  return _sv0t2;
 }
 
 static int replace_loop_exit_jump(int instrs, int back_offset) {
@@ -1407,6 +1450,144 @@ static int test_replace_loop_exit(void) {
   return 0;
 }
 
+static int test_enum_field_names(void) {
+  int _sv0t0 = enum_field_names(0);
+  int f0 = _sv0t0;
+  int _sv0t1 = sv0_vec_len(f0);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = enum_field_names(1);
+  int f1 = _sv0t2;
+  int _sv0t3 = sv0_vec_len(f1);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(f1, 0);
+  if ((_sv0t4 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = enum_field_names(4);
+  int f4 = _sv0t5;
+  int _sv0t6 = sv0_vec_len(f4);
+  if ((_sv0t6 != 4)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(f4, 0);
+  if ((_sv0t7 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(f4, 3);
+  if ((_sv0t8 != 3)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_value_width(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int bases = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int widths = _sv0t2;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(bases, 0);
+  sv0_vec_push(widths, 1);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(bases, 1);
+  sv0_vec_push(widths, 3);
+  int _sv0t3 = value_width(4, 20, names, bases, widths);
+  if ((_sv0t3 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = value_width(4, 10, names, bases, widths);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = value_width(4, 99, names, bases, widths);
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = value_width(0, 10, names, bases, widths);
+  if ((_sv0t6 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_bind_param(void) {
+  int _sv0t0 = sv0_vec_new();
+  int en = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int eb = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ew = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ef = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int sn = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int sf = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int enn = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int enw = _sv0t7;
+  sv0_vec_push(sn, 100);
+  sv0_vec_push(sf, 3);
+  sv0_vec_push(enn, 200);
+  sv0_vec_push(enw, 4);
+  int _sv0t8 = bind_param(10, 100, 0, en, eb, ew, ef, sn, sf, enn, enw);
+  int s1 = _sv0t8;
+  if ((s1 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = bind_param(20, 200, 3, en, eb, ew, ef, sn, sf, enn, enw);
+  int s2 = _sv0t9;
+  if ((s2 != 7)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = bind_param(30, 999, 7, en, eb, ew, ef, sn, sf, enn, enw);
+  int s3 = _sv0t10;
+  if ((s3 != 8)) {
+    return 3;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_len(en);
+  if ((_sv0t11 != 3)) {
+    return 4;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(ew, 0);
+  if ((_sv0t12 != 3)) {
+    return 5;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(ew, 1);
+  if ((_sv0t13 != 4)) {
+    return 6;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(ew, 2);
+  if ((_sv0t14 != 1)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_variant_slots();
   int r1 = _sv0t0;
@@ -1517,6 +1698,27 @@ int main(void) {
   if ((r16 != 0)) {
     int _sv0t30 = (170 + r16);
     return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_enum_field_names();
+  int r17 = _sv0t31;
+  if ((r17 != 0)) {
+    int _sv0t32 = (180 + r17);
+    return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_value_width();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (190 + r18);
+    return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_bind_param();
+  int r19 = _sv0t35;
+  if ((r19 != 0)) {
+    int _sv0t36 = (200 + r19);
+    return _sv0t36;
   } else {
   }
   return 0;

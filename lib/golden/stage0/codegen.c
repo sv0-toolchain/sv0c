@@ -365,8 +365,14 @@ static const char* c_escape_one(int c, const char* src, int pos) {
     return "\\r";
   } else {
   }
-  const char* _sv0t0 = sv0_string_substr(src, pos, 1);
-  return _sv0t0;
+  if ((c < 32)) {
+    const char* _sv0t0 = int_to_string(c);
+    const char* _sv0t1 = sv0_string_concat("\\", _sv0t0);
+    return _sv0t1;
+  } else {
+  }
+  const char* _sv0t2 = sv0_string_substr(src, pos, 1);
+  return _sv0t2;
 }
 
 static const char* c_escape_from(const char* src, int pos, const char* acc) {
@@ -1591,6 +1597,30 @@ static int test_escape(void) {
   int _sv0t5 = sv0_string_eq(_sv0t4, "ab");
   if ((!_sv0t5)) {
     return 3;
+  } else {
+  }
+  const char* _sv0t6 = c_escape_one(1, "x", 0);
+  const char* ctrl;
+  ctrl = _sv0t6;
+  int _sv0t7 = sv0_string_eq(ctrl, "\\1");
+  if ((!_sv0t7)) {
+    return 4;
+  } else {
+  }
+  const char* _sv0t8 = c_escape_one(31, "x", 0);
+  const char* ctrl2;
+  ctrl2 = _sv0t8;
+  int _sv0t9 = sv0_string_eq(ctrl2, "\\31");
+  if ((!_sv0t9)) {
+    return 5;
+  } else {
+  }
+  const char* _sv0t10 = c_escape_one(65, "A", 0);
+  const char* normal;
+  normal = _sv0t10;
+  int _sv0t11 = sv0_string_eq(normal, "A");
+  if ((!_sv0t11)) {
+    return 6;
   } else {
   }
   return 0;

@@ -94,6 +94,8 @@ static int ps_skip_optional_unsafe(int tags, int pos);
 static int ps_skip_generic_params(int tags, int pos);
 static int ps_skip_where_clause(int tags, int pos);
 static int ps_skip_attributes(int tags, int pos);
+static int parse_use_item(int tags, int pos, int path_out);
+static int parse_module_decl(int tags, int pos, int path_out);
 static int AST_ADD(void);
 static int AST_SUB(void);
 static int AST_MUL(void);
@@ -166,6 +168,8 @@ static int test_ps_nav(void);
 static int test_parse_path(void);
 static int test_ps_skip(void);
 static int test_parse_generic_params(void);
+static int test_parse_use_item(void);
+static int test_parse_module_decl(void);
 
 static int TK_INT_LIT(void) {
   return 0;
@@ -769,6 +773,45 @@ static int ps_skip_attributes(int tags, int pos) {
     }
   }
   return p;
+}
+
+static int parse_use_item(int tags, int pos, int path_out) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != 94)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int p1 = (pos + 1);
+  int _sv0t2 = parse_path(tags, p1, path_out);
+  int p2 = _sv0t2;
+  if ((p2 < 0)) {
+    int _sv0t3 = (0 - 1);
+    return _sv0t3;
+  } else {
+  }
+  int _sv0t4 = ps_expect(tags, p2, 13);
+  int p3 = _sv0t4;
+  return p3;
+}
+
+static int parse_module_decl(int tags, int pos, int path_out) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != 75)) {
+    return pos;
+  } else {
+  }
+  int p1 = (pos + 1);
+  int _sv0t1 = parse_path(tags, p1, path_out);
+  int p2 = _sv0t1;
+  if ((p2 < 0)) {
+    int _sv0t2 = (0 - 1);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = ps_expect(tags, p2, 13);
+  int p3 = _sv0t3;
+  return p3;
 }
 
 static int AST_ADD(void) {
@@ -2348,6 +2391,117 @@ static int test_parse_generic_params(void) {
   return 0;
 }
 
+static int test_parse_use_item(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  sv0_vec_push(tags, 94);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 15);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(tags, 97);
+  int _sv0t1 = sv0_vec_new();
+  int path = _sv0t1;
+  int _sv0t2 = parse_use_item(tags, 0, path);
+  int end_pos = _sv0t2;
+  if ((end_pos != 5)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(path);
+  if ((_sv0t3 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(path, 0);
+  if ((_sv0t4 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(path, 1);
+  if ((_sv0t5 != 3)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int path2 = _sv0t6;
+  int _sv0t7 = parse_use_item(tags, 1, path2);
+  int fail = _sv0t7;
+  int _sv0t8 = (0 - 1);
+  if ((fail != _sv0t8)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int tags2 = _sv0t9;
+  sv0_vec_push(tags2, 94);
+  sv0_vec_push(tags2, 5);
+  sv0_vec_push(tags2, 97);
+  int _sv0t10 = sv0_vec_new();
+  int path3 = _sv0t10;
+  int _sv0t11 = parse_use_item(tags2, 0, path3);
+  int fail2 = _sv0t11;
+  int _sv0t12 = (0 - 1);
+  if ((fail2 != _sv0t12)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_parse_module_decl(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  sv0_vec_push(tags, 75);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(tags, 97);
+  int _sv0t1 = sv0_vec_new();
+  int path = _sv0t1;
+  int _sv0t2 = parse_module_decl(tags, 0, path);
+  int end_pos = _sv0t2;
+  if ((end_pos != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(path);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(path, 0);
+  if ((_sv0t4 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int path2 = _sv0t5;
+  int _sv0t6 = parse_module_decl(tags, 3, path2);
+  int same = _sv0t6;
+  if ((same != 3)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(path2);
+  if ((_sv0t7 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int tags2 = _sv0t8;
+  sv0_vec_push(tags2, 5);
+  sv0_vec_push(tags2, 97);
+  int _sv0t9 = sv0_vec_new();
+  int path3 = _sv0t9;
+  int _sv0t10 = parse_module_decl(tags2, 0, path3);
+  int noop = _sv0t10;
+  if ((noop != 0)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_of();
   int r1 = _sv0t0;
@@ -2444,6 +2598,20 @@ int main(void) {
   if ((r14 != 0)) {
     int _sv0t26 = (220 + r14);
     return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_parse_use_item();
+  int r15 = _sv0t27;
+  if ((r15 != 0)) {
+    int _sv0t28 = (240 + r15);
+    return _sv0t28;
+  } else {
+  }
+  int _sv0t29 = test_parse_module_decl();
+  int r16 = _sv0t29;
+  if ((r16 != 0)) {
+    int _sv0t30 = (260 + r16);
+    return _sv0t30;
   } else {
   }
   return 0;

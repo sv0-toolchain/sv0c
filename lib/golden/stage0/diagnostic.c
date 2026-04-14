@@ -29,6 +29,11 @@ static const char* digit_char(int d);
 static const char* diag_int_to_str(int n);
 static const char* format_location(const char* file, int line, int col);
 static const char* format_diagnostic(int sev_tag, const char* message, const char* file, const char* source, int line, int col, int span_len);
+static const char* format_header_with_code(int sev_tag, const char* message, const char* code);
+static const char* format_gutter(int gutter_width);
+static const char* format_snippet_numbered(const char* source, int line_no, int col, int span_len);
+static const char* format_related(int gutter_width, const char* msg, const char* file, int line, int col);
+static const char* format_help(int gutter_width, const char* help_text);
 static int test_severity_tags(void);
 static int test_constructors(void);
 static int test_has_errors(void);
@@ -46,6 +51,10 @@ static int test_format_snippet(void);
 static int test_diag_int_to_str(void);
 static int test_format_location(void);
 static int test_format_diagnostic(void);
+static int test_format_header_with_code(void);
+static int test_format_gutter(void);
+static int test_format_related(void);
+static int test_format_help(void);
 
 static int severity_tag(Severity s) {
   int _sv0t0;
@@ -519,6 +528,145 @@ static const char* format_diagnostic(int sev_tag, const char* message, const cha
     out = _sv0t8;
   } else {
   }
+  return out;
+}
+
+static const char* format_header_with_code(int sev_tag, const char* message, const char* code) {
+  const char* out;
+  out = "";
+  if ((sev_tag == 0)) {
+    out = "error";
+  } else {
+  }
+  if ((sev_tag == 1)) {
+    out = "warning";
+  } else {
+  }
+  if ((sev_tag == 2)) {
+    out = "note";
+  } else {
+  }
+  int _sv0t0 = sv0_string_len(code);
+  if ((_sv0t0 > 0)) {
+    const char* _sv0t1 = sv0_string_concat(out, "[");
+    out = _sv0t1;
+    const char* _sv0t2 = sv0_string_concat(out, code);
+    out = _sv0t2;
+    const char* _sv0t3 = sv0_string_concat(out, "]");
+    out = _sv0t3;
+  } else {
+  }
+  const char* _sv0t4 = sv0_string_concat(out, ": ");
+  out = _sv0t4;
+  const char* _sv0t5 = sv0_string_concat(out, message);
+  out = _sv0t5;
+  return out;
+}
+
+static const char* format_gutter(int gutter_width) {
+  const char* _sv0t0 = spaces(gutter_width);
+  const char* pad;
+  pad = _sv0t0;
+  const char* _sv0t1 = sv0_string_concat(pad, " | ");
+  return _sv0t1;
+}
+
+static const char* format_snippet_numbered(const char* source, int line_no, int col, int span_len) {
+  const char* _sv0t0 = get_line(source, line_no);
+  const char* line_text;
+  line_text = _sv0t0;
+  int _sv0t1 = sv0_string_len(line_text);
+  if ((_sv0t1 == 0)) {
+    return "";
+  } else {
+  }
+  int effective_span = span_len;
+  if ((effective_span < 1)) {
+    effective_span = 1;
+  } else {
+  }
+  const char* _sv0t2 = diag_int_to_str(line_no);
+  const char* line_str;
+  line_str = _sv0t2;
+  int _sv0t3 = sv0_string_len(line_str);
+  int ls_len = _sv0t3;
+  int gw = ls_len;
+  if ((gw < 2)) {
+    gw = 2;
+  } else {
+  }
+  const char* _sv0t4 = format_gutter(gw);
+  const char* gutter;
+  gutter = _sv0t4;
+  const char* _sv0t5 = sv0_string_concat(gutter, "\n");
+  const char* blank;
+  blank = _sv0t5;
+  const char* _sv0t6 = pad_left(line_str, gw);
+  const char* _sv0t7 = sv0_string_concat(_sv0t6, " | ");
+  const char* _sv0t8 = sv0_string_concat(line_text, "\n");
+  const char* _sv0t9 = sv0_string_concat(_sv0t7, _sv0t8);
+  const char* numbered;
+  numbered = _sv0t9;
+  int col_offset = (col - 1);
+  const char* underline;
+  underline = gutter;
+  if ((col_offset > 0)) {
+    const char* _sv0t10 = spaces(col_offset);
+    const char* _sv0t11 = sv0_string_concat(underline, _sv0t10);
+    underline = _sv0t11;
+  } else {
+  }
+  const char* _sv0t12 = carets(effective_span);
+  const char* _sv0t13 = sv0_string_concat(underline, _sv0t12);
+  underline = _sv0t13;
+  const char* _sv0t14 = sv0_string_concat(underline, "\n");
+  underline = _sv0t14;
+  const char* _sv0t15 = sv0_string_concat(numbered, underline);
+  const char* _sv0t16 = sv0_string_concat(blank, _sv0t15);
+  return _sv0t16;
+}
+
+static const char* format_related(int gutter_width, const char* msg, const char* file, int line, int col) {
+  const char* _sv0t0 = format_gutter(gutter_width);
+  const char* gutter;
+  gutter = _sv0t0;
+  const char* out;
+  out = gutter;
+  const char* _sv0t1 = sv0_string_concat(out, "= note: ");
+  out = _sv0t1;
+  const char* _sv0t2 = sv0_string_concat(out, msg);
+  out = _sv0t2;
+  const char* _sv0t3 = sv0_string_concat(out, " at ");
+  out = _sv0t3;
+  const char* _sv0t4 = sv0_string_concat(out, file);
+  out = _sv0t4;
+  const char* _sv0t5 = sv0_string_concat(out, ":");
+  out = _sv0t5;
+  const char* _sv0t6 = diag_int_to_str(line);
+  const char* _sv0t7 = sv0_string_concat(out, _sv0t6);
+  out = _sv0t7;
+  const char* _sv0t8 = sv0_string_concat(out, ":");
+  out = _sv0t8;
+  const char* _sv0t9 = diag_int_to_str(col);
+  const char* _sv0t10 = sv0_string_concat(out, _sv0t9);
+  out = _sv0t10;
+  const char* _sv0t11 = sv0_string_concat(out, "\n");
+  out = _sv0t11;
+  return out;
+}
+
+static const char* format_help(int gutter_width, const char* help_text) {
+  const char* _sv0t0 = format_gutter(gutter_width);
+  const char* gutter;
+  gutter = _sv0t0;
+  const char* out;
+  out = gutter;
+  const char* _sv0t1 = sv0_string_concat(out, "= help: ");
+  out = _sv0t1;
+  const char* _sv0t2 = sv0_string_concat(out, help_text);
+  out = _sv0t2;
+  const char* _sv0t3 = sv0_string_concat(out, "\n");
+  out = _sv0t3;
   return out;
 }
 
@@ -1014,6 +1162,82 @@ static int test_format_diagnostic(void) {
   return 0;
 }
 
+static int test_format_header_with_code(void) {
+  const char* _sv0t0 = format_header_with_code(0, "bad type", "E0001");
+  const char* h1;
+  h1 = _sv0t0;
+  int _sv0t1 = sv0_string_eq(h1, "error[E0001]: bad type");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = format_header_with_code(1, "unused", "");
+  const char* h2;
+  h2 = _sv0t2;
+  int _sv0t3 = sv0_string_eq(h2, "warning: unused");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = format_header_with_code(2, "see here", "N42");
+  const char* h3;
+  h3 = _sv0t4;
+  int _sv0t5 = sv0_string_eq(h3, "note[N42]: see here");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_format_gutter(void) {
+  const char* _sv0t0 = format_gutter(2);
+  const char* g2;
+  g2 = _sv0t0;
+  int _sv0t1 = sv0_string_eq(g2, "   | ");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = format_gutter(4);
+  const char* g4;
+  g4 = _sv0t2;
+  int _sv0t3 = sv0_string_eq(g4, "     | ");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_format_related(void) {
+  const char* _sv0t0 = format_related(2, "defined here", "foo.sv0", 5, 3);
+  const char* rel;
+  rel = _sv0t0;
+  const char* expected;
+  expected = "   | = note: defined here at foo.sv0:5:3\n";
+  int _sv0t1 = sv0_string_eq(rel, expected);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_format_help(void) {
+  const char* _sv0t0 = format_help(2, "try adding mut");
+  const char* hlp;
+  hlp = _sv0t0;
+  const char* expected;
+  expected = "   | = help: try adding mut\n";
+  int _sv0t1 = sv0_string_eq(hlp, expected);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_severity_tags();
   int r1 = _sv0t0;
@@ -1131,6 +1355,34 @@ int main(void) {
   if ((r17 != 0)) {
     int _sv0t32 = (160 + r17);
     return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_format_header_with_code();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (170 + r18);
+    return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_format_gutter();
+  int r19 = _sv0t35;
+  if ((r19 != 0)) {
+    int _sv0t36 = (180 + r19);
+    return _sv0t36;
+  } else {
+  }
+  int _sv0t37 = test_format_related();
+  int r20 = _sv0t37;
+  if ((r20 != 0)) {
+    int _sv0t38 = (190 + r20);
+    return _sv0t38;
+  } else {
+  }
+  int _sv0t39 = test_format_help();
+  int r21 = _sv0t39;
+  if ((r21 != 0)) {
+    int _sv0t40 = (200 + r21);
+    return _sv0t40;
   } else {
   }
   return 0;
