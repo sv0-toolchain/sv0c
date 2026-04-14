@@ -7,7 +7,9 @@
    (Vec-based), env lookup/extend helpers, variant shape classification,
    constructor arity from shape, struct/enum name extraction from
    program tables, contract parameter classification, struct field
-   lookup by name.
+   lookup by name. expect (type unification gate — SML expect),
+   fields_of_struct (SML fieldsOfStruct), variant_shape_of (SML
+   variantShapeOf), assign_lhs_bad (SML assignLhsBad).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -363,6 +365,58 @@ fn struct_has_field(field_names: Vec<i32>, name: i32) -> bool {
     return struct_field_index(field_names, name) >= 0;
 }
 
+/* ── type unification gate (SML expect) ────────────────────── */
+
+fn expect(got_tag: i32, want_tag: i32) -> bool {
+    return got_tag == want_tag;
+}
+
+/* ── struct/enum definition lookup ─────────────────────────── */
+
+fn fields_of_struct(struct_names: Vec<i32>, struct_stride: i32,
+                    target_name: i32) -> i32 {
+    let n: i32 = vec_len(struct_names) / struct_stride;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(struct_names, i * struct_stride) == target_name {
+            return i;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn variant_shape_of(enum_names: Vec<i32>, enum_stride: i32,
+                    enum_name: i32, variant_name: i32,
+                    variant_tags: Vec<i32>, variant_enum_ids: Vec<i32>) -> i32 {
+    let ne: i32 = vec_len(enum_names) / enum_stride;
+    let mut found_enum: bool = false;
+    let mut i: i32 = 0;
+    while i < ne {
+        if vec_get(enum_names, i * enum_stride) == enum_name {
+            found_enum = true;
+            i = ne;
+        }
+        i = i + 1;
+    }
+    if found_enum == false { return 0 - 2; }
+    let nv: i32 = vec_len(variant_tags);
+    let mut j: i32 = 0;
+    while j < nv {
+        if vec_get(variant_enum_ids, j) == enum_name {
+            if vec_get(variant_tags, j) == variant_name {
+                return j;
+            }
+        }
+        j = j + 1;
+    }
+    return 0 - 1;
+}
+
+fn assign_lhs_bad() -> i32 {
+    return 0 - 1;
+}
+
 /* ── loop depth tracking ────────────────────────────────────── */
 
 fn in_loop(depth: i32) -> bool {
@@ -580,6 +634,42 @@ fn test_struct_enum_names() -> i32 {
     return 0;
 }
 
+fn test_expect() -> i32 {
+    if expect(5, 5) != true { return 1; }
+    if expect(5, 6) != false { return 2; }
+    if expect(0, 0) != true { return 3; }
+    return 0;
+}
+
+fn test_fields_of_struct() -> i32 {
+    let tbl: Vec<i32> = vec_new();
+    vec_push(tbl, 100); vec_push(tbl, 3);
+    vec_push(tbl, 200); vec_push(tbl, 5);
+    if fields_of_struct(tbl, 2, 100) != 0 { return 1; }
+    if fields_of_struct(tbl, 2, 200) != 1 { return 2; }
+    if fields_of_struct(tbl, 2, 999) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_variant_shape_of() -> i32 {
+    let en: Vec<i32> = vec_new();
+    vec_push(en, 10); vec_push(en, 0);
+    let vtags: Vec<i32> = vec_new();
+    let veids: Vec<i32> = vec_new();
+    vec_push(vtags, 50); vec_push(veids, 10);
+    vec_push(vtags, 60); vec_push(veids, 10);
+    if variant_shape_of(en, 2, 10, 50, vtags, veids) != 0 { return 1; }
+    if variant_shape_of(en, 2, 10, 60, vtags, veids) != 1 { return 2; }
+    if variant_shape_of(en, 2, 10, 99, vtags, veids) != 0 - 1 { return 3; }
+    if variant_shape_of(en, 2, 999, 50, vtags, veids) != 0 - 2 { return 4; }
+    return 0;
+}
+
+fn test_assign_lhs_bad() -> i32 {
+    if assign_lhs_bad() != 0 - 1 { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -615,5 +705,13 @@ fn main() -> i32 {
     if r16 != 0 { return 170 + r16; }
     let r17: i32 = test_struct_enum_names();
     if r17 != 0 { return 180 + r17; }
+    let r18: i32 = test_expect();
+    if r18 != 0 { return 190 + r18; }
+    let r19: i32 = test_fields_of_struct();
+    if r19 != 0 { return 200 + r19; }
+    let r20: i32 = test_variant_shape_of();
+    if r20 != 0 { return 210 + r20; }
+    let r21: i32 = test_assign_lhs_bad();
+    if r21 != 0 { return 220 + r21; }
     return 0;
 }

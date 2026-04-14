@@ -2,6 +2,9 @@
 
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
+static const char* lower_digit(int d);
+static const char* lower_int_to_str(int n);
+static const char* fresh_tmp_str(int counter);
 static int find_double_colon(const char* s, int start);
 static int split_qname_count(const char* s);
 static int has_qualified_name(const char* s);
@@ -45,6 +48,8 @@ static int LIT_UNIT(void);
 static int LIT_STRING(void);
 static int LIT_UNSUPPORTED(void);
 static int classify_literal(int lit_tag);
+static int lower_lit_to_ir_tag(int lit_tag);
+static const char* fn_ret_cty(int has_ret, const char* ret_cty);
 static int VAL_VAR(void);
 static int VAL_OTHER(void);
 static int value_to_expr_kind(int val_tag);
@@ -74,6 +79,9 @@ static int test_use_ret_slot(void);
 static int test_lit_supported(void);
 static int test_param_name_tag(void);
 static int test_uniq_old_names(void);
+static int test_fresh_tmp_str(void);
+static int test_lower_lit_ir(void);
+static int test_fn_ret_cty(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -82,6 +90,79 @@ static int fresh_tmp_name(int counter) {
 static int next_tmp(int counter) {
   int _sv0t0 = (counter + 1);
   return _sv0t0;
+}
+
+static const char* lower_digit(int d) {
+  if ((d == 0)) {
+    return "0";
+  } else {
+  }
+  if ((d == 1)) {
+    return "1";
+  } else {
+  }
+  if ((d == 2)) {
+    return "2";
+  } else {
+  }
+  if ((d == 3)) {
+    return "3";
+  } else {
+  }
+  if ((d == 4)) {
+    return "4";
+  } else {
+  }
+  if ((d == 5)) {
+    return "5";
+  } else {
+  }
+  if ((d == 6)) {
+    return "6";
+  } else {
+  }
+  if ((d == 7)) {
+    return "7";
+  } else {
+  }
+  if ((d == 8)) {
+    return "8";
+  } else {
+  }
+  return "9";
+}
+
+static const char* lower_int_to_str(int n) {
+  if ((n < 0)) {
+    int _sv0t0 = (0 - n);
+    const char* _sv0t1 = lower_int_to_str(_sv0t0);
+    const char* _sv0t2 = sv0_string_concat("-", _sv0t1);
+    return _sv0t2;
+  } else {
+  }
+  if ((n < 10)) {
+    const char* _sv0t3 = lower_digit(n);
+    return _sv0t3;
+  } else {
+  }
+  int _sv0t4 = (n / 10);
+  const char* _sv0t5 = lower_int_to_str(_sv0t4);
+  const char* rest;
+  rest = _sv0t5;
+  int _sv0t6 = (n / 10);
+  int _sv0t7 = (_sv0t6 * 10);
+  int _sv0t8 = (n - _sv0t7);
+  const char* _sv0t9 = lower_digit(_sv0t8);
+  const char* last;
+  last = _sv0t9;
+  const char* _sv0t10 = sv0_string_concat(rest, last);
+  return _sv0t10;
+}
+
+static const char* fresh_tmp_str(int counter) {
+  const char* _sv0t0 = lower_int_to_str(counter);
+  const char* _sv0t1 = sv0_string_concat("_sv0t", _sv0t0);
+  return _sv0t1;
 }
 
 static int find_double_colon(const char* s, int start) {
@@ -712,6 +793,35 @@ static int classify_literal(int lit_tag) {
   }
   int _sv0t0 = (0 - 1);
   return _sv0t0;
+}
+
+static int lower_lit_to_ir_tag(int lit_tag) {
+  if ((lit_tag == 0)) {
+    return 0;
+  } else {
+  }
+  if ((lit_tag == 1)) {
+    return 1;
+  } else {
+  }
+  if ((lit_tag == 2)) {
+    return 4;
+  } else {
+  }
+  if ((lit_tag == 3)) {
+    return 5;
+  } else {
+  }
+  int _sv0t0 = (0 - 1);
+  return _sv0t0;
+}
+
+static const char* fn_ret_cty(int has_ret, const char* ret_cty) {
+  if (has_ret) {
+    return ret_cty;
+  } else {
+  }
+  return "int";
 }
 
 static int VAL_VAR(void) {
@@ -1480,6 +1590,86 @@ static int test_uniq_old_names(void) {
   return 0;
 }
 
+static int test_fresh_tmp_str(void) {
+  const char* _sv0t0 = fresh_tmp_str(0);
+  int _sv0t1 = sv0_string_eq(_sv0t0, "_sv0t0");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = fresh_tmp_str(1);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "_sv0t1");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = fresh_tmp_str(42);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "_sv0t42");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = fresh_tmp_str(100);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "_sv0t100");
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lower_lit_ir(void) {
+  int _sv0t0 = lower_lit_to_ir_tag(0);
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = lower_lit_to_ir_tag(1);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = lower_lit_to_ir_tag(2);
+  if ((_sv0t2 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = lower_lit_to_ir_tag(3);
+  if ((_sv0t3 != 5)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = lower_lit_to_ir_tag(99);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_fn_ret_cty(void) {
+  const char* _sv0t0 = fn_ret_cty(0, "void");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "int");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = fn_ret_cty(1, "int32_t");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "int32_t");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = fn_ret_cty(1, "void");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "void");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -1632,6 +1822,27 @@ int main(void) {
   if ((r22 != 0)) {
     int _sv0t42 = (240 + r22);
     return _sv0t42;
+  } else {
+  }
+  int _sv0t43 = test_fresh_tmp_str();
+  int r23 = _sv0t43;
+  if ((r23 != 0)) {
+    int _sv0t44 = (250 + r23);
+    return _sv0t44;
+  } else {
+  }
+  int _sv0t45 = test_lower_lit_ir();
+  int r24 = _sv0t45;
+  if ((r24 != 0)) {
+    int _sv0t46 = (260 + r24);
+    return _sv0t46;
+  } else {
+  }
+  int _sv0t47 = test_fn_ret_cty();
+  int r25 = _sv0t47;
+  if ((r25 != 0)) {
+    int _sv0t48 = (270 + r25);
+    return _sv0t48;
   } else {
   }
   return 0;

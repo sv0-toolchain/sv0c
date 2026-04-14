@@ -81,6 +81,10 @@ static const char* error_immutable_assign(void);
 static const char* error_bad_assign_lhs(void);
 static int struct_field_index(int field_names, int name);
 static int struct_has_field(int field_names, int name);
+static int expect(int got_tag, int want_tag);
+static int fields_of_struct(int struct_names, int struct_stride, int target_name);
+static int variant_shape_of(int enum_names, int enum_stride, int enum_name, int variant_name, int variant_tags, int variant_enum_ids);
+static int assign_lhs_bad(void);
 static int in_loop(int depth);
 static int test_binop_class(void);
 static int test_integral_ty(void);
@@ -99,6 +103,10 @@ static int test_extra_classifiers(void);
 static int test_path_key_vec(void);
 static int test_contract_param(void);
 static int test_struct_enum_names(void);
+static int test_expect(void);
+static int test_fields_of_struct(void);
+static int test_variant_shape_of(void);
+static int test_assign_lhs_bad(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -834,6 +842,72 @@ static int struct_has_field(int field_names, int name) {
   return _sv0t1;
 }
 
+static int expect(int got_tag, int want_tag) {
+  int _sv0t0 = (got_tag == want_tag);
+  return _sv0t0;
+}
+
+static int fields_of_struct(int struct_names, int struct_stride, int target_name) {
+  int _sv0t0 = sv0_vec_len(struct_names);
+  int n = (_sv0t0 / struct_stride);
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = (i * struct_stride);
+    int _sv0t2 = sv0_vec_get(struct_names, _sv0t1);
+    if ((_sv0t2 == target_name)) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t3 = (0 - 1);
+  return _sv0t3;
+}
+
+static int variant_shape_of(int enum_names, int enum_stride, int enum_name, int variant_name, int variant_tags, int variant_enum_ids) {
+  int _sv0t0 = sv0_vec_len(enum_names);
+  int ne = (_sv0t0 / enum_stride);
+  int found_enum = 0;
+  int i = 0;
+  while ((i < ne)) {
+    int _sv0t1 = (i * enum_stride);
+    int _sv0t2 = sv0_vec_get(enum_names, _sv0t1);
+    if ((_sv0t2 == enum_name)) {
+      found_enum = 1;
+      i = ne;
+    } else {
+    }
+    i = (i + 1);
+  }
+  if ((found_enum == 0)) {
+    int _sv0t3 = (0 - 2);
+    return _sv0t3;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_len(variant_tags);
+  int nv = _sv0t4;
+  int j = 0;
+  while ((j < nv)) {
+    int _sv0t5 = sv0_vec_get(variant_enum_ids, j);
+    if ((_sv0t5 == enum_name)) {
+      int _sv0t6 = sv0_vec_get(variant_tags, j);
+      if ((_sv0t6 == variant_name)) {
+        return j;
+      } else {
+      }
+    } else {
+    }
+    j = (j + 1);
+  }
+  int _sv0t7 = (0 - 1);
+  return _sv0t7;
+}
+
+static int assign_lhs_bad(void) {
+  int _sv0t0 = (0 - 1);
+  return _sv0t0;
+}
+
 static int in_loop(int depth) {
   int _sv0t0 = (depth > 0);
   return _sv0t0;
@@ -1502,6 +1576,99 @@ static int test_struct_enum_names(void) {
   return 0;
 }
 
+static int test_expect(void) {
+  int _sv0t0 = expect(5, 5);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = expect(5, 6);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = expect(0, 0);
+  if ((_sv0t2 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_fields_of_struct(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tbl = _sv0t0;
+  sv0_vec_push(tbl, 100);
+  sv0_vec_push(tbl, 3);
+  sv0_vec_push(tbl, 200);
+  sv0_vec_push(tbl, 5);
+  int _sv0t1 = fields_of_struct(tbl, 2, 100);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = fields_of_struct(tbl, 2, 200);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = fields_of_struct(tbl, 2, 999);
+  int _sv0t4 = (0 - 1);
+  if ((_sv0t3 != _sv0t4)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_variant_shape_of(void) {
+  int _sv0t0 = sv0_vec_new();
+  int en = _sv0t0;
+  sv0_vec_push(en, 10);
+  sv0_vec_push(en, 0);
+  int _sv0t1 = sv0_vec_new();
+  int vtags = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int veids = _sv0t2;
+  sv0_vec_push(vtags, 50);
+  sv0_vec_push(veids, 10);
+  sv0_vec_push(vtags, 60);
+  sv0_vec_push(veids, 10);
+  int _sv0t3 = variant_shape_of(en, 2, 10, 50, vtags, veids);
+  if ((_sv0t3 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = variant_shape_of(en, 2, 10, 60, vtags, veids);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = variant_shape_of(en, 2, 10, 99, vtags, veids);
+  int _sv0t6 = (0 - 1);
+  if ((_sv0t5 != _sv0t6)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = variant_shape_of(en, 2, 999, 50, vtags, veids);
+  int _sv0t8 = (0 - 2);
+  if ((_sv0t7 != _sv0t8)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_assign_lhs_bad(void) {
+  int _sv0t0 = assign_lhs_bad();
+  int _sv0t1 = (0 - 1);
+  if ((_sv0t0 != _sv0t1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -1619,6 +1786,34 @@ int main(void) {
   if ((r17 != 0)) {
     int _sv0t32 = (180 + r17);
     return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_expect();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (190 + r18);
+    return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_fields_of_struct();
+  int r19 = _sv0t35;
+  if ((r19 != 0)) {
+    int _sv0t36 = (200 + r19);
+    return _sv0t36;
+  } else {
+  }
+  int _sv0t37 = test_variant_shape_of();
+  int r20 = _sv0t37;
+  if ((r20 != 0)) {
+    int _sv0t38 = (210 + r20);
+    return _sv0t38;
+  } else {
+  }
+  int _sv0t39 = test_assign_lhs_bad();
+  int r21 = _sv0t39;
+  if ((r21 != 0)) {
+    int _sv0t40 = (220 + r21);
+    return _sv0t40;
   } else {
   }
   return 0;

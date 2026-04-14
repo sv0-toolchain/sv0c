@@ -5,6 +5,9 @@
    indexOfField, binop/unop → opcode dispatch, instruction encoding
    length (encLen/encLens), string pool management (Vec-based), loop
    sentinels, value width classification, builtin function dispatch.
+   lookup_slot (SML lookupSlot — name→slot_info in Vec env),
+   alloc_local (SML allocLocal — bindParam wrapper), replace_loop_exit_jump
+   (SML replaceLoopExitJump — patches trailing JUMP placeholder).
    Full emit (emitValue/emitExpr/emitInstr/emitBlock/emitWhileLoop)
    deferred — needs IR+AST traversal with slot_env management. */
 
@@ -335,6 +338,52 @@ fn store_slot_offset(base: i32, width: i32, k: i32) -> i32 {
     return base + width - 1 - k;
 }
 
+/* ── slot environment lookup (SML lookupSlot) ──────────────── */
+
+fn lookup_slot(env_names: Vec<i32>, env_bases: Vec<i32>,
+               env_widths: Vec<i32>, name: i32) -> i32 {
+    let n: i32 = vec_len(env_names);
+    let mut i: i32 = n - 1;
+    while i >= 0 {
+        if vec_get(env_names, i) == name {
+            return i;
+        }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+fn slot_base(env_bases: Vec<i32>, idx: i32) -> i32 {
+    return vec_get(env_bases, idx);
+}
+
+fn slot_width(env_widths: Vec<i32>, idx: i32) -> i32 {
+    return vec_get(env_widths, idx);
+}
+
+/* ── alloc_local (SML allocLocal / bindParam) ──────────────── */
+
+fn alloc_local(env_names: Vec<i32>, env_bases: Vec<i32>,
+               env_widths: Vec<i32>, name: i32, width: i32, slot: i32) -> i32 {
+    vec_push(env_names, name);
+    vec_push(env_bases, slot);
+    vec_push(env_widths, width);
+    return slot + width;
+}
+
+/* ── replace_loop_exit_jump (SML replaceLoopExitJump) ──────── */
+
+fn replace_loop_exit_jump(instrs: Vec<i32>, back_offset: i32) -> bool {
+    let n: i32 = vec_len(instrs);
+    if n < 2 { return false; }
+    let last_op: i32 = vec_get(instrs, n - 2);
+    let last_arg: i32 = vec_get(instrs, n - 1);
+    if last_op != 112 { return false; }
+    if last_arg != loop_exit_sentinel() { return false; }
+    vec_set(instrs, n - 1, back_offset);
+    return true;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_variant_slots() -> i32 {
@@ -486,6 +535,49 @@ fn test_store_ordering() -> i32 {
     return 0;
 }
 
+fn test_lookup_slot() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let bases: Vec<i32> = vec_new();
+    let widths: Vec<i32> = vec_new();
+    vec_push(names, 10); vec_push(bases, 0); vec_push(widths, 1);
+    vec_push(names, 20); vec_push(bases, 1); vec_push(widths, 3);
+    if lookup_slot(names, bases, widths, 10) != 0 { return 1; }
+    if lookup_slot(names, bases, widths, 20) != 1 { return 2; }
+    if lookup_slot(names, bases, widths, 99) != 0 - 1 { return 3; }
+    if slot_base(bases, 1) != 1 { return 4; }
+    if slot_width(widths, 1) != 3 { return 5; }
+    return 0;
+}
+
+fn test_alloc_local() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let bases: Vec<i32> = vec_new();
+    let widths: Vec<i32> = vec_new();
+    let s1: i32 = alloc_local(names, bases, widths, 10, 1, 0);
+    if s1 != 1 { return 1; }
+    let s2: i32 = alloc_local(names, bases, widths, 20, 3, 1);
+    if s2 != 4 { return 2; }
+    if vec_len(names) != 2 { return 3; }
+    if slot_base(bases, 0) != 0 { return 4; }
+    if slot_width(widths, 1) != 3 { return 5; }
+    return 0;
+}
+
+fn test_replace_loop_exit() -> i32 {
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, 112);
+    vec_push(instrs, loop_exit_sentinel());
+    if replace_loop_exit_jump(instrs, 42) != true { return 1; }
+    if vec_get(instrs, 1) != 42 { return 2; }
+    let bad: Vec<i32> = vec_new();
+    vec_push(bad, 112);
+    vec_push(bad, 999);
+    if replace_loop_exit_jump(bad, 42) != false { return 3; }
+    let empty: Vec<i32> = vec_new();
+    if replace_loop_exit_jump(empty, 42) != false { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -513,5 +605,11 @@ fn main() -> i32 {
     if r12 != 0 { return 130 + r12; }
     let r13: i32 = test_layout_lookup();
     if r13 != 0 { return 140 + r13; }
+    let r14: i32 = test_lookup_slot();
+    if r14 != 0 { return 150 + r14; }
+    let r15: i32 = test_alloc_local();
+    if r15 != 0 { return 160 + r15; }
+    let r16: i32 = test_replace_loop_exit();
+    if r16 != 0 { return 170 + r16; }
     return 0;
 }
