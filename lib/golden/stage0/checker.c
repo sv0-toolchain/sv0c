@@ -86,6 +86,8 @@ static int fields_of_struct(int struct_names, int struct_stride, int target_name
 static int variant_shape_of(int enum_names, int enum_stride, int enum_name, int variant_name, int variant_tags, int variant_enum_ids);
 static int assign_lhs_bad(void);
 static int in_loop(int depth);
+static int enter_loop(int depth);
+static int exit_loop(int depth);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -913,6 +915,20 @@ static int in_loop(int depth) {
   return _sv0t0;
 }
 
+static int enter_loop(int depth) {
+  int _sv0t0 = (depth + 1);
+  return _sv0t0;
+}
+
+static int exit_loop(int depth) {
+  if ((depth <= 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = (depth - 1);
+  return _sv0t0;
+}
+
 static int test_binop_class(void) {
   int _sv0t0 = binop_class(0);
   if ((_sv0t0 != 0)) {
@@ -1365,6 +1381,31 @@ static int test_loop_depth(void) {
   int _sv0t2 = in_loop(3);
   if ((_sv0t2 != 1)) {
     return 3;
+  } else {
+  }
+  int _sv0t3 = enter_loop(0);
+  if ((_sv0t3 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = enter_loop(2);
+  if ((_sv0t4 != 3)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = exit_loop(1);
+  if ((_sv0t5 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t6 = exit_loop(3);
+  if ((_sv0t6 != 2)) {
+    return 7;
+  } else {
+  }
+  int _sv0t7 = exit_loop(0);
+  if ((_sv0t7 != 0)) {
+    return 8;
   } else {
   }
   return 0;

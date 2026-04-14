@@ -9,7 +9,8 @@
    program tables, contract parameter classification, struct field
    lookup by name. expect (type unification gate — SML expect),
    fields_of_struct (SML fieldsOfStruct), variant_shape_of (SML
-   variantShapeOf), assign_lhs_bad (SML assignLhsBad).
+   variantShapeOf), assign_lhs_bad (SML assignLhsBad),
+   enter_loop/exit_loop (SML withLoop decomposed).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -417,10 +418,19 @@ fn assign_lhs_bad() -> i32 {
     return 0 - 1;
 }
 
-/* ── loop depth tracking ────────────────────────────────────── */
+/* ── loop depth tracking (SML withLoop decomposed) ─────────── */
 
 fn in_loop(depth: i32) -> bool {
     return depth > 0;
+}
+
+fn enter_loop(depth: i32) -> i32 {
+    return depth + 1;
+}
+
+fn exit_loop(depth: i32) -> i32 {
+    if depth <= 0 { return 0; }
+    return depth - 1;
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -565,6 +575,11 @@ fn test_loop_depth() -> i32 {
     if in_loop(0) != false { return 1; }
     if in_loop(1) != true { return 2; }
     if in_loop(3) != true { return 3; }
+    if enter_loop(0) != 1 { return 4; }
+    if enter_loop(2) != 3 { return 5; }
+    if exit_loop(1) != 0 { return 6; }
+    if exit_loop(3) != 2 { return 7; }
+    if exit_loop(0) != 0 { return 8; }
     return 0;
 }
 

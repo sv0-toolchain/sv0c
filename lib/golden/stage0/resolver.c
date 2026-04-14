@@ -23,6 +23,9 @@ static int item_is_module(int tag);
 static int item_needs_registration(int tag);
 static int enum_variant_arity(int variant_kind, int tuple_fields, int struct_fields);
 static const char* enum_variant_qualified_path(const char* enum_name, const char* variant_name);
+static int variant_stem(int variant_kind, int name_handle);
+static const char* enum_variant_reg_path(const char* enum_name, const char* variant_name);
+static int enum_variant_reg_arity(int variant_kind, int tuple_fields, int struct_fields);
 static int pat_binds_count(int pat_tag, int child_count);
 static int pat_is_or(int pat_tag);
 static int should_allow_self(int item_tag);
@@ -47,6 +50,8 @@ static int test_arity_check(void);
 static int test_path_join_vec(void);
 static int test_import_alias(void);
 static int test_register_intrinsics(void);
+static int test_variant_stem(void);
+static int test_enum_variant_reg(void);
 
 static const char* path_join2(const char* a, const char* b) {
   const char* _sv0t0 = sv0_string_concat(a, "::");
@@ -494,6 +499,20 @@ static int enum_variant_arity(int variant_kind, int tuple_fields, int struct_fie
 
 static const char* enum_variant_qualified_path(const char* enum_name, const char* variant_name) {
   const char* _sv0t0 = path_join2(enum_name, variant_name);
+  return _sv0t0;
+}
+
+static int variant_stem(int variant_kind, int name_handle) {
+  return name_handle;
+}
+
+static const char* enum_variant_reg_path(const char* enum_name, const char* variant_name) {
+  const char* _sv0t0 = enum_variant_qualified_path(enum_name, variant_name);
+  return _sv0t0;
+}
+
+static int enum_variant_reg_arity(int variant_kind, int tuple_fields, int struct_fields) {
+  int _sv0t0 = enum_variant_arity(variant_kind, tuple_fields, struct_fields);
   return _sv0t0;
 }
 
@@ -1112,6 +1131,52 @@ static int test_register_intrinsics(void) {
   return 0;
 }
 
+static int test_variant_stem(void) {
+  int _sv0t0 = variant_stem(0, 42);
+  if ((_sv0t0 != 42)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = variant_stem(1, 99);
+  if ((_sv0t1 != 99)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = variant_stem(2, 7);
+  if ((_sv0t2 != 7)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_enum_variant_reg(void) {
+  const char* _sv0t0 = enum_variant_reg_path("Option", "Some");
+  const char* p;
+  p = _sv0t0;
+  int _sv0t1 = sv0_string_eq(p, "Option::Some");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = enum_variant_reg_arity(0, 0, 0);
+  if ((_sv0t2 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = enum_variant_reg_arity(1, 3, 0);
+  if ((_sv0t3 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = enum_variant_reg_arity(2, 0, 2);
+  if ((_sv0t4 != 2)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_join();
   int r1 = _sv0t0;
@@ -1208,6 +1273,20 @@ int main(void) {
   if ((r14 != 0)) {
     int _sv0t26 = (140 + r14);
     return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_variant_stem();
+  int r15 = _sv0t27;
+  if ((r15 != 0)) {
+    int _sv0t28 = (150 + r15);
+    return _sv0t28;
+  } else {
+  }
+  int _sv0t29 = test_enum_variant_reg();
+  int r16 = _sv0t29;
+  if ((r16 != 0)) {
+    int _sv0t30 = (160 + r16);
+    return _sv0t30;
   } else {
   }
   return 0;
