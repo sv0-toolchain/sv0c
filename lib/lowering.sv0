@@ -2,12 +2,14 @@
    Lowering utilities: splitQName (qualified name splitting on ::),
    AST binop/unop → C operator strings (full 6-variant unop table),
    AST type → C type string mapping (22 primitives), freshTmp counter
-   management, oldSlot naming (old_slot_name full string concat),
-   retSyntaxIsUnit, storeValueToSlot classification, paramName
-   extraction, uniqOldNames (Vec dedup), assignment LHS classification,
-   enum tag lookup (Vec-based), struct field list lookup, enum/struct
-   type detection, variant slot counting, enum max payload,
-   tryVariantNames (Result/Option), literal lowering classification.
+   management + fresh_tmp_str (string "_sv0t<N>" matching SML freshTmp),
+   oldSlot naming (old_slot_name full string concat), retSyntaxIsUnit,
+   storeValueToSlot classification, paramName extraction, uniqOldNames
+   (Vec dedup), assignment LHS classification, enum tag lookup (Vec),
+   struct field list lookup, enum/struct type detection, variant slot
+   counting, enum max payload, tryVariantNames (Result/Option), literal
+   lowering classification + lower_lit_to_ir_tag (SML lowerLit dispatch),
+   fn_ret_cty (SML fnRetCty — return type or default "int").
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -19,6 +21,31 @@ fn fresh_tmp_name(counter: i32) -> i32 {
 
 fn next_tmp(counter: i32) -> i32 {
     return counter + 1;
+}
+
+fn lower_digit(d: i32) -> string {
+    if d == 0 { return "0"; }
+    if d == 1 { return "1"; }
+    if d == 2 { return "2"; }
+    if d == 3 { return "3"; }
+    if d == 4 { return "4"; }
+    if d == 5 { return "5"; }
+    if d == 6 { return "6"; }
+    if d == 7 { return "7"; }
+    if d == 8 { return "8"; }
+    return "9";
+}
+
+fn lower_int_to_str(n: i32) -> string {
+    if n < 0 { return string_concat("-", lower_int_to_str(0 - n)); }
+    if n < 10 { return lower_digit(n); }
+    let rest: string = lower_int_to_str(n / 10);
+    let last: string = lower_digit(n - (n / 10) * 10);
+    return string_concat(rest, last);
+}
+
+fn fresh_tmp_str(counter: i32) -> string {
+    return string_concat("_sv0t", lower_int_to_str(counter));
 }
 
 /* ── splitQName ─────────────────────────────────────────────── */
@@ -370,6 +397,19 @@ fn classify_literal(lit_tag: i32) -> i32 {
     return 0 - 1;
 }
 
+fn lower_lit_to_ir_tag(lit_tag: i32) -> i32 {
+    if lit_tag == 0 { return 0; }
+    if lit_tag == 1 { return 1; }
+    if lit_tag == 2 { return 4; }
+    if lit_tag == 3 { return 5; }
+    return 0 - 1;
+}
+
+fn fn_ret_cty(has_ret: bool, ret_cty: string) -> string {
+    if has_ret { return ret_cty; }
+    return "int";
+}
+
 /* ── value → expr classification ────────────────────────────── */
 
 fn VAL_VAR() -> i32 { return 0; }
@@ -630,6 +670,30 @@ fn test_uniq_old_names() -> i32 {
     return 0;
 }
 
+fn test_fresh_tmp_str() -> i32 {
+    if string_eq(fresh_tmp_str(0), "_sv0t0") != true { return 1; }
+    if string_eq(fresh_tmp_str(1), "_sv0t1") != true { return 2; }
+    if string_eq(fresh_tmp_str(42), "_sv0t42") != true { return 3; }
+    if string_eq(fresh_tmp_str(100), "_sv0t100") != true { return 4; }
+    return 0;
+}
+
+fn test_lower_lit_ir() -> i32 {
+    if lower_lit_to_ir_tag(0) != 0 { return 1; }
+    if lower_lit_to_ir_tag(1) != 1 { return 2; }
+    if lower_lit_to_ir_tag(2) != 4 { return 3; }
+    if lower_lit_to_ir_tag(3) != 5 { return 4; }
+    if lower_lit_to_ir_tag(99) != 0 - 1 { return 5; }
+    return 0;
+}
+
+fn test_fn_ret_cty() -> i32 {
+    if string_eq(fn_ret_cty(false, "void"), "int") != true { return 1; }
+    if string_eq(fn_ret_cty(true, "int32_t"), "int32_t") != true { return 2; }
+    if string_eq(fn_ret_cty(true, "void"), "void") != true { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -675,5 +739,11 @@ fn main() -> i32 {
     if r21 != 0 { return 230 + r21; }
     let r22: i32 = test_uniq_old_names();
     if r22 != 0 { return 240 + r22; }
+    let r23: i32 = test_fresh_tmp_str();
+    if r23 != 0 { return 250 + r23; }
+    let r24: i32 = test_lower_lit_ir();
+    if r24 != 0 { return 260 + r24; }
+    let r25: i32 = test_fn_ret_cty();
+    if r25 != 0 { return 270 + r25; }
     return 0;
 }
