@@ -10,6 +10,9 @@ test/integration/patterns/patterns.sv0
 test/integration/structs/structs.sv0
 test/integration/field_assign/field_assign.sv0
 test/integration/generics/generics.sv0
+test/integration/enum_tuple_match/enum_tuple_match.sv0
+test/integration/string_api/string_api.sv0
+test/integration/enum_struct_match/enum_struct_match.sv0
 test/vm-parity/programs/vm_add_chain.sv0
 test/vm-parity/programs/vm_and_chain.sv0
 test/vm-parity/programs/vm_arith.sv0
@@ -86,3 +89,13 @@ lib/unify.sv0
 lib/diagnostic.sv0
 lib/env.sv0
 lib/include_expand.sv0
+lib/bytecode.sv0
+lib/vm_codegen.sv0
+lib/checker.sv0
+lib/lowering.sv0
+lib/parser.sv0
+lib/main.sv0
+lib/codegen.sv0
+lib/link.sv0
+lib/lexer.sv0
+lib/resolver.sv0

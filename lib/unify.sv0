@@ -2,7 +2,9 @@
    Structural type unification with the actual Ty enum (20 variants).
    Fixes TyVar semantics from unify_core.sv0 surrogate: TyVar matches
    ANY type (not just TyVar), matching SML lines 10-11.
-   Handles Ref/RefMut cross-matching (SML lines 23-26). */
+   Handles Ref/RefMut cross-matching (SML lines 23-26).
+   unify_list: pairwise Vec<i32> unification matching SML unifyList
+   (used by TyTuple, TyFn params, TyNamed generic args). */
 
 enum Ty {
     TyUnit,
@@ -88,6 +90,19 @@ fn unify_ref_inner(a: Ty, b: Ty) -> bool {
     }
 }
 
+fn unify_list(v1: Vec<i32>, v2: Vec<i32>) -> bool {
+    let n: i32 = vec_len(v1);
+    if n != vec_len(v2) { return false; }
+    let mut i: i32 = 0;
+    while i < n {
+        let h1: i32 = vec_get(v1, i);
+        let h2: i32 = vec_get(v2, i);
+        if h1 != h2 { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
 fn unify_same_tag(a: Ty, b: Ty) -> bool {
     match a {
         Ty::TyInt(w1) => {
@@ -143,14 +158,14 @@ fn unify_same_tag(a: Ty, b: Ty) -> bool {
         },
         Ty::TyTuple(v1) => {
             match b {
-                Ty::TyTuple(v2) => { return vec_len(v1) == vec_len(v2); },
+                Ty::TyTuple(v2) => { return unify_list(v1, v2); },
                 _ => { return false; },
             }
         },
         Ty::TyFn(ps1, r1) => {
             match b {
                 Ty::TyFn(ps2, r2) => {
-                    if vec_len(ps1) != vec_len(ps2) { return false; }
+                    if unify_list(ps1, ps2) == false { return false; }
                     let d1: Ty = box_deref(r1);
                     let d2: Ty = box_deref(r2);
                     return unify(d1, d2);
@@ -162,7 +177,7 @@ fn unify_same_tag(a: Ty, b: Ty) -> bool {
             match b {
                 Ty::TyNamed(n2, g2) => {
                     if n1 != n2 { return false; }
-                    return vec_len(g1) == vec_len(g2);
+                    return unify_list(g1, g2);
                 },
                 _ => { return false; },
             }
@@ -304,6 +319,27 @@ fn test_list_len() -> i32 {
     return 0;
 }
 
+fn test_unify_list() -> i32 {
+    let mut a: Vec<i32> = vec_new();
+    vec_push(a, 10);
+    vec_push(a, 20);
+    let mut b: Vec<i32> = vec_new();
+    vec_push(b, 10);
+    vec_push(b, 20);
+    if unify_list(a, b) != true { return 1; }
+    let mut c: Vec<i32> = vec_new();
+    vec_push(c, 10);
+    vec_push(c, 99);
+    if unify_list(a, c) != false { return 2; }
+    let mut d: Vec<i32> = vec_new();
+    vec_push(d, 10);
+    if unify_list(a, d) != false { return 3; }
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    if unify_list(e1, e2) != true { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_unit_variants();
     if r1 != 0 { return r1; }
@@ -317,5 +353,7 @@ fn main() -> i32 {
     if r5 != 0 { return 60 + r5; }
     let r6: i32 = test_list_len();
     if r6 != 0 { return 70 + r6; }
+    let r7: i32 = test_unify_list();
+    if r7 != 0 { return 80 + r7; }
     return 0;
 }

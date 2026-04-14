@@ -5,6 +5,7 @@ static int find_last_dot(const char* s, int start);
 static int path_has_sv0_ext(const char* path);
 static int sv0_ext_len(void);
 static int base_name_stem_end(const char* path);
+static const char* base_name_sv0(const char* path);
 static const char* vm_build_dir(void);
 static const char* sv0b_ext(void);
 static const char* vm_entry_stem_main(void);
@@ -35,6 +36,7 @@ static int test_vm_output(void);
 static int test_phases(void);
 static int test_cli(void);
 static int test_error_prefix(void);
+static int test_base_name_sv0(void);
 
 static int find_last_slash(const char* path) {
   int _sv0t0 = sv0_string_len(path);
@@ -121,6 +123,46 @@ static int base_name_stem_end(const char* path) {
   } else {
   }
   return len;
+}
+
+static const char* base_name_sv0(const char* path) {
+  int _sv0t0 = sv0_string_len(path);
+  int len = _sv0t0;
+  int _sv0t1 = find_last_slash(path);
+  int slash = _sv0t1;
+  int start = (slash + 1);
+  int flen = (len - start);
+  const char* _sv0t2 = sv0_string_substr(path, start, flen);
+  const char* fname;
+  fname = _sv0t2;
+  int _sv0t3 = sv0_string_len(fname);
+  int fnlen = _sv0t3;
+  if ((fnlen > 4)) {
+    int dot = (fnlen - 4);
+    int _sv0t4 = sv0_string_char_at(fname, dot);
+    if ((_sv0t4 == 46)) {
+      int _sv0t5 = (dot + 1);
+      int _sv0t6 = sv0_string_char_at(fname, _sv0t5);
+      if ((_sv0t6 == 115)) {
+        int _sv0t7 = (dot + 2);
+        int _sv0t8 = sv0_string_char_at(fname, _sv0t7);
+        if ((_sv0t8 == 118)) {
+          int _sv0t9 = (dot + 3);
+          int _sv0t10 = sv0_string_char_at(fname, _sv0t9);
+          if ((_sv0t10 == 48)) {
+            const char* _sv0t11 = sv0_string_substr(fname, 0, dot);
+            return _sv0t11;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+  } else {
+  }
+  return fname;
 }
 
 static const char* vm_build_dir(void) {
@@ -502,6 +544,46 @@ static int test_error_prefix(void) {
   return 0;
 }
 
+static int test_base_name_sv0(void) {
+  const char* _sv0t0 = base_name_sv0("foo/bar.sv0");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "bar");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = base_name_sv0("bar.sv0");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "bar");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = base_name_sv0("a/b/main.sv0");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "main");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = base_name_sv0("test.c");
+  int _sv0t7 = sv0_string_eq(_sv0t6, "test.c");
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  const char* _sv0t8 = base_name_sv0("noext");
+  int _sv0t9 = sv0_string_eq(_sv0t8, "noext");
+  if ((_sv0t9 != 1)) {
+    return 5;
+  } else {
+  }
+  const char* _sv0t10 = base_name_sv0("/abs/path/lib.sv0");
+  int _sv0t11 = sv0_string_eq(_sv0t10, "lib");
+  if ((_sv0t11 != 1)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_helpers();
   int r1 = _sv0t0;
@@ -535,6 +617,13 @@ int main(void) {
   if ((r5 != 0)) {
     int _sv0t8 = (50 + r5);
     return _sv0t8;
+  } else {
+  }
+  int _sv0t9 = test_base_name_sv0();
+  int r6 = _sv0t9;
+  if ((r6 != 0)) {
+    int _sv0t10 = (60 + r6);
+    return _sv0t10;
   } else {
   }
   return 0;

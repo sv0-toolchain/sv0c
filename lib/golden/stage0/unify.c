@@ -8,6 +8,7 @@ typedef struct {
 
 static int ty_tag(Ty t);
 static int unify_ref_inner(Ty a, Ty b);
+static int unify_list(int v1, int v2);
 static int unify_same_tag(Ty a, Ty b);
 static int unify(Ty a, Ty b);
 static int test_unit_variants(void);
@@ -16,6 +17,7 @@ static int test_recursive(void);
 static int test_ref_cross_unify(void);
 static int test_tyvar_wildcard(void);
 static int test_list_len(void);
+static int test_unify_list(void);
 
 static int ty_tag(Ty t) {
   int _sv0t0;
@@ -286,136 +288,159 @@ static int unify_ref_inner(Ty a, Ty b) {
   return _sv0t0;
 }
 
+static int unify_list(int v1, int v2) {
+  int _sv0t0 = sv0_vec_len(v1);
+  int n = _sv0t0;
+  int _sv0t1 = sv0_vec_len(v2);
+  if ((n != _sv0t1)) {
+    return 0;
+  } else {
+  }
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t2 = sv0_vec_get(v1, i);
+    int h1 = _sv0t2;
+    int _sv0t3 = sv0_vec_get(v2, i);
+    int h2 = _sv0t3;
+    if ((h1 != h2)) {
+      return 0;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 1;
+}
+
 static int unify_same_tag(Ty a, Ty b) {
   int _sv0t0;
   if ((a.tag == 7)) {
     int w1 = a.p0;
-    int _sv0t49;
+    int _sv0t44;
     if ((b.tag == 7)) {
       int w2 = b.p0;
-      int _sv0t50 = (w1 == w2);
-      return _sv0t50;
-      _sv0t49 = 0;
+      int _sv0t45 = (w1 == w2);
+      return _sv0t45;
+      _sv0t44 = 0;
     } else {
       if (1) {
         return 0;
-        _sv0t49 = 0;
+        _sv0t44 = 0;
       } else {
       }
     }
-    _sv0t0 = _sv0t49;
+    _sv0t0 = _sv0t44;
   } else {
     if ((a.tag == 8)) {
       int w1 = a.p0;
-      int _sv0t47;
+      int _sv0t42;
       if ((b.tag == 8)) {
         int w2 = b.p0;
-        int _sv0t48 = (w1 == w2);
-        return _sv0t48;
-        _sv0t47 = 0;
+        int _sv0t43 = (w1 == w2);
+        return _sv0t43;
+        _sv0t42 = 0;
       } else {
         if (1) {
           return 0;
-          _sv0t47 = 0;
+          _sv0t42 = 0;
         } else {
         }
       }
-      _sv0t0 = _sv0t47;
+      _sv0t0 = _sv0t42;
     } else {
       if ((a.tag == 9)) {
         int w1 = a.p0;
-        int _sv0t45;
+        int _sv0t40;
         if ((b.tag == 9)) {
           int w2 = b.p0;
-          int _sv0t46 = (w1 == w2);
-          return _sv0t46;
-          _sv0t45 = 0;
+          int _sv0t41 = (w1 == w2);
+          return _sv0t41;
+          _sv0t40 = 0;
         } else {
           if (1) {
             return 0;
-            _sv0t45 = 0;
+            _sv0t40 = 0;
           } else {
           }
         }
-        _sv0t0 = _sv0t45;
+        _sv0t0 = _sv0t40;
       } else {
         if ((a.tag == 11)) {
           int id1 = a.p0;
-          int _sv0t43;
+          int _sv0t38;
           if ((b.tag == 11)) {
             int id2 = b.p0;
-            int _sv0t44 = (id1 == id2);
-            return _sv0t44;
-            _sv0t43 = 0;
+            int _sv0t39 = (id1 == id2);
+            return _sv0t39;
+            _sv0t38 = 0;
           } else {
             if (1) {
               return 0;
-              _sv0t43 = 0;
+              _sv0t38 = 0;
             } else {
             }
           }
-          _sv0t0 = _sv0t43;
+          _sv0t0 = _sv0t38;
         } else {
           if ((a.tag == 12)) {
             int id1 = a.p0;
-            int _sv0t41;
+            int _sv0t36;
             if ((b.tag == 12)) {
               int id2 = b.p0;
-              int _sv0t42 = (id1 == id2);
-              return _sv0t42;
-              _sv0t41 = 0;
+              int _sv0t37 = (id1 == id2);
+              return _sv0t37;
+              _sv0t36 = 0;
             } else {
               if (1) {
                 return 0;
-                _sv0t41 = 0;
+                _sv0t36 = 0;
               } else {
               }
             }
-            _sv0t0 = _sv0t41;
+            _sv0t0 = _sv0t36;
           } else {
             if ((a.tag == 15)) {
               int b1 = a.p0;
-              int _sv0t31;
+              int _sv0t26;
               if ((b.tag == 15)) {
                 int b2 = b.p0;
-                Ty _sv0t32;
-                int _sv0t33 = sv0_box_load(b1, 0);
-                _sv0t32.tag = _sv0t33;
-                int _sv0t34 = sv0_box_load(b1, 1);
-                _sv0t32.p0 = _sv0t34;
-                int _sv0t35 = sv0_box_load(b1, 2);
-                _sv0t32.p1 = _sv0t35;
+                Ty _sv0t27;
+                int _sv0t28 = sv0_box_load(b1, 0);
+                _sv0t27.tag = _sv0t28;
+                int _sv0t29 = sv0_box_load(b1, 1);
+                _sv0t27.p0 = _sv0t29;
+                int _sv0t30 = sv0_box_load(b1, 2);
+                _sv0t27.p1 = _sv0t30;
                 Ty d1;
-                d1.tag = (_sv0t32).tag;
-                d1.p0 = (_sv0t32).p0;
-                d1.p1 = (_sv0t32).p1;
-                Ty _sv0t36;
-                int _sv0t37 = sv0_box_load(b2, 0);
-                _sv0t36.tag = _sv0t37;
-                int _sv0t38 = sv0_box_load(b2, 1);
-                _sv0t36.p0 = _sv0t38;
-                int _sv0t39 = sv0_box_load(b2, 2);
-                _sv0t36.p1 = _sv0t39;
+                d1.tag = (_sv0t27).tag;
+                d1.p0 = (_sv0t27).p0;
+                d1.p1 = (_sv0t27).p1;
+                Ty _sv0t31;
+                int _sv0t32 = sv0_box_load(b2, 0);
+                _sv0t31.tag = _sv0t32;
+                int _sv0t33 = sv0_box_load(b2, 1);
+                _sv0t31.p0 = _sv0t33;
+                int _sv0t34 = sv0_box_load(b2, 2);
+                _sv0t31.p1 = _sv0t34;
                 Ty d2;
-                d2.tag = (_sv0t36).tag;
-                d2.p0 = (_sv0t36).p0;
-                d2.p1 = (_sv0t36).p1;
-                int _sv0t40 = unify(d1, d2);
-                return _sv0t40;
-                _sv0t31 = 0;
+                d2.tag = (_sv0t31).tag;
+                d2.p0 = (_sv0t31).p0;
+                d2.p1 = (_sv0t31).p1;
+                int _sv0t35 = unify(d1, d2);
+                return _sv0t35;
+                _sv0t26 = 0;
               } else {
                 if (1) {
                   return 0;
-                  _sv0t31 = 0;
+                  _sv0t26 = 0;
                 } else {
                 }
               }
-              _sv0t0 = _sv0t31;
+              _sv0t0 = _sv0t26;
             } else {
               if ((a.tag == 16)) {
                 int b1 = a.p0;
                 int n1 = a.p1;
-                int _sv0t21;
+                int _sv0t16;
                 if ((b.tag == 16)) {
                   int b2 = b.p0;
                   int n2 = b.p1;
@@ -423,105 +448,102 @@ static int unify_same_tag(Ty a, Ty b) {
                     return 0;
                   } else {
                   }
-                  Ty _sv0t22;
-                  int _sv0t23 = sv0_box_load(b1, 0);
-                  _sv0t22.tag = _sv0t23;
-                  int _sv0t24 = sv0_box_load(b1, 1);
-                  _sv0t22.p0 = _sv0t24;
-                  int _sv0t25 = sv0_box_load(b1, 2);
-                  _sv0t22.p1 = _sv0t25;
+                  Ty _sv0t17;
+                  int _sv0t18 = sv0_box_load(b1, 0);
+                  _sv0t17.tag = _sv0t18;
+                  int _sv0t19 = sv0_box_load(b1, 1);
+                  _sv0t17.p0 = _sv0t19;
+                  int _sv0t20 = sv0_box_load(b1, 2);
+                  _sv0t17.p1 = _sv0t20;
                   Ty d1;
-                  d1.tag = (_sv0t22).tag;
-                  d1.p0 = (_sv0t22).p0;
-                  d1.p1 = (_sv0t22).p1;
-                  Ty _sv0t26;
-                  int _sv0t27 = sv0_box_load(b2, 0);
-                  _sv0t26.tag = _sv0t27;
-                  int _sv0t28 = sv0_box_load(b2, 1);
-                  _sv0t26.p0 = _sv0t28;
-                  int _sv0t29 = sv0_box_load(b2, 2);
-                  _sv0t26.p1 = _sv0t29;
+                  d1.tag = (_sv0t17).tag;
+                  d1.p0 = (_sv0t17).p0;
+                  d1.p1 = (_sv0t17).p1;
+                  Ty _sv0t21;
+                  int _sv0t22 = sv0_box_load(b2, 0);
+                  _sv0t21.tag = _sv0t22;
+                  int _sv0t23 = sv0_box_load(b2, 1);
+                  _sv0t21.p0 = _sv0t23;
+                  int _sv0t24 = sv0_box_load(b2, 2);
+                  _sv0t21.p1 = _sv0t24;
                   Ty d2;
-                  d2.tag = (_sv0t26).tag;
-                  d2.p0 = (_sv0t26).p0;
-                  d2.p1 = (_sv0t26).p1;
-                  int _sv0t30 = unify(d1, d2);
-                  return _sv0t30;
-                  _sv0t21 = 0;
+                  d2.tag = (_sv0t21).tag;
+                  d2.p0 = (_sv0t21).p0;
+                  d2.p1 = (_sv0t21).p1;
+                  int _sv0t25 = unify(d1, d2);
+                  return _sv0t25;
+                  _sv0t16 = 0;
                 } else {
                   if (1) {
                     return 0;
-                    _sv0t21 = 0;
+                    _sv0t16 = 0;
                   } else {
                   }
                 }
-                _sv0t0 = _sv0t21;
+                _sv0t0 = _sv0t16;
               } else {
                 if ((a.tag == 17)) {
                   int v1 = a.p0;
-                  int _sv0t17;
+                  int _sv0t14;
                   if ((b.tag == 17)) {
                     int v2 = b.p0;
-                    int _sv0t18 = sv0_vec_len(v1);
-                    int _sv0t19 = sv0_vec_len(v2);
-                    int _sv0t20 = (_sv0t18 == _sv0t19);
-                    return _sv0t20;
-                    _sv0t17 = 0;
+                    int _sv0t15 = unify_list(v1, v2);
+                    return _sv0t15;
+                    _sv0t14 = 0;
                   } else {
                     if (1) {
                       return 0;
-                      _sv0t17 = 0;
+                      _sv0t14 = 0;
                     } else {
                     }
                   }
-                  _sv0t0 = _sv0t17;
+                  _sv0t0 = _sv0t14;
                 } else {
                   if ((a.tag == 18)) {
                     int ps1 = a.p0;
                     int r1 = a.p1;
-                    int _sv0t5;
+                    int _sv0t3;
                     if ((b.tag == 18)) {
                       int ps2 = b.p0;
                       int r2 = b.p1;
-                      int _sv0t6 = sv0_vec_len(ps1);
-                      int _sv0t7 = sv0_vec_len(ps2);
-                      if ((_sv0t6 != _sv0t7)) {
+                      int _sv0t4 = unify_list(ps1, ps2);
+                      if ((_sv0t4 == 0)) {
                         return 0;
                       } else {
                       }
-                      Ty _sv0t8;
-                      int _sv0t9 = sv0_box_load(r1, 0);
-                      _sv0t8.tag = _sv0t9;
-                      int _sv0t10 = sv0_box_load(r1, 1);
-                      _sv0t8.p0 = _sv0t10;
-                      int _sv0t11 = sv0_box_load(r1, 2);
-                      _sv0t8.p1 = _sv0t11;
+                      Ty _sv0t5;
+                      int _sv0t6 = sv0_box_load(r1, 0);
+                      _sv0t5.tag = _sv0t6;
+                      int _sv0t7 = sv0_box_load(r1, 1);
+                      _sv0t5.p0 = _sv0t7;
+                      int _sv0t8 = sv0_box_load(r1, 2);
+                      _sv0t5.p1 = _sv0t8;
                       Ty d1;
-                      d1.tag = (_sv0t8).tag;
-                      d1.p0 = (_sv0t8).p0;
-                      d1.p1 = (_sv0t8).p1;
-                      Ty _sv0t12;
-                      int _sv0t13 = sv0_box_load(r2, 0);
-                      _sv0t12.tag = _sv0t13;
-                      int _sv0t14 = sv0_box_load(r2, 1);
-                      _sv0t12.p0 = _sv0t14;
-                      int _sv0t15 = sv0_box_load(r2, 2);
-                      _sv0t12.p1 = _sv0t15;
+                      d1.tag = (_sv0t5).tag;
+                      d1.p0 = (_sv0t5).p0;
+                      d1.p1 = (_sv0t5).p1;
+                      Ty _sv0t9;
+                      int _sv0t10 = sv0_box_load(r2, 0);
+                      _sv0t9.tag = _sv0t10;
+                      int _sv0t11 = sv0_box_load(r2, 1);
+                      _sv0t9.p0 = _sv0t11;
+                      int _sv0t12 = sv0_box_load(r2, 2);
+                      _sv0t9.p1 = _sv0t12;
                       Ty d2;
-                      d2.tag = (_sv0t12).tag;
-                      d2.p0 = (_sv0t12).p0;
-                      d2.p1 = (_sv0t12).p1;
-                      int _sv0t16 = unify(d1, d2);
-                      return _sv0t16;
-                      _sv0t5 = 0;
+                      d2.tag = (_sv0t9).tag;
+                      d2.p0 = (_sv0t9).p0;
+                      d2.p1 = (_sv0t9).p1;
+                      int _sv0t13 = unify(d1, d2);
+                      return _sv0t13;
+                      _sv0t3 = 0;
                     } else {
                       if (1) {
                         return 0;
-                        _sv0t5 = 0;
+                        _sv0t3 = 0;
                       } else {
                       }
                     }
-                    _sv0t0 = _sv0t5;
+                    _sv0t0 = _sv0t3;
                   } else {
                     if ((a.tag == 19)) {
                       int n1 = a.p0;
@@ -534,10 +556,8 @@ static int unify_same_tag(Ty a, Ty b) {
                           return 0;
                         } else {
                         }
-                        int _sv0t2 = sv0_vec_len(g1);
-                        int _sv0t3 = sv0_vec_len(g2);
-                        int _sv0t4 = (_sv0t2 == _sv0t3);
-                        return _sv0t4;
+                        int _sv0t2 = unify_list(g1, g2);
+                        return _sv0t2;
                         _sv0t1 = 0;
                       } else {
                         if (1) {
@@ -1255,6 +1275,49 @@ static int test_list_len(void) {
   return 0;
 }
 
+static int test_unify_list(void) {
+  int _sv0t0 = sv0_vec_new();
+  int a = _sv0t0;
+  sv0_vec_push(a, 10);
+  sv0_vec_push(a, 20);
+  int _sv0t1 = sv0_vec_new();
+  int b = _sv0t1;
+  sv0_vec_push(b, 10);
+  sv0_vec_push(b, 20);
+  int _sv0t2 = unify_list(a, b);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_new();
+  int c = _sv0t3;
+  sv0_vec_push(c, 10);
+  sv0_vec_push(c, 99);
+  int _sv0t4 = unify_list(a, c);
+  if ((_sv0t4 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int d = _sv0t5;
+  sv0_vec_push(d, 10);
+  int _sv0t6 = unify_list(a, d);
+  if ((_sv0t6 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_new();
+  int e1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int e2 = _sv0t8;
+  int _sv0t9 = unify_list(e1, e2);
+  if ((_sv0t9 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_unit_variants();
   int r1 = _sv0t0;
@@ -1295,6 +1358,13 @@ int main(void) {
   if ((r6 != 0)) {
     int _sv0t10 = (70 + r6);
     return _sv0t10;
+  } else {
+  }
+  int _sv0t11 = test_unify_list();
+  int r7 = _sv0t11;
+  if ((r7 != 0)) {
+    int _sv0t12 = (80 + r7);
+    return _sv0t12;
   } else {
   }
   return 0;

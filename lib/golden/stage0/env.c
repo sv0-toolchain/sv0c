@@ -10,6 +10,7 @@ static int dup_mod_ty(int name, int mod_tys);
 static int register_module_value(int mod_vals, int name);
 static int register_module_type(int mod_tys, int name);
 static int type_is_registered_by_handle(int name_h, int mod_tys);
+static int type_is_registered(const char* name, int mod_tys, int name_h);
 static int env_new_fn_arities(void);
 static int dup_fn_arity(int fn_arities, int name);
 static int register_fn_arity(int fn_arities, int name, int arity);
@@ -37,6 +38,7 @@ static int test_fn_arity(void);
 static int test_ty_alias(void);
 static int test_value_alias(void);
 static int test_lookup_type(void);
+static int test_type_is_registered(void);
 
 static int is_prelude_type(const char* name) {
   int _sv0t0 = sv0_string_eq(name, "i8");
@@ -206,6 +208,16 @@ static int register_module_type(int mod_tys, int name) {
 static int type_is_registered_by_handle(int name_h, int mod_tys) {
   int _sv0t0 = vec_contains(mod_tys, name_h);
   return _sv0t0;
+}
+
+static int type_is_registered(const char* name, int mod_tys, int name_h) {
+  int _sv0t0 = is_prelude_type(name);
+  if (_sv0t0) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = vec_contains(mod_tys, name_h);
+  return _sv0t1;
 }
 
 static int env_new_fn_arities(void) {
@@ -740,6 +752,38 @@ static int test_lookup_type(void) {
   return 0;
 }
 
+static int test_type_is_registered(void) {
+  int _sv0t0 = env_new_mod_tys();
+  int mt = _sv0t0;
+  int _sv0t1 = type_is_registered("i32", mt, 1);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = type_is_registered("bool", mt, 2);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = type_is_registered("Foo", mt, 3);
+  if ((_sv0t3 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = register_module_type(mt, 3);
+  int _sv0t5 = type_is_registered("Foo", mt, 3);
+  if ((_sv0t5 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = type_is_registered("Bar", mt, 99);
+  if ((_sv0t6 != 0)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_prelude_types();
   int r1 = _sv0t0;
@@ -808,6 +852,13 @@ int main(void) {
   if ((r10 != 0)) {
     int _sv0t18 = (90 + r10);
     return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_type_is_registered();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (100 + r11);
+    return _sv0t20;
   } else {
   }
   return 0;
