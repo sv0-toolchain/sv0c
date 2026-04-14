@@ -4,7 +4,9 @@
    param names from <T, U: Bound>), skipOptionalPub/skipOptionalUnsafe/
    skipGenericParams/skipWhereClause/skipAttributes on token stream,
    token→binop/assign-binop/literal mapping, Pratt precedence, span
-   merge. Full recursive-descent parser (parseExpr/parseType/parsePat/
+   merge, parse_use_item (SML parseUseItem — USE path SEMICOLON),
+   parse_module_decl (SML parseModuleDecl — MODULE path SEMICOLON).
+   Full recursive-descent parser (parseExpr/parseType/parsePat/
    parseItem) deferred — needs mutual recursion over AST construction. */
 
 /* ── token tag constants (from token.sv0) ───────────────────── */
@@ -269,6 +271,36 @@ fn ps_skip_attributes(tags: Vec<i32>, pos: i32) -> i32 {
         } else { scanning = false; }
     }
     return p;
+}
+
+/* ── parse_use_item (SML parseUseItem) ─────────────────────────
+   Parses: USE path SEMICOLON
+   Stores path segment indices in path_out.
+   Returns new pos after SEMICOLON, or -1 on error.
+   Assumes current token is USE (tag 94). */
+fn parse_use_item(tags: Vec<i32>, pos: i32,
+                  path_out: Vec<i32>) -> i32 {
+    if ps_peek(tags, pos) != 94 { return 0 - 1; }
+    let p1: i32 = pos + 1;
+    let p2: i32 = parse_path(tags, p1, path_out);
+    if p2 < 0 { return 0 - 1; }
+    let p3: i32 = ps_expect(tags, p2, 13);
+    return p3;
+}
+
+/* ── parse_module_decl (SML parseModuleDecl) ──────────────────
+   Parses: MODULE path SEMICOLON
+   Stores path segment indices in path_out.
+   Returns new pos after SEMICOLON, or -1 on error.
+   Returns same pos if current token is not MODULE (tag 83). */
+fn parse_module_decl(tags: Vec<i32>, pos: i32,
+                     path_out: Vec<i32>) -> i32 {
+    if ps_peek(tags, pos) != 75 { return pos; }
+    let p1: i32 = pos + 1;
+    let p2: i32 = parse_path(tags, p1, path_out);
+    if p2 < 0 { return 0 - 1; }
+    let p3: i32 = ps_expect(tags, p2, 13);
+    return p3;
 }
 
 /* ── AST binop tags (matching ast.sv0) ──────────────────────── */
@@ -856,6 +888,57 @@ fn test_parse_generic_params() -> i32 {
     return 0;
 }
 
+fn test_parse_use_item() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 94);
+    vec_push(tags, 5);
+    vec_push(tags, 15);
+    vec_push(tags, 5);
+    vec_push(tags, 13);
+    vec_push(tags, 97);
+    let path: Vec<i32> = vec_new();
+    let end_pos: i32 = parse_use_item(tags, 0, path);
+    if end_pos != 5 { return 1; }
+    if vec_len(path) != 2 { return 2; }
+    if vec_get(path, 0) != 1 { return 3; }
+    if vec_get(path, 1) != 3 { return 4; }
+    let path2: Vec<i32> = vec_new();
+    let fail: i32 = parse_use_item(tags, 1, path2);
+    if fail != 0 - 1 { return 5; }
+    let tags2: Vec<i32> = vec_new();
+    vec_push(tags2, 94);
+    vec_push(tags2, 5);
+    vec_push(tags2, 97);
+    let path3: Vec<i32> = vec_new();
+    let fail2: i32 = parse_use_item(tags2, 0, path3);
+    if fail2 != 0 - 1 { return 6; }
+    return 0;
+}
+
+fn test_parse_module_decl() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    vec_push(tags, 75);
+    vec_push(tags, 5);
+    vec_push(tags, 13);
+    vec_push(tags, 97);
+    let path: Vec<i32> = vec_new();
+    let end_pos: i32 = parse_module_decl(tags, 0, path);
+    if end_pos != 3 { return 1; }
+    if vec_len(path) != 1 { return 2; }
+    if vec_get(path, 0) != 1 { return 3; }
+    let path2: Vec<i32> = vec_new();
+    let same: i32 = parse_module_decl(tags, 3, path2);
+    if same != 3 { return 4; }
+    if vec_len(path2) != 0 { return 5; }
+    let tags2: Vec<i32> = vec_new();
+    vec_push(tags2, 5);
+    vec_push(tags2, 97);
+    let path3: Vec<i32> = vec_new();
+    let noop: i32 = parse_module_decl(tags2, 0, path3);
+    if noop != 0 { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_of();
     if r1 != 0 { return r1; }
@@ -885,5 +968,9 @@ fn main() -> i32 {
     if r13 != 0 { return 200 + r13; }
     let r14: i32 = test_parse_generic_params();
     if r14 != 0 { return 220 + r14; }
+    let r15: i32 = test_parse_use_item();
+    if r15 != 0 { return 240 + r15; }
+    let r16: i32 = test_parse_module_decl();
+    if r16 != 0 { return 260 + r16; }
     return 0;
 }

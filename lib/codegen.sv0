@@ -113,6 +113,9 @@ fn c_escape_one(c: i32, src: string, pos: i32) -> string {
     if c == 10 { return "\\n"; }
     if c == 9 { return "\\t"; }
     if c == 13 { return "\\r"; }
+    if c < 32 {
+        return string_concat("\\", int_to_string(c));
+    }
     return string_substr(src, pos, 1);
 }
 
@@ -556,6 +559,12 @@ fn test_escape() -> i32 {
     if !string_eq(c_escape_string("hello"), "hello") { return 1; }
     if !string_eq(c_escape_string(""), "") { return 2; }
     if !string_eq(c_escape_string("ab"), "ab") { return 3; }
+    let ctrl: string = c_escape_one(1, "x", 0);
+    if !string_eq(ctrl, "\\1") { return 4; }
+    let ctrl2: string = c_escape_one(31, "x", 0);
+    if !string_eq(ctrl2, "\\31") { return 5; }
+    let normal: string = c_escape_one(65, "A", 0);
+    if !string_eq(normal, "A") { return 6; }
     return 0;
 }
 

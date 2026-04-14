@@ -5,8 +5,13 @@
    line/col/message), sort-by-span (insertion sort on line+col),
    format_header, format_snippet, format_diagnostic (combines header +
    location + snippet into a single formatted string, matching SML's
-   `format source d`), int_to_str for line/col rendering. Remaining:
-   full report/reportAll (I/O output), related and help text fields. */
+   `format source d`), int_to_str for line/col rendering,
+   format_header_with_code (SML `codeStr` bracket — "[E0001]"),
+   format_related (SML `relatedStr` — "= note: ... at file:l:c"),
+   format_help (SML `helpStr` — "= help: ..."),
+   format_gutter (SML `gutter`/`blank` — numbered + blank gutter lines),
+   format_snippet_numbered (SML full numbered snippet with gutter).
+   Remaining: full report/reportAll (I/O output). */
 
 enum Severity { Error, Warning, Note }
 
@@ -289,6 +294,82 @@ fn format_diagnostic(sev_tag: i32, message: string, file: string,
     return out;
 }
 
+/* SML format: codeStr = if code = "" then "" else "[" ^ code ^ "]" */
+fn format_header_with_code(sev_tag: i32, message: string, code: string) -> string {
+    let mut out: string = "";
+    if sev_tag == 0 { out = "error"; }
+    if sev_tag == 1 { out = "warning"; }
+    if sev_tag == 2 { out = "note"; }
+    if string_len(code) > 0 {
+        out = string_concat(out, "[");
+        out = string_concat(out, code);
+        out = string_concat(out, "]");
+    }
+    out = string_concat(out, ": ");
+    out = string_concat(out, message);
+    return out;
+}
+
+/* SML format: gutter = spaces gutterWidth ^ " | " */
+fn format_gutter(gutter_width: i32) -> string {
+    let pad: string = spaces(gutter_width);
+    return string_concat(pad, " | ");
+}
+
+/* SML format: numbered = padLeft(lineStr, gutterWidth) ^ " | " ^ srcLine */
+fn format_snippet_numbered(source: string, line_no: i32,
+                           col: i32, span_len: i32) -> string {
+    let line_text: string = get_line(source, line_no);
+    if string_len(line_text) == 0 { return ""; }
+    let mut effective_span: i32 = span_len;
+    if effective_span < 1 { effective_span = 1; }
+    let line_str: string = diag_int_to_str(line_no);
+    let ls_len: i32 = string_len(line_str);
+    let mut gw: i32 = ls_len;
+    if gw < 2 { gw = 2; }
+    let gutter: string = format_gutter(gw);
+    let blank: string = string_concat(gutter, "\n");
+    let numbered: string = string_concat(
+        string_concat(pad_left(line_str, gw), " | "),
+        string_concat(line_text, "\n"));
+    let col_offset: i32 = col - 1;
+    let mut underline: string = gutter;
+    if col_offset > 0 {
+        underline = string_concat(underline, spaces(col_offset));
+    }
+    underline = string_concat(underline, carets(effective_span));
+    underline = string_concat(underline, "\n");
+    return string_concat(blank, string_concat(numbered, underline));
+}
+
+/* SML format: relatedStr — each (msg, file, line, col) →
+   gutter ^ "= note: " ^ msg ^ " at " ^ file ^ ":" ^ line ^ ":" ^ col */
+fn format_related(gutter_width: i32, msg: string, file: string,
+                  line: i32, col: i32) -> string {
+    let gutter: string = format_gutter(gutter_width);
+    let mut out: string = gutter;
+    out = string_concat(out, "= note: ");
+    out = string_concat(out, msg);
+    out = string_concat(out, " at ");
+    out = string_concat(out, file);
+    out = string_concat(out, ":");
+    out = string_concat(out, diag_int_to_str(line));
+    out = string_concat(out, ":");
+    out = string_concat(out, diag_int_to_str(col));
+    out = string_concat(out, "\n");
+    return out;
+}
+
+/* SML format: helpStr — each h → gutter ^ "= help: " ^ h */
+fn format_help(gutter_width: i32, help_text: string) -> string {
+    let gutter: string = format_gutter(gutter_width);
+    let mut out: string = gutter;
+    out = string_concat(out, "= help: ");
+    out = string_concat(out, help_text);
+    out = string_concat(out, "\n");
+    return out;
+}
+
 fn test_severity_tags() -> i32 {
     if severity_tag(Severity::Error) != 0 { return 1; }
     if severity_tag(Severity::Warning) != 1 { return 2; }
@@ -451,6 +532,38 @@ fn test_format_diagnostic() -> i32 {
     return 0;
 }
 
+fn test_format_header_with_code() -> i32 {
+    let h1: string = format_header_with_code(0, "bad type", "E0001");
+    if string_eq(h1, "error[E0001]: bad type") != true { return 1; }
+    let h2: string = format_header_with_code(1, "unused", "");
+    if string_eq(h2, "warning: unused") != true { return 2; }
+    let h3: string = format_header_with_code(2, "see here", "N42");
+    if string_eq(h3, "note[N42]: see here") != true { return 3; }
+    return 0;
+}
+
+fn test_format_gutter() -> i32 {
+    let g2: string = format_gutter(2);
+    if string_eq(g2, "   | ") != true { return 1; }
+    let g4: string = format_gutter(4);
+    if string_eq(g4, "     | ") != true { return 2; }
+    return 0;
+}
+
+fn test_format_related() -> i32 {
+    let rel: string = format_related(2, "defined here", "foo.sv0", 5, 3);
+    let expected: string = "   | = note: defined here at foo.sv0:5:3\n";
+    if string_eq(rel, expected) != true { return 1; }
+    return 0;
+}
+
+fn test_format_help() -> i32 {
+    let hlp: string = format_help(2, "try adding mut");
+    let expected: string = "   | = help: try adding mut\n";
+    if string_eq(hlp, expected) != true { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_severity_tags();
     if r1 != 0 { return r1; }
@@ -486,5 +599,13 @@ fn main() -> i32 {
     if r16 != 0 { return 150 + r16; }
     let r17: i32 = test_format_diagnostic();
     if r17 != 0 { return 160 + r17; }
+    let r18: i32 = test_format_header_with_code();
+    if r18 != 0 { return 170 + r18; }
+    let r19: i32 = test_format_gutter();
+    if r19 != 0 { return 180 + r19; }
+    let r20: i32 = test_format_related();
+    if r20 != 0 { return 190 + r20; }
+    let r21: i32 = test_format_help();
+    if r21 != 0 { return 200 + r21; }
     return 0;
 }
