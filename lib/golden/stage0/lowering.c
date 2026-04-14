@@ -5,6 +5,13 @@ static int next_tmp(int counter);
 static const char* lower_digit(int d);
 static const char* lower_int_to_str(int n);
 static const char* fresh_tmp_str(int counter);
+static int lower_alias_new(void);
+static int lower_alias_add(int aliases, int from_h, int to_h);
+static int lower_alias_lookup(int aliases, int name_h);
+static int resolve_fn_callee(int aliases, int name_h);
+static int resolve_enum_ctor_path(int ctor_from_enum, int ctor_from_var, int ctor_to_enum, int ctor_to_var, int enum_h, int variant_h);
+static int resolved_ctor_enum(int ctor_to_enum, int idx, int default_enum);
+static int resolved_ctor_variant(int ctor_to_var, int idx, int default_var);
 static int find_double_colon(const char* s, int start);
 static int split_qname_count(const char* s);
 static int has_qualified_name(const char* s);
@@ -82,6 +89,9 @@ static int test_uniq_old_names(void);
 static int test_fresh_tmp_str(void);
 static int test_lower_lit_ir(void);
 static int test_fn_ret_cty(void);
+static int test_lower_alias(void);
+static int test_resolve_fn_callee(void);
+static int test_resolve_ctor_path(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -163,6 +173,85 @@ static const char* fresh_tmp_str(int counter) {
   const char* _sv0t0 = lower_int_to_str(counter);
   const char* _sv0t1 = sv0_string_concat("_sv0t", _sv0t0);
   return _sv0t1;
+}
+
+static int lower_alias_new(void) {
+  int _sv0t0 = sv0_vec_new();
+  return _sv0t0;
+}
+
+static int lower_alias_add(int aliases, int from_h, int to_h) {
+  sv0_vec_push(aliases, from_h);
+  sv0_vec_push(aliases, to_h);
+  int _sv0t0 = sv0_vec_len(aliases);
+  int _sv0t1 = (_sv0t0 / 2);
+  return _sv0t1;
+}
+
+static int lower_alias_lookup(int aliases, int name_h) {
+  int _sv0t0 = sv0_vec_len(aliases);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(aliases, i);
+    if ((_sv0t1 == name_h)) {
+      int _sv0t2 = (i + 1);
+      int _sv0t3 = sv0_vec_get(aliases, _sv0t2);
+      return _sv0t3;
+    } else {
+    }
+    i = (i + 2);
+  }
+  int _sv0t4 = (0 - 1);
+  return _sv0t4;
+}
+
+static int resolve_fn_callee(int aliases, int name_h) {
+  int _sv0t0 = lower_alias_lookup(aliases, name_h);
+  int target = _sv0t0;
+  if ((target < 0)) {
+    return name_h;
+  } else {
+  }
+  return target;
+}
+
+static int resolve_enum_ctor_path(int ctor_from_enum, int ctor_from_var, int ctor_to_enum, int ctor_to_var, int enum_h, int variant_h) {
+  int _sv0t0 = sv0_vec_len(ctor_from_enum);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(ctor_from_enum, i);
+    if ((_sv0t1 == enum_h)) {
+      int _sv0t2 = sv0_vec_get(ctor_from_var, i);
+      if ((_sv0t2 == variant_h)) {
+        return i;
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t3 = (0 - 1);
+  return _sv0t3;
+}
+
+static int resolved_ctor_enum(int ctor_to_enum, int idx, int default_enum) {
+  if ((idx < 0)) {
+    return default_enum;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(ctor_to_enum, idx);
+  return _sv0t0;
+}
+
+static int resolved_ctor_variant(int ctor_to_var, int idx, int default_var) {
+  if ((idx < 0)) {
+    return default_var;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(ctor_to_var, idx);
+  return _sv0t0;
 }
 
 static int find_double_colon(const char* s, int start) {
@@ -1670,6 +1759,96 @@ static int test_fn_ret_cty(void) {
   return 0;
 }
 
+static int test_lower_alias(void) {
+  int _sv0t0 = lower_alias_new();
+  int a = _sv0t0;
+  int _sv0t1 = lower_alias_add(a, 10, 20);
+  int _sv0t2 = lower_alias_add(a, 30, 40);
+  int _sv0t3 = lower_alias_lookup(a, 10);
+  if ((_sv0t3 != 20)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = lower_alias_lookup(a, 30);
+  if ((_sv0t4 != 40)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = lower_alias_lookup(a, 99);
+  int _sv0t6 = (0 - 1);
+  if ((_sv0t5 != _sv0t6)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_fn_callee(void) {
+  int _sv0t0 = lower_alias_new();
+  int a = _sv0t0;
+  int _sv0t1 = lower_alias_add(a, 10, 20);
+  int _sv0t2 = resolve_fn_callee(a, 10);
+  if ((_sv0t2 != 20)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = resolve_fn_callee(a, 99);
+  if ((_sv0t3 != 99)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_ctor_path(void) {
+  int _sv0t0 = sv0_vec_new();
+  int fe = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int fv = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int te = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int tv = _sv0t3;
+  sv0_vec_push(fe, 10);
+  sv0_vec_push(fv, 20);
+  sv0_vec_push(te, 30);
+  sv0_vec_push(tv, 40);
+  int _sv0t4 = resolve_enum_ctor_path(fe, fv, te, tv, 10, 20);
+  int idx = _sv0t4;
+  if ((idx != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = resolved_ctor_enum(te, idx, 10);
+  if ((_sv0t5 != 30)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = resolved_ctor_variant(tv, idx, 20);
+  if ((_sv0t6 != 40)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = resolve_enum_ctor_path(fe, fv, te, tv, 99, 88);
+  int miss = _sv0t7;
+  int _sv0t8 = (0 - 1);
+  if ((miss != _sv0t8)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = resolved_ctor_enum(te, miss, 99);
+  if ((_sv0t9 != 99)) {
+    return 5;
+  } else {
+  }
+  int _sv0t10 = resolved_ctor_variant(tv, miss, 88);
+  if ((_sv0t10 != 88)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -1843,6 +2022,27 @@ int main(void) {
   if ((r25 != 0)) {
     int _sv0t48 = (270 + r25);
     return _sv0t48;
+  } else {
+  }
+  int _sv0t49 = test_lower_alias();
+  int r26 = _sv0t49;
+  if ((r26 != 0)) {
+    int _sv0t50 = (280 + r26);
+    return _sv0t50;
+  } else {
+  }
+  int _sv0t51 = test_resolve_fn_callee();
+  int r27 = _sv0t51;
+  if ((r27 != 0)) {
+    int _sv0t52 = (290 + r27);
+    return _sv0t52;
+  } else {
+  }
+  int _sv0t53 = test_resolve_ctor_path();
+  int r28 = _sv0t53;
+  if ((r28 != 0)) {
+    int _sv0t54 = (300 + r28);
+    return _sv0t54;
   } else {
   }
   return 0;

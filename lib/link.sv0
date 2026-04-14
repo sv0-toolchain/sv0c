@@ -3,7 +3,8 @@
    name extraction (fileStem), name mangling (mangle), fn_name_for_link
    (main exemption), link_dir_from_entry (directory extraction),
    top-level name collection (collectTops by item tag), link directive
-   stripping (stripLinkDirectives), split-module detection.
+   stripping (stripLinkDirectives), split-module detection,
+   map_path_segs (SML mapPathSegs — 1/2-segment path mangling).
    AST map functions (mapTy/mapPat/mapExpr/mapItem) and I/O
    (walkSv0, parseFile, linkProjectDir) deferred — need full AST
    enum traversal with Box support and host filesystem. */
@@ -226,6 +227,19 @@ fn path_seg_needs_mangle(tops: Vec<i32>, name: i32) -> bool {
     return in_tops(tops, name);
 }
 
+/* ── map_path_segs (SML mapPathSegs) ───────────────────────── */
+
+fn map_path_segs_needs_mangle(tops: Vec<i32>, seg_count: i32,
+                              first_seg: i32) -> bool {
+    if seg_count == 1 { return in_tops(tops, first_seg); }
+    if seg_count == 2 { return in_tops(tops, first_seg); }
+    return false;
+}
+
+fn map_path_segs_mangle_first(mod_id: string, first_seg_str: string) -> string {
+    return mangle(mod_id, first_seg_str);
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_is_sv0() -> i32 {
@@ -391,6 +405,20 @@ fn test_item_rewrite() -> i32 {
     return 0;
 }
 
+fn test_map_path_segs() -> i32 {
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 10);
+    vec_push(tops, 20);
+    if map_path_segs_needs_mangle(tops, 1, 10) != true { return 1; }
+    if map_path_segs_needs_mangle(tops, 1, 99) != false { return 2; }
+    if map_path_segs_needs_mangle(tops, 2, 10) != true { return 3; }
+    if map_path_segs_needs_mangle(tops, 2, 99) != false { return 4; }
+    if map_path_segs_needs_mangle(tops, 3, 10) != false { return 5; }
+    if map_path_segs_needs_mangle(tops, 0, 10) != false { return 6; }
+    if string_eq(map_path_segs_mangle_first("mod", "Foo"), "mod__Foo") != true { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_sv0();
     if r1 != 0 { return r1; }
@@ -424,5 +452,7 @@ fn main() -> i32 {
     if r15 != 0 { return 150 + r15; }
     let r16: i32 = test_link_dir_from_entry();
     if r16 != 0 { return 160 + r16; }
+    let r17: i32 = test_map_path_segs();
+    if r17 != 0 { return 170 + r17; }
     return 0;
 }

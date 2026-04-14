@@ -9,7 +9,10 @@
    struct field list lookup, enum/struct type detection, variant slot
    counting, enum max payload, tryVariantNames (Result/Option), literal
    lowering classification + lower_lit_to_ir_tag (SML lowerLit dispatch),
-   fn_ret_cty (SML fnRetCty — return type or default "int").
+   fn_ret_cty (SML fnRetCty — return type or default "int"),
+   import alias management (lower_alias_new/add/lookup/set) +
+   resolve_fn_callee (SML resolveFnCallee) +
+   resolve_enum_ctor_path (SML resolveEnumCtorPath).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -46,6 +49,62 @@ fn lower_int_to_str(n: i32) -> string {
 
 fn fresh_tmp_str(counter: i32) -> string {
     return string_concat("_sv0t", lower_int_to_str(counter));
+}
+
+/* ── import aliases (SML importAliases : (string*string) list ref) ── */
+
+fn lower_alias_new() -> Vec<i32> {
+    return vec_new();
+}
+
+fn lower_alias_add(aliases: Vec<i32>, from_h: i32, to_h: i32) -> i32 {
+    vec_push(aliases, from_h);
+    vec_push(aliases, to_h);
+    return vec_len(aliases) / 2;
+}
+
+fn lower_alias_lookup(aliases: Vec<i32>, name_h: i32) -> i32 {
+    let n: i32 = vec_len(aliases);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(aliases, i) == name_h {
+            return vec_get(aliases, i + 1);
+        }
+        i = i + 2;
+    }
+    return 0 - 1;
+}
+
+fn resolve_fn_callee(aliases: Vec<i32>, name_h: i32) -> i32 {
+    let target: i32 = lower_alias_lookup(aliases, name_h);
+    if target < 0 { return name_h; }
+    return target;
+}
+
+fn resolve_enum_ctor_path(ctor_from_enum: Vec<i32>, ctor_from_var: Vec<i32>,
+                          ctor_to_enum: Vec<i32>, ctor_to_var: Vec<i32>,
+                          enum_h: i32, variant_h: i32) -> i32 {
+    let n: i32 = vec_len(ctor_from_enum);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(ctor_from_enum, i) == enum_h {
+            if vec_get(ctor_from_var, i) == variant_h {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn resolved_ctor_enum(ctor_to_enum: Vec<i32>, idx: i32, default_enum: i32) -> i32 {
+    if idx < 0 { return default_enum; }
+    return vec_get(ctor_to_enum, idx);
+}
+
+fn resolved_ctor_variant(ctor_to_var: Vec<i32>, idx: i32, default_var: i32) -> i32 {
+    if idx < 0 { return default_var; }
+    return vec_get(ctor_to_var, idx);
 }
 
 /* ── splitQName ─────────────────────────────────────────────── */
@@ -694,6 +753,42 @@ fn test_fn_ret_cty() -> i32 {
     return 0;
 }
 
+fn test_lower_alias() -> i32 {
+    let a: Vec<i32> = lower_alias_new();
+    lower_alias_add(a, 10, 20);
+    lower_alias_add(a, 30, 40);
+    if lower_alias_lookup(a, 10) != 20 { return 1; }
+    if lower_alias_lookup(a, 30) != 40 { return 2; }
+    if lower_alias_lookup(a, 99) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_resolve_fn_callee() -> i32 {
+    let a: Vec<i32> = lower_alias_new();
+    lower_alias_add(a, 10, 20);
+    if resolve_fn_callee(a, 10) != 20 { return 1; }
+    if resolve_fn_callee(a, 99) != 99 { return 2; }
+    return 0;
+}
+
+fn test_resolve_ctor_path() -> i32 {
+    let fe: Vec<i32> = vec_new();
+    let fv: Vec<i32> = vec_new();
+    let te: Vec<i32> = vec_new();
+    let tv: Vec<i32> = vec_new();
+    vec_push(fe, 10); vec_push(fv, 20);
+    vec_push(te, 30); vec_push(tv, 40);
+    let idx: i32 = resolve_enum_ctor_path(fe, fv, te, tv, 10, 20);
+    if idx != 0 { return 1; }
+    if resolved_ctor_enum(te, idx, 10) != 30 { return 2; }
+    if resolved_ctor_variant(tv, idx, 20) != 40 { return 3; }
+    let miss: i32 = resolve_enum_ctor_path(fe, fv, te, tv, 99, 88);
+    if miss != 0 - 1 { return 4; }
+    if resolved_ctor_enum(te, miss, 99) != 99 { return 5; }
+    if resolved_ctor_variant(tv, miss, 88) != 88 { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -745,5 +840,11 @@ fn main() -> i32 {
     if r24 != 0 { return 260 + r24; }
     let r25: i32 = test_fn_ret_cty();
     if r25 != 0 { return 270 + r25; }
+    let r26: i32 = test_lower_alias();
+    if r26 != 0 { return 280 + r26; }
+    let r27: i32 = test_resolve_fn_callee();
+    if r27 != 0 { return 290 + r27; }
+    let r28: i32 = test_resolve_ctor_path();
+    if r28 != 0 { return 300 + r28; }
     return 0;
 }
