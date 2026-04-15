@@ -25,7 +25,11 @@
    parse_if_expr/parse_while_expr/parse_for_expr/parse_loop_expr/
    parse_return_expr (control-flow expressions),
    expr_ends_with_braced_block (braced block heuristic).
-   Remaining: parseMatchExpr/parseMatchArms/parseQuant/parseItem. */
+   parse_match_expr (SML parseMatchExpr — match scrutinee { arms }),
+   parse_quant (SML parseQuant — forall/exists as ExprCall),
+   old/no_alias dispatch (ExprCall encoding),
+   loop_invariant parsing in parse_while_expr.
+   Remaining: parseItem cluster. */
 
 /* ── token tag constants (from token.sv0) ───────────────────── */
 
@@ -1163,7 +1167,10 @@ fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 
    Stmt-like nodes (also in the expr arena, referenced by ExprBlock):
     27 LetStmt      : d1=name_tok_pos, d2=type_flag(0=present,-1=none), d3=init_idx(-1=none), d4=is_mut(0/1)
-    28 SemiStmt     : d1=expr_idx */
+    28 SemiStmt     : d1=expr_idx
+
+   Match arm nodes (also in expr arena, referenced by ExprMatch):
+    29 ExprMatchArm : d1=pat_tag, d2=pat_d1, d3=guard_idx(-1=none), d4=body_idx */
 
 fn parse_arg_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                   source: string, pos: i32,
@@ -1466,6 +1473,66 @@ fn parse_primary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(ed3, 0);
         vec_push(ed4, 0);
         return pa;
+    }
+    if t == 74 {
+        return parse_match_expr(tags, starts, ends, source, pos + 1,
+                                et, ed1, ed2, ed3, ed4, pp, sf_names);
+    }
+    if t == 67 {
+        return parse_quant(tags, starts, ends, source, pos, 1,
+                           et, ed1, ed2, ed3, ed4, pp);
+    }
+    if t == 63 {
+        return parse_quant(tags, starts, ends, source, pos, 0,
+                           et, ed1, ed2, ed3, ed4, pp);
+    }
+    if t == 80 {
+        if ps_peek(tags, pos + 1) != 6 { return 0 - 1; }
+        let first_idx: i32 = vec_len(et);
+        let pe: i32 = parse_expr(tags, starts, ends, source, pos + 2,
+                                  et, ed1, ed2, ed3, ed4, pp, 1);
+        if pe < 0 { return 0 - 1; }
+        if ps_peek(tags, pe) != 7 { return 0 - 1; }
+        let pps: i32 = vec_len(pp);
+        vec_push(pp, pos);
+        vec_push(et, 1);
+        vec_push(ed1, pps);
+        vec_push(ed2, 1);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        let callee_idx: i32 = vec_len(et) - 1;
+        vec_push(et, 4);
+        vec_push(ed1, callee_idx);
+        vec_push(ed2, first_idx);
+        vec_push(ed3, 1);
+        vec_push(ed4, 0);
+        return pe + 1;
+    }
+    if t == 79 {
+        if ps_peek(tags, pos + 1) != 6 { return 0 - 1; }
+        let first_idx: i32 = vec_len(et);
+        let pa: i32 = parse_expr(tags, starts, ends, source, pos + 2,
+                                  et, ed1, ed2, ed3, ed4, pp, 1);
+        if pa < 0 { return 0 - 1; }
+        if ps_peek(tags, pa) != 12 { return 0 - 1; }
+        let pb: i32 = parse_expr(tags, starts, ends, source, pa + 1,
+                                  et, ed1, ed2, ed3, ed4, pp, 1);
+        if pb < 0 { return 0 - 1; }
+        if ps_peek(tags, pb) != 7 { return 0 - 1; }
+        let pps: i32 = vec_len(pp);
+        vec_push(pp, pos);
+        vec_push(et, 1);
+        vec_push(ed1, pps);
+        vec_push(ed2, 1);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        let callee_idx: i32 = vec_len(et) - 1;
+        vec_push(et, 4);
+        vec_push(ed1, callee_idx);
+        vec_push(ed2, first_idx);
+        vec_push(ed3, 2);
+        vec_push(ed4, 0);
+        return pb + 1;
     }
     return 0 - 1;
 }
@@ -2472,15 +2539,34 @@ fn parse_while_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                     tt, td1, td2, td3, 0);
     if p1 < 0 { return 0 - 1; }
     let cond_idx: i32 = vec_len(et) - 1;
-    let p2: i32 = parse_block(tags, starts, ends, source, p1,
+    let inv_mark: i32 = vec_len(et);
+    let mut inv_count: i32 = 0;
+    let mut pi: i32 = p1;
+    let mut inv_done: bool = false;
+    while inv_done != true {
+        if ps_peek(tags, pi) != 73 {
+            inv_done = true;
+        } else {
+            if ps_peek(tags, pi + 1) != 6 { return 0 - 1; }
+            let pe: i32 = parse_expr(tags, starts, ends, source, pi + 2,
+                                      et, ed1, ed2, ed3, ed4, pp, 1);
+            if pe < 0 { return 0 - 1; }
+            if ps_peek(tags, pe) != 7 { return 0 - 1; }
+            inv_count = inv_count + 1;
+            pi = pe + 1;
+        }
+    }
+    let p2: i32 = parse_block(tags, starts, ends, source, pi,
                                et, ed1, ed2, ed3, ed4, pp, sf_names);
     if p2 < 0 { return 0 - 1; }
     let body_idx: i32 = vec_len(et) - 1;
+    let mut inv_first: i32 = 0 - 1;
+    if inv_count > 0 { inv_first = inv_mark; }
     vec_push(et, 12);
     vec_push(ed1, cond_idx);
     vec_push(ed2, body_idx);
-    vec_push(ed3, 0);
-    vec_push(ed4, 0);
+    vec_push(ed3, inv_first);
+    vec_push(ed4, inv_count);
     return p2;
 }
 
@@ -2535,6 +2621,129 @@ fn parse_loop_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(ed3, 0);
     vec_push(ed4, 0);
     return pb;
+}
+
+/* ── match expressions + contract quantifiers ─────────────────
+   SML: parseMatchExpr, parseMatchArms, parseQuant.
+   Match arms encoded as ExprMatchArm(29) in the expr arena.
+   Quantifiers (forall/exists) and old/no_alias encoded as ExprCall. */
+
+fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                    source: string, pos: i32,
+                    et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>,
+                    pp: Vec<i32>, sf_names: Vec<i32>) -> i32 {
+    let sf: Vec<i32> = vec_new();
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    let td3: Vec<i32> = vec_new();
+    let p1: i32 = parse_range_expr(tags, starts, ends, source, pos,
+                                    et, ed1, ed2, ed3, ed4, pp, sf,
+                                    tt, td1, td2, td3, 0);
+    if p1 < 0 { return 0 - 1; }
+    let scrut_idx: i32 = vec_len(et) - 1;
+    if ps_peek(tags, p1) != 8 { return 0 - 1; }
+    let mut arms_first: i32 = 0 - 1;
+    let mut arm_count: i32 = 0;
+    let mut p: i32 = p1 + 1;
+    let mut arms_done: bool = false;
+    while arms_done != true {
+        if ps_peek(tags, p) == 9 {
+            arms_done = true;
+        } else {
+            let pt: Vec<i32> = vec_new();
+            let pd1v: Vec<i32> = vec_new();
+            let pd2v: Vec<i32> = vec_new();
+            let pd3v: Vec<i32> = vec_new();
+            let pp2: Vec<i32> = vec_new();
+            let pa: i32 = parse_pat(tags, starts, ends, source, p,
+                                     pt, pd1v, pd2v, pd3v, pp2);
+            if pa < 0 { return 0 - 1; }
+            let pat_tag: i32 = vec_get(pt, 0);
+            let pat_d1: i32 = vec_get(pd1v, 0);
+            let mut guard_idx: i32 = 0 - 1;
+            let mut p2: i32 = pa;
+            if ps_peek(tags, p2) == 68 {
+                let pg: i32 = parse_expr(tags, starts, ends, source, p2 + 1,
+                                          et, ed1, ed2, ed3, ed4, pp, 1);
+                if pg < 0 { return 0 - 1; }
+                guard_idx = vec_len(et) - 1;
+                p2 = pg;
+            }
+            if ps_peek(tags, p2) != 20 { return 0 - 1; }
+            let p3: i32 = p2 + 1;
+            let mut body_pos: i32 = 0;
+            if ps_peek(tags, p3) == 8 {
+                body_pos = parse_block(tags, starts, ends, source, p3,
+                                        et, ed1, ed2, ed3, ed4, pp, sf_names);
+            } else {
+                body_pos = parse_expr(tags, starts, ends, source, p3,
+                                       et, ed1, ed2, ed3, ed4, pp, 1);
+            }
+            if body_pos < 0 { return 0 - 1; }
+            let body_idx: i32 = vec_len(et) - 1;
+            vec_push(et, 29);
+            vec_push(ed1, pat_tag);
+            vec_push(ed2, pat_d1);
+            vec_push(ed3, guard_idx);
+            vec_push(ed4, body_idx);
+            if arms_first < 0 { arms_first = vec_len(et) - 1; }
+            arm_count = arm_count + 1;
+            if ps_peek(tags, body_pos) == 12 {
+                p = body_pos + 1;
+            } else {
+                p = body_pos;
+            }
+        }
+    }
+    vec_push(et, 11);
+    vec_push(ed1, scrut_idx);
+    vec_push(ed2, arms_first);
+    vec_push(ed3, arm_count);
+    vec_push(ed4, 0);
+    return p + 1;
+}
+
+fn parse_quant(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+               source: string, pos: i32, is_forall: i32,
+               et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+               ed3: Vec<i32>, ed4: Vec<i32>,
+               pp: Vec<i32>) -> i32 {
+    if ps_peek(tags, pos + 1) != 6 { return 0 - 1; }
+    if ps_peek(tags, pos + 2) != 5 { return 0 - 1; }
+    let id_pos: i32 = pos + 2;
+    if ps_peek(tags, pos + 3) != 70 { return 0 - 1; }
+    let first_idx: i32 = vec_len(et);
+    let pps_id: i32 = vec_len(pp);
+    vec_push(pp, id_pos);
+    vec_push(et, 1);
+    vec_push(ed1, pps_id);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let pd: i32 = parse_expr(tags, starts, ends, source, pos + 4,
+                              et, ed1, ed2, ed3, ed4, pp, 1);
+    if pd < 0 { return 0 - 1; }
+    if ps_peek(tags, pd) != 12 { return 0 - 1; }
+    let pb: i32 = parse_expr(tags, starts, ends, source, pd + 1,
+                              et, ed1, ed2, ed3, ed4, pp, 1);
+    if pb < 0 { return 0 - 1; }
+    if ps_peek(tags, pb) != 7 { return 0 - 1; }
+    let pps_q: i32 = vec_len(pp);
+    vec_push(pp, pos);
+    vec_push(et, 1);
+    vec_push(ed1, pps_q);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let callee_idx: i32 = vec_len(et) - 1;
+    vec_push(et, 4);
+    vec_push(ed1, callee_idx);
+    vec_push(ed2, first_idx);
+    vec_push(ed3, 3);
+    vec_push(ed4, 0);
+    return pb + 1;
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -4061,6 +4270,222 @@ fn test_parse_assign() -> i32 {
     return 0;
 }
 
+fn test_parse_match_simple() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 74); vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 8); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 0); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 20); vec_push(starts, 12); vec_push(ends, 14);
+    vec_push(tags, 0); vec_push(starts, 15); vec_push(ends, 16);
+    vec_push(tags, 9); vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(tags, 97); vec_push(starts, 18); vec_push(ends, 18);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "match x { 1 => 2 }", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 7 { return 1; }
+    if vec_get(et, 0) != 1 { return 2; }
+    if vec_get(et, 1) != 0 { return 3; }
+    if vec_get(et, 2) != 29 { return 4; }
+    if vec_get(ed1v, 2) != 2 { return 5; }
+    if vec_get(ed3v, 2) != 0 - 1 { return 6; }
+    if vec_get(ed4v, 2) != 1 { return 7; }
+    if vec_get(et, 3) != 11 { return 8; }
+    if vec_get(ed1v, 3) != 0 { return 9; }
+    if vec_get(ed3v, 3) != 1 { return 10; }
+    return 0;
+}
+
+fn test_parse_match_multi() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 74); vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 8); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 0); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 20); vec_push(starts, 12); vec_push(ends, 14);
+    vec_push(tags, 0); vec_push(starts, 15); vec_push(ends, 16);
+    vec_push(tags, 12); vec_push(starts, 16); vec_push(ends, 17);
+    vec_push(tags, 0); vec_push(starts, 18); vec_push(ends, 19);
+    vec_push(tags, 20); vec_push(starts, 20); vec_push(ends, 22);
+    vec_push(tags, 0); vec_push(starts, 23); vec_push(ends, 24);
+    vec_push(tags, 9); vec_push(starts, 25); vec_push(ends, 26);
+    vec_push(tags, 97); vec_push(starts, 26); vec_push(ends, 26);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "match x { 1 => 2, 3 => 4 }", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 11 { return 1; }
+    if vec_get(et, 0) != 1 { return 2; }
+    if vec_get(et, 1) != 0 { return 3; }
+    if vec_get(et, 2) != 29 { return 4; }
+    if vec_get(et, 3) != 0 { return 5; }
+    if vec_get(et, 4) != 29 { return 6; }
+    if vec_get(et, 5) != 11 { return 7; }
+    if vec_get(ed3v, 5) != 2 { return 8; }
+    return 0;
+}
+
+fn test_parse_match_guard() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 74); vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 8); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 0); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 68); vec_push(starts, 12); vec_push(ends, 14);
+    vec_push(tags, 5); vec_push(starts, 15); vec_push(ends, 16);
+    vec_push(tags, 20); vec_push(starts, 17); vec_push(ends, 19);
+    vec_push(tags, 0); vec_push(starts, 20); vec_push(ends, 21);
+    vec_push(tags, 9); vec_push(starts, 22); vec_push(ends, 23);
+    vec_push(tags, 97); vec_push(starts, 23); vec_push(ends, 23);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "match x { 1 if y => 2 }", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 9 { return 1; }
+    if vec_get(et, 0) != 1 { return 2; }
+    if vec_get(et, 1) != 1 { return 3; }
+    if vec_get(et, 2) != 0 { return 4; }
+    if vec_get(et, 3) != 29 { return 5; }
+    if vec_get(ed3v, 3) != 1 { return 6; }
+    if vec_get(ed4v, 3) != 2 { return 7; }
+    if vec_get(et, 4) != 11 { return 8; }
+    return 0;
+}
+
+fn test_parse_quant() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 67); vec_push(starts, 0); vec_push(ends, 6);
+    vec_push(tags, 6); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 5); vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(tags, 70); vec_push(starts, 9); vec_push(ends, 11);
+    vec_push(tags, 5); vec_push(starts, 12); vec_push(ends, 14);
+    vec_push(tags, 12); vec_push(starts, 14); vec_push(ends, 15);
+    vec_push(tags, 5); vec_push(starts, 16); vec_push(ends, 20);
+    vec_push(tags, 7); vec_push(starts, 20); vec_push(ends, 21);
+    vec_push(tags, 97); vec_push(starts, 21); vec_push(ends, 21);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "forall(i in xs, body)", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 8 { return 1; }
+    if vec_get(et, 0) != 1 { return 2; }
+    if vec_get(et, 1) != 1 { return 3; }
+    if vec_get(et, 2) != 1 { return 4; }
+    if vec_get(et, 3) != 1 { return 5; }
+    if vec_get(et, 4) != 4 { return 6; }
+    if vec_get(ed3v, 4) != 3 { return 7; }
+    return 0;
+}
+
+fn test_parse_old() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 80); vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(tags, 6); vec_push(starts, 3); vec_push(ends, 4);
+    vec_push(tags, 5); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 7); vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(tags, 97); vec_push(starts, 6); vec_push(ends, 6);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "old(x)", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 4 { return 1; }
+    if vec_get(et, 0) != 1 { return 2; }
+    if vec_get(et, 1) != 1 { return 3; }
+    if vec_get(et, 2) != 4 { return 4; }
+    if vec_get(ed3v, 2) != 1 { return 5; }
+    return 0;
+}
+
+fn test_parse_no_alias() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 79); vec_push(starts, 0); vec_push(ends, 8);
+    vec_push(tags, 6); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 5); vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(tags, 12); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 5); vec_push(starts, 12); vec_push(ends, 13);
+    vec_push(tags, 7); vec_push(starts, 13); vec_push(ends, 14);
+    vec_push(tags, 97); vec_push(starts, 14); vec_push(ends, 14);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "no_alias(a, b)", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 6 { return 1; }
+    if vec_get(et, 0) != 1 { return 2; }
+    if vec_get(et, 1) != 1 { return 3; }
+    if vec_get(et, 2) != 1 { return 4; }
+    if vec_get(et, 3) != 4 { return 5; }
+    if vec_get(ed3v, 3) != 2 { return 6; }
+    return 0;
+}
+
+fn test_parse_while_inv() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 96); vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 73); vec_push(starts, 8); vec_push(ends, 22);
+    vec_push(tags, 6); vec_push(starts, 22); vec_push(ends, 23);
+    vec_push(tags, 5); vec_push(starts, 23); vec_push(ends, 24);
+    vec_push(tags, 7); vec_push(starts, 24); vec_push(ends, 25);
+    vec_push(tags, 8); vec_push(starts, 26); vec_push(ends, 27);
+    vec_push(tags, 9); vec_push(starts, 28); vec_push(ends, 29);
+    vec_push(tags, 97); vec_push(starts, 29); vec_push(ends, 29);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends,
+                             "while c loop_invariant(x) { }", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 8 { return 1; }
+    if vec_get(et, 0) != 1 { return 2; }
+    if vec_get(et, 1) != 1 { return 3; }
+    if vec_get(et, 2) != 9 { return 4; }
+    if vec_get(et, 3) != 12 { return 5; }
+    if vec_get(ed4v, 3) != 1 { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_of();
     if r1 != 0 { return r1; }
@@ -4180,5 +4605,19 @@ fn main() -> i32 {
     if r58 != 0 { return 690 + r58; }
     let r59: i32 = test_parse_assign();
     if r59 != 0 { return 700 + r59; }
+    let r60: i32 = test_parse_match_simple();
+    if r60 != 0 { return 710 + r60; }
+    let r61: i32 = test_parse_match_multi();
+    if r61 != 0 { return 720 + r61; }
+    let r62: i32 = test_parse_match_guard();
+    if r62 != 0 { return 730 + r62; }
+    let r63: i32 = test_parse_quant();
+    if r63 != 0 { return 740 + r63; }
+    let r64: i32 = test_parse_old();
+    if r64 != 0 { return 750 + r64; }
+    let r65: i32 = test_parse_no_alias();
+    if r65 != 0 { return 760 + r65; }
+    let r66: i32 = test_parse_while_inv();
+    if r66 != 0 { return 770 + r66; }
     return 0;
 }

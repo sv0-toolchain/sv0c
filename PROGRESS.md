@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 15 — control-flow expressions + block/stmt machinery.** `parser.sv0`: 10 new functions — `expr_ends_with_braced_block`, `parse_return_expr`, `parse_let_stmt`, `try_assign_stmt`, `try_stmt`, `parse_block` (with stmt loop + braced-block heuristic), `parse_if_expr` (recursive else-if), `parse_while_expr`, `parse_for_expr`, `parse_loop_expr`. Stmt arena inline in expr arena (LetStmt=27, SemiStmt=28). Control-flow dispatch in `parse_primary_expr` for LBRACE/IF/WHILE/FOR/LOOP/RETURN/UNSAFE/ASSERT. 8 new TK_ constants. 10 new test groups (block_empty/tail/semi/let, if_simple/else, while, loop, return, assign). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 16 — match expressions + contract quantifiers + loop invariants.** `parser.sv0`: 2 new functions (`parse_match_expr` with iterative arm loop, `parse_quant`), `ExprMatchArm`(29) in expr arena, MATCH/FORALL/EXISTS/OLD/NO_ALIAS dispatch in `parse_primary_expr`, `parse_while_expr` updated with `loop_invariant(expr)` parsing (d3/d4). 7 new test groups (match_simple/multi/guard, quant, old, no_alias, while_inv). Parser remaining: `parseItem` cluster only. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
