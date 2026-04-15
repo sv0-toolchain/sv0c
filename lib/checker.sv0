@@ -16,7 +16,8 @@
    tyOfStructField via parallel type Vec),
    dup_variant_names (SML dupVariants — duplicate name check),
    struct_enum_name_clash (SML initTypes clash check),
-   named_only_ty (SML namedOnlyTy — struct/enum/none classifier).
+   named_only_ty (SML namedOnlyTy — struct/enum/none classifier),
+   fields_of_struct_count (SML fieldsOfStruct — field count by name handle).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -534,6 +535,22 @@ fn named_only_ty(struct_names: Vec<i32>, enum_names: Vec<i32>,
     return 0;
 }
 
+/* ── fields_of_struct_count (SML fieldsOfStruct length) ────── */
+
+fn fields_of_struct_count(struct_names: Vec<i32>,
+                          struct_field_counts: Vec<i32>,
+                          name: i32) -> i32 {
+    let n: i32 = vec_len(struct_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(struct_names, i) == name {
+            return vec_get(struct_field_counts, i);
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -860,6 +877,19 @@ fn test_named_only_ty() -> i32 {
     return 0;
 }
 
+fn test_fields_of_struct_count() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let counts: Vec<i32> = vec_new();
+    vec_push(names, 50);
+    vec_push(counts, 3);
+    vec_push(names, 60);
+    vec_push(counts, 2);
+    if fields_of_struct_count(names, counts, 50) != 3 { return 1; }
+    if fields_of_struct_count(names, counts, 60) != 2 { return 2; }
+    if fields_of_struct_count(names, counts, 99) != 0 - 1 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -915,5 +945,7 @@ fn main() -> i32 {
     if r26 != 0 { return 270 + r26; }
     let r27: i32 = test_named_only_ty();
     if r27 != 0 { return 280 + r27; }
+    let r28: i32 = test_fields_of_struct_count();
+    if r28 != 0 { return 290 + r28; }
     return 0;
 }

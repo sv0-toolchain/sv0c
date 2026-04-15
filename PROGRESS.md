@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 10.** `checker.sv0`: `dup_variant_names` (SML `dupVariants` — O(n^2) duplicate check), `struct_enum_name_clash` (SML `initTypes` clash), `named_only_ty` (SML `namedOnlyTy` — struct/enum/none). `lowering.sv0`: `ast_ty_to_c_string_with_user` (SML `astTyToCString` struct/enum typedef branch). `lexer.sv0`: `scan_escape` (SML `scanEscape` — full escape decode incl. `\xNN`). `vm_codegen.sv0`: `patch_continue_jumps` (SML `patchContinueJumpsFrom`), `insn_vec_stride` (byte→element stride). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 11.** `checker.sv0`: `fields_of_struct_count` (SML `fieldsOfStruct` — field count by name handle). `lowering.sv0`: `find_fn_index`/`callee_fn_index` (SML `calleeRetCty` decomposed — resolve alias + fn-table scan), `scrut_local_lookup`/`param_ty_lookup` (SML `matchScrutCty` helpers). `vm_codegen.sv0`: `struct_layouts_build` (SML `structLayouts` — filter ItemStruct), `enum_layouts_build` (SML `enumLayouts` — filter ItemEnum, width=1+maxP). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

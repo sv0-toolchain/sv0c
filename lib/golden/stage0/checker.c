@@ -94,6 +94,7 @@ static int infer_lit(int lit_tag);
 static int dup_variant_names(int names);
 static int struct_enum_name_clash(int struct_names, int enum_names);
 static int named_only_ty(int struct_names, int enum_names, int name);
+static int fields_of_struct_count(int struct_names, int struct_field_counts, int name);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -121,6 +122,7 @@ static int test_infer_lit(void);
 static int test_dup_variant_names(void);
 static int test_struct_enum_clash(void);
 static int test_named_only_ty(void);
+static int test_fields_of_struct_count(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -1055,6 +1057,23 @@ static int named_only_ty(int struct_names, int enum_names, int name) {
     j = (j + 1);
   }
   return 0;
+}
+
+static int fields_of_struct_count(int struct_names, int struct_field_counts, int name) {
+  int _sv0t0 = sv0_vec_len(struct_names);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(struct_names, i);
+    if ((_sv0t1 == name)) {
+      int _sv0t2 = sv0_vec_get(struct_field_counts, i);
+      return _sv0t2;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t3 = (0 - 1);
+  return _sv0t3;
 }
 
 static int test_binop_class(void) {
@@ -2024,6 +2043,34 @@ static int test_named_only_ty(void) {
   return 0;
 }
 
+static int test_fields_of_struct_count(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int counts = _sv0t1;
+  sv0_vec_push(names, 50);
+  sv0_vec_push(counts, 3);
+  sv0_vec_push(names, 60);
+  sv0_vec_push(counts, 2);
+  int _sv0t2 = fields_of_struct_count(names, counts, 50);
+  if ((_sv0t2 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = fields_of_struct_count(names, counts, 60);
+  if ((_sv0t3 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = fields_of_struct_count(names, counts, 99);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -2211,6 +2258,13 @@ int main(void) {
   if ((r27 != 0)) {
     int _sv0t52 = (280 + r27);
     return _sv0t52;
+  } else {
+  }
+  int _sv0t53 = test_fields_of_struct_count();
+  int r28 = _sv0t53;
+  if ((r28 != 0)) {
+    int _sv0t54 = (290 + r28);
+    return _sv0t54;
   } else {
   }
   return 0;
