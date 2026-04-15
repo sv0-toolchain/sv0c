@@ -918,8 +918,8 @@ structure TestRunner = struct
                  (goldenPassCompileRun "parser_prec_core")
       val () = check "golden pass bytecode_decode_insn_core compile+run"
                  (goldenPassCompileRun "bytecode_decode_insn_core")
-      val () = check "golden pass bytecode_file_layout_core compile+run"
-                 (goldenPassCompileRun "bytecode_file_layout_core")
+      (* bytecode_file_layout_core removed — stale surrogate seed;
+         layout math is now in lib/bytecode.sv0 (encode_strings etc.) *)
       val () = check "golden pass lexer_skip_comment_core compile+run"
                  (goldenPassCompileRun "lexer_skip_comment_core")
       val () = check "golden pass lexer_keyword_core compile+run"

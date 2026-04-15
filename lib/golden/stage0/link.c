@@ -10,6 +10,7 @@ static const char* fn_name_for_link(const char* mod_id, const char* name);
 static const char* link_dir_from_entry(const char* entry_path);
 static int is_top_defining(int tag);
 static int collect_tops_count(int item_tags);
+static int collect_top_names(int item_tags, int item_names, int out);
 static int is_link_directive(int tag);
 static int strip_directives_count(int item_tags);
 static int has_module_prefix(int first_tag);
@@ -28,6 +29,8 @@ static int in_tops(int tops, int name);
 static int path_seg_needs_mangle(int tops, int name);
 static int map_path_segs_needs_mangle(int tops, int seg_count, int first_seg);
 static const char* map_path_segs_mangle_first(const char* mod_id, const char* first_seg_str);
+static const char* map_path_segs_rewrite_1(int tops, const char* mod_id, int seg_handle, const char* seg_str);
+static const char* map_path_segs_rewrite_2(int tops, const char* mod_id, int first_handle, const char* first_str);
 static int test_is_sv0(void);
 static int test_is_hidden(void);
 static int test_file_stem(void);
@@ -44,6 +47,8 @@ static int test_path_seg_needs_mangle(void);
 static int test_split_module(void);
 static int test_map_ty_kind(void);
 static int test_item_rewrite(void);
+static int test_collect_top_names(void);
+static int test_map_path_segs_rewrite(void);
 static int test_map_path_segs(void);
 
 static int is_sv0(const char* name) {
@@ -198,6 +203,25 @@ static int collect_tops_count(int item_tags) {
     int tag = _sv0t1;
     int _sv0t2 = is_top_defining(tag);
     if (_sv0t2) {
+      count = (count + 1);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return count;
+}
+
+static int collect_top_names(int item_tags, int item_names, int out) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int len = _sv0t0;
+  int count = 0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    int _sv0t2 = is_top_defining(_sv0t1);
+    if (_sv0t2) {
+      int _sv0t3 = sv0_vec_get(item_names, i);
+      sv0_vec_push(out, _sv0t3);
       count = (count + 1);
     } else {
     }
@@ -427,6 +451,26 @@ static int map_path_segs_needs_mangle(int tops, int seg_count, int first_seg) {
 static const char* map_path_segs_mangle_first(const char* mod_id, const char* first_seg_str) {
   const char* _sv0t0 = mangle(mod_id, first_seg_str);
   return _sv0t0;
+}
+
+static const char* map_path_segs_rewrite_1(int tops, const char* mod_id, int seg_handle, const char* seg_str) {
+  int _sv0t0 = in_tops(tops, seg_handle);
+  if (_sv0t0) {
+    const char* _sv0t1 = mangle(mod_id, seg_str);
+    return _sv0t1;
+  } else {
+  }
+  return seg_str;
+}
+
+static const char* map_path_segs_rewrite_2(int tops, const char* mod_id, int first_handle, const char* first_str) {
+  int _sv0t0 = in_tops(tops, first_handle);
+  if (_sv0t0) {
+    const char* _sv0t1 = mangle(mod_id, first_str);
+    return _sv0t1;
+  } else {
+  }
+  return first_str;
 }
 
 static int test_is_sv0(void) {
@@ -924,6 +968,92 @@ static int test_item_rewrite(void) {
   return 0;
 }
 
+static int test_collect_top_names(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int names = _sv0t1;
+  sv0_vec_push(tags, 0);
+  sv0_vec_push(names, 100);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(names, 200);
+  sv0_vec_push(tags, 1);
+  sv0_vec_push(names, 300);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(names, 400);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(names, 500);
+  int _sv0t2 = sv0_vec_new();
+  int out = _sv0t2;
+  int _sv0t3 = collect_top_names(tags, names, out);
+  int n = _sv0t3;
+  if ((n != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_len(out);
+  if ((_sv0t4 != 3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(out, 0);
+  if ((_sv0t5 != 100)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(out, 1);
+  if ((_sv0t6 != 300)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(out, 2);
+  if ((_sv0t7 != 500)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_map_path_segs_rewrite(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tops = _sv0t0;
+  sv0_vec_push(tops, 10);
+  sv0_vec_push(tops, 20);
+  const char* _sv0t1 = map_path_segs_rewrite_1(tops, "mod", 10, "Foo");
+  const char* r1;
+  r1 = _sv0t1;
+  int _sv0t2 = sv0_string_eq(r1, "mod__Foo");
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t3 = map_path_segs_rewrite_1(tops, "mod", 99, "Bar");
+  const char* r2;
+  r2 = _sv0t3;
+  int _sv0t4 = sv0_string_eq(r2, "Bar");
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t5 = map_path_segs_rewrite_2(tops, "mod", 20, "Baz");
+  const char* r3;
+  r3 = _sv0t5;
+  int _sv0t6 = sv0_string_eq(r3, "mod__Baz");
+  if ((_sv0t6 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t7 = map_path_segs_rewrite_2(tops, "mod", 99, "Qux");
+  const char* r4;
+  r4 = _sv0t7;
+  int _sv0t8 = sv0_string_eq(r4, "Qux");
+  if ((_sv0t8 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 static int test_map_path_segs(void) {
   int _sv0t0 = sv0_vec_new();
   int tops = _sv0t0;
@@ -1085,6 +1215,20 @@ int main(void) {
   if ((r17 != 0)) {
     int _sv0t32 = (170 + r17);
     return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_collect_top_names();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (180 + r18);
+    return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_map_path_segs_rewrite();
+  int r19 = _sv0t35;
+  if ((r19 != 0)) {
+    int _sv0t36 = (190 + r19);
+    return _sv0t36;
   } else {
   }
   return 0;

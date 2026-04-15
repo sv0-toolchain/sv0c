@@ -7,11 +7,13 @@
    (Vec-based), env lookup/extend helpers, variant shape classification,
    constructor arity from shape, struct/enum name extraction from
    program tables, contract parameter classification, struct field
-   lookup by name. expect (type unification gate — SML expect),
+   lookup by name + type. expect (type unification gate — SML expect),
    fields_of_struct (SML fieldsOfStruct), variant_shape_of (SML
    variantShapeOf), assign_lhs_bad (SML assignLhsBad),
    enter_loop/exit_loop (SML withLoop decomposed).
    infer_lit (SML synth literal arms — maps literal tag to type tag).
+   ctor_ty_arity (SML ctorTy param count), struct_field_ty (SML
+   tyOfStructField via parallel type Vec).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -434,6 +436,25 @@ fn exit_loop(depth: i32) -> i32 {
     return depth - 1;
 }
 
+/* ── constructor type arity (SML ctorTy param count) ─────────
+   VSUnit → 0 params, VSTuple → field_count params, VSStruct → field_count params.
+   This is the arity of the function type a constructor creates. */
+fn ctor_ty_arity(shape: i32, field_count: i32) -> i32 {
+    if shape == 0 { return 0; }
+    return field_count;
+}
+
+/* ── struct field type lookup (SML tyOfStructField) ──────────
+   Given parallel name and type Vecs for a struct's fields,
+   look up the type tag for a field by name handle.
+   Returns -1 if the field is not found. */
+fn struct_field_ty(field_names: Vec<i32>, field_types: Vec<i32>,
+                   name: i32) -> i32 {
+    let idx: i32 = struct_field_index(field_names, name);
+    if idx < 0 { return 0 - 1; }
+    return vec_get(field_types, idx);
+}
+
 /* ── literal type inference (SML synth ExprLit arms) ─────────
    Maps literal tag to type tag.  Tags from ast.sv0:
      0 = IntLit  → TyInt(32) = type tag 0
@@ -703,6 +724,27 @@ fn test_assign_lhs_bad() -> i32 {
     return 0;
 }
 
+fn test_ctor_ty_arity() -> i32 {
+    if ctor_ty_arity(0, 0) != 0 { return 1; }
+    if ctor_ty_arity(0, 3) != 0 { return 2; }
+    if ctor_ty_arity(1, 3) != 3 { return 3; }
+    if ctor_ty_arity(2, 2) != 2 { return 4; }
+    return 0;
+}
+
+fn test_struct_field_ty() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let types: Vec<i32> = vec_new();
+    vec_push(names, 10); vec_push(types, 0);
+    vec_push(names, 20); vec_push(types, 5);
+    vec_push(names, 30); vec_push(types, 3);
+    if struct_field_ty(names, types, 10) != 0 { return 1; }
+    if struct_field_ty(names, types, 20) != 5 { return 2; }
+    if struct_field_ty(names, types, 30) != 3 { return 3; }
+    if struct_field_ty(names, types, 99) != 0 - 1 { return 4; }
+    return 0;
+}
+
 fn test_infer_lit() -> i32 {
     if infer_lit(0) != 0 { return 1; }
     if infer_lit(1) != 2 { return 2; }
@@ -758,5 +800,9 @@ fn main() -> i32 {
     if r21 != 0 { return 220 + r21; }
     let r22: i32 = test_infer_lit();
     if r22 != 0 { return 230 + r22; }
+    let r23: i32 = test_ctor_ty_arity();
+    if r23 != 0 { return 240 + r23; }
+    let r24: i32 = test_struct_field_ty();
+    if r24 != 0 { return 250 + r24; }
     return 0;
 }

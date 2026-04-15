@@ -5,7 +5,9 @@
    skipGenericParams/skipWhereClause/skipAttributes on token stream,
    token→binop/assign-binop/literal mapping, Pratt precedence, span
    merge, parse_use_item (SML parseUseItem — USE path SEMICOLON),
-   parse_module_decl (SML parseModuleDecl — MODULE path SEMICOLON).
+   parse_module_decl (SML parseModuleDecl — MODULE path SEMICOLON),
+   is_assign_tok (SML isAssignTok — EQ or compound assign),
+   path_of_ty_valid (SML pathOfTy — TyName has path).
    Full recursive-descent parser (parseExpr/parseType/parsePat/
    parseItem) deferred — needs mutual recursion over AST construction. */
 
@@ -379,6 +381,18 @@ fn is_compound_assign(tok_tag: i32) -> bool {
     return false;
 }
 
+/* SML isAssignTok: token is = (EQ) or any compound assignment op */
+fn is_assign_tok(tok_tag: i32) -> bool {
+    if tok_tag == 35 { return true; }
+    return has_assign_binop(tok_tag);
+}
+
+/* SML pathOfTy: TyName (tag 0 in ast.sv0) has an extractable path.
+   Returns true if the type tag is TyName. */
+fn path_of_ty_valid(ty_tag: i32) -> bool {
+    return ty_tag == 0;
+}
+
 /* ── literal classification from token ──────────────────────── */
 
 fn LIT_TAG_INT() -> i32 { return 0; }
@@ -624,6 +638,23 @@ fn test_assign_binop() -> i32 {
     if is_compound_assign(44) != true { return 14; }
     if is_compound_assign(53) != true { return 15; }
     if is_compound_assign(22) != false { return 16; }
+    return 0;
+}
+
+fn test_is_assign_tok() -> i32 {
+    if is_assign_tok(35) != true { return 1; }
+    if is_assign_tok(44) != true { return 2; }
+    if is_assign_tok(53) != true { return 3; }
+    if is_assign_tok(22) != false { return 4; }
+    if is_assign_tok(0) != false { return 5; }
+    if is_assign_tok(97) != false { return 6; }
+    return 0;
+}
+
+fn test_path_of_ty() -> i32 {
+    if path_of_ty_valid(0) != true { return 1; }
+    if path_of_ty_valid(1) != false { return 2; }
+    if path_of_ty_valid(5) != false { return 3; }
     return 0;
 }
 
@@ -972,5 +1003,9 @@ fn main() -> i32 {
     if r15 != 0 { return 240 + r15; }
     let r16: i32 = test_parse_module_decl();
     if r16 != 0 { return 260 + r16; }
+    let r17: i32 = test_is_assign_tok();
+    if r17 != 0 { return 280 + r17; }
+    let r18: i32 = test_path_of_ty();
+    if r18 != 0 { return 290 + r18; }
     return 0;
 }

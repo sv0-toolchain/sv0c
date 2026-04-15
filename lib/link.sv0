@@ -2,9 +2,10 @@
    Link-time utilities: file classification (isSv0, isHidden),
    name extraction (fileStem), name mangling (mangle), fn_name_for_link
    (main exemption), link_dir_from_entry (directory extraction),
-   top-level name collection (collectTops by item tag), link directive
-   stripping (stripLinkDirectives), split-module detection,
-   map_path_segs (SML mapPathSegs — 1/2-segment path mangling).
+   top-level name collection (collectTops — tag+name streams and
+   Vec<i32> collection), link directive stripping (stripLinkDirectives),
+   split-module detection, map_path_segs (SML mapPathSegs — 1/2-segment
+   path mangling with rewrite).
    AST map functions (mapTy/mapPat/mapExpr/mapItem) and I/O
    (walkSv0, parseFile, linkProjectDir) deferred — need full AST
    enum traversal with Box support and host filesystem. */
@@ -102,6 +103,23 @@ fn collect_tops_count(item_tags: Vec<i32>) -> i32 {
     while i < len {
         let tag: i32 = vec_get(item_tags, i);
         if is_top_defining(tag) { count = count + 1; }
+        i = i + 1;
+    }
+    return count;
+}
+
+/* SML collectTops: builds a list of name handles for top-defining items.
+   item_tags and item_names are parallel Vecs of the same length. */
+fn collect_top_names(item_tags: Vec<i32>, item_names: Vec<i32>,
+                     out: Vec<i32>) -> i32 {
+    let len: i32 = vec_len(item_tags);
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < len {
+        if is_top_defining(vec_get(item_tags, i)) {
+            vec_push(out, vec_get(item_names, i));
+            count = count + 1;
+        }
         i = i + 1;
     }
     return count;
@@ -238,6 +256,27 @@ fn map_path_segs_needs_mangle(tops: Vec<i32>, seg_count: i32,
 
 fn map_path_segs_mangle_first(mod_id: string, first_seg_str: string) -> string {
     return mangle(mod_id, first_seg_str);
+}
+
+/* SML mapPathSegs composition: for a 1-segment path, if in tops
+   the result is [mangle(mod_id, seg)]; for 2-segment, [mangle(mod_id, seg0), seg1].
+   map_path_segs_rewrite_1 returns mangled string for a 1-seg path. */
+fn map_path_segs_rewrite_1(tops: Vec<i32>, mod_id: string,
+                           seg_handle: i32, seg_str: string) -> string {
+    if in_tops(tops, seg_handle) {
+        return mangle(mod_id, seg_str);
+    }
+    return seg_str;
+}
+
+/* map_path_segs_rewrite_2 returns mangled first segment for a 2-seg path.
+   Second segment is unchanged; caller keeps it. */
+fn map_path_segs_rewrite_2(tops: Vec<i32>, mod_id: string,
+                           first_handle: i32, first_str: string) -> string {
+    if in_tops(tops, first_handle) {
+        return mangle(mod_id, first_str);
+    }
+    return first_str;
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -405,6 +444,39 @@ fn test_item_rewrite() -> i32 {
     return 0;
 }
 
+fn test_collect_top_names() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let names: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(names, 100);
+    vec_push(tags, 5); vec_push(names, 200);
+    vec_push(tags, 1); vec_push(names, 300);
+    vec_push(tags, 6); vec_push(names, 400);
+    vec_push(tags, 7); vec_push(names, 500);
+    let out: Vec<i32> = vec_new();
+    let n: i32 = collect_top_names(tags, names, out);
+    if n != 3 { return 1; }
+    if vec_len(out) != 3 { return 2; }
+    if vec_get(out, 0) != 100 { return 3; }
+    if vec_get(out, 1) != 300 { return 4; }
+    if vec_get(out, 2) != 500 { return 5; }
+    return 0;
+}
+
+fn test_map_path_segs_rewrite() -> i32 {
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 10);
+    vec_push(tops, 20);
+    let r1: string = map_path_segs_rewrite_1(tops, "mod", 10, "Foo");
+    if string_eq(r1, "mod__Foo") != true { return 1; }
+    let r2: string = map_path_segs_rewrite_1(tops, "mod", 99, "Bar");
+    if string_eq(r2, "Bar") != true { return 2; }
+    let r3: string = map_path_segs_rewrite_2(tops, "mod", 20, "Baz");
+    if string_eq(r3, "mod__Baz") != true { return 3; }
+    let r4: string = map_path_segs_rewrite_2(tops, "mod", 99, "Qux");
+    if string_eq(r4, "Qux") != true { return 4; }
+    return 0;
+}
+
 fn test_map_path_segs() -> i32 {
     let tops: Vec<i32> = vec_new();
     vec_push(tops, 10);
@@ -454,5 +526,9 @@ fn main() -> i32 {
     if r16 != 0 { return 160 + r16; }
     let r17: i32 = test_map_path_segs();
     if r17 != 0 { return 170 + r17; }
+    let r18: i32 = test_collect_top_names();
+    if r18 != 0 { return 180 + r18; }
+    let r19: i32 = test_map_path_segs_rewrite();
+    if r19 != 0 { return 190 + r19; }
     return 0;
 }
