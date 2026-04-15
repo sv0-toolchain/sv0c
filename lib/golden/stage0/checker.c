@@ -88,6 +88,8 @@ static int assign_lhs_bad(void);
 static int in_loop(int depth);
 static int enter_loop(int depth);
 static int exit_loop(int depth);
+static int ctor_ty_arity(int shape, int field_count);
+static int struct_field_ty(int field_names, int field_types, int name);
 static int infer_lit(int lit_tag);
 static int test_binop_class(void);
 static int test_integral_ty(void);
@@ -110,6 +112,8 @@ static int test_expect(void);
 static int test_fields_of_struct(void);
 static int test_variant_shape_of(void);
 static int test_assign_lhs_bad(void);
+static int test_ctor_ty_arity(void);
+static int test_struct_field_ty(void);
 static int test_infer_lit(void);
 
 static int BINOP_ARITH(void) {
@@ -931,6 +935,26 @@ static int exit_loop(int depth) {
   return _sv0t0;
 }
 
+static int ctor_ty_arity(int shape, int field_count) {
+  if ((shape == 0)) {
+    return 0;
+  } else {
+  }
+  return field_count;
+}
+
+static int struct_field_ty(int field_names, int field_types, int name) {
+  int _sv0t0 = struct_field_index(field_names, name);
+  int idx = _sv0t0;
+  if ((idx < 0)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(field_types, idx);
+  return _sv0t2;
+}
+
 static int infer_lit(int lit_tag) {
   if ((lit_tag == 0)) {
     return 0;
@@ -1737,6 +1761,65 @@ static int test_assign_lhs_bad(void) {
   return 0;
 }
 
+static int test_ctor_ty_arity(void) {
+  int _sv0t0 = ctor_ty_arity(0, 0);
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = ctor_ty_arity(0, 3);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = ctor_ty_arity(1, 3);
+  if ((_sv0t2 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = ctor_ty_arity(2, 2);
+  if ((_sv0t3 != 2)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_struct_field_ty(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int types = _sv0t1;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(types, 0);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(types, 5);
+  sv0_vec_push(names, 30);
+  sv0_vec_push(types, 3);
+  int _sv0t2 = struct_field_ty(names, types, 10);
+  if ((_sv0t2 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = struct_field_ty(names, types, 20);
+  if ((_sv0t3 != 5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = struct_field_ty(names, types, 30);
+  if ((_sv0t4 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = struct_field_ty(names, types, 99);
+  int _sv0t6 = (0 - 1);
+  if ((_sv0t5 != _sv0t6)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 static int test_infer_lit(void) {
   int _sv0t0 = infer_lit(0);
   if ((_sv0t0 != 0)) {
@@ -1924,6 +2007,20 @@ int main(void) {
   if ((r22 != 0)) {
     int _sv0t42 = (230 + r22);
     return _sv0t42;
+  } else {
+  }
+  int _sv0t43 = test_ctor_ty_arity();
+  int r23 = _sv0t43;
+  if ((r23 != 0)) {
+    int _sv0t44 = (240 + r23);
+    return _sv0t44;
+  } else {
+  }
+  int _sv0t45 = test_struct_field_ty();
+  int r24 = _sv0t45;
+  if ((r24 != 0)) {
+    int _sv0t46 = (250 + r24);
+    return _sv0t46;
   } else {
   }
   return 0;

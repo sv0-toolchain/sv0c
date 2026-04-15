@@ -119,6 +119,8 @@ static int has_binop(int tok_tag);
 static int assign_binop(int tok_tag);
 static int has_assign_binop(int tok_tag);
 static int is_compound_assign(int tok_tag);
+static int is_assign_tok(int tok_tag);
+static int path_of_ty_valid(int ty_tag);
 static int LIT_TAG_INT(void);
 static int LIT_TAG_FLOAT(void);
 static int LIT_TAG_STRING(void);
@@ -156,6 +158,8 @@ static int binop_is_arithmetic(int binop_tag);
 static int binop_is_logical(int binop_tag);
 static int test_binop_of(void);
 static int test_assign_binop(void);
+static int test_is_assign_tok(void);
+static int test_path_of_ty(void);
 static int test_lit_from_tok(void);
 static int test_expr_span(void);
 static int test_skip_helpers(void);
@@ -1031,6 +1035,20 @@ static int is_compound_assign(int tok_tag) {
   return 0;
 }
 
+static int is_assign_tok(int tok_tag) {
+  if ((tok_tag == 35)) {
+    return 1;
+  } else {
+  }
+  int _sv0t0 = has_assign_binop(tok_tag);
+  return _sv0t0;
+}
+
+static int path_of_ty_valid(int ty_tag) {
+  int _sv0t0 = (ty_tag == 0);
+  return _sv0t0;
+}
+
 static int LIT_TAG_INT(void) {
   return 0;
 }
@@ -1617,6 +1635,59 @@ static int test_assign_binop(void) {
   int _sv0t16 = is_compound_assign(22);
   if ((_sv0t16 != 0)) {
     return 16;
+  } else {
+  }
+  return 0;
+}
+
+static int test_is_assign_tok(void) {
+  int _sv0t0 = is_assign_tok(35);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = is_assign_tok(44);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = is_assign_tok(53);
+  if ((_sv0t2 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = is_assign_tok(22);
+  if ((_sv0t3 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = is_assign_tok(0);
+  if ((_sv0t4 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = is_assign_tok(97);
+  if ((_sv0t5 != 0)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_path_of_ty(void) {
+  int _sv0t0 = path_of_ty_valid(0);
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = path_of_ty_valid(1);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = path_of_ty_valid(5);
+  if ((_sv0t2 != 0)) {
+    return 3;
   } else {
   }
   return 0;
@@ -2612,6 +2683,20 @@ int main(void) {
   if ((r16 != 0)) {
     int _sv0t30 = (260 + r16);
     return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_is_assign_tok();
+  int r17 = _sv0t31;
+  if ((r17 != 0)) {
+    int _sv0t32 = (280 + r17);
+    return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_path_of_ty();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (290 + r18);
+    return _sv0t34;
   } else {
   }
   return 0;

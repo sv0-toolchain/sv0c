@@ -5,7 +5,8 @@
    including IfElse/While/Block with recursive Vec<i32> + Box<Instr>
    iteration and Call with Vec<i32> + Box<Value> arguments),
    emitParamList (general over Vec<Param>), emitFnProto,
-   is_main_block, emit_block_body, emitBlockDefn, emit (top-level). */
+   is_main_block, split_main_index (SML splitMain),
+   emit_block_body, emitBlockDefn, emit (top-level). */
 
 enum Value {
     VInt(i32),
@@ -487,6 +488,18 @@ fn emit_fn_proto_ex(is_static: i32, ret_cty_h: i32, label_h: i32, params: Vec<i3
 
 fn is_main_block(label_h: i32) -> bool {
     return label_h == 11;
+}
+
+/* SML splitMain: find index of the main block in a 4-stride block list.
+   Returns -1 if no main block exists. */
+fn split_main_index(blocks: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(blocks) / 4;
+    let mut i: i32 = 0;
+    while i < n {
+        if is_main_block(vec_get(blocks, i * 4)) { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
 }
 
 fn emit_block_body(instrs: Vec<i32>, ret_name: string) -> string {
@@ -1032,6 +1045,19 @@ fn test_instr_call_void_with_args() -> i32 {
     return 0;
 }
 
+fn test_split_main_index() -> i32 {
+    let blocks: Vec<i32> = vec_new();
+    vec_push(blocks, 99); vec_push(blocks, 0); vec_push(blocks, 0); vec_push(blocks, 0);
+    vec_push(blocks, 11); vec_push(blocks, 0); vec_push(blocks, 0); vec_push(blocks, 0);
+    if split_main_index(blocks) != 1 { return 1; }
+    let no_main: Vec<i32> = vec_new();
+    vec_push(no_main, 99); vec_push(no_main, 0); vec_push(no_main, 0); vec_push(no_main, 0);
+    if split_main_index(no_main) != 0 - 1 { return 2; }
+    let empty: Vec<i32> = vec_new();
+    if split_main_index(empty) != 0 - 1 { return 3; }
+    return 0;
+}
+
 fn test_block_defn() -> i32 {
     let proto: string = emit_fn_proto(0, 9, 11, "void");
     let body: string = "  return 0;\n";
@@ -1179,5 +1205,8 @@ fn main() -> i32 {
     let r41: i32 = test_emit_program_no_main();
     if r41 != 0 { return 400 + r41; }
     println("PASS test_emit_program_no_main");
+    let r42: i32 = test_split_main_index();
+    if r42 != 0 { return 410 + r42; }
+    println("PASS test_split_main_index");
     return 0;
 }

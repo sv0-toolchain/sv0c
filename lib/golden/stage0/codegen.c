@@ -46,6 +46,7 @@ static const char* emit_block_defn(const char* proto, const char* body);
 static const char* emit_param_list(int params);
 static const char* emit_fn_proto_ex(int is_static, int ret_cty_h, int label_h, int params);
 static int is_main_block(int label_h);
+static int split_main_index(int blocks);
 static const char* emit_block_body(int instrs, const char* ret_name);
 static const char* emit_program(const char* typedefs, int blocks);
 static int test_int_format(void);
@@ -93,6 +94,7 @@ static int test_call_args_two(void);
 static int test_call_args_three(void);
 static int test_instr_call_with_args(void);
 static int test_instr_call_void_with_args(void);
+static int test_split_main_index(void);
 static int test_block_defn(void);
 
 static int value_tag(Value v) {
@@ -1439,6 +1441,24 @@ static const char* emit_fn_proto_ex(int is_static, int ret_cty_h, int label_h, i
 static int is_main_block(int label_h) {
   int _sv0t0 = (label_h == 11);
   return _sv0t0;
+}
+
+static int split_main_index(int blocks) {
+  int _sv0t0 = sv0_vec_len(blocks);
+  int n = (_sv0t0 / 4);
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = (i * 4);
+    int _sv0t2 = sv0_vec_get(blocks, _sv0t1);
+    int _sv0t3 = is_main_block(_sv0t2);
+    if (_sv0t3) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t4 = (0 - 1);
+  return _sv0t4;
 }
 
 static const char* emit_block_body(int instrs, const char* ret_name) {
@@ -2916,6 +2936,45 @@ static int test_instr_call_void_with_args(void) {
   return 0;
 }
 
+static int test_split_main_index(void) {
+  int _sv0t0 = sv0_vec_new();
+  int blocks = _sv0t0;
+  sv0_vec_push(blocks, 99);
+  sv0_vec_push(blocks, 0);
+  sv0_vec_push(blocks, 0);
+  sv0_vec_push(blocks, 0);
+  sv0_vec_push(blocks, 11);
+  sv0_vec_push(blocks, 0);
+  sv0_vec_push(blocks, 0);
+  sv0_vec_push(blocks, 0);
+  int _sv0t1 = split_main_index(blocks);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_new();
+  int no_main = _sv0t2;
+  sv0_vec_push(no_main, 99);
+  sv0_vec_push(no_main, 0);
+  sv0_vec_push(no_main, 0);
+  sv0_vec_push(no_main, 0);
+  int _sv0t3 = split_main_index(no_main);
+  int _sv0t4 = (0 - 1);
+  if ((_sv0t3 != _sv0t4)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int empty = _sv0t5;
+  int _sv0t6 = split_main_index(empty);
+  int _sv0t7 = (0 - 1);
+  if ((_sv0t6 != _sv0t7)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 static int test_block_defn(void) {
   const char* _sv0t0 = emit_fn_proto(0, 9, 11, "void");
   const char* proto;
@@ -3301,6 +3360,14 @@ int main(void) {
   } else {
   }
   sv0_println("PASS test_emit_program_no_main");
+  int _sv0t91 = test_split_main_index();
+  int r42 = _sv0t91;
+  if ((r42 != 0)) {
+    int _sv0t92 = (410 + r42);
+    return _sv0t92;
+  } else {
+  }
+  sv0_println("PASS test_split_main_index");
   return 0;
 }
 
