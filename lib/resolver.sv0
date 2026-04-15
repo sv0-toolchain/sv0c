@@ -13,10 +13,16 @@
    res_type_exists — string-based name comparison via token stream),
    resolve_pat_shape (SML resolvePatShape — pattern name validation),
    resolve_ty (SML resolveTy — type name validation; TyArray size expr
-   deferred to resolve_expr).
-   Remaining: resolve_expr, resolve_stmt, resolve_contract, resolve_fn,
-   resolve_struct/enum/trait/impl, resolveTopItem, applyUseClause,
-   resolve (top-level entry). */
+   deferred to resolve_expr),
+   scope management (res_enter_scope, res_bind_local,
+   res_lookup_in_frames_str, res_full_value_exists,
+   res_lookup_fn_arity_str),
+   resolve_expr (SML resolveExpr — 27 expr tag cases with scope/binding/
+   arity checking; ExprCast type validation deferred — type arena local),
+   resolve_stmt (SML resolveStmt — LetStmt/SemiStmt),
+   resolve_contract (SML resolveContract — thin wrapper).
+   Remaining: resolveFn, resolveStruct/Enum/Trait/Impl, resolveTopItem,
+   applyUseClause, resolve (top-level entry). */
 
 /* ── path joining ───────────────────────────────────────────── */
 
@@ -632,6 +638,530 @@ fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
     return 0;
 }
 
+/* ── scope management helpers ────────────────────────────────
+   Inline copies of env.sv0 scope operations. Frames is a Vec
+   of Vec<i32>, each inner Vec holding name token positions. */
+
+fn res_enter_scope(frames: Vec<i32>) -> i32 {
+    let f: Vec<i32> = vec_new();
+    vec_push(frames, f);
+    return 0;
+}
+
+fn res_bind_local(frames: Vec<i32>, name_pos: i32) -> i32 {
+    let len: i32 = vec_len(frames);
+    if len == 0 {
+        let f: Vec<i32> = vec_new();
+        vec_push(f, name_pos);
+        vec_push(frames, f);
+        return 0;
+    }
+    let top: Vec<i32> = vec_get(frames, len - 1);
+    vec_push(top, name_pos);
+    return 0;
+}
+
+fn res_lookup_in_frames_str(frames: Vec<i32>, name_str: string,
+                            source: string, starts: Vec<i32>,
+                            ends: Vec<i32>) -> bool {
+    let flen: i32 = vec_len(frames);
+    let mut fi: i32 = flen - 1;
+    while fi >= 0 {
+        let frame: Vec<i32> = vec_get(frames, fi);
+        let fv_len: i32 = vec_len(frame);
+        let mut j: i32 = 0;
+        while j < fv_len {
+            let pos: i32 = vec_get(frame, j);
+            let nm: string = tok_str(source, starts, ends, pos);
+            if string_eq(nm, name_str) { return true; }
+            j = j + 1;
+        }
+        fi = fi - 1;
+    }
+    return false;
+}
+
+fn res_full_value_exists(mod_vals: Vec<i32>, frames: Vec<i32>,
+                         name_str: string, source: string,
+                         starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    if res_lookup_in_frames_str(frames, name_str, source, starts, ends) {
+        return true;
+    }
+    return res_value_exists(mod_vals, name_str, source, starts, ends);
+}
+
+fn res_lookup_fn_arity_str(fn_arities: Vec<i32>, name_str: string,
+                           source: string, starts: Vec<i32>,
+                           ends: Vec<i32>) -> i32 {
+    let len: i32 = vec_len(fn_arities);
+    let mut i: i32 = 0;
+    while i < len {
+        let pos: i32 = vec_get(fn_arities, i);
+        let nm: string = tok_str(source, starts, ends, pos);
+        if string_eq(nm, name_str) {
+            return vec_get(fn_arities, i + 1);
+        }
+        i = i + 2;
+    }
+    return 0 - 1;
+}
+
+/* ── resolve_expr (SML resolveExpr) ───────────────────────────
+   Walks the expr arena and validates names, scoping, and arity.
+   Returns 0 on success, error code on failure.
+   Type arena is local to parser — ExprCast type validation deferred.
+   Pattern arena is local to parser — ExprFor/ExprMatch patterns
+   use inlined tag/d1 from expr arena. */
+
+fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                source: string, starts: Vec<i32>, ends: Vec<i32>,
+                mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                fn_arities: Vec<i32>, frames: Vec<i32>,
+                pp: Vec<i32>) -> i32 {
+    if idx < 0 { return 0; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 0 { return 0; }
+    if tag == 1 {
+        let pps: i32 = vec_get(ed1, idx);
+        let ppc: i32 = vec_get(ed2, idx);
+        let path: Vec<i32> = vec_new();
+        let mut k: i32 = 0;
+        while k < ppc {
+            vec_push(path, vec_get(pp, pps + k));
+            k = k + 1;
+        }
+        let ps: string = path_join_vec(source, starts, ends, path);
+        if res_full_value_exists(mod_vals, frames, ps,
+                                  source, starts, ends) != true {
+            return 300;
+        }
+        return 0;
+    }
+    if tag == 2 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 3 {
+        let r1: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if r1 != 0 { return r1; }
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed3, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 4 {
+        let callee: i32 = vec_get(ed1, idx);
+        let args_first: i32 = vec_get(ed2, idx);
+        let args_count: i32 = vec_get(ed3, idx);
+        if vec_get(et, callee) == 1 {
+            let cpps: i32 = vec_get(ed1, callee);
+            let cppc: i32 = vec_get(ed2, callee);
+            let cpath: Vec<i32> = vec_new();
+            let mut ck: i32 = 0;
+            while ck < cppc {
+                vec_push(cpath, vec_get(pp, cpps + ck));
+                ck = ck + 1;
+            }
+            let cps: string = path_join_vec(source, starts, ends, cpath);
+            if cppc == 1 {
+                if string_eq(cps, "forall") {
+                    if args_count == 3 {
+                        let binder: i32 = args_first;
+                        if vec_get(et, binder) == 1 {
+                            let bpos: i32 = vec_get(pp, vec_get(ed1, binder));
+                            let rd: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                                        args_first + 1,
+                                                        source, starts, ends,
+                                                        mod_vals, mod_tys,
+                                                        fn_arities, frames, pp);
+                            if rd != 0 { return rd; }
+                            res_enter_scope(frames);
+                            res_bind_local(frames, bpos);
+                            let rb: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                                        args_first + 2,
+                                                        source, starts, ends,
+                                                        mod_vals, mod_tys,
+                                                        fn_arities, frames, pp);
+                            return rb;
+                        }
+                    }
+                }
+                if string_eq(cps, "exists") {
+                    if args_count == 3 {
+                        let binder: i32 = args_first;
+                        if vec_get(et, binder) == 1 {
+                            let bpos: i32 = vec_get(pp, vec_get(ed1, binder));
+                            let rd: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                                        args_first + 1,
+                                                        source, starts, ends,
+                                                        mod_vals, mod_tys,
+                                                        fn_arities, frames, pp);
+                            if rd != 0 { return rd; }
+                            res_enter_scope(frames);
+                            res_bind_local(frames, bpos);
+                            let rb: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                                        args_first + 2,
+                                                        source, starts, ends,
+                                                        mod_vals, mod_tys,
+                                                        fn_arities, frames, pp);
+                            return rb;
+                        }
+                    }
+                }
+            }
+            let arity: i32 = res_lookup_fn_arity_str(fn_arities, cps,
+                                                      source, starts, ends);
+            if arity >= 0 {
+                if arity != args_count { return 307; }
+            }
+        }
+        let rf: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, callee,
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if rf != 0 { return rf; }
+        let mut ai: i32 = 0;
+        while ai < args_count {
+            let ra: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                        args_first + ai,
+                                        source, starts, ends,
+                                        mod_vals, mod_tys, fn_arities, frames, pp);
+            if ra != 0 { return ra; }
+            ai = ai + 1;
+        }
+        return 0;
+    }
+    if tag == 5 {
+        let recv: i32 = vec_get(ed1, idx);
+        let margs_first: i32 = vec_get(ed3, idx);
+        let margs_count: i32 = vec_get(ed4, idx);
+        let rr: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, recv,
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if rr != 0 { return rr; }
+        let mut mi: i32 = 0;
+        while mi < margs_count {
+            let rm: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                        margs_first + mi,
+                                        source, starts, ends,
+                                        mod_vals, mod_tys, fn_arities, frames, pp);
+            if rm != 0 { return rm; }
+            mi = mi + 1;
+        }
+        return 0;
+    }
+    if tag == 6 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 7 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 8 {
+        let ra: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if ra != 0 { return ra; }
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 9 {
+        let sf: i32 = vec_get(ed1, idx);
+        let sc: i32 = vec_get(ed2, idx);
+        let tail: i32 = vec_get(ed3, idx);
+        res_enter_scope(frames);
+        let mut si: i32 = 0;
+        while si < sc {
+            let rs: i32 = resolve_stmt(et, ed1, ed2, ed3, ed4,
+                                        sf + si,
+                                        source, starts, ends,
+                                        mod_vals, mod_tys,
+                                        fn_arities, frames, pp);
+            if rs != 0 { return rs; }
+            si = si + 1;
+        }
+        if tail >= 0 {
+            return resolve_expr(et, ed1, ed2, ed3, ed4, tail,
+                                 source, starts, ends,
+                                 mod_vals, mod_tys, fn_arities, frames, pp);
+        }
+        return 0;
+    }
+    if tag == 10 {
+        let rc: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if rc != 0 { return rc; }
+        let rt: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if rt != 0 { return rt; }
+        let else_idx: i32 = vec_get(ed3, idx);
+        if else_idx >= 0 {
+            return resolve_expr(et, ed1, ed2, ed3, ed4, else_idx,
+                                 source, starts, ends,
+                                 mod_vals, mod_tys, fn_arities, frames, pp);
+        }
+        return 0;
+    }
+    if tag == 11 {
+        let scrut: i32 = vec_get(ed1, idx);
+        let arms_f: i32 = vec_get(ed2, idx);
+        let arms_c: i32 = vec_get(ed3, idx);
+        let rsc: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, scrut,
+                                     source, starts, ends,
+                                     mod_vals, mod_tys, fn_arities, frames, pp);
+        if rsc != 0 { return rsc; }
+        let mut ami: i32 = 0;
+        while ami < arms_c {
+            let arm_idx: i32 = arms_f + ami;
+            let arm_pat_tag: i32 = vec_get(ed1, arm_idx);
+            let arm_pat_d1: i32 = vec_get(ed2, arm_idx);
+            let guard: i32 = vec_get(ed3, arm_idx);
+            let body: i32 = vec_get(ed4, arm_idx);
+            res_enter_scope(frames);
+            if arm_pat_tag == 1 {
+                res_bind_local(frames, arm_pat_d1);
+            }
+            if guard >= 0 {
+                let rg: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, guard,
+                                            source, starts, ends,
+                                            mod_vals, mod_tys,
+                                            fn_arities, frames, pp);
+                if rg != 0 { return rg; }
+            }
+            let rb: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, body,
+                                        source, starts, ends,
+                                        mod_vals, mod_tys,
+                                        fn_arities, frames, pp);
+            if rb != 0 { return rb; }
+            ami = ami + 1;
+        }
+        return 0;
+    }
+    if tag == 12 {
+        let cond: i32 = vec_get(ed1, idx);
+        let wbody: i32 = vec_get(ed2, idx);
+        let inv_f: i32 = vec_get(ed3, idx);
+        let inv_c: i32 = vec_get(ed4, idx);
+        let rwc: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, cond,
+                                     source, starts, ends,
+                                     mod_vals, mod_tys, fn_arities, frames, pp);
+        if rwc != 0 { return rwc; }
+        let mut ii: i32 = 0;
+        while ii < inv_c {
+            let ri: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                        inv_f + ii,
+                                        source, starts, ends,
+                                        mod_vals, mod_tys,
+                                        fn_arities, frames, pp);
+            if ri != 0 { return ri; }
+            ii = ii + 1;
+        }
+        return resolve_expr(et, ed1, ed2, ed3, ed4, wbody,
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 13 {
+        let pat_tok: i32 = vec_get(ed1, idx);
+        let iter: i32 = vec_get(ed2, idx);
+        let fbody: i32 = vec_get(ed3, idx);
+        let rit: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, iter,
+                                     source, starts, ends,
+                                     mod_vals, mod_tys, fn_arities, frames, pp);
+        if rit != 0 { return rit; }
+        res_enter_scope(frames);
+        res_bind_local(frames, pat_tok);
+        return resolve_expr(et, ed1, ed2, ed3, ed4, fbody,
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 14 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 15 {
+        let rv: i32 = vec_get(ed1, idx);
+        if rv >= 0 {
+            return resolve_expr(et, ed1, ed2, ed3, ed4, rv,
+                                 source, starts, ends,
+                                 mod_vals, mod_tys, fn_arities, frames, pp);
+        }
+        return 0;
+    }
+    if tag == 16 {
+        let bv: i32 = vec_get(ed1, idx);
+        if bv >= 0 {
+            return resolve_expr(et, ed1, ed2, ed3, ed4, bv,
+                                 source, starts, ends,
+                                 mod_vals, mod_tys, fn_arities, frames, pp);
+        }
+        return 0;
+    }
+    if tag == 17 { return 0; }
+    if tag == 18 {
+        let ra: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if ra != 0 { return ra; }
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 19 {
+        let ra: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
+                                    source, starts, ends,
+                                    mod_vals, mod_tys, fn_arities, frames, pp);
+        if ra != 0 { return ra; }
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed3, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 20 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 21 {
+        let lo: i32 = vec_get(ed1, idx);
+        let hi: i32 = vec_get(ed2, idx);
+        if lo >= 0 {
+            let rl: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, lo,
+                                        source, starts, ends,
+                                        mod_vals, mod_tys, fn_arities, frames, pp);
+            if rl != 0 { return rl; }
+        }
+        if hi >= 0 {
+            return resolve_expr(et, ed1, ed2, ed3, ed4, hi,
+                                 source, starts, ends,
+                                 mod_vals, mod_tys, fn_arities, frames, pp);
+        }
+        return 0;
+    }
+    if tag == 22 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 23 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    if tag == 24 {
+        let spps: i32 = vec_get(ed1, idx);
+        let sppc: i32 = vec_get(ed2, idx);
+        let sfc: i32 = vec_get(ed3, idx);
+        let spath: Vec<i32> = vec_new();
+        let mut sk: i32 = 0;
+        while sk < sppc {
+            vec_push(spath, vec_get(pp, spps + sk));
+            sk = sk + 1;
+        }
+        let sps: string = path_join_vec(source, starts, ends, spath);
+        if res_type_exists(mod_tys, sps, source, starts, ends) != true {
+            return 301;
+        }
+        let mut sfi: i32 = 0;
+        while sfi < sfc {
+            let rfe: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                         idx - sfc + sfi,
+                                         source, starts, ends,
+                                         mod_vals, mod_tys,
+                                         fn_arities, frames, pp);
+            if rfe != 0 { return rfe; }
+            sfi = sfi + 1;
+        }
+        return 0;
+    }
+    if tag == 25 {
+        let tf: i32 = vec_get(ed1, idx);
+        let tc: i32 = vec_get(ed2, idx);
+        let mut ti: i32 = 0;
+        while ti < tc {
+            let rte: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                         tf + ti,
+                                         source, starts, ends,
+                                         mod_vals, mod_tys,
+                                         fn_arities, frames, pp);
+            if rte != 0 { return rte; }
+            ti = ti + 1;
+        }
+        return 0;
+    }
+    if tag == 26 {
+        let af: i32 = vec_get(ed1, idx);
+        let ac: i32 = vec_get(ed2, idx);
+        let mut ari: i32 = 0;
+        while ari < ac {
+            let rae: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
+                                         af + ari,
+                                         source, starts, ends,
+                                         mod_vals, mod_tys,
+                                         fn_arities, frames, pp);
+            if rae != 0 { return rae; }
+            ari = ari + 1;
+        }
+        return 0;
+    }
+    return 0;
+}
+
+/* ── resolve_stmt (SML resolveStmt) ──────────────────────────
+   Handles LetStmt(27) and SemiStmt(28) in the expr arena.
+   LetStmt binds the local variable in the current scope.
+   Type annotations are local to parser — validation deferred. */
+
+fn resolve_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                source: string, starts: Vec<i32>, ends: Vec<i32>,
+                mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                fn_arities: Vec<i32>, frames: Vec<i32>,
+                pp: Vec<i32>) -> i32 {
+    let tag: i32 = vec_get(et, idx);
+    if tag == 27 {
+        let init: i32 = vec_get(ed3, idx);
+        if init >= 0 {
+            let ri: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, init,
+                                        source, starts, ends,
+                                        mod_vals, mod_tys,
+                                        fn_arities, frames, pp);
+            if ri != 0 { return ri; }
+        }
+        let name_pos: i32 = vec_get(ed1, idx);
+        res_bind_local(frames, name_pos);
+        return 0;
+    }
+    if tag == 28 {
+        return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed1, idx),
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
+    return resolve_expr(et, ed1, ed2, ed3, ed4, idx,
+                         source, starts, ends,
+                         mod_vals, mod_tys, fn_arities, frames, pp);
+}
+
+/* ── resolve_contract (SML resolveContract) ───────────────── */
+
+fn resolve_contract(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>,
+                    mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                    fn_arities: Vec<i32>, frames: Vec<i32>,
+                    pp: Vec<i32>) -> i32 {
+    return resolve_expr(et, ed1, ed2, ed3, ed4, idx,
+                         source, starts, ends,
+                         mod_vals, mod_tys, fn_arities, frames, pp);
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_path_join() -> i32 {
@@ -1050,6 +1580,176 @@ fn test_resolve_ty_ref() -> i32 {
     return 0;
 }
 
+fn test_scope_mgmt() -> i32 {
+    let source: string = "x y z";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 5);
+    let frames: Vec<i32> = vec_new();
+    res_enter_scope(frames);
+    res_bind_local(frames, 0);
+    if res_lookup_in_frames_str(frames, "x", source, starts, ends) != true { return 1; }
+    if res_lookup_in_frames_str(frames, "y", source, starts, ends) != false { return 2; }
+    res_bind_local(frames, 1);
+    if res_lookup_in_frames_str(frames, "y", source, starts, ends) != true { return 3; }
+    let mv: Vec<i32> = vec_new();
+    vec_push(mv, 2);
+    if res_full_value_exists(mv, frames, "z", source, starts, ends) != true { return 4; }
+    if res_full_value_exists(mv, frames, "x", source, starts, ends) != true { return 5; }
+    return 0;
+}
+
+fn test_resolve_expr_lit() -> i32 {
+    let source: string = "42";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 0);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let frames: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    if resolve_expr(et, ed1, ed2, ed3, ed4, 0, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 0 { return 1; }
+    return 0;
+}
+
+fn test_resolve_expr_path() -> i32 {
+    let source: string = "foo bar";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    let mv: Vec<i32> = vec_new();
+    vec_push(mv, 0);
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let frames: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    if resolve_expr(et, ed1, ed2, ed3, ed4, 0, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 0 { return 1; }
+    vec_push(pp, 1);
+    vec_push(et, 1); vec_push(ed1, 1); vec_push(ed2, 1);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    if resolve_expr(et, ed1, ed2, ed3, ed4, 1, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 300 { return 2; }
+    return 0;
+}
+
+fn test_resolve_expr_block() -> i32 {
+    let source: string = "x 10";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(starts, 2); vec_push(ends, 4);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let frames: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 27); vec_push(ed1, 0); vec_push(ed2, 0 - 1);
+    vec_push(ed3, 0 - 1); vec_push(ed4, 0);
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 9); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 1); vec_push(ed4, 0);
+    if resolve_expr(et, ed1, ed2, ed3, ed4, 2, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 0 { return 1; }
+    return 0;
+}
+
+fn test_resolve_expr_call_arity() -> i32 {
+    let source: string = "foo 1 2";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(starts, 6); vec_push(ends, 7);
+    let mv: Vec<i32> = vec_new();
+    vec_push(mv, 0);
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    vec_push(fa, 0);
+    vec_push(fa, 2);
+    let frames: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 2);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 4); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 2); vec_push(ed4, 0);
+    if resolve_expr(et, ed1, ed2, ed3, ed4, 3, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 0 { return 1; }
+    vec_push(et, 4); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 1); vec_push(ed4, 0);
+    if resolve_expr(et, ed1, ed2, ed3, ed4, 4, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 307 { return 2; }
+    return 0;
+}
+
+fn test_resolve_stmt_let() -> i32 {
+    let source: string = "a b";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(starts, 2); vec_push(ends, 3);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let frames: Vec<i32> = vec_new();
+    res_enter_scope(frames);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 27); vec_push(ed1, 0); vec_push(ed2, 0 - 1);
+    vec_push(ed3, 0 - 1); vec_push(ed4, 0);
+    if resolve_stmt(et, ed1, ed2, ed3, ed4, 0, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 0 { return 1; }
+    if res_lookup_in_frames_str(frames, "a", source, starts, ends) != true { return 2; }
+    vec_push(pp, 0);
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(ed3, 0); vec_push(ed4, 0);
+    if resolve_expr(et, ed1, ed2, ed3, ed4, 1, source, starts, ends,
+                     mv, mt, fa, frames, pp) != 0 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_join();
     if r1 != 0 { return r1; }
@@ -1107,5 +1807,17 @@ fn main() -> i32 {
     if r27 != 0 { return 270 + r27; }
     let r28: i32 = test_resolve_ty_ref();
     if r28 != 0 { return 280 + r28; }
+    let r29: i32 = test_scope_mgmt();
+    if r29 != 0 { return 3 + r29; }
+    let r30: i32 = test_resolve_expr_lit();
+    if r30 != 0 { return 60 + r30; }
+    let r31: i32 = test_resolve_expr_path();
+    if r31 != 0 { return 63 + r31; }
+    let r32: i32 = test_resolve_expr_block();
+    if r32 != 0 { return 66 + r32; }
+    let r33: i32 = test_resolve_expr_call_arity();
+    if r33 != 0 { return 136 + r33; }
+    let r34: i32 = test_resolve_stmt_let();
+    if r34 != 0 { return 146 + r34; }
     return 0;
 }
