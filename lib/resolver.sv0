@@ -4,7 +4,9 @@
    register_all_intrinsics into env fn_arities/mod_values), import
    alias management (Vec-based add/lookup/reset), item registration
    dispatch (by item tag), pattern-bind counting, variant-arity
-   extraction, context rules (allowSelf), error codes, arity checks.
+   extraction, context rules (allowSelf), error codes, arity checks,
+   pat_binds (SML patBinds — collects bound var handles from flat
+   patterns into Vec), bind_pattern_locals (SML bindPatternLocals).
    AST traversal functions (resolveTy, resolveExpr, resolveStmt,
    resolveTopItem) and applyUseClause deferred — need full AST enum
    pattern matching with Box handles. */
@@ -284,6 +286,36 @@ fn pat_is_or(pat_tag: i32) -> bool {
     return pat_tag == 6;
 }
 
+/* SML patBinds: collects bound variable name handles from a flat
+   pattern.  In the bootstrap sv0, patterns are not yet recursive
+   (no Box<Pat>), so this handles the flat cases:
+     PatWild (0) → nothing
+     PatBind (1) → push name handle
+     PatLit  (2) → nothing
+   For compound patterns (PatTuple/PatStruct/PatEnum), the caller
+   must iterate sub-patterns and call pat_binds on each.
+   PatOr (6) is unsupported (SML raises Fail). */
+fn pat_binds(pat_tag: i32, name_handle: i32, out: Vec<i32>) -> i32 {
+    if pat_tag == 1 {
+        vec_push(out, name_handle);
+        return 1;
+    }
+    return 0;
+}
+
+/* SML bindPatternLocals: folds patBinds result into an env.
+   Takes the collected binds Vec and pushes each handle into the
+   env's local names Vec. Returns the count of locals bound. */
+fn bind_pattern_locals(binds: Vec<i32>, env_locals: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(binds);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(env_locals, vec_get(binds, i));
+        i = i + 1;
+    }
+    return n;
+}
+
 /* ── context rules (allowSelf) ──────────────────────────────── */
 
 fn should_allow_self(item_tag: i32) -> bool {
@@ -500,6 +532,38 @@ fn test_enum_variant_reg() -> i32 {
     return 0;
 }
 
+fn test_pat_binds_vec() -> i32 {
+    let out: Vec<i32> = vec_new();
+    if pat_binds(0, 10, out) != 0 { return 1; }
+    if vec_len(out) != 0 { return 2; }
+    if pat_binds(1, 42, out) != 1 { return 3; }
+    if vec_len(out) != 1 { return 4; }
+    if vec_get(out, 0) != 42 { return 5; }
+    if pat_binds(2, 99, out) != 0 { return 6; }
+    if vec_len(out) != 1 { return 7; }
+    if pat_binds(1, 77, out) != 1 { return 8; }
+    if vec_len(out) != 2 { return 9; }
+    if vec_get(out, 1) != 77 { return 10; }
+    return 0;
+}
+
+fn test_bind_pattern_locals() -> i32 {
+    let binds: Vec<i32> = vec_new();
+    vec_push(binds, 10);
+    vec_push(binds, 20);
+    vec_push(binds, 30);
+    let env: Vec<i32> = vec_new();
+    let n: i32 = bind_pattern_locals(binds, env);
+    if n != 3 { return 1; }
+    if vec_len(env) != 3 { return 2; }
+    if vec_get(env, 0) != 10 { return 3; }
+    if vec_get(env, 2) != 30 { return 4; }
+    let empty: Vec<i32> = vec_new();
+    let env2: Vec<i32> = vec_new();
+    if bind_pattern_locals(empty, env2) != 0 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_join();
     if r1 != 0 { return r1; }
@@ -533,5 +597,9 @@ fn main() -> i32 {
     if r15 != 0 { return 150 + r15; }
     let r16: i32 = test_enum_variant_reg();
     if r16 != 0 { return 160 + r16; }
+    let r17: i32 = test_pat_binds_vec();
+    if r17 != 0 { return 170 + r17; }
+    let r18: i32 = test_bind_pattern_locals();
+    if r18 != 0 { return 180 + r18; }
     return 0;
 }

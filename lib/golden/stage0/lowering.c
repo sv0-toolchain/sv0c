@@ -25,6 +25,8 @@ static const char* old_slot_prefix(void);
 static int old_slot_name_len(int name_len);
 static const char* old_slot_name(const char* name);
 static int param_name_tag(int pat_tag);
+static int param_name(int pat_tag, int name_handle);
+static int lower_field_index(int field_names, int target);
 static int old_name_seen(int seen, int name);
 static int old_names_add_unique(int seen, int name);
 static int uniq_old_names(int names);
@@ -92,6 +94,8 @@ static int test_fn_ret_cty(void);
 static int test_lower_alias(void);
 static int test_resolve_fn_callee(void);
 static int test_resolve_ctor_path(void);
+static int test_param_name(void);
+static int test_lower_field_index(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -559,6 +563,31 @@ static const char* old_slot_name(const char* name) {
 static int param_name_tag(int pat_tag) {
   int _sv0t0 = (pat_tag == 1);
   return _sv0t0;
+}
+
+static int param_name(int pat_tag, int name_handle) {
+  if ((pat_tag == 1)) {
+    return name_handle;
+  } else {
+  }
+  int _sv0t0 = (0 - 1);
+  return _sv0t0;
+}
+
+static int lower_field_index(int field_names, int target) {
+  int _sv0t0 = sv0_vec_len(field_names);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(field_names, i);
+    if ((_sv0t1 == target)) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
 }
 
 static int old_name_seen(int seen, int name) {
@@ -1849,6 +1878,65 @@ static int test_resolve_ctor_path(void) {
   return 0;
 }
 
+static int test_param_name(void) {
+  int _sv0t0 = param_name(1, 42);
+  if ((_sv0t0 != 42)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = param_name(0, 42);
+  int _sv0t2 = (0 - 1);
+  if ((_sv0t1 != _sv0t2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = param_name(3, 99);
+  int _sv0t4 = (0 - 1);
+  if ((_sv0t3 != _sv0t4)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lower_field_index(void) {
+  int _sv0t0 = sv0_vec_new();
+  int fields = _sv0t0;
+  sv0_vec_push(fields, 10);
+  sv0_vec_push(fields, 20);
+  sv0_vec_push(fields, 30);
+  int _sv0t1 = lower_field_index(fields, 10);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = lower_field_index(fields, 20);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = lower_field_index(fields, 30);
+  if ((_sv0t3 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = lower_field_index(fields, 99);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int empty = _sv0t6;
+  int _sv0t7 = lower_field_index(empty, 10);
+  int _sv0t8 = (0 - 1);
+  if ((_sv0t7 != _sv0t8)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -2043,6 +2131,20 @@ int main(void) {
   if ((r28 != 0)) {
     int _sv0t54 = (300 + r28);
     return _sv0t54;
+  } else {
+  }
+  int _sv0t55 = test_param_name();
+  int r29 = _sv0t55;
+  if ((r29 != 0)) {
+    int _sv0t56 = (310 + r29);
+    return _sv0t56;
+  } else {
+  }
+  int _sv0t57 = test_lower_field_index();
+  int r30 = _sv0t57;
+  if ((r30 != 0)) {
+    int _sv0t58 = (320 + r30);
+    return _sv0t58;
   } else {
   }
   return 0;

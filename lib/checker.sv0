@@ -11,6 +11,7 @@
    fields_of_struct (SML fieldsOfStruct), variant_shape_of (SML
    variantShapeOf), assign_lhs_bad (SML assignLhsBad),
    enter_loop/exit_loop (SML withLoop decomposed).
+   infer_lit (SML synth literal arms — maps literal tag to type tag).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -433,6 +434,23 @@ fn exit_loop(depth: i32) -> i32 {
     return depth - 1;
 }
 
+/* ── literal type inference (SML synth ExprLit arms) ─────────
+   Maps literal tag to type tag.  Tags from ast.sv0:
+     0 = IntLit  → TyInt(32) = type tag 0
+     1 = BoolLit → TyBool    = type tag 2
+     2 = UnitLit → TyUnit    = type tag 4
+     3 = StringLit → TyString = type tag 5
+     4 = FloatLit → TyFloat  = type tag 1 (if supported)
+   Returns -1 for unknown literal tag. */
+fn infer_lit(lit_tag: i32) -> i32 {
+    if lit_tag == 0 { return 0; }
+    if lit_tag == 1 { return 2; }
+    if lit_tag == 2 { return 4; }
+    if lit_tag == 3 { return 5; }
+    if lit_tag == 4 { return 1; }
+    return 0 - 1;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -685,6 +703,16 @@ fn test_assign_lhs_bad() -> i32 {
     return 0;
 }
 
+fn test_infer_lit() -> i32 {
+    if infer_lit(0) != 0 { return 1; }
+    if infer_lit(1) != 2 { return 2; }
+    if infer_lit(2) != 4 { return 3; }
+    if infer_lit(3) != 5 { return 4; }
+    if infer_lit(4) != 1 { return 5; }
+    if infer_lit(99) != 0 - 1 { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -728,5 +756,7 @@ fn main() -> i32 {
     if r20 != 0 { return 210 + r20; }
     let r21: i32 = test_assign_lhs_bad();
     if r21 != 0 { return 220 + r21; }
+    let r22: i32 = test_infer_lit();
+    if r22 != 0 { return 230 + r22; }
     return 0;
 }

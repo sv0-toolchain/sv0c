@@ -12,7 +12,10 @@
    fn_ret_cty (SML fnRetCty — return type or default "int"),
    import alias management (lower_alias_new/add/lookup/set) +
    resolve_fn_callee (SML resolveFnCallee) +
-   resolve_enum_ctor_path (SML resolveEnumCtorPath).
+   resolve_enum_ctor_path (SML resolveEnumCtorPath),
+   param_name (SML paramName — extract name handle from PatBind param),
+   lower_field_index (SML local fieldIndex in matchArmSetup —
+   struct field name → index lookup in a field-name Vec).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -243,6 +246,26 @@ fn old_slot_name(name: string) -> string {
 
 fn param_name_tag(pat_tag: i32) -> bool {
     return pat_tag == 1;
+}
+
+/* SML paramName: extracts the name handle from a PatBind parameter.
+   Returns the handle if pat_tag == 1 (PatBind), else -1. */
+fn param_name(pat_tag: i32, name_handle: i32) -> i32 {
+    if pat_tag == 1 { return name_handle; }
+    return 0 - 1;
+}
+
+/* SML local fieldIndex in matchArmSetup: given a Vec of struct
+   field name handles and a target name handle, returns its index
+   or -1 if not found. */
+fn lower_field_index(field_names: Vec<i32>, target: i32) -> i32 {
+    let n: i32 = vec_len(field_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(field_names, i) == target { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
 }
 
 /* ── uniqOldNames (dedup) ──────────────────────────────────────
@@ -789,6 +812,27 @@ fn test_resolve_ctor_path() -> i32 {
     return 0;
 }
 
+fn test_param_name() -> i32 {
+    if param_name(1, 42) != 42 { return 1; }
+    if param_name(0, 42) != 0 - 1 { return 2; }
+    if param_name(3, 99) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_lower_field_index() -> i32 {
+    let fields: Vec<i32> = vec_new();
+    vec_push(fields, 10);
+    vec_push(fields, 20);
+    vec_push(fields, 30);
+    if lower_field_index(fields, 10) != 0 { return 1; }
+    if lower_field_index(fields, 20) != 1 { return 2; }
+    if lower_field_index(fields, 30) != 2 { return 3; }
+    if lower_field_index(fields, 99) != 0 - 1 { return 4; }
+    let empty: Vec<i32> = vec_new();
+    if lower_field_index(empty, 10) != 0 - 1 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -846,5 +890,9 @@ fn main() -> i32 {
     if r27 != 0 { return 290 + r27; }
     let r28: i32 = test_resolve_ctor_path();
     if r28 != 0 { return 300 + r28; }
+    let r29: i32 = test_param_name();
+    if r29 != 0 { return 310 + r29; }
+    let r30: i32 = test_lower_field_index();
+    if r30 != 0 { return 320 + r30; }
     return 0;
 }

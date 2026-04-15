@@ -6,8 +6,10 @@
    i32 without bitwise ops), Vec-based LE encoding (encode_u16_le,
    encode_u32_le, encode_i32_le push bytes into Vec<i32>),
    file header encoding (encode_header), .sv0b file layout constants
-   (6-byte header, 20-byte func entry, string pool overhead).
-   Full byte-vector encode/decode deferred — needs Word8Vector. */
+   (6-byte header, 20-byte func entry, string pool overhead),
+   encode_strings / decode_strings (SML encodeStrings/decodeStrings —
+   string pool byte codec using string_char_at for ASCII byte loops).
+   Full encodeInsn/decodeInsnVec/encodeFile/decodeFile deferred. */
 
 /* ── magic and version ──────────────────────────────────────── */
 
@@ -338,6 +340,65 @@ fn func_table_size(count: i32) -> i32 {
     return 4 + count * 20;
 }
 
+/* ── string pool encode/decode (SML encodeStrings/decodeStrings)
+   String pool wire format: u32 count, then for each string:
+   u32 byte_length followed by byte_length raw bytes (ASCII).
+   sv0 strings are ASCII; each char is one byte via string_char_at. */
+
+fn encode_strings(strings: Vec<i32>, source: string, starts: Vec<i32>,
+                  ends: Vec<i32>, out: Vec<i32>) -> i32 {
+    let count: i32 = vec_len(strings);
+    encode_u32_le(count, out);
+    let mut total: i32 = 4;
+    let mut i: i32 = 0;
+    while i < count {
+        let idx: i32 = vec_get(strings, i);
+        let s: i32 = vec_get(starts, idx);
+        let e: i32 = vec_get(ends, idx);
+        let slen: i32 = e - s;
+        encode_u32_le(slen, out);
+        total = total + 4;
+        let mut j: i32 = 0;
+        while j < slen {
+            vec_push(out, string_char_at(source, s + j));
+            j = j + 1;
+        }
+        total = total + slen;
+        i = i + 1;
+    }
+    return total;
+}
+
+fn encode_string_literals(strs: Vec<i32>, out: Vec<i32>) -> i32 {
+    let count: i32 = vec_len(strs);
+    encode_u32_le(count, out);
+    let mut total: i32 = 4;
+    let mut i: i32 = 0;
+    while i < count {
+        let handle: i32 = vec_get(strs, i);
+        encode_u32_le(handle, out);
+        total = total + 4;
+        i = i + 1;
+    }
+    return total;
+}
+
+fn decode_strings(buf: Vec<i32>, pos: i32,
+                  out_starts: Vec<i32>, out_lens: Vec<i32>) -> i32 {
+    let count: i32 = decode_u32_at(buf, pos);
+    let mut p: i32 = pos + 4;
+    let mut i: i32 = 0;
+    while i < count {
+        let slen: i32 = decode_u32_at(buf, p);
+        p = p + 4;
+        vec_push(out_starts, p);
+        vec_push(out_lens, slen);
+        p = p + slen;
+        i = i + 1;
+    }
+    return p;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_magic() -> i32 {
@@ -500,6 +561,47 @@ fn test_verify_magic() -> i32 {
     return 0;
 }
 
+fn test_encode_decode_strings() -> i32 {
+    let source: string = "hello world";
+    let strings: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(starts, 6); vec_push(ends, 11);
+    vec_push(strings, 0);
+    vec_push(strings, 1);
+    let out: Vec<i32> = vec_new();
+    let total: i32 = encode_strings(strings, source, starts, ends, out);
+    if total != 4 + 4 + 5 + 4 + 5 { return 1; }
+    let d_starts: Vec<i32> = vec_new();
+    let d_lens: Vec<i32> = vec_new();
+    let end_pos: i32 = decode_strings(out, 0, d_starts, d_lens);
+    if end_pos != total { return 2; }
+    if vec_len(d_starts) != 2 { return 3; }
+    if vec_get(d_lens, 0) != 5 { return 4; }
+    if vec_get(d_lens, 1) != 5 { return 5; }
+    if vec_get(out, vec_get(d_starts, 0)) != 104 { return 6; }
+    if vec_get(out, vec_get(d_starts, 1)) != 119 { return 7; }
+    return 0;
+}
+
+fn test_encode_string_literals() -> i32 {
+    let strs: Vec<i32> = vec_new();
+    vec_push(strs, 42);
+    vec_push(strs, 99);
+    let out: Vec<i32> = vec_new();
+    let total: i32 = encode_string_literals(strs, out);
+    if total != 12 { return 1; }
+    if vec_len(out) != 12 { return 2; }
+    let count: i32 = decode_u32_at(out, 0);
+    if count != 2 { return 3; }
+    let h0: i32 = decode_u32_at(out, 4);
+    if h0 != 42 { return 4; }
+    let h1: i32 = decode_u32_at(out, 8);
+    if h1 != 99 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_magic();
     if r1 != 0 { return r1; }
@@ -521,5 +623,9 @@ fn main() -> i32 {
     if r9 != 0 { return 120 + r9; }
     let r10: i32 = test_verify_magic();
     if r10 != 0 { return 130 + r10; }
+    let r11: i32 = test_encode_decode_strings();
+    if r11 != 0 { return 140 + r11; }
+    let r12: i32 = test_encode_string_literals();
+    if r12 != 0 { return 150 + r12; }
     return 0;
 }
