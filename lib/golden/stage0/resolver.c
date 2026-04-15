@@ -40,6 +40,12 @@ static int arity_matches(int expected, int actual);
 static int check_call_arity(int expected, int actual);
 static int register_item(int item_tag, int item_d1, int item_d2, int item_d3, int item_d4, int mod_vals, int mod_tys, int fn_arities);
 static int register_items(int it, int id1, int id2, int id3, int id4, int mod_vals, int mod_tys, int fn_arities);
+static const char* tok_str(const char* source, int starts, int ends, int pos);
+static int res_is_prelude_type(const char* name);
+static int res_value_exists(int mod_vals, const char* name_str, const char* source, int starts, int ends);
+static int res_type_exists(int mod_tys, const char* name_str, const char* source, int starts, int ends);
+static int resolve_pat_shape(int pt, int pd1, int pd2, int pd3, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int pp);
+static int resolve_ty(int tt, int td1, int td2, int td3, int idx, const char* source, int starts, int ends, int mod_tys, int pp);
 static int test_path_join(void);
 static int test_mangle_use(void);
 static int test_is_intrinsic(void);
@@ -61,6 +67,13 @@ static int test_bind_pattern_locals(void);
 static int test_register_item_fn(void);
 static int test_register_item_struct(void);
 static int test_register_items(void);
+static int test_tok_str(void);
+static int test_res_value_exists(void);
+static int test_res_type_exists(void);
+static int test_resolve_pat_shape_simple(void);
+static int test_resolve_pat_enum(void);
+static int test_resolve_ty_simple(void);
+static int test_resolve_ty_ref(void);
 
 static const char* path_join2(const char* a, const char* b) {
   const char* _sv0t0 = sv0_string_concat(a, "::");
@@ -682,6 +695,394 @@ static int register_items(int it, int id1, int id2, int id3, int id4, int mod_va
     int d4 = _sv0t5;
     int _sv0t6 = register_item(tag, d1, d2, d3, d4, mod_vals, mod_tys, fn_arities);
     i = (i + 1);
+  }
+  return 0;
+}
+
+static const char* tok_str(const char* source, int starts, int ends, int pos) {
+  int _sv0t0 = sv0_vec_get(starts, pos);
+  int s = _sv0t0;
+  int _sv0t1 = sv0_vec_get(ends, pos);
+  int e = _sv0t1;
+  int _sv0t2 = (e - s);
+  const char* _sv0t3 = sv0_string_substr(source, s, _sv0t2);
+  return _sv0t3;
+}
+
+static int res_is_prelude_type(const char* name) {
+  int _sv0t0 = sv0_string_eq(name, "i8");
+  if (_sv0t0) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = sv0_string_eq(name, "i16");
+  if (_sv0t1) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_string_eq(name, "i32");
+  if (_sv0t2) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_string_eq(name, "i64");
+  if (_sv0t3) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(name, "i128");
+  if (_sv0t4) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_string_eq(name, "u8");
+  if (_sv0t5) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_string_eq(name, "u16");
+  if (_sv0t6) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = sv0_string_eq(name, "u32");
+  if (_sv0t7) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = sv0_string_eq(name, "u64");
+  if (_sv0t8) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_string_eq(name, "u128");
+  if (_sv0t9) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = sv0_string_eq(name, "isize");
+  if (_sv0t10) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = sv0_string_eq(name, "usize");
+  if (_sv0t11) {
+    return 1;
+  } else {
+  }
+  int _sv0t12 = sv0_string_eq(name, "f32");
+  if (_sv0t12) {
+    return 1;
+  } else {
+  }
+  int _sv0t13 = sv0_string_eq(name, "f64");
+  if (_sv0t13) {
+    return 1;
+  } else {
+  }
+  int _sv0t14 = sv0_string_eq(name, "bool");
+  if (_sv0t14) {
+    return 1;
+  } else {
+  }
+  int _sv0t15 = sv0_string_eq(name, "char");
+  if (_sv0t15) {
+    return 1;
+  } else {
+  }
+  int _sv0t16 = sv0_string_eq(name, "str");
+  if (_sv0t16) {
+    return 1;
+  } else {
+  }
+  int _sv0t17 = sv0_string_eq(name, "string");
+  if (_sv0t17) {
+    return 1;
+  } else {
+  }
+  int _sv0t18 = sv0_string_eq(name, "String");
+  if (_sv0t18) {
+    return 1;
+  } else {
+  }
+  int _sv0t19 = sv0_string_eq(name, "unit");
+  if (_sv0t19) {
+    return 1;
+  } else {
+  }
+  int _sv0t20 = sv0_string_eq(name, "Vec");
+  if (_sv0t20) {
+    return 1;
+  } else {
+  }
+  int _sv0t21 = sv0_string_eq(name, "Box");
+  if (_sv0t21) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int res_value_exists(int mod_vals, const char* name_str, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_len(mod_vals);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(mod_vals, i);
+    int pos = _sv0t1;
+    const char* _sv0t2 = tok_str(source, starts, ends, pos);
+    const char* nm;
+    nm = _sv0t2;
+    int _sv0t3 = sv0_string_eq(nm, name_str);
+    if (_sv0t3) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int res_type_exists(int mod_tys, const char* name_str, const char* source, int starts, int ends) {
+  int _sv0t0 = res_is_prelude_type(name_str);
+  if (_sv0t0) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(mod_tys);
+  int len = _sv0t1;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t2 = sv0_vec_get(mod_tys, i);
+    int pos = _sv0t2;
+    const char* _sv0t3 = tok_str(source, starts, ends, pos);
+    const char* nm;
+    nm = _sv0t3;
+    int _sv0t4 = sv0_string_eq(nm, name_str);
+    if (_sv0t4) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int resolve_pat_shape(int pt, int pd1, int pd2, int pd3, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int pp) {
+  int _sv0t0 = sv0_vec_get(pt, idx);
+  int tag = _sv0t0;
+  if ((tag == 0)) {
+    return 0;
+  } else {
+  }
+  if ((tag == 1)) {
+    return 0;
+  } else {
+  }
+  if ((tag == 2)) {
+    return 0;
+  } else {
+  }
+  if ((tag == 3)) {
+    int _sv0t1 = sv0_vec_get(pd1, idx);
+    int first = _sv0t1;
+    int _sv0t2 = sv0_vec_get(pd2, idx);
+    int count = _sv0t2;
+    int i = 0;
+    while ((i < count)) {
+      int _sv0t3 = (first + i);
+      int _sv0t4 = resolve_pat_shape(pt, pd1, pd2, pd3, _sv0t3, source, starts, ends, mod_vals, mod_tys, pp);
+      int r = _sv0t4;
+      if ((r != 0)) {
+        return r;
+      } else {
+      }
+      i = (i + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((tag == 4)) {
+    int _sv0t5 = sv0_vec_get(pd1, idx);
+    int pps = _sv0t5;
+    int _sv0t6 = sv0_vec_get(pd2, idx);
+    int ppc = _sv0t6;
+    int _sv0t7 = sv0_vec_get(pd3, idx);
+    int fc = _sv0t7;
+    int _sv0t8 = sv0_vec_new();
+    int path = _sv0t8;
+    int k = 0;
+    while ((k < ppc)) {
+      int _sv0t9 = (pps + k);
+      int _sv0t10 = sv0_vec_get(pp, _sv0t9);
+      sv0_vec_push(path, _sv0t10);
+      k = (k + 1);
+    }
+    const char* _sv0t11 = path_join_vec(source, starts, ends, path);
+    const char* ps;
+    ps = _sv0t11;
+    if ((ppc >= 2)) {
+      int _sv0t12 = res_value_exists(mod_vals, ps, source, starts, ends);
+      if ((_sv0t12 != 1)) {
+        return 300;
+      } else {
+      }
+    } else {
+      int _sv0t13 = res_type_exists(mod_tys, ps, source, starts, ends);
+      if ((_sv0t13 != 1)) {
+        return 301;
+      } else {
+      }
+    }
+    int fi = 0;
+    while ((fi < fc)) {
+      int _sv0t14 = (idx - fc);
+      int child_idx = (_sv0t14 + fi);
+      int _sv0t15 = resolve_pat_shape(pt, pd1, pd2, pd3, child_idx, source, starts, ends, mod_vals, mod_tys, pp);
+      int r = _sv0t15;
+      if ((r != 0)) {
+        return r;
+      } else {
+      }
+      fi = (fi + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((tag == 5)) {
+    int _sv0t16 = sv0_vec_get(pd1, idx);
+    int pps = _sv0t16;
+    int _sv0t17 = sv0_vec_get(pd2, idx);
+    int ppc = _sv0t17;
+    int _sv0t18 = sv0_vec_get(pd3, idx);
+    int ac = _sv0t18;
+    int _sv0t19 = sv0_vec_new();
+    int path = _sv0t19;
+    int k = 0;
+    while ((k < ppc)) {
+      int _sv0t20 = (pps + k);
+      int _sv0t21 = sv0_vec_get(pp, _sv0t20);
+      sv0_vec_push(path, _sv0t21);
+      k = (k + 1);
+    }
+    const char* _sv0t22 = path_join_vec(source, starts, ends, path);
+    const char* ps;
+    ps = _sv0t22;
+    int _sv0t23 = res_value_exists(mod_vals, ps, source, starts, ends);
+    if ((_sv0t23 != 1)) {
+      return 300;
+    } else {
+    }
+    int ai = 0;
+    while ((ai < ac)) {
+      int _sv0t24 = (idx - ac);
+      int child_idx = (_sv0t24 + ai);
+      int _sv0t25 = resolve_pat_shape(pt, pd1, pd2, pd3, child_idx, source, starts, ends, mod_vals, mod_tys, pp);
+      int r = _sv0t25;
+      if ((r != 0)) {
+        return r;
+      } else {
+      }
+      ai = (ai + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((tag == 6)) {
+    return 306;
+  } else {
+  }
+  return 0;
+}
+
+static int resolve_ty(int tt, int td1, int td2, int td3, int idx, const char* source, int starts, int ends, int mod_tys, int pp) {
+  int _sv0t0 = sv0_vec_get(tt, idx);
+  int tag = _sv0t0;
+  if ((tag == 6)) {
+    return 0;
+  } else {
+  }
+  if ((tag == 0)) {
+    int _sv0t1 = sv0_vec_get(td1, idx);
+    int pps = _sv0t1;
+    int _sv0t2 = sv0_vec_get(td2, idx);
+    int ppc = _sv0t2;
+    int _sv0t3 = sv0_vec_get(td3, idx);
+    int tac = _sv0t3;
+    int _sv0t4 = sv0_vec_new();
+    int path = _sv0t4;
+    int k = 0;
+    while ((k < ppc)) {
+      int _sv0t5 = (pps + k);
+      int _sv0t6 = sv0_vec_get(pp, _sv0t5);
+      sv0_vec_push(path, _sv0t6);
+      k = (k + 1);
+    }
+    const char* _sv0t7 = path_join_vec(source, starts, ends, path);
+    const char* ps;
+    ps = _sv0t7;
+    int _sv0t8 = res_type_exists(mod_tys, ps, source, starts, ends);
+    if ((_sv0t8 != 1)) {
+      return 301;
+    } else {
+    }
+    int ti = 0;
+    while ((ti < tac)) {
+      int _sv0t9 = (idx - tac);
+      int child_idx = (_sv0t9 + ti);
+      int _sv0t10 = resolve_ty(tt, td1, td2, td3, child_idx, source, starts, ends, mod_tys, pp);
+      int r = _sv0t10;
+      if ((r != 0)) {
+        return r;
+      } else {
+      }
+      ti = (ti + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((tag == 1)) {
+    int _sv0t11 = sv0_vec_get(td1, idx);
+    int _sv0t12 = resolve_ty(tt, td1, td2, td3, _sv0t11, source, starts, ends, mod_tys, pp);
+    return _sv0t12;
+  } else {
+  }
+  if ((tag == 2)) {
+    int _sv0t13 = sv0_vec_get(td1, idx);
+    int _sv0t14 = resolve_ty(tt, td1, td2, td3, _sv0t13, source, starts, ends, mod_tys, pp);
+    return _sv0t14;
+  } else {
+  }
+  if ((tag == 3)) {
+    int _sv0t15 = sv0_vec_get(td1, idx);
+    int _sv0t16 = resolve_ty(tt, td1, td2, td3, _sv0t15, source, starts, ends, mod_tys, pp);
+    return _sv0t16;
+  } else {
+  }
+  if ((tag == 4)) {
+    int _sv0t17 = sv0_vec_get(td1, idx);
+    int _sv0t18 = resolve_ty(tt, td1, td2, td3, _sv0t17, source, starts, ends, mod_tys, pp);
+    return _sv0t18;
+  } else {
+  }
+  if ((tag == 5)) {
+    int _sv0t19 = sv0_vec_get(td1, idx);
+    int first = _sv0t19;
+    int _sv0t20 = sv0_vec_get(td2, idx);
+    int count = _sv0t20;
+    int i = 0;
+    while ((i < count)) {
+      int _sv0t21 = (first + i);
+      int _sv0t22 = resolve_ty(tt, td1, td2, td3, _sv0t21, source, starts, ends, mod_tys, pp);
+      int r = _sv0t22;
+      if ((r != 0)) {
+        return r;
+      } else {
+      }
+      i = (i + 1);
+    }
+    return 0;
+  } else {
   }
   return 0;
 }
@@ -1516,6 +1917,326 @@ static int test_register_items(void) {
   return 0;
 }
 
+static int test_tok_str(void) {
+  const char* source;
+  source = "fn foo bar";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(starts, 3);
+  sv0_vec_push(ends, 6);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 10);
+  const char* _sv0t2 = tok_str(source, starts, ends, 0);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "fn");
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t4 = tok_str(source, starts, ends, 1);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "foo");
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t6 = tok_str(source, starts, ends, 2);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "bar");
+  if ((_sv0t7 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_res_value_exists(void) {
+  const char* source;
+  source = "alpha beta gamma";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 5);
+  sv0_vec_push(starts, 6);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 16);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  sv0_vec_push(mv, 0);
+  sv0_vec_push(mv, 2);
+  int _sv0t3 = res_value_exists(mv, "alpha", source, starts, ends);
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = res_value_exists(mv, "gamma", source, starts, ends);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = res_value_exists(mv, "beta", source, starts, ends);
+  if ((_sv0t5 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = res_value_exists(mv, "nope", source, starts, ends);
+  if ((_sv0t6 != 0)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_res_type_exists(void) {
+  const char* source;
+  source = "MyStruct i32";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 12);
+  int _sv0t2 = sv0_vec_new();
+  int mt = _sv0t2;
+  sv0_vec_push(mt, 0);
+  int _sv0t3 = res_type_exists(mt, "MyStruct", source, starts, ends);
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = res_type_exists(mt, "i32", source, starts, ends);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = res_type_exists(mt, "bool", source, starts, ends);
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = res_type_exists(mt, "Nope", source, starts, ends);
+  if ((_sv0t6 != 0)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_pat_shape_simple(void) {
+  int _sv0t0 = sv0_vec_new();
+  int pt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int pd1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int pd2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pd3 = _sv0t3;
+  sv0_vec_push(pt, 0);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  const char* source;
+  source = "_";
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 1);
+  int _sv0t6 = sv0_vec_new();
+  int mv = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int mt = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int pp = _sv0t8;
+  int _sv0t9 = resolve_pat_shape(pt, pd1, pd2, pd3, 0, source, starts, ends, mv, mt, pp);
+  if ((_sv0t9 != 0)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(pt, 1);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  int _sv0t10 = resolve_pat_shape(pt, pd1, pd2, pd3, 1, source, starts, ends, mv, mt, pp);
+  if ((_sv0t10 != 0)) {
+    return 2;
+  } else {
+  }
+  sv0_vec_push(pt, 6);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  int _sv0t11 = resolve_pat_shape(pt, pd1, pd2, pd3, 2, source, starts, ends, mv, mt, pp);
+  if ((_sv0t11 != 306)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_pat_enum(void) {
+  const char* source;
+  source = "Option Some Option::Some x";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 6);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 11);
+  sv0_vec_push(starts, 12);
+  sv0_vec_push(ends, 24);
+  sv0_vec_push(starts, 25);
+  sv0_vec_push(ends, 26);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  sv0_vec_push(mv, 2);
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int pp = _sv0t4;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t5 = sv0_vec_new();
+  int pt = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int pd1 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int pd2 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int pd3 = _sv0t8;
+  sv0_vec_push(pt, 1);
+  sv0_vec_push(pd1, 3);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  sv0_vec_push(pt, 5);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 2);
+  sv0_vec_push(pd3, 1);
+  int _sv0t9 = resolve_pat_shape(pt, pd1, pd2, pd3, 1, source, starts, ends, mv, mt, pp);
+  if ((_sv0t9 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_new();
+  int mv2 = _sv0t10;
+  int _sv0t11 = resolve_pat_shape(pt, pd1, pd2, pd3, 1, source, starts, ends, mv2, mt, pp);
+  if ((_sv0t11 != 300)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_ty_simple(void) {
+  const char* source;
+  source = "i32 MyType";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 4);
+  sv0_vec_push(ends, 10);
+  int _sv0t2 = sv0_vec_new();
+  int mt = _sv0t2;
+  sv0_vec_push(mt, 1);
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(pp, 0);
+  int _sv0t4 = sv0_vec_new();
+  int tt = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int td1 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int td2 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int td3 = _sv0t7;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 1);
+  sv0_vec_push(td3, 0);
+  int _sv0t8 = resolve_ty(tt, td1, td2, td3, 0, source, starts, ends, mt, pp);
+  if ((_sv0t8 != 0)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(pp, 1);
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(td1, 1);
+  sv0_vec_push(td2, 1);
+  sv0_vec_push(td3, 0);
+  int _sv0t9 = resolve_ty(tt, td1, td2, td3, 1, source, starts, ends, mt, pp);
+  if ((_sv0t9 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_new();
+  int mt2 = _sv0t10;
+  int _sv0t11 = resolve_ty(tt, td1, td2, td3, 1, source, starts, ends, mt2, pp);
+  if ((_sv0t11 != 301)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_ty_ref(void) {
+  const char* source;
+  source = "i32";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  int _sv0t2 = sv0_vec_new();
+  int mt = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(pp, 0);
+  int _sv0t4 = sv0_vec_new();
+  int tt = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int td1 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int td2 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int td3 = _sv0t7;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 1);
+  sv0_vec_push(td3, 0);
+  sv0_vec_push(tt, 1);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td3, 0);
+  int _sv0t8 = resolve_ty(tt, td1, td2, td3, 1, source, starts, ends, mt, pp);
+  if ((_sv0t8 != 0)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td3, 0);
+  int _sv0t9 = resolve_ty(tt, td1, td2, td3, 2, source, starts, ends, mt, pp);
+  if ((_sv0t9 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_join();
   int r1 = _sv0t0;
@@ -1661,6 +2382,55 @@ int main(void) {
   if ((r21 != 0)) {
     int _sv0t40 = (210 + r21);
     return _sv0t40;
+  } else {
+  }
+  int _sv0t41 = test_tok_str();
+  int r22 = _sv0t41;
+  if ((r22 != 0)) {
+    int _sv0t42 = (220 + r22);
+    return _sv0t42;
+  } else {
+  }
+  int _sv0t43 = test_res_value_exists();
+  int r23 = _sv0t43;
+  if ((r23 != 0)) {
+    int _sv0t44 = (230 + r23);
+    return _sv0t44;
+  } else {
+  }
+  int _sv0t45 = test_res_type_exists();
+  int r24 = _sv0t45;
+  if ((r24 != 0)) {
+    int _sv0t46 = (240 + r24);
+    return _sv0t46;
+  } else {
+  }
+  int _sv0t47 = test_resolve_pat_shape_simple();
+  int r25 = _sv0t47;
+  if ((r25 != 0)) {
+    int _sv0t48 = (250 + r25);
+    return _sv0t48;
+  } else {
+  }
+  int _sv0t49 = test_resolve_pat_enum();
+  int r26 = _sv0t49;
+  if ((r26 != 0)) {
+    int _sv0t50 = (260 + r26);
+    return _sv0t50;
+  } else {
+  }
+  int _sv0t51 = test_resolve_ty_simple();
+  int r27 = _sv0t51;
+  if ((r27 != 0)) {
+    int _sv0t52 = (270 + r27);
+    return _sv0t52;
+  } else {
+  }
+  int _sv0t53 = test_resolve_ty_ref();
+  int r28 = _sv0t53;
+  if ((r28 != 0)) {
+    int _sv0t54 = (280 + r28);
+    return _sv0t54;
   } else {
   }
   return 0;
