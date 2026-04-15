@@ -97,6 +97,9 @@ static int file_header_magic_len(void);
 static int file_header_version_len(void);
 static int string_section_size(int count, int total_bytes);
 static int func_table_size(int count);
+static int encode_strings(int strings, const char* source, int starts, int ends, int out);
+static int encode_string_literals(int strs, int out);
+static int decode_strings(int buf, int pos, int out_starts, int out_lens);
 static int test_magic(void);
 static int test_opcodes(void);
 static int test_insn_sizes(void);
@@ -107,6 +110,8 @@ static int test_encode_le(void);
 static int test_encode_header(void);
 static int test_decode_at(void);
 static int test_verify_magic(void);
+static int test_encode_decode_strings(void);
+static int test_encode_string_literals(void);
 
 static int magic_byte_0(void) {
   return 83;
@@ -914,6 +919,68 @@ static int func_table_size(int count) {
   return _sv0t1;
 }
 
+static int encode_strings(int strings, const char* source, int starts, int ends, int out) {
+  int _sv0t0 = sv0_vec_len(strings);
+  int count = _sv0t0;
+  int _sv0t1 = encode_u32_le(count, out);
+  int total = 4;
+  int i = 0;
+  while ((i < count)) {
+    int _sv0t2 = sv0_vec_get(strings, i);
+    int idx = _sv0t2;
+    int _sv0t3 = sv0_vec_get(starts, idx);
+    int s = _sv0t3;
+    int _sv0t4 = sv0_vec_get(ends, idx);
+    int e = _sv0t4;
+    int slen = (e - s);
+    int _sv0t5 = encode_u32_le(slen, out);
+    total = (total + 4);
+    int j = 0;
+    while ((j < slen)) {
+      int _sv0t6 = (s + j);
+      int _sv0t7 = sv0_string_char_at(source, _sv0t6);
+      sv0_vec_push(out, _sv0t7);
+      j = (j + 1);
+    }
+    total = (total + slen);
+    i = (i + 1);
+  }
+  return total;
+}
+
+static int encode_string_literals(int strs, int out) {
+  int _sv0t0 = sv0_vec_len(strs);
+  int count = _sv0t0;
+  int _sv0t1 = encode_u32_le(count, out);
+  int total = 4;
+  int i = 0;
+  while ((i < count)) {
+    int _sv0t2 = sv0_vec_get(strs, i);
+    int handle = _sv0t2;
+    int _sv0t3 = encode_u32_le(handle, out);
+    total = (total + 4);
+    i = (i + 1);
+  }
+  return total;
+}
+
+static int decode_strings(int buf, int pos, int out_starts, int out_lens) {
+  int _sv0t0 = decode_u32_at(buf, pos);
+  int count = _sv0t0;
+  int p = (pos + 4);
+  int i = 0;
+  while ((i < count)) {
+    int _sv0t1 = decode_u32_at(buf, p);
+    int slen = _sv0t1;
+    p = (p + 4);
+    sv0_vec_push(out_starts, p);
+    sv0_vec_push(out_lens, slen);
+    p = (p + slen);
+    i = (i + 1);
+  }
+  return p;
+}
+
 static int test_magic(void) {
   int _sv0t0 = magic_byte_0();
   if ((_sv0t0 != 83)) {
@@ -1465,6 +1532,112 @@ static int test_verify_magic(void) {
   return 0;
 }
 
+static int test_encode_decode_strings(void) {
+  const char* source;
+  source = "hello world";
+  int _sv0t0 = sv0_vec_new();
+  int strings = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int starts = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ends = _sv0t2;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 5);
+  sv0_vec_push(starts, 6);
+  sv0_vec_push(ends, 11);
+  sv0_vec_push(strings, 0);
+  sv0_vec_push(strings, 1);
+  int _sv0t3 = sv0_vec_new();
+  int out = _sv0t3;
+  int _sv0t4 = encode_strings(strings, source, starts, ends, out);
+  int total = _sv0t4;
+  int _sv0t5 = (4 + 4);
+  int _sv0t6 = (_sv0t5 + 5);
+  int _sv0t7 = (_sv0t6 + 4);
+  int _sv0t8 = (_sv0t7 + 5);
+  if ((total != _sv0t8)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int d_starts = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int d_lens = _sv0t10;
+  int _sv0t11 = decode_strings(out, 0, d_starts, d_lens);
+  int end_pos = _sv0t11;
+  if ((end_pos != total)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_len(d_starts);
+  if ((_sv0t12 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(d_lens, 0);
+  if ((_sv0t13 != 5)) {
+    return 4;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(d_lens, 1);
+  if ((_sv0t14 != 5)) {
+    return 5;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_get(d_starts, 0);
+  int _sv0t16 = sv0_vec_get(out, _sv0t15);
+  if ((_sv0t16 != 104)) {
+    return 6;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_get(d_starts, 1);
+  int _sv0t18 = sv0_vec_get(out, _sv0t17);
+  if ((_sv0t18 != 119)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
+static int test_encode_string_literals(void) {
+  int _sv0t0 = sv0_vec_new();
+  int strs = _sv0t0;
+  sv0_vec_push(strs, 42);
+  sv0_vec_push(strs, 99);
+  int _sv0t1 = sv0_vec_new();
+  int out = _sv0t1;
+  int _sv0t2 = encode_string_literals(strs, out);
+  int total = _sv0t2;
+  if ((total != 12)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(out);
+  if ((_sv0t3 != 12)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = decode_u32_at(out, 0);
+  int count = _sv0t4;
+  if ((count != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = decode_u32_at(out, 4);
+  int h0 = _sv0t5;
+  if ((h0 != 42)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = decode_u32_at(out, 8);
+  int h1 = _sv0t6;
+  if ((h1 != 99)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_magic();
   int r1 = _sv0t0;
@@ -1533,6 +1706,20 @@ int main(void) {
   if ((r10 != 0)) {
     int _sv0t18 = (130 + r10);
     return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_encode_decode_strings();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (140 + r11);
+    return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_encode_string_literals();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (150 + r12);
+    return _sv0t22;
   } else {
   }
   return 0;

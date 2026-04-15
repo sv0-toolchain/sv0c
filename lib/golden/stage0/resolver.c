@@ -28,6 +28,8 @@ static const char* enum_variant_reg_path(const char* enum_name, const char* vari
 static int enum_variant_reg_arity(int variant_kind, int tuple_fields, int struct_fields);
 static int pat_binds_count(int pat_tag, int child_count);
 static int pat_is_or(int pat_tag);
+static int pat_binds(int pat_tag, int name_handle, int out);
+static int bind_pattern_locals(int binds, int env_locals);
 static int should_allow_self(int item_tag);
 static const char* error_code_unbound_ident(void);
 static const char* error_code_unknown_type(void);
@@ -52,6 +54,8 @@ static int test_import_alias(void);
 static int test_register_intrinsics(void);
 static int test_variant_stem(void);
 static int test_enum_variant_reg(void);
+static int test_pat_binds_vec(void);
+static int test_bind_pattern_locals(void);
 
 static const char* path_join2(const char* a, const char* b) {
   const char* _sv0t0 = sv0_string_concat(a, "::");
@@ -551,6 +555,27 @@ static int pat_binds_count(int pat_tag, int child_count) {
 static int pat_is_or(int pat_tag) {
   int _sv0t0 = (pat_tag == 6);
   return _sv0t0;
+}
+
+static int pat_binds(int pat_tag, int name_handle, int out) {
+  if ((pat_tag == 1)) {
+    sv0_vec_push(out, name_handle);
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int bind_pattern_locals(int binds, int env_locals) {
+  int _sv0t0 = sv0_vec_len(binds);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(binds, i);
+    sv0_vec_push(env_locals, _sv0t1);
+    i = (i + 1);
+  }
+  return n;
 }
 
 static int should_allow_self(int item_tag) {
@@ -1177,6 +1202,103 @@ static int test_enum_variant_reg(void) {
   return 0;
 }
 
+static int test_pat_binds_vec(void) {
+  int _sv0t0 = sv0_vec_new();
+  int out = _sv0t0;
+  int _sv0t1 = pat_binds(0, 10, out);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_len(out);
+  if ((_sv0t2 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = pat_binds(1, 42, out);
+  if ((_sv0t3 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_len(out);
+  if ((_sv0t4 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(out, 0);
+  if ((_sv0t5 != 42)) {
+    return 5;
+  } else {
+  }
+  int _sv0t6 = pat_binds(2, 99, out);
+  if ((_sv0t6 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(out);
+  if ((_sv0t7 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t8 = pat_binds(1, 77, out);
+  if ((_sv0t8 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_len(out);
+  if ((_sv0t9 != 2)) {
+    return 9;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(out, 1);
+  if ((_sv0t10 != 77)) {
+    return 10;
+  } else {
+  }
+  return 0;
+}
+
+static int test_bind_pattern_locals(void) {
+  int _sv0t0 = sv0_vec_new();
+  int binds = _sv0t0;
+  sv0_vec_push(binds, 10);
+  sv0_vec_push(binds, 20);
+  sv0_vec_push(binds, 30);
+  int _sv0t1 = sv0_vec_new();
+  int env = _sv0t1;
+  int _sv0t2 = bind_pattern_locals(binds, env);
+  int n = _sv0t2;
+  if ((n != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(env);
+  if ((_sv0t3 != 3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(env, 0);
+  if ((_sv0t4 != 10)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(env, 2);
+  if ((_sv0t5 != 30)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int empty = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int env2 = _sv0t7;
+  int _sv0t8 = bind_pattern_locals(empty, env2);
+  if ((_sv0t8 != 0)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_join();
   int r1 = _sv0t0;
@@ -1287,6 +1409,20 @@ int main(void) {
   if ((r16 != 0)) {
     int _sv0t30 = (160 + r16);
     return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_pat_binds_vec();
+  int r17 = _sv0t31;
+  if ((r17 != 0)) {
+    int _sv0t32 = (170 + r17);
+    return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_bind_pattern_locals();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (180 + r18);
+    return _sv0t34;
   } else {
   }
   return 0;

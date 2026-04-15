@@ -88,6 +88,7 @@ static int assign_lhs_bad(void);
 static int in_loop(int depth);
 static int enter_loop(int depth);
 static int exit_loop(int depth);
+static int infer_lit(int lit_tag);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -109,6 +110,7 @@ static int test_expect(void);
 static int test_fields_of_struct(void);
 static int test_variant_shape_of(void);
 static int test_assign_lhs_bad(void);
+static int test_infer_lit(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -929,6 +931,31 @@ static int exit_loop(int depth) {
   return _sv0t0;
 }
 
+static int infer_lit(int lit_tag) {
+  if ((lit_tag == 0)) {
+    return 0;
+  } else {
+  }
+  if ((lit_tag == 1)) {
+    return 2;
+  } else {
+  }
+  if ((lit_tag == 2)) {
+    return 4;
+  } else {
+  }
+  if ((lit_tag == 3)) {
+    return 5;
+  } else {
+  }
+  if ((lit_tag == 4)) {
+    return 1;
+  } else {
+  }
+  int _sv0t0 = (0 - 1);
+  return _sv0t0;
+}
+
 static int test_binop_class(void) {
   int _sv0t0 = binop_class(0);
   if ((_sv0t0 != 0)) {
@@ -1710,6 +1737,41 @@ static int test_assign_lhs_bad(void) {
   return 0;
 }
 
+static int test_infer_lit(void) {
+  int _sv0t0 = infer_lit(0);
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = infer_lit(1);
+  if ((_sv0t1 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = infer_lit(2);
+  if ((_sv0t2 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = infer_lit(3);
+  if ((_sv0t3 != 5)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = infer_lit(4);
+  if ((_sv0t4 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = infer_lit(99);
+  int _sv0t6 = (0 - 1);
+  if ((_sv0t5 != _sv0t6)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -1855,6 +1917,13 @@ int main(void) {
   if ((r21 != 0)) {
     int _sv0t40 = (220 + r21);
     return _sv0t40;
+  } else {
+  }
+  int _sv0t41 = test_infer_lit();
+  int r22 = _sv0t41;
+  if ((r22 != 0)) {
+    int _sv0t42 = (230 + r22);
+    return _sv0t42;
   } else {
   }
   return 0;
