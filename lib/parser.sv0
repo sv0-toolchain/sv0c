@@ -15,8 +15,11 @@
    path_pattern_from (SML pathPatternFrom — struct/enum pattern after
    path), parse_pat_atom (SML parsePatAtom — wildcard/bind/lit/tuple/
    enum dispatch), parse_pat (SML parsePat — entry point with | for
-   PatOr).
-   Remaining recursive-descent parser (parseExpr/parseItem) deferred. */
+   PatOr),
+   parse_expr (SML parseExpr — full expression parser with precedence
+   chain: parse_primary_expr/postfix/unary/cast/mul/add/shift/bit_and/
+   bit_xor/bit_or/cmp/and/or/range, struct literal fields, arg list,
+   array body, tuples). Remaining: parseBlock/tryStmt/parseItem. */
 
 /* ── token tag constants (from token.sv0) ───────────────────── */
 
@@ -1106,6 +1109,904 @@ fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     return p;
 }
 
+/* ── expr arena tags ──────────────────────────────────────────
+   0=ExprLit     1=ExprPath    2=ExprUnop     3=ExprBinop
+   4=ExprCall    5=ExprMethodCall  6=ExprField  7=ExprTupleField
+   8=ExprIndex   9=ExprBlock   10=ExprIf      11=ExprMatch
+   12=ExprWhile  13=ExprFor    14=ExprLoop    15=ExprReturn
+   16=ExprBreak  17=ExprContinue  18=ExprAssign 19=ExprAssignOp
+   20=ExprCast   21=ExprRange  22=ExprTry     23=ExprAssert
+   24=ExprStruct 25=ExprTuple  26=ExprArray
+
+   Arena encoding (parallel Vec<i32>s, children before parents):
+     0 ExprLit      : d1=lit_tag, d2=tok_pos
+     1 ExprPath     : d1=pp_start, d2=pp_count
+     2 ExprUnop     : d1=unop_tag, d2=operand_idx
+     3 ExprBinop    : d1=binop_tag, d2=lhs_idx, d3=rhs_idx
+     4 ExprCall     : d1=callee_idx, d2=args_first_idx, d3=args_count
+     5 ExprMethodCall: d1=obj_idx, d2=method_tok, d3=args_first, d4=args_count
+     6 ExprField    : d1=obj_idx, d2=field_tok
+     7 ExprTupleField: d1=obj_idx, d2=field_num
+     8 ExprIndex    : d1=obj_idx, d2=index_idx
+     9 ExprBlock    : d1=stmts_first, d2=stmts_count, d3=tail_idx(-1=none)
+    10 ExprIf       : d1=cond_idx, d2=then_idx, d3=else_idx(-1=none)
+    11 ExprMatch    : d1=scrut_idx, d2=arms_first, d3=arms_count
+    12 ExprWhile    : d1=cond_idx, d2=body_idx, d3=inv_first, d4=inv_count
+    13 ExprFor      : d1=pat_idx, d2=iter_idx, d3=body_idx
+    14 ExprLoop     : d1=body_idx
+    15 ExprReturn   : d1=value_idx(-1=none)
+    16 ExprBreak    : d1=value_idx(-1=none)
+    17 ExprContinue : (no payload)
+    18 ExprAssign   : d1=lhs_idx, d2=rhs_idx
+    19 ExprAssignOp : d1=binop_tag, d2=lhs_idx, d3=rhs_idx
+    20 ExprCast     : d1=expr_idx, d2=type_arena_idx
+    21 ExprRange    : d1=lo_idx(-1=none), d2=hi_idx(-1=none)
+    22 ExprTry      : d1=expr_idx
+    23 ExprAssert   : d1=expr_idx
+    24 ExprStruct   : d1=pp_start, d2=pp_count, d3=field_count
+    25 ExprTuple    : d1=first_elem_idx, d2=elem_count
+    26 ExprArray    : d1=first_elem_idx, d2=elem_count */
+
+fn parse_arg_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                  source: string, pos: i32,
+                  et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                  ed3: Vec<i32>, ed4: Vec<i32>,
+                  pp: Vec<i32>) -> i32 {
+    if ps_peek(tags, pos) == 7 { return pos; }
+    let first_idx: i32 = vec_len(et);
+    let p1: i32 = parse_expr(tags, starts, ends, source, pos,
+                              et, ed1, ed2, ed3, ed4, pp, 1);
+    if p1 < 0 { return 0 - 1; }
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t == 12 {
+            let nt: i32 = ps_peek(tags, p + 1);
+            if nt == 7 {
+                done = true;
+            } else {
+                p = p + 1;
+                let pa: i32 = parse_expr(tags, starts, ends, source, p,
+                                          et, ed1, ed2, ed3, ed4, pp, 1);
+                if pa < 0 { return 0 - 1; }
+                p = pa;
+            }
+        } else {
+            done = true;
+        }
+    }
+    return p;
+}
+
+fn parse_struct_fields(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                       source: string, pos: i32,
+                       et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                       ed3: Vec<i32>, ed4: Vec<i32>,
+                       pp: Vec<i32>, sf_names: Vec<i32>) -> i32 {
+    if ps_peek(tags, pos) == 9 { return pos + 1; }
+    let mut p: i32 = pos;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t == 9 {
+            done = true;
+            p = p + 1;
+        } else {
+            if t == 17 {
+                let nt: i32 = ps_peek(tags, p + 1);
+                if nt == 5 {
+                    let n2: i32 = ps_peek(tags, p + 2);
+                    if n2 == 14 {
+                        vec_push(sf_names, p + 1);
+                        let pv: i32 = parse_expr(tags, starts, ends, source, p + 3,
+                                                  et, ed1, ed2, ed3, ed4, pp, 1);
+                        if pv < 0 { return 0 - 1; }
+                        p = pv;
+                    } else {
+                        return 0 - 1;
+                    }
+                } else {
+                    return 0 - 1;
+                }
+            } else {
+                if t == 5 {
+                    let nt: i32 = ps_peek(tags, p + 1);
+                    if nt == 14 {
+                        vec_push(sf_names, p);
+                        let pv: i32 = parse_expr(tags, starts, ends, source, p + 2,
+                                                  et, ed1, ed2, ed3, ed4, pp, 1);
+                        if pv < 0 { return 0 - 1; }
+                        p = pv;
+                    } else {
+                        vec_push(sf_names, p);
+                        let pps: i32 = vec_len(pp);
+                        vec_push(pp, p);
+                        vec_push(et, 1);
+                        vec_push(ed1, pps);
+                        vec_push(ed2, 1);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                        p = p + 1;
+                    }
+                } else {
+                    return 0 - 1;
+                }
+            }
+            let ct: i32 = ps_peek(tags, p);
+            if ct == 12 {
+                p = p + 1;
+            } else {
+                if ct != 9 { return 0 - 1; }
+            }
+        }
+    }
+    return p;
+}
+
+fn parse_primary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                      source: string, pos: i32,
+                      et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                      ed3: Vec<i32>, ed4: Vec<i32>,
+                      pp: Vec<i32>, sf_names: Vec<i32>,
+                      allow_struct: i32) -> i32 {
+    let t: i32 = ps_peek(tags, pos);
+    let lt: i32 = lit_from_tok(t);
+    if lt != 0 - 1 {
+        vec_push(et, 0);
+        vec_push(ed1, lt);
+        vec_push(ed2, pos);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return pos + 1;
+    }
+    if t == 5 {
+        let pps: i32 = vec_len(pp);
+        let p1: i32 = parse_path(tags, pos, pp);
+        if p1 < 0 { return 0 - 1; }
+        let ppc: i32 = vec_len(pp) - pps;
+        if allow_struct == 1 {
+            if ps_peek(tags, p1) == 8 {
+                let fc_before: i32 = vec_len(sf_names);
+                let first_val: i32 = vec_len(et);
+                let pf: i32 = parse_struct_fields(tags, starts, ends, source,
+                                                   p1 + 1, et, ed1, ed2, ed3,
+                                                   ed4, pp, sf_names);
+                if pf < 0 { return 0 - 1; }
+                let fc: i32 = vec_len(sf_names) - fc_before;
+                vec_push(et, 24);
+                vec_push(ed1, pps);
+                vec_push(ed2, ppc);
+                vec_push(ed3, fc);
+                vec_push(ed4, 0);
+                return pf;
+            }
+        }
+        vec_push(et, 1);
+        vec_push(ed1, pps);
+        vec_push(ed2, ppc);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return p1;
+    }
+    if t == 6 {
+        let nt: i32 = ps_peek(tags, pos + 1);
+        if nt == 7 {
+            vec_push(et, 0);
+            vec_push(ed1, 5);
+            vec_push(ed2, pos);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            return pos + 2;
+        }
+        let p1: i32 = parse_expr(tags, starts, ends, source, pos + 1,
+                                  et, ed1, ed2, ed3, ed4, pp, 1);
+        if p1 < 0 { return 0 - 1; }
+        if ps_peek(tags, p1) == 7 {
+            return p1 + 1;
+        }
+        if ps_peek(tags, p1) == 12 {
+            let first_idx: i32 = vec_len(et) - 1;
+            let mut count: i32 = 1;
+            let mut p: i32 = p1 + 1;
+            let mut td: bool = false;
+            while td != true {
+                if ps_peek(tags, p) == 7 {
+                    vec_push(et, 25);
+                    vec_push(ed1, first_idx);
+                    vec_push(ed2, count);
+                    vec_push(ed3, 0);
+                    vec_push(ed4, 0);
+                    return p + 1;
+                }
+                let pa: i32 = parse_expr(tags, starts, ends, source, p,
+                                          et, ed1, ed2, ed3, ed4, pp, 1);
+                if pa < 0 { return 0 - 1; }
+                count = count + 1;
+                p = pa;
+                if ps_peek(tags, p) == 12 {
+                    p = p + 1;
+                } else {
+                    if ps_peek(tags, p) == 7 {
+                        vec_push(et, 25);
+                        vec_push(ed1, first_idx);
+                        vec_push(ed2, count);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                        return p + 1;
+                    }
+                    return 0 - 1;
+                }
+            }
+        }
+        return 0 - 1;
+    }
+    if t == 10 {
+        if ps_peek(tags, pos + 1) == 11 {
+            vec_push(et, 26);
+            vec_push(ed1, 0);
+            vec_push(ed2, 0);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            return pos + 2;
+        }
+        let first_idx: i32 = vec_len(et);
+        let p1: i32 = parse_expr(tags, starts, ends, source, pos + 1,
+                                  et, ed1, ed2, ed3, ed4, pp, 1);
+        if p1 < 0 { return 0 - 1; }
+        if ps_peek(tags, p1) == 13 {
+            let p2: i32 = parse_expr(tags, starts, ends, source, p1 + 1,
+                                      et, ed1, ed2, ed3, ed4, pp, 1);
+            if p2 < 0 { return 0 - 1; }
+            if ps_peek(tags, p2) != 11 { return 0 - 1; }
+            vec_push(et, 26);
+            vec_push(ed1, first_idx);
+            vec_push(ed2, 2);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            return p2 + 1;
+        }
+        if ps_peek(tags, p1) == 11 {
+            vec_push(et, 26);
+            vec_push(ed1, first_idx);
+            vec_push(ed2, 1);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            return p1 + 1;
+        }
+        if ps_peek(tags, p1) == 12 {
+            let mut count: i32 = 1;
+            let mut p: i32 = p1 + 1;
+            let mut ad: bool = false;
+            while ad != true {
+                if ps_peek(tags, p) == 11 {
+                    vec_push(et, 26);
+                    vec_push(ed1, first_idx);
+                    vec_push(ed2, count);
+                    vec_push(ed3, 0);
+                    vec_push(ed4, 0);
+                    return p + 1;
+                }
+                let pa: i32 = parse_expr(tags, starts, ends, source, p,
+                                          et, ed1, ed2, ed3, ed4, pp, 1);
+                if pa < 0 { return 0 - 1; }
+                count = count + 1;
+                p = pa;
+                if ps_peek(tags, p) == 12 {
+                    p = p + 1;
+                } else {
+                    if ps_peek(tags, p) == 11 {
+                        vec_push(et, 26);
+                        vec_push(ed1, first_idx);
+                        vec_push(ed2, count);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                        return p + 1;
+                    }
+                    return 0 - 1;
+                }
+            }
+        }
+        return 0 - 1;
+    }
+    return 0 - 1;
+}
+
+fn parse_postfix_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                      source: string, pos: i32,
+                      et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                      ed3: Vec<i32>, ed4: Vec<i32>,
+                      pp: Vec<i32>, sf_names: Vec<i32>,
+                      allow_struct: i32) -> i32 {
+    let p1: i32 = parse_primary_expr(tags, starts, ends, source, pos,
+                                      et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                      allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut cur: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t == 6 {
+            let args_before: i32 = vec_len(et);
+            let pa: i32 = parse_arg_list(tags, starts, ends, source, p + 1,
+                                          et, ed1, ed2, ed3, ed4, pp);
+            if pa < 0 { return 0 - 1; }
+            let argc: i32 = vec_len(et) - args_before;
+            if ps_peek(tags, pa) != 7 { return 0 - 1; }
+            vec_push(et, 4);
+            vec_push(ed1, cur);
+            vec_push(ed2, args_before);
+            vec_push(ed3, argc);
+            vec_push(ed4, 0);
+            cur = vec_len(et) - 1;
+            p = pa + 1;
+        } else {
+            if t == 16 {
+                let nt: i32 = ps_peek(tags, p + 1);
+                if nt == 5 {
+                    let n2: i32 = ps_peek(tags, p + 2);
+                    if n2 == 6 {
+                        let method_tok: i32 = p + 1;
+                        let args_before: i32 = vec_len(et);
+                        let pa: i32 = parse_arg_list(tags, starts, ends, source,
+                                                      p + 3, et, ed1, ed2, ed3,
+                                                      ed4, pp);
+                        if pa < 0 { return 0 - 1; }
+                        let argc: i32 = vec_len(et) - args_before;
+                        if ps_peek(tags, pa) != 7 { return 0 - 1; }
+                        vec_push(et, 5);
+                        vec_push(ed1, cur);
+                        vec_push(ed2, method_tok);
+                        vec_push(ed3, args_before);
+                        vec_push(ed4, argc);
+                        cur = vec_len(et) - 1;
+                        p = pa + 1;
+                    } else {
+                        vec_push(et, 6);
+                        vec_push(ed1, cur);
+                        vec_push(ed2, p + 1);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                        cur = vec_len(et) - 1;
+                        p = p + 2;
+                    }
+                } else {
+                    if nt == 0 {
+                        vec_push(et, 7);
+                        vec_push(ed1, cur);
+                        vec_push(ed2, p + 1);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                        cur = vec_len(et) - 1;
+                        p = p + 2;
+                    } else {
+                        done = true;
+                    }
+                }
+            } else {
+                if t == 10 {
+                    let ix_p: i32 = parse_expr(tags, starts, ends, source,
+                                                p + 1, et, ed1, ed2, ed3,
+                                                ed4, pp, 1);
+                    if ix_p < 0 { return 0 - 1; }
+                    let ix_idx: i32 = vec_len(et) - 1;
+                    if ps_peek(tags, ix_p) != 11 { return 0 - 1; }
+                    vec_push(et, 8);
+                    vec_push(ed1, cur);
+                    vec_push(ed2, ix_idx);
+                    vec_push(ed3, 0);
+                    vec_push(ed4, 0);
+                    cur = vec_len(et) - 1;
+                    p = ix_p + 1;
+                } else {
+                    done = true;
+                }
+            }
+        }
+    }
+    return p;
+}
+
+fn parse_unary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                    source: string, pos: i32,
+                    et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>,
+                    pp: Vec<i32>, sf_names: Vec<i32>,
+                    allow_struct: i32) -> i32 {
+    let t: i32 = ps_peek(tags, pos);
+    if t == 23 {
+        let p1: i32 = parse_unary_expr(tags, starts, ends, source, pos + 1,
+                                        et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                        allow_struct);
+        if p1 < 0 { return 0 - 1; }
+        let oi: i32 = vec_len(et) - 1;
+        vec_push(et, 2);
+        vec_push(ed1, 0);
+        vec_push(ed2, oi);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return p1;
+    }
+    if t == 33 {
+        let p1: i32 = parse_unary_expr(tags, starts, ends, source, pos + 1,
+                                        et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                        allow_struct);
+        if p1 < 0 { return 0 - 1; }
+        let oi: i32 = vec_len(et) - 1;
+        vec_push(et, 2);
+        vec_push(ed1, 1);
+        vec_push(ed2, oi);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return p1;
+    }
+    if t == 24 {
+        let p1: i32 = parse_unary_expr(tags, starts, ends, source, pos + 1,
+                                        et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                        allow_struct);
+        if p1 < 0 { return 0 - 1; }
+        let oi: i32 = vec_len(et) - 1;
+        vec_push(et, 2);
+        vec_push(ed1, 3);
+        vec_push(ed2, oi);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return p1;
+    }
+    if t == 27 {
+        if ps_peek(tags, pos + 1) == 77 {
+            let p1: i32 = parse_unary_expr(tags, starts, ends, source, pos + 2,
+                                            et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                            allow_struct);
+            if p1 < 0 { return 0 - 1; }
+            let oi: i32 = vec_len(et) - 1;
+            vec_push(et, 2);
+            vec_push(ed1, 5);
+            vec_push(ed2, oi);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            return p1;
+        }
+        let p1: i32 = parse_unary_expr(tags, starts, ends, source, pos + 1,
+                                        et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                        allow_struct);
+        if p1 < 0 { return 0 - 1; }
+        let oi: i32 = vec_len(et) - 1;
+        vec_push(et, 2);
+        vec_push(ed1, 4);
+        vec_push(ed2, oi);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return p1;
+    }
+    return parse_postfix_expr(tags, starts, ends, source, pos,
+                               et, ed1, ed2, ed3, ed4, pp, sf_names,
+                               allow_struct);
+}
+
+fn parse_cast_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                   source: string, pos: i32,
+                   et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                   ed3: Vec<i32>, ed4: Vec<i32>,
+                   pp: Vec<i32>, sf_names: Vec<i32>,
+                   ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                   ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                   allow_struct: i32) -> i32 {
+    let p1: i32 = parse_unary_expr(tags, starts, ends, source, pos,
+                                    et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                    allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut cur: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        if ps_peek(tags, p) == 54 {
+            let ty_idx: i32 = vec_len(ty_tags);
+            let pt: i32 = parse_type(tags, starts, ends, source, p + 1,
+                                      ty_tags, ty_d1, ty_d2, ty_d3, pp);
+            if pt < 0 { return 0 - 1; }
+            vec_push(et, 20);
+            vec_push(ed1, cur);
+            vec_push(ed2, ty_idx);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            cur = vec_len(et) - 1;
+            p = pt;
+        } else {
+            done = true;
+        }
+    }
+    return p;
+}
+
+fn parse_mul_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                  source: string, pos: i32,
+                  et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                  ed3: Vec<i32>, ed4: Vec<i32>,
+                  pp: Vec<i32>, sf_names: Vec<i32>,
+                  ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                  ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                  allow_struct: i32) -> i32 {
+    let p1: i32 = parse_cast_expr(tags, starts, ends, source, pos,
+                                   et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                   ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if is_multiplicative_token(t) != true {
+            done = true;
+        } else {
+            let bop: i32 = binop_of(t);
+            let pa: i32 = parse_cast_expr(tags, starts, ends, source, p + 1,
+                                           et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                           ty_tags, ty_d1, ty_d2, ty_d3,
+                                           allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, bop);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_add_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                  source: string, pos: i32,
+                  et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                  ed3: Vec<i32>, ed4: Vec<i32>,
+                  pp: Vec<i32>, sf_names: Vec<i32>,
+                  ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                  ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                  allow_struct: i32) -> i32 {
+    let p1: i32 = parse_mul_expr(tags, starts, ends, source, pos,
+                                  et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                  ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if is_additive_token(t) != true {
+            done = true;
+        } else {
+            let bop: i32 = binop_of(t);
+            let pa: i32 = parse_mul_expr(tags, starts, ends, source, p + 1,
+                                          et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                          ty_tags, ty_d1, ty_d2, ty_d3,
+                                          allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, bop);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_shift_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                    source: string, pos: i32,
+                    et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>,
+                    pp: Vec<i32>, sf_names: Vec<i32>,
+                    ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                    ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                    allow_struct: i32) -> i32 {
+    let p1: i32 = parse_add_expr(tags, starts, ends, source, pos,
+                                  et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                  ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if is_shift_token(t) != true {
+            done = true;
+        } else {
+            let bop: i32 = binop_of(t);
+            let pa: i32 = parse_add_expr(tags, starts, ends, source, p + 1,
+                                          et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                          ty_tags, ty_d1, ty_d2, ty_d3,
+                                          allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, bop);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_bit_and_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                      source: string, pos: i32,
+                      et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                      ed3: Vec<i32>, ed4: Vec<i32>,
+                      pp: Vec<i32>, sf_names: Vec<i32>,
+                      ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                      ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                      allow_struct: i32) -> i32 {
+    let p1: i32 = parse_shift_expr(tags, starts, ends, source, pos,
+                                    et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                    ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t != 27 {
+            done = true;
+        } else {
+            let bop: i32 = binop_of(t);
+            let pa: i32 = parse_shift_expr(tags, starts, ends, source, p + 1,
+                                            et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                            ty_tags, ty_d1, ty_d2, ty_d3,
+                                            allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, bop);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_bit_xor_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                      source: string, pos: i32,
+                      et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                      ed3: Vec<i32>, ed4: Vec<i32>,
+                      pp: Vec<i32>, sf_names: Vec<i32>,
+                      ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                      ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                      allow_struct: i32) -> i32 {
+    let p1: i32 = parse_bit_and_expr(tags, starts, ends, source, pos,
+                                      et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                      ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t != 31 {
+            done = true;
+        } else {
+            let bop: i32 = binop_of(t);
+            let pa: i32 = parse_bit_and_expr(tags, starts, ends, source, p + 1,
+                                              et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                              ty_tags, ty_d1, ty_d2, ty_d3,
+                                              allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, bop);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_bit_or_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                     source: string, pos: i32,
+                     et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                     ed3: Vec<i32>, ed4: Vec<i32>,
+                     pp: Vec<i32>, sf_names: Vec<i32>,
+                     ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                     ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                     allow_struct: i32) -> i32 {
+    let p1: i32 = parse_bit_xor_expr(tags, starts, ends, source, pos,
+                                      et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                      ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t != 29 {
+            done = true;
+        } else {
+            let bop: i32 = binop_of(t);
+            let pa: i32 = parse_bit_xor_expr(tags, starts, ends, source, p + 1,
+                                              et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                              ty_tags, ty_d1, ty_d2, ty_d3,
+                                              allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, bop);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_cmp_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                  source: string, pos: i32,
+                  et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                  ed3: Vec<i32>, ed4: Vec<i32>,
+                  pp: Vec<i32>, sf_names: Vec<i32>,
+                  ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                  ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                  allow_struct: i32) -> i32 {
+    let p1: i32 = parse_bit_or_expr(tags, starts, ends, source, pos,
+                                     et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                     ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let t: i32 = ps_peek(tags, p1);
+    if is_cmp_token(t) == true {
+        let bop: i32 = binop_of(t);
+        let left: i32 = vec_len(et) - 1;
+        let pa: i32 = parse_bit_or_expr(tags, starts, ends, source, p1 + 1,
+                                         et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                         ty_tags, ty_d1, ty_d2, ty_d3,
+                                         allow_struct);
+        if pa < 0 { return 0 - 1; }
+        let ri: i32 = vec_len(et) - 1;
+        vec_push(et, 3);
+        vec_push(ed1, bop);
+        vec_push(ed2, left);
+        vec_push(ed3, ri);
+        vec_push(ed4, 0);
+        return pa;
+    }
+    return p1;
+}
+
+fn parse_and_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                  source: string, pos: i32,
+                  et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                  ed3: Vec<i32>, ed4: Vec<i32>,
+                  pp: Vec<i32>, sf_names: Vec<i32>,
+                  ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                  ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                  allow_struct: i32) -> i32 {
+    let p1: i32 = parse_cmp_expr(tags, starts, ends, source, pos,
+                                  et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                  ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t != 28 {
+            done = true;
+        } else {
+            let pa: i32 = parse_cmp_expr(tags, starts, ends, source, p + 1,
+                                          et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                          ty_tags, ty_d1, ty_d2, ty_d3,
+                                          allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, 10);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_or_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                 source: string, pos: i32,
+                 et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                 ed3: Vec<i32>, ed4: Vec<i32>,
+                 pp: Vec<i32>, sf_names: Vec<i32>,
+                 ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                 ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                 allow_struct: i32) -> i32 {
+    let p1: i32 = parse_and_expr(tags, starts, ends, source, pos,
+                                  et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                  ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let mut left: i32 = vec_len(et) - 1;
+    let mut p: i32 = p1;
+    let mut done: bool = false;
+    while done != true {
+        let t: i32 = ps_peek(tags, p);
+        if t != 30 {
+            done = true;
+        } else {
+            let pa: i32 = parse_and_expr(tags, starts, ends, source, p + 1,
+                                          et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                          ty_tags, ty_d1, ty_d2, ty_d3,
+                                          allow_struct);
+            if pa < 0 { return 0 - 1; }
+            let ri: i32 = vec_len(et) - 1;
+            vec_push(et, 3);
+            vec_push(ed1, 11);
+            vec_push(ed2, left);
+            vec_push(ed3, ri);
+            vec_push(ed4, 0);
+            left = vec_len(et) - 1;
+            p = pa;
+        }
+    }
+    return p;
+}
+
+fn parse_range_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                    source: string, pos: i32,
+                    et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>,
+                    pp: Vec<i32>, sf_names: Vec<i32>,
+                    ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                    ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                    allow_struct: i32) -> i32 {
+    let p1: i32 = parse_or_expr(tags, starts, ends, source, pos,
+                                 et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                 ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+    if p1 < 0 { return 0 - 1; }
+    let t: i32 = ps_peek(tags, p1);
+    if t == 17 {
+        let left_idx: i32 = vec_len(et) - 1;
+        let pa: i32 = parse_or_expr(tags, starts, ends, source, p1 + 1,
+                                     et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                     ty_tags, ty_d1, ty_d2, ty_d3, allow_struct);
+        if pa < 0 { return 0 - 1; }
+        let ri: i32 = vec_len(et) - 1;
+        vec_push(et, 21);
+        vec_push(ed1, left_idx);
+        vec_push(ed2, ri);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return pa;
+    }
+    return p1;
+}
+
+fn parse_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+              source: string, pos: i32,
+              et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+              ed3: Vec<i32>, ed4: Vec<i32>,
+              pp: Vec<i32>, allow_struct: i32) -> i32 {
+    let sf: Vec<i32> = vec_new();
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    let td3: Vec<i32> = vec_new();
+    return parse_range_expr(tags, starts, ends, source, pos,
+                             et, ed1, ed2, ed3, ed4, pp, sf,
+                             tt, td1, td2, td3, allow_struct);
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_of() -> i32 {
@@ -1949,6 +2850,383 @@ fn test_parse_module_decl() -> i32 {
     return 0;
 }
 
+fn test_parse_expr_lit() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(tags, 97); vec_push(starts, 2); vec_push(ends, 2);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "42", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 1 { return 1; }
+    if vec_len(et) != 1 { return 2; }
+    if vec_get(et, 0) != 0 { return 3; }
+    if vec_get(ed1, 0) != 0 { return 4; }
+    let tags2: Vec<i32> = vec_new();
+    let starts2: Vec<i32> = vec_new();
+    let ends2: Vec<i32> = vec_new();
+    vec_push(tags2, 91); vec_push(starts2, 0); vec_push(ends2, 4);
+    vec_push(tags2, 97); vec_push(starts2, 4); vec_push(ends2, 4);
+    let et2: Vec<i32> = vec_new();
+    let ed12: Vec<i32> = vec_new();
+    let ed22: Vec<i32> = vec_new();
+    let ed32: Vec<i32> = vec_new();
+    let ed42: Vec<i32> = vec_new();
+    let pp2: Vec<i32> = vec_new();
+    let p2: i32 = parse_expr(tags2, starts2, ends2, "true", 0,
+                              et2, ed12, ed22, ed32, ed42, pp2, 1);
+    if p2 != 1 { return 5; }
+    if vec_get(et2, 0) != 0 { return 6; }
+    if vec_get(ed12, 0) != 5 { return 7; }
+    return 0;
+}
+
+fn test_parse_expr_path() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(tags, 97); vec_push(starts, 3); vec_push(ends, 3);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "foo", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 1 { return 1; }
+    if vec_len(et) != 1 { return 2; }
+    if vec_get(et, 0) != 1 { return 3; }
+    if vec_get(ed2, 0) != 1 { return 4; }
+    if vec_len(pp) != 1 { return 5; }
+    return 0;
+}
+
+fn test_parse_expr_binop() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 22); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 0); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 97); vec_push(starts, 5); vec_push(ends, 5);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "1 + 2", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 3 { return 1; }
+    if vec_len(et) != 3 { return 2; }
+    if vec_get(et, 0) != 0 { return 3; }
+    if vec_get(et, 1) != 0 { return 4; }
+    if vec_get(et, 2) != 3 { return 5; }
+    if vec_get(ed1, 2) != 0 { return 6; }
+    if vec_get(ed2, 2) != 0 { return 7; }
+    if vec_get(ed3, 2) != 1 { return 8; }
+    return 0;
+}
+
+fn test_parse_expr_unary() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 23); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 0); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 97); vec_push(starts, 2); vec_push(ends, 2);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "-x", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 2 { return 1; }
+    if vec_len(et) != 2 { return 2; }
+    if vec_get(et, 0) != 0 { return 3; }
+    if vec_get(et, 1) != 2 { return 4; }
+    if vec_get(ed1, 1) != 0 { return 5; }
+    if vec_get(ed2, 1) != 0 { return 6; }
+    let tags2: Vec<i32> = vec_new();
+    let starts2: Vec<i32> = vec_new();
+    let ends2: Vec<i32> = vec_new();
+    vec_push(tags2, 33); vec_push(starts2, 0); vec_push(ends2, 1);
+    vec_push(tags2, 5); vec_push(starts2, 1); vec_push(ends2, 2);
+    vec_push(tags2, 97); vec_push(starts2, 2); vec_push(ends2, 2);
+    let et2: Vec<i32> = vec_new();
+    let ed12: Vec<i32> = vec_new();
+    let ed22: Vec<i32> = vec_new();
+    let ed32: Vec<i32> = vec_new();
+    let ed42: Vec<i32> = vec_new();
+    let pp2: Vec<i32> = vec_new();
+    let p2: i32 = parse_expr(tags2, starts2, ends2, "!x", 0,
+                              et2, ed12, ed22, ed32, ed42, pp2, 1);
+    if p2 != 2 { return 7; }
+    if vec_get(et2, 1) != 2 { return 8; }
+    if vec_get(ed12, 1) != 1 { return 9; }
+    return 0;
+}
+
+fn test_parse_expr_call() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(tags, 6); vec_push(starts, 3); vec_push(ends, 4);
+    vec_push(tags, 0); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 12); vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(tags, 0); vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(tags, 7); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 97); vec_push(starts, 9); vec_push(ends, 9);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "foo(1, 2)", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 6 { return 1; }
+    if vec_len(et) != 4 { return 2; }
+    if vec_get(et, 0) != 1 { return 3; }
+    if vec_get(et, 1) != 0 { return 4; }
+    if vec_get(et, 2) != 0 { return 5; }
+    if vec_get(et, 3) != 4 { return 6; }
+    if vec_get(ed1, 3) != 0 { return 7; }
+    if vec_get(ed2, 3) != 1 { return 8; }
+    if vec_get(ed3, 3) != 2 { return 9; }
+    return 0;
+}
+
+fn test_parse_expr_field() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 16); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 5); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 97); vec_push(starts, 3); vec_push(ends, 3);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "x.y", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 3 { return 1; }
+    if vec_len(et) != 2 { return 2; }
+    if vec_get(et, 0) != 1 { return 3; }
+    if vec_get(et, 1) != 6 { return 4; }
+    if vec_get(ed1, 1) != 0 { return 5; }
+    if vec_get(ed2, 1) != 2 { return 6; }
+    let tags2: Vec<i32> = vec_new();
+    let starts2: Vec<i32> = vec_new();
+    let ends2: Vec<i32> = vec_new();
+    vec_push(tags2, 5); vec_push(starts2, 0); vec_push(ends2, 1);
+    vec_push(tags2, 16); vec_push(starts2, 1); vec_push(ends2, 2);
+    vec_push(tags2, 0); vec_push(starts2, 2); vec_push(ends2, 3);
+    vec_push(tags2, 97); vec_push(starts2, 3); vec_push(ends2, 3);
+    let et2: Vec<i32> = vec_new();
+    let ed12: Vec<i32> = vec_new();
+    let ed22: Vec<i32> = vec_new();
+    let ed32: Vec<i32> = vec_new();
+    let ed42: Vec<i32> = vec_new();
+    let pp2: Vec<i32> = vec_new();
+    let p2: i32 = parse_expr(tags2, starts2, ends2, "x.0", 0,
+                              et2, ed12, ed22, ed32, ed42, pp2, 1);
+    if p2 != 3 { return 7; }
+    if vec_get(et2, 1) != 7 { return 8; }
+    if vec_get(ed12, 1) != 0 { return 9; }
+    return 0;
+}
+
+fn test_parse_expr_tuple() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 6); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 0); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 12); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 0); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 7); vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(tags, 97); vec_push(starts, 6); vec_push(ends, 6);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "(1, 2)", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 5 { return 1; }
+    if vec_len(et) != 3 { return 2; }
+    if vec_get(et, 0) != 0 { return 3; }
+    if vec_get(et, 1) != 0 { return 4; }
+    if vec_get(et, 2) != 25 { return 5; }
+    if vec_get(ed1, 2) != 0 { return 6; }
+    if vec_get(ed2, 2) != 2 { return 7; }
+    let tags3: Vec<i32> = vec_new();
+    let starts3: Vec<i32> = vec_new();
+    let ends3: Vec<i32> = vec_new();
+    vec_push(tags3, 6); vec_push(starts3, 0); vec_push(ends3, 1);
+    vec_push(tags3, 7); vec_push(starts3, 1); vec_push(ends3, 2);
+    vec_push(tags3, 97); vec_push(starts3, 2); vec_push(ends3, 2);
+    let et3: Vec<i32> = vec_new();
+    let ed13: Vec<i32> = vec_new();
+    let ed23: Vec<i32> = vec_new();
+    let ed33: Vec<i32> = vec_new();
+    let ed43: Vec<i32> = vec_new();
+    let pp3: Vec<i32> = vec_new();
+    let p3: i32 = parse_expr(tags3, starts3, ends3, "()", 0,
+                              et3, ed13, ed23, ed33, ed43, pp3, 1);
+    if p3 != 2 { return 8; }
+    if vec_get(et3, 0) != 0 { return 9; }
+    if vec_get(ed13, 0) != 5 { return 10; }
+    return 0;
+}
+
+fn test_parse_expr_array() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 10); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 0); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 12); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 0); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 11); vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(tags, 97); vec_push(starts, 6); vec_push(ends, 6);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "[1, 2]", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 5 { return 1; }
+    if vec_len(et) != 3 { return 2; }
+    if vec_get(et, 0) != 0 { return 3; }
+    if vec_get(et, 1) != 0 { return 4; }
+    if vec_get(et, 2) != 26 { return 5; }
+    if vec_get(ed1, 2) != 0 { return 6; }
+    if vec_get(ed2, 2) != 2 { return 7; }
+    let tags2: Vec<i32> = vec_new();
+    let starts2: Vec<i32> = vec_new();
+    let ends2: Vec<i32> = vec_new();
+    vec_push(tags2, 10); vec_push(starts2, 0); vec_push(ends2, 1);
+    vec_push(tags2, 11); vec_push(starts2, 1); vec_push(ends2, 2);
+    vec_push(tags2, 97); vec_push(starts2, 2); vec_push(ends2, 2);
+    let et2: Vec<i32> = vec_new();
+    let ed12: Vec<i32> = vec_new();
+    let ed22: Vec<i32> = vec_new();
+    let ed32: Vec<i32> = vec_new();
+    let ed42: Vec<i32> = vec_new();
+    let pp2: Vec<i32> = vec_new();
+    let p2: i32 = parse_expr(tags2, starts2, ends2, "[]", 0,
+                              et2, ed12, ed22, ed32, ed42, pp2, 1);
+    if p2 != 2 { return 8; }
+    if vec_get(et2, 0) != 26 { return 9; }
+    if vec_get(ed12, 0) != 0 { return 10; }
+    if vec_get(ed22, 0) != 0 { return 11; }
+    return 0;
+}
+
+fn test_parse_expr_cast() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(tags, 54); vec_push(starts, 3); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 9);
+    vec_push(tags, 97); vec_push(starts, 9); vec_push(ends, 9);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "42 as i32", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 3 { return 1; }
+    if vec_len(et) != 2 { return 2; }
+    if vec_get(et, 0) != 0 { return 3; }
+    if vec_get(et, 1) != 20 { return 4; }
+    if vec_get(ed1, 1) != 0 { return 5; }
+    return 0;
+}
+
+fn test_parse_expr_precedence() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 22); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 0); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 24); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 0); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 97); vec_push(starts, 9); vec_push(ends, 9);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "1 + 2 * 3", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 5 { return 1; }
+    if vec_len(et) != 5 { return 2; }
+    if vec_get(et, 0) != 0 { return 3; }
+    if vec_get(et, 1) != 0 { return 4; }
+    if vec_get(et, 2) != 0 { return 5; }
+    if vec_get(et, 3) != 3 { return 6; }
+    if vec_get(ed1, 3) != 2 { return 7; }
+    if vec_get(ed2, 3) != 1 { return 8; }
+    if vec_get(ed3, 3) != 2 { return 9; }
+    if vec_get(et, 4) != 3 { return 10; }
+    if vec_get(ed1, 4) != 0 { return 11; }
+    if vec_get(ed2, 4) != 0 { return 12; }
+    if vec_get(ed3, 4) != 3 { return 13; }
+    return 0;
+}
+
+fn test_parse_expr_index() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 10); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 0); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 11); vec_push(starts, 3); vec_push(ends, 4);
+    vec_push(tags, 97); vec_push(starts, 4); vec_push(ends, 4);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "a[0]", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 4 { return 1; }
+    if vec_len(et) != 3 { return 2; }
+    if vec_get(et, 0) != 1 { return 3; }
+    if vec_get(et, 1) != 0 { return 4; }
+    if vec_get(et, 2) != 8 { return 5; }
+    if vec_get(ed1, 2) != 0 { return 6; }
+    if vec_get(ed2, 2) != 1 { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_of();
     if r1 != 0 { return r1; }
@@ -2026,5 +3304,27 @@ fn main() -> i32 {
     if r37 != 0 { return 480 + r37; }
     let r38: i32 = test_parse_pat_bare_enum();
     if r38 != 0 { return 490 + r38; }
+    let r39: i32 = test_parse_expr_lit();
+    if r39 != 0 { return 500 + r39; }
+    let r40: i32 = test_parse_expr_path();
+    if r40 != 0 { return 510 + r40; }
+    let r41: i32 = test_parse_expr_binop();
+    if r41 != 0 { return 520 + r41; }
+    let r42: i32 = test_parse_expr_unary();
+    if r42 != 0 { return 530 + r42; }
+    let r43: i32 = test_parse_expr_call();
+    if r43 != 0 { return 540 + r43; }
+    let r44: i32 = test_parse_expr_field();
+    if r44 != 0 { return 550 + r44; }
+    let r45: i32 = test_parse_expr_tuple();
+    if r45 != 0 { return 560 + r45; }
+    let r46: i32 = test_parse_expr_array();
+    if r46 != 0 { return 570 + r46; }
+    let r47: i32 = test_parse_expr_cast();
+    if r47 != 0 { return 580 + r47; }
+    let r48: i32 = test_parse_expr_precedence();
+    if r48 != 0 { return 590 + r48; }
+    let r49: i32 = test_parse_expr_index();
+    if r49 != 0 { return 600 + r49; }
     return 0;
 }

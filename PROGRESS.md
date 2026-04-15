@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 13 — pattern parser cluster.** `parser.sv0`: `path_pattern_from` (SML `pathPatternFrom` lines 247-294 — struct `{field: pat}` and enum `(arg)` pattern dispatch), `parse_pat_atom` (SML `parsePatAtom` lines 296-355 — wildcard/bind/literal/tuple/enum dispatch), `parse_pat` (SML `parsePat` lines 228-244 — entry point with `|` for `PatOr`). 11 new test groups. Also documents C-backend while-loop condition hoisting pitfall in rule 41. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 14 — expression parser: full precedence chain + simple primary expressions.** `parser.sv0`: 20 new functions — `parse_arg_list`, `parse_struct_fields`, `parse_primary_expr` (literals/paths/struct literals/parens/tuples/arrays), `parse_postfix_expr` (calls/method calls/fields/tuple fields/index), `parse_unary_expr` (neg/not/deref/borrow/borrow_mut), `parse_cast_expr` (as Type), `parse_mul_expr`…`parse_or_expr` (8-level binary precedence chain), `parse_cmp_expr`, `parse_range_expr`, `parse_expr` (entry point). Expr arena encoding with 4 data Vecs + tags (27 variants). 11 new test groups (lit/path/binop/unary/call/field/tuple/array/cast/precedence/index). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
