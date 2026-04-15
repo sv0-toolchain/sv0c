@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 12 — first recursive-descent parser function.** `parser.sv0`: `is_builtin_type_name` (SML inline 18-primitive check in `parseType`), `parse_type` (SML `parseType` lines 128-225 — recursive-descent type parser with flat arena output, handles TyUnit/TyName/TyRef/TyRefMut/TyArray/TySlice/TyTuple and generic type arguments `<T1, T2>`). 9 new test groups. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 13 — pattern parser cluster.** `parser.sv0`: `path_pattern_from` (SML `pathPatternFrom` lines 247-294 — struct `{field: pat}` and enum `(arg)` pattern dispatch), `parse_pat_atom` (SML `parsePatAtom` lines 296-355 — wildcard/bind/literal/tuple/enum dispatch), `parse_pat` (SML `parsePat` lines 228-244 — entry point with `|` for `PatOr`). 11 new test groups. Also documents C-backend while-loop condition hoisting pitfall in rule 41. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

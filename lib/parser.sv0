@@ -11,9 +11,12 @@
    is_builtin_type_name (SML inline check in parseType — 18 primitives),
    parse_type (SML parseType — recursive-descent type parser with
    arena output; handles TyUnit/TyName/TyRef/TyRefMut/TyArray/TySlice/
-   TyTuple and generic type arguments).
-   Remaining recursive-descent parser (parseExpr/parsePat/parseItem)
-   deferred — needs mutual recursion over AST construction. */
+   TyTuple and generic type arguments),
+   path_pattern_from (SML pathPatternFrom — struct/enum pattern after
+   path), parse_pat_atom (SML parsePatAtom — wildcard/bind/lit/tuple/
+   enum dispatch), parse_pat (SML parsePat — entry point with | for
+   PatOr).
+   Remaining recursive-descent parser (parseExpr/parseItem) deferred. */
 
 /* ── token tag constants (from token.sv0) ───────────────────── */
 
@@ -836,6 +839,273 @@ fn parse_type(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     return 0 - 1;
 }
 
+/* ── pat arena tags ────────────────────────────────────────────
+   0=PatWild  1=PatBind  2=PatLit  3=PatTuple
+   4=PatStruct  5=PatEnum  6=PatOr
+
+   Arena encoding (parallel Vec<i32>s, children before parents):
+     0 PatWild   : (no payload)
+     1 PatBind   : data1=name_tok_pos, data2=is_mut
+     2 PatLit    : data1=lit_tag, data2=tok_pos, data3=is_neg
+     3 PatTuple  : data1=first_elem_idx, data2=elem_count
+     4 PatStruct : data1=pp_start, data2=pp_count, data3=field_count
+     5 PatEnum   : data1=pp_start, data2=pp_count, data3=arg_count
+     6 PatOr     : data1=first_alt_idx, data2=alt_count */
+
+/* ── path_pattern_from (SML pathPatternFrom, lines 247-294) ───
+   Called after a path is parsed. Dispatches on next token:
+   { → struct pattern, ( → enum with args, else → bare enum. */
+
+fn path_pattern_from(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                     source: string, pos: i32,
+                     pat_tags: Vec<i32>, pat_data1: Vec<i32>,
+                     pat_data2: Vec<i32>, pat_data3: Vec<i32>,
+                     path_pool: Vec<i32>,
+                     pp_start: i32, pp_count: i32) -> i32 {
+    let t: i32 = ps_peek(tags, pos);
+    if t == 8 {
+        let mut p: i32 = pos + 1;
+        let mut field_count: i32 = 0;
+        let mut done: bool = false;
+        while done != true {
+            let ft: i32 = ps_peek(tags, p);
+            if ft == 9 {
+                vec_push(pat_tags, 4);
+                vec_push(pat_data1, pp_start);
+                vec_push(pat_data2, pp_count);
+                vec_push(pat_data3, field_count);
+                return p + 1;
+            }
+            if ft == 17 {
+                if ps_peek(tags, p + 1) == 9 {
+                    vec_push(pat_tags, 4);
+                    vec_push(pat_data1, pp_start);
+                    vec_push(pat_data2, pp_count);
+                    vec_push(pat_data3, field_count);
+                    return p + 2;
+                }
+            }
+            if ft != 5 { return 0 - 1; }
+            let fname_pos: i32 = p;
+            p = p + 1;
+            if ps_peek(tags, p) == 14 {
+                p = p + 1;
+                let pv: i32 = parse_pat(tags, starts, ends, source, p,
+                                         pat_tags, pat_data1, pat_data2,
+                                         pat_data3, path_pool);
+                if pv < 0 { return 0 - 1; }
+                p = pv;
+            } else {
+                vec_push(pat_tags, 1);
+                vec_push(pat_data1, fname_pos);
+                vec_push(pat_data2, 0);
+                vec_push(pat_data3, 0);
+            }
+            field_count = field_count + 1;
+            if ps_peek(tags, p) == 12 {
+                p = p + 1;
+            }
+        }
+        return 0 - 1;
+    }
+    if t == 6 {
+        let mut p: i32 = pos + 1;
+        if ps_peek(tags, p) == 7 {
+            vec_push(pat_tags, 5);
+            vec_push(pat_data1, pp_start);
+            vec_push(pat_data2, pp_count);
+            vec_push(pat_data3, 0);
+            return p + 1;
+        }
+        let mut arg_count: i32 = 0;
+        let mut done: bool = false;
+        while done != true {
+            let pa: i32 = parse_pat(tags, starts, ends, source, p,
+                                     pat_tags, pat_data1, pat_data2,
+                                     pat_data3, path_pool);
+            if pa < 0 { return 0 - 1; }
+            arg_count = arg_count + 1;
+            p = pa;
+            if ps_peek(tags, p) == 12 {
+                p = p + 1;
+            } else {
+                if ps_peek(tags, p) == 7 {
+                    done = true;
+                } else { return 0 - 1; }
+            }
+        }
+        vec_push(pat_tags, 5);
+        vec_push(pat_data1, pp_start);
+        vec_push(pat_data2, pp_count);
+        vec_push(pat_data3, arg_count);
+        return p + 1;
+    }
+    vec_push(pat_tags, 5);
+    vec_push(pat_data1, pp_start);
+    vec_push(pat_data2, pp_count);
+    vec_push(pat_data3, 0);
+    return pos;
+}
+
+/* ── parse_pat_atom (SML parsePatAtom, lines 296-355) ─────────
+   Dispatches on token: _ → PatWild, mut IDENT → PatBind,
+   IDENT :: → path+pathPatternFrom, IDENT → PatBind,
+   - literal → PatLit(neg), literal → PatLit,
+   () → PatTuple(0), (pat) → unwrap, (pat,...) → PatTuple. */
+
+fn parse_pat_atom(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                  source: string, pos: i32,
+                  pat_tags: Vec<i32>, pat_data1: Vec<i32>,
+                  pat_data2: Vec<i32>, pat_data3: Vec<i32>,
+                  path_pool: Vec<i32>) -> i32 {
+    let t: i32 = ps_peek(tags, pos);
+    if t == 77 {
+        if ps_peek(tags, pos + 1) == 5 {
+            vec_push(pat_tags, 1);
+            vec_push(pat_data1, pos + 1);
+            vec_push(pat_data2, 1);
+            vec_push(pat_data3, 0);
+            return pos + 2;
+        }
+        return 0 - 1;
+    }
+    if t == 5 {
+        let txt: string = ps_tok_text(source, starts, ends, pos);
+        if string_eq(txt, "_") {
+            vec_push(pat_tags, 0);
+            vec_push(pat_data1, 0);
+            vec_push(pat_data2, 0);
+            vec_push(pat_data3, 0);
+            return pos + 1;
+        }
+        if ps_peek(tags, pos + 1) == 15 {
+            let pp_start: i32 = vec_len(path_pool);
+            let p1: i32 = parse_path(tags, pos, path_pool);
+            if p1 < 0 { return 0 - 1; }
+            let pp_count: i32 = vec_len(path_pool) - pp_start;
+            return path_pattern_from(tags, starts, ends, source, p1,
+                                      pat_tags, pat_data1, pat_data2,
+                                      pat_data3, path_pool,
+                                      pp_start, pp_count);
+        }
+        vec_push(pat_tags, 1);
+        vec_push(pat_data1, pos);
+        vec_push(pat_data2, 0);
+        vec_push(pat_data3, 0);
+        return pos + 1;
+    }
+    if t == 23 {
+        let nt: i32 = ps_peek(tags, pos + 1);
+        if nt == 0 {
+            vec_push(pat_tags, 2);
+            vec_push(pat_data1, 0);
+            vec_push(pat_data2, pos + 1);
+            vec_push(pat_data3, 1);
+            return pos + 2;
+        }
+        if nt == 1 {
+            vec_push(pat_tags, 2);
+            vec_push(pat_data1, 1);
+            vec_push(pat_data2, pos + 1);
+            vec_push(pat_data3, 1);
+            return pos + 2;
+        }
+        return 0 - 1;
+    }
+    let lt: i32 = lit_from_tok(t);
+    if lt >= 0 {
+        vec_push(pat_tags, 2);
+        vec_push(pat_data1, lt);
+        vec_push(pat_data2, pos);
+        vec_push(pat_data3, 0);
+        return pos + 1;
+    }
+    if t == 6 {
+        let p1: i32 = pos + 1;
+        if ps_peek(tags, p1) == 7 {
+            vec_push(pat_tags, 3);
+            vec_push(pat_data1, 0);
+            vec_push(pat_data2, 0);
+            vec_push(pat_data3, 0);
+            return p1 + 1;
+        }
+        let first_idx: i32 = vec_len(pat_tags);
+        let p2: i32 = parse_pat(tags, starts, ends, source, p1,
+                                  pat_tags, pat_data1, pat_data2,
+                                  pat_data3, path_pool);
+        if p2 < 0 { return 0 - 1; }
+        if ps_peek(tags, p2) == 7 {
+            return p2 + 1;
+        }
+        if ps_peek(tags, p2) == 12 {
+            let mut p: i32 = p2 + 1;
+            let mut count: i32 = 1;
+            let mut done: bool = false;
+            while done != true {
+                if ps_peek(tags, p) == 7 {
+                    vec_push(pat_tags, 3);
+                    vec_push(pat_data1, first_idx);
+                    vec_push(pat_data2, count);
+                    vec_push(pat_data3, 0);
+                    return p + 1;
+                }
+                let pn: i32 = parse_pat(tags, starts, ends, source, p,
+                                          pat_tags, pat_data1, pat_data2,
+                                          pat_data3, path_pool);
+                if pn < 0 { return 0 - 1; }
+                count = count + 1;
+                p = pn;
+                if ps_peek(tags, p) == 12 {
+                    p = p + 1;
+                } else {
+                    if ps_peek(tags, p) != 7 { return 0 - 1; }
+                }
+            }
+        }
+        return 0 - 1;
+    }
+    return 0 - 1;
+}
+
+/* ── parse_pat (SML parsePat, lines 228-244) ──────────────────
+   Entry point: parse_pat_atom then accumulate | alternatives. */
+
+fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+             source: string, pos: i32,
+             pat_tags: Vec<i32>, pat_data1: Vec<i32>,
+             pat_data2: Vec<i32>, pat_data3: Vec<i32>,
+             path_pool: Vec<i32>) -> i32 {
+    let first_idx: i32 = vec_len(pat_tags);
+    let p1: i32 = parse_pat_atom(tags, starts, ends, source, pos,
+                                  pat_tags, pat_data1, pat_data2,
+                                  pat_data3, path_pool);
+    if p1 < 0 { return 0 - 1; }
+    if ps_peek(tags, p1) != 29 {
+        return p1;
+    }
+    let mut p: i32 = p1;
+    let mut count: i32 = 1;
+    let mut or_done: bool = false;
+    while or_done != true {
+        if ps_peek(tags, p) != 29 {
+            or_done = true;
+        } else {
+            p = p + 1;
+            let pa: i32 = parse_pat_atom(tags, starts, ends, source, p,
+                                          pat_tags, pat_data1, pat_data2,
+                                          pat_data3, path_pool);
+            if pa < 0 { return 0 - 1; }
+            count = count + 1;
+            p = pa;
+        }
+    }
+    vec_push(pat_tags, 6);
+    vec_push(pat_data1, first_idx);
+    vec_push(pat_data2, count);
+    vec_push(pat_data3, 0);
+    return p;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_of() -> i32 {
@@ -1217,6 +1487,264 @@ fn test_parse_type_paren() -> i32 {
     return 0;
 }
 
+fn test_parse_pat_wild() -> i32 {
+    let src: string = "_";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 97); vec_push(starts, 1); vec_push(ends, 1);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 1 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 0 { return 3; }
+    return 0;
+}
+
+fn test_parse_pat_bind() -> i32 {
+    let src: string = "x";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 97); vec_push(starts, 1); vec_push(ends, 1);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 1 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 1 { return 3; }
+    if vec_get(pd1, 0) != 0 { return 4; }
+    if vec_get(pd2, 0) != 0 { return 5; }
+    return 0;
+}
+
+fn test_parse_pat_bind_mut() -> i32 {
+    let src: string = "mut x";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 77); vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(tags, 5); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 97); vec_push(starts, 5); vec_push(ends, 5);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 2 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 1 { return 3; }
+    if vec_get(pd1, 0) != 1 { return 4; }
+    if vec_get(pd2, 0) != 1 { return 5; }
+    return 0;
+}
+
+fn test_parse_pat_lit() -> i32 {
+    let src: string = "42";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(tags, 97); vec_push(starts, 2); vec_push(ends, 2);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 1 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 2 { return 3; }
+    if vec_get(pd1, 0) != 0 { return 4; }
+    if vec_get(pd3, 0) != 0 { return 5; }
+    return 0;
+}
+
+fn test_parse_pat_neg_lit() -> i32 {
+    let src: string = "-42";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 23); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 0); vec_push(starts, 1); vec_push(ends, 3);
+    vec_push(tags, 97); vec_push(starts, 3); vec_push(ends, 3);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 2 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 2 { return 3; }
+    if vec_get(pd1, 0) != 0 { return 4; }
+    if vec_get(pd3, 0) != 1 { return 5; }
+    return 0;
+}
+
+fn test_parse_pat_unit() -> i32 {
+    let src: string = "()";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 6); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 7); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 97); vec_push(starts, 2); vec_push(ends, 2);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 2 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 3 { return 3; }
+    if vec_get(pd2, 0) != 0 { return 4; }
+    return 0;
+}
+
+fn test_parse_pat_tuple() -> i32 {
+    let src: string = "(x, y)";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 6); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 5); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 12); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 5); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 7); vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(tags, 97); vec_push(starts, 6); vec_push(ends, 6);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 5 { return 1; }
+    if vec_len(pt) != 3 { return 2; }
+    if vec_get(pt, 0) != 1 { return 3; }
+    if vec_get(pt, 1) != 1 { return 4; }
+    if vec_get(pt, 2) != 3 { return 5; }
+    if vec_get(pd2, 2) != 2 { return 6; }
+    return 0;
+}
+
+fn test_parse_pat_enum() -> i32 {
+    let src: string = "Foo::Bar(x)";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(tags, 15); vec_push(starts, 3); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 5); vec_push(ends, 8);
+    vec_push(tags, 6); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 5); vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(tags, 7); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 97); vec_push(starts, 11); vec_push(ends, 11);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 6 { return 1; }
+    if vec_get(pt, 0) != 1 { return 2; }
+    if vec_get(pt, 1) != 5 { return 3; }
+    if vec_get(pd3, 1) != 1 { return 4; }
+    if vec_len(pp) != 2 { return 5; }
+    return 0;
+}
+
+fn test_parse_pat_or() -> i32 {
+    let src: string = "x | y";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 29); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 5); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 97); vec_push(starts, 5); vec_push(ends, 5);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 3 { return 1; }
+    if vec_len(pt) != 3 { return 2; }
+    if vec_get(pt, 0) != 1 { return 3; }
+    if vec_get(pt, 1) != 1 { return 4; }
+    if vec_get(pt, 2) != 6 { return 5; }
+    if vec_get(pd1, 2) != 0 { return 6; }
+    if vec_get(pd2, 2) != 2 { return 7; }
+    return 0;
+}
+
+fn test_parse_pat_paren() -> i32 {
+    let src: string = "(x)";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 6); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 5); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 7); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 97); vec_push(starts, 3); vec_push(ends, 3);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 3 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 1 { return 3; }
+    return 0;
+}
+
+fn test_parse_pat_bare_enum() -> i32 {
+    let src: string = "Foo::Bar";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(tags, 15); vec_push(starts, 3); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 5); vec_push(ends, 8);
+    vec_push(tags, 97); vec_push(starts, 8); vec_push(ends, 8);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_pat(tags, starts, ends, src, 0,
+                             pt, pd1, pd2, pd3, pp);
+    if p != 3 { return 1; }
+    if vec_len(pt) != 1 { return 2; }
+    if vec_get(pt, 0) != 5 { return 3; }
+    if vec_get(pd3, 0) != 0 { return 4; }
+    if vec_len(pp) != 2 { return 5; }
+    return 0;
+}
+
 fn test_ps_nav() -> i32 {
     let tags: Vec<i32> = vec_new();
     vec_push(tags, 5);
@@ -1476,5 +2004,27 @@ fn main() -> i32 {
     if r26 != 0 { return 370 + r26; }
     let r27: i32 = test_parse_type_paren();
     if r27 != 0 { return 380 + r27; }
+    let r28: i32 = test_parse_pat_wild();
+    if r28 != 0 { return 390 + r28; }
+    let r29: i32 = test_parse_pat_bind();
+    if r29 != 0 { return 400 + r29; }
+    let r30: i32 = test_parse_pat_bind_mut();
+    if r30 != 0 { return 410 + r30; }
+    let r31: i32 = test_parse_pat_lit();
+    if r31 != 0 { return 420 + r31; }
+    let r32: i32 = test_parse_pat_neg_lit();
+    if r32 != 0 { return 430 + r32; }
+    let r33: i32 = test_parse_pat_unit();
+    if r33 != 0 { return 440 + r33; }
+    let r34: i32 = test_parse_pat_tuple();
+    if r34 != 0 { return 450 + r34; }
+    let r35: i32 = test_parse_pat_enum();
+    if r35 != 0 { return 460 + r35; }
+    let r36: i32 = test_parse_pat_or();
+    if r36 != 0 { return 470 + r36; }
+    let r37: i32 = test_parse_pat_paren();
+    if r37 != 0 { return 480 + r37; }
+    let r38: i32 = test_parse_pat_bare_enum();
+    if r38 != 0 { return 490 + r38; }
     return 0;
 }
