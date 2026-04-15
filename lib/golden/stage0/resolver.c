@@ -38,6 +38,8 @@ static const char* error_code_wrong_arity(void);
 static const char* error_code_use_clause(void);
 static int arity_matches(int expected, int actual);
 static int check_call_arity(int expected, int actual);
+static int register_item(int item_tag, int item_d1, int item_d2, int item_d3, int item_d4, int mod_vals, int mod_tys, int fn_arities);
+static int register_items(int it, int id1, int id2, int id3, int id4, int mod_vals, int mod_tys, int fn_arities);
 static int test_path_join(void);
 static int test_mangle_use(void);
 static int test_is_intrinsic(void);
@@ -56,6 +58,9 @@ static int test_variant_stem(void);
 static int test_enum_variant_reg(void);
 static int test_pat_binds_vec(void);
 static int test_bind_pattern_locals(void);
+static int test_register_item_fn(void);
+static int test_register_item_struct(void);
+static int test_register_items(void);
 
 static const char* path_join2(const char* a, const char* b) {
   const char* _sv0t0 = sv0_string_concat(a, "::");
@@ -625,6 +630,60 @@ static int check_call_arity(int expected, int actual) {
   } else {
   }
   return 1;
+}
+
+static int register_item(int item_tag, int item_d1, int item_d2, int item_d3, int item_d4, int mod_vals, int mod_tys, int fn_arities) {
+  if ((item_tag == 0)) {
+    sv0_vec_push(mod_vals, item_d1);
+    sv0_vec_push(fn_arities, item_d1);
+    sv0_vec_push(fn_arities, item_d3);
+    return 0;
+  } else {
+  }
+  if ((item_tag == 1)) {
+    sv0_vec_push(mod_vals, item_d1);
+    sv0_vec_push(mod_tys, item_d1);
+    return 0;
+  } else {
+  }
+  if ((item_tag == 2)) {
+    sv0_vec_push(mod_vals, item_d1);
+    sv0_vec_push(mod_tys, item_d1);
+    return 0;
+  } else {
+  }
+  if ((item_tag == 3)) {
+    sv0_vec_push(mod_tys, item_d1);
+    return 0;
+  } else {
+  }
+  if ((item_tag == 7)) {
+    sv0_vec_push(mod_tys, item_d1);
+    return 0;
+  } else {
+  }
+  return 0;
+}
+
+static int register_items(int it, int id1, int id2, int id3, int id4, int mod_vals, int mod_tys, int fn_arities) {
+  int _sv0t0 = sv0_vec_len(it);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(it, i);
+    int tag = _sv0t1;
+    int _sv0t2 = sv0_vec_get(id1, i);
+    int d1 = _sv0t2;
+    int _sv0t3 = sv0_vec_get(id2, i);
+    int d2 = _sv0t3;
+    int _sv0t4 = sv0_vec_get(id3, i);
+    int d3 = _sv0t4;
+    int _sv0t5 = sv0_vec_get(id4, i);
+    int d4 = _sv0t5;
+    int _sv0t6 = register_item(tag, d1, d2, d3, d4, mod_vals, mod_tys, fn_arities);
+    i = (i + 1);
+  }
+  return 0;
 }
 
 static int test_path_join(void) {
@@ -1299,6 +1358,164 @@ static int test_bind_pattern_locals(void) {
   return 0;
 }
 
+static int test_register_item_fn(void) {
+  int _sv0t0 = sv0_vec_new();
+  int mv = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int mt = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int fa = _sv0t2;
+  int _sv0t3 = register_item(0, 42, 1, 3, 0, mv, mt, fa);
+  int _sv0t4 = sv0_vec_len(mv);
+  if ((_sv0t4 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(mv, 0);
+  if ((_sv0t5 != 42)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_len(mt);
+  if ((_sv0t6 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(fa);
+  if ((_sv0t7 != 2)) {
+    return 4;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(fa, 0);
+  if ((_sv0t8 != 42)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(fa, 1);
+  if ((_sv0t9 != 3)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_register_item_struct(void) {
+  int _sv0t0 = sv0_vec_new();
+  int mv = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int mt = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int fa = _sv0t2;
+  int _sv0t3 = register_item(1, 10, 2, 0, 0, mv, mt, fa);
+  int _sv0t4 = sv0_vec_len(mv);
+  if ((_sv0t4 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(mv, 0);
+  if ((_sv0t5 != 10)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_len(mt);
+  if ((_sv0t6 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(mt, 0);
+  if ((_sv0t7 != 10)) {
+    return 4;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_len(fa);
+  if ((_sv0t8 != 0)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_register_items(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int id1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int id2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int id3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int id4 = _sv0t4;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(id1, 5);
+  sv0_vec_push(id2, 1);
+  sv0_vec_push(id3, 2);
+  sv0_vec_push(id4, 0);
+  sv0_vec_push(it, 1);
+  sv0_vec_push(id1, 10);
+  sv0_vec_push(id2, 3);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  sv0_vec_push(it, 3);
+  sv0_vec_push(id1, 20);
+  sv0_vec_push(id2, 1);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  int _sv0t5 = sv0_vec_new();
+  int mv = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int mt = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int fa = _sv0t7;
+  int _sv0t8 = register_items(it, id1, id2, id3, id4, mv, mt, fa);
+  int _sv0t9 = sv0_vec_len(mv);
+  if ((_sv0t9 != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(mv, 0);
+  if ((_sv0t10 != 5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(mv, 1);
+  if ((_sv0t11 != 10)) {
+    return 3;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_len(mt);
+  if ((_sv0t12 != 2)) {
+    return 4;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(mt, 0);
+  if ((_sv0t13 != 10)) {
+    return 5;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(mt, 1);
+  if ((_sv0t14 != 20)) {
+    return 6;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_len(fa);
+  if ((_sv0t15 != 2)) {
+    return 7;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_get(fa, 0);
+  if ((_sv0t16 != 5)) {
+    return 8;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_get(fa, 1);
+  if ((_sv0t17 != 2)) {
+    return 9;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_join();
   int r1 = _sv0t0;
@@ -1423,6 +1640,27 @@ int main(void) {
   if ((r18 != 0)) {
     int _sv0t34 = (180 + r18);
     return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_register_item_fn();
+  int r19 = _sv0t35;
+  if ((r19 != 0)) {
+    int _sv0t36 = (190 + r19);
+    return _sv0t36;
+  } else {
+  }
+  int _sv0t37 = test_register_item_struct();
+  int r20 = _sv0t37;
+  if ((r20 != 0)) {
+    int _sv0t38 = (200 + r20);
+    return _sv0t38;
+  } else {
+  }
+  int _sv0t39 = test_register_items();
+  int r21 = _sv0t39;
+  if ((r21 != 0)) {
+    int _sv0t40 = (210 + r21);
+    return _sv0t40;
   } else {
   }
   return 0;

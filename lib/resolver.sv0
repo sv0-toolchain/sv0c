@@ -6,7 +6,9 @@
    dispatch (by item tag), pattern-bind counting, variant-arity
    extraction, context rules (allowSelf), error codes, arity checks,
    pat_binds (SML patBinds — collects bound var handles from flat
-   patterns into Vec), bind_pattern_locals (SML bindPatternLocals).
+   patterns into Vec), bind_pattern_locals (SML bindPatternLocals),
+   register_item/register_items (SML registerItem — item arena to
+   env registration pass; enum variant registration deferred).
    AST traversal functions (resolveTy, resolveExpr, resolveStmt,
    resolveTopItem) and applyUseClause deferred — need full AST enum
    pattern matching with Box handles. */
@@ -344,6 +346,61 @@ fn check_call_arity(expected: i32, actual: i32) -> i32 {
     return 1;
 }
 
+/* ── item registration pass (SML registerItem) ────────────────
+   Walks the item arena and registers names/arities in the env.
+   Enum variant registration deferred — needs variant sub-arena
+   with per-variant name + arity data (see transliteration-plan). */
+
+fn register_item(item_tag: i32, item_d1: i32, item_d2: i32,
+                 item_d3: i32, item_d4: i32,
+                 mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                 fn_arities: Vec<i32>) -> i32 {
+    if item_tag == 0 {
+        vec_push(mod_vals, item_d1);
+        vec_push(fn_arities, item_d1);
+        vec_push(fn_arities, item_d3);
+        return 0;
+    }
+    if item_tag == 1 {
+        vec_push(mod_vals, item_d1);
+        vec_push(mod_tys, item_d1);
+        return 0;
+    }
+    if item_tag == 2 {
+        vec_push(mod_vals, item_d1);
+        vec_push(mod_tys, item_d1);
+        return 0;
+    }
+    if item_tag == 3 {
+        vec_push(mod_tys, item_d1);
+        return 0;
+    }
+    if item_tag == 7 {
+        vec_push(mod_tys, item_d1);
+        return 0;
+    }
+    return 0;
+}
+
+fn register_items(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                  id3: Vec<i32>, id4: Vec<i32>,
+                  mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                  fn_arities: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(it, i);
+        let d1: i32 = vec_get(id1, i);
+        let d2: i32 = vec_get(id2, i);
+        let d3: i32 = vec_get(id3, i);
+        let d4: i32 = vec_get(id4, i);
+        register_item(tag, d1, d2, d3, d4,
+                      mod_vals, mod_tys, fn_arities);
+        i = i + 1;
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_path_join() -> i32 {
@@ -564,6 +621,58 @@ fn test_bind_pattern_locals() -> i32 {
     return 0;
 }
 
+fn test_register_item_fn() -> i32 {
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    register_item(0, 42, 1, 3, 0, mv, mt, fa);
+    if vec_len(mv) != 1 { return 1; }
+    if vec_get(mv, 0) != 42 { return 2; }
+    if vec_len(mt) != 0 { return 3; }
+    if vec_len(fa) != 2 { return 4; }
+    if vec_get(fa, 0) != 42 { return 5; }
+    if vec_get(fa, 1) != 3 { return 6; }
+    return 0;
+}
+
+fn test_register_item_struct() -> i32 {
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    register_item(1, 10, 2, 0, 0, mv, mt, fa);
+    if vec_len(mv) != 1 { return 1; }
+    if vec_get(mv, 0) != 10 { return 2; }
+    if vec_len(mt) != 1 { return 3; }
+    if vec_get(mt, 0) != 10 { return 4; }
+    if vec_len(fa) != 0 { return 5; }
+    return 0;
+}
+
+fn test_register_items() -> i32 {
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    vec_push(it, 0); vec_push(id1, 5); vec_push(id2, 1); vec_push(id3, 2); vec_push(id4, 0);
+    vec_push(it, 1); vec_push(id1, 10); vec_push(id2, 3); vec_push(id3, 0); vec_push(id4, 0);
+    vec_push(it, 3); vec_push(id1, 20); vec_push(id2, 1); vec_push(id3, 0); vec_push(id4, 0);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    register_items(it, id1, id2, id3, id4, mv, mt, fa);
+    if vec_len(mv) != 2 { return 1; }
+    if vec_get(mv, 0) != 5 { return 2; }
+    if vec_get(mv, 1) != 10 { return 3; }
+    if vec_len(mt) != 2 { return 4; }
+    if vec_get(mt, 0) != 10 { return 5; }
+    if vec_get(mt, 1) != 20 { return 6; }
+    if vec_len(fa) != 2 { return 7; }
+    if vec_get(fa, 0) != 5 { return 8; }
+    if vec_get(fa, 1) != 2 { return 9; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_join();
     if r1 != 0 { return r1; }
@@ -601,5 +710,11 @@ fn main() -> i32 {
     if r17 != 0 { return 170 + r17; }
     let r18: i32 = test_bind_pattern_locals();
     if r18 != 0 { return 180 + r18; }
+    let r19: i32 = test_register_item_fn();
+    if r19 != 0 { return 190 + r19; }
+    let r20: i32 = test_register_item_struct();
+    if r20 != 0 { return 200 + r20; }
+    let r21: i32 = test_register_items();
+    if r21 != 0 { return 210 + r21; }
     return 0;
 }
