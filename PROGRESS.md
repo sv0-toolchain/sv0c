@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 18 — enriched ItemFn arena + resolver registration pass.** `parser.sv0`: ItemFn arena enriched with d3=param_count, d4=contract_count; `parse_param_list`/`parse_contracts` signatures extended with count_out Vec. `resolver.sv0`: 2 new functions (`register_item`, `register_items` — SML `registerItem` dispatched by item tag; enum variant registration deferred), 3 new test groups. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 19 — resolver env inlining + resolve_pat_shape + resolve_ty.** `resolver.sv0`: 6 new functions — `tok_str` (token position → string extraction), `res_is_prelude_type` (inline copy from env.sv0), `res_value_exists` (string-based mod_vals search), `res_type_exists` (string-based mod_tys + prelude search), `resolve_pat_shape` (SML `resolvePatShape` — recursive pattern arena walk, validates constructor/type names via env; handles PatWild/PatBind/PatLit/PatTuple/PatStruct/PatEnum/PatOr), `resolve_ty` (SML `resolveTy` — recursive type arena walk, validates type names; handles TyUnit/TyName/TyRef/TyRefMut/TyArray/TySlice/TyTuple; TyArray size expr deferred). 7 new test groups. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

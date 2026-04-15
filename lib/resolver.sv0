@@ -8,10 +8,15 @@
    pat_binds (SML patBinds — collects bound var handles from flat
    patterns into Vec), bind_pattern_locals (SML bindPatternLocals),
    register_item/register_items (SML registerItem — item arena to
-   env registration pass; enum variant registration deferred).
-   AST traversal functions (resolveTy, resolveExpr, resolveStmt,
-   resolveTopItem) and applyUseClause deferred — need full AST enum
-   pattern matching with Box handles. */
+   env registration pass; enum variant registration deferred),
+   inline env lookups (tok_str, res_is_prelude_type, res_value_exists,
+   res_type_exists — string-based name comparison via token stream),
+   resolve_pat_shape (SML resolvePatShape — pattern name validation),
+   resolve_ty (SML resolveTy — type name validation; TyArray size expr
+   deferred to resolve_expr).
+   Remaining: resolve_expr, resolve_stmt, resolve_contract, resolve_fn,
+   resolve_struct/enum/trait/impl, resolveTopItem, applyUseClause,
+   resolve (top-level entry). */
 
 /* ── path joining ───────────────────────────────────────────── */
 
@@ -401,6 +406,232 @@ fn register_items(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
     return 0;
 }
 
+/* ── inline env lookups for resolver traversals ──────────────
+   Each .sv0 is compiled standalone; resolver needs env-style
+   lookups but cannot import from env.sv0. These operate on the
+   same data structures (mod_vals/mod_tys as Vec<i32> of token
+   positions, fn_arities interleaved [pos, arity, ...]).
+   Lookups extract strings from the token stream for comparison
+   since two occurrences of the same name have different positions. */
+
+fn tok_str(source: string, starts: Vec<i32>, ends: Vec<i32>,
+           pos: i32) -> string {
+    let s: i32 = vec_get(starts, pos);
+    let e: i32 = vec_get(ends, pos);
+    return string_substr(source, s, e - s);
+}
+
+fn res_is_prelude_type(name: string) -> bool {
+    if string_eq(name, "i8") { return true; }
+    if string_eq(name, "i16") { return true; }
+    if string_eq(name, "i32") { return true; }
+    if string_eq(name, "i64") { return true; }
+    if string_eq(name, "i128") { return true; }
+    if string_eq(name, "u8") { return true; }
+    if string_eq(name, "u16") { return true; }
+    if string_eq(name, "u32") { return true; }
+    if string_eq(name, "u64") { return true; }
+    if string_eq(name, "u128") { return true; }
+    if string_eq(name, "isize") { return true; }
+    if string_eq(name, "usize") { return true; }
+    if string_eq(name, "f32") { return true; }
+    if string_eq(name, "f64") { return true; }
+    if string_eq(name, "bool") { return true; }
+    if string_eq(name, "char") { return true; }
+    if string_eq(name, "str") { return true; }
+    if string_eq(name, "string") { return true; }
+    if string_eq(name, "String") { return true; }
+    if string_eq(name, "unit") { return true; }
+    if string_eq(name, "Vec") { return true; }
+    if string_eq(name, "Box") { return true; }
+    return false;
+}
+
+fn res_value_exists(mod_vals: Vec<i32>, name_str: string,
+                    source: string, starts: Vec<i32>,
+                    ends: Vec<i32>) -> bool {
+    let len: i32 = vec_len(mod_vals);
+    let mut i: i32 = 0;
+    while i < len {
+        let pos: i32 = vec_get(mod_vals, i);
+        let nm: string = tok_str(source, starts, ends, pos);
+        if string_eq(nm, name_str) { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn res_type_exists(mod_tys: Vec<i32>, name_str: string,
+                   source: string, starts: Vec<i32>,
+                   ends: Vec<i32>) -> bool {
+    if res_is_prelude_type(name_str) { return true; }
+    let len: i32 = vec_len(mod_tys);
+    let mut i: i32 = 0;
+    while i < len {
+        let pos: i32 = vec_get(mod_tys, i);
+        let nm: string = tok_str(source, starts, ends, pos);
+        if string_eq(nm, name_str) { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* ── resolve_pat_shape (SML resolvePatShape) ──────────────────
+   Validates that struct/enum constructor names in patterns exist
+   in the env. Walks pattern arena recursively. Returns 0 on
+   success, 300 for unbound constructor, 301 for unknown type,
+   306 for unsupported PatOr. */
+
+fn resolve_pat_shape(pt: Vec<i32>, pd1: Vec<i32>, pd2: Vec<i32>,
+                     pd3: Vec<i32>, idx: i32,
+                     source: string, starts: Vec<i32>,
+                     ends: Vec<i32>,
+                     mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                     pp: Vec<i32>) -> i32 {
+    let tag: i32 = vec_get(pt, idx);
+    if tag == 0 { return 0; }
+    if tag == 1 { return 0; }
+    if tag == 2 { return 0; }
+    if tag == 3 {
+        let first: i32 = vec_get(pd1, idx);
+        let count: i32 = vec_get(pd2, idx);
+        let mut i: i32 = 0;
+        while i < count {
+            let r: i32 = resolve_pat_shape(pt, pd1, pd2, pd3, first + i,
+                                            source, starts, ends,
+                                            mod_vals, mod_tys, pp);
+            if r != 0 { return r; }
+            i = i + 1;
+        }
+        return 0;
+    }
+    if tag == 4 {
+        let pps: i32 = vec_get(pd1, idx);
+        let ppc: i32 = vec_get(pd2, idx);
+        let fc: i32 = vec_get(pd3, idx);
+        let path: Vec<i32> = vec_new();
+        let mut k: i32 = 0;
+        while k < ppc {
+            vec_push(path, vec_get(pp, pps + k));
+            k = k + 1;
+        }
+        let ps: string = path_join_vec(source, starts, ends, path);
+        if ppc >= 2 {
+            if res_value_exists(mod_vals, ps, source, starts, ends) != true {
+                return 300;
+            }
+        } else {
+            if res_type_exists(mod_tys, ps, source, starts, ends) != true {
+                return 301;
+            }
+        }
+        let mut fi: i32 = 0;
+        while fi < fc {
+            let child_idx: i32 = idx - fc + fi;
+            let r: i32 = resolve_pat_shape(pt, pd1, pd2, pd3, child_idx,
+                                            source, starts, ends,
+                                            mod_vals, mod_tys, pp);
+            if r != 0 { return r; }
+            fi = fi + 1;
+        }
+        return 0;
+    }
+    if tag == 5 {
+        let pps: i32 = vec_get(pd1, idx);
+        let ppc: i32 = vec_get(pd2, idx);
+        let ac: i32 = vec_get(pd3, idx);
+        let path: Vec<i32> = vec_new();
+        let mut k: i32 = 0;
+        while k < ppc {
+            vec_push(path, vec_get(pp, pps + k));
+            k = k + 1;
+        }
+        let ps: string = path_join_vec(source, starts, ends, path);
+        if res_value_exists(mod_vals, ps, source, starts, ends) != true {
+            return 300;
+        }
+        let mut ai: i32 = 0;
+        while ai < ac {
+            let child_idx: i32 = idx - ac + ai;
+            let r: i32 = resolve_pat_shape(pt, pd1, pd2, pd3, child_idx,
+                                            source, starts, ends,
+                                            mod_vals, mod_tys, pp);
+            if r != 0 { return r; }
+            ai = ai + 1;
+        }
+        return 0;
+    }
+    if tag == 6 { return 306; }
+    return 0;
+}
+
+/* ── resolve_ty (SML resolveTy) ───────────────────────────────
+   Validates that type names in the type arena exist in the env.
+   Walks type arena recursively. Returns 0 on success, 301 for
+   unknown type. TyArray size expression resolution deferred to
+   resolve_expr (batch 20+). */
+
+fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
+              td3: Vec<i32>, idx: i32,
+              source: string, starts: Vec<i32>, ends: Vec<i32>,
+              mod_tys: Vec<i32>, pp: Vec<i32>) -> i32 {
+    let tag: i32 = vec_get(tt, idx);
+    if tag == 6 { return 0; }
+    if tag == 0 {
+        let pps: i32 = vec_get(td1, idx);
+        let ppc: i32 = vec_get(td2, idx);
+        let tac: i32 = vec_get(td3, idx);
+        let path: Vec<i32> = vec_new();
+        let mut k: i32 = 0;
+        while k < ppc {
+            vec_push(path, vec_get(pp, pps + k));
+            k = k + 1;
+        }
+        let ps: string = path_join_vec(source, starts, ends, path);
+        if res_type_exists(mod_tys, ps, source, starts, ends) != true {
+            return 301;
+        }
+        let mut ti: i32 = 0;
+        while ti < tac {
+            let child_idx: i32 = idx - tac + ti;
+            let r: i32 = resolve_ty(tt, td1, td2, td3, child_idx,
+                                     source, starts, ends, mod_tys, pp);
+            if r != 0 { return r; }
+            ti = ti + 1;
+        }
+        return 0;
+    }
+    if tag == 1 {
+        return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
+                           source, starts, ends, mod_tys, pp);
+    }
+    if tag == 2 {
+        return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
+                           source, starts, ends, mod_tys, pp);
+    }
+    if tag == 3 {
+        return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
+                           source, starts, ends, mod_tys, pp);
+    }
+    if tag == 4 {
+        return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
+                           source, starts, ends, mod_tys, pp);
+    }
+    if tag == 5 {
+        let first: i32 = vec_get(td1, idx);
+        let count: i32 = vec_get(td2, idx);
+        let mut i: i32 = 0;
+        while i < count {
+            let r: i32 = resolve_ty(tt, td1, td2, td3, first + i,
+                                     source, starts, ends, mod_tys, pp);
+            if r != 0 { return r; }
+            i = i + 1;
+        }
+        return 0;
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_path_join() -> i32 {
@@ -673,6 +904,152 @@ fn test_register_items() -> i32 {
     return 0;
 }
 
+fn test_tok_str() -> i32 {
+    let source: string = "fn foo bar";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(starts, 3); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 10);
+    if string_eq(tok_str(source, starts, ends, 0), "fn") != true { return 1; }
+    if string_eq(tok_str(source, starts, ends, 1), "foo") != true { return 2; }
+    if string_eq(tok_str(source, starts, ends, 2), "bar") != true { return 3; }
+    return 0;
+}
+
+fn test_res_value_exists() -> i32 {
+    let source: string = "alpha beta gamma";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(starts, 6); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 16);
+    let mv: Vec<i32> = vec_new();
+    vec_push(mv, 0);
+    vec_push(mv, 2);
+    if res_value_exists(mv, "alpha", source, starts, ends) != true { return 1; }
+    if res_value_exists(mv, "gamma", source, starts, ends) != true { return 2; }
+    if res_value_exists(mv, "beta", source, starts, ends) != false { return 3; }
+    if res_value_exists(mv, "nope", source, starts, ends) != false { return 4; }
+    return 0;
+}
+
+fn test_res_type_exists() -> i32 {
+    let source: string = "MyStruct i32";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 12);
+    let mt: Vec<i32> = vec_new();
+    vec_push(mt, 0);
+    if res_type_exists(mt, "MyStruct", source, starts, ends) != true { return 1; }
+    if res_type_exists(mt, "i32", source, starts, ends) != true { return 2; }
+    if res_type_exists(mt, "bool", source, starts, ends) != true { return 3; }
+    if res_type_exists(mt, "Nope", source, starts, ends) != false { return 4; }
+    return 0;
+}
+
+fn test_resolve_pat_shape_simple() -> i32 {
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    vec_push(pt, 0); vec_push(pd1, 0); vec_push(pd2, 0); vec_push(pd3, 0);
+    let source: string = "_";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    if resolve_pat_shape(pt, pd1, pd2, pd3, 0,
+                          source, starts, ends, mv, mt, pp) != 0 { return 1; }
+    vec_push(pt, 1); vec_push(pd1, 0); vec_push(pd2, 0); vec_push(pd3, 0);
+    if resolve_pat_shape(pt, pd1, pd2, pd3, 1,
+                          source, starts, ends, mv, mt, pp) != 0 { return 2; }
+    vec_push(pt, 6); vec_push(pd1, 0); vec_push(pd2, 0); vec_push(pd3, 0);
+    if resolve_pat_shape(pt, pd1, pd2, pd3, 2,
+                          source, starts, ends, mv, mt, pp) != 306 { return 3; }
+    return 0;
+}
+
+fn test_resolve_pat_enum() -> i32 {
+    let source: string = "Option Some Option::Some x";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 11);
+    vec_push(starts, 12); vec_push(ends, 24);
+    vec_push(starts, 25); vec_push(ends, 26);
+    let mv: Vec<i32> = vec_new();
+    vec_push(mv, 2);
+    let mt: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    vec_push(pt, 1); vec_push(pd1, 3); vec_push(pd2, 0); vec_push(pd3, 0);
+    vec_push(pt, 5); vec_push(pd1, 0); vec_push(pd2, 2); vec_push(pd3, 1);
+    if resolve_pat_shape(pt, pd1, pd2, pd3, 1,
+                          source, starts, ends, mv, mt, pp) != 0 { return 1; }
+    let mv2: Vec<i32> = vec_new();
+    if resolve_pat_shape(pt, pd1, pd2, pd3, 1,
+                          source, starts, ends, mv2, mt, pp) != 300 { return 2; }
+    return 0;
+}
+
+fn test_resolve_ty_simple() -> i32 {
+    let source: string = "i32 MyType";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 10);
+    let mt: Vec<i32> = vec_new();
+    vec_push(mt, 1);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    let td3: Vec<i32> = vec_new();
+    vec_push(tt, 0); vec_push(td1, 0); vec_push(td2, 1); vec_push(td3, 0);
+    if resolve_ty(tt, td1, td2, td3, 0,
+                   source, starts, ends, mt, pp) != 0 { return 1; }
+    vec_push(pp, 1);
+    vec_push(tt, 0); vec_push(td1, 1); vec_push(td2, 1); vec_push(td3, 0);
+    if resolve_ty(tt, td1, td2, td3, 1,
+                   source, starts, ends, mt, pp) != 0 { return 2; }
+    let mt2: Vec<i32> = vec_new();
+    if resolve_ty(tt, td1, td2, td3, 1,
+                   source, starts, ends, mt2, pp) != 301 { return 3; }
+    return 0;
+}
+
+fn test_resolve_ty_ref() -> i32 {
+    let source: string = "i32";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    let mt: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    let td3: Vec<i32> = vec_new();
+    vec_push(tt, 0); vec_push(td1, 0); vec_push(td2, 1); vec_push(td3, 0);
+    vec_push(tt, 1); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
+    if resolve_ty(tt, td1, td2, td3, 1,
+                   source, starts, ends, mt, pp) != 0 { return 1; }
+    vec_push(tt, 6); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
+    if resolve_ty(tt, td1, td2, td3, 2,
+                   source, starts, ends, mt, pp) != 0 { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_join();
     if r1 != 0 { return r1; }
@@ -716,5 +1093,19 @@ fn main() -> i32 {
     if r20 != 0 { return 200 + r20; }
     let r21: i32 = test_register_items();
     if r21 != 0 { return 210 + r21; }
+    let r22: i32 = test_tok_str();
+    if r22 != 0 { return 220 + r22; }
+    let r23: i32 = test_res_value_exists();
+    if r23 != 0 { return 230 + r23; }
+    let r24: i32 = test_res_type_exists();
+    if r24 != 0 { return 240 + r24; }
+    let r25: i32 = test_resolve_pat_shape_simple();
+    if r25 != 0 { return 250 + r25; }
+    let r26: i32 = test_resolve_pat_enum();
+    if r26 != 0 { return 260 + r26; }
+    let r27: i32 = test_resolve_ty_simple();
+    if r27 != 0 { return 270 + r27; }
+    let r28: i32 = test_resolve_ty_ref();
+    if r28 != 0 { return 280 + r28; }
     return 0;
 }
