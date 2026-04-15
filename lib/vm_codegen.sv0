@@ -8,6 +8,8 @@
    lookup_slot (SML lookupSlot — name→slot_info in Vec env),
    alloc_local (SML allocLocal — bindParam wrapper), replace_loop_exit_jump
    (SML replaceLoopExitJump — patches trailing JUMP placeholder),
+   patch_continue_jumps (SML patchContinueJumpsFrom — walk flat opcode
+   stream and replace continue-sentinel JUMP args with real offsets),
    enum_field_names (SML enumFieldNames — "tag","p0","p1"... Vec),
    value_width (SML valueWidth — slot-based width for VVar, else 1),
    bind_param (SML bindParam — slot_info with struct/enum fields).
@@ -436,6 +438,45 @@ fn replace_loop_exit_jump(instrs: Vec<i32>, back_offset: i32) -> bool {
     return true;
 }
 
+/* ── insn_vec_stride ───────────────────────────────────────────
+   Number of i32 elements one instruction occupies in a flat Vec.
+   Byte size → element count: 1→1, 2→2, 5→2, 9→3, 13→4.        */
+fn insn_vec_stride(opc: i32) -> i32 {
+    let bs: i32 = insn_size(opc);
+    if bs <= 1 { return 1; }
+    return (bs - 1) / 4 + 1;
+}
+
+/* ── patch_continue_jumps (SML patchContinueJumpsFrom) ────────
+   Walk a flat instruction Vec starting at byte position from_pos.
+   For each JUMP (opcode 112) whose arg is the continue sentinel,
+   replace the arg with (target_abs - (current_byte_pos + byte_len)).
+   Byte positions use insn_size; Vec indices use insn_vec_stride. */
+fn patch_continue_jumps(instrs: Vec<i32>, from_pos: i32,
+                        target_abs: i32) -> i32 {
+    let n: i32 = vec_len(instrs);
+    let mut i: i32 = 0;
+    let mut pos: i32 = from_pos;
+    let mut patched: i32 = 0;
+    while i < n {
+        let op: i32 = vec_get(instrs, i);
+        let byte_sz: i32 = insn_size(op);
+        let stride: i32 = insn_vec_stride(op);
+        if op == 112 {
+            if i + 1 < n {
+                let arg: i32 = vec_get(instrs, i + 1);
+                if is_loop_continue_sentinel(arg) {
+                    vec_set(instrs, i + 1, target_abs - (pos + byte_sz));
+                    patched = patched + 1;
+                }
+            }
+        }
+        i = i + stride;
+        pos = pos + byte_sz;
+    }
+    return patched;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_variant_slots() -> i32 {
@@ -680,6 +721,32 @@ fn test_bind_param() -> i32 {
     return 0;
 }
 
+fn test_patch_continue_jumps() -> i32 {
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, 112);
+    vec_push(instrs, loop_continue_sentinel());
+    let n: i32 = patch_continue_jumps(instrs, 0, 100);
+    if n != 1 { return 1; }
+    if vec_get(instrs, 1) != 95 { return 2; }
+    let i2: Vec<i32> = vec_new();
+    vec_push(i2, 0);
+    vec_push(i2, 112);
+    vec_push(i2, loop_continue_sentinel());
+    let n2: i32 = patch_continue_jumps(i2, 10, 50);
+    if n2 != 1 { return 3; }
+    if vec_get(i2, 2) != 34 { return 4; }
+    let i3: Vec<i32> = vec_new();
+    vec_push(i3, 112);
+    vec_push(i3, 42);
+    let n3: i32 = patch_continue_jumps(i3, 0, 100);
+    if n3 != 0 { return 5; }
+    if vec_get(i3, 1) != 42 { return 6; }
+    let empty: Vec<i32> = vec_new();
+    let n4: i32 = patch_continue_jumps(empty, 0, 100);
+    if n4 != 0 { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -719,5 +786,7 @@ fn main() -> i32 {
     if r18 != 0 { return 190 + r18; }
     let r19: i32 = test_bind_param();
     if r19 != 0 { return 200 + r19; }
+    let r20: i32 = test_patch_continue_jumps();
+    if r20 != 0 { return 210 + r20; }
     return 0;
 }

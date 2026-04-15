@@ -19,6 +19,7 @@ static const char* ast_binop_to_c(int tag);
 static const char* ast_unop_to_c(int tag);
 static int is_supported_unop(int tag);
 static const char* ast_ty_to_c_string(const char* name);
+static const char* ast_ty_to_c_string_with_user(const char* name, int name_handle, int struct_names, int enum_names);
 static int is_void_cty(const char* name);
 static int ast_ty_is_unit(const char* name);
 static const char* old_slot_prefix(void);
@@ -96,6 +97,7 @@ static int test_resolve_fn_callee(void);
 static int test_resolve_ctor_path(void);
 static int test_param_name(void);
 static int test_lower_field_index(void);
+static int test_ast_ty_c_string_user(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -522,6 +524,28 @@ static const char* ast_ty_to_c_string(const char* name) {
   int _sv0t15 = sv0_string_eq(name, "Box");
   if (_sv0t15) {
     return "int";
+  } else {
+  }
+  return "int";
+}
+
+static const char* ast_ty_to_c_string_with_user(const char* name, int name_handle, int struct_names, int enum_names) {
+  const char* _sv0t0 = ast_ty_to_c_string(name);
+  const char* prim;
+  prim = _sv0t0;
+  int _sv0t1 = sv0_string_eq(prim, "int");
+  if ((_sv0t1 != 1)) {
+    return prim;
+  } else {
+  }
+  int _sv0t2 = is_struct_cty(struct_names, name_handle);
+  if (_sv0t2) {
+    return name;
+  } else {
+  }
+  int _sv0t3 = is_enum_cty(enum_names, name_handle);
+  if (_sv0t3) {
+    return name;
   } else {
   }
   return "int";
@@ -1937,6 +1961,46 @@ static int test_lower_field_index(void) {
   return 0;
 }
 
+static int test_ast_ty_c_string_user(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int en = _sv0t1;
+  sv0_vec_push(sn, 100);
+  sv0_vec_push(en, 200);
+  const char* _sv0t2 = ast_ty_to_c_string_with_user("i32", 50, sn, en);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "int");
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t4 = ast_ty_to_c_string_with_user("MyStruct", 100, sn, en);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "MyStruct");
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t6 = ast_ty_to_c_string_with_user("MyEnum", 200, sn, en);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "MyEnum");
+  if ((_sv0t7 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t8 = ast_ty_to_c_string_with_user("Unknown", 999, sn, en);
+  int _sv0t9 = sv0_string_eq(_sv0t8, "int");
+  if ((_sv0t9 != 1)) {
+    return 4;
+  } else {
+  }
+  const char* _sv0t10 = ast_ty_to_c_string_with_user("bool", 999, sn, en);
+  int _sv0t11 = sv0_string_eq(_sv0t10, "int");
+  if ((_sv0t11 != 1)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -2145,6 +2209,13 @@ int main(void) {
   if ((r30 != 0)) {
     int _sv0t58 = (320 + r30);
     return _sv0t58;
+  } else {
+  }
+  int _sv0t59 = test_ast_ty_c_string_user();
+  int r31 = _sv0t59;
+  if ((r31 != 0)) {
+    int _sv0t60 = (330 + r31);
+    return _sv0t60;
   } else {
   }
   return 0;

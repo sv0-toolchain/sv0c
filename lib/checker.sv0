@@ -13,7 +13,10 @@
    enter_loop/exit_loop (SML withLoop decomposed).
    infer_lit (SML synth literal arms — maps literal tag to type tag).
    ctor_ty_arity (SML ctorTy param count), struct_field_ty (SML
-   tyOfStructField via parallel type Vec).
+   tyOfStructField via parallel type Vec),
+   dup_variant_names (SML dupVariants — duplicate name check),
+   struct_enum_name_clash (SML initTypes clash check),
+   named_only_ty (SML namedOnlyTy — struct/enum/none classifier).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -472,6 +475,65 @@ fn infer_lit(lit_tag: i32) -> i32 {
     return 0 - 1;
 }
 
+/* ── dup_variant_names (SML dupVariants) ───────────────────────
+   Scan a Vec of variant name handles; return the index of the first
+   duplicate, or -1 if all names are unique.  O(n^2) — fine for
+   typical enum sizes. */
+fn dup_variant_names(names: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(names);
+    let mut i: i32 = 0;
+    while i < n {
+        let mut j: i32 = 0;
+        while j < i {
+            if vec_get(names, j) == vec_get(names, i) { return i; }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── struct_enum_name_clash (SML initTypes clash check) ───────
+   Given a Vec of struct name handles and a Vec of enum name handles,
+   return the first struct name that also appears as an enum, or -1. */
+fn struct_enum_name_clash(struct_names: Vec<i32>,
+                          enum_names: Vec<i32>) -> i32 {
+    let sn: i32 = vec_len(struct_names);
+    let en: i32 = vec_len(enum_names);
+    let mut i: i32 = 0;
+    while i < sn {
+        let s: i32 = vec_get(struct_names, i);
+        let mut j: i32 = 0;
+        while j < en {
+            if vec_get(enum_names, j) == s { return s; }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── named_only_ty (SML namedOnlyTy) ──────────────────────────
+   Given struct and enum name tables, check whether a name handle
+   is a struct, enum, or neither.  Returns:
+     1 = struct, 2 = enum, 0 = not found. */
+fn named_only_ty(struct_names: Vec<i32>, enum_names: Vec<i32>,
+                 name: i32) -> i32 {
+    let sn: i32 = vec_len(struct_names);
+    let mut i: i32 = 0;
+    while i < sn {
+        if vec_get(struct_names, i) == name { return 1; }
+        i = i + 1;
+    }
+    let en: i32 = vec_len(enum_names);
+    let mut j: i32 = 0;
+    while j < en {
+        if vec_get(enum_names, j) == name { return 2; }
+        j = j + 1;
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -755,6 +817,49 @@ fn test_infer_lit() -> i32 {
     return 0;
 }
 
+fn test_dup_variant_names() -> i32 {
+    let v: Vec<i32> = vec_new();
+    vec_push(v, 10);
+    vec_push(v, 20);
+    vec_push(v, 30);
+    if dup_variant_names(v) != 0 - 1 { return 1; }
+    let v2: Vec<i32> = vec_new();
+    vec_push(v2, 10);
+    vec_push(v2, 20);
+    vec_push(v2, 10);
+    if dup_variant_names(v2) != 2 { return 2; }
+    let v3: Vec<i32> = vec_new();
+    if dup_variant_names(v3) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_struct_enum_clash() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(sn, 10);
+    vec_push(sn, 20);
+    vec_push(en, 30);
+    vec_push(en, 40);
+    if struct_enum_name_clash(sn, en) != 0 - 1 { return 1; }
+    vec_push(en, 20);
+    if struct_enum_name_clash(sn, en) != 20 { return 2; }
+    let e2: Vec<i32> = vec_new();
+    let s2: Vec<i32> = vec_new();
+    if struct_enum_name_clash(s2, e2) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_named_only_ty() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(sn, 10);
+    vec_push(en, 20);
+    if named_only_ty(sn, en, 10) != 1 { return 1; }
+    if named_only_ty(sn, en, 20) != 2 { return 2; }
+    if named_only_ty(sn, en, 99) != 0 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -804,5 +909,11 @@ fn main() -> i32 {
     if r23 != 0 { return 240 + r23; }
     let r24: i32 = test_struct_field_ty();
     if r24 != 0 { return 250 + r24; }
+    let r25: i32 = test_dup_variant_names();
+    if r25 != 0 { return 260 + r25; }
+    let r26: i32 = test_struct_enum_clash();
+    if r26 != 0 { return 270 + r26; }
+    let r27: i32 = test_named_only_ty();
+    if r27 != 0 { return 280 + r27; }
     return 0;
 }

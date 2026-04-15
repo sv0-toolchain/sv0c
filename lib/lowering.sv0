@@ -16,6 +16,8 @@
    param_name (SML paramName — extract name handle from PatBind param),
    lower_field_index (SML local fieldIndex in matchArmSetup —
    struct field name → index lookup in a field-name Vec).
+   ast_ty_to_c_string_with_user (SML astTyToCString struct/enum branch —
+   extends primitive mapping with user-defined struct/enum typedef names).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -212,6 +214,22 @@ fn ast_ty_to_c_string(name: string) -> string {
     if string_eq(name, "String") { return "const char*"; }
     if string_eq(name, "Vec") { return "int"; }
     if string_eq(name, "Box") { return "int"; }
+    return "int";
+}
+
+/* ── ast_ty_to_c_string_with_user (SML astTyToCString struct/enum branch)
+   Like ast_ty_to_c_string but if the primitive lookup returns "int"
+   (unknown), checks struct and enum name-handle tables.  If the
+   handle is a known struct or enum, returns the original name string
+   (the caller's C typedef); otherwise falls back to "int".
+   SML: `TyName ([n],_,_) => if exists structFieldOrder n then n ...` */
+fn ast_ty_to_c_string_with_user(name: string, name_handle: i32,
+                                struct_names: Vec<i32>,
+                                enum_names: Vec<i32>) -> string {
+    let prim: string = ast_ty_to_c_string(name);
+    if string_eq(prim, "int") != true { return prim; }
+    if is_struct_cty(struct_names, name_handle) { return name; }
+    if is_enum_cty(enum_names, name_handle) { return name; }
     return "int";
 }
 
@@ -833,6 +851,19 @@ fn test_lower_field_index() -> i32 {
     return 0;
 }
 
+fn test_ast_ty_c_string_user() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(sn, 100);
+    vec_push(en, 200);
+    if string_eq(ast_ty_to_c_string_with_user("i32", 50, sn, en), "int") != true { return 1; }
+    if string_eq(ast_ty_to_c_string_with_user("MyStruct", 100, sn, en), "MyStruct") != true { return 2; }
+    if string_eq(ast_ty_to_c_string_with_user("MyEnum", 200, sn, en), "MyEnum") != true { return 3; }
+    if string_eq(ast_ty_to_c_string_with_user("Unknown", 999, sn, en), "int") != true { return 4; }
+    if string_eq(ast_ty_to_c_string_with_user("bool", 999, sn, en), "int") != true { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -894,5 +925,7 @@ fn main() -> i32 {
     if r29 != 0 { return 310 + r29; }
     let r30: i32 = test_lower_field_index();
     if r30 != 0 { return 320 + r30; }
+    let r31: i32 = test_ast_ty_c_string_user();
+    if r31 != 0 { return 330 + r31; }
     return 0;
 }

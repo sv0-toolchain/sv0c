@@ -91,6 +91,9 @@ static int exit_loop(int depth);
 static int ctor_ty_arity(int shape, int field_count);
 static int struct_field_ty(int field_names, int field_types, int name);
 static int infer_lit(int lit_tag);
+static int dup_variant_names(int names);
+static int struct_enum_name_clash(int struct_names, int enum_names);
+static int named_only_ty(int struct_names, int enum_names, int name);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -115,6 +118,9 @@ static int test_assign_lhs_bad(void);
 static int test_ctor_ty_arity(void);
 static int test_struct_field_ty(void);
 static int test_infer_lit(void);
+static int test_dup_variant_names(void);
+static int test_struct_enum_clash(void);
+static int test_named_only_ty(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -978,6 +984,77 @@ static int infer_lit(int lit_tag) {
   }
   int _sv0t0 = (0 - 1);
   return _sv0t0;
+}
+
+static int dup_variant_names(int names) {
+  int _sv0t0 = sv0_vec_len(names);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int j = 0;
+    while ((j < i)) {
+      int _sv0t1 = sv0_vec_get(names, j);
+      int _sv0t2 = sv0_vec_get(names, i);
+      if ((_sv0t1 == _sv0t2)) {
+        return i;
+      } else {
+      }
+      j = (j + 1);
+    }
+    i = (i + 1);
+  }
+  int _sv0t3 = (0 - 1);
+  return _sv0t3;
+}
+
+static int struct_enum_name_clash(int struct_names, int enum_names) {
+  int _sv0t0 = sv0_vec_len(struct_names);
+  int sn = _sv0t0;
+  int _sv0t1 = sv0_vec_len(enum_names);
+  int en = _sv0t1;
+  int i = 0;
+  while ((i < sn)) {
+    int _sv0t2 = sv0_vec_get(struct_names, i);
+    int s = _sv0t2;
+    int j = 0;
+    while ((j < en)) {
+      int _sv0t3 = sv0_vec_get(enum_names, j);
+      if ((_sv0t3 == s)) {
+        return s;
+      } else {
+      }
+      j = (j + 1);
+    }
+    i = (i + 1);
+  }
+  int _sv0t4 = (0 - 1);
+  return _sv0t4;
+}
+
+static int named_only_ty(int struct_names, int enum_names, int name) {
+  int _sv0t0 = sv0_vec_len(struct_names);
+  int sn = _sv0t0;
+  int i = 0;
+  while ((i < sn)) {
+    int _sv0t1 = sv0_vec_get(struct_names, i);
+    if ((_sv0t1 == name)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t2 = sv0_vec_len(enum_names);
+  int en = _sv0t2;
+  int j = 0;
+  while ((j < en)) {
+    int _sv0t3 = sv0_vec_get(enum_names, j);
+    if ((_sv0t3 == name)) {
+      return 2;
+    } else {
+    }
+    j = (j + 1);
+  }
+  return 0;
 }
 
 static int test_binop_class(void) {
@@ -1855,6 +1932,98 @@ static int test_infer_lit(void) {
   return 0;
 }
 
+static int test_dup_variant_names(void) {
+  int _sv0t0 = sv0_vec_new();
+  int v = _sv0t0;
+  sv0_vec_push(v, 10);
+  sv0_vec_push(v, 20);
+  sv0_vec_push(v, 30);
+  int _sv0t1 = dup_variant_names(v);
+  int _sv0t2 = (0 - 1);
+  if ((_sv0t1 != _sv0t2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_new();
+  int v2 = _sv0t3;
+  sv0_vec_push(v2, 10);
+  sv0_vec_push(v2, 20);
+  sv0_vec_push(v2, 10);
+  int _sv0t4 = dup_variant_names(v2);
+  if ((_sv0t4 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int v3 = _sv0t5;
+  int _sv0t6 = dup_variant_names(v3);
+  int _sv0t7 = (0 - 1);
+  if ((_sv0t6 != _sv0t7)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_struct_enum_clash(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int en = _sv0t1;
+  sv0_vec_push(sn, 10);
+  sv0_vec_push(sn, 20);
+  sv0_vec_push(en, 30);
+  sv0_vec_push(en, 40);
+  int _sv0t2 = struct_enum_name_clash(sn, en);
+  int _sv0t3 = (0 - 1);
+  if ((_sv0t2 != _sv0t3)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(en, 20);
+  int _sv0t4 = struct_enum_name_clash(sn, en);
+  if ((_sv0t4 != 20)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int e2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int s2 = _sv0t6;
+  int _sv0t7 = struct_enum_name_clash(s2, e2);
+  int _sv0t8 = (0 - 1);
+  if ((_sv0t7 != _sv0t8)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_named_only_ty(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int en = _sv0t1;
+  sv0_vec_push(sn, 10);
+  sv0_vec_push(en, 20);
+  int _sv0t2 = named_only_ty(sn, en, 10);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = named_only_ty(sn, en, 20);
+  if ((_sv0t3 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = named_only_ty(sn, en, 99);
+  if ((_sv0t4 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -2021,6 +2190,27 @@ int main(void) {
   if ((r24 != 0)) {
     int _sv0t46 = (250 + r24);
     return _sv0t46;
+  } else {
+  }
+  int _sv0t47 = test_dup_variant_names();
+  int r25 = _sv0t47;
+  if ((r25 != 0)) {
+    int _sv0t48 = (260 + r25);
+    return _sv0t48;
+  } else {
+  }
+  int _sv0t49 = test_struct_enum_clash();
+  int r26 = _sv0t49;
+  if ((r26 != 0)) {
+    int _sv0t50 = (270 + r26);
+    return _sv0t50;
+  } else {
+  }
+  int _sv0t51 = test_named_only_ty();
+  int r27 = _sv0t51;
+  if ((r27 != 0)) {
+    int _sv0t52 = (280 + r27);
+    return _sv0t52;
   } else {
   }
   return 0;
