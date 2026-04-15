@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 16 — match expressions + contract quantifiers + loop invariants.** `parser.sv0`: 2 new functions (`parse_match_expr` with iterative arm loop, `parse_quant`), `ExprMatchArm`(29) in expr arena, MATCH/FORALL/EXISTS/OLD/NO_ALIAS dispatch in `parse_primary_expr`, `parse_while_expr` updated with `loop_invariant(expr)` parsing (d3/d4). 7 new test groups (match_simple/multi/guard, quant, old, no_alias, while_inv). Parser remaining: `parseItem` cluster only. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 17 — parseItem cluster (parser closure).** `parser.sv0`: 12 new functions (`parse_param`, `parse_param_list`, `parse_contract`, `parse_contracts`, `parse_fn_body`, `parse_struct_item`, `parse_enum_item`, `parse_type_alias_item`, `parse_trait_item`, `parse_impl_item`, `parse_item`, `parse_program`), item arena tags 0–7 (ItemFn/ItemStruct/ItemEnum/ItemTrait/ItemImpl/ItemUse/ItemModule/ItemTypeAlias), 4 new TK_ constants (REQUIRES/ENSURES/MODULE/NEWTYPE), 7 new test groups (fn_simple/fn_ret/struct/enum_mixed/impl/fn_contract/program). **Parser transliteration complete** — all SML parser functions have sv0 equivalents. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
