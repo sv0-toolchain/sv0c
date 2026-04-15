@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 9 + CI fix.** Removed stale `bytecode_file_layout_core` golden test (fixed CI red on batches 7-8). Fixed README sv0c SHA format (40-hex). `link.sv0`: `collect_top_names` (SML `collectTops` — collect name handles into Vec), `map_path_segs_rewrite_1`/`_2` (SML `mapPathSegs` path rewriting). `checker.sv0`: `ctor_ty_arity` (SML `ctorTy` param count), `struct_field_ty` (SML `tyOfStructField` via parallel type Vec). `parser.sv0`: `is_assign_tok` (SML `isAssignTok`), `path_of_ty_valid` (SML `pathOfTy` predicate). `codegen.sv0`: `split_main_index` (SML `splitMain` index scan). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-15 (America/Denver; **Deep-function transliteration batch 10.** `checker.sv0`: `dup_variant_names` (SML `dupVariants` — O(n^2) duplicate check), `struct_enum_name_clash` (SML `initTypes` clash), `named_only_ty` (SML `namedOnlyTy` — struct/enum/none). `lowering.sv0`: `ast_ty_to_c_string_with_user` (SML `astTyToCString` struct/enum typedef branch). `lexer.sv0`: `scan_escape` (SML `scanEscape` — full escape decode incl. `\xNN`). `vm_codegen.sv0`: `patch_continue_jumps` (SML `patchContinueJumpsFrom`), `insn_vec_stride` (byte→element stride). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

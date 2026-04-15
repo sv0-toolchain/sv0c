@@ -42,6 +42,8 @@ static int slot_width(int env_widths, int idx);
 static int alloc_local(int env_names, int env_bases, int env_widths, int name, int width, int slot);
 static int bind_param(int name, int cty_handle, int slot, int env_names, int env_bases, int env_widths, int env_fields, int structs_names, int structs_field_counts, int enums_names, int enums_widths);
 static int replace_loop_exit_jump(int instrs, int back_offset);
+static int insn_vec_stride(int opc);
+static int patch_continue_jumps(int instrs, int from_pos, int target_abs);
 static int test_variant_slots(void);
 static int test_cty_classify(void);
 static int test_width_of_cty(void);
@@ -61,6 +63,7 @@ static int test_replace_loop_exit(void);
 static int test_enum_field_names(void);
 static int test_value_width(void);
 static int test_bind_param(void);
+static int test_patch_continue_jumps(void);
 
 static int variant_slots_unit(void) {
   return 0;
@@ -869,6 +872,57 @@ static int replace_loop_exit_jump(int instrs, int back_offset) {
   return 1;
 }
 
+static int insn_vec_stride(int opc) {
+  int _sv0t0 = insn_size(opc);
+  int bs = _sv0t0;
+  if ((bs <= 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = (bs - 1);
+  int _sv0t2 = (_sv0t1 / 4);
+  int _sv0t3 = (_sv0t2 + 1);
+  return _sv0t3;
+}
+
+static int patch_continue_jumps(int instrs, int from_pos, int target_abs) {
+  int _sv0t0 = sv0_vec_len(instrs);
+  int n = _sv0t0;
+  int i = 0;
+  int pos = from_pos;
+  int patched = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(instrs, i);
+    int op = _sv0t1;
+    int _sv0t2 = insn_size(op);
+    int byte_sz = _sv0t2;
+    int _sv0t3 = insn_vec_stride(op);
+    int stride = _sv0t3;
+    if ((op == 112)) {
+      int _sv0t4 = (i + 1);
+      if ((_sv0t4 < n)) {
+        int _sv0t5 = (i + 1);
+        int _sv0t6 = sv0_vec_get(instrs, _sv0t5);
+        int arg = _sv0t6;
+        int _sv0t7 = is_loop_continue_sentinel(arg);
+        if (_sv0t7) {
+          int _sv0t8 = (i + 1);
+          int _sv0t9 = (pos + byte_sz);
+          int _sv0t10 = (target_abs - _sv0t9);
+          sv0_vec_set(instrs, _sv0t8, _sv0t10);
+          patched = (patched + 1);
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    i = (i + stride);
+    pos = (pos + byte_sz);
+  }
+  return patched;
+}
+
 static int test_variant_slots(void) {
   int _sv0t0 = variant_slots(0, 0);
   if ((_sv0t0 != 0)) {
@@ -1588,6 +1642,66 @@ static int test_bind_param(void) {
   return 0;
 }
 
+static int test_patch_continue_jumps(void) {
+  int _sv0t0 = sv0_vec_new();
+  int instrs = _sv0t0;
+  sv0_vec_push(instrs, 112);
+  int _sv0t1 = loop_continue_sentinel();
+  sv0_vec_push(instrs, _sv0t1);
+  int _sv0t2 = patch_continue_jumps(instrs, 0, 100);
+  int n = _sv0t2;
+  if ((n != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(instrs, 1);
+  if ((_sv0t3 != 95)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_new();
+  int i2 = _sv0t4;
+  sv0_vec_push(i2, 0);
+  sv0_vec_push(i2, 112);
+  int _sv0t5 = loop_continue_sentinel();
+  sv0_vec_push(i2, _sv0t5);
+  int _sv0t6 = patch_continue_jumps(i2, 10, 50);
+  int n2 = _sv0t6;
+  if ((n2 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(i2, 2);
+  if ((_sv0t7 != 34)) {
+    return 4;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int i3 = _sv0t8;
+  sv0_vec_push(i3, 112);
+  sv0_vec_push(i3, 42);
+  int _sv0t9 = patch_continue_jumps(i3, 0, 100);
+  int n3 = _sv0t9;
+  if ((n3 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(i3, 1);
+  if ((_sv0t10 != 42)) {
+    return 6;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int empty = _sv0t11;
+  int _sv0t12 = patch_continue_jumps(empty, 0, 100);
+  int n4 = _sv0t12;
+  if ((n4 != 0)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_variant_slots();
   int r1 = _sv0t0;
@@ -1719,6 +1833,13 @@ int main(void) {
   if ((r19 != 0)) {
     int _sv0t36 = (200 + r19);
     return _sv0t36;
+  } else {
+  }
+  int _sv0t37 = test_patch_continue_jumps();
+  int r20 = _sv0t37;
+  if ((r20 != 0)) {
+    int _sv0t38 = (210 + r20);
+    return _sv0t38;
   } else {
   }
   return 0;

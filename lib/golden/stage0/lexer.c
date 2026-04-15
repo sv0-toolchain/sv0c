@@ -28,6 +28,7 @@ static int scan_oct_digits_end(const char* source, int pos);
 static int op_single_tag(int c);
 static int op_double_tag(int c1, int c2);
 static int op_fallback_tag(int c);
+static int scan_escape(const char* source, int pos, int out);
 static int scan_string_end(const char* source, int pos);
 static int scan_char_end(const char* source, int pos);
 static int scan_number_full(const char* source, int pos, int buf);
@@ -49,6 +50,7 @@ static int test_scan_number(void);
 static int test_tokenize_simple(void);
 static int test_tokenize_ops(void);
 static int test_tokenize_string(void);
+static int test_scan_escape(void);
 
 static int is_ident_start(int c) {
   if ((c >= 65)) {
@@ -1037,6 +1039,45 @@ static int op_fallback_tag(int c) {
   } else {
   }
   return 0;
+}
+
+static int scan_escape(const char* source, int pos, int out) {
+  int _sv0t0 = sv0_string_len(source);
+  int len = _sv0t0;
+  if ((pos >= len)) {
+    sv0_vec_push(out, 92);
+    return pos;
+  } else {
+  }
+  int _sv0t1 = sv0_string_char_at(source, pos);
+  int c = _sv0t1;
+  if ((c == 120)) {
+    int d1 = 48;
+    int d2 = 48;
+    int _sv0t2 = (pos + 1);
+    if ((_sv0t2 < len)) {
+      int _sv0t3 = (pos + 1);
+      int _sv0t4 = sv0_string_char_at(source, _sv0t3);
+      d1 = _sv0t4;
+    } else {
+    }
+    int _sv0t5 = (pos + 2);
+    if ((_sv0t5 < len)) {
+      int _sv0t6 = (pos + 2);
+      int _sv0t7 = sv0_string_char_at(source, _sv0t6);
+      d2 = _sv0t7;
+    } else {
+    }
+    int _sv0t8 = hex_escape_value(d1, d2);
+    sv0_vec_push(out, _sv0t8);
+    int _sv0t9 = (pos + 3);
+    return _sv0t9;
+  } else {
+  }
+  int _sv0t10 = escape_char(c);
+  sv0_vec_push(out, _sv0t10);
+  int _sv0t11 = (pos + 1);
+  return _sv0t11;
 }
 
 static int scan_string_end(const char* source, int pos) {
@@ -2159,6 +2200,75 @@ static int test_tokenize_string(void) {
   return 0;
 }
 
+static int test_scan_escape(void) {
+  int _sv0t0 = sv0_vec_new();
+  int r1 = _sv0t0;
+  int _sv0t1 = scan_escape("n", 0, r1);
+  int p1 = _sv0t1;
+  int _sv0t2 = sv0_vec_get(r1, 0);
+  if ((_sv0t2 != 10)) {
+    return 1;
+  } else {
+  }
+  if ((p1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_new();
+  int r2 = _sv0t3;
+  int _sv0t4 = scan_escape("t", 0, r2);
+  int p2 = _sv0t4;
+  int _sv0t5 = sv0_vec_get(r2, 0);
+  if ((_sv0t5 != 9)) {
+    return 3;
+  } else {
+  }
+  if ((p2 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int r3 = _sv0t6;
+  int _sv0t7 = scan_escape("x41", 0, r3);
+  int p3 = _sv0t7;
+  int _sv0t8 = sv0_vec_get(r3, 0);
+  if ((_sv0t8 != 65)) {
+    return 5;
+  } else {
+  }
+  if ((p3 != 3)) {
+    return 6;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int r4 = _sv0t9;
+  int _sv0t10 = scan_escape("0", 0, r4);
+  int p4 = _sv0t10;
+  int _sv0t11 = sv0_vec_get(r4, 0);
+  if ((_sv0t11 != 0)) {
+    return 7;
+  } else {
+  }
+  if ((p4 != 1)) {
+    return 8;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int r5 = _sv0t12;
+  int _sv0t13 = scan_escape("z", 0, r5);
+  int p5 = _sv0t13;
+  int _sv0t14 = sv0_vec_get(r5, 0);
+  if ((_sv0t14 != 122)) {
+    return 9;
+  } else {
+  }
+  if ((p5 != 1)) {
+    return 10;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_char_class();
   int r1 = _sv0t0;
@@ -2269,6 +2379,13 @@ int main(void) {
   if ((r16 != 0)) {
     int _sv0t30 = (250 + r16);
     return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_scan_escape();
+  int r17 = _sv0t31;
+  if ((r17 != 0)) {
+    int _sv0t32 = (260 + r17);
+    return _sv0t32;
   } else {
   }
   return 0;
