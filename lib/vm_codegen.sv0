@@ -12,7 +12,9 @@
    stream and replace continue-sentinel JUMP args with real offsets),
    enum_field_names (SML enumFieldNames — "tag","p0","p1"... Vec),
    value_width (SML valueWidth — slot-based width for VVar, else 1),
-   bind_param (SML bindParam — slot_info with struct/enum fields).
+   bind_param (SML bindParam — slot_info with struct/enum fields),
+   struct_layouts_build (SML structLayouts — filter ItemStruct from items),
+   enum_layouts_build (SML enumLayouts — filter ItemEnum, width = 1+maxP).
    Full emit (emitValue/emitExpr/emitInstr/emitBlock/emitWhileLoop)
    deferred — needs IR+AST traversal with slot_env management. */
 
@@ -477,6 +479,45 @@ fn patch_continue_jumps(instrs: Vec<i32>, from_pos: i32,
     return patched;
 }
 
+/* ── struct_layouts_build / enum_layouts_build ─────────────── */
+
+fn struct_layouts_build(item_tags: Vec<i32>, item_names: Vec<i32>,
+                        item_field_counts: Vec<i32>,
+                        out_names: Vec<i32>,
+                        out_field_counts: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 1 {
+            vec_push(out_names, vec_get(item_names, i));
+            vec_push(out_field_counts, vec_get(item_field_counts, i));
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+fn enum_layouts_build(item_tags: Vec<i32>, item_names: Vec<i32>,
+                      item_variant_counts: Vec<i32>,
+                      item_variant_max_payload: Vec<i32>,
+                      out_names: Vec<i32>,
+                      out_widths: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 2 {
+            vec_push(out_names, vec_get(item_names, i));
+            vec_push(out_widths, 1 + vec_get(item_variant_max_payload, i));
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_variant_slots() -> i32 {
@@ -747,6 +788,45 @@ fn test_patch_continue_jumps() -> i32 {
     return 0;
 }
 
+fn test_struct_layouts_build() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let names: Vec<i32> = vec_new();
+    let fcounts: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(names, 10); vec_push(fcounts, 0);
+    vec_push(tags, 1); vec_push(names, 20); vec_push(fcounts, 3);
+    vec_push(tags, 2); vec_push(names, 30); vec_push(fcounts, 0);
+    vec_push(tags, 1); vec_push(names, 40); vec_push(fcounts, 2);
+    let out_n: Vec<i32> = vec_new();
+    let out_fc: Vec<i32> = vec_new();
+    let count: i32 = struct_layouts_build(tags, names, fcounts, out_n, out_fc);
+    if count != 2 { return 1; }
+    if vec_get(out_n, 0) != 20 { return 2; }
+    if vec_get(out_fc, 0) != 3 { return 3; }
+    if vec_get(out_n, 1) != 40 { return 4; }
+    if vec_get(out_fc, 1) != 2 { return 5; }
+    return 0;
+}
+
+fn test_enum_layouts_build() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let names: Vec<i32> = vec_new();
+    let vcounts: Vec<i32> = vec_new();
+    let maxp: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(names, 10); vec_push(vcounts, 0); vec_push(maxp, 0);
+    vec_push(tags, 2); vec_push(names, 20); vec_push(vcounts, 3); vec_push(maxp, 2);
+    vec_push(tags, 1); vec_push(names, 30); vec_push(vcounts, 0); vec_push(maxp, 0);
+    vec_push(tags, 2); vec_push(names, 40); vec_push(vcounts, 2); vec_push(maxp, 0);
+    let out_n: Vec<i32> = vec_new();
+    let out_w: Vec<i32> = vec_new();
+    let count: i32 = enum_layouts_build(tags, names, vcounts, maxp, out_n, out_w);
+    if count != 2 { return 1; }
+    if vec_get(out_n, 0) != 20 { return 2; }
+    if vec_get(out_w, 0) != 3 { return 3; }
+    if vec_get(out_n, 1) != 40 { return 4; }
+    if vec_get(out_w, 1) != 1 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -788,5 +868,9 @@ fn main() -> i32 {
     if r19 != 0 { return 200 + r19; }
     let r20: i32 = test_patch_continue_jumps();
     if r20 != 0 { return 210 + r20; }
+    let r21: i32 = test_struct_layouts_build();
+    if r21 != 0 { return 220 + r21; }
+    let r22: i32 = test_enum_layouts_build();
+    if r22 != 0 { return 230 + r22; }
     return 0;
 }

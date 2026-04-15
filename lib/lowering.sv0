@@ -17,7 +17,11 @@
    lower_field_index (SML local fieldIndex in matchArmSetup —
    struct field name → index lookup in a field-name Vec).
    ast_ty_to_c_string_with_user (SML astTyToCString struct/enum branch —
-   extends primitive mapping with user-defined struct/enum typedef names).
+   extends primitive mapping with user-defined struct/enum typedef names),
+   find_fn_index / callee_fn_index (SML calleeRetCty decomposed — resolve
+   alias then linear scan fn name Vec for index),
+   scrut_local_lookup / param_ty_lookup (SML matchScrutCty helpers —
+   linear scan name Vecs returning index or -1).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -542,6 +546,48 @@ fn ret_value_slot() -> string {
     return "_sv0ret";
 }
 
+/* ── find_fn_index (SML calleeRetCty helper — index into fn table) */
+
+fn find_fn_index(fn_names: Vec<i32>, name_h: i32) -> i32 {
+    let n: i32 = vec_len(fn_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(fn_names, i) == name_h { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── callee_fn_index (SML calleeRetCty — resolve alias + find) */
+
+fn callee_fn_index(fn_names: Vec<i32>, aliases: Vec<i32>,
+                   name_h: i32) -> i32 {
+    let resolved: i32 = resolve_fn_callee(aliases, name_h);
+    return find_fn_index(fn_names, resolved);
+}
+
+/* ── scrut_local_lookup / param_ty_lookup ──────────────────── */
+
+fn scrut_local_lookup(scrut_names: Vec<i32>, name_h: i32) -> i32 {
+    let n: i32 = vec_len(scrut_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(scrut_names, i) == name_h { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn param_ty_lookup(param_names: Vec<i32>, name_h: i32) -> i32 {
+    let n: i32 = vec_len(param_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(param_names, i) == name_h { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_fresh_tmp() -> i32 {
@@ -864,6 +910,51 @@ fn test_ast_ty_c_string_user() -> i32 {
     return 0;
 }
 
+fn test_find_fn_index() -> i32 {
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 10);
+    vec_push(names, 20);
+    vec_push(names, 30);
+    if find_fn_index(names, 10) != 0 { return 1; }
+    if find_fn_index(names, 20) != 1 { return 2; }
+    if find_fn_index(names, 30) != 2 { return 3; }
+    if find_fn_index(names, 99) != 0 - 1 { return 4; }
+    return 0;
+}
+
+fn test_callee_fn_index() -> i32 {
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 10);
+    vec_push(names, 20);
+    let aliases: Vec<i32> = vec_new();
+    vec_push(aliases, 30);
+    vec_push(aliases, 10);
+    if callee_fn_index(names, aliases, 10) != 0 { return 1; }
+    if callee_fn_index(names, aliases, 30) != 0 { return 2; }
+    if callee_fn_index(names, aliases, 99) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_scrut_local() -> i32 {
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 50);
+    vec_push(names, 60);
+    if scrut_local_lookup(names, 50) != 0 { return 1; }
+    if scrut_local_lookup(names, 60) != 1 { return 2; }
+    if scrut_local_lookup(names, 99) != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_param_ty() -> i32 {
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 70);
+    vec_push(names, 80);
+    if param_ty_lookup(names, 70) != 0 { return 1; }
+    if param_ty_lookup(names, 80) != 1 { return 2; }
+    if param_ty_lookup(names, 99) != 0 - 1 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -927,5 +1018,13 @@ fn main() -> i32 {
     if r30 != 0 { return 320 + r30; }
     let r31: i32 = test_ast_ty_c_string_user();
     if r31 != 0 { return 330 + r31; }
+    let r32: i32 = test_find_fn_index();
+    if r32 != 0 { return 340 + r32; }
+    let r33: i32 = test_callee_fn_index();
+    if r33 != 0 { return 350 + r33; }
+    let r34: i32 = test_scrut_local();
+    if r34 != 0 { return 360 + r34; }
+    let r35: i32 = test_param_ty();
+    if r35 != 0 { return 370 + r35; }
     return 0;
 }

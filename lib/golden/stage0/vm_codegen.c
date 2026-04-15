@@ -44,6 +44,8 @@ static int bind_param(int name, int cty_handle, int slot, int env_names, int env
 static int replace_loop_exit_jump(int instrs, int back_offset);
 static int insn_vec_stride(int opc);
 static int patch_continue_jumps(int instrs, int from_pos, int target_abs);
+static int struct_layouts_build(int item_tags, int item_names, int item_field_counts, int out_names, int out_field_counts);
+static int enum_layouts_build(int item_tags, int item_names, int item_variant_counts, int item_variant_max_payload, int out_names, int out_widths);
 static int test_variant_slots(void);
 static int test_cty_classify(void);
 static int test_width_of_cty(void);
@@ -64,6 +66,8 @@ static int test_enum_field_names(void);
 static int test_value_width(void);
 static int test_bind_param(void);
 static int test_patch_continue_jumps(void);
+static int test_struct_layouts_build(void);
+static int test_enum_layouts_build(void);
 
 static int variant_slots_unit(void) {
   return 0;
@@ -923,6 +927,47 @@ static int patch_continue_jumps(int instrs, int from_pos, int target_abs) {
   return patched;
 }
 
+static int struct_layouts_build(int item_tags, int item_names, int item_field_counts, int out_names, int out_field_counts) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  int count = 0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    if ((_sv0t1 == 1)) {
+      int _sv0t2 = sv0_vec_get(item_names, i);
+      sv0_vec_push(out_names, _sv0t2);
+      int _sv0t3 = sv0_vec_get(item_field_counts, i);
+      sv0_vec_push(out_field_counts, _sv0t3);
+      count = (count + 1);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return count;
+}
+
+static int enum_layouts_build(int item_tags, int item_names, int item_variant_counts, int item_variant_max_payload, int out_names, int out_widths) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  int count = 0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    if ((_sv0t1 == 2)) {
+      int _sv0t2 = sv0_vec_get(item_names, i);
+      sv0_vec_push(out_names, _sv0t2);
+      int _sv0t3 = sv0_vec_get(item_variant_max_payload, i);
+      int _sv0t4 = (1 + _sv0t3);
+      sv0_vec_push(out_widths, _sv0t4);
+      count = (count + 1);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return count;
+}
+
 static int test_variant_slots(void) {
   int _sv0t0 = variant_slots(0, 0);
   if ((_sv0t0 != 0)) {
@@ -1702,6 +1747,116 @@ static int test_patch_continue_jumps(void) {
   return 0;
 }
 
+static int test_struct_layouts_build(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int names = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int fcounts = _sv0t2;
+  sv0_vec_push(tags, 0);
+  sv0_vec_push(names, 10);
+  sv0_vec_push(fcounts, 0);
+  sv0_vec_push(tags, 1);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(fcounts, 3);
+  sv0_vec_push(tags, 2);
+  sv0_vec_push(names, 30);
+  sv0_vec_push(fcounts, 0);
+  sv0_vec_push(tags, 1);
+  sv0_vec_push(names, 40);
+  sv0_vec_push(fcounts, 2);
+  int _sv0t3 = sv0_vec_new();
+  int out_n = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int out_fc = _sv0t4;
+  int _sv0t5 = struct_layouts_build(tags, names, fcounts, out_n, out_fc);
+  int count = _sv0t5;
+  if ((count != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(out_n, 0);
+  if ((_sv0t6 != 20)) {
+    return 2;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(out_fc, 0);
+  if ((_sv0t7 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(out_n, 1);
+  if ((_sv0t8 != 40)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(out_fc, 1);
+  if ((_sv0t9 != 2)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_enum_layouts_build(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int names = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int vcounts = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int maxp = _sv0t3;
+  sv0_vec_push(tags, 0);
+  sv0_vec_push(names, 10);
+  sv0_vec_push(vcounts, 0);
+  sv0_vec_push(maxp, 0);
+  sv0_vec_push(tags, 2);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(vcounts, 3);
+  sv0_vec_push(maxp, 2);
+  sv0_vec_push(tags, 1);
+  sv0_vec_push(names, 30);
+  sv0_vec_push(vcounts, 0);
+  sv0_vec_push(maxp, 0);
+  sv0_vec_push(tags, 2);
+  sv0_vec_push(names, 40);
+  sv0_vec_push(vcounts, 2);
+  sv0_vec_push(maxp, 0);
+  int _sv0t4 = sv0_vec_new();
+  int out_n = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int out_w = _sv0t5;
+  int _sv0t6 = enum_layouts_build(tags, names, vcounts, maxp, out_n, out_w);
+  int count = _sv0t6;
+  if ((count != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(out_n, 0);
+  if ((_sv0t7 != 20)) {
+    return 2;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(out_w, 0);
+  if ((_sv0t8 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(out_n, 1);
+  if ((_sv0t9 != 40)) {
+    return 4;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(out_w, 1);
+  if ((_sv0t10 != 1)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_variant_slots();
   int r1 = _sv0t0;
@@ -1840,6 +1995,20 @@ int main(void) {
   if ((r20 != 0)) {
     int _sv0t38 = (210 + r20);
     return _sv0t38;
+  } else {
+  }
+  int _sv0t39 = test_struct_layouts_build();
+  int r21 = _sv0t39;
+  if ((r21 != 0)) {
+    int _sv0t40 = (220 + r21);
+    return _sv0t40;
+  } else {
+  }
+  int _sv0t41 = test_enum_layouts_build();
+  int r22 = _sv0t41;
+  if ((r22 != 0)) {
+    int _sv0t42 = (230 + r22);
+    return _sv0t42;
   } else {
   }
   return 0;

@@ -67,6 +67,10 @@ static int payload_field_name(int index);
 static int enum_store_payload_count(int val_count);
 static int enum_alloc_width(int max_payload);
 static const char* ret_value_slot(void);
+static int find_fn_index(int fn_names, int name_h);
+static int callee_fn_index(int fn_names, int aliases, int name_h);
+static int scrut_local_lookup(int scrut_names, int name_h);
+static int param_ty_lookup(int param_names, int name_h);
 static int test_fresh_tmp(void);
 static int test_split_qname(void);
 static int test_binop_to_c(void);
@@ -98,6 +102,10 @@ static int test_resolve_ctor_path(void);
 static int test_param_name(void);
 static int test_lower_field_index(void);
 static int test_ast_ty_c_string_user(void);
+static int test_find_fn_index(void);
+static int test_callee_fn_index(void);
+static int test_scrut_local(void);
+static int test_param_ty(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -997,6 +1005,61 @@ static int enum_alloc_width(int max_payload) {
 
 static const char* ret_value_slot(void) {
   return "_sv0ret";
+}
+
+static int find_fn_index(int fn_names, int name_h) {
+  int _sv0t0 = sv0_vec_len(fn_names);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(fn_names, i);
+    if ((_sv0t1 == name_h)) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
+}
+
+static int callee_fn_index(int fn_names, int aliases, int name_h) {
+  int _sv0t0 = resolve_fn_callee(aliases, name_h);
+  int resolved = _sv0t0;
+  int _sv0t1 = find_fn_index(fn_names, resolved);
+  return _sv0t1;
+}
+
+static int scrut_local_lookup(int scrut_names, int name_h) {
+  int _sv0t0 = sv0_vec_len(scrut_names);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(scrut_names, i);
+    if ((_sv0t1 == name_h)) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
+}
+
+static int param_ty_lookup(int param_names, int name_h) {
+  int _sv0t0 = sv0_vec_len(param_names);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(param_names, i);
+    if ((_sv0t1 == name_h)) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
 }
 
 static int test_fresh_tmp(void) {
@@ -2001,6 +2064,112 @@ static int test_ast_ty_c_string_user(void) {
   return 0;
 }
 
+static int test_find_fn_index(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(names, 30);
+  int _sv0t1 = find_fn_index(names, 10);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = find_fn_index(names, 20);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = find_fn_index(names, 30);
+  if ((_sv0t3 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = find_fn_index(names, 99);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_callee_fn_index(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(names, 20);
+  int _sv0t1 = sv0_vec_new();
+  int aliases = _sv0t1;
+  sv0_vec_push(aliases, 30);
+  sv0_vec_push(aliases, 10);
+  int _sv0t2 = callee_fn_index(names, aliases, 10);
+  if ((_sv0t2 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = callee_fn_index(names, aliases, 30);
+  if ((_sv0t3 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = callee_fn_index(names, aliases, 99);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_scrut_local(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  sv0_vec_push(names, 50);
+  sv0_vec_push(names, 60);
+  int _sv0t1 = scrut_local_lookup(names, 50);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = scrut_local_lookup(names, 60);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = scrut_local_lookup(names, 99);
+  int _sv0t4 = (0 - 1);
+  if ((_sv0t3 != _sv0t4)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_param_ty(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  sv0_vec_push(names, 70);
+  sv0_vec_push(names, 80);
+  int _sv0t1 = param_ty_lookup(names, 70);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = param_ty_lookup(names, 80);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = param_ty_lookup(names, 99);
+  int _sv0t4 = (0 - 1);
+  if ((_sv0t3 != _sv0t4)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -2216,6 +2385,34 @@ int main(void) {
   if ((r31 != 0)) {
     int _sv0t60 = (330 + r31);
     return _sv0t60;
+  } else {
+  }
+  int _sv0t61 = test_find_fn_index();
+  int r32 = _sv0t61;
+  if ((r32 != 0)) {
+    int _sv0t62 = (340 + r32);
+    return _sv0t62;
+  } else {
+  }
+  int _sv0t63 = test_callee_fn_index();
+  int r33 = _sv0t63;
+  if ((r33 != 0)) {
+    int _sv0t64 = (350 + r33);
+    return _sv0t64;
+  } else {
+  }
+  int _sv0t65 = test_scrut_local();
+  int r34 = _sv0t65;
+  if ((r34 != 0)) {
+    int _sv0t66 = (360 + r34);
+    return _sv0t66;
+  } else {
+  }
+  int _sv0t67 = test_param_ty();
+  int r35 = _sv0t67;
+  if ((r35 != 0)) {
+    int _sv0t68 = (370 + r35);
+    return _sv0t68;
   } else {
   }
   return 0;
