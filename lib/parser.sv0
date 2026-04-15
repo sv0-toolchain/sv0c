@@ -2759,7 +2759,7 @@ fn parse_quant(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 
 /* ── item-level parsing (SML parseFnBody…parseItem…val parse) ─
    Item arena (parallel Vec<i32>s: it, id1, id2, id3, id4):
-     0 ItemFn         : d1=name_tok_pos, d2=has_ret(0/1)
+     0 ItemFn         : d1=name_tok_pos, d2=has_ret(0/1), d3=param_count, d4=contract_count
      1 ItemStruct     : d1=name_tok_pos, d2=field_count
      2 ItemEnum       : d1=name_tok_pos, d2=variant_count
      3 ItemTrait      : d1=name_tok_pos, d2=method_count
@@ -2791,10 +2791,12 @@ fn parse_param(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 }
 
 fn parse_param_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
-                    source: string, pos: i32, pp: Vec<i32>) -> i32 {
-    if ps_peek(tags, pos) == 7 { return pos; }
+                    source: string, pos: i32, pp: Vec<i32>,
+                    count_out: Vec<i32>) -> i32 {
+    if ps_peek(tags, pos) == 7 { vec_push(count_out, 0); return pos; }
     let p1: i32 = parse_param(tags, starts, ends, source, pos, pp);
     if p1 < 0 { return 0 - 1; }
+    let mut count: i32 = 1;
     let mut p: i32 = p1;
     let mut done: bool = false;
     while done != true {
@@ -2805,12 +2807,14 @@ fn parse_param_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             } else {
                 let pn: i32 = parse_param(tags, starts, ends, source, p + 1, pp);
                 if pn < 0 { return 0 - 1; }
+                count = count + 1;
                 p = pn;
             }
         } else {
             done = true;
         }
     }
+    vec_push(count_out, count);
     return p;
 }
 
@@ -2836,17 +2840,21 @@ fn parse_contract(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 }
 
 fn parse_contracts(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
-                   source: string, pos: i32, pp: Vec<i32>) -> i32 {
+                   source: string, pos: i32, pp: Vec<i32>,
+                   count_out: Vec<i32>) -> i32 {
     let mut p: i32 = pos;
+    let mut count: i32 = 0;
     let mut done: bool = false;
     while done != true {
         let pc: i32 = parse_contract(tags, starts, ends, source, p, pp);
         if pc == 0 - 2 { done = true; }
         else {
             if pc < 0 { return 0 - 1; }
+            count = count + 1;
             p = pc;
         }
     }
+    vec_push(count_out, count);
     return p;
 }
 
@@ -2862,9 +2870,11 @@ fn parse_fn_body(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     let gp: Vec<i32> = vec_new();
     let p1: i32 = parse_generic_params(tags, p0 + 2, gp);
     if ps_peek(tags, p1) != 6 { return 0 - 1; }
-    let p2: i32 = parse_param_list(tags, starts, ends, source, p1 + 1, pp);
+    let pc: Vec<i32> = vec_new();
+    let p2: i32 = parse_param_list(tags, starts, ends, source, p1 + 1, pp, pc);
     if p2 < 0 { return 0 - 1; }
     if ps_peek(tags, p2) != 7 { return 0 - 1; }
+    let param_count: i32 = vec_get(pc, 0);
     let mut has_ret: i32 = 0;
     let mut p3: i32 = p2 + 1;
     if ps_peek(tags, p3) == 19 {
@@ -2879,8 +2889,10 @@ fn parse_fn_body(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         p3 = pt;
     }
     let p4: i32 = ps_skip_where_clause(tags, p3);
-    let p5: i32 = parse_contracts(tags, starts, ends, source, p4, pp);
+    let cc: Vec<i32> = vec_new();
+    let p5: i32 = parse_contracts(tags, starts, ends, source, p4, pp, cc);
     if p5 < 0 { return 0 - 1; }
+    let contract_count: i32 = vec_get(cc, 0);
     let et: Vec<i32> = vec_new();
     let ed1v: Vec<i32> = vec_new();
     let ed2v: Vec<i32> = vec_new();
@@ -2893,8 +2905,8 @@ fn parse_fn_body(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(it, 0);
     vec_push(id1, name_pos);
     vec_push(id2, has_ret);
-    vec_push(id3, 0);
-    vec_push(id4, 0);
+    vec_push(id3, param_count);
+    vec_push(id4, contract_count);
     return p6;
 }
 
@@ -4991,6 +5003,8 @@ fn test_parse_fn_simple() -> i32 {
     if vec_get(it, 0) != 0 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
     if vec_get(id2, 0) != 0 { return 4; }
+    if vec_get(id3, 0) != 0 { return 5; }
+    if vec_get(id4, 0) != 0 { return 6; }
     return 0;
 }
 
@@ -5024,6 +5038,8 @@ fn test_parse_fn_ret() -> i32 {
     if vec_get(it, 0) != 0 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
     if vec_get(id2, 0) != 1 { return 4; }
+    if vec_get(id3, 0) != 1 { return 5; }
+    if vec_get(id4, 0) != 0 { return 6; }
     return 0;
 }
 
@@ -5151,6 +5167,8 @@ fn test_parse_fn_contract() -> i32 {
     if r != 10 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
+    if vec_get(id3, 0) != 0 { return 4; }
+    if vec_get(id4, 0) != 1 { return 5; }
     return 0;
 }
 
