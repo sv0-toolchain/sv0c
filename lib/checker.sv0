@@ -18,6 +18,11 @@
    struct_enum_name_clash (SML initTypes clash check),
    named_only_ty (SML namedOnlyTy — struct/enum/none classifier),
    fields_of_struct_count (SML fieldsOfStruct — field count by name handle).
+   stmt_returns_arena / last_stmt_returns_arena (SML stmtReturns /
+   lastStmtReturns — arena-aware, real expr arena tags 28/15).
+   chk_tok_str (single-token text extraction for checker arena walks).
+   expr_references_result (SML exprReferencesResult — recursive expr
+   arena walk checking for single-segment "result" path).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -551,6 +556,216 @@ fn fields_of_struct_count(struct_names: Vec<i32>,
     return 0 - 1;
 }
 
+/* ── arena-aware statement return detection ────────────────────
+   Uses real expression arena tags (SemiStmt=28, ExprReturn=15).
+   SML stmtReturns/lastStmtReturns using arena Vecs directly. */
+
+fn stmt_returns_arena(et: Vec<i32>, ed1: Vec<i32>, idx: i32) -> bool {
+    let tag: i32 = vec_get(et, idx);
+    if tag == 28 {
+        let inner: i32 = vec_get(ed1, idx);
+        if inner >= 0 { return vec_get(et, inner) == 15; }
+        return false;
+    }
+    if tag == 15 { return true; }
+    return false;
+}
+
+fn last_stmt_returns_arena(et: Vec<i32>, ed1: Vec<i32>,
+                           first_stmt: i32,
+                           stmt_count: i32) -> bool {
+    if stmt_count == 0 { return false; }
+    return stmt_returns_arena(et, ed1, first_stmt + stmt_count - 1);
+}
+
+/* ── token text helper ─────────────────────────────────────── */
+
+fn chk_tok_str(source: string, starts: Vec<i32>, ends: Vec<i32>,
+               pos: i32) -> string {
+    let s: i32 = vec_get(starts, pos);
+    let e: i32 = vec_get(ends, pos);
+    return string_substr(source, s, e - s);
+}
+
+/* ── expr_references_result (SML exprReferencesResult) ────────
+   Recursive walk over the expression arena checking whether any
+   ExprPath is the single-segment path "result".  Used by
+   checkContract to reject `ensures` on unit-returning functions
+   that mention `result`. */
+
+fn expr_references_result(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                          ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                          source: string, starts: Vec<i32>,
+                          ends: Vec<i32>, pp: Vec<i32>) -> bool {
+    if idx < 0 { return false; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 0 { return false; }
+    if tag == 1 {
+        let pps: i32 = vec_get(ed1, idx);
+        let ppc: i32 = vec_get(ed2, idx);
+        if ppc == 1 {
+            let tok: i32 = vec_get(pp, pps);
+            let name: string = chk_tok_str(source, starts, ends, tok);
+            return string_eq(name, "result");
+        }
+        return false;
+    }
+    if tag == 2 {
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed2, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 3 {
+        if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed2, idx),
+                                   source, starts, ends, pp) { return true; }
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed3, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 4 {
+        let callee: i32 = vec_get(ed1, idx);
+        if expr_references_result(et, ed1, ed2, ed3, ed4, callee,
+                                   source, starts, ends, pp) { return true; }
+        let af: i32 = vec_get(ed2, idx);
+        let ac: i32 = vec_get(ed3, idx);
+        let mut ai: i32 = 0;
+        while ai < ac {
+            if expr_references_result(et, ed1, ed2, ed3, ed4, af + ai,
+                                       source, starts, ends, pp) { return true; }
+            ai = ai + 1;
+        }
+        return false;
+    }
+    if tag == 6 {
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed1, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 10 {
+        if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed1, idx),
+                                   source, starts, ends, pp) { return true; }
+        if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed2, idx),
+                                   source, starts, ends, pp) { return true; }
+        let else_idx: i32 = vec_get(ed3, idx);
+        if else_idx >= 0 {
+            return expr_references_result(et, ed1, ed2, ed3, ed4, else_idx,
+                                           source, starts, ends, pp);
+        }
+        return false;
+    }
+    if tag == 11 {
+        let scrut: i32 = vec_get(ed1, idx);
+        if expr_references_result(et, ed1, ed2, ed3, ed4, scrut,
+                                   source, starts, ends, pp) { return true; }
+        let arms_f: i32 = vec_get(ed2, idx);
+        let arms_c: i32 = vec_get(ed3, idx);
+        let mut ami: i32 = 0;
+        while ami < arms_c {
+            let arm_idx: i32 = arms_f + ami;
+            let guard: i32 = vec_get(ed3, arm_idx);
+            let body: i32 = vec_get(ed4, arm_idx);
+            if guard >= 0 {
+                if expr_references_result(et, ed1, ed2, ed3, ed4, guard,
+                                           source, starts, ends, pp) { return true; }
+            }
+            if expr_references_result(et, ed1, ed2, ed3, ed4, body,
+                                       source, starts, ends, pp) { return true; }
+            ami = ami + 1;
+        }
+        return false;
+    }
+    if tag == 12 {
+        if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed1, idx),
+                                   source, starts, ends, pp) { return true; }
+        let inv_f: i32 = vec_get(ed3, idx);
+        let inv_c: i32 = vec_get(ed4, idx);
+        let mut ii: i32 = 0;
+        while ii < inv_c {
+            if expr_references_result(et, ed1, ed2, ed3, ed4, inv_f + ii,
+                                       source, starts, ends, pp) { return true; }
+            ii = ii + 1;
+        }
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed2, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 13 {
+        if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed2, idx),
+                                   source, starts, ends, pp) { return true; }
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed3, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 14 {
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed1, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 16 {
+        let bv: i32 = vec_get(ed1, idx);
+        if bv >= 0 {
+            return expr_references_result(et, ed1, ed2, ed3, ed4, bv,
+                                           source, starts, ends, pp);
+        }
+        return false;
+    }
+    if tag == 17 { return false; }
+    if tag == 18 {
+        if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed1, idx),
+                                   source, starts, ends, pp) { return true; }
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed2, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 19 {
+        if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed2, idx),
+                                   source, starts, ends, pp) { return true; }
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed3, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 20 {
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed1, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 22 {
+        return expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       vec_get(ed1, idx),
+                                       source, starts, ends, pp);
+    }
+    if tag == 24 {
+        let sfc: i32 = vec_get(ed3, idx);
+        let mut sfi: i32 = 0;
+        while sfi < sfc {
+            if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       idx - sfc + sfi,
+                                       source, starts, ends, pp) { return true; }
+            sfi = sfi + 1;
+        }
+        return false;
+    }
+    if tag == 25 {
+        let tf: i32 = vec_get(ed1, idx);
+        let tc: i32 = vec_get(ed2, idx);
+        let mut ti: i32 = 0;
+        while ti < tc {
+            if expr_references_result(et, ed1, ed2, ed3, ed4, tf + ti,
+                                       source, starts, ends, pp) { return true; }
+            ti = ti + 1;
+        }
+        return false;
+    }
+    return false;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -890,6 +1105,64 @@ fn test_fields_of_struct_count() -> i32 {
     return 0;
 }
 
+fn test_stmt_returns_arena() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    vec_push(et, 15);  vec_push(ed1, 0 - 1);
+    vec_push(et, 28);  vec_push(ed1, 0);
+    vec_push(et, 0);   vec_push(ed1, 0);
+    vec_push(et, 28);  vec_push(ed1, 2);
+    vec_push(et, 27);  vec_push(ed1, 0);
+    if stmt_returns_arena(et, ed1, 1) != true { return 1; }
+    if stmt_returns_arena(et, ed1, 3) != false { return 2; }
+    if stmt_returns_arena(et, ed1, 4) != false { return 3; }
+    if stmt_returns_arena(et, ed1, 0) != true { return 4; }
+    return 0;
+}
+
+fn test_last_stmt_returns_arena() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    vec_push(et, 0);   vec_push(ed1, 0);
+    vec_push(et, 28);  vec_push(ed1, 0);
+    vec_push(et, 15);  vec_push(ed1, 0 - 1);
+    vec_push(et, 28);  vec_push(ed1, 2);
+    if last_stmt_returns_arena(et, ed1, 0, 0) != false { return 1; }
+    if last_stmt_returns_arena(et, ed1, 1, 1) != false { return 2; }
+    if last_stmt_returns_arena(et, ed1, 3, 1) != true { return 3; }
+    return 0;
+}
+
+fn test_expr_references_result() -> i32 {
+    let source: string = "result  x  y";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);  vec_push(ends, 6);
+    vec_push(starts, 8);  vec_push(ends, 9);
+    vec_push(starts, 11); vec_push(ends, 12);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    vec_push(pp, 2);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 1); vec_push(ed1, 1); vec_push(ed2, 1); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 3); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 2); vec_push(ed4, 0);
+    vec_push(et, 3); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 2); vec_push(ed4, 0);
+    if expr_references_result(et, ed1, ed2, ed3, ed4, 0, source, starts, ends, pp) != true { return 1; }
+    if expr_references_result(et, ed1, ed2, ed3, ed4, 1, source, starts, ends, pp) != false { return 2; }
+    if expr_references_result(et, ed1, ed2, ed3, ed4, 2, source, starts, ends, pp) != false { return 3; }
+    if expr_references_result(et, ed1, ed2, ed3, ed4, 3, source, starts, ends, pp) != true { return 4; }
+    if expr_references_result(et, ed1, ed2, ed3, ed4, 4, source, starts, ends, pp) != false { return 5; }
+    if expr_references_result(et, ed1, ed2, ed3, ed4, 0 - 1, source, starts, ends, pp) != false { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -947,5 +1220,11 @@ fn main() -> i32 {
     if r27 != 0 { return 280 + r27; }
     let r28: i32 = test_fields_of_struct_count();
     if r28 != 0 { return 290 + r28; }
+    let r29: i32 = test_stmt_returns_arena();
+    if r29 != 0 { return 300 + r29; }
+    let r30: i32 = test_last_stmt_returns_arena();
+    if r30 != 0 { return 310 + r30; }
+    let r31: i32 = test_expr_references_result();
+    if r31 != 0 { return 320 + r31; }
     return 0;
 }
