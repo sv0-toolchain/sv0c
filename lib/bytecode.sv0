@@ -12,8 +12,10 @@
    encode_insn_at / decode_insn_at (SML encodeInsn/decodeInsnVec —
    instruction-level byte encoding/decoding between flat insn Vec
    and byte buffer), encode_all_insns / decode_all_insns (SML
-   encodeAll/decodeAll — full instruction stream encode/decode).
-   File-level encodeFile/decodeFile deferred. */
+   encodeAll/decodeAll — full instruction stream encode/decode),
+   encode_file / decode_file (SML encodeFile/decodeFile — complete
+   .sv0b file-level serialization with header, string section,
+   function table section, and code section). */
 
 /* ── magic and version ──────────────────────────────────────── */
 
@@ -729,6 +731,121 @@ fn decode_all_insns(buf: Vec<i32>, buf_len: i32, out: Vec<i32>) -> i32 {
     return vec_len(out) - start_len;
 }
 
+/* ── encode_file (SML encodeFile) ─────────────────────────────
+   Assembles a complete .sv0b file from a pre-encoded string section
+   and a function table.  str_sec/str_sec_len hold the already-encoded
+   string pool bytes (produced by encode_strings or encode_string_literals).
+   ft_entries is stride-4: [nameIdx, arity, localCount, code_vec_handle]
+   repeated for each function.  code_vec_handle is a Vec<i32> of flat
+   instruction data (opcode + payload slots).
+   Layout: header(6) + str_section + func_section + code_section.
+   Returns total byte count. */
+
+fn encode_file(str_sec: Vec<i32>, str_sec_len: i32,
+               ft_entries: Vec<i32>, out: Vec<i32>) -> i32 {
+    encode_header(1, out);
+    let func_count: i32 = vec_len(ft_entries) / 4;
+    encode_u32_le(str_sec_len, out);
+    let mut si: i32 = 0;
+    while si < str_sec_len {
+        vec_push(out, vec_get(str_sec, si));
+        si = si + 1;
+    }
+    let code_sizes: Vec<i32> = vec_new();
+    let code_bufs: Vec<i32> = vec_new();
+    let mut fi: i32 = 0;
+    while fi < func_count {
+        let code_vec: Vec<i32> = vec_get(ft_entries, fi * 4 + 3);
+        let cbuf: Vec<i32> = vec_new();
+        let bcount: i32 = encode_all_insns(code_vec, cbuf);
+        vec_push(code_sizes, bcount);
+        vec_push(code_bufs, cbuf);
+        fi = fi + 1;
+    }
+    let func_sec_data_len: i32 = 4 + func_count * 20;
+    encode_u32_le(func_sec_data_len, out);
+    encode_u32_le(func_count, out);
+    let mut code_offset: i32 = 0;
+    fi = 0;
+    while fi < func_count {
+        encode_u32_le(vec_get(ft_entries, fi * 4 + 0), out);
+        encode_u32_le(vec_get(ft_entries, fi * 4 + 1), out);
+        encode_u32_le(vec_get(ft_entries, fi * 4 + 2), out);
+        encode_u32_le(code_offset, out);
+        encode_u32_le(vec_get(code_sizes, fi), out);
+        code_offset = code_offset + vec_get(code_sizes, fi);
+        fi = fi + 1;
+    }
+    encode_u32_le(code_offset, out);
+    fi = 0;
+    while fi < func_count {
+        let fb: Vec<i32> = vec_get(code_bufs, fi);
+        let flen: i32 = vec_len(fb);
+        let mut ci: i32 = 0;
+        while ci < flen {
+            vec_push(out, vec_get(fb, ci));
+            ci = ci + 1;
+        }
+        fi = fi + 1;
+    }
+    return vec_len(out);
+}
+
+/* ── decode_file (SML decodeFile) ─────────────────────────────
+   Parses a .sv0b byte buffer into string offsets/lengths and a
+   function table.  out_str_starts/out_str_lens receive byte positions
+   and lengths of decoded strings within buf.  out_ft receives
+   stride-4 entries [nameIdx, arity, localCount, code_vec_handle]
+   where code_vec_handle is a newly allocated Vec<i32> of decoded
+   instruction data.  Returns 0 on success, negative on error. */
+
+fn decode_file(buf: Vec<i32>, buf_len: i32,
+               out_str_starts: Vec<i32>, out_str_lens: Vec<i32>,
+               out_ft: Vec<i32>) -> i32 {
+    if verify_magic(buf) == false { return 0 - 1; }
+    let ver: i32 = decode_u16_at(buf, 4);
+    if ver != 1 { return 0 - 2; }
+    let mut pos: i32 = 6;
+    let str_sec_len: i32 = decode_u32_at(buf, pos);
+    pos = pos + 4;
+    let str_end: i32 = pos + str_sec_len;
+    decode_strings(buf, pos, out_str_starts, out_str_lens);
+    pos = str_end;
+    let func_sec_len: i32 = decode_u32_at(buf, pos);
+    pos = pos + 4;
+    let func_sec_end: i32 = pos + func_sec_len;
+    let func_count: i32 = decode_u32_at(buf, pos);
+    pos = pos + 4;
+    let code_sec_start: i32 = func_sec_end + 4;
+    let mut fi: i32 = 0;
+    while fi < func_count {
+        let nameIdx: i32 = decode_u32_at(buf, pos);
+        pos = pos + 4;
+        let arity: i32 = decode_u32_at(buf, pos);
+        pos = pos + 4;
+        let localCount: i32 = decode_u32_at(buf, pos);
+        pos = pos + 4;
+        let code_off: i32 = decode_u32_at(buf, pos);
+        pos = pos + 4;
+        let code_len: i32 = decode_u32_at(buf, pos);
+        pos = pos + 4;
+        let code_buf: Vec<i32> = vec_new();
+        let mut ci: i32 = 0;
+        while ci < code_len {
+            vec_push(code_buf, vec_get(buf, code_sec_start + code_off + ci));
+            ci = ci + 1;
+        }
+        let code_vec: Vec<i32> = vec_new();
+        decode_all_insns(code_buf, code_len, code_vec);
+        vec_push(out_ft, nameIdx);
+        vec_push(out_ft, arity);
+        vec_push(out_ft, localCount);
+        vec_push(out_ft, code_vec);
+        fi = fi + 1;
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_magic() -> i32 {
@@ -1121,6 +1238,81 @@ fn test_encode_decode_all() -> i32 {
     return 0;
 }
 
+fn test_encode_file() -> i32 {
+    let source: string = "main";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 4);
+    let pool: Vec<i32> = vec_new();
+    vec_push(pool, 0);
+    let str_buf: Vec<i32> = vec_new();
+    let str_len: i32 = encode_strings(pool, source, starts, ends, str_buf);
+    let code0: Vec<i32> = vec_new();
+    vec_push(code0, 0);
+    let ft: Vec<i32> = vec_new();
+    vec_push(ft, 0); vec_push(ft, 0); vec_push(ft, 1); vec_push(ft, code0);
+    let out: Vec<i32> = vec_new();
+    let total: i32 = encode_file(str_buf, str_len, ft, out);
+    if total <= 0 { return 1; }
+    if vec_get(out, 0) != 83 { return 2; }
+    if vec_get(out, 1) != 86 { return 3; }
+    if vec_get(out, 2) != 48 { return 4; }
+    if vec_get(out, 3) != 66 { return 5; }
+    return 0;
+}
+
+fn test_decode_file_roundtrip() -> i32 {
+    let source: string = "main add";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 4);
+    vec_push(starts, 5); vec_push(ends, 8);
+    let pool: Vec<i32> = vec_new();
+    vec_push(pool, 0);
+    vec_push(pool, 1);
+    let str_buf: Vec<i32> = vec_new();
+    let str_len: i32 = encode_strings(pool, source, starts, ends, str_buf);
+    let code0: Vec<i32> = vec_new();
+    vec_push(code0, 4); vec_push(code0, 42);
+    vec_push(code0, 118); vec_push(code0, 1);
+    let code1: Vec<i32> = vec_new();
+    vec_push(code1, 0);
+    let ft: Vec<i32> = vec_new();
+    vec_push(ft, 0); vec_push(ft, 0); vec_push(ft, 2); vec_push(ft, code0);
+    vec_push(ft, 1); vec_push(ft, 2); vec_push(ft, 0); vec_push(ft, code1);
+    let out: Vec<i32> = vec_new();
+    let _ef: i32 = encode_file(str_buf, str_len, ft, out);
+    let buf_len: i32 = vec_len(out);
+    let ds: Vec<i32> = vec_new();
+    let dl: Vec<i32> = vec_new();
+    let dft: Vec<i32> = vec_new();
+    let rc: i32 = decode_file(out, buf_len, ds, dl, dft);
+    if rc != 0 { return 1; }
+    if vec_len(ds) != 2 { return 2; }
+    if vec_get(dl, 0) != 4 { return 3; }
+    let s0: i32 = vec_get(ds, 0);
+    if vec_get(out, s0) != 109 { return 4; }
+    if vec_get(out, s0 + 3) != 110 { return 5; }
+    if vec_get(dl, 1) != 3 { return 6; }
+    if vec_len(dft) != 8 { return 7; }
+    if vec_get(dft, 0) != 0 { return 8; }
+    if vec_get(dft, 1) != 0 { return 9; }
+    if vec_get(dft, 2) != 2 { return 10; }
+    let dc0: Vec<i32> = vec_get(dft, 3);
+    if vec_len(dc0) != 4 { return 11; }
+    if vec_get(dc0, 0) != 4 { return 12; }
+    if vec_get(dc0, 1) != 42 { return 13; }
+    if vec_get(dc0, 2) != 118 { return 14; }
+    if vec_get(dc0, 3) != 1 { return 15; }
+    if vec_get(dft, 4) != 1 { return 16; }
+    if vec_get(dft, 5) != 2 { return 17; }
+    if vec_get(dft, 6) != 0 { return 18; }
+    let dc1: Vec<i32> = vec_get(dft, 7);
+    if vec_len(dc1) != 1 { return 19; }
+    if vec_get(dc1, 0) != 0 { return 20; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_magic();
     if r1 != 0 { return r1; }
@@ -1160,5 +1352,9 @@ fn main() -> i32 {
     if r18 != 0 { return 222 + r18; }
     let r19: i32 = test_encode_decode_all();
     if r19 != 0 { return 236 + r19; }
+    let r20: i32 = test_encode_file();
+    if r20 != 0 { return 246 + r20; }
+    let r21: i32 = test_decode_file_roundtrip();
+    if r21 != 0 { return 10 + r21; }
     return 0;
 }
