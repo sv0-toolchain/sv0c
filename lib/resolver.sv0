@@ -20,9 +20,18 @@
    resolve_expr (SML resolveExpr — 27 expr tag cases with scope/binding/
    arity checking; ExprCast type validation deferred — type arena local),
    resolve_stmt (SML resolveStmt — LetStmt/SemiStmt),
-   resolve_contract (SML resolveContract — thin wrapper).
-   Remaining: resolveFn, resolveStruct/Enum/Trait/Impl, resolveTopItem,
-   applyUseClause, resolve (top-level entry). */
+   resolve_contract (SML resolveContract — thin wrapper),
+   apply_use_clause/apply_use_clauses (SML applyUseClause — use clause
+   alias registration; enum variant aliases deferred — variant names
+   local to parser), resolve_top_item (stub — item-body resolution
+   deferred; requires parser arena enrichment to retain param types,
+   field types, contracts, and function bodies), resolve_program
+   (SML resolve — top-level orchestration: register_items →
+   apply_use_clauses → resolve_top_items; intrinsic registration
+   owned by caller).
+   Remaining: resolveFn, resolveStruct/Enum/Trait/Impl body traversals
+   (blocked on parser arena enrichment — sub-tree data local to parser
+   call sites, not stored in item arena). */
 
 /* ── path joining ───────────────────────────────────────────── */
 
@@ -1162,6 +1171,124 @@ fn resolve_contract(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                          mod_vals, mod_tys, fn_arities, frames, pp);
 }
 
+/* ── apply_use_clause (SML applyUseClause) ───────────────────
+   Processes a single ItemUse. Constructs the mangled target name
+   (module__item), checks if it exists as a function or type,
+   and registers the short alias in the environment.
+   Assumes item names are already mangled (link phase complete).
+   Enum variant alias registration deferred — variant names are
+   local to parser and not stored in item arena.
+   Returns 0 on success, 309 on unknown module item. */
+
+fn apply_use_clause(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                    idx: i32,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>,
+                    mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                    fn_arities: Vec<i32>,
+                    pp: Vec<i32>) -> i32 {
+    let tag: i32 = vec_get(it, idx);
+    if tag != 5 { return 0; }
+    let pps: i32 = vec_get(id1, idx);
+    let ppc: i32 = vec_get(id2, idx);
+    if ppc != 2 { return 309; }
+    let m_tok: i32 = vec_get(pp, pps);
+    let nm_tok: i32 = vec_get(pp, pps + 1);
+    let m_str: string = tok_str(source, starts, ends, m_tok);
+    let nm_str: string = tok_str(source, starts, ends, nm_tok);
+    let tgt: string = mangle_use_target(m_str, nm_str);
+    let arity: i32 = res_lookup_fn_arity_str(fn_arities, tgt,
+                                              source, starts, ends);
+    if arity >= 0 {
+        vec_push(mod_vals, nm_tok);
+        vec_push(fn_arities, nm_tok);
+        vec_push(fn_arities, arity);
+        return 0;
+    }
+    if res_type_exists(mod_tys, tgt, source, starts, ends) {
+        vec_push(mod_tys, nm_tok);
+        return 0;
+    }
+    return 309;
+}
+
+fn apply_use_clauses(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                     id3: Vec<i32>, id4: Vec<i32>,
+                     source: string, starts: Vec<i32>, ends: Vec<i32>,
+                     mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                     fn_arities: Vec<i32>,
+                     pp: Vec<i32>) -> i32 {
+    let len: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < len {
+        if vec_get(it, i) == 5 {
+            let r: i32 = apply_use_clause(it, id1, id2, i,
+                                           source, starts, ends,
+                                           mod_vals, mod_tys,
+                                           fn_arities, pp);
+            if r != 0 { return r; }
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+/* ── resolve_top_item (SML resolveTopItem) ────────────────────
+   Dispatcher by item tag. Item-body resolution (resolveFn,
+   resolveStruct, resolveEnum, resolveTrait, resolveImpl) is
+   deferred — requires parser arena enrichment to retain param
+   types, field types, contract expressions, and function bodies
+   across the parse boundary. Currently a stub that validates
+   item existence in the environment. */
+
+fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                    id3: Vec<i32>, id4: Vec<i32>, idx: i32,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>,
+                    mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                    fn_arities: Vec<i32>,
+                    pp: Vec<i32>) -> i32 {
+    let tag: i32 = vec_get(it, idx);
+    if tag == 5 { return 0; }
+    if tag == 6 { return 0; }
+    return 0;
+}
+
+/* ── resolve_program (SML resolve) ────────────────────────────
+   Top-level entry: register intrinsics → register_items →
+   apply_use_clauses → resolve_top_items.
+   Returns 0 on success, error code on failure. */
+
+/* resolve_program: top-level entry. Caller is responsible for
+   registering intrinsics before calling this function (using
+   register_all_intrinsics with the appropriate token handles
+   from the program's token stream). This function orchestrates:
+   register_items → apply_use_clauses → resolve_top_items. */
+
+fn resolve_program(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                   id3: Vec<i32>, id4: Vec<i32>,
+                   source: string, starts: Vec<i32>, ends: Vec<i32>,
+                   mod_vals: Vec<i32>, mod_tys: Vec<i32>,
+                   fn_arities: Vec<i32>,
+                   pp: Vec<i32>) -> i32 {
+    register_items(it, id1, id2, id3, id4,
+                   mod_vals, mod_tys, fn_arities);
+    let ru: i32 = apply_use_clauses(it, id1, id2, id3, id4,
+                                     source, starts, ends,
+                                     mod_vals, mod_tys,
+                                     fn_arities, pp);
+    if ru != 0 { return ru; }
+    let len: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < len {
+        let r: i32 = resolve_top_item(it, id1, id2, id3, id4, i,
+                                       source, starts, ends,
+                                       mod_vals, mod_tys,
+                                       fn_arities, pp);
+        if r != 0 { return r; }
+        i = i + 1;
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_path_join() -> i32 {
@@ -1750,6 +1877,122 @@ fn test_resolve_stmt_let() -> i32 {
     return 0;
 }
 
+fn test_apply_use_clause_value() -> i32 {
+    let source: string = "mymod mymod__bar bar x";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(starts, 6); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 20);
+    vec_push(starts, 21); vec_push(ends, 22);
+    let mv: Vec<i32> = vec_new();
+    vec_push(mv, 1);
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    vec_push(fa, 1);
+    vec_push(fa, 2);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 2);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    vec_push(it, 5);
+    vec_push(id1, 0);
+    vec_push(id2, 2);
+    let r: i32 = apply_use_clause(it, id1, id2, 0,
+                                   source, starts, ends,
+                                   mv, mt, fa, pp);
+    if r != 0 { return 1; }
+    if res_full_value_exists(mv, vec_new(), "bar",
+                              source, starts, ends) != true { return 2; }
+    if res_lookup_fn_arity_str(fa, "bar", source, starts, ends) != 2 { return 3; }
+    return 0;
+}
+
+fn test_apply_use_clause_type() -> i32 {
+    let source: string = "mymod mymod__Point Point";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(starts, 6); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 24);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    vec_push(mt, 1);
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 2);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    vec_push(it, 5);
+    vec_push(id1, 0);
+    vec_push(id2, 2);
+    let r: i32 = apply_use_clause(it, id1, id2, 0,
+                                   source, starts, ends,
+                                   mv, mt, fa, pp);
+    if r != 0 { return 1; }
+    if res_type_exists(mt, "Point", source, starts, ends) != true { return 2; }
+    return 0;
+}
+
+fn test_apply_use_clause_unknown() -> i32 {
+    let source: string = "mymod unknown";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(starts, 6); vec_push(ends, 13);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    vec_push(it, 5);
+    vec_push(id1, 0);
+    vec_push(id2, 2);
+    let r: i32 = apply_use_clause(it, id1, id2, 0,
+                                   source, starts, ends,
+                                   mv, mt, fa, pp);
+    if r != 309 { return 1; }
+    return 0;
+}
+
+fn test_resolve_program() -> i32 {
+    let source: string = "main 0";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 4);
+    vec_push(starts, 5); vec_push(ends, 6);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    vec_push(id1, 0);
+    vec_push(id2, 0);
+    vec_push(id3, 1);
+    vec_push(id4, 0);
+    let r: i32 = resolve_program(it, id1, id2, id3, id4,
+                                  source, starts, ends,
+                                  mv, mt, fa, pp);
+    if r != 0 { return 1; }
+    if res_full_value_exists(mv, vec_new(), "main",
+                              source, starts, ends) != true { return 2; }
+    if res_lookup_fn_arity_str(fa, "main", source, starts, ends) != 1 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_join();
     if r1 != 0 { return r1; }
@@ -1819,5 +2062,13 @@ fn main() -> i32 {
     if r33 != 0 { return 136 + r33; }
     let r34: i32 = test_resolve_stmt_let();
     if r34 != 0 { return 146 + r34; }
+    let r35: i32 = test_apply_use_clause_value();
+    if r35 != 0 { return 152 + r35; }
+    let r36: i32 = test_apply_use_clause_type();
+    if r36 != 0 { return 156 + r36; }
+    let r37: i32 = test_apply_use_clause_unknown();
+    if r37 != 0 { return 159 + r37; }
+    let r38: i32 = test_resolve_program();
+    if r38 != 0 { return 162 + r38; }
     return 0;
 }

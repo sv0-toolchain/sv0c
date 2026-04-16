@@ -54,6 +54,10 @@ static int res_lookup_fn_arity_str(int fn_arities, const char* name_str, const c
 static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
 static int resolve_stmt(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
 static int resolve_contract(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
+static int apply_use_clause(int it, int id1, int id2, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
+static int apply_use_clauses(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
+static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
+static int resolve_program(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
 static int test_path_join(void);
 static int test_mangle_use(void);
 static int test_is_intrinsic(void);
@@ -88,6 +92,10 @@ static int test_resolve_expr_path(void);
 static int test_resolve_expr_block(void);
 static int test_resolve_expr_call_arity(void);
 static int test_resolve_stmt_let(void);
+static int test_apply_use_clause_value(void);
+static int test_apply_use_clause_type(void);
+static int test_apply_use_clause_unknown(void);
+static int test_resolve_program(void);
 
 static const char* path_join2(const char* a, const char* b) {
   const char* _sv0t0 = sv0_string_concat(a, "::");
@@ -1773,6 +1781,110 @@ static int resolve_contract(int et, int ed1, int ed2, int ed3, int ed4, int idx,
   return _sv0t0;
 }
 
+static int apply_use_clause(int it, int id1, int id2, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+  int _sv0t0 = sv0_vec_get(it, idx);
+  int tag = _sv0t0;
+  if ((tag != 5)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(id1, idx);
+  int pps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(id2, idx);
+  int ppc = _sv0t2;
+  if ((ppc != 2)) {
+    return 309;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(pp, pps);
+  int m_tok = _sv0t3;
+  int _sv0t4 = (pps + 1);
+  int _sv0t5 = sv0_vec_get(pp, _sv0t4);
+  int nm_tok = _sv0t5;
+  const char* _sv0t6 = tok_str(source, starts, ends, m_tok);
+  const char* m_str;
+  m_str = _sv0t6;
+  const char* _sv0t7 = tok_str(source, starts, ends, nm_tok);
+  const char* nm_str;
+  nm_str = _sv0t7;
+  const char* _sv0t8 = mangle_use_target(m_str, nm_str);
+  const char* tgt;
+  tgt = _sv0t8;
+  int _sv0t9 = res_lookup_fn_arity_str(fn_arities, tgt, source, starts, ends);
+  int arity = _sv0t9;
+  if ((arity >= 0)) {
+    sv0_vec_push(mod_vals, nm_tok);
+    sv0_vec_push(fn_arities, nm_tok);
+    sv0_vec_push(fn_arities, arity);
+    return 0;
+  } else {
+  }
+  int _sv0t10 = res_type_exists(mod_tys, tgt, source, starts, ends);
+  if (_sv0t10) {
+    sv0_vec_push(mod_tys, nm_tok);
+    return 0;
+  } else {
+  }
+  return 309;
+}
+
+static int apply_use_clauses(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+  int _sv0t0 = sv0_vec_len(it);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(it, i);
+    if ((_sv0t1 == 5)) {
+      int _sv0t2 = apply_use_clause(it, id1, id2, i, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
+      int r = _sv0t2;
+      if ((r != 0)) {
+        return r;
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+  int _sv0t0 = sv0_vec_get(it, idx);
+  int tag = _sv0t0;
+  if ((tag == 5)) {
+    return 0;
+  } else {
+  }
+  if ((tag == 6)) {
+    return 0;
+  } else {
+  }
+  return 0;
+}
+
+static int resolve_program(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+  int _sv0t0 = register_items(it, id1, id2, id3, id4, mod_vals, mod_tys, fn_arities);
+  int _sv0t1 = apply_use_clauses(it, id1, id2, id3, id4, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
+  int ru = _sv0t1;
+  if ((ru != 0)) {
+    return ru;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_len(it);
+  int len = _sv0t2;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t3 = resolve_top_item(it, id1, id2, id3, id4, i, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
+    int r = _sv0t3;
+    if ((r != 0)) {
+      return r;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
 static int test_path_join(void) {
   const char* _sv0t0 = path_join2("Foo", "Bar");
   int _sv0t1 = sv0_string_eq(_sv0t0, "Foo::Bar");
@@ -3267,6 +3379,203 @@ static int test_resolve_stmt_let(void) {
   return 0;
 }
 
+static int test_apply_use_clause_value(void) {
+  const char* source;
+  source = "mymod mymod__bar bar x";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 5);
+  sv0_vec_push(starts, 6);
+  sv0_vec_push(ends, 16);
+  sv0_vec_push(starts, 17);
+  sv0_vec_push(ends, 20);
+  sv0_vec_push(starts, 21);
+  sv0_vec_push(ends, 22);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  sv0_vec_push(mv, 1);
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  sv0_vec_push(fa, 1);
+  sv0_vec_push(fa, 2);
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 2);
+  int _sv0t6 = sv0_vec_new();
+  int it = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id2 = _sv0t8;
+  sv0_vec_push(it, 5);
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(id2, 2);
+  int _sv0t9 = apply_use_clause(it, id1, id2, 0, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t9;
+  if ((r != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_new();
+  int _sv0t11 = res_full_value_exists(mv, _sv0t10, "bar", source, starts, ends);
+  if ((_sv0t11 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = res_lookup_fn_arity_str(fa, "bar", source, starts, ends);
+  if ((_sv0t12 != 2)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_apply_use_clause_type(void) {
+  const char* source;
+  source = "mymod mymod__Point Point";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 5);
+  sv0_vec_push(starts, 6);
+  sv0_vec_push(ends, 18);
+  sv0_vec_push(starts, 19);
+  sv0_vec_push(ends, 24);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  sv0_vec_push(mt, 1);
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 2);
+  int _sv0t6 = sv0_vec_new();
+  int it = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id2 = _sv0t8;
+  sv0_vec_push(it, 5);
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(id2, 2);
+  int _sv0t9 = apply_use_clause(it, id1, id2, 0, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t9;
+  if ((r != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = res_type_exists(mt, "Point", source, starts, ends);
+  if ((_sv0t10 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_apply_use_clause_unknown(void) {
+  const char* source;
+  source = "mymod unknown";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 5);
+  sv0_vec_push(starts, 6);
+  sv0_vec_push(ends, 13);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t6 = sv0_vec_new();
+  int it = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id2 = _sv0t8;
+  sv0_vec_push(it, 5);
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(id2, 2);
+  int _sv0t9 = apply_use_clause(it, id1, id2, 0, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t9;
+  if ((r != 309)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_program(void) {
+  const char* source;
+  source = "main 0";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 4);
+  sv0_vec_push(starts, 5);
+  sv0_vec_push(ends, 6);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int it = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id2 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int id3 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int id4 = _sv0t10;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(id2, 0);
+  sv0_vec_push(id3, 1);
+  sv0_vec_push(id4, 0);
+  int _sv0t11 = resolve_program(it, id1, id2, id3, id4, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t11;
+  if ((r != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int _sv0t13 = res_full_value_exists(mv, _sv0t12, "main", source, starts, ends);
+  if ((_sv0t13 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t14 = res_lookup_fn_arity_str(fa, "main", source, starts, ends);
+  if ((_sv0t14 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_join();
   int r1 = _sv0t0;
@@ -3503,6 +3812,34 @@ int main(void) {
   if ((r34 != 0)) {
     int _sv0t66 = (146 + r34);
     return _sv0t66;
+  } else {
+  }
+  int _sv0t67 = test_apply_use_clause_value();
+  int r35 = _sv0t67;
+  if ((r35 != 0)) {
+    int _sv0t68 = (152 + r35);
+    return _sv0t68;
+  } else {
+  }
+  int _sv0t69 = test_apply_use_clause_type();
+  int r36 = _sv0t69;
+  if ((r36 != 0)) {
+    int _sv0t70 = (156 + r36);
+    return _sv0t70;
+  } else {
+  }
+  int _sv0t71 = test_apply_use_clause_unknown();
+  int r37 = _sv0t71;
+  if ((r37 != 0)) {
+    int _sv0t72 = (159 + r37);
+    return _sv0t72;
+  } else {
+  }
+  int _sv0t73 = test_resolve_program();
+  int r38 = _sv0t73;
+  if ((r38 != 0)) {
+    int _sv0t74 = (162 + r38);
+    return _sv0t74;
   } else {
   }
   return 0;
