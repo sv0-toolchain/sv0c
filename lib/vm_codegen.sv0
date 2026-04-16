@@ -18,9 +18,16 @@
    emit_value (SML emitValue — IR Value → bytecode instruction words;
    all scalar cases: VInt/VBool/VUnit/VString/VVar/VAddrOf; VMember deferred),
    emit_expr (SML emitExpr — IR Expr → bytecode instruction words;
-   Literal/Load/Binop/Unop with handle-based op resolution; FieldAccess deferred).
-   Remaining emit (emitInstr/emitBlock/emitWhileLoop/emitFn/emit)
-   deferred — needs IR instruction traversal with slot_env management. */
+   Literal/Load/Binop/Unop with handle-based op resolution; FieldAccess deferred),
+   emit_instr (SML emitInstr — IR Instr → bytecode instruction words;
+   Nop/DeclVar/DeclNamed/Assign/Store/ReturnVoid/ReturnVal implemented;
+   IfElse/WhileLoop/BlockInstr/Call/StoreField/Requires/Ensures deferred),
+   emit_instrs (SML emitBlock — iterate Box<Instr> Vec, calling emit_instr),
+   vec_append (copy src Vec<i32> into dst), emit_ret_width (value width for
+   RETURN_SLOTS).
+   Remaining: IfElse/WhileLoop/BlockInstr (jump offset calc), Call (builtin
+   dispatch + fn index), StoreField (field data), Requires/Ensures (pool
+   string construction), localCountAndEnv/emitFn/top-level emit. */
 
 /* ── variant slot counting ──────────────────────────────────── */
 
@@ -687,6 +694,183 @@ fn emit_expr(e: Expr,
     return 0 - 1;
 }
 
+/* ── vec_append helper ────────────────────────────────────── */
+
+fn vec_append(dst: Vec<i32>, src: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(src);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(dst, vec_get(src, i));
+        i = i + 1;
+    }
+    return n;
+}
+
+/* ── emit_ret_width (value width for RETURN_SLOTS) ───────── */
+
+fn emit_ret_width(v: Value,
+                  env_names: Vec<i32>, env_bases: Vec<i32>,
+                  env_widths: Vec<i32>) -> i32 {
+    match v {
+        Value::VVar(x) => {
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x);
+            if si >= 0 { return slot_width(env_widths, si); }
+            return 1;
+        },
+        Value::VInt(n) => { return 1; },
+        Value::VFloat(h) => { return 1; },
+        Value::VBool(b) => { return 1; },
+        Value::VString(s) => { return 1; },
+        Value::VUnit => { return 1; },
+        Value::VMember(bv, f) => { return 1; },
+        Value::VAddrOf(h) => { return 1; },
+    }
+    return 1;
+}
+
+/* ── IR instruction type (local; mirrors ir.sv0 / codegen.sv0) */
+
+enum Instr {
+    Nop,
+    DeclVar(i32),
+    DeclNamed(i32, i32),
+    Assign(i32, Box<Expr>),
+    Store(i32, Box<Expr>),
+    StoreField(i32, i32, Box<Expr>),
+    IfElse(Box<Expr>, Vec<i32>, Vec<i32>),
+    WhileLoop(Box<Expr>, Vec<i32>),
+    BlockInstr(Vec<i32>),
+    Break,
+    Continue,
+    Call(i32, i32, Vec<i32>, i32),
+    Requires(Box<Expr>, i32),
+    Ensures(Box<Expr>, i32),
+    ReturnVoid,
+    ReturnVal(Box<Value>),
+}
+
+/* ── emit_instr (SML emitInstr — IR instruction → bytecode) ──
+   Pushes instruction words into `out`.  Returns the number of
+   Vec elements pushed, or -1 on error / deferred case.
+   Implemented: Nop, DeclVar, DeclNamed, Assign, Store,
+   ReturnVoid, ReturnVal.
+   Deferred: IfElse, WhileLoop, BlockInstr, Call, StoreField,
+   Break, Continue, Requires, Ensures. */
+
+fn emit_instr(ins: Instr,
+              env_names: Vec<i32>, env_bases: Vec<i32>,
+              env_widths: Vec<i32>,
+              pool: Vec<i32>,
+              source: string, starts: Vec<i32>, ends: Vec<i32>,
+              out: Vec<i32>) -> i32 {
+    match ins {
+        Instr::Nop => { return 0; },
+        Instr::DeclVar(x) => { return 0; },
+        Instr::DeclNamed(cty, x) => { return 0; },
+        Instr::Assign(x, be) => {
+            let e: Expr = box_deref(be);
+            let n: i32 = emit_expr(e, env_names, env_bases, env_widths,
+                                   pool, source, starts, ends, out);
+            if n < 0 { return 0 - 1; }
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x);
+            if si < 0 { return 0 - 1; }
+            let base: i32 = slot_base(env_bases, si);
+            let width: i32 = slot_width(env_widths, si);
+            let mut k: i32 = 0;
+            while k < width {
+                vec_push(out, 97);
+                vec_push(out, base + width - 1 - k);
+                k = k + 1;
+            }
+            return n + width * 2;
+        },
+        Instr::Store(x, be) => {
+            let e: Expr = box_deref(be);
+            let n: i32 = emit_expr(e, env_names, env_bases, env_widths,
+                                   pool, source, starts, ends, out);
+            if n < 0 { return 0 - 1; }
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x);
+            if si < 0 { return 0 - 1; }
+            let base: i32 = slot_base(env_bases, si);
+            let width: i32 = slot_width(env_widths, si);
+            let mut k: i32 = 0;
+            while k < width {
+                vec_push(out, 97);
+                vec_push(out, base + width - 1 - k);
+                k = k + 1;
+            }
+            return n + width * 2;
+        },
+        Instr::StoreField(bh, fh, be) => {
+            return 0 - 1;
+        },
+        Instr::IfElse(be, th, el) => {
+            return 0 - 1;
+        },
+        Instr::WhileLoop(be, body) => {
+            return 0 - 1;
+        },
+        Instr::BlockInstr(body) => {
+            return 0 - 1;
+        },
+        Instr::Break => {
+            return 0 - 1;
+        },
+        Instr::Continue => {
+            return 0 - 1;
+        },
+        Instr::Call(dst, fn_h, args, rt) => {
+            return 0 - 1;
+        },
+        Instr::Requires(be, fn_h) => {
+            return 0 - 1;
+        },
+        Instr::Ensures(be, fn_h) => {
+            return 0 - 1;
+        },
+        Instr::ReturnVoid => {
+            vec_push(out, 118);
+            vec_push(out, 0);
+            return 2;
+        },
+        Instr::ReturnVal(bv) => {
+            let v: Value = box_deref(bv);
+            let w: i32 = emit_ret_width(v, env_names, env_bases, env_widths);
+            let n: i32 = emit_value(v, env_names, env_bases, env_widths, pool, out);
+            if n < 0 { return 0 - 1; }
+            vec_push(out, 118);
+            vec_push(out, w);
+            return n + 2;
+        },
+    }
+    return 0 - 1;
+}
+
+/* ── emit_instrs (SML emitBlock — iterate Box<Instr> Vec) ────
+   Each element of `instrs` is a Box<Instr> handle.
+   Returns total Vec elements pushed to `out`. */
+
+fn emit_instrs(instrs: Vec<i32>,
+               env_names: Vec<i32>, env_bases: Vec<i32>,
+               env_widths: Vec<i32>,
+               pool: Vec<i32>,
+               source: string, starts: Vec<i32>, ends: Vec<i32>,
+               out: Vec<i32>) -> i32 {
+    let count: i32 = vec_len(instrs);
+    let mut total: i32 = 0;
+    let mut idx: i32 = 0;
+    while idx < count {
+        let bh: Box<Instr> = vec_get(instrs, idx);
+        let ins: Instr = box_deref(bh);
+        let n: i32 = emit_instr(ins, env_names, env_bases, env_widths,
+                                pool, source, starts, ends, out);
+        if n < 0 { return 0 - 1; }
+        total = total + n;
+        idx = idx + 1;
+    }
+    return total;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_variant_slots() -> i32 {
@@ -1113,6 +1297,155 @@ fn test_emit_expr() -> i32 {
     return 0;
 }
 
+fn test_emit_instr() -> i32 {
+    let en: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    let pool: Vec<i32> = vec_new();
+    let source: string = "+-!";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(en, 50); vec_push(eb, 0); vec_push(ew, 1);
+    let out1: Vec<i32> = vec_new();
+    let r1: i32 = emit_instr(Instr::Nop, en, eb, ew, pool, source, starts, ends, out1);
+    if r1 != 0 { return 1; }
+    if vec_len(out1) != 0 { return 2; }
+    let out2: Vec<i32> = vec_new();
+    let r2: i32 = emit_instr(Instr::DeclVar(99), en, eb, ew, pool, source, starts, ends, out2);
+    if r2 != 0 { return 3; }
+    if vec_len(out2) != 0 { return 4; }
+    let out3: Vec<i32> = vec_new();
+    let r3: i32 = emit_instr(Instr::DeclNamed(1, 2), en, eb, ew, pool, source, starts, ends, out3);
+    if r3 != 0 { return 5; }
+    let out4: Vec<i32> = vec_new();
+    let asgn_e: Expr = Expr::Literal(box_new(Value::VInt(42)));
+    let r4: i32 = emit_instr(Instr::Assign(50, box_new(asgn_e)),
+                              en, eb, ew, pool, source, starts, ends, out4);
+    if r4 != 4 { return 6; }
+    if vec_get(out4, 0) != 4 { return 7; }
+    if vec_get(out4, 1) != 42 { return 8; }
+    if vec_get(out4, 2) != 97 { return 9; }
+    if vec_get(out4, 3) != 0 { return 10; }
+    let out5: Vec<i32> = vec_new();
+    let store_e: Expr = Expr::Literal(box_new(Value::VBool(true)));
+    let r5: i32 = emit_instr(Instr::Store(50, box_new(store_e)),
+                              en, eb, ew, pool, source, starts, ends, out5);
+    if r5 != 4 { return 11; }
+    if vec_get(out5, 0) != 7 { return 12; }
+    if vec_get(out5, 1) != 1 { return 13; }
+    if vec_get(out5, 2) != 97 { return 14; }
+    if vec_get(out5, 3) != 0 { return 15; }
+    let out6: Vec<i32> = vec_new();
+    let r6: i32 = emit_instr(Instr::ReturnVoid, en, eb, ew, pool, source, starts, ends, out6);
+    if r6 != 2 { return 16; }
+    if vec_get(out6, 0) != 118 { return 17; }
+    if vec_get(out6, 1) != 0 { return 18; }
+    let out7: Vec<i32> = vec_new();
+    let r7: i32 = emit_instr(Instr::ReturnVal(box_new(Value::VInt(7))),
+                              en, eb, ew, pool, source, starts, ends, out7);
+    if r7 != 4 { return 19; }
+    if vec_get(out7, 0) != 4 { return 20; }
+    if vec_get(out7, 1) != 7 { return 21; }
+    if vec_get(out7, 2) != 118 { return 22; }
+    if vec_get(out7, 3) != 1 { return 23; }
+    let out8: Vec<i32> = vec_new();
+    let r8: i32 = emit_instr(Instr::ReturnVal(box_new(Value::VVar(50))),
+                              en, eb, ew, pool, source, starts, ends, out8);
+    if r8 != 4 { return 24; }
+    if vec_get(out8, 0) != 96 { return 25; }
+    if vec_get(out8, 1) != 0 { return 26; }
+    if vec_get(out8, 2) != 118 { return 27; }
+    if vec_get(out8, 3) != 1 { return 28; }
+    vec_push(en, 60); vec_push(eb, 1); vec_push(ew, 3);
+    let out9: Vec<i32> = vec_new();
+    let asgn2_e: Expr = Expr::Load(60);
+    let r9: i32 = emit_instr(Instr::Assign(60, box_new(asgn2_e)),
+                              en, eb, ew, pool, source, starts, ends, out9);
+    if r9 != 12 { return 29; }
+    if vec_get(out9, 0) != 96 { return 30; }
+    if vec_get(out9, 1) != 1 { return 31; }
+    if vec_get(out9, 2) != 96 { return 32; }
+    if vec_get(out9, 3) != 2 { return 33; }
+    if vec_get(out9, 4) != 96 { return 34; }
+    if vec_get(out9, 5) != 3 { return 35; }
+    if vec_get(out9, 6) != 97 { return 36; }
+    if vec_get(out9, 7) != 3 { return 37; }
+    if vec_get(out9, 8) != 97 { return 38; }
+    if vec_get(out9, 9) != 2 { return 39; }
+    if vec_get(out9, 10) != 97 { return 40; }
+    if vec_get(out9, 11) != 1 { return 41; }
+    let out10: Vec<i32> = vec_new();
+    let r10: i32 = emit_instr(Instr::ReturnVal(box_new(Value::VVar(60))),
+                               en, eb, ew, pool, source, starts, ends, out10);
+    if r10 != 8 { return 42; }
+    if vec_get(out10, 6) != 118 { return 43; }
+    if vec_get(out10, 7) != 3 { return 44; }
+    return 0;
+}
+
+fn test_emit_instrs() -> i32 {
+    let en: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    let pool: Vec<i32> = vec_new();
+    let source: string = "+";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    let empty: Vec<i32> = vec_new();
+    let out1: Vec<i32> = vec_new();
+    let r1: i32 = emit_instrs(empty, en, eb, ew, pool, source, starts, ends, out1);
+    if r1 != 0 { return 1; }
+    if vec_len(out1) != 0 { return 2; }
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, box_new(Instr::Nop));
+    vec_push(instrs, box_new(Instr::ReturnVoid));
+    let out2: Vec<i32> = vec_new();
+    let r2: i32 = emit_instrs(instrs, en, eb, ew, pool, source, starts, ends, out2);
+    if r2 != 2 { return 3; }
+    if vec_len(out2) != 2 { return 4; }
+    if vec_get(out2, 0) != 118 { return 5; }
+    if vec_get(out2, 1) != 0 { return 6; }
+    vec_push(en, 70); vec_push(eb, 0); vec_push(ew, 1);
+    let instrs2: Vec<i32> = vec_new();
+    let a_e: Expr = Expr::Literal(box_new(Value::VInt(99)));
+    vec_push(instrs2, box_new(Instr::Assign(70, box_new(a_e))));
+    vec_push(instrs2, box_new(Instr::ReturnVal(box_new(Value::VVar(70)))));
+    let out3: Vec<i32> = vec_new();
+    let r3: i32 = emit_instrs(instrs2, en, eb, ew, pool, source, starts, ends, out3);
+    if r3 != 8 { return 7; }
+    if vec_get(out3, 0) != 4 { return 8; }
+    if vec_get(out3, 1) != 99 { return 9; }
+    if vec_get(out3, 2) != 97 { return 10; }
+    if vec_get(out3, 3) != 0 { return 11; }
+    if vec_get(out3, 4) != 96 { return 12; }
+    if vec_get(out3, 5) != 0 { return 13; }
+    if vec_get(out3, 6) != 118 { return 14; }
+    if vec_get(out3, 7) != 1 { return 15; }
+    return 0;
+}
+
+fn test_vec_append() -> i32 {
+    let dst: Vec<i32> = vec_new();
+    vec_push(dst, 1);
+    let src: Vec<i32> = vec_new();
+    vec_push(src, 2); vec_push(src, 3);
+    let n: i32 = vec_append(dst, src);
+    if n != 2 { return 1; }
+    if vec_len(dst) != 3 { return 2; }
+    if vec_get(dst, 0) != 1 { return 3; }
+    if vec_get(dst, 1) != 2 { return 4; }
+    if vec_get(dst, 2) != 3 { return 5; }
+    let e: Vec<i32> = vec_new();
+    let n2: i32 = vec_append(dst, e);
+    if n2 != 0 { return 6; }
+    if vec_len(dst) != 3 { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -1162,5 +1495,11 @@ fn main() -> i32 {
     if r23 != 0 { return 240 + r23; }
     let r24: i32 = test_emit_expr();
     if r24 != 0 { return 270 + r24; }
+    let r25: i32 = test_emit_instr();
+    if r25 != 0 { return 300 + r25; }
+    let r26: i32 = test_emit_instrs();
+    if r26 != 0 { return 350 + r26; }
+    let r27: i32 = test_vec_append();
+    if r27 != 0 { return 370 + r27; }
     return 0;
 }
