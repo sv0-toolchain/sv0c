@@ -446,7 +446,9 @@ fn replace_loop_exit_jump(instrs: Vec<i32>, back_offset: i32) -> bool {
 fn insn_vec_stride(opc: i32) -> i32 {
     let bs: i32 = insn_size(opc);
     if bs <= 1 { return 1; }
-    return (bs - 1) / 4 + 1;
+    let payload: i32 = bs - 1;
+    let slots: i32 = (payload + 3) / 4;
+    return 1 + slots;
 }
 
 /* ── patch_continue_jumps (SML patchContinueJumpsFrom) ────────

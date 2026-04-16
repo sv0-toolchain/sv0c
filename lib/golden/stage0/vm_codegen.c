@@ -883,10 +883,11 @@ static int insn_vec_stride(int opc) {
     return 1;
   } else {
   }
-  int _sv0t1 = (bs - 1);
-  int _sv0t2 = (_sv0t1 / 4);
-  int _sv0t3 = (_sv0t2 + 1);
-  return _sv0t3;
+  int payload = (bs - 1);
+  int _sv0t1 = (payload + 3);
+  int slots = (_sv0t1 / 4);
+  int _sv0t2 = (1 + slots);
+  return _sv0t2;
 }
 
 static int patch_continue_jumps(int instrs, int from_pos, int target_abs) {

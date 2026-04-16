@@ -8,8 +8,12 @@
    file header encoding (encode_header), .sv0b file layout constants
    (6-byte header, 20-byte func entry, string pool overhead),
    encode_strings / decode_strings (SML encodeStrings/decodeStrings —
-   string pool byte codec using string_char_at for ASCII byte loops).
-   Full encodeInsn/decodeInsnVec/encodeFile/decodeFile deferred. */
+   string pool byte codec using string_char_at for ASCII byte loops),
+   encode_insn_at / decode_insn_at (SML encodeInsn/decodeInsnVec —
+   instruction-level byte encoding/decoding between flat insn Vec
+   and byte buffer), encode_all_insns / decode_all_insns (SML
+   encodeAll/decodeAll — full instruction stream encode/decode).
+   File-level encodeFile/decodeFile deferred. */
 
 /* ── magic and version ──────────────────────────────────────── */
 
@@ -399,6 +403,332 @@ fn decode_strings(buf: Vec<i32>, pos: i32,
     return p;
 }
 
+/* ── encode_insn_at (SML encodeInsn) ──────────────────────────
+   Reads one instruction from flat insn Vec (instrs) starting at idx.
+   Instruction layout: slot 0 = opcode, slots 1+ = payload i32 values.
+   Writes encoded bytes to out Vec<i32>.
+   Returns next index in instrs (idx + stride). */
+fn encode_insn_at(instrs: Vec<i32>, idx: i32, out: Vec<i32>) -> i32 {
+    let opc: i32 = vec_get(instrs, idx);
+    vec_push(out, opc);
+
+    if opc == 0 { return idx + 1; }
+    if opc == 1 { return idx + 1; }
+    if opc == 2 { return idx + 1; }
+    if opc == 3 { return idx + 1; }
+
+    if opc == 4 {
+        encode_i32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 5 {
+        encode_i32_le(vec_get(instrs, idx + 1), out);
+        encode_i32_le(vec_get(instrs, idx + 2), out);
+        return idx + 3;
+    }
+    if opc == 6 {
+        encode_i32_le(vec_get(instrs, idx + 1), out);
+        encode_i32_le(vec_get(instrs, idx + 2), out);
+        return idx + 3;
+    }
+    if opc == 7 {
+        let bval: i32 = vec_get(instrs, idx + 1);
+        if bval != 0 { vec_push(out, 1); }
+        if bval == 0 { vec_push(out, 0); }
+        return idx + 2;
+    }
+    if opc == 8 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+
+    if opc >= 16 {
+        if opc <= 21 { return idx + 1; }
+    }
+    if opc >= 32 {
+        if opc <= 37 { return idx + 1; }
+    }
+    if opc >= 48 {
+        if opc <= 52 { return idx + 1; }
+    }
+    if opc >= 64 {
+        if opc <= 69 { return idx + 1; }
+    }
+    if opc >= 80 {
+        if opc <= 82 { return idx + 1; }
+    }
+    if opc >= 88 {
+        if opc <= 93 { return idx + 1; }
+    }
+
+    if opc == 96 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 97 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+
+    if opc == 112 {
+        encode_i32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 113 {
+        encode_i32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 114 {
+        encode_i32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 115 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        encode_u32_le(vec_get(instrs, idx + 2), out);
+        return idx + 3;
+    }
+    if opc == 116 { return idx + 1; }
+    if opc == 117 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 118 {
+        let cnt: i32 = vec_get(instrs, idx + 1);
+        vec_push(out, cnt);
+        return idx + 2;
+    }
+
+    if opc == 128 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 129 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 130 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 131 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 132 { return idx + 1; }
+    if opc == 133 { return idx + 1; }
+
+    if opc == 144 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        encode_u32_le(vec_get(instrs, idx + 2), out);
+        encode_u32_le(vec_get(instrs, idx + 3), out);
+        return idx + 4;
+    }
+    if opc == 145 { return idx + 1; }
+    if opc == 146 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+
+    if opc == 160 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
+    if opc == 161 {
+        encode_u16_le(vec_get(instrs, idx + 1), out);
+        encode_u16_le(vec_get(instrs, idx + 2), out);
+        return idx + 3;
+    }
+
+    return idx + 1;
+}
+
+/* ── decode_insn_at (SML decodeInsnVec) ──────────────────────
+   Reads one instruction from byte buffer (buf) starting at pos.
+   Appends opcode + payload slots to out Vec<i32>.
+   Returns the next byte position in buf. */
+fn decode_insn_at(buf: Vec<i32>, pos: i32, out: Vec<i32>) -> i32 {
+    let opc: i32 = vec_get(buf, pos);
+    vec_push(out, opc);
+
+    if opc == 0 { return pos + 1; }
+    if opc == 1 { return pos + 1; }
+    if opc == 2 { return pos + 1; }
+    if opc == 3 { return pos + 1; }
+
+    if opc == 4 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 5 {
+        let lo: i32 = decode_u32_at(buf, pos + 1);
+        let hi: i32 = decode_u32_at(buf, pos + 5);
+        vec_push(out, lo);
+        vec_push(out, hi);
+        return pos + 9;
+    }
+    if opc == 6 {
+        let lo: i32 = decode_u32_at(buf, pos + 1);
+        let hi: i32 = decode_u32_at(buf, pos + 5);
+        vec_push(out, lo);
+        vec_push(out, hi);
+        return pos + 9;
+    }
+    if opc == 7 {
+        let bval: i32 = vec_get(buf, pos + 1);
+        vec_push(out, bval);
+        return pos + 2;
+    }
+    if opc == 8 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+
+    if opc >= 16 {
+        if opc <= 21 { return pos + 1; }
+    }
+    if opc >= 32 {
+        if opc <= 37 { return pos + 1; }
+    }
+    if opc >= 48 {
+        if opc <= 52 { return pos + 1; }
+    }
+    if opc >= 64 {
+        if opc <= 69 { return pos + 1; }
+    }
+    if opc >= 80 {
+        if opc <= 82 { return pos + 1; }
+    }
+    if opc >= 88 {
+        if opc <= 93 { return pos + 1; }
+    }
+
+    if opc == 96 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 97 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+
+    if opc == 112 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 113 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 114 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 115 {
+        let f: i32 = decode_u32_at(buf, pos + 1);
+        let n: i32 = decode_u32_at(buf, pos + 5);
+        vec_push(out, f);
+        vec_push(out, n);
+        return pos + 9;
+    }
+    if opc == 116 { return pos + 1; }
+    if opc == 117 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 118 {
+        let cnt: i32 = vec_get(buf, pos + 1);
+        vec_push(out, cnt);
+        return pos + 2;
+    }
+
+    if opc == 128 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 129 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 130 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 131 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 132 { return pos + 1; }
+    if opc == 133 { return pos + 1; }
+
+    if opc == 144 {
+        let t: i32 = decode_u32_at(buf, pos + 1);
+        let vv: i32 = decode_u32_at(buf, pos + 5);
+        let fc: i32 = decode_u32_at(buf, pos + 9);
+        vec_push(out, t);
+        vec_push(out, vv);
+        vec_push(out, fc);
+        return pos + 13;
+    }
+    if opc == 145 { return pos + 1; }
+    if opc == 146 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+
+    if opc == 160 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
+    }
+    if opc == 161 {
+        let a: i32 = decode_u16_at(buf, pos + 1);
+        let b: i32 = decode_u16_at(buf, pos + 3);
+        vec_push(out, a);
+        vec_push(out, b);
+        return pos + 5;
+    }
+
+    return pos + 1;
+}
+
+/* ── encode_all_insns (SML encodeAll) ────────────────────────
+   Encodes every instruction in the flat insn Vec into bytes in out.
+   Returns total byte count written. */
+fn encode_all_insns(instrs: Vec<i32>, out: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(instrs);
+    let start_len: i32 = vec_len(out);
+    let mut idx: i32 = 0;
+    while idx < n {
+        idx = encode_insn_at(instrs, idx, out);
+    }
+    return vec_len(out) - start_len;
+}
+
+/* ── decode_all_insns (SML decodeAll) ────────────────────────
+   Decodes all instructions from byte buffer buf[0..buf_len) into
+   opcode+payload slots appended to out.  Returns total slots written. */
+fn decode_all_insns(buf: Vec<i32>, buf_len: i32, out: Vec<i32>) -> i32 {
+    let start_len: i32 = vec_len(out);
+    let mut pos: i32 = 0;
+    while pos < buf_len {
+        pos = decode_insn_at(buf, pos, out);
+    }
+    return vec_len(out) - start_len;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_magic() -> i32 {
@@ -602,6 +932,195 @@ fn test_encode_string_literals() -> i32 {
     return 0;
 }
 
+fn test_encode_insn_simple() -> i32 {
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, 0);
+    vec_push(instrs, 1);
+    vec_push(instrs, 2);
+    vec_push(instrs, 3);
+    vec_push(instrs, 116);
+    vec_push(instrs, 132);
+    vec_push(instrs, 133);
+    vec_push(instrs, 145);
+    let out: Vec<i32> = vec_new();
+    let mut idx: i32 = 0;
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 1 { return 1; }
+    idx = encode_insn_at(instrs, idx, out);
+    idx = encode_insn_at(instrs, idx, out);
+    idx = encode_insn_at(instrs, idx, out);
+    idx = encode_insn_at(instrs, idx, out);
+    idx = encode_insn_at(instrs, idx, out);
+    idx = encode_insn_at(instrs, idx, out);
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 8 { return 2; }
+    if vec_len(out) != 8 { return 3; }
+    if vec_get(out, 0) != 0 { return 4; }
+    if vec_get(out, 1) != 1 { return 5; }
+    if vec_get(out, 4) != 116 { return 6; }
+    if vec_get(out, 7) != 145 { return 7; }
+    return 0;
+}
+
+fn test_encode_insn_payload() -> i32 {
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, 4);  vec_push(instrs, 42);
+    vec_push(instrs, 7);  vec_push(instrs, 1);
+    vec_push(instrs, 7);  vec_push(instrs, 0);
+    vec_push(instrs, 96); vec_push(instrs, 5);
+    vec_push(instrs, 118); vec_push(instrs, 3);
+    let out: Vec<i32> = vec_new();
+    let mut idx: i32 = 0;
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 2 { return 1; }
+    if vec_len(out) != 5 { return 2; }
+    if vec_get(out, 0) != 4 { return 3; }
+    if vec_get(out, 1) != 42 { return 4; }
+    if vec_get(out, 2) != 0 { return 5; }
+    if vec_get(out, 3) != 0 { return 6; }
+    if vec_get(out, 4) != 0 { return 7; }
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 4 { return 8; }
+    if vec_get(out, 5) != 7 { return 9; }
+    if vec_get(out, 6) != 1 { return 10; }
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 6 { return 11; }
+    if vec_get(out, 7) != 7 { return 12; }
+    if vec_get(out, 8) != 0 { return 13; }
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 8 { return 14; }
+    if vec_len(out) != 14 { return 15; }
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 10 { return 16; }
+    if vec_get(out, 14) != 118 { return 17; }
+    if vec_get(out, 15) != 3 { return 18; }
+    return 0;
+}
+
+fn test_encode_insn_multi() -> i32 {
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, 115); vec_push(instrs, 2); vec_push(instrs, 3);
+    vec_push(instrs, 144); vec_push(instrs, 10); vec_push(instrs, 20); vec_push(instrs, 30);
+    vec_push(instrs, 161); vec_push(instrs, 1); vec_push(instrs, 2);
+    let out: Vec<i32> = vec_new();
+    let mut idx: i32 = 0;
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 3 { return 1; }
+    if vec_len(out) != 9 { return 2; }
+    if vec_get(out, 0) != 115 { return 3; }
+    let d_func: i32 = decode_u32_at(out, 1);
+    if d_func != 2 { return 4; }
+    let d_arity: i32 = decode_u32_at(out, 5);
+    if d_arity != 3 { return 5; }
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 7 { return 6; }
+    if vec_len(out) != 22 { return 7; }
+    if vec_get(out, 9) != 144 { return 8; }
+    idx = encode_insn_at(instrs, idx, out);
+    if idx != 10 { return 9; }
+    if vec_len(out) != 27 { return 10; }
+    if vec_get(out, 22) != 161 { return 11; }
+    let d_from: i32 = decode_u16_at(out, 23);
+    if d_from != 1 { return 12; }
+    let d_to: i32 = decode_u16_at(out, 25);
+    if d_to != 2 { return 13; }
+    return 0;
+}
+
+fn test_decode_insn_simple() -> i32 {
+    let buf: Vec<i32> = vec_new();
+    vec_push(buf, 0);
+    vec_push(buf, 1);
+    vec_push(buf, 116);
+    let out: Vec<i32> = vec_new();
+    let mut pos: i32 = 0;
+    pos = decode_insn_at(buf, pos, out);
+    if pos != 1 { return 1; }
+    if vec_get(out, 0) != 0 { return 2; }
+    pos = decode_insn_at(buf, pos, out);
+    if pos != 2 { return 3; }
+    if vec_get(out, 1) != 1 { return 4; }
+    pos = decode_insn_at(buf, pos, out);
+    if pos != 3 { return 5; }
+    if vec_get(out, 2) != 116 { return 6; }
+    return 0;
+}
+
+fn test_decode_insn_payload() -> i32 {
+    let buf: Vec<i32> = vec_new();
+    vec_push(buf, 4);
+    encode_i32_le(42, buf);
+    vec_push(buf, 7); vec_push(buf, 1);
+    vec_push(buf, 96);
+    encode_u32_le(99, buf);
+    let out: Vec<i32> = vec_new();
+    let mut pos: i32 = 0;
+    pos = decode_insn_at(buf, pos, out);
+    if pos != 5 { return 1; }
+    if vec_get(out, 0) != 4 { return 2; }
+    if vec_get(out, 1) != 42 { return 3; }
+    pos = decode_insn_at(buf, pos, out);
+    if pos != 7 { return 4; }
+    if vec_get(out, 2) != 7 { return 5; }
+    if vec_get(out, 3) != 1 { return 6; }
+    pos = decode_insn_at(buf, pos, out);
+    if pos != 12 { return 7; }
+    if vec_get(out, 4) != 96 { return 8; }
+    if vec_get(out, 5) != 99 { return 9; }
+    return 0;
+}
+
+fn test_encode_decode_roundtrip() -> i32 {
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, 0);
+    vec_push(instrs, 4);  vec_push(instrs, 100);
+    vec_push(instrs, 7);  vec_push(instrs, 1);
+    vec_push(instrs, 115); vec_push(instrs, 5); vec_push(instrs, 2);
+    vec_push(instrs, 116);
+    vec_push(instrs, 118); vec_push(instrs, 4);
+    let bytes: Vec<i32> = vec_new();
+    let bcount: i32 = encode_all_insns(instrs, bytes);
+    if bcount != 1 + 5 + 2 + 9 + 1 + 2 { return 1; }
+    let decoded: Vec<i32> = vec_new();
+    let scount: i32 = decode_all_insns(bytes, bcount, decoded);
+    if vec_len(decoded) != vec_len(instrs) { return 2; }
+    let mut i: i32 = 0;
+    while i < vec_len(instrs) {
+        if vec_get(instrs, i) != vec_get(decoded, i) { return 3 + i; }
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn test_encode_decode_all() -> i32 {
+    let instrs: Vec<i32> = vec_new();
+    vec_push(instrs, 3);
+    vec_push(instrs, 16);
+    vec_push(instrs, 64);
+    vec_push(instrs, 112); vec_push(instrs, 10);
+    vec_push(instrs, 144); vec_push(instrs, 1); vec_push(instrs, 2); vec_push(instrs, 3);
+    vec_push(instrs, 161); vec_push(instrs, 4); vec_push(instrs, 8);
+    let bytes: Vec<i32> = vec_new();
+    let bcount: i32 = encode_all_insns(instrs, bytes);
+    if bcount != 1 + 1 + 1 + 5 + 13 + 5 { return 1; }
+    let decoded: Vec<i32> = vec_new();
+    decode_all_insns(bytes, bcount, decoded);
+    if vec_len(decoded) != vec_len(instrs) { return 2; }
+    if vec_get(decoded, 0) != 3 { return 3; }
+    if vec_get(decoded, 1) != 16 { return 4; }
+    if vec_get(decoded, 2) != 64 { return 5; }
+    if vec_get(decoded, 3) != 112 { return 6; }
+    if vec_get(decoded, 4) != 10 { return 7; }
+    if vec_get(decoded, 5) != 144 { return 8; }
+    if vec_get(decoded, 6) != 1 { return 9; }
+    if vec_get(decoded, 7) != 2 { return 10; }
+    if vec_get(decoded, 8) != 3 { return 11; }
+    if vec_get(decoded, 9) != 161 { return 12; }
+    if vec_get(decoded, 10) != 4 { return 13; }
+    if vec_get(decoded, 11) != 8 { return 14; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_magic();
     if r1 != 0 { return r1; }
@@ -627,5 +1146,19 @@ fn main() -> i32 {
     if r11 != 0 { return 140 + r11; }
     let r12: i32 = test_encode_string_literals();
     if r12 != 0 { return 150 + r12; }
+    let r13: i32 = test_encode_insn_simple();
+    if r13 != 0 { return 160 + r13; }
+    let r14: i32 = test_encode_insn_payload();
+    if r14 != 0 { return 170 + r14; }
+    let r15: i32 = test_encode_insn_multi();
+    if r15 != 0 { return 190 + r15; }
+    let r16: i32 = test_decode_insn_simple();
+    if r16 != 0 { return 204 + r16; }
+    let r17: i32 = test_decode_insn_payload();
+    if r17 != 0 { return 212 + r17; }
+    let r18: i32 = test_encode_decode_roundtrip();
+    if r18 != 0 { return 222 + r18; }
+    let r19: i32 = test_encode_decode_all();
+    if r19 != 0 { return 236 + r19; }
     return 0;
 }

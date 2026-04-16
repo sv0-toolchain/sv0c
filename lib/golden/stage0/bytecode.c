@@ -100,6 +100,10 @@ static int func_table_size(int count);
 static int encode_strings(int strings, const char* source, int starts, int ends, int out);
 static int encode_string_literals(int strs, int out);
 static int decode_strings(int buf, int pos, int out_starts, int out_lens);
+static int encode_insn_at(int instrs, int idx, int out);
+static int decode_insn_at(int buf, int pos, int out);
+static int encode_all_insns(int instrs, int out);
+static int decode_all_insns(int buf, int buf_len, int out);
 static int test_magic(void);
 static int test_opcodes(void);
 static int test_insn_sizes(void);
@@ -112,6 +116,13 @@ static int test_decode_at(void);
 static int test_verify_magic(void);
 static int test_encode_decode_strings(void);
 static int test_encode_string_literals(void);
+static int test_encode_insn_simple(void);
+static int test_encode_insn_payload(void);
+static int test_encode_insn_multi(void);
+static int test_decode_insn_simple(void);
+static int test_decode_insn_payload(void);
+static int test_encode_decode_roundtrip(void);
+static int test_encode_decode_all(void);
 
 static int magic_byte_0(void) {
   return 83;
@@ -981,6 +992,634 @@ static int decode_strings(int buf, int pos, int out_starts, int out_lens) {
   return p;
 }
 
+static int encode_insn_at(int instrs, int idx, int out) {
+  int _sv0t0 = sv0_vec_get(instrs, idx);
+  int opc = _sv0t0;
+  sv0_vec_push(out, opc);
+  if ((opc == 0)) {
+    int _sv0t1 = (idx + 1);
+    return _sv0t1;
+  } else {
+  }
+  if ((opc == 1)) {
+    int _sv0t2 = (idx + 1);
+    return _sv0t2;
+  } else {
+  }
+  if ((opc == 2)) {
+    int _sv0t3 = (idx + 1);
+    return _sv0t3;
+  } else {
+  }
+  if ((opc == 3)) {
+    int _sv0t4 = (idx + 1);
+    return _sv0t4;
+  } else {
+  }
+  if ((opc == 4)) {
+    int _sv0t5 = (idx + 1);
+    int _sv0t6 = sv0_vec_get(instrs, _sv0t5);
+    int _sv0t7 = encode_i32_le(_sv0t6, out);
+    int _sv0t8 = (idx + 2);
+    return _sv0t8;
+  } else {
+  }
+  if ((opc == 5)) {
+    int _sv0t9 = (idx + 1);
+    int _sv0t10 = sv0_vec_get(instrs, _sv0t9);
+    int _sv0t11 = encode_i32_le(_sv0t10, out);
+    int _sv0t12 = (idx + 2);
+    int _sv0t13 = sv0_vec_get(instrs, _sv0t12);
+    int _sv0t14 = encode_i32_le(_sv0t13, out);
+    int _sv0t15 = (idx + 3);
+    return _sv0t15;
+  } else {
+  }
+  if ((opc == 6)) {
+    int _sv0t16 = (idx + 1);
+    int _sv0t17 = sv0_vec_get(instrs, _sv0t16);
+    int _sv0t18 = encode_i32_le(_sv0t17, out);
+    int _sv0t19 = (idx + 2);
+    int _sv0t20 = sv0_vec_get(instrs, _sv0t19);
+    int _sv0t21 = encode_i32_le(_sv0t20, out);
+    int _sv0t22 = (idx + 3);
+    return _sv0t22;
+  } else {
+  }
+  if ((opc == 7)) {
+    int _sv0t23 = (idx + 1);
+    int _sv0t24 = sv0_vec_get(instrs, _sv0t23);
+    int bval = _sv0t24;
+    if ((bval != 0)) {
+      sv0_vec_push(out, 1);
+    } else {
+    }
+    if ((bval == 0)) {
+      sv0_vec_push(out, 0);
+    } else {
+    }
+    int _sv0t25 = (idx + 2);
+    return _sv0t25;
+  } else {
+  }
+  if ((opc == 8)) {
+    int _sv0t26 = (idx + 1);
+    int _sv0t27 = sv0_vec_get(instrs, _sv0t26);
+    int _sv0t28 = encode_u32_le(_sv0t27, out);
+    int _sv0t29 = (idx + 2);
+    return _sv0t29;
+  } else {
+  }
+  if ((opc >= 16)) {
+    if ((opc <= 21)) {
+      int _sv0t30 = (idx + 1);
+      return _sv0t30;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 32)) {
+    if ((opc <= 37)) {
+      int _sv0t31 = (idx + 1);
+      return _sv0t31;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 48)) {
+    if ((opc <= 52)) {
+      int _sv0t32 = (idx + 1);
+      return _sv0t32;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 64)) {
+    if ((opc <= 69)) {
+      int _sv0t33 = (idx + 1);
+      return _sv0t33;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 80)) {
+    if ((opc <= 82)) {
+      int _sv0t34 = (idx + 1);
+      return _sv0t34;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 88)) {
+    if ((opc <= 93)) {
+      int _sv0t35 = (idx + 1);
+      return _sv0t35;
+    } else {
+    }
+  } else {
+  }
+  if ((opc == 96)) {
+    int _sv0t36 = (idx + 1);
+    int _sv0t37 = sv0_vec_get(instrs, _sv0t36);
+    int _sv0t38 = encode_u32_le(_sv0t37, out);
+    int _sv0t39 = (idx + 2);
+    return _sv0t39;
+  } else {
+  }
+  if ((opc == 97)) {
+    int _sv0t40 = (idx + 1);
+    int _sv0t41 = sv0_vec_get(instrs, _sv0t40);
+    int _sv0t42 = encode_u32_le(_sv0t41, out);
+    int _sv0t43 = (idx + 2);
+    return _sv0t43;
+  } else {
+  }
+  if ((opc == 112)) {
+    int _sv0t44 = (idx + 1);
+    int _sv0t45 = sv0_vec_get(instrs, _sv0t44);
+    int _sv0t46 = encode_i32_le(_sv0t45, out);
+    int _sv0t47 = (idx + 2);
+    return _sv0t47;
+  } else {
+  }
+  if ((opc == 113)) {
+    int _sv0t48 = (idx + 1);
+    int _sv0t49 = sv0_vec_get(instrs, _sv0t48);
+    int _sv0t50 = encode_i32_le(_sv0t49, out);
+    int _sv0t51 = (idx + 2);
+    return _sv0t51;
+  } else {
+  }
+  if ((opc == 114)) {
+    int _sv0t52 = (idx + 1);
+    int _sv0t53 = sv0_vec_get(instrs, _sv0t52);
+    int _sv0t54 = encode_i32_le(_sv0t53, out);
+    int _sv0t55 = (idx + 2);
+    return _sv0t55;
+  } else {
+  }
+  if ((opc == 115)) {
+    int _sv0t56 = (idx + 1);
+    int _sv0t57 = sv0_vec_get(instrs, _sv0t56);
+    int _sv0t58 = encode_u32_le(_sv0t57, out);
+    int _sv0t59 = (idx + 2);
+    int _sv0t60 = sv0_vec_get(instrs, _sv0t59);
+    int _sv0t61 = encode_u32_le(_sv0t60, out);
+    int _sv0t62 = (idx + 3);
+    return _sv0t62;
+  } else {
+  }
+  if ((opc == 116)) {
+    int _sv0t63 = (idx + 1);
+    return _sv0t63;
+  } else {
+  }
+  if ((opc == 117)) {
+    int _sv0t64 = (idx + 1);
+    int _sv0t65 = sv0_vec_get(instrs, _sv0t64);
+    int _sv0t66 = encode_u32_le(_sv0t65, out);
+    int _sv0t67 = (idx + 2);
+    return _sv0t67;
+  } else {
+  }
+  if ((opc == 118)) {
+    int _sv0t68 = (idx + 1);
+    int _sv0t69 = sv0_vec_get(instrs, _sv0t68);
+    int cnt = _sv0t69;
+    sv0_vec_push(out, cnt);
+    int _sv0t70 = (idx + 2);
+    return _sv0t70;
+  } else {
+  }
+  if ((opc == 128)) {
+    int _sv0t71 = (idx + 1);
+    int _sv0t72 = sv0_vec_get(instrs, _sv0t71);
+    int _sv0t73 = encode_u32_le(_sv0t72, out);
+    int _sv0t74 = (idx + 2);
+    return _sv0t74;
+  } else {
+  }
+  if ((opc == 129)) {
+    int _sv0t75 = (idx + 1);
+    int _sv0t76 = sv0_vec_get(instrs, _sv0t75);
+    int _sv0t77 = encode_u32_le(_sv0t76, out);
+    int _sv0t78 = (idx + 2);
+    return _sv0t78;
+  } else {
+  }
+  if ((opc == 130)) {
+    int _sv0t79 = (idx + 1);
+    int _sv0t80 = sv0_vec_get(instrs, _sv0t79);
+    int _sv0t81 = encode_u32_le(_sv0t80, out);
+    int _sv0t82 = (idx + 2);
+    return _sv0t82;
+  } else {
+  }
+  if ((opc == 131)) {
+    int _sv0t83 = (idx + 1);
+    int _sv0t84 = sv0_vec_get(instrs, _sv0t83);
+    int _sv0t85 = encode_u32_le(_sv0t84, out);
+    int _sv0t86 = (idx + 2);
+    return _sv0t86;
+  } else {
+  }
+  if ((opc == 132)) {
+    int _sv0t87 = (idx + 1);
+    return _sv0t87;
+  } else {
+  }
+  if ((opc == 133)) {
+    int _sv0t88 = (idx + 1);
+    return _sv0t88;
+  } else {
+  }
+  if ((opc == 144)) {
+    int _sv0t89 = (idx + 1);
+    int _sv0t90 = sv0_vec_get(instrs, _sv0t89);
+    int _sv0t91 = encode_u32_le(_sv0t90, out);
+    int _sv0t92 = (idx + 2);
+    int _sv0t93 = sv0_vec_get(instrs, _sv0t92);
+    int _sv0t94 = encode_u32_le(_sv0t93, out);
+    int _sv0t95 = (idx + 3);
+    int _sv0t96 = sv0_vec_get(instrs, _sv0t95);
+    int _sv0t97 = encode_u32_le(_sv0t96, out);
+    int _sv0t98 = (idx + 4);
+    return _sv0t98;
+  } else {
+  }
+  if ((opc == 145)) {
+    int _sv0t99 = (idx + 1);
+    return _sv0t99;
+  } else {
+  }
+  if ((opc == 146)) {
+    int _sv0t100 = (idx + 1);
+    int _sv0t101 = sv0_vec_get(instrs, _sv0t100);
+    int _sv0t102 = encode_u32_le(_sv0t101, out);
+    int _sv0t103 = (idx + 2);
+    return _sv0t103;
+  } else {
+  }
+  if ((opc == 160)) {
+    int _sv0t104 = (idx + 1);
+    int _sv0t105 = sv0_vec_get(instrs, _sv0t104);
+    int _sv0t106 = encode_u32_le(_sv0t105, out);
+    int _sv0t107 = (idx + 2);
+    return _sv0t107;
+  } else {
+  }
+  if ((opc == 161)) {
+    int _sv0t108 = (idx + 1);
+    int _sv0t109 = sv0_vec_get(instrs, _sv0t108);
+    int _sv0t110 = encode_u16_le(_sv0t109, out);
+    int _sv0t111 = (idx + 2);
+    int _sv0t112 = sv0_vec_get(instrs, _sv0t111);
+    int _sv0t113 = encode_u16_le(_sv0t112, out);
+    int _sv0t114 = (idx + 3);
+    return _sv0t114;
+  } else {
+  }
+  int _sv0t115 = (idx + 1);
+  return _sv0t115;
+}
+
+static int decode_insn_at(int buf, int pos, int out) {
+  int _sv0t0 = sv0_vec_get(buf, pos);
+  int opc = _sv0t0;
+  sv0_vec_push(out, opc);
+  if ((opc == 0)) {
+    int _sv0t1 = (pos + 1);
+    return _sv0t1;
+  } else {
+  }
+  if ((opc == 1)) {
+    int _sv0t2 = (pos + 1);
+    return _sv0t2;
+  } else {
+  }
+  if ((opc == 2)) {
+    int _sv0t3 = (pos + 1);
+    return _sv0t3;
+  } else {
+  }
+  if ((opc == 3)) {
+    int _sv0t4 = (pos + 1);
+    return _sv0t4;
+  } else {
+  }
+  if ((opc == 4)) {
+    int _sv0t5 = (pos + 1);
+    int _sv0t6 = decode_u32_at(buf, _sv0t5);
+    int v = _sv0t6;
+    sv0_vec_push(out, v);
+    int _sv0t7 = (pos + 5);
+    return _sv0t7;
+  } else {
+  }
+  if ((opc == 5)) {
+    int _sv0t8 = (pos + 1);
+    int _sv0t9 = decode_u32_at(buf, _sv0t8);
+    int lo = _sv0t9;
+    int _sv0t10 = (pos + 5);
+    int _sv0t11 = decode_u32_at(buf, _sv0t10);
+    int hi = _sv0t11;
+    sv0_vec_push(out, lo);
+    sv0_vec_push(out, hi);
+    int _sv0t12 = (pos + 9);
+    return _sv0t12;
+  } else {
+  }
+  if ((opc == 6)) {
+    int _sv0t13 = (pos + 1);
+    int _sv0t14 = decode_u32_at(buf, _sv0t13);
+    int lo = _sv0t14;
+    int _sv0t15 = (pos + 5);
+    int _sv0t16 = decode_u32_at(buf, _sv0t15);
+    int hi = _sv0t16;
+    sv0_vec_push(out, lo);
+    sv0_vec_push(out, hi);
+    int _sv0t17 = (pos + 9);
+    return _sv0t17;
+  } else {
+  }
+  if ((opc == 7)) {
+    int _sv0t18 = (pos + 1);
+    int _sv0t19 = sv0_vec_get(buf, _sv0t18);
+    int bval = _sv0t19;
+    sv0_vec_push(out, bval);
+    int _sv0t20 = (pos + 2);
+    return _sv0t20;
+  } else {
+  }
+  if ((opc == 8)) {
+    int _sv0t21 = (pos + 1);
+    int _sv0t22 = decode_u32_at(buf, _sv0t21);
+    int v = _sv0t22;
+    sv0_vec_push(out, v);
+    int _sv0t23 = (pos + 5);
+    return _sv0t23;
+  } else {
+  }
+  if ((opc >= 16)) {
+    if ((opc <= 21)) {
+      int _sv0t24 = (pos + 1);
+      return _sv0t24;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 32)) {
+    if ((opc <= 37)) {
+      int _sv0t25 = (pos + 1);
+      return _sv0t25;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 48)) {
+    if ((opc <= 52)) {
+      int _sv0t26 = (pos + 1);
+      return _sv0t26;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 64)) {
+    if ((opc <= 69)) {
+      int _sv0t27 = (pos + 1);
+      return _sv0t27;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 80)) {
+    if ((opc <= 82)) {
+      int _sv0t28 = (pos + 1);
+      return _sv0t28;
+    } else {
+    }
+  } else {
+  }
+  if ((opc >= 88)) {
+    if ((opc <= 93)) {
+      int _sv0t29 = (pos + 1);
+      return _sv0t29;
+    } else {
+    }
+  } else {
+  }
+  if ((opc == 96)) {
+    int _sv0t30 = (pos + 1);
+    int _sv0t31 = decode_u32_at(buf, _sv0t30);
+    int v = _sv0t31;
+    sv0_vec_push(out, v);
+    int _sv0t32 = (pos + 5);
+    return _sv0t32;
+  } else {
+  }
+  if ((opc == 97)) {
+    int _sv0t33 = (pos + 1);
+    int _sv0t34 = decode_u32_at(buf, _sv0t33);
+    int v = _sv0t34;
+    sv0_vec_push(out, v);
+    int _sv0t35 = (pos + 5);
+    return _sv0t35;
+  } else {
+  }
+  if ((opc == 112)) {
+    int _sv0t36 = (pos + 1);
+    int _sv0t37 = decode_u32_at(buf, _sv0t36);
+    int v = _sv0t37;
+    sv0_vec_push(out, v);
+    int _sv0t38 = (pos + 5);
+    return _sv0t38;
+  } else {
+  }
+  if ((opc == 113)) {
+    int _sv0t39 = (pos + 1);
+    int _sv0t40 = decode_u32_at(buf, _sv0t39);
+    int v = _sv0t40;
+    sv0_vec_push(out, v);
+    int _sv0t41 = (pos + 5);
+    return _sv0t41;
+  } else {
+  }
+  if ((opc == 114)) {
+    int _sv0t42 = (pos + 1);
+    int _sv0t43 = decode_u32_at(buf, _sv0t42);
+    int v = _sv0t43;
+    sv0_vec_push(out, v);
+    int _sv0t44 = (pos + 5);
+    return _sv0t44;
+  } else {
+  }
+  if ((opc == 115)) {
+    int _sv0t45 = (pos + 1);
+    int _sv0t46 = decode_u32_at(buf, _sv0t45);
+    int f = _sv0t46;
+    int _sv0t47 = (pos + 5);
+    int _sv0t48 = decode_u32_at(buf, _sv0t47);
+    int n = _sv0t48;
+    sv0_vec_push(out, f);
+    sv0_vec_push(out, n);
+    int _sv0t49 = (pos + 9);
+    return _sv0t49;
+  } else {
+  }
+  if ((opc == 116)) {
+    int _sv0t50 = (pos + 1);
+    return _sv0t50;
+  } else {
+  }
+  if ((opc == 117)) {
+    int _sv0t51 = (pos + 1);
+    int _sv0t52 = decode_u32_at(buf, _sv0t51);
+    int v = _sv0t52;
+    sv0_vec_push(out, v);
+    int _sv0t53 = (pos + 5);
+    return _sv0t53;
+  } else {
+  }
+  if ((opc == 118)) {
+    int _sv0t54 = (pos + 1);
+    int _sv0t55 = sv0_vec_get(buf, _sv0t54);
+    int cnt = _sv0t55;
+    sv0_vec_push(out, cnt);
+    int _sv0t56 = (pos + 2);
+    return _sv0t56;
+  } else {
+  }
+  if ((opc == 128)) {
+    int _sv0t57 = (pos + 1);
+    int _sv0t58 = decode_u32_at(buf, _sv0t57);
+    int v = _sv0t58;
+    sv0_vec_push(out, v);
+    int _sv0t59 = (pos + 5);
+    return _sv0t59;
+  } else {
+  }
+  if ((opc == 129)) {
+    int _sv0t60 = (pos + 1);
+    int _sv0t61 = decode_u32_at(buf, _sv0t60);
+    int v = _sv0t61;
+    sv0_vec_push(out, v);
+    int _sv0t62 = (pos + 5);
+    return _sv0t62;
+  } else {
+  }
+  if ((opc == 130)) {
+    int _sv0t63 = (pos + 1);
+    int _sv0t64 = decode_u32_at(buf, _sv0t63);
+    int v = _sv0t64;
+    sv0_vec_push(out, v);
+    int _sv0t65 = (pos + 5);
+    return _sv0t65;
+  } else {
+  }
+  if ((opc == 131)) {
+    int _sv0t66 = (pos + 1);
+    int _sv0t67 = decode_u32_at(buf, _sv0t66);
+    int v = _sv0t67;
+    sv0_vec_push(out, v);
+    int _sv0t68 = (pos + 5);
+    return _sv0t68;
+  } else {
+  }
+  if ((opc == 132)) {
+    int _sv0t69 = (pos + 1);
+    return _sv0t69;
+  } else {
+  }
+  if ((opc == 133)) {
+    int _sv0t70 = (pos + 1);
+    return _sv0t70;
+  } else {
+  }
+  if ((opc == 144)) {
+    int _sv0t71 = (pos + 1);
+    int _sv0t72 = decode_u32_at(buf, _sv0t71);
+    int t = _sv0t72;
+    int _sv0t73 = (pos + 5);
+    int _sv0t74 = decode_u32_at(buf, _sv0t73);
+    int vv = _sv0t74;
+    int _sv0t75 = (pos + 9);
+    int _sv0t76 = decode_u32_at(buf, _sv0t75);
+    int fc = _sv0t76;
+    sv0_vec_push(out, t);
+    sv0_vec_push(out, vv);
+    sv0_vec_push(out, fc);
+    int _sv0t77 = (pos + 13);
+    return _sv0t77;
+  } else {
+  }
+  if ((opc == 145)) {
+    int _sv0t78 = (pos + 1);
+    return _sv0t78;
+  } else {
+  }
+  if ((opc == 146)) {
+    int _sv0t79 = (pos + 1);
+    int _sv0t80 = decode_u32_at(buf, _sv0t79);
+    int v = _sv0t80;
+    sv0_vec_push(out, v);
+    int _sv0t81 = (pos + 5);
+    return _sv0t81;
+  } else {
+  }
+  if ((opc == 160)) {
+    int _sv0t82 = (pos + 1);
+    int _sv0t83 = decode_u32_at(buf, _sv0t82);
+    int v = _sv0t83;
+    sv0_vec_push(out, v);
+    int _sv0t84 = (pos + 5);
+    return _sv0t84;
+  } else {
+  }
+  if ((opc == 161)) {
+    int _sv0t85 = (pos + 1);
+    int _sv0t86 = decode_u16_at(buf, _sv0t85);
+    int a = _sv0t86;
+    int _sv0t87 = (pos + 3);
+    int _sv0t88 = decode_u16_at(buf, _sv0t87);
+    int b = _sv0t88;
+    sv0_vec_push(out, a);
+    sv0_vec_push(out, b);
+    int _sv0t89 = (pos + 5);
+    return _sv0t89;
+  } else {
+  }
+  int _sv0t90 = (pos + 1);
+  return _sv0t90;
+}
+
+static int encode_all_insns(int instrs, int out) {
+  int _sv0t0 = sv0_vec_len(instrs);
+  int n = _sv0t0;
+  int _sv0t1 = sv0_vec_len(out);
+  int start_len = _sv0t1;
+  int idx = 0;
+  while ((idx < n)) {
+    int _sv0t2 = encode_insn_at(instrs, idx, out);
+    idx = _sv0t2;
+  }
+  int _sv0t3 = sv0_vec_len(out);
+  int _sv0t4 = (_sv0t3 - start_len);
+  return _sv0t4;
+}
+
+static int decode_all_insns(int buf, int buf_len, int out) {
+  int _sv0t0 = sv0_vec_len(out);
+  int start_len = _sv0t0;
+  int pos = 0;
+  while ((pos < buf_len)) {
+    int _sv0t1 = decode_insn_at(buf, pos, out);
+    pos = _sv0t1;
+  }
+  int _sv0t2 = sv0_vec_len(out);
+  int _sv0t3 = (_sv0t2 - start_len);
+  return _sv0t3;
+}
+
 static int test_magic(void) {
   int _sv0t0 = magic_byte_0();
   if ((_sv0t0 != 83)) {
@@ -1638,6 +2277,537 @@ static int test_encode_string_literals(void) {
   return 0;
 }
 
+static int test_encode_insn_simple(void) {
+  int _sv0t0 = sv0_vec_new();
+  int instrs = _sv0t0;
+  sv0_vec_push(instrs, 0);
+  sv0_vec_push(instrs, 1);
+  sv0_vec_push(instrs, 2);
+  sv0_vec_push(instrs, 3);
+  sv0_vec_push(instrs, 116);
+  sv0_vec_push(instrs, 132);
+  sv0_vec_push(instrs, 133);
+  sv0_vec_push(instrs, 145);
+  int _sv0t1 = sv0_vec_new();
+  int out = _sv0t1;
+  int idx = 0;
+  int _sv0t2 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t2;
+  if ((idx != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t3;
+  int _sv0t4 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t4;
+  int _sv0t5 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t5;
+  int _sv0t6 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t6;
+  int _sv0t7 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t7;
+  int _sv0t8 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t8;
+  int _sv0t9 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t9;
+  if ((idx != 8)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_len(out);
+  if ((_sv0t10 != 8)) {
+    return 3;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(out, 0);
+  if ((_sv0t11 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(out, 1);
+  if ((_sv0t12 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(out, 4);
+  if ((_sv0t13 != 116)) {
+    return 6;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(out, 7);
+  if ((_sv0t14 != 145)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
+static int test_encode_insn_payload(void) {
+  int _sv0t0 = sv0_vec_new();
+  int instrs = _sv0t0;
+  sv0_vec_push(instrs, 4);
+  sv0_vec_push(instrs, 42);
+  sv0_vec_push(instrs, 7);
+  sv0_vec_push(instrs, 1);
+  sv0_vec_push(instrs, 7);
+  sv0_vec_push(instrs, 0);
+  sv0_vec_push(instrs, 96);
+  sv0_vec_push(instrs, 5);
+  sv0_vec_push(instrs, 118);
+  sv0_vec_push(instrs, 3);
+  int _sv0t1 = sv0_vec_new();
+  int out = _sv0t1;
+  int idx = 0;
+  int _sv0t2 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t2;
+  if ((idx != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(out);
+  if ((_sv0t3 != 5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(out, 0);
+  if ((_sv0t4 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(out, 1);
+  if ((_sv0t5 != 42)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(out, 2);
+  if ((_sv0t6 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(out, 3);
+  if ((_sv0t7 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(out, 4);
+  if ((_sv0t8 != 0)) {
+    return 7;
+  } else {
+  }
+  int _sv0t9 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t9;
+  if ((idx != 4)) {
+    return 8;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(out, 5);
+  if ((_sv0t10 != 7)) {
+    return 9;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(out, 6);
+  if ((_sv0t11 != 1)) {
+    return 10;
+  } else {
+  }
+  int _sv0t12 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t12;
+  if ((idx != 6)) {
+    return 11;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(out, 7);
+  if ((_sv0t13 != 7)) {
+    return 12;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(out, 8);
+  if ((_sv0t14 != 0)) {
+    return 13;
+  } else {
+  }
+  int _sv0t15 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t15;
+  if ((idx != 8)) {
+    return 14;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_len(out);
+  if ((_sv0t16 != 14)) {
+    return 15;
+  } else {
+  }
+  int _sv0t17 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t17;
+  if ((idx != 10)) {
+    return 16;
+  } else {
+  }
+  int _sv0t18 = sv0_vec_get(out, 14);
+  if ((_sv0t18 != 118)) {
+    return 17;
+  } else {
+  }
+  int _sv0t19 = sv0_vec_get(out, 15);
+  if ((_sv0t19 != 3)) {
+    return 18;
+  } else {
+  }
+  return 0;
+}
+
+static int test_encode_insn_multi(void) {
+  int _sv0t0 = sv0_vec_new();
+  int instrs = _sv0t0;
+  sv0_vec_push(instrs, 115);
+  sv0_vec_push(instrs, 2);
+  sv0_vec_push(instrs, 3);
+  sv0_vec_push(instrs, 144);
+  sv0_vec_push(instrs, 10);
+  sv0_vec_push(instrs, 20);
+  sv0_vec_push(instrs, 30);
+  sv0_vec_push(instrs, 161);
+  sv0_vec_push(instrs, 1);
+  sv0_vec_push(instrs, 2);
+  int _sv0t1 = sv0_vec_new();
+  int out = _sv0t1;
+  int idx = 0;
+  int _sv0t2 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t2;
+  if ((idx != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(out);
+  if ((_sv0t3 != 9)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(out, 0);
+  if ((_sv0t4 != 115)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = decode_u32_at(out, 1);
+  int d_func = _sv0t5;
+  if ((d_func != 2)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = decode_u32_at(out, 5);
+  int d_arity = _sv0t6;
+  if ((d_arity != 3)) {
+    return 5;
+  } else {
+  }
+  int _sv0t7 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t7;
+  if ((idx != 7)) {
+    return 6;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_len(out);
+  if ((_sv0t8 != 22)) {
+    return 7;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(out, 9);
+  if ((_sv0t9 != 144)) {
+    return 8;
+  } else {
+  }
+  int _sv0t10 = encode_insn_at(instrs, idx, out);
+  idx = _sv0t10;
+  if ((idx != 10)) {
+    return 9;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_len(out);
+  if ((_sv0t11 != 27)) {
+    return 10;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(out, 22);
+  if ((_sv0t12 != 161)) {
+    return 11;
+  } else {
+  }
+  int _sv0t13 = decode_u16_at(out, 23);
+  int d_from = _sv0t13;
+  if ((d_from != 1)) {
+    return 12;
+  } else {
+  }
+  int _sv0t14 = decode_u16_at(out, 25);
+  int d_to = _sv0t14;
+  if ((d_to != 2)) {
+    return 13;
+  } else {
+  }
+  return 0;
+}
+
+static int test_decode_insn_simple(void) {
+  int _sv0t0 = sv0_vec_new();
+  int buf = _sv0t0;
+  sv0_vec_push(buf, 0);
+  sv0_vec_push(buf, 1);
+  sv0_vec_push(buf, 116);
+  int _sv0t1 = sv0_vec_new();
+  int out = _sv0t1;
+  int pos = 0;
+  int _sv0t2 = decode_insn_at(buf, pos, out);
+  pos = _sv0t2;
+  if ((pos != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(out, 0);
+  if ((_sv0t3 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = decode_insn_at(buf, pos, out);
+  pos = _sv0t4;
+  if ((pos != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(out, 1);
+  if ((_sv0t5 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = decode_insn_at(buf, pos, out);
+  pos = _sv0t6;
+  if ((pos != 3)) {
+    return 5;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(out, 2);
+  if ((_sv0t7 != 116)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_decode_insn_payload(void) {
+  int _sv0t0 = sv0_vec_new();
+  int buf = _sv0t0;
+  sv0_vec_push(buf, 4);
+  int _sv0t1 = encode_i32_le(42, buf);
+  sv0_vec_push(buf, 7);
+  sv0_vec_push(buf, 1);
+  sv0_vec_push(buf, 96);
+  int _sv0t2 = encode_u32_le(99, buf);
+  int _sv0t3 = sv0_vec_new();
+  int out = _sv0t3;
+  int pos = 0;
+  int _sv0t4 = decode_insn_at(buf, pos, out);
+  pos = _sv0t4;
+  if ((pos != 5)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(out, 0);
+  if ((_sv0t5 != 4)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(out, 1);
+  if ((_sv0t6 != 42)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = decode_insn_at(buf, pos, out);
+  pos = _sv0t7;
+  if ((pos != 7)) {
+    return 4;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(out, 2);
+  if ((_sv0t8 != 7)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(out, 3);
+  if ((_sv0t9 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t10 = decode_insn_at(buf, pos, out);
+  pos = _sv0t10;
+  if ((pos != 12)) {
+    return 7;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(out, 4);
+  if ((_sv0t11 != 96)) {
+    return 8;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(out, 5);
+  if ((_sv0t12 != 99)) {
+    return 9;
+  } else {
+  }
+  return 0;
+}
+
+static int test_encode_decode_roundtrip(void) {
+  int _sv0t0 = sv0_vec_new();
+  int instrs = _sv0t0;
+  sv0_vec_push(instrs, 0);
+  sv0_vec_push(instrs, 4);
+  sv0_vec_push(instrs, 100);
+  sv0_vec_push(instrs, 7);
+  sv0_vec_push(instrs, 1);
+  sv0_vec_push(instrs, 115);
+  sv0_vec_push(instrs, 5);
+  sv0_vec_push(instrs, 2);
+  sv0_vec_push(instrs, 116);
+  sv0_vec_push(instrs, 118);
+  sv0_vec_push(instrs, 4);
+  int _sv0t1 = sv0_vec_new();
+  int bytes = _sv0t1;
+  int _sv0t2 = encode_all_insns(instrs, bytes);
+  int bcount = _sv0t2;
+  int _sv0t3 = (1 + 5);
+  int _sv0t4 = (_sv0t3 + 2);
+  int _sv0t5 = (_sv0t4 + 9);
+  int _sv0t6 = (_sv0t5 + 1);
+  int _sv0t7 = (_sv0t6 + 2);
+  if ((bcount != _sv0t7)) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int decoded = _sv0t8;
+  int _sv0t9 = decode_all_insns(bytes, bcount, decoded);
+  int scount = _sv0t9;
+  int _sv0t10 = sv0_vec_len(decoded);
+  int _sv0t11 = sv0_vec_len(instrs);
+  if ((_sv0t10 != _sv0t11)) {
+    return 2;
+  } else {
+  }
+  int i = 0;
+  int _sv0t12 = sv0_vec_len(instrs);
+  while ((i < _sv0t12)) {
+    int _sv0t13 = sv0_vec_get(instrs, i);
+    int _sv0t14 = sv0_vec_get(decoded, i);
+    if ((_sv0t13 != _sv0t14)) {
+      int _sv0t15 = (3 + i);
+      return _sv0t15;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int test_encode_decode_all(void) {
+  int _sv0t0 = sv0_vec_new();
+  int instrs = _sv0t0;
+  sv0_vec_push(instrs, 3);
+  sv0_vec_push(instrs, 16);
+  sv0_vec_push(instrs, 64);
+  sv0_vec_push(instrs, 112);
+  sv0_vec_push(instrs, 10);
+  sv0_vec_push(instrs, 144);
+  sv0_vec_push(instrs, 1);
+  sv0_vec_push(instrs, 2);
+  sv0_vec_push(instrs, 3);
+  sv0_vec_push(instrs, 161);
+  sv0_vec_push(instrs, 4);
+  sv0_vec_push(instrs, 8);
+  int _sv0t1 = sv0_vec_new();
+  int bytes = _sv0t1;
+  int _sv0t2 = encode_all_insns(instrs, bytes);
+  int bcount = _sv0t2;
+  int _sv0t3 = (1 + 1);
+  int _sv0t4 = (_sv0t3 + 1);
+  int _sv0t5 = (_sv0t4 + 5);
+  int _sv0t6 = (_sv0t5 + 13);
+  int _sv0t7 = (_sv0t6 + 5);
+  if ((bcount != _sv0t7)) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int decoded = _sv0t8;
+  int _sv0t9 = decode_all_insns(bytes, bcount, decoded);
+  int _sv0t10 = sv0_vec_len(decoded);
+  int _sv0t11 = sv0_vec_len(instrs);
+  if ((_sv0t10 != _sv0t11)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(decoded, 0);
+  if ((_sv0t12 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(decoded, 1);
+  if ((_sv0t13 != 16)) {
+    return 4;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(decoded, 2);
+  if ((_sv0t14 != 64)) {
+    return 5;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_get(decoded, 3);
+  if ((_sv0t15 != 112)) {
+    return 6;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_get(decoded, 4);
+  if ((_sv0t16 != 10)) {
+    return 7;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_get(decoded, 5);
+  if ((_sv0t17 != 144)) {
+    return 8;
+  } else {
+  }
+  int _sv0t18 = sv0_vec_get(decoded, 6);
+  if ((_sv0t18 != 1)) {
+    return 9;
+  } else {
+  }
+  int _sv0t19 = sv0_vec_get(decoded, 7);
+  if ((_sv0t19 != 2)) {
+    return 10;
+  } else {
+  }
+  int _sv0t20 = sv0_vec_get(decoded, 8);
+  if ((_sv0t20 != 3)) {
+    return 11;
+  } else {
+  }
+  int _sv0t21 = sv0_vec_get(decoded, 9);
+  if ((_sv0t21 != 161)) {
+    return 12;
+  } else {
+  }
+  int _sv0t22 = sv0_vec_get(decoded, 10);
+  if ((_sv0t22 != 4)) {
+    return 13;
+  } else {
+  }
+  int _sv0t23 = sv0_vec_get(decoded, 11);
+  if ((_sv0t23 != 8)) {
+    return 14;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_magic();
   int r1 = _sv0t0;
@@ -1720,6 +2890,55 @@ int main(void) {
   if ((r12 != 0)) {
     int _sv0t22 = (150 + r12);
     return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_encode_insn_simple();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (160 + r13);
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_encode_insn_payload();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (170 + r14);
+    return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_encode_insn_multi();
+  int r15 = _sv0t27;
+  if ((r15 != 0)) {
+    int _sv0t28 = (190 + r15);
+    return _sv0t28;
+  } else {
+  }
+  int _sv0t29 = test_decode_insn_simple();
+  int r16 = _sv0t29;
+  if ((r16 != 0)) {
+    int _sv0t30 = (204 + r16);
+    return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_decode_insn_payload();
+  int r17 = _sv0t31;
+  if ((r17 != 0)) {
+    int _sv0t32 = (212 + r17);
+    return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_encode_decode_roundtrip();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (222 + r18);
+    return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_encode_decode_all();
+  int r19 = _sv0t35;
+  if ((r19 != 0)) {
+    int _sv0t36 = (236 + r19);
+    return _sv0t36;
   } else {
   }
   return 0;
