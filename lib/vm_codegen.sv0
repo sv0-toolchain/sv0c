@@ -20,14 +20,15 @@
    emit_expr (SML emitExpr — IR Expr → bytecode instruction words;
    Literal/Load/Binop/Unop with handle-based op resolution; FieldAccess deferred),
    emit_instr (SML emitInstr — IR Instr → bytecode instruction words;
-   Nop/DeclVar/DeclNamed/Assign/Store/ReturnVoid/ReturnVal implemented;
-   IfElse/WhileLoop/BlockInstr/Call/StoreField/Requires/Ensures deferred),
+   Nop/DeclVar/DeclNamed/Assign/Store/ReturnVoid/ReturnVal/IfElse/BlockInstr
+   implemented; WhileLoop/Call/StoreField/Requires/Ensures deferred),
    emit_instrs (SML emitBlock — iterate Box<Instr> Vec, calling emit_instr),
    vec_append (copy src Vec<i32> into dst), emit_ret_width (value width for
-   RETURN_SLOTS).
-   Remaining: IfElse/WhileLoop/BlockInstr (jump offset calc), Call (builtin
-   dispatch + fn index), StoreField (field data), Requires/Ensures (pool
-   string construction), localCountAndEnv/emitFn/top-level emit. */
+   RETURN_SLOTS), flat_byte_size (walk flat insn Vec and sum encoded byte
+   sizes for jump offset calculation).
+   Remaining: WhileLoop (loop emission), Call (builtin dispatch + fn index),
+   StoreField (field data), Requires/Ensures (pool string construction),
+   localCountAndEnv/emitFn/top-level emit. */
 
 /* ── variant slot counting ──────────────────────────────────── */
 
@@ -706,6 +707,23 @@ fn vec_append(dst: Vec<i32>, src: Vec<i32>) -> i32 {
     return n;
 }
 
+/* ── flat_byte_size (total encoded byte size of flat insn Vec) ─
+   Walks the Vec with insn_vec_stride (not element-by-element),
+   summing insn_size for each opcode.  Used by IfElse for jump
+   offset calculation. */
+
+fn flat_byte_size(instrs: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(instrs);
+    let mut total: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        let opc: i32 = vec_get(instrs, i);
+        total = total + insn_size(opc);
+        i = i + insn_vec_stride(opc);
+    }
+    return total;
+}
+
 /* ── emit_ret_width (value width for RETURN_SLOTS) ───────── */
 
 fn emit_ret_width(v: Value,
@@ -753,8 +771,8 @@ enum Instr {
    Pushes instruction words into `out`.  Returns the number of
    Vec elements pushed, or -1 on error / deferred case.
    Implemented: Nop, DeclVar, DeclNamed, Assign, Store,
-   ReturnVoid, ReturnVal.
-   Deferred: IfElse, WhileLoop, BlockInstr, Call, StoreField,
+   ReturnVoid, ReturnVal, IfElse, BlockInstr.
+   Deferred: WhileLoop, Call, StoreField,
    Break, Continue, Requires, Ensures. */
 
 fn emit_instr(ins: Instr,
@@ -805,13 +823,34 @@ fn emit_instr(ins: Instr,
             return 0 - 1;
         },
         Instr::IfElse(be, th, el) => {
-            return 0 - 1;
+            let cond: Expr = box_deref(be);
+            let nc: i32 = emit_expr(cond, env_names, env_bases, env_widths,
+                                    pool, source, starts, ends, out);
+            if nc < 0 { return 0 - 1; }
+            let then_out: Vec<i32> = vec_new();
+            let nt: i32 = emit_instrs(th, env_names, env_bases, env_widths,
+                                      pool, source, starts, ends, then_out);
+            if nt < 0 { return 0 - 1; }
+            let else_out: Vec<i32> = vec_new();
+            let ne: i32 = emit_instrs(el, env_names, env_bases, env_widths,
+                                      pool, source, starts, ends, else_out);
+            if ne < 0 { return 0 - 1; }
+            let off_else: i32 = flat_byte_size(then_out) + insn_size(112);
+            let off_end: i32 = flat_byte_size(else_out);
+            vec_push(out, 113);
+            vec_push(out, off_else);
+            let at: i32 = vec_append(out, then_out);
+            vec_push(out, 112);
+            vec_push(out, off_end);
+            let ae: i32 = vec_append(out, else_out);
+            return nc + 2 + at + 2 + ae;
         },
         Instr::WhileLoop(be, body) => {
             return 0 - 1;
         },
         Instr::BlockInstr(body) => {
-            return 0 - 1;
+            return emit_instrs(body, env_names, env_bases, env_widths,
+                               pool, source, starts, ends, out);
         },
         Instr::Break => {
             return 0 - 1;
@@ -1446,6 +1485,103 @@ fn test_vec_append() -> i32 {
     return 0;
 }
 
+fn test_flat_byte_size() -> i32 {
+    let v1: Vec<i32> = vec_new();
+    if flat_byte_size(v1) != 0 { return 1; }
+    let v2: Vec<i32> = vec_new();
+    vec_push(v2, 118); vec_push(v2, 0);
+    if flat_byte_size(v2) != 2 { return 2; }
+    let v3: Vec<i32> = vec_new();
+    vec_push(v3, 4); vec_push(v3, 42);
+    if flat_byte_size(v3) != 5 { return 3; }
+    let v4: Vec<i32> = vec_new();
+    vec_push(v4, 4); vec_push(v4, 42);
+    vec_push(v4, 97); vec_push(v4, 0);
+    vec_push(v4, 118); vec_push(v4, 0);
+    if flat_byte_size(v4) != 12 { return 4; }
+    let v5: Vec<i32> = vec_new();
+    vec_push(v5, 7); vec_push(v5, 1);
+    if flat_byte_size(v5) != 2 { return 5; }
+    let v6: Vec<i32> = vec_new();
+    vec_push(v6, 3);
+    if flat_byte_size(v6) != 1 { return 6; }
+    return 0;
+}
+
+fn test_emit_ifelse_block() -> i32 {
+    let en: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    let pool: Vec<i32> = vec_new();
+    let source: string = "+";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(en, 50); vec_push(eb, 0); vec_push(ew, 1);
+    let cond1: Box<Expr> = box_new(Expr::Literal(box_new(Value::VBool(true))));
+    let th1: Vec<i32> = vec_new();
+    vec_push(th1, box_new(Instr::ReturnVoid));
+    let el1: Vec<i32> = vec_new();
+    vec_push(el1, box_new(Instr::ReturnVoid));
+    let out1: Vec<i32> = vec_new();
+    let r1: i32 = emit_instr(Instr::IfElse(cond1, th1, el1),
+                              en, eb, ew, pool, source, starts, ends, out1);
+    if r1 < 0 { return 1; }
+    if vec_len(out1) != 10 { return 2; }
+    if vec_get(out1, 0) != 7 { return 3; }
+    if vec_get(out1, 1) != 1 { return 4; }
+    if vec_get(out1, 2) != 113 { return 5; }
+    if vec_get(out1, 3) != 7 { return 6; }
+    if vec_get(out1, 4) != 118 { return 7; }
+    if vec_get(out1, 5) != 0 { return 8; }
+    if vec_get(out1, 6) != 112 { return 9; }
+    if vec_get(out1, 7) != 2 { return 10; }
+    if vec_get(out1, 8) != 118 { return 11; }
+    if vec_get(out1, 9) != 0 { return 12; }
+    let cond2: Box<Expr> = box_new(Expr::Literal(box_new(Value::VInt(1))));
+    let th2: Vec<i32> = vec_new();
+    let asgn_e: Expr = Expr::Literal(box_new(Value::VInt(42)));
+    vec_push(th2, box_new(Instr::Assign(50, box_new(asgn_e))));
+    vec_push(th2, box_new(Instr::ReturnVoid));
+    let el2: Vec<i32> = vec_new();
+    vec_push(el2, box_new(Instr::ReturnVoid));
+    let out2: Vec<i32> = vec_new();
+    let r2: i32 = emit_instr(Instr::IfElse(cond2, th2, el2),
+                              en, eb, ew, pool, source, starts, ends, out2);
+    if r2 < 0 { return 13; }
+    if vec_len(out2) != 14 { return 14; }
+    if vec_get(out2, 0) != 4 { return 15; }
+    if vec_get(out2, 1) != 1 { return 16; }
+    if vec_get(out2, 2) != 113 { return 17; }
+    if vec_get(out2, 3) != 17 { return 18; }
+    if vec_get(out2, 4) != 4 { return 19; }
+    if vec_get(out2, 5) != 42 { return 20; }
+    if vec_get(out2, 6) != 97 { return 21; }
+    if vec_get(out2, 7) != 0 { return 22; }
+    if vec_get(out2, 8) != 118 { return 23; }
+    if vec_get(out2, 9) != 0 { return 24; }
+    if vec_get(out2, 10) != 112 { return 25; }
+    if vec_get(out2, 11) != 2 { return 26; }
+    if vec_get(out2, 12) != 118 { return 27; }
+    if vec_get(out2, 13) != 0 { return 28; }
+    let blk_body: Vec<i32> = vec_new();
+    vec_push(blk_body, box_new(Instr::Nop));
+    vec_push(blk_body, box_new(Instr::ReturnVoid));
+    let out3: Vec<i32> = vec_new();
+    let r3: i32 = emit_instr(Instr::BlockInstr(blk_body),
+                              en, eb, ew, pool, source, starts, ends, out3);
+    if r3 != 2 { return 29; }
+    if vec_get(out3, 0) != 118 { return 30; }
+    if vec_get(out3, 1) != 0 { return 31; }
+    let empty_blk: Vec<i32> = vec_new();
+    let out4: Vec<i32> = vec_new();
+    let r4: i32 = emit_instr(Instr::BlockInstr(empty_blk),
+                              en, eb, ew, pool, source, starts, ends, out4);
+    if r4 != 0 { return 32; }
+    if vec_len(out4) != 0 { return 33; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -1501,5 +1637,9 @@ fn main() -> i32 {
     if r26 != 0 { return 350 + r26; }
     let r27: i32 = test_vec_append();
     if r27 != 0 { return 370 + r27; }
+    let r28: i32 = test_flat_byte_size();
+    if r28 != 0 { return 380 + r28; }
+    let r29: i32 = test_emit_ifelse_block();
+    if r29 != 0 { return 390 + r29; }
     return 0;
 }
