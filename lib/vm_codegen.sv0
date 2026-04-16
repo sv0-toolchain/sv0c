@@ -33,8 +33,12 @@
    scan_instr_env / scan_instrs_env (SML scanInstr — recursive env scan),
    local_count_and_env (SML localCountAndEnv — bind params + scan instrs,
    build env Vecs, return local slot count; field_starts placeholder-only
-   until struct field name storage is added).
-   Remaining: emitFn/top-level emit. */
+   until struct field name storage is added),
+   compute_arity (sum of param widths),
+   emit_fn (SML emitFn — function-level orchestration: builds env via
+   local_count_and_env, emits code via emit_instrs, computes arity,
+   pools label, appends stride-4 func_entry to ft_entries).
+   Remaining: top-level emit (program orchestration). */
 
 /* ── variant slot counting ──────────────────────────────────── */
 
@@ -1293,6 +1297,67 @@ fn local_count_and_env(param_names: Vec<i32>, param_ctys: Vec<i32>,
                            enums_names, enums_widths);
 }
 
+/* ── compute_arity (SML arity calculation in emitFn) ──────────
+   Sum of widthOfCty for each parameter type. */
+fn compute_arity(param_ctys: Vec<i32>,
+                 structs_names: Vec<i32>,
+                 structs_field_counts: Vec<i32>,
+                 enums_names: Vec<i32>,
+                 enums_widths: Vec<i32>) -> i32 {
+    let np: i32 = vec_len(param_ctys);
+    let mut total: i32 = 0;
+    let mut i: i32 = 0;
+    while i < np {
+        total = total + width_of_cty(vec_get(param_ctys, i),
+                                      structs_names, structs_field_counts,
+                                      enums_names, enums_widths);
+        i = i + 1;
+    }
+    return total;
+}
+
+/* ── emit_fn (SML emitFn) ────────────────────────────────────
+   Function-level orchestration: builds env via local_count_and_env,
+   emits bytecode via emit_instrs, computes arity, pools the label,
+   and appends a stride-4 function entry to ft_entries:
+     [+0] nameIdx  (pool index for the function name)
+     [+1] arity    (sum of param widths)
+     [+2] localCount
+     [+3] code     (Vec<i32> handle — flat opcode/payload words)
+   Returns 0 on success, -1 on emission error. */
+fn emit_fn(label: i32,
+           param_names: Vec<i32>, param_ctys: Vec<i32>,
+           instrs: Vec<i32>,
+           structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
+           enums_names: Vec<i32>, enums_widths: Vec<i32>,
+           pool: Vec<i32>,
+           source: string, starts: Vec<i32>, ends: Vec<i32>,
+           fn_names: Vec<i32>,
+           ft_entries: Vec<i32>) -> i32 {
+    let en: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    let efs: Vec<i32> = vec_new();
+    let eff: Vec<i32> = vec_new();
+    let lc: i32 = local_count_and_env(param_names, param_ctys,
+                                       instrs, en, eb, ew, efs,
+                                       structs_names, structs_field_counts,
+                                       enums_names, enums_widths);
+    let code: Vec<i32> = vec_new();
+    let n: i32 = emit_instrs(instrs, en, eb, ew, efs, eff,
+                              pool, source, starts, ends, fn_names, code);
+    if n < 0 { return 0 - 1; }
+    let arity: i32 = compute_arity(param_ctys, structs_names,
+                                    structs_field_counts,
+                                    enums_names, enums_widths);
+    let name_idx: i32 = pool_add(pool, label);
+    vec_push(ft_entries, name_idx);
+    vec_push(ft_entries, arity);
+    vec_push(ft_entries, lc);
+    vec_push(ft_entries, code);
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_variant_slots() -> i32 {
@@ -2284,6 +2349,132 @@ fn test_emit_contract() -> i32 {
     return 0;
 }
 
+fn test_compute_arity() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let sfc: Vec<i32> = vec_new();
+    let enn: Vec<i32> = vec_new();
+    let enw: Vec<i32> = vec_new();
+    /* --- no params → arity 0 --- */
+    let pc0: Vec<i32> = vec_new();
+    if compute_arity(pc0, sn, sfc, enn, enw) != 0 { return 1; }
+    /* --- one scalar param → arity 1 --- */
+    let pc1: Vec<i32> = vec_new();
+    vec_push(pc1, 777);
+    if compute_arity(pc1, sn, sfc, enn, enw) != 1 { return 2; }
+    /* --- two scalar params → arity 2 --- */
+    let pc2: Vec<i32> = vec_new();
+    vec_push(pc2, 777);
+    vec_push(pc2, 778);
+    if compute_arity(pc2, sn, sfc, enn, enw) != 2 { return 3; }
+    /* --- struct param (width 3) → arity 3 --- */
+    let sn2: Vec<i32> = vec_new();
+    let sfc2: Vec<i32> = vec_new();
+    vec_push(sn2, 500);
+    vec_push(sfc2, 3);
+    let pc3: Vec<i32> = vec_new();
+    vec_push(pc3, 500);
+    if compute_arity(pc3, sn2, sfc2, enn, enw) != 3 { return 4; }
+    /* --- mixed: scalar + struct(3) → arity 4 --- */
+    let pc4: Vec<i32> = vec_new();
+    vec_push(pc4, 777);
+    vec_push(pc4, 500);
+    if compute_arity(pc4, sn2, sfc2, enn, enw) != 4 { return 5; }
+    /* --- enum param (width 2) → arity 2 --- */
+    let enn2: Vec<i32> = vec_new();
+    let enw2: Vec<i32> = vec_new();
+    vec_push(enn2, 600);
+    vec_push(enw2, 2);
+    let pc5: Vec<i32> = vec_new();
+    vec_push(pc5, 600);
+    if compute_arity(pc5, sn, sfc, enn2, enw2) != 2 { return 6; }
+    return 0;
+}
+
+fn test_emit_fn() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let sfc: Vec<i32> = vec_new();
+    let enn: Vec<i32> = vec_new();
+    let enw: Vec<i32> = vec_new();
+    let pool: Vec<i32> = vec_new();
+    let fns: Vec<i32> = vec_new();
+    let source: string = "+";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    let ft: Vec<i32> = vec_new();
+    /* --- fn with no params, ReturnVoid body --- */
+    let pn0: Vec<i32> = vec_new();
+    let pc0: Vec<i32> = vec_new();
+    let ins0: Vec<i32> = vec_new();
+    vec_push(ins0, box_new(Instr::ReturnVoid));
+    let r0: i32 = emit_fn(42, pn0, pc0, ins0,
+                            sn, sfc, enn, enw,
+                            pool, source, starts, ends, fns, ft);
+    if r0 != 0 { return 1; }
+    if vec_len(ft) != 4 { return 2; }
+    let ni0: i32 = vec_get(ft, 0);
+    if ni0 != 0 { return 3; }
+    if vec_get(ft, 1) != 0 { return 4; }
+    if vec_get(ft, 2) != 0 { return 5; }
+    let code0: Vec<i32> = vec_get(ft, 3);
+    if vec_len(code0) != 2 { return 6; }
+    if vec_get(code0, 0) != 118 { return 7; }
+    if vec_get(code0, 1) != 0 { return 8; }
+    /* --- fn with one scalar param, Assign + ReturnVal --- */
+    let pn1: Vec<i32> = vec_new();
+    let pc1: Vec<i32> = vec_new();
+    vec_push(pn1, 10);
+    vec_push(pc1, 777);
+    let ins1: Vec<i32> = vec_new();
+    vec_push(ins1, box_new(Instr::Assign(20,
+        box_new(Expr::Literal(box_new(Value::VInt(99)))))));
+    vec_push(ins1, box_new(Instr::ReturnVal(
+        box_new(Value::VVar(20)))));
+    let r1: i32 = emit_fn(43, pn1, pc1, ins1,
+                            sn, sfc, enn, enw,
+                            pool, source, starts, ends, fns, ft);
+    if r1 != 0 { return 9; }
+    if vec_len(ft) != 8 { return 10; }
+    if vec_get(ft, 5) != 1 { return 11; }
+    let lc1: i32 = vec_get(ft, 6);
+    if lc1 != 2 { return 12; }
+    let code1: Vec<i32> = vec_get(ft, 7);
+    if vec_len(code1) < 2 { return 13; }
+    /* --- pool correctness: two distinct labels pooled --- */
+    if pool_size(pool) != 2 { return 14; }
+    /* --- fn with struct param (width 3) → arity 3, lc 3 --- */
+    let sn3: Vec<i32> = vec_new();
+    let sfc3: Vec<i32> = vec_new();
+    vec_push(sn3, 500);
+    vec_push(sfc3, 3);
+    let pn2: Vec<i32> = vec_new();
+    let pc2: Vec<i32> = vec_new();
+    vec_push(pn2, 30);
+    vec_push(pc2, 500);
+    let ins2: Vec<i32> = vec_new();
+    vec_push(ins2, box_new(Instr::ReturnVoid));
+    let pool2: Vec<i32> = vec_new();
+    let ft2: Vec<i32> = vec_new();
+    let r2: i32 = emit_fn(44, pn2, pc2, ins2,
+                            sn3, sfc3, enn, enw,
+                            pool2, source, starts, ends, fns, ft2);
+    if r2 != 0 { return 15; }
+    if vec_get(ft2, 1) != 3 { return 16; }
+    if vec_get(ft2, 2) != 3 { return 17; }
+    /* --- two functions into same ft → stride-4 entries --- */
+    let pn3: Vec<i32> = vec_new();
+    let pc3: Vec<i32> = vec_new();
+    let ins3: Vec<i32> = vec_new();
+    vec_push(ins3, box_new(Instr::ReturnVoid));
+    let r3: i32 = emit_fn(45, pn3, pc3, ins3,
+                            sn, sfc, enn, enw,
+                            pool2, source, starts, ends, fns, ft2);
+    if r3 != 0 { return 18; }
+    if vec_len(ft2) != 8 { return 19; }
+    if vec_get(ft2, 4) != vec_get(ft2, 0) + 1 { return 20; }
+    return 0;
+}
+
 fn test_local_count_and_env() -> i32 {
     let sn: Vec<i32> = vec_new();
     let sfc: Vec<i32> = vec_new();
@@ -2583,5 +2774,9 @@ fn main() -> i32 {
     if r33 != 0 { return 540 + r33; }
     let r34: i32 = test_local_count_and_env();
     if r34 != 0 { return 570 + r34; }
+    let r35: i32 = test_compute_arity();
+    if r35 != 0 { return 610 + r35; }
+    let r36: i32 = test_emit_fn();
+    if r36 != 0 { return 620 + r36; }
     return 0;
 }
