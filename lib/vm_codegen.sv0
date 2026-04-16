@@ -277,6 +277,7 @@ fn enc_lens(opcodes: Vec<i32>) -> i32 {
 
 fn loop_exit_sentinel() -> i32 { return 0 - 987654321; }
 fn loop_continue_sentinel() -> i32 { return 0 - 876543210; }
+fn loop_break_sentinel() -> i32 { return 0 - 765432109; }
 
 fn is_loop_exit_sentinel(v: i32) -> bool {
     return v == 0 - 987654321;
@@ -284,6 +285,10 @@ fn is_loop_exit_sentinel(v: i32) -> bool {
 
 fn is_loop_continue_sentinel(v: i32) -> bool {
     return v == 0 - 876543210;
+}
+
+fn is_loop_break_sentinel(v: i32) -> bool {
+    return v == 0 - 765432109;
 }
 
 /* ── string pool ────────────────────────────────────────────── */
@@ -482,6 +487,35 @@ fn patch_continue_jumps(instrs: Vec<i32>, from_pos: i32,
             if i + 1 < n {
                 let arg: i32 = vec_get(instrs, i + 1);
                 if is_loop_continue_sentinel(arg) {
+                    vec_set(instrs, i + 1, target_abs - (pos + byte_sz));
+                    patched = patched + 1;
+                }
+            }
+        }
+        i = i + stride;
+        pos = pos + byte_sz;
+    }
+    return patched;
+}
+
+/* ── patch_break_jumps ──────────────────────────────────────────
+   Same scan as patch_continue_jumps but matches break sentinel.
+   Each matching JUMP arg is replaced with
+   (target_abs - (current_byte_pos + byte_len)). */
+fn patch_break_jumps(instrs: Vec<i32>, from_pos: i32,
+                     target_abs: i32) -> i32 {
+    let n: i32 = vec_len(instrs);
+    let mut i: i32 = 0;
+    let mut pos: i32 = from_pos;
+    let mut patched: i32 = 0;
+    while i < n {
+        let op: i32 = vec_get(instrs, i);
+        let byte_sz: i32 = insn_size(op);
+        let stride: i32 = insn_vec_stride(op);
+        if op == 112 {
+            if i + 1 < n {
+                let arg: i32 = vec_get(instrs, i + 1);
+                if is_loop_break_sentinel(arg) {
                     vec_set(instrs, i + 1, target_abs - (pos + byte_sz));
                     patched = patched + 1;
                 }
@@ -797,11 +831,12 @@ enum Instr {
    Pushes instruction words into `out`.  Returns the number of
    Vec elements pushed, or -1 on error / deferred case.
    Implemented: Nop, DeclVar, DeclNamed, Assign, Store,
-   ReturnVoid, ReturnVal, IfElse, BlockInstr, Call.
-   Call handles all 15 builtins via CALL_BUILTIN and general
-   user-defined calls via CALL with fn_names table lookup.
-   Deferred: WhileLoop, StoreField,
-   Break, Continue, Requires, Ensures. */
+   ReturnVoid, ReturnVal, IfElse, BlockInstr, Call,
+   WhileLoop, Break, Continue.
+   WhileLoop emits cond + JUMP_IF_NOT + body + JUMP back-edge,
+   with sentinel patching for break/continue.  Break/Continue
+   emit JUMP with sentinel operands, patched by WhileLoop.
+   Deferred: StoreField, Requires, Ensures. */
 
 fn emit_instr(ins: Instr,
               env_names: Vec<i32>, env_bases: Vec<i32>,
@@ -877,17 +912,48 @@ fn emit_instr(ins: Instr,
             return nc + 2 + at + 2 + ae;
         },
         Instr::WhileLoop(be, body) => {
-            return 0 - 1;
+            let cond: Expr = box_deref(be);
+            let cond_out: Vec<i32> = vec_new();
+            let nc: i32 = emit_expr(cond, env_names, env_bases, env_widths,
+                                    pool, source, starts, ends, cond_out);
+            if nc < 0 { return 0 - 1; }
+            let body_out: Vec<i32> = vec_new();
+            let nb: i32 = emit_instrs(body, env_names, env_bases, env_widths,
+                                      pool, source, starts, ends,
+                                      fn_names, body_out);
+            if nb < 0 { return 0 - 1; }
+            vec_push(body_out, 112);
+            vec_push(body_out, loop_exit_sentinel());
+            let cond_bytes: i32 = flat_byte_size(cond_out);
+            let jif_bytes: i32 = insn_size(113);
+            let body_bytes: i32 = flat_byte_size(body_out);
+            let forward: i32 = body_bytes;
+            let back: i32 = 0 - (cond_bytes + jif_bytes + body_bytes);
+            replace_loop_exit_jump(body_out, back);
+            let loop_out: Vec<i32> = vec_new();
+            vec_append(loop_out, cond_out);
+            vec_push(loop_out, 113);
+            vec_push(loop_out, forward);
+            vec_append(loop_out, body_out);
+            let total_bytes: i32 = flat_byte_size(loop_out);
+            patch_continue_jumps(loop_out, 0, 0);
+            patch_break_jumps(loop_out, 0, total_bytes);
+            let added: i32 = vec_append(out, loop_out);
+            return added;
         },
         Instr::BlockInstr(body) => {
             return emit_instrs(body, env_names, env_bases, env_widths,
                                pool, source, starts, ends, fn_names, out);
         },
         Instr::Break => {
-            return 0 - 1;
+            vec_push(out, 112);
+            vec_push(out, loop_break_sentinel());
+            return 2;
         },
         Instr::Continue => {
-            return 0 - 1;
+            vec_push(out, 112);
+            vec_push(out, loop_continue_sentinel());
+            return 2;
         },
         Instr::Call(dst_h, fn_h, args, rt_h) => {
             let fn_name: string = handle_to_str(fn_h, source, starts, ends);
@@ -1686,6 +1752,89 @@ fn test_emit_ifelse_block() -> i32 {
     return 0;
 }
 
+fn test_emit_while_loop() -> i32 {
+    let en: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    let pool: Vec<i32> = vec_new();
+    let fns: Vec<i32> = vec_new();
+    let source: string = "+";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(en, 50); vec_push(eb, 0); vec_push(ew, 1);
+    let cond1: Box<Expr> = box_new(Expr::Literal(box_new(Value::VBool(true))));
+    let body1: Vec<i32> = vec_new();
+    vec_push(body1, box_new(Instr::ReturnVoid));
+    let out1: Vec<i32> = vec_new();
+    let r1: i32 = emit_instr(Instr::WhileLoop(cond1, body1),
+                              en, eb, ew, pool, source, starts, ends, fns, out1);
+    if r1 < 0 { return 1; }
+    if vec_len(out1) != 8 { return 2; }
+    if vec_get(out1, 0) != 7 { return 3; }
+    if vec_get(out1, 1) != 1 { return 4; }
+    if vec_get(out1, 2) != 113 { return 5; }
+    if vec_get(out1, 3) != 7 { return 6; }
+    if vec_get(out1, 4) != 118 { return 7; }
+    if vec_get(out1, 5) != 0 { return 8; }
+    if vec_get(out1, 6) != 112 { return 9; }
+    if vec_get(out1, 7) != 0 - 14 { return 10; }
+    let cond2: Box<Expr> = box_new(Expr::Literal(box_new(Value::VBool(true))));
+    let body2: Vec<i32> = vec_new();
+    let out2: Vec<i32> = vec_new();
+    let r2: i32 = emit_instr(Instr::WhileLoop(cond2, body2),
+                              en, eb, ew, pool, source, starts, ends, fns, out2);
+    if r2 < 0 { return 11; }
+    if vec_len(out2) != 6 { return 12; }
+    if vec_get(out2, 0) != 7 { return 13; }
+    if vec_get(out2, 1) != 1 { return 14; }
+    if vec_get(out2, 2) != 113 { return 15; }
+    if vec_get(out2, 3) != 5 { return 16; }
+    if vec_get(out2, 4) != 112 { return 17; }
+    if vec_get(out2, 5) != 0 - 12 { return 18; }
+    let cond3: Box<Expr> = box_new(Expr::Literal(box_new(Value::VBool(true))));
+    let body3: Vec<i32> = vec_new();
+    vec_push(body3, box_new(Instr::Break));
+    let out3: Vec<i32> = vec_new();
+    let r3: i32 = emit_instr(Instr::WhileLoop(cond3, body3),
+                              en, eb, ew, pool, source, starts, ends, fns, out3);
+    if r3 < 0 { return 19; }
+    if vec_len(out3) != 8 { return 20; }
+    if vec_get(out3, 4) != 112 { return 21; }
+    if vec_get(out3, 5) != 5 { return 22; }
+    if vec_get(out3, 6) != 112 { return 23; }
+    if vec_get(out3, 7) != 0 - 17 { return 24; }
+    let cond4: Box<Expr> = box_new(Expr::Literal(box_new(Value::VBool(true))));
+    let body4: Vec<i32> = vec_new();
+    vec_push(body4, box_new(Instr::Continue));
+    let out4: Vec<i32> = vec_new();
+    let r4: i32 = emit_instr(Instr::WhileLoop(cond4, body4),
+                              en, eb, ew, pool, source, starts, ends, fns, out4);
+    if r4 < 0 { return 25; }
+    if vec_len(out4) != 8 { return 26; }
+    if vec_get(out4, 4) != 112 { return 27; }
+    if vec_get(out4, 5) != 0 - 12 { return 28; }
+    if vec_get(out4, 6) != 112 { return 29; }
+    if vec_get(out4, 7) != 0 - 17 { return 30; }
+    let cond5: Box<Expr> = box_new(Expr::Literal(box_new(Value::VBool(true))));
+    let body5: Vec<i32> = vec_new();
+    let asgn_e: Expr = Expr::Literal(box_new(Value::VInt(42)));
+    vec_push(body5, box_new(Instr::Assign(50, box_new(asgn_e))));
+    vec_push(body5, box_new(Instr::ReturnVoid));
+    let out5: Vec<i32> = vec_new();
+    let r5: i32 = emit_instr(Instr::WhileLoop(cond5, body5),
+                              en, eb, ew, pool, source, starts, ends, fns, out5);
+    if r5 < 0 { return 31; }
+    if vec_len(out5) != 12 { return 32; }
+    if vec_get(out5, 2) != 113 { return 33; }
+    if vec_get(out5, 3) != 17 { return 34; }
+    if vec_get(out5, 4) != 4 { return 35; }
+    if vec_get(out5, 5) != 42 { return 36; }
+    if vec_get(out5, 10) != 112 { return 37; }
+    if vec_get(out5, 11) != 0 - 24 { return 38; }
+    return 0;
+}
+
 fn test_emit_call() -> i32 {
     let en: Vec<i32> = vec_new();
     let eb: Vec<i32> = vec_new();
@@ -1832,5 +1981,7 @@ fn main() -> i32 {
     if r29 != 0 { return 390 + r29; }
     let r30: i32 = test_emit_call();
     if r30 != 0 { return 430 + r30; }
+    let r31: i32 = test_emit_while_loop();
+    if r31 != 0 { return 470 + r31; }
     return 0;
 }
