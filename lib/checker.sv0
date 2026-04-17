@@ -68,6 +68,12 @@
    field type tag extraction using scan_type_tag_at),
    scan_fn_param_type_tags (function parameter type tag extraction —
    walks fn signature tokens to extract each param's type tag).
+   Batch 45: fn_table_lookup_str (string-based fn table lookup for
+   cross-scope name resolution), scan_fn_ret_type_tag (token re-scan
+   for function return type), item_fn_ty_to_table (SML itemFnTy —
+   extract function type from item arena and register in fn table),
+   register_all_item_fns (first part of modEnvFromProg — walk all
+   ItemFn items and populate function type table).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -459,6 +465,32 @@ fn fn_table_param_type(fn_param_offsets: Vec<i32>,
     if fn_idx < 0 { return TY_UNKNOWN(); }
     let off: i32 = vec_get(fn_param_offsets, fn_idx);
     return vec_get(fn_param_types_flat, off + param_idx);
+}
+
+/* ── fn_table_lookup_str (string-based fn table lookup) ────────
+   Companion to fn_table_lookup that compares by string value
+   instead of token position.  Extracts the name string at each
+   fn_names entry and compares with name_str.  Required for
+   cross-scope lookups where the call-site token position differs
+   from the declaration token position.                          */
+
+fn fn_table_lookup_str(fn_names: Vec<i32>,
+                       source: string, starts: Vec<i32>,
+                       ends: Vec<i32>,
+                       name_str: string) -> i32 {
+    let n: i32 = vec_len(fn_names);
+    let mut i: i32 = n - 1;
+    while i >= 0 {
+        let pos: i32 = vec_get(fn_names, i);
+        let s: i32 = vec_get(starts, pos);
+        let e: i32 = vec_get(ends, pos);
+        let nm: string = string_substr(source, s, e - s);
+        if string_eq(nm, name_str) {
+            return i;
+        }
+        i = i - 1;
+    }
+    return 0 - 1;
 }
 
 /* ── variant shape classification ───────────────────────────── */
@@ -1448,6 +1480,128 @@ fn scan_fn_param_type_tags(tok_tags: Vec<i32>, source: string,
         if vec_get(tok_tags, p) == 12 { p = p + 1; }
     }
     return 0;
+}
+
+/* ── scan_fn_ret_type_tag (token re-scan for fn return type) ──
+   For a function with name_tok_pos and has_ret flag (from id2),
+   re-scans the token stream to resolve the return type to a
+   type tag.  Walks past optional generics and balanced parens
+   to find the -> arrow, then uses scan_type_tag_at on the type
+   after the arrow.  Returns TY_UNIT if has_ret == 0.           */
+
+fn scan_fn_ret_type_tag(tok_tags: Vec<i32>, source: string,
+                        starts: Vec<i32>, ends: Vec<i32>,
+                        struct_names: Vec<i32>,
+                        enum_names: Vec<i32>,
+                        type_params: Vec<i32>, tp_limit: i32,
+                        name_tok_pos: i32, has_ret: i32) -> i32 {
+    if has_ret == 0 { return TY_UNIT(); }
+    let mut p: i32 = name_tok_pos + 1;
+    if vec_get(tok_tags, p) == 38 {
+        let mut depth: i32 = 1;
+        p = p + 1;
+        while depth > 0 {
+            let u: i32 = vec_get(tok_tags, p);
+            if u == 38 { depth = depth + 1; }
+            if u == 39 { depth = depth - 1; }
+            p = p + 1;
+        }
+    }
+    if vec_get(tok_tags, p) != 6 { return TY_UNKNOWN(); }
+    let mut depth: i32 = 1;
+    p = p + 1;
+    while depth > 0 {
+        let u: i32 = vec_get(tok_tags, p);
+        if u == 6 { depth = depth + 1; }
+        if u == 7 { depth = depth - 1; }
+        p = p + 1;
+    }
+    if vec_get(tok_tags, p) != 19 { return TY_UNKNOWN(); }
+    let out: Vec<i32> = vec_new();
+    let _end: i32 = scan_type_tag_at(tok_tags, source, starts, ends,
+                                      struct_names, enum_names,
+                                      type_params, tp_limit,
+                                      p + 1, out);
+    if vec_len(out) == 0 { return TY_UNKNOWN(); }
+    return vec_get(out, 0);
+}
+
+/* ── item_fn_ty_to_table (SML itemFnTy → fn table) ────────────
+   Given an item arena index for an ItemFn, extracts param type
+   tags (via scan_fn_param_type_tags) and return type tag (via
+   scan_fn_ret_type_tag), then registers in the function type
+   table via fn_table_add.  Returns 0 on success, -1 on error. */
+
+fn item_fn_ty_to_table(tok_tags: Vec<i32>, source: string,
+                       starts: Vec<i32>, ends: Vec<i32>,
+                       struct_names: Vec<i32>,
+                       enum_names: Vec<i32>,
+                       type_params: Vec<i32>, tp_limit: i32,
+                       id1: Vec<i32>, id2: Vec<i32>,
+                       id3: Vec<i32>,
+                       fn_names: Vec<i32>,
+                       fn_param_counts: Vec<i32>,
+                       fn_ret_types: Vec<i32>,
+                       fn_param_offsets: Vec<i32>,
+                       fn_param_types_flat: Vec<i32>,
+                       item_idx: i32) -> i32 {
+    let name_pos: i32 = vec_get(id1, item_idx);
+    let has_ret: i32 = vec_get(id2, item_idx);
+    let param_count: i32 = vec_get(id3, item_idx);
+    let param_types: Vec<i32> = vec_new();
+    let r1: i32 = scan_fn_param_type_tags(tok_tags, source, starts, ends,
+                                           struct_names, enum_names,
+                                           type_params, tp_limit,
+                                           name_pos, param_count,
+                                           param_types);
+    if r1 < 0 { return 0 - 1; }
+    let ret_tag: i32 = scan_fn_ret_type_tag(tok_tags, source, starts, ends,
+                                             struct_names, enum_names,
+                                             type_params, tp_limit,
+                                             name_pos, has_ret);
+    let _idx: i32 = fn_table_add(fn_names, fn_param_counts,
+                                  fn_ret_types, fn_param_offsets,
+                                  fn_param_types_flat,
+                                  name_pos, ret_tag,
+                                  param_types, param_count);
+    return 0;
+}
+
+/* ── register_all_item_fns (first part of modEnvFromProg) ─────
+   Walks all item arena entries; for each ItemFn (it[i] == 0),
+   calls item_fn_ty_to_table to extract and register the
+   function's type.  Returns the count of registered functions. */
+
+fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
+                         starts: Vec<i32>, ends: Vec<i32>,
+                         struct_names: Vec<i32>,
+                         enum_names: Vec<i32>,
+                         type_params: Vec<i32>, tp_limit: i32,
+                         it: Vec<i32>, id1: Vec<i32>,
+                         id2: Vec<i32>, id3: Vec<i32>,
+                         fn_names: Vec<i32>,
+                         fn_param_counts: Vec<i32>,
+                         fn_ret_types: Vec<i32>,
+                         fn_param_offsets: Vec<i32>,
+                         fn_param_types_flat: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(it);
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(it, i) == 0 {
+            let r: i32 = item_fn_ty_to_table(tok_tags, source,
+                                              starts, ends,
+                                              struct_names, enum_names,
+                                              type_params, tp_limit,
+                                              id1, id2, id3,
+                                              fn_names, fn_param_counts,
+                                              fn_ret_types, fn_param_offsets,
+                                              fn_param_types_flat, i);
+            if r == 0 { count = count + 1; }
+        }
+        i = i + 1;
+    }
+    return count;
 }
 
 /* ── contract_expr scoped flag (SML withContractExpr) ────────
@@ -2549,6 +2703,162 @@ fn test_scan_fn_param_type_tags() -> i32 {
     return 0;
 }
 
+fn test_fn_table_lookup_str() -> i32 {
+    let source: string = "foo bar baz";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    vec_push(starts, 8); vec_push(ends, 11);
+    let fnames: Vec<i32> = vec_new();
+    let fpcs: Vec<i32> = vec_new();
+    let frets: Vec<i32> = vec_new();
+    let foffs: Vec<i32> = vec_new();
+    let fptf: Vec<i32> = vec_new();
+    let p0: Vec<i32> = vec_new();
+    vec_push(p0, TY_INT());
+    let x0: i32 = fn_table_add(fnames, fpcs, frets, foffs, fptf,
+                                0, TY_BOOL(), p0, 1);
+    if x0 < 0 { return 99; }
+    let p1: Vec<i32> = vec_new();
+    let x1: i32 = fn_table_add(fnames, fpcs, frets, foffs, fptf,
+                                1, TY_STRING(), p1, 0);
+    if x1 < 0 { return 99; }
+    let r0: i32 = fn_table_lookup_str(fnames, source, starts, ends, "foo");
+    if r0 != 0 { return 1; }
+    let r1: i32 = fn_table_lookup_str(fnames, source, starts, ends, "bar");
+    if r1 != 1 { return 2; }
+    let r2: i32 = fn_table_lookup_str(fnames, source, starts, ends, "baz");
+    if r2 != 0 - 1 { return 3; }
+    if fn_table_ret_type(frets, r0) != TY_BOOL() { return 4; }
+    if fn_table_ret_type(frets, r1) != TY_STRING() { return 5; }
+    return 0;
+}
+
+fn test_scan_fn_ret_type_tag() -> i32 {
+    let source: string = "fn foo ( x : i32 ) -> bool { }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(starts, 3); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 21);
+    vec_push(starts, 22); vec_push(ends, 26);
+    vec_push(starts, 27); vec_push(ends, 28);
+    vec_push(starts, 29); vec_push(ends, 30);
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 65);
+    vec_push(tt, 5);
+    vec_push(tt, 6);
+    vec_push(tt, 5);
+    vec_push(tt, 14);
+    vec_push(tt, 5);
+    vec_push(tt, 7);
+    vec_push(tt, 19);
+    vec_push(tt, 5);
+    vec_push(tt, 8);
+    vec_push(tt, 9);
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let r: i32 = scan_fn_ret_type_tag(tt, source, starts, ends,
+                                       sn, en, tp, 0, 1, 1);
+    if r != TY_BOOL() { return 1; }
+    let r0: i32 = scan_fn_ret_type_tag(tt, source, starts, ends,
+                                        sn, en, tp, 0, 1, 0);
+    if r0 != TY_UNIT() { return 2; }
+    return 0;
+}
+
+fn test_register_all_item_fns() -> i32 {
+    let source: string = "fn foo ( x : i32 ) -> bool { } fn bar ( ) -> i32 { }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(starts, 3); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 21);
+    vec_push(starts, 22); vec_push(ends, 26);
+    vec_push(starts, 27); vec_push(ends, 28);
+    vec_push(starts, 29); vec_push(ends, 30);
+    vec_push(starts, 31); vec_push(ends, 33);
+    vec_push(starts, 34); vec_push(ends, 37);
+    vec_push(starts, 38); vec_push(ends, 39);
+    vec_push(starts, 40); vec_push(ends, 41);
+    vec_push(starts, 42); vec_push(ends, 44);
+    vec_push(starts, 45); vec_push(ends, 48);
+    vec_push(starts, 49); vec_push(ends, 50);
+    vec_push(starts, 51); vec_push(ends, 52);
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 65);
+    vec_push(tt, 5);
+    vec_push(tt, 6);
+    vec_push(tt, 5);
+    vec_push(tt, 14);
+    vec_push(tt, 5);
+    vec_push(tt, 7);
+    vec_push(tt, 19);
+    vec_push(tt, 5);
+    vec_push(tt, 8);
+    vec_push(tt, 9);
+    vec_push(tt, 65);
+    vec_push(tt, 5);
+    vec_push(tt, 6);
+    vec_push(tt, 7);
+    vec_push(tt, 19);
+    vec_push(tt, 5);
+    vec_push(tt, 8);
+    vec_push(tt, 9);
+    let item_t: Vec<i32> = vec_new();
+    let item_d1: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
+    let item_d3: Vec<i32> = vec_new();
+    vec_push(item_t, 0);
+    vec_push(item_d1, 1);
+    vec_push(item_d2, 1);
+    vec_push(item_d3, 1);
+    vec_push(item_t, 0);
+    vec_push(item_d1, 12);
+    vec_push(item_d2, 1);
+    vec_push(item_d3, 0);
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let fnames: Vec<i32> = vec_new();
+    let fpcs: Vec<i32> = vec_new();
+    let frets: Vec<i32> = vec_new();
+    let foffs: Vec<i32> = vec_new();
+    let fptf: Vec<i32> = vec_new();
+    let count: i32 = register_all_item_fns(tt, source, starts, ends,
+                                            sn, en, tp, 0,
+                                            item_t, item_d1,
+                                            item_d2, item_d3,
+                                            fnames, fpcs,
+                                            frets, foffs, fptf);
+    if count != 2 { return 1; }
+    if vec_len(fnames) != 2 { return 2; }
+    let idx0: i32 = fn_table_lookup_str(fnames, source, starts, ends,
+                                         "foo");
+    if idx0 < 0 { return 3; }
+    if fn_table_ret_type(frets, idx0) != TY_BOOL() { return 4; }
+    if fn_table_param_count(fpcs, idx0) != 1 { return 5; }
+    if fn_table_param_type(foffs, fptf, idx0, 0) != TY_INT() { return 6; }
+    let idx1: i32 = fn_table_lookup_str(fnames, source, starts, ends,
+                                         "bar");
+    if idx1 < 0 { return 7; }
+    if fn_table_ret_type(frets, idx1) != TY_INT() { return 8; }
+    if fn_table_param_count(fpcs, idx1) != 0 { return 9; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -2648,5 +2958,11 @@ fn main() -> i32 {
     if r48 != 0 { return 500 + r48; }
     let r49: i32 = test_scan_fn_param_type_tags();
     if r49 != 0 { return 510 + r49; }
+    let r50: i32 = test_fn_table_lookup_str();
+    if r50 != 0 { return 520 + r50; }
+    let r51: i32 = test_scan_fn_ret_type_tag();
+    if r51 != 0 { return 530 + r51; }
+    let r52: i32 = test_register_all_item_fns();
+    if r52 != 0 { return 540 + r52; }
     return 0;
 }
