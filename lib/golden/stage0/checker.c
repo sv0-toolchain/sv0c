@@ -137,6 +137,12 @@ static int init_struct_defs(int tok_tags, const char* source, int starts, int en
 static int init_enum_defs(int tok_tags, int it, int id1, int id2, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat);
 static int struct_def_field_ty_str(int sdef_names, int sdef_field_offsets, int sdef_field_counts, int sdef_fnames_flat, int sdef_ftypes_flat, const char* source, int starts, int ends, int struct_name_pos, const char* field_name_str);
 static int enum_def_variant_shape_str(int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, const char* source, int starts, int ends, int enum_name_pos, const char* variant_name_str);
+static int BUILTIN_COUNT(void);
+static int builtin_fn_lookup(const char* name_str);
+static int builtin_fn_ret_type(int bid);
+static int builtin_fn_param_count(int bid);
+static int builtin_fn_param_type(int bid, int idx);
+static int resolve_fn_call(int fn_names, const char* source, int starts, int ends, const char* name_str, int is_builtin_out);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -192,6 +198,8 @@ static int test_register_all_item_fns(void);
 static int test_scan_enum_variant_shapes(void);
 static int test_init_struct_defs(void);
 static int test_init_enum_defs(void);
+static int test_builtin_fn_lookup(void);
+static int test_resolve_fn_call(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -2875,6 +2883,321 @@ static int enum_def_variant_shape_str(int edef_names, int edef_variant_offsets, 
   }
   int _sv0t14 = (0 - 1);
   return _sv0t14;
+}
+
+static int BUILTIN_COUNT(void) {
+  return 13;
+}
+
+static int builtin_fn_lookup(const char* name_str) {
+  int _sv0t0 = sv0_string_eq(name_str, "println");
+  if (_sv0t0) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_string_eq(name_str, "string_len");
+  if (_sv0t1) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_string_eq(name_str, "string_eq");
+  if (_sv0t2) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = sv0_string_eq(name_str, "string_concat");
+  if (_sv0t3) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(name_str, "string_char_at");
+  if (_sv0t4) {
+    return 4;
+  } else {
+  }
+  int _sv0t5 = sv0_string_eq(name_str, "string_substr");
+  if (_sv0t5) {
+    return 5;
+  } else {
+  }
+  int _sv0t6 = sv0_string_eq(name_str, "vec_new");
+  if (_sv0t6) {
+    return 6;
+  } else {
+  }
+  int _sv0t7 = sv0_string_eq(name_str, "vec_push");
+  if (_sv0t7) {
+    return 7;
+  } else {
+  }
+  int _sv0t8 = sv0_string_eq(name_str, "vec_len");
+  if (_sv0t8) {
+    return 8;
+  } else {
+  }
+  int _sv0t9 = sv0_string_eq(name_str, "vec_get");
+  if (_sv0t9) {
+    return 9;
+  } else {
+  }
+  int _sv0t10 = sv0_string_eq(name_str, "vec_set");
+  if (_sv0t10) {
+    return 10;
+  } else {
+  }
+  int _sv0t11 = sv0_string_eq(name_str, "box_new");
+  if (_sv0t11) {
+    return 11;
+  } else {
+  }
+  int _sv0t12 = sv0_string_eq(name_str, "box_deref");
+  if (_sv0t12) {
+    return 12;
+  } else {
+  }
+  int _sv0t13 = (0 - 1);
+  return _sv0t13;
+}
+
+static int builtin_fn_ret_type(int bid) {
+  if ((bid == 0)) {
+    int _sv0t0 = TY_UNIT();
+    return _sv0t0;
+  } else {
+  }
+  if ((bid == 1)) {
+    int _sv0t1 = TY_INT();
+    return _sv0t1;
+  } else {
+  }
+  if ((bid == 2)) {
+    int _sv0t2 = TY_BOOL();
+    return _sv0t2;
+  } else {
+  }
+  if ((bid == 3)) {
+    int _sv0t3 = TY_STRING();
+    return _sv0t3;
+  } else {
+  }
+  if ((bid == 4)) {
+    int _sv0t4 = TY_INT();
+    return _sv0t4;
+  } else {
+  }
+  if ((bid == 5)) {
+    int _sv0t5 = TY_STRING();
+    return _sv0t5;
+  } else {
+  }
+  if ((bid == 6)) {
+    int _sv0t6 = TY_NAMED();
+    return _sv0t6;
+  } else {
+  }
+  if ((bid == 7)) {
+    int _sv0t7 = TY_UNIT();
+    return _sv0t7;
+  } else {
+  }
+  if ((bid == 8)) {
+    int _sv0t8 = TY_INT();
+    return _sv0t8;
+  } else {
+  }
+  if ((bid == 9)) {
+    int _sv0t9 = TY_VAR();
+    return _sv0t9;
+  } else {
+  }
+  if ((bid == 10)) {
+    int _sv0t10 = TY_UNIT();
+    return _sv0t10;
+  } else {
+  }
+  if ((bid == 11)) {
+    int _sv0t11 = TY_NAMED();
+    return _sv0t11;
+  } else {
+  }
+  if ((bid == 12)) {
+    int _sv0t12 = TY_VAR();
+    return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = (0 - 1);
+  return _sv0t13;
+}
+
+static int builtin_fn_param_count(int bid) {
+  if ((bid == 0)) {
+    return 1;
+  } else {
+  }
+  if ((bid == 1)) {
+    return 1;
+  } else {
+  }
+  if ((bid == 2)) {
+    return 2;
+  } else {
+  }
+  if ((bid == 3)) {
+    return 2;
+  } else {
+  }
+  if ((bid == 4)) {
+    return 2;
+  } else {
+  }
+  if ((bid == 5)) {
+    return 3;
+  } else {
+  }
+  if ((bid == 6)) {
+    return 0;
+  } else {
+  }
+  if ((bid == 7)) {
+    return 2;
+  } else {
+  }
+  if ((bid == 8)) {
+    return 1;
+  } else {
+  }
+  if ((bid == 9)) {
+    return 2;
+  } else {
+  }
+  if ((bid == 10)) {
+    return 3;
+  } else {
+  }
+  if ((bid == 11)) {
+    return 1;
+  } else {
+  }
+  if ((bid == 12)) {
+    return 1;
+  } else {
+  }
+  int _sv0t0 = (0 - 1);
+  return _sv0t0;
+}
+
+static int builtin_fn_param_type(int bid, int idx) {
+  if ((bid == 0)) {
+    int _sv0t0 = TY_STRING();
+    return _sv0t0;
+  } else {
+  }
+  if ((bid == 1)) {
+    int _sv0t1 = TY_STRING();
+    return _sv0t1;
+  } else {
+  }
+  if ((bid == 2)) {
+    int _sv0t2 = TY_STRING();
+    return _sv0t2;
+  } else {
+  }
+  if ((bid == 3)) {
+    int _sv0t3 = TY_STRING();
+    return _sv0t3;
+  } else {
+  }
+  if ((bid == 4)) {
+    if ((idx == 0)) {
+      int _sv0t4 = TY_STRING();
+      return _sv0t4;
+    } else {
+    }
+    int _sv0t5 = TY_INT();
+    return _sv0t5;
+  } else {
+  }
+  if ((bid == 5)) {
+    if ((idx == 0)) {
+      int _sv0t6 = TY_STRING();
+      return _sv0t6;
+    } else {
+    }
+    int _sv0t7 = TY_INT();
+    return _sv0t7;
+  } else {
+  }
+  if ((bid == 7)) {
+    if ((idx == 0)) {
+      int _sv0t8 = TY_NAMED();
+      return _sv0t8;
+    } else {
+    }
+    int _sv0t9 = TY_VAR();
+    return _sv0t9;
+  } else {
+  }
+  if ((bid == 8)) {
+    int _sv0t10 = TY_NAMED();
+    return _sv0t10;
+  } else {
+  }
+  if ((bid == 9)) {
+    if ((idx == 0)) {
+      int _sv0t11 = TY_NAMED();
+      return _sv0t11;
+    } else {
+    }
+    int _sv0t12 = TY_INT();
+    return _sv0t12;
+  } else {
+  }
+  if ((bid == 10)) {
+    if ((idx == 0)) {
+      int _sv0t13 = TY_NAMED();
+      return _sv0t13;
+    } else {
+    }
+    if ((idx == 1)) {
+      int _sv0t14 = TY_INT();
+      return _sv0t14;
+    } else {
+    }
+    int _sv0t15 = TY_VAR();
+    return _sv0t15;
+  } else {
+  }
+  if ((bid == 11)) {
+    int _sv0t16 = TY_VAR();
+    return _sv0t16;
+  } else {
+  }
+  if ((bid == 12)) {
+    int _sv0t17 = TY_NAMED();
+    return _sv0t17;
+  } else {
+  }
+  int _sv0t18 = (0 - 1);
+  return _sv0t18;
+}
+
+static int resolve_fn_call(int fn_names, const char* source, int starts, int ends, const char* name_str, int is_builtin_out) {
+  int _sv0t0 = fn_table_lookup_str(fn_names, source, starts, ends, name_str);
+  int idx = _sv0t0;
+  if ((idx >= 0)) {
+    sv0_vec_push(is_builtin_out, 0);
+    return idx;
+  } else {
+  }
+  int _sv0t1 = builtin_fn_lookup(name_str);
+  int bid = _sv0t1;
+  if ((bid >= 0)) {
+    sv0_vec_push(is_builtin_out, 1);
+    return bid;
+  } else {
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
 }
 
 static int test_binop_class(void) {
@@ -5906,6 +6229,180 @@ static int test_init_enum_defs(void) {
   return 0;
 }
 
+static int test_builtin_fn_lookup(void) {
+  int _sv0t0 = builtin_fn_lookup("println");
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = builtin_fn_lookup("string_len");
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = builtin_fn_lookup("vec_new");
+  if ((_sv0t2 != 6)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = builtin_fn_lookup("vec_get");
+  if ((_sv0t3 != 9)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = builtin_fn_lookup("box_deref");
+  if ((_sv0t4 != 12)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = builtin_fn_lookup("unknown");
+  int _sv0t6 = (0 - 1);
+  if ((_sv0t5 != _sv0t6)) {
+    return 6;
+  } else {
+  }
+  int _sv0t7 = builtin_fn_ret_type(0);
+  int _sv0t8 = TY_UNIT();
+  if ((_sv0t7 != _sv0t8)) {
+    return 7;
+  } else {
+  }
+  int _sv0t9 = builtin_fn_ret_type(1);
+  int _sv0t10 = TY_INT();
+  if ((_sv0t9 != _sv0t10)) {
+    return 8;
+  } else {
+  }
+  int _sv0t11 = builtin_fn_ret_type(2);
+  int _sv0t12 = TY_BOOL();
+  if ((_sv0t11 != _sv0t12)) {
+    return 9;
+  } else {
+  }
+  int _sv0t13 = builtin_fn_ret_type(3);
+  int _sv0t14 = TY_STRING();
+  if ((_sv0t13 != _sv0t14)) {
+    return 10;
+  } else {
+  }
+  int _sv0t15 = builtin_fn_ret_type(9);
+  int _sv0t16 = TY_VAR();
+  if ((_sv0t15 != _sv0t16)) {
+    return 11;
+  } else {
+  }
+  int _sv0t17 = builtin_fn_param_count(0);
+  if ((_sv0t17 != 1)) {
+    return 12;
+  } else {
+  }
+  int _sv0t18 = builtin_fn_param_count(5);
+  if ((_sv0t18 != 3)) {
+    return 13;
+  } else {
+  }
+  int _sv0t19 = builtin_fn_param_count(6);
+  if ((_sv0t19 != 0)) {
+    return 14;
+  } else {
+  }
+  int _sv0t20 = builtin_fn_param_type(0, 0);
+  int _sv0t21 = TY_STRING();
+  if ((_sv0t20 != _sv0t21)) {
+    return 15;
+  } else {
+  }
+  int _sv0t22 = builtin_fn_param_type(4, 0);
+  int _sv0t23 = TY_STRING();
+  if ((_sv0t22 != _sv0t23)) {
+    return 16;
+  } else {
+  }
+  int _sv0t24 = builtin_fn_param_type(4, 1);
+  int _sv0t25 = TY_INT();
+  if ((_sv0t24 != _sv0t25)) {
+    return 17;
+  } else {
+  }
+  int _sv0t26 = builtin_fn_param_type(9, 0);
+  int _sv0t27 = TY_NAMED();
+  if ((_sv0t26 != _sv0t27)) {
+    return 18;
+  } else {
+  }
+  int _sv0t28 = builtin_fn_param_type(9, 1);
+  int _sv0t29 = TY_INT();
+  if ((_sv0t28 != _sv0t29)) {
+    return 19;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_fn_call(void) {
+  const char* source;
+  source = "fn foo ( ) -> i32 { }";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(starts, 3);
+  sv0_vec_push(ends, 6);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 13);
+  sv0_vec_push(starts, 14);
+  sv0_vec_push(ends, 17);
+  sv0_vec_push(starts, 18);
+  sv0_vec_push(ends, 19);
+  sv0_vec_push(starts, 20);
+  sv0_vec_push(ends, 21);
+  int _sv0t2 = sv0_vec_new();
+  int fnames = _sv0t2;
+  sv0_vec_push(fnames, 1);
+  int _sv0t3 = sv0_vec_new();
+  int ib0 = _sv0t3;
+  int _sv0t4 = resolve_fn_call(fnames, source, starts, ends, "foo", ib0);
+  int r0 = _sv0t4;
+  if ((r0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(ib0, 0);
+  if ((_sv0t5 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int ib1 = _sv0t6;
+  int _sv0t7 = resolve_fn_call(fnames, source, starts, ends, "println", ib1);
+  int r1 = _sv0t7;
+  if ((r1 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(ib1, 0);
+  if ((_sv0t8 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int ib2 = _sv0t9;
+  int _sv0t10 = resolve_fn_call(fnames, source, starts, ends, "nonexistent", ib2);
+  int r2 = _sv0t10;
+  int _sv0t11 = (0 - 1);
+  if ((r2 != _sv0t11)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -6289,6 +6786,20 @@ int main(void) {
   if ((r55 != 0)) {
     int _sv0t108 = (570 + r55);
     return _sv0t108;
+  } else {
+  }
+  int _sv0t109 = test_builtin_fn_lookup();
+  int r56 = _sv0t109;
+  if ((r56 != 0)) {
+    int _sv0t110 = (580 + r56);
+    return _sv0t110;
+  } else {
+  }
+  int _sv0t111 = test_resolve_fn_call();
+  int r57 = _sv0t111;
+  if ((r57 != 0)) {
+    int _sv0t112 = (600 + r57);
+    return _sv0t112;
   } else {
   }
   return 0;
