@@ -36,6 +36,7 @@ static int TY_UNKNOWN(void);
 static int ast_type_name_to_tag(const char* name);
 static int is_primitive_type_name(const char* name);
 static int int_width_from_name(const char* name);
+static int ast_ty_to_types_tag(const char* name);
 static int AL_VAR(void);
 static int AL_FIELD(void);
 static int AL_INVALID(void);
@@ -130,6 +131,7 @@ static int test_fields_of_struct_count(void);
 static int test_stmt_returns_arena(void);
 static int test_last_stmt_returns_arena(void);
 static int test_expr_references_result(void);
+static int test_ast_ty_types_tag(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -502,6 +504,111 @@ static int int_width_from_name(const char* name) {
   } else {
   }
   return 0;
+}
+
+static int ast_ty_to_types_tag(const char* name) {
+  int _sv0t0 = sv0_string_eq(name, "unit");
+  if (_sv0t0) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_string_eq(name, "bool");
+  if (_sv0t1) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_string_eq(name, "char");
+  if (_sv0t2) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = sv0_string_eq(name, "str");
+  if (_sv0t3) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(name, "string");
+  if (_sv0t4) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_string_eq(name, "String");
+  if (_sv0t5) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = sv0_string_eq(name, "isize");
+  if (_sv0t6) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = sv0_string_eq(name, "usize");
+  if (_sv0t7) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = sv0_string_eq(name, "i8");
+  if (_sv0t8) {
+    return 7;
+  } else {
+  }
+  int _sv0t9 = sv0_string_eq(name, "i16");
+  if (_sv0t9) {
+    return 7;
+  } else {
+  }
+  int _sv0t10 = sv0_string_eq(name, "i32");
+  if (_sv0t10) {
+    return 7;
+  } else {
+  }
+  int _sv0t11 = sv0_string_eq(name, "i64");
+  if (_sv0t11) {
+    return 7;
+  } else {
+  }
+  int _sv0t12 = sv0_string_eq(name, "i128");
+  if (_sv0t12) {
+    return 7;
+  } else {
+  }
+  int _sv0t13 = sv0_string_eq(name, "u8");
+  if (_sv0t13) {
+    return 8;
+  } else {
+  }
+  int _sv0t14 = sv0_string_eq(name, "u16");
+  if (_sv0t14) {
+    return 8;
+  } else {
+  }
+  int _sv0t15 = sv0_string_eq(name, "u32");
+  if (_sv0t15) {
+    return 8;
+  } else {
+  }
+  int _sv0t16 = sv0_string_eq(name, "u64");
+  if (_sv0t16) {
+    return 8;
+  } else {
+  }
+  int _sv0t17 = sv0_string_eq(name, "u128");
+  if (_sv0t17) {
+    return 8;
+  } else {
+  }
+  int _sv0t18 = sv0_string_eq(name, "f32");
+  if (_sv0t18) {
+    return 9;
+  } else {
+  }
+  int _sv0t19 = sv0_string_eq(name, "f64");
+  if (_sv0t19) {
+    return 9;
+  } else {
+  }
+  int _sv0t20 = (0 - 1);
+  return _sv0t20;
 }
 
 static int AL_VAR(void) {
@@ -2550,6 +2657,87 @@ static int test_expr_references_result(void) {
   return 0;
 }
 
+static int test_ast_ty_types_tag(void) {
+  int _sv0t0 = ast_ty_to_types_tag("unit");
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = ast_ty_to_types_tag("bool");
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = ast_ty_to_types_tag("char");
+  if ((_sv0t2 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = ast_ty_to_types_tag("str");
+  if ((_sv0t3 != 3)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = ast_ty_to_types_tag("string");
+  if ((_sv0t4 != 3)) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = ast_ty_to_types_tag("String");
+  if ((_sv0t5 != 3)) {
+    return 6;
+  } else {
+  }
+  int _sv0t6 = ast_ty_to_types_tag("isize");
+  if ((_sv0t6 != 4)) {
+    return 7;
+  } else {
+  }
+  int _sv0t7 = ast_ty_to_types_tag("usize");
+  if ((_sv0t7 != 5)) {
+    return 8;
+  } else {
+  }
+  int _sv0t8 = ast_ty_to_types_tag("i32");
+  if ((_sv0t8 != 7)) {
+    return 9;
+  } else {
+  }
+  int _sv0t9 = ast_ty_to_types_tag("u32");
+  if ((_sv0t9 != 8)) {
+    return 10;
+  } else {
+  }
+  int _sv0t10 = ast_ty_to_types_tag("f64");
+  if ((_sv0t10 != 9)) {
+    return 11;
+  } else {
+  }
+  int _sv0t11 = ast_ty_to_types_tag("Foo");
+  int _sv0t12 = (0 - 1);
+  if ((_sv0t11 != _sv0t12)) {
+    return 12;
+  } else {
+  }
+  int _sv0t13 = ast_ty_to_types_tag("Vec");
+  int _sv0t14 = (0 - 1);
+  if ((_sv0t13 != _sv0t14)) {
+    return 13;
+  } else {
+  }
+  int _sv0t15 = int_width_from_name("i32");
+  if ((_sv0t15 != 32)) {
+    return 14;
+  } else {
+  }
+  int _sv0t16 = int_width_from_name("u64");
+  if ((_sv0t16 != 64)) {
+    return 15;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -2765,6 +2953,13 @@ int main(void) {
   if ((r31 != 0)) {
     int _sv0t60 = (320 + r31);
     return _sv0t60;
+  } else {
+  }
+  int _sv0t61 = test_ast_ty_types_tag();
+  int r32 = _sv0t61;
+  if ((r32 != 0)) {
+    int _sv0t62 = (330 + r32);
+    return _sv0t62;
   } else {
   }
   return 0;

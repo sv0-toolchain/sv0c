@@ -26,6 +26,10 @@
    ExprPath for enum ctors, ExprCall callee return type, ExprTuple(1)
    recursion; returns -1 for "int"), scan_lets (SML scanLets — walk
    ExprBlock for LetStmt with init, collect name+type handle pairs).
+   Arena lookup helpers (batch 37): try_variant_names_lookup (SML
+   tryVariantNames — full arena lookup with string-based Ok/Err/Some/None
+   detection; returns success+failure variant handles), find_variant_in_items
+   (SML findVariantAst — find variant flat index within an enum's item arena).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -481,6 +485,98 @@ fn is_try_enum(has_ok: bool, has_err: bool, has_some: bool, has_none: bool) -> b
         if has_none { return true; }
     }
     return false;
+}
+
+/* ── try_variant_names_lookup (SML tryVariantNames — full arena) ─ */
+/* Finds Ok/Err or Some/None variant name handles for a given enum.
+   Pushes success handle then failure handle into out_handles.
+   Returns true if the enum is a Result/Option shape. */
+
+fn try_variant_names_lookup(enum_names: Vec<i32>,
+                            enum_tag_offsets: Vec<i32>,
+                            enum_tag_counts: Vec<i32>,
+                            enum_tags_flat: Vec<i32>,
+                            source: string, starts: Vec<i32>,
+                            ends: Vec<i32>,
+                            enum_name: i32,
+                            out_handles: Vec<i32>) -> bool {
+    let n: i32 = vec_len(enum_names);
+    let mut ei: i32 = 0;
+    while ei < n {
+        if vec_get(enum_names, ei) == enum_name {
+            let offset: i32 = vec_get(enum_tag_offsets, ei);
+            let count: i32 = vec_get(enum_tag_counts, ei);
+            let mut has_ok: bool = false;
+            let mut has_err: bool = false;
+            let mut has_some: bool = false;
+            let mut has_none: bool = false;
+            let mut ok_h: i32 = 0;
+            let mut err_h: i32 = 0;
+            let mut some_h: i32 = 0;
+            let mut none_h: i32 = 0;
+            let mut vi: i32 = 0;
+            while vi < count {
+                let vn_h: i32 = vec_get(enum_tags_flat, offset + vi * 2);
+                let vn_s: string = handle_to_str(vn_h, source, starts, ends);
+                if string_eq(vn_s, "Ok") { has_ok = true; ok_h = vn_h; }
+                if string_eq(vn_s, "Err") { has_err = true; err_h = vn_h; }
+                if string_eq(vn_s, "Some") { has_some = true; some_h = vn_h; }
+                if string_eq(vn_s, "None") { has_none = true; none_h = vn_h; }
+                vi = vi + 1;
+            }
+            if has_ok {
+                if has_err {
+                    vec_push(out_handles, ok_h);
+                    vec_push(out_handles, err_h);
+                    return true;
+                }
+            }
+            if has_some {
+                if has_none {
+                    vec_push(out_handles, some_h);
+                    vec_push(out_handles, none_h);
+                    return true;
+                }
+            }
+            return false;
+        }
+        ei = ei + 1;
+    }
+    return false;
+}
+
+/* ── find_variant_in_items (SML findVariantAst — arena) ────────── */
+/* Given enum name handle and variant name handle, find the
+   variant's flat index (within the enum's variant list) from the
+   item arena.  Returns -1 if enum not found, -2 if variant not
+   found within the enum. */
+
+fn find_variant_in_items(item_tags: Vec<i32>, item_names: Vec<i32>,
+                         item_field_counts: Vec<i32>,
+                         variant_names_flat: Vec<i32>,
+                         enum_name: i32, variant_name: i32) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    let mut vn_offset: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(item_tags, i);
+        let vc: i32 = vec_get(item_field_counts, i);
+        if tag == 2 {
+            if vec_get(item_names, i) == enum_name {
+                let mut vi: i32 = 0;
+                while vi < vc {
+                    if vec_get(variant_names_flat, vn_offset + vi) == variant_name {
+                        return vi;
+                    }
+                    vi = vi + 1;
+                }
+                return 0 - 2;
+            }
+            vn_offset = vn_offset + vc;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
 }
 
 /* ── literal lowering classification ────────────────────────── */
@@ -1705,6 +1801,73 @@ fn test_expr_init_cty() -> i32 {
     return 0;
 }
 
+fn test_try_variant_lookup() -> i32 {
+    let src: string = "Ok Err Some None Other";
+    let st: Vec<i32> = vec_new();
+    let nd: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(nd, 2);
+    vec_push(st, 3); vec_push(nd, 6);
+    vec_push(st, 7); vec_push(nd, 11);
+    vec_push(st, 12); vec_push(nd, 16);
+    vec_push(st, 17); vec_push(nd, 22);
+    let en: Vec<i32> = vec_new();
+    let eto: Vec<i32> = vec_new();
+    let etc: Vec<i32> = vec_new();
+    let etf: Vec<i32> = vec_new();
+    let emp: Vec<i32> = vec_new();
+    vec_push(en, 100);
+    vec_push(eto, 0);
+    vec_push(etc, 2);
+    vec_push(emp, 1);
+    vec_push(etf, 0); vec_push(etf, 0);
+    vec_push(etf, 1); vec_push(etf, 1);
+    let out1: Vec<i32> = vec_new();
+    if try_variant_names_lookup(en, eto, etc, etf, src, st, nd, 100, out1) != true { return 1; }
+    if vec_len(out1) != 2 { return 2; }
+    if vec_get(out1, 0) != 0 { return 3; }
+    if vec_get(out1, 1) != 1 { return 4; }
+    let en2: Vec<i32> = vec_new();
+    let eto2: Vec<i32> = vec_new();
+    let etc2: Vec<i32> = vec_new();
+    let etf2: Vec<i32> = vec_new();
+    vec_push(en2, 200);
+    vec_push(eto2, 0);
+    vec_push(etc2, 2);
+    vec_push(etf2, 2); vec_push(etf2, 0);
+    vec_push(etf2, 3); vec_push(etf2, 1);
+    let out2: Vec<i32> = vec_new();
+    if try_variant_names_lookup(en2, eto2, etc2, etf2, src, st, nd, 200, out2) != true { return 5; }
+    if vec_get(out2, 0) != 2 { return 6; }
+    if vec_get(out2, 1) != 3 { return 7; }
+    let en3: Vec<i32> = vec_new();
+    let eto3: Vec<i32> = vec_new();
+    let etc3: Vec<i32> = vec_new();
+    let etf3: Vec<i32> = vec_new();
+    vec_push(en3, 300);
+    vec_push(eto3, 0);
+    vec_push(etc3, 2);
+    vec_push(etf3, 0); vec_push(etf3, 0);
+    vec_push(etf3, 4); vec_push(etf3, 1);
+    let out3: Vec<i32> = vec_new();
+    if try_variant_names_lookup(en3, eto3, etc3, etf3, src, st, nd, 300, out3) != false { return 8; }
+    return 0;
+}
+
+fn test_find_variant_in_items() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let nms: Vec<i32> = vec_new();
+    let fcs: Vec<i32> = vec_new();
+    let vnf: Vec<i32> = vec_new();
+    vec_push(tags, 1); vec_push(nms, 10); vec_push(fcs, 2);
+    vec_push(tags, 2); vec_push(nms, 20); vec_push(fcs, 3);
+    vec_push(vnf, 30); vec_push(vnf, 31); vec_push(vnf, 32);
+    if find_variant_in_items(tags, nms, fcs, vnf, 20, 30) != 0 { return 1; }
+    if find_variant_in_items(tags, nms, fcs, vnf, 20, 32) != 2 { return 2; }
+    if find_variant_in_items(tags, nms, fcs, vnf, 20, 99) != 0 - 2 { return 3; }
+    if find_variant_in_items(tags, nms, fcs, vnf, 99, 30) != 0 - 1 { return 4; }
+    return 0;
+}
+
 fn test_scan_lets() -> i32 {
     let et: Vec<i32> = vec_new();
     let ed1: Vec<i32> = vec_new();
@@ -1829,5 +1992,9 @@ fn main() -> i32 {
     if r39 != 0 { return 410 + r39; }
     let r40: i32 = test_scan_lets();
     if r40 != 0 { return 420 + r40; }
+    let r41: i32 = test_try_variant_lookup();
+    if r41 != 0 { return 430 + r41; }
+    let r42: i32 = test_find_variant_in_items();
+    if r42 != 0 { return 440 + r42; }
     return 0;
 }
