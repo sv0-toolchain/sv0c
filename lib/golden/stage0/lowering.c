@@ -34,13 +34,7 @@ static int uniq_old_names(int names);
 static int ret_syntax_is_unit(int has_ret, const char* ret_ty_name);
 static int use_ret_slot(int is_unit, int ens_mentions_result);
 static int lower_lit_supported(int lit_tag);
-static int SV_SKIP(void);
-static int SV_STORE(void);
-static int SV_LOAD(void);
 static int store_value_class(int is_var, int var_name_eq_slot);
-static int LOW_AL_VAR(void);
-static int LOW_AL_FIELD(void);
-static int LOW_AL_INVALID(void);
 static int low_classify_assign_lhs(int expr_tag);
 static int enum_tag_lookup(int enum_names, int enum_tags_flat, int enum_tag_offsets, int enum_tag_counts, int enum_name, int variant_name);
 static int struct_fields_lookup(int struct_names, int struct_field_offsets, int struct_field_counts, int struct_fields_flat, int name);
@@ -52,16 +46,9 @@ static int enum_max_payload_lookup(int enum_names, int enum_max_payloads, int na
 static const char* try_variant_success(int has_ok, int has_some);
 static const char* try_variant_failure(int has_err, int has_none);
 static int is_try_enum(int has_ok, int has_err, int has_some, int has_none);
-static int LIT_INT(void);
-static int LIT_BOOL(void);
-static int LIT_UNIT(void);
-static int LIT_STRING(void);
-static int LIT_UNSUPPORTED(void);
 static int classify_literal(int lit_tag);
 static int lower_lit_to_ir_tag(int lit_tag);
 static const char* fn_ret_cty(int has_ret, const char* ret_cty);
-static int VAL_VAR(void);
-static int VAL_OTHER(void);
 static int value_to_expr_kind(int val_tag);
 static int payload_field_name(int index);
 static int enum_store_payload_count(int val_count);
@@ -71,6 +58,12 @@ static int find_fn_index(int fn_names, int name_h);
 static int callee_fn_index(int fn_names, int aliases, int name_h);
 static int scrut_local_lookup(int scrut_names, int name_h);
 static int param_ty_lookup(int param_names, int name_h);
+static const char* handle_to_str(int h, const char* source, int starts, int ends);
+static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, int fcount, const char* source, int starts, int ends, int sn, int en);
+static const char* emit_enum_td(int name_h, int max_payload, const char* source, int starts, int ends);
+static int build_struct_order(int item_tags, int item_names, int item_field_counts, int struct_fnames_flat, int out_names, int out_offsets, int out_counts, int out_flat);
+static int build_enum_variants_data(int item_tags, int item_names, int item_field_counts, int item_vmax, int enum_vnames_flat, int out_names, int out_tag_offsets, int out_tag_counts, int out_tags_flat, int out_max_payloads);
+static const char* collect_typedefs_str(int item_tags, int item_names, int item_field_counts, int item_vmax, int sf_names, int sf_types, const char* source, int starts, int ends, int sn, int en);
 static int test_fresh_tmp(void);
 static int test_split_qname(void);
 static int test_binop_to_c(void);
@@ -106,6 +99,7 @@ static int test_find_fn_index(void);
 static int test_callee_fn_index(void);
 static int test_scrut_local(void);
 static int test_param_ty(void);
+static int test_typedef_builders(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -689,18 +683,6 @@ static int lower_lit_supported(int lit_tag) {
   return _sv0t1;
 }
 
-static int SV_SKIP(void) {
-  return 0;
-}
-
-static int SV_STORE(void) {
-  return 1;
-}
-
-static int SV_LOAD(void) {
-  return 2;
-}
-
 static int store_value_class(int is_var, int var_name_eq_slot) {
   if (is_var) {
     if (var_name_eq_slot) {
@@ -711,19 +693,6 @@ static int store_value_class(int is_var, int var_name_eq_slot) {
   } else {
   }
   return 1;
-}
-
-static int LOW_AL_VAR(void) {
-  return 0;
-}
-
-static int LOW_AL_FIELD(void) {
-  return 1;
-}
-
-static int LOW_AL_INVALID(void) {
-  int _sv0t0 = (0 - 1);
-  return _sv0t0;
 }
 
 static int low_classify_assign_lhs(int expr_tag) {
@@ -903,27 +872,6 @@ static int is_try_enum(int has_ok, int has_err, int has_some, int has_none) {
   return 0;
 }
 
-static int LIT_INT(void) {
-  return 0;
-}
-
-static int LIT_BOOL(void) {
-  return 1;
-}
-
-static int LIT_UNIT(void) {
-  return 2;
-}
-
-static int LIT_STRING(void) {
-  return 3;
-}
-
-static int LIT_UNSUPPORTED(void) {
-  int _sv0t0 = (0 - 1);
-  return _sv0t0;
-}
-
 static int classify_literal(int lit_tag) {
   if ((lit_tag == 0)) {
     return 0;
@@ -972,14 +920,6 @@ static const char* fn_ret_cty(int has_ret, const char* ret_cty) {
   } else {
   }
   return "int";
-}
-
-static int VAL_VAR(void) {
-  return 0;
-}
-
-static int VAL_OTHER(void) {
-  return 1;
 }
 
 static int value_to_expr_kind(int val_tag) {
@@ -1060,6 +1000,194 @@ static int param_ty_lookup(int param_names, int name_h) {
   }
   int _sv0t2 = (0 - 1);
   return _sv0t2;
+}
+
+static const char* handle_to_str(int h, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_get(starts, h);
+  int s = _sv0t0;
+  int _sv0t1 = sv0_vec_get(ends, h);
+  int e = _sv0t1;
+  int _sv0t2 = (e - s);
+  const char* _sv0t3 = sv0_string_substr(source, s, _sv0t2);
+  return _sv0t3;
+}
+
+static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, int fcount, const char* source, int starts, int ends, int sn, int en) {
+  const char* _sv0t0 = handle_to_str(name_h, source, starts, ends);
+  const char* name;
+  name = _sv0t0;
+  const char* r;
+  r = "typedef struct {\n";
+  int i = 0;
+  while ((i < fcount)) {
+    int _sv0t1 = (foff + i);
+    int _sv0t2 = sv0_vec_get(ftypes, _sv0t1);
+    int th = _sv0t2;
+    const char* _sv0t3 = handle_to_str(th, source, starts, ends);
+    const char* tname;
+    tname = _sv0t3;
+    const char* _sv0t4 = ast_ty_to_c_string_with_user(tname, th, sn, en);
+    const char* cty;
+    cty = _sv0t4;
+    int _sv0t5 = (foff + i);
+    int _sv0t6 = sv0_vec_get(fnames, _sv0t5);
+    const char* _sv0t7 = handle_to_str(_sv0t6, source, starts, ends);
+    const char* fname;
+    fname = _sv0t7;
+    const char* _sv0t8 = sv0_string_concat(r, "  ");
+    r = _sv0t8;
+    const char* _sv0t9 = sv0_string_concat(r, cty);
+    r = _sv0t9;
+    const char* _sv0t10 = sv0_string_concat(r, " ");
+    r = _sv0t10;
+    const char* _sv0t11 = sv0_string_concat(r, fname);
+    r = _sv0t11;
+    const char* _sv0t12 = sv0_string_concat(r, ";\n");
+    r = _sv0t12;
+    i = (i + 1);
+  }
+  const char* _sv0t13 = sv0_string_concat(r, "} ");
+  r = _sv0t13;
+  const char* _sv0t14 = sv0_string_concat(r, name);
+  r = _sv0t14;
+  const char* _sv0t15 = sv0_string_concat(r, ";\n");
+  r = _sv0t15;
+  return r;
+}
+
+static const char* emit_enum_td(int name_h, int max_payload, const char* source, int starts, int ends) {
+  const char* _sv0t0 = handle_to_str(name_h, source, starts, ends);
+  const char* name;
+  name = _sv0t0;
+  const char* r;
+  r = "typedef struct {\n  int tag;\n";
+  int i = 0;
+  while ((i < max_payload)) {
+    const char* _sv0t1 = sv0_string_concat(r, "  int p");
+    r = _sv0t1;
+    const char* _sv0t2 = lower_int_to_str(i);
+    const char* _sv0t3 = sv0_string_concat(r, _sv0t2);
+    r = _sv0t3;
+    const char* _sv0t4 = sv0_string_concat(r, ";\n");
+    r = _sv0t4;
+    i = (i + 1);
+  }
+  const char* _sv0t5 = sv0_string_concat(r, "} ");
+  r = _sv0t5;
+  const char* _sv0t6 = sv0_string_concat(r, name);
+  r = _sv0t6;
+  const char* _sv0t7 = sv0_string_concat(r, ";\n");
+  r = _sv0t7;
+  return r;
+}
+
+static int build_struct_order(int item_tags, int item_names, int item_field_counts, int struct_fnames_flat, int out_names, int out_offsets, int out_counts, int out_flat) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  int i = 0;
+  int sf = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    int tag = _sv0t1;
+    int _sv0t2 = sv0_vec_get(item_field_counts, i);
+    int fc = _sv0t2;
+    if ((tag == 1)) {
+      int _sv0t3 = sv0_vec_get(item_names, i);
+      sv0_vec_push(out_names, _sv0t3);
+      int _sv0t4 = sv0_vec_len(out_flat);
+      sv0_vec_push(out_offsets, _sv0t4);
+      sv0_vec_push(out_counts, fc);
+      int j = 0;
+      while ((j < fc)) {
+        int _sv0t5 = (sf + j);
+        int _sv0t6 = sv0_vec_get(struct_fnames_flat, _sv0t5);
+        sv0_vec_push(out_flat, _sv0t6);
+        j = (j + 1);
+      }
+      sf = (sf + fc);
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t7 = sv0_vec_len(out_names);
+  return _sv0t7;
+}
+
+static int build_enum_variants_data(int item_tags, int item_names, int item_field_counts, int item_vmax, int enum_vnames_flat, int out_names, int out_tag_offsets, int out_tag_counts, int out_tags_flat, int out_max_payloads) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  int i = 0;
+  int ev = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    int tag = _sv0t1;
+    int _sv0t2 = sv0_vec_get(item_field_counts, i);
+    int vc = _sv0t2;
+    if ((tag == 2)) {
+      int _sv0t3 = sv0_vec_get(item_names, i);
+      sv0_vec_push(out_names, _sv0t3);
+      int _sv0t4 = sv0_vec_len(out_tags_flat);
+      sv0_vec_push(out_tag_offsets, _sv0t4);
+      sv0_vec_push(out_tag_counts, vc);
+      int _sv0t5 = sv0_vec_get(item_vmax, i);
+      sv0_vec_push(out_max_payloads, _sv0t5);
+      int j = 0;
+      while ((j < vc)) {
+        int _sv0t6 = (ev + j);
+        int _sv0t7 = sv0_vec_get(enum_vnames_flat, _sv0t6);
+        sv0_vec_push(out_tags_flat, _sv0t7);
+        sv0_vec_push(out_tags_flat, j);
+        j = (j + 1);
+      }
+      ev = (ev + vc);
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t8 = sv0_vec_len(out_names);
+  return _sv0t8;
+}
+
+static const char* collect_typedefs_str(int item_tags, int item_names, int item_field_counts, int item_vmax, int sf_names, int sf_types, const char* source, int starts, int ends, int sn, int en) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  const char* r;
+  r = "";
+  int i = 0;
+  int sf = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    int tag = _sv0t1;
+    int _sv0t2 = sv0_vec_get(item_field_counts, i);
+    int fc = _sv0t2;
+    if ((tag == 1)) {
+      int _sv0t3 = sv0_vec_get(item_names, i);
+      const char* _sv0t4 = emit_struct_td(_sv0t3, sf_names, sf_types, sf, fc, source, starts, ends, sn, en);
+      const char* td;
+      td = _sv0t4;
+      const char* _sv0t5 = sv0_string_concat(r, td);
+      r = _sv0t5;
+      sf = (sf + fc);
+    } else {
+    }
+    i = (i + 1);
+  }
+  i = 0;
+  while ((i < n)) {
+    int _sv0t6 = sv0_vec_get(item_tags, i);
+    if ((_sv0t6 == 2)) {
+      int _sv0t7 = sv0_vec_get(item_names, i);
+      int _sv0t8 = sv0_vec_get(item_vmax, i);
+      const char* _sv0t9 = emit_enum_td(_sv0t7, _sv0t8, source, starts, ends);
+      const char* td2;
+      td2 = _sv0t9;
+      const char* _sv0t10 = sv0_string_concat(r, td2);
+      r = _sv0t10;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return r;
 }
 
 static int test_fresh_tmp(void) {
@@ -2170,6 +2298,124 @@ static int test_param_ty(void) {
   return 0;
 }
 
+static int test_typedef_builders(void) {
+  const char* src;
+  src = "P x i32 y bool E";
+  int _sv0t0 = sv0_vec_new();
+  int st = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int nd = _sv0t1;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(nd, 1);
+  sv0_vec_push(st, 2);
+  sv0_vec_push(nd, 3);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(nd, 7);
+  sv0_vec_push(st, 8);
+  sv0_vec_push(nd, 9);
+  sv0_vec_push(st, 10);
+  sv0_vec_push(nd, 14);
+  sv0_vec_push(st, 15);
+  sv0_vec_push(nd, 16);
+  const char* _sv0t2 = handle_to_str(0, src, st, nd);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "P");
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_new();
+  int sn = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int en = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int fv = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int tv = _sv0t7;
+  sv0_vec_push(fv, 1);
+  sv0_vec_push(fv, 3);
+  sv0_vec_push(tv, 2);
+  sv0_vec_push(tv, 4);
+  const char* _sv0t8 = emit_struct_td(0, fv, tv, 0, 2, src, st, nd, sn, en);
+  const char* td;
+  td = _sv0t8;
+  int _sv0t9 = sv0_string_eq(td, "typedef struct {\n  int x;\n  int y;\n} P;\n");
+  if ((_sv0t9 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t10 = emit_enum_td(5, 1, src, st, nd);
+  const char* td2;
+  td2 = _sv0t10;
+  int _sv0t11 = sv0_string_eq(td2, "typedef struct {\n  int tag;\n  int p0;\n} E;\n");
+  if ((_sv0t11 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int tags = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int nms = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int fcs = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int vmx = _sv0t15;
+  sv0_vec_push(tags, 1);
+  sv0_vec_push(nms, 0);
+  sv0_vec_push(fcs, 2);
+  sv0_vec_push(vmx, 0);
+  sv0_vec_push(tags, 2);
+  sv0_vec_push(nms, 5);
+  sv0_vec_push(fcs, 2);
+  sv0_vec_push(vmx, 1);
+  int _sv0t16 = sv0_vec_new();
+  int sff = _sv0t16;
+  sv0_vec_push(sff, 1);
+  sv0_vec_push(sff, 3);
+  int _sv0t17 = sv0_vec_new();
+  int on = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int oo = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int oc = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int of1 = _sv0t20;
+  int _sv0t21 = build_struct_order(tags, nms, fcs, sff, on, oo, oc, of1);
+  if ((_sv0t21 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t22 = sv0_vec_get(oc, 0);
+  if ((_sv0t22 != 2)) {
+    return 5;
+  } else {
+  }
+  int _sv0t23 = sv0_vec_new();
+  int evn = _sv0t23;
+  sv0_vec_push(evn, 10);
+  sv0_vec_push(evn, 20);
+  int _sv0t24 = sv0_vec_new();
+  int en2 = _sv0t24;
+  int _sv0t25 = sv0_vec_new();
+  int eto = _sv0t25;
+  int _sv0t26 = sv0_vec_new();
+  int etc = _sv0t26;
+  int _sv0t27 = sv0_vec_new();
+  int etf = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int emp = _sv0t28;
+  int _sv0t29 = build_enum_variants_data(tags, nms, fcs, vmx, evn, en2, eto, etc, etf, emp);
+  if ((_sv0t29 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t30 = sv0_vec_get(emp, 0);
+  if ((_sv0t30 != 1)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -2413,6 +2659,13 @@ int main(void) {
   if ((r35 != 0)) {
     int _sv0t68 = (370 + r35);
     return _sv0t68;
+  } else {
+  }
+  int _sv0t69 = test_typedef_builders();
+  int r36 = _sv0t69;
+  if ((r36 != 0)) {
+    int _sv0t70 = (380 + r36);
+    return _sv0t70;
   } else {
   }
   return 0;
