@@ -33,6 +33,10 @@
    addTyImportAlias/clearTyImportAliases — scoped push with
    logical-length restore), ctor_ty_tag (SML ctorTy — returns
    TY_FN for parameterised variants, TY_ENUM for nullary).
+   try_success_validate (SML trySuccessPayloadTy — validates enum
+   is a valid ? target: Result(Ok/Err) or Option(Some/None) with
+   single-field tuple success variant; returns 1=Result, 2=Option,
+   0=not valid, -1=shape mismatch).
    type_param_push/type_param_restore/type_param_lookup (SML
    withTypeParams decomposed — push/pop generic type param bindings
    into a stride-2 Vec<i32> of (name_handle, ty_tag) pairs).
@@ -976,6 +980,73 @@ fn ctor_ty_tag(shape: i32, param_count: i32) -> i32 {
     return TY_ENUM();
 }
 
+/* ── try_success_validate (SML trySuccessPayloadTy) ─────────
+   Validate that an enum is a valid `?` target (Result or Option).
+   Scans variant_tags/variant_enum_ids for Ok/Err or Some/None
+   variants (using string comparison via source/starts/ends),
+   then checks the success variant (Ok or Some) has VSTuple
+   shape with exactly 1 field.
+   Returns:
+     1 = valid Result (has Ok(T)/Err(E))
+     2 = valid Option (has Some(T)/None)
+     0 = not a Result/Option enum
+    -1 = has Ok/Err or Some/None but success variant shape invalid
+   The success variant's flat index is pushed to out_idx. */
+
+fn try_success_validate(variant_tags: Vec<i32>,
+                        variant_enum_ids: Vec<i32>,
+                        variant_shapes: Vec<i32>,
+                        variant_field_counts: Vec<i32>,
+                        enum_name: i32,
+                        source: string, starts: Vec<i32>,
+                        ends: Vec<i32>,
+                        out_idx: Vec<i32>) -> i32 {
+    let nv: i32 = vec_len(variant_tags);
+    let mut has_ok: bool = false;
+    let mut has_err: bool = false;
+    let mut has_some: bool = false;
+    let mut has_none: bool = false;
+    let mut ok_idx: i32 = 0 - 1;
+    let mut some_idx: i32 = 0 - 1;
+    let mut j: i32 = 0;
+    while j < nv {
+        if vec_get(variant_enum_ids, j) == enum_name {
+            let vh: i32 = vec_get(variant_tags, j);
+            let vs: i32 = vec_get(starts, vh);
+            let ve: i32 = vec_get(ends, vh);
+            let vn: string = string_substr(source, vs, ve - vs);
+            if string_eq(vn, "Ok") { has_ok = true; ok_idx = j; }
+            if string_eq(vn, "Err") { has_err = true; }
+            if string_eq(vn, "Some") { has_some = true; some_idx = j; }
+            if string_eq(vn, "None") { has_none = true; }
+        }
+        j = j + 1;
+    }
+    if has_ok {
+        if has_err {
+            let sh: i32 = vec_get(variant_shapes, ok_idx);
+            let fc: i32 = vec_get(variant_field_counts, ok_idx);
+            if try_success_shape_valid(sh, fc) {
+                vec_push(out_idx, ok_idx);
+                return 1;
+            }
+            return 0 - 1;
+        }
+    }
+    if has_some {
+        if has_none {
+            let sh2: i32 = vec_get(variant_shapes, some_idx);
+            let fc2: i32 = vec_get(variant_field_counts, some_idx);
+            if try_success_shape_valid(sh2, fc2) {
+                vec_push(out_idx, some_idx);
+                return 2;
+            }
+            return 0 - 1;
+        }
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -1508,6 +1579,69 @@ fn test_ctor_ty_tag() -> i32 {
     return 0;
 }
 
+fn test_try_success_validate() -> i32 {
+    let vt: Vec<i32> = vec_new();
+    let vei: Vec<i32> = vec_new();
+    let vs: Vec<i32> = vec_new();
+    let vfc: Vec<i32> = vec_new();
+    let src: string = "OkErrSomeNoneFoo";
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0);
+    vec_push(en, 2);
+    vec_push(st, 2);
+    vec_push(en, 5);
+    vec_push(st, 5);
+    vec_push(en, 9);
+    vec_push(st, 9);
+    vec_push(en, 13);
+    vec_push(st, 13);
+    vec_push(en, 16);
+    vec_push(vt, 0);
+    vec_push(vei, 100);
+    vec_push(vs, 1);
+    vec_push(vfc, 1);
+    vec_push(vt, 1);
+    vec_push(vei, 100);
+    vec_push(vs, 1);
+    vec_push(vfc, 1);
+    let oi1: Vec<i32> = vec_new();
+    let r1: i32 = try_success_validate(vt, vei, vs, vfc, 100,
+                      src, st, en, oi1);
+    if r1 != 1 { return 1; }
+    if vec_len(oi1) != 1 { return 2; }
+    if vec_get(oi1, 0) != 0 { return 3; }
+    let vt2: Vec<i32> = vec_new();
+    let vei2: Vec<i32> = vec_new();
+    let vs2: Vec<i32> = vec_new();
+    let vfc2: Vec<i32> = vec_new();
+    vec_push(vt2, 2);
+    vec_push(vei2, 200);
+    vec_push(vs2, 1);
+    vec_push(vfc2, 1);
+    vec_push(vt2, 3);
+    vec_push(vei2, 200);
+    vec_push(vs2, 0);
+    vec_push(vfc2, 0);
+    let oi2: Vec<i32> = vec_new();
+    let r2: i32 = try_success_validate(vt2, vei2, vs2, vfc2, 200,
+                      src, st, en, oi2);
+    if r2 != 2 { return 4; }
+    let vt3: Vec<i32> = vec_new();
+    let vei3: Vec<i32> = vec_new();
+    let vs3: Vec<i32> = vec_new();
+    let vfc3: Vec<i32> = vec_new();
+    vec_push(vt3, 4);
+    vec_push(vei3, 300);
+    vec_push(vs3, 0);
+    vec_push(vfc3, 0);
+    let oi3: Vec<i32> = vec_new();
+    let r3: i32 = try_success_validate(vt3, vei3, vs3, vfc3, 300,
+                      src, st, en, oi3);
+    if r3 != 0 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -1583,5 +1717,7 @@ fn main() -> i32 {
     if r36 != 0 { return 380 + r36; }
     let r37: i32 = test_ctor_ty_tag();
     if r37 != 0 { return 390 + r37; }
+    let r38: i32 = test_try_success_validate();
+    if r38 != 0 { return 400 + r38; }
     return 0;
 }
