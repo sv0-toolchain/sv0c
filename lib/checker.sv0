@@ -52,6 +52,10 @@
    resolve_field_ty_tag (SML resolveFieldTy simplified — maps parser
    type arena node to types.sv0 Ty tag using struct/enum name tables
    and type param scope; initTypes building block).
+   Batch 42: env_entry_index (SML envEntry index-returning lookup),
+   function type table (fn_table_add/lookup/ret_type/param_count/
+   param_type — parallel Vecs for function signatures needed by
+   modEnvFromProg and synth ExprCall).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -369,6 +373,80 @@ fn env_extend(env_names: Vec<i32>, env_types: Vec<i32>, env_muts: Vec<i32>,
 fn env_is_mut(env_muts: Vec<i32>, idx: i32) -> bool {
     if idx < 0 { return false; }
     return vec_get(env_muts, idx) != 0;
+}
+
+/* ── env_entry_index (SML envEntry — index-returning lookup) ─
+   Returns the Vec index for a name in the env, or -1 if not
+   found.  Callers can then retrieve both type and mut. */
+
+fn env_entry_index(env_names: Vec<i32>, name: i32) -> i32 {
+    let n: i32 = vec_len(env_names);
+    let mut i: i32 = n - 1;
+    while i >= 0 {
+        if vec_get(env_names, i) == name {
+            return i;
+        }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+/* ── function type table (modEnvFromProg / synth support) ────
+   Separate from the general env.  Stores function signatures
+   for user-defined and built-in functions:
+     fn_names      — name handles (parallel)
+     fn_param_counts — param count per function (parallel)
+     fn_ret_types  — return type tag per function (parallel)
+     fn_param_types_flat — flat array of param type tags
+     fn_param_offsets — start offset in fn_param_types_flat
+                                                             */
+
+fn fn_table_add(fn_names: Vec<i32>, fn_param_counts: Vec<i32>,
+                fn_ret_types: Vec<i32>, fn_param_offsets: Vec<i32>,
+                fn_param_types_flat: Vec<i32>,
+                name: i32, ret_ty: i32,
+                param_tags: Vec<i32>, param_count: i32) -> i32 {
+    let offset: i32 = vec_len(fn_param_types_flat);
+    vec_push(fn_names, name);
+    vec_push(fn_param_counts, param_count);
+    vec_push(fn_ret_types, ret_ty);
+    vec_push(fn_param_offsets, offset);
+    let mut j: i32 = 0;
+    while j < param_count {
+        vec_push(fn_param_types_flat, vec_get(param_tags, j));
+        j = j + 1;
+    }
+    return vec_len(fn_names) - 1;
+}
+
+fn fn_table_lookup(fn_names: Vec<i32>, name: i32) -> i32 {
+    let n: i32 = vec_len(fn_names);
+    let mut i: i32 = n - 1;
+    while i >= 0 {
+        if vec_get(fn_names, i) == name {
+            return i;
+        }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+fn fn_table_ret_type(fn_ret_types: Vec<i32>, idx: i32) -> i32 {
+    if idx < 0 { return TY_UNKNOWN(); }
+    return vec_get(fn_ret_types, idx);
+}
+
+fn fn_table_param_count(fn_param_counts: Vec<i32>, idx: i32) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    return vec_get(fn_param_counts, idx);
+}
+
+fn fn_table_param_type(fn_param_offsets: Vec<i32>,
+                       fn_param_types_flat: Vec<i32>,
+                       fn_idx: i32, param_idx: i32) -> i32 {
+    if fn_idx < 0 { return TY_UNKNOWN(); }
+    let off: i32 = vec_get(fn_param_offsets, fn_idx);
+    return vec_get(fn_param_types_flat, off + param_idx);
 }
 
 /* ── variant shape classification ───────────────────────────── */
@@ -1849,6 +1927,55 @@ fn test_enum_ctor_count() -> i32 {
     return 0;
 }
 
+fn test_env_entry_index() -> i32 {
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 10);
+    vec_push(names, 20);
+    vec_push(names, 30);
+    if env_entry_index(names, 10) != 0 { return 1; }
+    if env_entry_index(names, 20) != 1 { return 2; }
+    if env_entry_index(names, 30) != 2 { return 3; }
+    if env_entry_index(names, 99) != 0 - 1 { return 4; }
+    vec_push(names, 10);
+    if env_entry_index(names, 10) != 3 { return 5; }
+    return 0;
+}
+
+fn test_fn_table() -> i32 {
+    let fnames: Vec<i32> = vec_new();
+    let fpcs: Vec<i32> = vec_new();
+    let frets: Vec<i32> = vec_new();
+    let foffs: Vec<i32> = vec_new();
+    let fptf: Vec<i32> = vec_new();
+    let params1: Vec<i32> = vec_new();
+    vec_push(params1, TY_STRING());
+    let x1: i32 = fn_table_add(fnames, fpcs, frets, foffs, fptf,
+                     100, TY_UNIT(), params1, 1);
+    if x1 != 0 { return 1; }
+    if fn_table_lookup(fnames, 100) != 0 { return 2; }
+    if fn_table_ret_type(frets, 0) != TY_UNIT() { return 3; }
+    if fn_table_param_count(fpcs, 0) != 1 { return 4; }
+    if fn_table_param_type(foffs, fptf, 0, 0) != TY_STRING() { return 5; }
+    let params2: Vec<i32> = vec_new();
+    vec_push(params2, TY_INT());
+    vec_push(params2, TY_INT());
+    let x2: i32 = fn_table_add(fnames, fpcs, frets, foffs, fptf,
+                     200, TY_BOOL(), params2, 2);
+    if x2 != 1 { return 6; }
+    if fn_table_param_count(fpcs, 1) != 2 { return 7; }
+    if fn_table_param_type(foffs, fptf, 1, 0) != TY_INT() { return 8; }
+    if fn_table_param_type(foffs, fptf, 1, 1) != TY_INT() { return 9; }
+    if fn_table_ret_type(frets, 1) != TY_BOOL() { return 10; }
+    if fn_table_lookup(fnames, 999) != 0 - 1 { return 11; }
+    if fn_table_ret_type(frets, 0 - 1) != TY_UNKNOWN() { return 12; }
+    let params0: Vec<i32> = vec_new();
+    let x3: i32 = fn_table_add(fnames, fpcs, frets, foffs, fptf,
+                     300, TY_INT(), params0, 0);
+    if fn_table_param_count(fpcs, x3) != 0 { return 13; }
+    if fn_table_ret_type(frets, x3) != TY_INT() { return 14; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -1934,5 +2061,9 @@ fn main() -> i32 {
     if r41 != 0 { return 430 + r41; }
     let r42: i32 = test_binop_unop_result_ty();
     if r42 != 0 { return 440 + r42; }
+    let r43: i32 = test_env_entry_index();
+    if r43 != 0 { return 450 + r43; }
+    let r44: i32 = test_fn_table();
+    if r44 != 0 { return 460 + r44; }
     return 0;
 }
