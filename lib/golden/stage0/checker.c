@@ -59,6 +59,12 @@ static int canon_ty_import(int names, int targets, int name);
 static int env_lookup(int env_names, int env_types, int name);
 static int env_extend(int env_names, int env_types, int env_muts, int name, int ty, int is_mut);
 static int env_is_mut(int env_muts, int idx);
+static int env_entry_index(int env_names, int name);
+static int fn_table_add(int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int name, int ret_ty, int param_tags, int param_count);
+static int fn_table_lookup(int fn_names, int name);
+static int fn_table_ret_type(int fn_ret_types, int idx);
+static int fn_table_param_count(int fn_param_counts, int idx);
+static int fn_table_param_type(int fn_param_offsets, int fn_param_types_flat, int fn_idx, int param_idx);
 static int VS_UNIT(void);
 static int VS_TUPLE(void);
 static int VS_STRUCT(void);
@@ -158,6 +164,8 @@ static int test_binop_unop_result_ty(void);
 static int test_int_width_from_name(void);
 static int test_ast_ty_payload(void);
 static int test_enum_ctor_count(void);
+static int test_env_entry_index(void);
+static int test_fn_table(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -886,6 +894,89 @@ static int env_is_mut(int env_muts, int idx) {
   int _sv0t0 = sv0_vec_get(env_muts, idx);
   int _sv0t1 = (_sv0t0 != 0);
   return _sv0t1;
+}
+
+static int env_entry_index(int env_names, int name) {
+  int _sv0t0 = sv0_vec_len(env_names);
+  int n = _sv0t0;
+  int i = (n - 1);
+  while ((i >= 0)) {
+    int _sv0t1 = sv0_vec_get(env_names, i);
+    if ((_sv0t1 == name)) {
+      return i;
+    } else {
+    }
+    i = (i - 1);
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
+}
+
+static int fn_table_add(int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int name, int ret_ty, int param_tags, int param_count) {
+  int _sv0t0 = sv0_vec_len(fn_param_types_flat);
+  int offset = _sv0t0;
+  sv0_vec_push(fn_names, name);
+  sv0_vec_push(fn_param_counts, param_count);
+  sv0_vec_push(fn_ret_types, ret_ty);
+  sv0_vec_push(fn_param_offsets, offset);
+  int j = 0;
+  while ((j < param_count)) {
+    int _sv0t1 = sv0_vec_get(param_tags, j);
+    sv0_vec_push(fn_param_types_flat, _sv0t1);
+    j = (j + 1);
+  }
+  int _sv0t2 = sv0_vec_len(fn_names);
+  int _sv0t3 = (_sv0t2 - 1);
+  return _sv0t3;
+}
+
+static int fn_table_lookup(int fn_names, int name) {
+  int _sv0t0 = sv0_vec_len(fn_names);
+  int n = _sv0t0;
+  int i = (n - 1);
+  while ((i >= 0)) {
+    int _sv0t1 = sv0_vec_get(fn_names, i);
+    if ((_sv0t1 == name)) {
+      return i;
+    } else {
+    }
+    i = (i - 1);
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
+}
+
+static int fn_table_ret_type(int fn_ret_types, int idx) {
+  if ((idx < 0)) {
+    int _sv0t0 = TY_UNKNOWN();
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(fn_ret_types, idx);
+  return _sv0t1;
+}
+
+static int fn_table_param_count(int fn_param_counts, int idx) {
+  if ((idx < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(fn_param_counts, idx);
+  return _sv0t1;
+}
+
+static int fn_table_param_type(int fn_param_offsets, int fn_param_types_flat, int fn_idx, int param_idx) {
+  if ((fn_idx < 0)) {
+    int _sv0t0 = TY_UNKNOWN();
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(fn_param_offsets, fn_idx);
+  int off = _sv0t1;
+  int _sv0t2 = (off + param_idx);
+  int _sv0t3 = sv0_vec_get(fn_param_types_flat, _sv0t2);
+  return _sv0t3;
 }
 
 static int VS_UNIT(void) {
@@ -3769,6 +3860,154 @@ static int test_enum_ctor_count(void) {
   return 0;
 }
 
+static int test_env_entry_index(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(names, 30);
+  int _sv0t1 = env_entry_index(names, 10);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = env_entry_index(names, 20);
+  if ((_sv0t2 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = env_entry_index(names, 30);
+  if ((_sv0t3 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = env_entry_index(names, 99);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 4;
+  } else {
+  }
+  sv0_vec_push(names, 10);
+  int _sv0t6 = env_entry_index(names, 10);
+  if ((_sv0t6 != 3)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_fn_table(void) {
+  int _sv0t0 = sv0_vec_new();
+  int fnames = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int fpcs = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int frets = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int foffs = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int fptf = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int params1 = _sv0t5;
+  int _sv0t6 = TY_STRING();
+  sv0_vec_push(params1, _sv0t6);
+  int _sv0t7 = TY_UNIT();
+  int _sv0t8 = fn_table_add(fnames, fpcs, frets, foffs, fptf, 100, _sv0t7, params1, 1);
+  int x1 = _sv0t8;
+  if ((x1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = fn_table_lookup(fnames, 100);
+  if ((_sv0t9 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = fn_table_ret_type(frets, 0);
+  int _sv0t11 = TY_UNIT();
+  if ((_sv0t10 != _sv0t11)) {
+    return 3;
+  } else {
+  }
+  int _sv0t12 = fn_table_param_count(fpcs, 0);
+  if ((_sv0t12 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t13 = fn_table_param_type(foffs, fptf, 0, 0);
+  int _sv0t14 = TY_STRING();
+  if ((_sv0t13 != _sv0t14)) {
+    return 5;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_new();
+  int params2 = _sv0t15;
+  int _sv0t16 = TY_INT();
+  sv0_vec_push(params2, _sv0t16);
+  int _sv0t17 = TY_INT();
+  sv0_vec_push(params2, _sv0t17);
+  int _sv0t18 = TY_BOOL();
+  int _sv0t19 = fn_table_add(fnames, fpcs, frets, foffs, fptf, 200, _sv0t18, params2, 2);
+  int x2 = _sv0t19;
+  if ((x2 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t20 = fn_table_param_count(fpcs, 1);
+  if ((_sv0t20 != 2)) {
+    return 7;
+  } else {
+  }
+  int _sv0t21 = fn_table_param_type(foffs, fptf, 1, 0);
+  int _sv0t22 = TY_INT();
+  if ((_sv0t21 != _sv0t22)) {
+    return 8;
+  } else {
+  }
+  int _sv0t23 = fn_table_param_type(foffs, fptf, 1, 1);
+  int _sv0t24 = TY_INT();
+  if ((_sv0t23 != _sv0t24)) {
+    return 9;
+  } else {
+  }
+  int _sv0t25 = fn_table_ret_type(frets, 1);
+  int _sv0t26 = TY_BOOL();
+  if ((_sv0t25 != _sv0t26)) {
+    return 10;
+  } else {
+  }
+  int _sv0t27 = fn_table_lookup(fnames, 999);
+  int _sv0t28 = (0 - 1);
+  if ((_sv0t27 != _sv0t28)) {
+    return 11;
+  } else {
+  }
+  int _sv0t29 = (0 - 1);
+  int _sv0t30 = fn_table_ret_type(frets, _sv0t29);
+  int _sv0t31 = TY_UNKNOWN();
+  if ((_sv0t30 != _sv0t31)) {
+    return 12;
+  } else {
+  }
+  int _sv0t32 = sv0_vec_new();
+  int params0 = _sv0t32;
+  int _sv0t33 = TY_INT();
+  int _sv0t34 = fn_table_add(fnames, fpcs, frets, foffs, fptf, 300, _sv0t33, params0, 0);
+  int x3 = _sv0t34;
+  int _sv0t35 = fn_table_param_count(fpcs, x3);
+  if ((_sv0t35 != 0)) {
+    return 13;
+  } else {
+  }
+  int _sv0t36 = fn_table_ret_type(frets, x3);
+  int _sv0t37 = TY_INT();
+  if ((_sv0t36 != _sv0t37)) {
+    return 14;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -4061,6 +4300,20 @@ int main(void) {
   if ((r42 != 0)) {
     int _sv0t82 = (440 + r42);
     return _sv0t82;
+  } else {
+  }
+  int _sv0t83 = test_env_entry_index();
+  int r43 = _sv0t83;
+  if ((r43 != 0)) {
+    int _sv0t84 = (450 + r43);
+    return _sv0t84;
+  } else {
+  }
+  int _sv0t85 = test_fn_table();
+  int r44 = _sv0t85;
+  if ((r44 != 0)) {
+    int _sv0t86 = (460 + r44);
+    return _sv0t86;
   } else {
   }
   return 0;
