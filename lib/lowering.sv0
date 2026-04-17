@@ -16,6 +16,11 @@
    buildEnumVariants — populate enum variant tag + max payload tables),
    collect_typedefs_str (SML collectTypedefs — concatenate all struct then
    enum typedef strings from item Vecs).
+   AST walk helpers (batch 35): mentions_result (SML mentionsResult —
+   recursive expr arena walk detecting "result" path for ensures clause
+   result-slot injection), all_old_names_expr (SML allOldNames — recursive
+   expr arena walk collecting old(x) token handles for contract pre/post
+   variable setup; includes ExprBlock/stmt dispatch for LetStmt/SemiStmt).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -730,6 +735,323 @@ fn collect_typedefs_str(item_tags: Vec<i32>, item_names: Vec<i32>,
     return r;
 }
 
+/* ── mentions_result (SML mentionsResult — expr arena walk) ─── */
+
+fn mentions_result(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                   ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                   source: string, starts: Vec<i32>,
+                   ends: Vec<i32>, pp: Vec<i32>) -> bool {
+    if idx < 0 { return false; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 0 { return false; }
+    if tag == 1 {
+        let ppc: i32 = vec_get(ed2, idx);
+        if ppc == 1 {
+            let tok: i32 = vec_get(pp, vec_get(ed1, idx));
+            return string_eq(handle_to_str(tok, source, starts, ends), "result");
+        }
+        return false;
+    }
+    if tag == 2 {
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed2, idx), source, starts, ends, pp);
+    }
+    if tag == 3 {
+        if mentions_result(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp) { return true; }
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed3, idx), source, starts, ends, pp);
+    }
+    if tag == 4 {
+        if mentions_result(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp) { return true; }
+        let af: i32 = vec_get(ed2, idx);
+        let ac: i32 = vec_get(ed3, idx);
+        let mut ai: i32 = 0;
+        while ai < ac {
+            if mentions_result(et, ed1, ed2, ed3, ed4,
+                               af + ai, source, starts, ends, pp) { return true; }
+            ai = ai + 1;
+        }
+        return false;
+    }
+    if tag == 6 {
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed1, idx), source, starts, ends, pp);
+    }
+    if tag == 10 {
+        if mentions_result(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp) { return true; }
+        if mentions_result(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp) { return true; }
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed3, idx), source, starts, ends, pp);
+    }
+    if tag == 11 {
+        if mentions_result(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp) { return true; }
+        let amf: i32 = vec_get(ed2, idx);
+        let amc: i32 = vec_get(ed3, idx);
+        let mut ami: i32 = 0;
+        while ami < amc {
+            let aidx: i32 = amf + ami;
+            let grd: i32 = vec_get(ed3, aidx);
+            if grd >= 0 {
+                if mentions_result(et, ed1, ed2, ed3, ed4,
+                                   grd, source, starts, ends, pp) { return true; }
+            }
+            if mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed4, aidx), source, starts, ends, pp) { return true; }
+            ami = ami + 1;
+        }
+        return false;
+    }
+    if tag == 12 {
+        if mentions_result(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp) { return true; }
+        let invf: i32 = vec_get(ed3, idx);
+        let invc: i32 = vec_get(ed4, idx);
+        let mut ii: i32 = 0;
+        while ii < invc {
+            if mentions_result(et, ed1, ed2, ed3, ed4,
+                               invf + ii, source, starts, ends, pp) { return true; }
+            ii = ii + 1;
+        }
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed2, idx), source, starts, ends, pp);
+    }
+    if tag == 13 {
+        if mentions_result(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp) { return true; }
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed3, idx), source, starts, ends, pp);
+    }
+    if tag == 14 {
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed1, idx), source, starts, ends, pp);
+    }
+    if tag == 16 {
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed1, idx), source, starts, ends, pp);
+    }
+    if tag == 20 {
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed1, idx), source, starts, ends, pp);
+    }
+    if tag == 22 {
+        return mentions_result(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed1, idx), source, starts, ends, pp);
+    }
+    if tag == 24 {
+        let sfc: i32 = vec_get(ed3, idx);
+        let mut sfi: i32 = 0;
+        while sfi < sfc {
+            if mentions_result(et, ed1, ed2, ed3, ed4,
+                               idx - sfc + sfi, source, starts, ends, pp) { return true; }
+            sfi = sfi + 1;
+        }
+        return false;
+    }
+    if tag == 25 {
+        let tf: i32 = vec_get(ed1, idx);
+        let tc: i32 = vec_get(ed2, idx);
+        let mut ti: i32 = 0;
+        while ti < tc {
+            if mentions_result(et, ed1, ed2, ed3, ed4,
+                               tf + ti, source, starts, ends, pp) { return true; }
+            ti = ti + 1;
+        }
+        return false;
+    }
+    return false;
+}
+
+/* ── all_old_names_expr (SML allOldNames — collect old(x) handles) */
+
+fn all_old_names_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                      ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                      source: string, starts: Vec<i32>,
+                      ends: Vec<i32>, pp: Vec<i32>,
+                      out: Vec<i32>) -> i32 {
+    if idx < 0 { return 0; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 0 { return 0; }
+    if tag == 1 { return 0; }
+    if tag == 4 {
+        let callee: i32 = vec_get(ed1, idx);
+        let ac: i32 = vec_get(ed3, idx);
+        if ac == 1 {
+            let ct: i32 = vec_get(et, callee);
+            if ct == 1 {
+                let cppc: i32 = vec_get(ed2, callee);
+                if cppc == 1 {
+                    let ctok: i32 = vec_get(pp, vec_get(ed1, callee));
+                    if string_eq(handle_to_str(ctok, source, starts, ends), "old") {
+                        let arg0: i32 = vec_get(ed2, idx);
+                        let at: i32 = vec_get(et, arg0);
+                        if at == 1 {
+                            let appc: i32 = vec_get(ed2, arg0);
+                            if appc == 1 {
+                                let ntok: i32 = vec_get(pp, vec_get(ed1, arg0));
+                                vec_push(out, ntok);
+                                return 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        all_old_names_expr(et, ed1, ed2, ed3, ed4, callee,
+                           source, starts, ends, pp, out);
+        let af: i32 = vec_get(ed2, idx);
+        let mut ai: i32 = 0;
+        while ai < ac {
+            all_old_names_expr(et, ed1, ed2, ed3, ed4, af + ai,
+                               source, starts, ends, pp, out);
+            ai = ai + 1;
+        }
+        return 0;
+    }
+    if tag == 2 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 3 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp, out);
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed3, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 6 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 10 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp, out);
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed3, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 11 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        let amf: i32 = vec_get(ed2, idx);
+        let amc: i32 = vec_get(ed3, idx);
+        let mut ami: i32 = 0;
+        while ami < amc {
+            let aidx: i32 = amf + ami;
+            let grd: i32 = vec_get(ed3, aidx);
+            if grd >= 0 {
+                all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                                   grd, source, starts, ends, pp, out);
+            }
+            all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                               vec_get(ed4, aidx), source, starts, ends, pp, out);
+            ami = ami + 1;
+        }
+        return 0;
+    }
+    if tag == 12 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        let invf: i32 = vec_get(ed3, idx);
+        let invc: i32 = vec_get(ed4, idx);
+        let mut ii: i32 = 0;
+        while ii < invc {
+            all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                               invf + ii, source, starts, ends, pp, out);
+            ii = ii + 1;
+        }
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 13 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp, out);
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed3, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 14 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 20 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 21 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed2, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 22 {
+        all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                           vec_get(ed1, idx), source, starts, ends, pp, out);
+        return 0;
+    }
+    if tag == 24 {
+        let sfc: i32 = vec_get(ed3, idx);
+        let mut sfi: i32 = 0;
+        while sfi < sfc {
+            all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                               idx - sfc + sfi, source, starts, ends, pp, out);
+            sfi = sfi + 1;
+        }
+        return 0;
+    }
+    if tag == 25 {
+        let tf: i32 = vec_get(ed1, idx);
+        let tc: i32 = vec_get(ed2, idx);
+        let mut ti: i32 = 0;
+        while ti < tc {
+            all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                               tf + ti, source, starts, ends, pp, out);
+            ti = ti + 1;
+        }
+        return 0;
+    }
+    if tag == 9 {
+        let sf: i32 = vec_get(ed1, idx);
+        let sc: i32 = vec_get(ed2, idx);
+        let mut si: i32 = 0;
+        while si < sc {
+            let sidx: i32 = sf + si;
+            let stag: i32 = vec_get(et, sidx);
+            if stag == 27 {
+                let ini: i32 = vec_get(ed3, sidx);
+                if ini >= 0 {
+                    all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                                       ini, source, starts, ends, pp, out);
+                }
+            }
+            if stag == 28 {
+                all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                                   vec_get(ed1, sidx), source, starts, ends, pp, out);
+            }
+            si = si + 1;
+        }
+        let tail: i32 = vec_get(ed3, idx);
+        if tail >= 0 {
+            all_old_names_expr(et, ed1, ed2, ed3, ed4,
+                               tail, source, starts, ends, pp, out);
+        }
+        return 0;
+    }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_fresh_tmp() -> i32 {
@@ -1097,6 +1419,93 @@ fn test_param_ty() -> i32 {
     return 0;
 }
 
+fn test_mentions_result() -> i32 {
+    if mentions_result(vec_new(), vec_new(), vec_new(), vec_new(), vec_new(),
+                       0 - 1, "", vec_new(), vec_new(), vec_new()) != false { return 1; }
+    let src: string = "result x old";
+    let st: Vec<i32> = vec_new();
+    let nd: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(nd, 6);
+    vec_push(st, 7); vec_push(nd, 8);
+    vec_push(st, 9); vec_push(nd, 12);
+    let pp: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let d1: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    let d3: Vec<i32> = vec_new();
+    let d4: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    vec_push(et, 1); vec_push(d1, 0); vec_push(d2, 1); vec_push(d3, 0); vec_push(d4, 0);
+    if mentions_result(et, d1, d2, d3, d4, 0, src, st, nd, pp) != true { return 2; }
+    let et2: Vec<i32> = vec_new();
+    let d1b: Vec<i32> = vec_new();
+    let d2b: Vec<i32> = vec_new();
+    let d3b: Vec<i32> = vec_new();
+    let d4b: Vec<i32> = vec_new();
+    let pp2: Vec<i32> = vec_new();
+    vec_push(pp2, 1);
+    vec_push(et2, 1); vec_push(d1b, 0); vec_push(d2b, 1); vec_push(d3b, 0); vec_push(d4b, 0);
+    if mentions_result(et2, d1b, d2b, d3b, d4b, 0, src, st, nd, pp2) != false { return 3; }
+    let et3: Vec<i32> = vec_new();
+    let d1c: Vec<i32> = vec_new();
+    let d2c: Vec<i32> = vec_new();
+    let d3c: Vec<i32> = vec_new();
+    let d4c: Vec<i32> = vec_new();
+    let pp3: Vec<i32> = vec_new();
+    vec_push(pp3, 0);
+    vec_push(pp3, 1);
+    vec_push(et3, 1); vec_push(d1c, 1); vec_push(d2c, 1); vec_push(d3c, 0); vec_push(d4c, 0);
+    vec_push(et3, 1); vec_push(d1c, 0); vec_push(d2c, 1); vec_push(d3c, 0); vec_push(d4c, 0);
+    vec_push(et3, 3); vec_push(d1c, 0); vec_push(d2c, 0); vec_push(d3c, 1); vec_push(d4c, 0);
+    if mentions_result(et3, d1c, d2c, d3c, d4c, 2, src, st, nd, pp3) != true { return 4; }
+    return 0;
+}
+
+fn test_all_old_names() -> i32 {
+    let out0: Vec<i32> = vec_new();
+    all_old_names_expr(vec_new(), vec_new(), vec_new(), vec_new(), vec_new(),
+                       0 - 1, "", vec_new(), vec_new(), vec_new(), out0);
+    if vec_len(out0) != 0 { return 1; }
+    let src: string = "old x y";
+    let st: Vec<i32> = vec_new();
+    let nd: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(nd, 3);
+    vec_push(st, 4); vec_push(nd, 5);
+    vec_push(st, 6); vec_push(nd, 7);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0); vec_push(pp, 1); vec_push(pp, 2);
+    let et: Vec<i32> = vec_new();
+    let d1: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    let d3: Vec<i32> = vec_new();
+    let d4: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(d1, 0); vec_push(d2, 1); vec_push(d3, 0); vec_push(d4, 0);
+    vec_push(et, 1); vec_push(d1, 1); vec_push(d2, 1); vec_push(d3, 0); vec_push(d4, 0);
+    vec_push(et, 4); vec_push(d1, 0); vec_push(d2, 1); vec_push(d3, 1); vec_push(d4, 0);
+    let out: Vec<i32> = vec_new();
+    all_old_names_expr(et, d1, d2, d3, d4, 2, src, st, nd, pp, out);
+    if vec_len(out) != 1 { return 2; }
+    if vec_get(out, 0) != 1 { return 3; }
+    let et2: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+    let e4: Vec<i32> = vec_new();
+    vec_push(et2, 1); vec_push(e1, 0); vec_push(e2, 1); vec_push(e3, 0); vec_push(e4, 0);
+    vec_push(et2, 1); vec_push(e1, 1); vec_push(e2, 1); vec_push(e3, 0); vec_push(e4, 0);
+    vec_push(et2, 4); vec_push(e1, 0); vec_push(e2, 1); vec_push(e3, 1); vec_push(e4, 0);
+    vec_push(et2, 1); vec_push(e1, 2); vec_push(e2, 1); vec_push(e3, 0); vec_push(e4, 0);
+    vec_push(et2, 4); vec_push(e1, 0); vec_push(e2, 3); vec_push(e3, 1); vec_push(e4, 0);
+    vec_push(et2, 3); vec_push(e1, 0); vec_push(e2, 2); vec_push(e3, 4); vec_push(e4, 0);
+    let out3: Vec<i32> = vec_new();
+    all_old_names_expr(et2, e1, e2, e3, e4, 5, src, st, nd, pp, out3);
+    if vec_len(out3) != 2 { return 4; }
+    if vec_get(out3, 0) != 1 { return 5; }
+    if vec_get(out3, 1) != 2 { return 6; }
+    return 0;
+}
+
 fn test_typedef_builders() -> i32 {
     let src: string = "P x i32 y bool E";
     let st: Vec<i32> = vec_new();
@@ -1217,5 +1626,9 @@ fn main() -> i32 {
     if r35 != 0 { return 370 + r35; }
     let r36: i32 = test_typedef_builders();
     if r36 != 0 { return 380 + r36; }
+    let r37: i32 = test_mentions_result();
+    if r37 != 0 { return 390 + r37; }
+    let r38: i32 = test_all_old_names();
+    if r38 != 0 { return 400 + r38; }
     return 0;
 }
