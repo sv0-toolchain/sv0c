@@ -103,6 +103,13 @@ static int expr_references_result(int et, int ed1, int ed2, int ed3, int ed4, in
 static int type_param_push(int type_params, int new_names, int new_tags);
 static int type_param_lookup(int type_params, int limit, int name);
 static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int idx);
+static int contract_expr_new(void);
+static int contract_expr_enter(int flag);
+static int contract_expr_exit(int flag, int saved);
+static int contract_expr_active(int flag);
+static int ty_import_alias_push(int aliases, int from_h, int to_h);
+static int alias_lookup_bounded(int names, int targets, int limit, int name);
+static int ctor_ty_tag(int shape, int param_count);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -137,6 +144,9 @@ static int test_expr_references_result(void);
 static int test_ast_ty_types_tag(void);
 static int test_type_params(void);
 static int test_resolve_field_ty(void);
+static int test_contract_expr_flag(void);
+static int test_ty_import_alias_push(void);
+static int test_ctor_ty_tag(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -1632,6 +1642,72 @@ static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
   return _sv0t24;
 }
 
+static int contract_expr_new(void) {
+  int _sv0t0 = sv0_vec_new();
+  int v = _sv0t0;
+  sv0_vec_push(v, 0);
+  return v;
+}
+
+static int contract_expr_enter(int flag) {
+  int _sv0t0 = sv0_vec_get(flag, 0);
+  int saved = _sv0t0;
+  sv0_vec_push(flag, 1);
+  return saved;
+}
+
+static int contract_expr_exit(int flag, int saved) {
+  sv0_vec_push(flag, saved);
+  return 0;
+}
+
+static int contract_expr_active(int flag) {
+  int _sv0t0 = sv0_vec_len(flag);
+  int n = _sv0t0;
+  int _sv0t1 = (n - 1);
+  int _sv0t2 = sv0_vec_get(flag, _sv0t1);
+  int _sv0t3 = (_sv0t2 == 1);
+  return _sv0t3;
+}
+
+static int ty_import_alias_push(int aliases, int from_h, int to_h) {
+  int _sv0t0 = sv0_vec_len(aliases);
+  int saved = _sv0t0;
+  sv0_vec_push(aliases, from_h);
+  sv0_vec_push(aliases, to_h);
+  return saved;
+}
+
+static int alias_lookup_bounded(int names, int targets, int limit, int name) {
+  int n = limit;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t0 = sv0_vec_get(names, i);
+    if ((_sv0t0 == name)) {
+      int _sv0t1 = sv0_vec_get(targets, i);
+      return _sv0t1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return name;
+}
+
+static int ctor_ty_tag(int shape, int param_count) {
+  if ((shape == 0)) {
+    int _sv0t0 = TY_ENUM();
+    return _sv0t0;
+  } else {
+  }
+  if ((param_count > 0)) {
+    int _sv0t1 = TY_FN();
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = TY_ENUM();
+  return _sv0t2;
+}
+
 static int test_binop_class(void) {
   int _sv0t0 = binop_class(0);
   if ((_sv0t0 != 0)) {
@@ -3041,6 +3117,91 @@ static int test_resolve_field_ty(void) {
   return 0;
 }
 
+static int test_contract_expr_flag(void) {
+  int _sv0t0 = contract_expr_new();
+  int flag = _sv0t0;
+  int _sv0t1 = contract_expr_active(flag);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = contract_expr_enter(flag);
+  int saved = _sv0t2;
+  int _sv0t3 = contract_expr_active(flag);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = contract_expr_exit(flag, saved);
+  int x = _sv0t4;
+  int _sv0t5 = contract_expr_active(flag);
+  if ((_sv0t5 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_ty_import_alias_push(void) {
+  int _sv0t0 = sv0_vec_new();
+  int names = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int targets = _sv0t1;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(targets, 20);
+  int _sv0t2 = sv0_vec_len(names);
+  int saved = _sv0t2;
+  sv0_vec_push(names, 30);
+  sv0_vec_push(targets, 40);
+  int _sv0t3 = alias_lookup_bounded(names, targets, saved, 30);
+  int r1 = _sv0t3;
+  if ((r1 != 30)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = alias_lookup_bounded(names, targets, 2, 30);
+  int r2 = _sv0t4;
+  if ((r2 != 40)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = alias_lookup_bounded(names, targets, 0, 10);
+  int r3 = _sv0t5;
+  if ((r3 != 10)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_ctor_ty_tag(void) {
+  int _sv0t0 = ctor_ty_tag(0, 0);
+  int _sv0t1 = TY_ENUM();
+  if ((_sv0t0 != _sv0t1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = ctor_ty_tag(1, 3);
+  int _sv0t3 = TY_FN();
+  if ((_sv0t2 != _sv0t3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = ctor_ty_tag(2, 2);
+  int _sv0t5 = TY_FN();
+  if ((_sv0t4 != _sv0t5)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = ctor_ty_tag(1, 0);
+  int _sv0t7 = TY_ENUM();
+  if ((_sv0t6 != _sv0t7)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -3277,6 +3438,27 @@ int main(void) {
   if ((r34 != 0)) {
     int _sv0t66 = (360 + r34);
     return _sv0t66;
+  } else {
+  }
+  int _sv0t67 = test_contract_expr_flag();
+  int r35 = _sv0t67;
+  if ((r35 != 0)) {
+    int _sv0t68 = (370 + r35);
+    return _sv0t68;
+  } else {
+  }
+  int _sv0t69 = test_ty_import_alias_push();
+  int r36 = _sv0t69;
+  if ((r36 != 0)) {
+    int _sv0t70 = (380 + r36);
+    return _sv0t70;
+  } else {
+  }
+  int _sv0t71 = test_ctor_ty_tag();
+  int r37 = _sv0t71;
+  if ((r37 != 0)) {
+    int _sv0t72 = (390 + r37);
+    return _sv0t72;
   } else {
   }
   return 0;

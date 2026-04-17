@@ -27,6 +27,12 @@
    name strings to types.sv0 Ty tag values: TyUnit=0, TyBool=1, TyChar=2,
    TyString=3, TyIsize=4, TyUsize=5, TyInt=7, TyUint=8, TyFloat=9;
    returns -1 for user/unknown types).
+   contract_expr_new/enter/exit/active (SML withContractExpr
+   decomposed — scoped "in contract expr" flag via Vec tail),
+   ty_import_alias_push / alias_lookup_bounded (SML
+   addTyImportAlias/clearTyImportAliases — scoped push with
+   logical-length restore), ctor_ty_tag (SML ctorTy — returns
+   TY_FN for parameterised variants, TY_ENUM for nullary).
    type_param_push/type_param_restore/type_param_lookup (SML
    withTypeParams decomposed — push/pop generic type param bindings
    into a stride-2 Vec<i32> of (name_handle, ty_tag) pairs).
@@ -897,6 +903,79 @@ fn resolve_field_ty_tag(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
     return 0 - 1;
 }
 
+/* ── contract_expr scoped flag (SML withContractExpr) ────────
+   SML uses a mutable bool ref toggled by withContractExpr; sv0
+   decomposes into enter/exit and a pure query.  The flag is
+   represented as a stride-0 Vec<i32> (single element) that
+   callers thread through the checker:
+     0 = not inside a contract expression
+     1 = inside a contract expression                        */
+
+fn contract_expr_new() -> Vec<i32> {
+    let v: Vec<i32> = vec_new();
+    vec_push(v, 0);
+    return v;
+}
+
+fn contract_expr_enter(flag: Vec<i32>) -> i32 {
+    let saved: i32 = vec_get(flag, 0);
+    vec_push(flag, 1);
+    return saved;
+}
+
+fn contract_expr_exit(flag: Vec<i32>, saved: i32) -> i32 {
+    vec_push(flag, saved);
+    return 0;
+}
+
+fn contract_expr_active(flag: Vec<i32>) -> bool {
+    let n: i32 = vec_len(flag);
+    return vec_get(flag, n - 1) == 1;
+}
+
+/* ── ty import alias scoped push (SML addTyImportAlias /
+   clearTyImportAliases) ─────────────────────────────────────
+   Uses the same logical-length model as type_param_push:
+   aliases are stride-2 (from, to) in a single Vec; push
+   returns the saved length; callers pass saved_len as limit
+   to alias_lookup and canon_ty_import to restrict scope.
+   "clear" = use limit 0.                                    */
+
+fn ty_import_alias_push(aliases: Vec<i32>,
+                        from_h: i32, to_h: i32) -> i32 {
+    let saved: i32 = vec_len(aliases);
+    vec_push(aliases, from_h);
+    vec_push(aliases, to_h);
+    return saved;
+}
+
+fn alias_lookup_bounded(names: Vec<i32>, targets: Vec<i32>,
+                        limit: i32, name: i32) -> i32 {
+    let n: i32 = limit;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(names, i) == name {
+            return vec_get(targets, i);
+        }
+        i = i + 1;
+    }
+    return name;
+}
+
+/* ── ctor_ty_tag (SML ctorTy — constructor type tag) ────────
+   Returns TY_FN when the variant has parameters (VSTuple or
+   VSStruct), TY_ENUM when it is VSUnit (nullary).  The caller
+   supplies the variant shape tag (0=Unit, 1=Tuple, 2=Struct)
+   and the param_count.  This is the tag-level building block;
+   the full TyFn(param_types, TyEnum en) construction comes
+   with initTypes.                                           */
+
+fn ctor_ty_tag(shape: i32, param_count: i32) -> i32 {
+    if shape == 0 { return TY_ENUM(); }
+    if param_count > 0 { return TY_FN(); }
+    return TY_ENUM();
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -1394,6 +1473,41 @@ fn test_resolve_field_ty() -> i32 {
     return 0;
 }
 
+fn test_contract_expr_flag() -> i32 {
+    let flag: Vec<i32> = contract_expr_new();
+    if contract_expr_active(flag) != false { return 1; }
+    let saved: i32 = contract_expr_enter(flag);
+    if contract_expr_active(flag) != true { return 2; }
+    let x: i32 = contract_expr_exit(flag, saved);
+    if contract_expr_active(flag) != false { return 3; }
+    return 0;
+}
+
+fn test_ty_import_alias_push() -> i32 {
+    let names: Vec<i32> = vec_new();
+    let targets: Vec<i32> = vec_new();
+    vec_push(names, 10);
+    vec_push(targets, 20);
+    let saved: i32 = vec_len(names);
+    vec_push(names, 30);
+    vec_push(targets, 40);
+    let r1: i32 = alias_lookup_bounded(names, targets, saved, 30);
+    if r1 != 30 { return 1; }
+    let r2: i32 = alias_lookup_bounded(names, targets, 2, 30);
+    if r2 != 40 { return 2; }
+    let r3: i32 = alias_lookup_bounded(names, targets, 0, 10);
+    if r3 != 10 { return 3; }
+    return 0;
+}
+
+fn test_ctor_ty_tag() -> i32 {
+    if ctor_ty_tag(0, 0) != TY_ENUM() { return 1; }
+    if ctor_ty_tag(1, 3) != TY_FN() { return 2; }
+    if ctor_ty_tag(2, 2) != TY_FN() { return 3; }
+    if ctor_ty_tag(1, 0) != TY_ENUM() { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -1463,5 +1577,11 @@ fn main() -> i32 {
     if r33 != 0 { return 340 + r33; }
     let r34: i32 = test_resolve_field_ty();
     if r34 != 0 { return 360 + r34; }
+    let r35: i32 = test_contract_expr_flag();
+    if r35 != 0 { return 370 + r35; }
+    let r36: i32 = test_ty_import_alias_push();
+    if r36 != 0 { return 380 + r36; }
+    let r37: i32 = test_ctor_ty_tag();
+    if r37 != 0 { return 390 + r37; }
     return 0;
 }
