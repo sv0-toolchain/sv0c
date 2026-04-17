@@ -1,27 +1,21 @@
 /* Phase 2 real pipeline module: sml/ir/lowering.sml -> sv0.
-   Lowering utilities: splitQName (qualified name splitting on ::),
-   AST binop/unop → C operator strings (full 6-variant unop table),
-   AST type → C type string mapping (22 primitives), freshTmp counter
-   management + fresh_tmp_str (string "_sv0t<N>" matching SML freshTmp),
-   oldSlot naming (old_slot_name full string concat), retSyntaxIsUnit,
-   storeValueToSlot classification, paramName extraction, uniqOldNames
-   (Vec dedup), assignment LHS classification, enum tag lookup (Vec),
+   Lowering utilities: splitQName, binop/unop → C strings, AST type → C
+   type mapping, freshTmp counter + fresh_tmp_str, oldSlot naming,
+   retSyntaxIsUnit, storeValueToSlot/assignment LHS classification,
+   paramName extraction, uniqOldNames (dedup), enum tag lookup (Vec),
    struct field list lookup, enum/struct type detection, variant slot
-   counting, enum max payload, tryVariantNames (Result/Option), literal
-   lowering classification + lower_lit_to_ir_tag (SML lowerLit dispatch),
-   fn_ret_cty (SML fnRetCty — return type or default "int"),
-   import alias management (lower_alias_new/add/lookup/set) +
-   resolve_fn_callee (SML resolveFnCallee) +
-   resolve_enum_ctor_path (SML resolveEnumCtorPath),
-   param_name (SML paramName — extract name handle from PatBind param),
-   lower_field_index (SML local fieldIndex in matchArmSetup —
-   struct field name → index lookup in a field-name Vec).
-   ast_ty_to_c_string_with_user (SML astTyToCString struct/enum branch —
-   extends primitive mapping with user-defined struct/enum typedef names),
-   find_fn_index / callee_fn_index (SML calleeRetCty decomposed — resolve
-   alias then linear scan fn name Vec for index),
-   scrut_local_lookup / param_ty_lookup (SML matchScrutCty helpers —
-   linear scan name Vecs returning index or -1).
+   counting, enum max payload, tryVariantNames, literal classification +
+   lower_lit_to_ir_tag, fn_ret_cty, value_to_expr_kind, enum_alloc_width,
+   import alias management + resolve_fn_callee + resolve_enum_ctor_path,
+   param_name, lower_field_index, ast_ty_to_c_string_with_user,
+   find_fn_index / callee_fn_index, scrut_local_lookup / param_ty_lookup.
+   Typedef builders (batch 34): handle_to_str (token handle → string),
+   emit_struct_td / emit_enum_td (SML emitStructTd/emitEnumTd — C typedef
+   string generation), build_struct_order (SML buildStructOrder — populate
+   struct field order lookup tables), build_enum_variants_data (SML
+   buildEnumVariants — populate enum variant tag + max payload tables),
+   collect_typedefs_str (SML collectTypedefs — concatenate all struct then
+   enum typedef strings from item Vecs).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -341,10 +335,7 @@ fn lower_lit_supported(lit_tag: i32) -> bool {
 }
 
 /* ── storeValueToSlot classification ────────────────────────── */
-
-fn SV_SKIP() -> i32 { return 0; }
-fn SV_STORE() -> i32 { return 1; }
-fn SV_LOAD() -> i32 { return 2; }
+/* Class constants: SKIP=0, STORE=1, LOAD=2 */
 
 fn store_value_class(is_var: bool, var_name_eq_slot: bool) -> i32 {
     if is_var {
@@ -355,10 +346,7 @@ fn store_value_class(is_var: bool, var_name_eq_slot: bool) -> i32 {
 }
 
 /* ── assignment LHS classification ──────────────────────────── */
-
-fn LOW_AL_VAR() -> i32 { return 0; }
-fn LOW_AL_FIELD() -> i32 { return 1; }
-fn LOW_AL_INVALID() -> i32 { return 0 - 1; }
+/* Class constants: VAR=0, FIELD=1, INVALID=-1 */
 
 fn low_classify_assign_lhs(expr_tag: i32) -> i32 {
     if expr_tag == 2 { return 0; }
@@ -486,12 +474,7 @@ fn is_try_enum(has_ok: bool, has_err: bool, has_some: bool, has_none: bool) -> b
 }
 
 /* ── literal lowering classification ────────────────────────── */
-
-fn LIT_INT() -> i32 { return 0; }
-fn LIT_BOOL() -> i32 { return 1; }
-fn LIT_UNIT() -> i32 { return 2; }
-fn LIT_STRING() -> i32 { return 3; }
-fn LIT_UNSUPPORTED() -> i32 { return 0 - 1; }
+/* Tag constants: INT=0, BOOL=1, UNIT=2, STRING=3, UNSUPPORTED=-1 */
 
 fn classify_literal(lit_tag: i32) -> i32 {
     if lit_tag == 0 { return 0; }
@@ -515,9 +498,7 @@ fn fn_ret_cty(has_ret: bool, ret_cty: string) -> string {
 }
 
 /* ── value → expr classification ────────────────────────────── */
-
-fn VAL_VAR() -> i32 { return 0; }
-fn VAL_OTHER() -> i32 { return 1; }
+/* Class constants: VAR=0, OTHER=1 */
 
 fn value_to_expr_kind(val_tag: i32) -> i32 {
     if val_tag == 0 { return 0; }
@@ -586,6 +567,167 @@ fn param_ty_lookup(param_names: Vec<i32>, name_h: i32) -> i32 {
         i = i + 1;
     }
     return 0 - 1;
+}
+
+/* ── handle_to_str (token handle → string) ──────────────────── */
+
+fn handle_to_str(h: i32, source: string,
+                 starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let s: i32 = vec_get(starts, h);
+    let e: i32 = vec_get(ends, h);
+    return string_substr(source, s, e - s);
+}
+
+/* ── emit_struct_td (SML emitStructTd) ──────────────────────── */
+
+fn emit_struct_td(name_h: i32,
+                  fnames: Vec<i32>, ftypes: Vec<i32>,
+                  foff: i32, fcount: i32,
+                  source: string, starts: Vec<i32>, ends: Vec<i32>,
+                  sn: Vec<i32>, en: Vec<i32>) -> string {
+    let name: string = handle_to_str(name_h, source, starts, ends);
+    let mut r: string = "typedef struct {\n";
+    let mut i: i32 = 0;
+    while i < fcount {
+        let th: i32 = vec_get(ftypes, foff + i);
+        let tname: string = handle_to_str(th, source, starts, ends);
+        let cty: string = ast_ty_to_c_string_with_user(tname, th, sn, en);
+        let fname: string = handle_to_str(vec_get(fnames, foff + i), source, starts, ends);
+        r = string_concat(r, "  ");
+        r = string_concat(r, cty);
+        r = string_concat(r, " ");
+        r = string_concat(r, fname);
+        r = string_concat(r, ";\n");
+        i = i + 1;
+    }
+    r = string_concat(r, "} ");
+    r = string_concat(r, name);
+    r = string_concat(r, ";\n");
+    return r;
+}
+
+/* ── emit_enum_td (SML emitEnumTd) ──────────────────────────── */
+
+fn emit_enum_td(name_h: i32, max_payload: i32,
+                source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let name: string = handle_to_str(name_h, source, starts, ends);
+    let mut r: string = "typedef struct {\n  int tag;\n";
+    let mut i: i32 = 0;
+    while i < max_payload {
+        r = string_concat(r, "  int p");
+        r = string_concat(r, lower_int_to_str(i));
+        r = string_concat(r, ";\n");
+        i = i + 1;
+    }
+    r = string_concat(r, "} ");
+    r = string_concat(r, name);
+    r = string_concat(r, ";\n");
+    return r;
+}
+
+/* ── build_struct_order (SML buildStructOrder) ──────────────── */
+
+fn build_struct_order(item_tags: Vec<i32>, item_names: Vec<i32>,
+                      item_field_counts: Vec<i32>,
+                      struct_fnames_flat: Vec<i32>,
+                      out_names: Vec<i32>,
+                      out_offsets: Vec<i32>,
+                      out_counts: Vec<i32>,
+                      out_flat: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    let mut sf: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(item_tags, i);
+        let fc: i32 = vec_get(item_field_counts, i);
+        if tag == 1 {
+            vec_push(out_names, vec_get(item_names, i));
+            vec_push(out_offsets, vec_len(out_flat));
+            vec_push(out_counts, fc);
+            let mut j: i32 = 0;
+            while j < fc {
+                vec_push(out_flat, vec_get(struct_fnames_flat, sf + j));
+                j = j + 1;
+            }
+            sf = sf + fc;
+        }
+        i = i + 1;
+    }
+    return vec_len(out_names);
+}
+
+/* ── build_enum_variants_data (SML buildEnumVariants) ────────── */
+
+fn build_enum_variants_data(item_tags: Vec<i32>, item_names: Vec<i32>,
+                            item_field_counts: Vec<i32>,
+                            item_vmax: Vec<i32>,
+                            enum_vnames_flat: Vec<i32>,
+                            out_names: Vec<i32>,
+                            out_tag_offsets: Vec<i32>,
+                            out_tag_counts: Vec<i32>,
+                            out_tags_flat: Vec<i32>,
+                            out_max_payloads: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    let mut ev: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(item_tags, i);
+        let vc: i32 = vec_get(item_field_counts, i);
+        if tag == 2 {
+            vec_push(out_names, vec_get(item_names, i));
+            vec_push(out_tag_offsets, vec_len(out_tags_flat));
+            vec_push(out_tag_counts, vc);
+            vec_push(out_max_payloads, vec_get(item_vmax, i));
+            let mut j: i32 = 0;
+            while j < vc {
+                vec_push(out_tags_flat, vec_get(enum_vnames_flat, ev + j));
+                vec_push(out_tags_flat, j);
+                j = j + 1;
+            }
+            ev = ev + vc;
+        }
+        i = i + 1;
+    }
+    return vec_len(out_names);
+}
+
+/* ── collect_typedefs_str (SML collectTypedefs) ──────────────── */
+
+fn collect_typedefs_str(item_tags: Vec<i32>, item_names: Vec<i32>,
+                        item_field_counts: Vec<i32>,
+                        item_vmax: Vec<i32>,
+                        sf_names: Vec<i32>, sf_types: Vec<i32>,
+                        source: string, starts: Vec<i32>, ends: Vec<i32>,
+                        sn: Vec<i32>, en: Vec<i32>) -> string {
+    let n: i32 = vec_len(item_tags);
+    let mut r: string = "";
+    let mut i: i32 = 0;
+    let mut sf: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(item_tags, i);
+        let fc: i32 = vec_get(item_field_counts, i);
+        if tag == 1 {
+            let td: string = emit_struct_td(vec_get(item_names, i),
+                                             sf_names, sf_types,
+                                             sf, fc,
+                                             source, starts, ends,
+                                             sn, en);
+            r = string_concat(r, td);
+            sf = sf + fc;
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 2 {
+            let td2: string = emit_enum_td(vec_get(item_names, i),
+                                            vec_get(item_vmax, i),
+                                            source, starts, ends);
+            r = string_concat(r, td2);
+        }
+        i = i + 1;
+    }
+    return r;
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -955,6 +1097,53 @@ fn test_param_ty() -> i32 {
     return 0;
 }
 
+fn test_typedef_builders() -> i32 {
+    let src: string = "P x i32 y bool E";
+    let st: Vec<i32> = vec_new();
+    let nd: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(nd, 1);
+    vec_push(st, 2); vec_push(nd, 3);
+    vec_push(st, 4); vec_push(nd, 7);
+    vec_push(st, 8); vec_push(nd, 9);
+    vec_push(st, 10); vec_push(nd, 14);
+    vec_push(st, 15); vec_push(nd, 16);
+    if string_eq(handle_to_str(0, src, st, nd), "P") != true { return 1; }
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let fv: Vec<i32> = vec_new();
+    let tv: Vec<i32> = vec_new();
+    vec_push(fv, 1); vec_push(fv, 3);
+    vec_push(tv, 2); vec_push(tv, 4);
+    let td: string = emit_struct_td(0, fv, tv, 0, 2, src, st, nd, sn, en);
+    if string_eq(td, "typedef struct {\n  int x;\n  int y;\n} P;\n") != true { return 2; }
+    let td2: string = emit_enum_td(5, 1, src, st, nd);
+    if string_eq(td2, "typedef struct {\n  int tag;\n  int p0;\n} E;\n") != true { return 3; }
+    let tags: Vec<i32> = vec_new();
+    let nms: Vec<i32> = vec_new();
+    let fcs: Vec<i32> = vec_new();
+    let vmx: Vec<i32> = vec_new();
+    vec_push(tags, 1); vec_push(nms, 0); vec_push(fcs, 2); vec_push(vmx, 0);
+    vec_push(tags, 2); vec_push(nms, 5); vec_push(fcs, 2); vec_push(vmx, 1);
+    let sff: Vec<i32> = vec_new();
+    vec_push(sff, 1); vec_push(sff, 3);
+    let on: Vec<i32> = vec_new();
+    let oo: Vec<i32> = vec_new();
+    let oc: Vec<i32> = vec_new();
+    let of1: Vec<i32> = vec_new();
+    if build_struct_order(tags, nms, fcs, sff, on, oo, oc, of1) != 1 { return 4; }
+    if vec_get(oc, 0) != 2 { return 5; }
+    let evn: Vec<i32> = vec_new();
+    vec_push(evn, 10); vec_push(evn, 20);
+    let en2: Vec<i32> = vec_new();
+    let eto: Vec<i32> = vec_new();
+    let etc: Vec<i32> = vec_new();
+    let etf: Vec<i32> = vec_new();
+    let emp: Vec<i32> = vec_new();
+    if build_enum_variants_data(tags, nms, fcs, vmx, evn, en2, eto, etc, etf, emp) != 1 { return 6; }
+    if vec_get(emp, 0) != 1 { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -1026,5 +1215,7 @@ fn main() -> i32 {
     if r34 != 0 { return 360 + r34; }
     let r35: i32 = test_param_ty();
     if r35 != 0 { return 370 + r35; }
+    let r36: i32 = test_typedef_builders();
+    if r36 != 0 { return 380 + r36; }
     return 0;
 }
