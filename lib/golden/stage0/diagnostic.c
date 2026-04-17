@@ -34,6 +34,7 @@ static const char* format_gutter(int gutter_width);
 static const char* format_snippet_numbered(const char* source, int line_no, int col, int span_len);
 static const char* format_related(int gutter_width, const char* msg, const char* file, int line, int col);
 static const char* format_help(int gutter_width, const char* help_text);
+static const char* format_diagnostic_full(int sev_tag, const char* message, const char* code, const char* file, const char* source, int line, int col, int span_len);
 static int test_severity_tags(void);
 static int test_constructors(void);
 static int test_has_errors(void);
@@ -55,6 +56,7 @@ static int test_format_header_with_code(void);
 static int test_format_gutter(void);
 static int test_format_related(void);
 static int test_format_help(void);
+static int test_format_diagnostic_full(void);
 
 static int severity_tag(Severity s) {
   int _sv0t0;
@@ -670,6 +672,34 @@ static const char* format_help(int gutter_width, const char* help_text) {
   return out;
 }
 
+static const char* format_diagnostic_full(int sev_tag, const char* message, const char* code, const char* file, const char* source, int line, int col, int span_len) {
+  const char* _sv0t0 = format_header_with_code(sev_tag, message, code);
+  const char* header;
+  header = _sv0t0;
+  const char* _sv0t1 = format_location(file, line, col);
+  const char* loc;
+  loc = _sv0t1;
+  const char* _sv0t2 = sv0_string_concat(header, "\n");
+  const char* out;
+  out = _sv0t2;
+  const char* _sv0t3 = sv0_string_concat(out, loc);
+  out = _sv0t3;
+  const char* _sv0t4 = sv0_string_concat(out, "\n");
+  out = _sv0t4;
+  const char* _sv0t5 = format_snippet_numbered(source, line, col, span_len);
+  const char* snippet;
+  snippet = _sv0t5;
+  int _sv0t6 = sv0_string_len(snippet);
+  if ((_sv0t6 > 0)) {
+    const char* _sv0t7 = sv0_string_concat(out, snippet);
+    out = _sv0t7;
+  } else {
+  }
+  const char* _sv0t8 = sv0_string_concat(out, "\n");
+  out = _sv0t8;
+  return out;
+}
+
 static int test_severity_tags(void) {
   Severity _sv0t0;
   _sv0t0.tag = 0;
@@ -1238,6 +1268,36 @@ static int test_format_help(void) {
   return 0;
 }
 
+static int test_format_diagnostic_full(void) {
+  const char* src;
+  src = "let x = 42;";
+  const char* _sv0t0 = format_diagnostic_full(0, "undeclared variable", "E0401", "test.sv0", src, 1, 5, 1);
+  const char* fd;
+  fd = _sv0t0;
+  int _sv0t1 = sv0_string_len(fd);
+  if ((_sv0t1 == 0)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = format_diagnostic_full(1, "unused", "", "f.sv0", "", 99, 1, 1);
+  const char* fd2;
+  fd2 = _sv0t2;
+  int _sv0t3 = sv0_string_len(fd2);
+  if ((_sv0t3 == 0)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = format_diagnostic_full(0, "bad type", "E0400", "m.sv0", "fn main() {", 1, 4, 4);
+  const char* fd3;
+  fd3 = _sv0t4;
+  int _sv0t5 = sv0_string_len(fd3);
+  if ((_sv0t5 == 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_severity_tags();
   int r1 = _sv0t0;
@@ -1383,6 +1443,13 @@ int main(void) {
   if ((r21 != 0)) {
     int _sv0t40 = (200 + r21);
     return _sv0t40;
+  } else {
+  }
+  int _sv0t41 = test_format_diagnostic_full();
+  int r22 = _sv0t41;
+  if ((r22 != 0)) {
+    int _sv0t42 = (210 + r22);
+    return _sv0t42;
   } else {
   }
   return 0;

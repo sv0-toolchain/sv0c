@@ -370,6 +370,27 @@ fn format_help(gutter_width: i32, help_text: string) -> string {
     return out;
 }
 
+/* ── format_diagnostic_full (SML format with code bracket) ────── */
+/* Combines header_with_code + location + snippet_numbered into
+   a single string matching SML's `format source d`. */
+
+fn format_diagnostic_full(sev_tag: i32, message: string, code: string,
+                          file: string, source: string,
+                          line: i32, col: i32,
+                          span_len: i32) -> string {
+    let header: string = format_header_with_code(sev_tag, message, code);
+    let loc: string = format_location(file, line, col);
+    let mut out: string = string_concat(header, "\n");
+    out = string_concat(out, loc);
+    out = string_concat(out, "\n");
+    let snippet: string = format_snippet_numbered(source, line, col, span_len);
+    if string_len(snippet) > 0 {
+        out = string_concat(out, snippet);
+    }
+    out = string_concat(out, "\n");
+    return out;
+}
+
 fn test_severity_tags() -> i32 {
     if severity_tag(Severity::Error) != 0 { return 1; }
     if severity_tag(Severity::Warning) != 1 { return 2; }
@@ -564,6 +585,19 @@ fn test_format_help() -> i32 {
     return 0;
 }
 
+fn test_format_diagnostic_full() -> i32 {
+    let src: string = "let x = 42;";
+    let fd: string = format_diagnostic_full(0, "undeclared variable", "E0401",
+                                            "test.sv0", src, 1, 5, 1);
+    if string_len(fd) == 0 { return 1; }
+    let fd2: string = format_diagnostic_full(1, "unused", "", "f.sv0", "", 99, 1, 1);
+    if string_len(fd2) == 0 { return 2; }
+    let fd3: string = format_diagnostic_full(0, "bad type", "E0400",
+                                             "m.sv0", "fn main() {", 1, 4, 4);
+    if string_len(fd3) == 0 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_severity_tags();
     if r1 != 0 { return r1; }
@@ -607,5 +641,7 @@ fn main() -> i32 {
     if r20 != 0 { return 190 + r20; }
     let r21: i32 = test_format_help();
     if r21 != 0 { return 200 + r21; }
+    let r22: i32 = test_format_diagnostic_full();
+    if r22 != 0 { return 210 + r22; }
     return 0;
 }

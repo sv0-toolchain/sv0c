@@ -23,6 +23,10 @@
    chk_tok_str (single-token text extraction for checker arena walks).
    expr_references_result (SML exprReferencesResult — recursive expr
    arena walk checking for single-segment "result" path).
+   ast_ty_to_types_tag (SML astTyToTy primitive dispatch — maps type
+   name strings to types.sv0 Ty tag values: TyUnit=0, TyBool=1, TyChar=2,
+   TyString=3, TyIsize=4, TyUsize=5, TyInt=7, TyUint=8, TyFloat=9;
+   returns -1 for user/unknown types).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -142,6 +146,35 @@ fn int_width_from_name(name: string) -> i32 {
     if string_eq(name, "f32") { return 32; }
     if string_eq(name, "f64") { return 64; }
     return 0;
+}
+
+/* ── ast_ty_to_types_tag (SML astTyToTy primitive dispatch) ─── */
+/* Maps type name string to types.sv0 Ty tag:
+   TyUnit=0 TyBool=1 TyChar=2 TyString=3 TyIsize=4 TyUsize=5
+   TyInt=7 TyUint=8 TyFloat=9. Returns -1 for user/unknown. */
+
+fn ast_ty_to_types_tag(name: string) -> i32 {
+    if string_eq(name, "unit") { return 0; }
+    if string_eq(name, "bool") { return 1; }
+    if string_eq(name, "char") { return 2; }
+    if string_eq(name, "str") { return 3; }
+    if string_eq(name, "string") { return 3; }
+    if string_eq(name, "String") { return 3; }
+    if string_eq(name, "isize") { return 4; }
+    if string_eq(name, "usize") { return 5; }
+    if string_eq(name, "i8") { return 7; }
+    if string_eq(name, "i16") { return 7; }
+    if string_eq(name, "i32") { return 7; }
+    if string_eq(name, "i64") { return 7; }
+    if string_eq(name, "i128") { return 7; }
+    if string_eq(name, "u8") { return 8; }
+    if string_eq(name, "u16") { return 8; }
+    if string_eq(name, "u32") { return 8; }
+    if string_eq(name, "u64") { return 8; }
+    if string_eq(name, "u128") { return 8; }
+    if string_eq(name, "f32") { return 9; }
+    if string_eq(name, "f64") { return 9; }
+    return 0 - 1;
 }
 
 /* ── assignment LHS classification ──────────────────────────── */
@@ -1163,6 +1196,25 @@ fn test_expr_references_result() -> i32 {
     return 0;
 }
 
+fn test_ast_ty_types_tag() -> i32 {
+    if ast_ty_to_types_tag("unit") != 0 { return 1; }
+    if ast_ty_to_types_tag("bool") != 1 { return 2; }
+    if ast_ty_to_types_tag("char") != 2 { return 3; }
+    if ast_ty_to_types_tag("str") != 3 { return 4; }
+    if ast_ty_to_types_tag("string") != 3 { return 5; }
+    if ast_ty_to_types_tag("String") != 3 { return 6; }
+    if ast_ty_to_types_tag("isize") != 4 { return 7; }
+    if ast_ty_to_types_tag("usize") != 5 { return 8; }
+    if ast_ty_to_types_tag("i32") != 7 { return 9; }
+    if ast_ty_to_types_tag("u32") != 8 { return 10; }
+    if ast_ty_to_types_tag("f64") != 9 { return 11; }
+    if ast_ty_to_types_tag("Foo") != 0 - 1 { return 12; }
+    if ast_ty_to_types_tag("Vec") != 0 - 1 { return 13; }
+    if int_width_from_name("i32") != 32 { return 14; }
+    if int_width_from_name("u64") != 64 { return 15; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -1226,5 +1278,7 @@ fn main() -> i32 {
     if r30 != 0 { return 310 + r30; }
     let r31: i32 = test_expr_references_result();
     if r31 != 0 { return 320 + r31; }
+    let r32: i32 = test_ast_ty_types_tag();
+    if r32 != 0 { return 330 + r32; }
     return 0;
 }
