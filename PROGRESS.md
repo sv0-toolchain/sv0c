@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 46 — checker.sv0.** `checker.sv0`: `scan_enum_variant_shapes` (token re-scan — classify variant as VSUnit/VSTuple/VSStruct), `init_struct_defs` (SML `initTypes` struct half — walks ItemStruct items, populates struct def table with field names+types), `init_enum_defs` (SML `initTypes` enum half — walks ItemEnum items, populates enum def table with variant names+shapes), `struct_def_field_ty_str` (string-based field type lookup in struct def table), `enum_def_variant_shape_str` (string-based variant shape lookup in enum def table); **bugfix**: `scan_enum_variant_names` now handles `(...)` tuple variants (tag 6/7). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 47 — checker.sv0.** `checker.sv0`: `builtin_fn_lookup` (maps builtin name string to integer ID — 13 builtins: println, string_*, vec_*, box_*), `builtin_fn_ret_type`/`builtin_fn_param_count`/`builtin_fn_param_type` (builtin type signature accessors; TY_VAR for polymorphic positions), `BUILTIN_COUNT` (constant 13), `resolve_fn_call` (unified user fn + builtin lookup for synth ExprCall — checks fn_table first, falls through to builtins). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
