@@ -60,6 +60,14 @@
    extract struct field name positions from token stream using item
    arena metadata), scan_enum_variant_names (same for enum variant
    name positions — handles unit, tuple, and struct variant shapes).
+   Batch 44: type_param_lookup_str (string-based type param lookup),
+   scan_type_tag_at (token-stream type resolver — resolves type
+   annotation at a token position to a checker type tag using string
+   comparison; handles primitives, struct/enum, type params, Vec/Box,
+   unit, tuple, ref, refmut), scan_struct_field_type_tags (struct
+   field type tag extraction using scan_type_tag_at),
+   scan_fn_param_type_tags (function parameter type tag extraction —
+   walks fn signature tokens to extract each param's type tag).
    Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
    needs deep AST traversal and unification. */
 
@@ -1216,6 +1224,232 @@ fn scan_enum_variant_names(tok_tags: Vec<i32>, name_tok_pos: i32,
     return 0;
 }
 
+/* ── type_param_lookup_str (string-based type param lookup) ───
+   Companion to type_param_lookup that compares by string value
+   instead of token position.  The type_params Vec stores stride-2
+   entries (tok_pos, tag); this function extracts the string at each
+   tok_pos and compares with name_str.  Returns the tag on match,
+   or -1 if not found.  Needed by scan_type_tag_at where the type
+   annotation token is at a different position than the declaration
+   token but refers to the same name.                            */
+
+fn type_param_lookup_str(type_params: Vec<i32>, limit: i32,
+                         source: string, starts: Vec<i32>,
+                         ends: Vec<i32>,
+                         name_str: string) -> i32 {
+    let mut i: i32 = limit - 2;
+    while i >= 0 {
+        let tp_pos: i32 = vec_get(type_params, i);
+        let tps: i32 = vec_get(starts, tp_pos);
+        let tpe: i32 = vec_get(ends, tp_pos);
+        let tp_name: string = string_substr(source, tps, tpe - tps);
+        if string_eq(tp_name, name_str) {
+            return vec_get(type_params, i + 1);
+        }
+        i = i - 2;
+    }
+    return 0 - 1;
+}
+
+/* ── scan_type_tag_at (token-stream type resolver) ────────────
+   Given a position in the token stream at the start of a type
+   annotation, resolves it to a checker type tag.  Pushes the
+   resolved tag into out_tag.  Returns the token position AFTER
+   the consumed type tokens, or -1 on error.
+
+   Handles:
+     IDENT         → primitive dispatch (ast_type_name_to_tag),
+                     struct/enum name (string comparison), or
+                     type param (string-based lookup)
+     IDENT < ... > → TY_NAMED (Vec, Box, generic container)
+     ( )           → TY_UNIT
+     ( T, ... )    → TY_TUPLE (balanced parens)
+     & T           → TY_REF
+     & mut T       → TY_REFMUT
+     fallback      → TY_UNKNOWN
+
+   Token tags: IDENT=5, LPAREN=6, RPAREN=7, LT=38, GT=39,
+   AMP=27, MUT=77.                                              */
+
+fn scan_type_tag_at(tok_tags: Vec<i32>, source: string,
+                    starts: Vec<i32>, ends: Vec<i32>,
+                    struct_names: Vec<i32>, enum_names: Vec<i32>,
+                    type_params: Vec<i32>, tp_limit: i32,
+                    pos: i32, out_tag: Vec<i32>) -> i32 {
+    let t: i32 = vec_get(tok_tags, pos);
+    if t == 5 {
+        if vec_get(tok_tags, pos + 1) == 38 {
+            let mut depth: i32 = 1;
+            let mut p: i32 = pos + 2;
+            while depth > 0 {
+                let u: i32 = vec_get(tok_tags, p);
+                if u == 38 { depth = depth + 1; }
+                if u == 39 { depth = depth - 1; }
+                p = p + 1;
+            }
+            vec_push(out_tag, 15);
+            return p;
+        }
+        let s: i32 = vec_get(starts, pos);
+        let e: i32 = vec_get(ends, pos);
+        let name: string = string_substr(source, s, e - s);
+        let prim: i32 = ast_type_name_to_tag(name);
+        if prim >= 0 {
+            vec_push(out_tag, prim);
+            return pos + 1;
+        }
+        let mut ni: i32 = 0;
+        while ni < vec_len(struct_names) {
+            let sn: i32 = vec_get(struct_names, ni);
+            let ss: i32 = vec_get(starts, sn);
+            let se: i32 = vec_get(ends, sn);
+            let sname: string = string_substr(source, ss, se - ss);
+            if string_eq(name, sname) {
+                vec_push(out_tag, 6);
+                return pos + 1;
+            }
+            ni = ni + 1;
+        }
+        let mut ei: i32 = 0;
+        while ei < vec_len(enum_names) {
+            let en_pos: i32 = vec_get(enum_names, ei);
+            let es: i32 = vec_get(starts, en_pos);
+            let ee: i32 = vec_get(ends, en_pos);
+            let ename: string = string_substr(source, es, ee - es);
+            if string_eq(name, ename) {
+                vec_push(out_tag, 7);
+                return pos + 1;
+            }
+            ei = ei + 1;
+        }
+        let tp: i32 = type_param_lookup_str(type_params, tp_limit,
+                                             source, starts, ends, name);
+        if tp >= 0 {
+            vec_push(out_tag, 16);
+            return pos + 1;
+        }
+        vec_push(out_tag, 0 - 1);
+        return pos + 1;
+    }
+    if t == 6 {
+        if vec_get(tok_tags, pos + 1) == 7 {
+            vec_push(out_tag, 2);
+            return pos + 2;
+        }
+        let mut depth: i32 = 1;
+        let mut p: i32 = pos + 1;
+        while depth > 0 {
+            let u: i32 = vec_get(tok_tags, p);
+            if u == 6 { depth = depth + 1; }
+            if u == 7 { depth = depth - 1; }
+            p = p + 1;
+        }
+        vec_push(out_tag, 14);
+        return p;
+    }
+    if t == 27 {
+        if vec_get(tok_tags, pos + 1) == 77 {
+            let inner_out: Vec<i32> = vec_new();
+            let p: i32 = scan_type_tag_at(tok_tags, source, starts, ends,
+                                           struct_names, enum_names,
+                                           type_params, tp_limit,
+                                           pos + 2, inner_out);
+            vec_push(out_tag, 13);
+            return p;
+        }
+        let inner_out: Vec<i32> = vec_new();
+        let p: i32 = scan_type_tag_at(tok_tags, source, starts, ends,
+                                       struct_names, enum_names,
+                                       type_params, tp_limit,
+                                       pos + 1, inner_out);
+        vec_push(out_tag, 12);
+        return p;
+    }
+    vec_push(out_tag, 0 - 1);
+    return pos + 1;
+}
+
+/* ── scan_struct_field_type_tags (field type extraction) ────────
+   Given field name positions (from scan_struct_field_names),
+   resolves each field's type by calling scan_type_tag_at at
+   position name_pos + 2 (past IDENT COLON).  Pushes one type
+   tag per field into out_field_types.  Returns 0 on success.  */
+
+fn scan_struct_field_type_tags(tok_tags: Vec<i32>, source: string,
+                               starts: Vec<i32>, ends: Vec<i32>,
+                               struct_names: Vec<i32>,
+                               enum_names: Vec<i32>,
+                               type_params: Vec<i32>, tp_limit: i32,
+                               field_name_positions: Vec<i32>,
+                               out_field_types: Vec<i32>) -> i32 {
+    let count: i32 = vec_len(field_name_positions);
+    let mut i: i32 = 0;
+    while i < count {
+        let name_pos: i32 = vec_get(field_name_positions, i);
+        let type_start: i32 = name_pos + 2;
+        let _end: i32 = scan_type_tag_at(tok_tags, source, starts, ends,
+                                          struct_names, enum_names,
+                                          type_params, tp_limit,
+                                          type_start, out_field_types);
+        i = i + 1;
+    }
+    return 0;
+}
+
+/* ── scan_fn_param_type_tags (function param type extraction) ──
+   For a function with name_tok_pos (from item arena id1) and
+   param_count (from id3), re-scans the token stream to extract
+   each parameter's type tag.  Walks past optional generics
+   <...>, through ( ), handling [mut] IDENT : Type patterns.
+   Pushes param_count type tags into out_param_types.
+   Returns 0 on success, -1 on unexpected tokens.
+
+   Token layout: fn NAME [<...>] ( [mut] p1 : T1 , [mut] p2 : T2 ) ...
+   Token tags: FN=65 IDENT=5 LT=38 GT=39 LPAREN=6 RPAREN=7
+               MUT=77 SELF=86 COLON=14 COMMA=12                */
+
+fn scan_fn_param_type_tags(tok_tags: Vec<i32>, source: string,
+                           starts: Vec<i32>, ends: Vec<i32>,
+                           struct_names: Vec<i32>,
+                           enum_names: Vec<i32>,
+                           type_params: Vec<i32>, tp_limit: i32,
+                           name_tok_pos: i32, param_count: i32,
+                           out_param_types: Vec<i32>) -> i32 {
+    if param_count == 0 { return 0; }
+    let mut p: i32 = name_tok_pos + 1;
+    if vec_get(tok_tags, p) == 38 {
+        let mut depth: i32 = 1;
+        p = p + 1;
+        while depth > 0 {
+            let u: i32 = vec_get(tok_tags, p);
+            if u == 38 { depth = depth + 1; }
+            if u == 39 { depth = depth - 1; }
+            p = p + 1;
+        }
+    }
+    if vec_get(tok_tags, p) != 6 { return 0 - 1; }
+    p = p + 1;
+    let mut found: i32 = 0;
+    while found < param_count {
+        if vec_get(tok_tags, p) == 77 { p = p + 1; }
+        let pt: i32 = vec_get(tok_tags, p);
+        if pt != 5 {
+            if pt != 86 { return 0 - 1; }
+        }
+        p = p + 1;
+        if vec_get(tok_tags, p) != 14 { return 0 - 1; }
+        p = p + 1;
+        p = scan_type_tag_at(tok_tags, source, starts, ends,
+                              struct_names, enum_names,
+                              type_params, tp_limit,
+                              p, out_param_types);
+        if p < 0 { return 0 - 1; }
+        found = found + 1;
+        if vec_get(tok_tags, p) == 12 { p = p + 1; }
+    }
+    return 0;
+}
+
 /* ── contract_expr scoped flag (SML withContractExpr) ────────
    SML uses a mutable bool ref toggled by withContractExpr; sv0
    decomposes into enter/exit and a pure query.  The flag is
@@ -2137,6 +2371,184 @@ fn test_scan_enum_variant_names() -> i32 {
     return 0;
 }
 
+fn test_scan_type_tag_at() -> i32 {
+    let source: string = "i32 bool Foo Bar T Vec < i32 > ( ) & i32 i32";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 22);
+    vec_push(starts, 23); vec_push(ends, 24);
+    vec_push(starts, 25); vec_push(ends, 28);
+    vec_push(starts, 29); vec_push(ends, 30);
+    vec_push(starts, 31); vec_push(ends, 32);
+    vec_push(starts, 33); vec_push(ends, 34);
+    vec_push(starts, 35); vec_push(ends, 36);
+    vec_push(starts, 37); vec_push(ends, 40);
+    vec_push(starts, 41); vec_push(ends, 44);
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 5);
+    vec_push(tt, 5);
+    vec_push(tt, 5);
+    vec_push(tt, 5);
+    vec_push(tt, 5);
+    vec_push(tt, 5);
+    vec_push(tt, 38);
+    vec_push(tt, 5);
+    vec_push(tt, 39);
+    vec_push(tt, 6);
+    vec_push(tt, 7);
+    vec_push(tt, 27);
+    vec_push(tt, 5);
+    vec_push(tt, 5);
+    let sn: Vec<i32> = vec_new();
+    vec_push(sn, 2);
+    let en: Vec<i32> = vec_new();
+    vec_push(en, 3);
+    let tp: Vec<i32> = vec_new();
+    vec_push(tp, 4);
+    vec_push(tp, 99);
+    let out: Vec<i32> = vec_new();
+    let p0: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 0, out);
+    if p0 != 1 { return 1; }
+    if vec_get(out, 0) != 0 { return 2; }
+    let out1: Vec<i32> = vec_new();
+    let p1: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 1, out1);
+    if p1 != 2 { return 3; }
+    if vec_get(out1, 0) != 3 { return 4; }
+    let out2: Vec<i32> = vec_new();
+    let p2: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 2, out2);
+    if p2 != 3 { return 5; }
+    if vec_get(out2, 0) != 6 { return 6; }
+    let out3: Vec<i32> = vec_new();
+    let p3: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 3, out3);
+    if p3 != 4 { return 7; }
+    if vec_get(out3, 0) != 7 { return 8; }
+    let out4: Vec<i32> = vec_new();
+    let p4: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 4, out4);
+    if p4 != 5 { return 9; }
+    if vec_get(out4, 0) != 16 { return 10; }
+    let out5: Vec<i32> = vec_new();
+    let p5: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 5, out5);
+    if p5 != 9 { return 11; }
+    if vec_get(out5, 0) != 15 { return 12; }
+    let out6: Vec<i32> = vec_new();
+    let p6: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 9, out6);
+    if p6 != 11 { return 13; }
+    if vec_get(out6, 0) != 2 { return 14; }
+    let out7: Vec<i32> = vec_new();
+    let p7: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en,
+                                    tp, 2, 11, out7);
+    if p7 != 13 { return 15; }
+    if vec_get(out7, 0) != 12 { return 16; }
+    return 0;
+}
+
+fn test_scan_struct_field_type_tags() -> i32 {
+    let source: string = "struct Pt { x : i32 , y : bool }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 9);
+    vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(starts, 12); vec_push(ends, 13);
+    vec_push(starts, 14); vec_push(ends, 15);
+    vec_push(starts, 16); vec_push(ends, 19);
+    vec_push(starts, 20); vec_push(ends, 21);
+    vec_push(starts, 22); vec_push(ends, 23);
+    vec_push(starts, 24); vec_push(ends, 25);
+    vec_push(starts, 26); vec_push(ends, 30);
+    vec_push(starts, 31); vec_push(ends, 32);
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 89);
+    vec_push(tt, 5);
+    vec_push(tt, 8);
+    vec_push(tt, 5);
+    vec_push(tt, 14);
+    vec_push(tt, 5);
+    vec_push(tt, 12);
+    vec_push(tt, 5);
+    vec_push(tt, 14);
+    vec_push(tt, 5);
+    vec_push(tt, 9);
+    let fnames: Vec<i32> = vec_new();
+    let fr: i32 = scan_struct_field_names(tt, 1, 2, fnames);
+    if fr != 0 { return 1; }
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let ftypes: Vec<i32> = vec_new();
+    let r: i32 = scan_struct_field_type_tags(tt, source, starts, ends,
+                                              sn, en, tp, 0,
+                                              fnames, ftypes);
+    if r != 0 { return 2; }
+    if vec_len(ftypes) != 2 { return 3; }
+    if vec_get(ftypes, 0) != 0 { return 4; }
+    if vec_get(ftypes, 1) != 3 { return 5; }
+    return 0;
+}
+
+fn test_scan_fn_param_type_tags() -> i32 {
+    let source: string = "fn foo ( x : i32 , y : bool ) -> i32";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(starts, 3); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 20);
+    vec_push(starts, 21); vec_push(ends, 22);
+    vec_push(starts, 23); vec_push(ends, 27);
+    vec_push(starts, 28); vec_push(ends, 29);
+    vec_push(starts, 30); vec_push(ends, 32);
+    vec_push(starts, 33); vec_push(ends, 36);
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 65);
+    vec_push(tt, 5);
+    vec_push(tt, 6);
+    vec_push(tt, 5);
+    vec_push(tt, 14);
+    vec_push(tt, 5);
+    vec_push(tt, 12);
+    vec_push(tt, 5);
+    vec_push(tt, 14);
+    vec_push(tt, 5);
+    vec_push(tt, 7);
+    vec_push(tt, 19);
+    vec_push(tt, 5);
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let ptypes: Vec<i32> = vec_new();
+    let r: i32 = scan_fn_param_type_tags(tt, source, starts, ends,
+                                          sn, en, tp, 0,
+                                          1, 2, ptypes);
+    if r != 0 { return 1; }
+    if vec_len(ptypes) != 2 { return 2; }
+    if vec_get(ptypes, 0) != 0 { return 3; }
+    if vec_get(ptypes, 1) != 3 { return 4; }
+    let ptypes0: Vec<i32> = vec_new();
+    let r0: i32 = scan_fn_param_type_tags(tt, source, starts, ends,
+                                           sn, en, tp, 0,
+                                           1, 0, ptypes0);
+    if r0 != 0 { return 5; }
+    if vec_len(ptypes0) != 0 { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -2230,5 +2642,11 @@ fn main() -> i32 {
     if r45 != 0 { return 470 + r45; }
     let r46: i32 = test_scan_enum_variant_names();
     if r46 != 0 { return 480 + r46; }
+    let r47: i32 = test_scan_type_tag_at();
+    if r47 != 0 { return 490 + r47; }
+    let r48: i32 = test_scan_struct_field_type_tags();
+    if r48 != 0 { return 500 + r48; }
+    let r49: i32 = test_scan_fn_param_type_tags();
+    if r49 != 0 { return 510 + r49; }
     return 0;
 }
