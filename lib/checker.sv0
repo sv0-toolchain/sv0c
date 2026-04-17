@@ -37,6 +37,15 @@
    is a valid ? target: Result(Ok/Err) or Option(Some/None) with
    single-field tuple success variant; returns 1=Result, 2=Option,
    0=not valid, -1=shape mismatch).
+   Full type resolution (batch 41): ast_ty_to_ty_payload
+   (SML astTyToTy full dispatch — resolve_field_ty_tag + payload
+   data: width for int/float, name handle for struct/enum, type
+   param index for TyVar), enum_ctor_count (count variants for
+   an enum by name handle), item_fn_ret_ty_tag (function return
+   type resolution from arena index), binop_result_ty_tag and
+   unop_result_ty_tag (SML synth ExprBinop/ExprUnop result type
+   helpers for Arith→TyInt, Logic/Cmp→TyBool, Neg/BitNot→TyInt,
+   Not→TyBool).
    type_param_push/type_param_restore/type_param_lookup (SML
    withTypeParams decomposed — push/pop generic type param bindings
    into a stride-2 Vec<i32> of (name_handle, ty_tag) pairs).
@@ -75,6 +84,18 @@ fn is_cmp_binop(tag: i32) -> bool { return binop_class(tag) == 2; }
 fn binop_returns_bool(tag: i32) -> bool {
     if is_cmp_binop(tag) { return true; }
     return is_logic_binop(tag);
+}
+
+fn binop_result_ty_tag(op_tag: i32) -> i32 {
+    if is_arith_binop(op_tag) { return TY_INT(); }
+    return TY_BOOL();
+}
+
+fn unop_result_ty_tag(op_tag: i32) -> i32 {
+    if op_tag == 0 { return TY_INT(); }
+    if op_tag == 1 { return TY_BOOL(); }
+    if op_tag == 2 { return TY_INT(); }
+    return TY_UNKNOWN();
 }
 
 /* ── integral type detection ────────────────────────────────── */
@@ -907,6 +928,106 @@ fn resolve_field_ty_tag(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
     return 0 - 1;
 }
 
+/* ── ast_ty_to_ty_payload (SML astTyToTy — full dispatch) ────
+   Extends resolve_field_ty_tag by also returning payload data.
+   For TyInt/TyUint/TyFloat: pushes width (8/16/32/64/128) to out.
+   For TyStruct/TyEnum: pushes name token handle to out.
+   For TyVar: pushes the type parameter index to out.
+   For simple types (TyUnit, TyBool, etc.): out unchanged.
+   Returns the type tag, or -1 for unknown.  */
+
+fn ast_ty_to_ty_payload(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                        ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                        pp: Vec<i32>,
+                        source: string, starts: Vec<i32>,
+                        ends: Vec<i32>,
+                        struct_names: Vec<i32>, enum_names: Vec<i32>,
+                        type_params: Vec<i32>, tp_limit: i32,
+                        idx: i32, out_payload: Vec<i32>) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    let tag: i32 = vec_get(ty_tags, idx);
+    if tag == 6 { return TY_UNIT(); }
+    if tag == 2 { return TY_REF(); }
+    if tag == 3 { return TY_REFMUT(); }
+    if tag == 7 { return TY_TUPLE(); }
+    if tag == 0 {
+        let seg_count: i32 = vec_get(ty_d2, idx);
+        if seg_count == 1 {
+            let pps: i32 = vec_get(ty_d1, idx);
+            let tok: i32 = vec_get(pp, pps);
+            let s: i32 = vec_get(starts, tok);
+            let e: i32 = vec_get(ends, tok);
+            let name: string = string_substr(source, s, e - s);
+            let prim: i32 = ast_type_name_to_tag(name);
+            if prim >= 0 {
+                let w: i32 = int_width_from_name(name);
+                if w > 0 { vec_push(out_payload, w); }
+                return prim;
+            }
+            let mut ni: i32 = 0;
+            while ni < vec_len(struct_names) {
+                if vec_get(struct_names, ni) == tok {
+                    vec_push(out_payload, tok);
+                    return TY_STRUCT();
+                }
+                ni = ni + 1;
+            }
+            let mut ei: i32 = 0;
+            while ei < vec_len(enum_names) {
+                if vec_get(enum_names, ei) == tok {
+                    vec_push(out_payload, tok);
+                    return TY_ENUM();
+                }
+                ei = ei + 1;
+            }
+            let tp: i32 = type_param_lookup(type_params, tp_limit, tok);
+            if tp >= 0 {
+                vec_push(out_payload, tp);
+                return TY_VAR();
+            }
+            return 0 - 1;
+        }
+        return 0 - 1;
+    }
+    return 0 - 1;
+}
+
+/* ── enum_ctor_count (variant count for an enum) ───────────── */
+
+fn enum_ctor_count(variant_enum_ids: Vec<i32>, enum_name: i32) -> i32 {
+    let nv: i32 = vec_len(variant_enum_ids);
+    let mut count: i32 = 0;
+    let mut j: i32 = 0;
+    while j < nv {
+        if vec_get(variant_enum_ids, j) == enum_name {
+            count = count + 1;
+        }
+        j = j + 1;
+    }
+    return count;
+}
+
+/* ── item_fn_ret_ty_tag (function return type tag) ──────────
+   Given a function item's return type arena index (or -1 for
+   no explicit return type), resolves to a Ty tag.  Returns
+   TY_UNKNOWN (-1) if no return type or type not found.
+   Building block for itemFnTy / modEnvFromProg. */
+
+fn item_fn_ret_ty_tag(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                      ty_d2: Vec<i32>, ty_d3: Vec<i32>,
+                      pp: Vec<i32>,
+                      source: string, starts: Vec<i32>,
+                      ends: Vec<i32>,
+                      struct_names: Vec<i32>, enum_names: Vec<i32>,
+                      type_params: Vec<i32>, tp_limit: i32,
+                      ret_idx: i32) -> i32 {
+    if ret_idx < 0 { return TY_UNKNOWN(); }
+    return resolve_field_ty_tag(ty_tags, ty_d1, ty_d2, ty_d3,
+                                pp, source, starts, ends,
+                                struct_names, enum_names,
+                                type_params, tp_limit, ret_idx);
+}
+
 /* ── contract_expr scoped flag (SML withContractExpr) ────────
    SML uses a mutable bool ref toggled by withContractExpr; sv0
    decomposes into enter/exit and a pure query.  The flag is
@@ -1642,6 +1763,92 @@ fn test_try_success_validate() -> i32 {
     return 0;
 }
 
+fn test_binop_unop_result_ty() -> i32 {
+    if binop_result_ty_tag(0) != TY_INT() { return 1; }
+    if binop_result_ty_tag(1) != TY_INT() { return 2; }
+    if binop_result_ty_tag(11) != TY_BOOL() { return 3; }
+    if binop_result_ty_tag(5) != TY_BOOL() { return 4; }
+    if unop_result_ty_tag(0) != TY_INT() { return 5; }
+    if unop_result_ty_tag(1) != TY_BOOL() { return 6; }
+    if unop_result_ty_tag(2) != TY_INT() { return 7; }
+    if unop_result_ty_tag(99) != TY_UNKNOWN() { return 8; }
+    return 0;
+}
+
+fn test_int_width_from_name() -> i32 {
+    if int_width_from_name("i32") != 32 { return 1; }
+    if int_width_from_name("u64") != 64 { return 2; }
+    if int_width_from_name("i8") != 8 { return 3; }
+    if int_width_from_name("f64") != 64 { return 4; }
+    if int_width_from_name("bool") != 0 { return 5; }
+    if int_width_from_name("string") != 0 { return 6; }
+    if int_width_from_name("i128") != 128 { return 7; }
+    return 0;
+}
+
+fn test_ast_ty_payload() -> i32 {
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    let td3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let src: string = "i32MyStruct";
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0);
+    vec_push(en, 3);
+    vec_push(st, 3);
+    vec_push(en, 11);
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    vec_push(tt, 0);
+    vec_push(td1, 0);
+    vec_push(td2, 1);
+    vec_push(td3, 0);
+    let sn: Vec<i32> = vec_new();
+    vec_push(sn, 1);
+    let enn: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let op1: Vec<i32> = vec_new();
+    let r1: i32 = ast_ty_to_ty_payload(tt, td1, td2, td3, pp,
+                      src, st, en, sn, enn, tp, 0, 0, op1);
+    if r1 != TY_INT() { return 1; }
+    if vec_len(op1) != 1 { return 2; }
+    if vec_get(op1, 0) != 32 { return 3; }
+    let op2: Vec<i32> = vec_new();
+    vec_push(tt, 0);
+    vec_push(td1, 1);
+    vec_push(td2, 1);
+    vec_push(td3, 0);
+    let r2: i32 = ast_ty_to_ty_payload(tt, td1, td2, td3, pp,
+                      src, st, en, sn, enn, tp, 0, 1, op2);
+    if r2 != TY_STRUCT() { return 4; }
+    if vec_len(op2) != 1 { return 5; }
+    if vec_get(op2, 0) != 1 { return 6; }
+    let op3: Vec<i32> = vec_new();
+    vec_push(tt, 6);
+    vec_push(td1, 0);
+    vec_push(td2, 0);
+    vec_push(td3, 0);
+    let r3: i32 = ast_ty_to_ty_payload(tt, td1, td2, td3, pp,
+                      src, st, en, sn, enn, tp, 0, 2, op3);
+    if r3 != TY_UNIT() { return 7; }
+    if vec_len(op3) != 0 { return 8; }
+    return 0;
+}
+
+fn test_enum_ctor_count() -> i32 {
+    let vei: Vec<i32> = vec_new();
+    vec_push(vei, 100);
+    vec_push(vei, 100);
+    vec_push(vei, 200);
+    vec_push(vei, 100);
+    if enum_ctor_count(vei, 100) != 3 { return 1; }
+    if enum_ctor_count(vei, 200) != 1 { return 2; }
+    if enum_ctor_count(vei, 999) != 0 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -1719,5 +1926,13 @@ fn main() -> i32 {
     if r37 != 0 { return 390 + r37; }
     let r38: i32 = test_try_success_validate();
     if r38 != 0 { return 400 + r38; }
+    let r39: i32 = test_int_width_from_name();
+    if r39 != 0 { return 410 + r39; }
+    let r40: i32 = test_ast_ty_payload();
+    if r40 != 0 { return 420 + r40; }
+    let r41: i32 = test_enum_ctor_count();
+    if r41 != 0 { return 430 + r41; }
+    let r42: i32 = test_binop_unop_result_ty();
+    if r42 != 0 { return 440 + r42; }
     return 0;
 }
