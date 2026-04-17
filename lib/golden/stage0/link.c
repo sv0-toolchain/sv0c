@@ -31,6 +31,9 @@ static int map_path_segs_needs_mangle(int tops, int seg_count, int first_seg);
 static const char* map_path_segs_mangle_first(const char* mod_id, const char* first_seg_str);
 static const char* map_path_segs_rewrite_1(int tops, const char* mod_id, int seg_handle, const char* seg_str);
 static const char* map_path_segs_rewrite_2(int tops, const char* mod_id, int first_handle, const char* first_str);
+static int strip_link_directives(int item_tags, int out_indices);
+static int split_module_name(int item_tags, int item_d1, int pp, int default_name);
+static int split_module_body_start(int item_tags);
 static int test_is_sv0(void);
 static int test_is_hidden(void);
 static int test_file_stem(void);
@@ -50,6 +53,8 @@ static int test_item_rewrite(void);
 static int test_collect_top_names(void);
 static int test_map_path_segs_rewrite(void);
 static int test_map_path_segs(void);
+static int test_strip_link_directives(void);
+static int test_split_module_name(void);
 
 static int is_sv0(const char* name) {
   int _sv0t0 = sv0_string_len(name);
@@ -471,6 +476,56 @@ static const char* map_path_segs_rewrite_2(int tops, const char* mod_id, int fir
   } else {
   }
   return first_str;
+}
+
+static int strip_link_directives(int item_tags, int out_indices) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int len = _sv0t0;
+  int i = 0;
+  while ((i < len)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    int tag = _sv0t1;
+    int _sv0t2 = is_link_directive(tag);
+    if ((_sv0t2 != 1)) {
+      sv0_vec_push(out_indices, i);
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t3 = sv0_vec_len(out_indices);
+  return _sv0t3;
+}
+
+static int split_module_name(int item_tags, int item_d1, int pp, int default_name) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  if ((_sv0t0 == 0)) {
+    return default_name;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(item_tags, 0);
+  int first = _sv0t1;
+  if ((first == 6)) {
+    int _sv0t2 = sv0_vec_get(item_d1, 0);
+    int pp_start = _sv0t2;
+    int _sv0t3 = sv0_vec_get(pp, pp_start);
+    return _sv0t3;
+  } else {
+  }
+  return default_name;
+}
+
+static int split_module_body_start(int item_tags) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  if ((_sv0t0 == 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(item_tags, 0);
+  if ((_sv0t1 == 6)) {
+    return 1;
+  } else {
+  }
+  return 0;
 }
 
 static int test_is_sv0(void) {
@@ -1098,6 +1153,111 @@ static int test_map_path_segs(void) {
   return 0;
 }
 
+static int test_strip_link_directives(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(it, 5);
+  sv0_vec_push(it, 1);
+  sv0_vec_push(it, 6);
+  sv0_vec_push(it, 2);
+  int _sv0t1 = sv0_vec_new();
+  int out = _sv0t1;
+  int _sv0t2 = strip_link_directives(it, out);
+  int n = _sv0t2;
+  if ((n != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(out, 0);
+  if ((_sv0t3 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(out, 1);
+  if ((_sv0t4 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(out, 2);
+  if ((_sv0t5 != 4)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int empty_it = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int empty_out = _sv0t7;
+  int _sv0t8 = strip_link_directives(empty_it, empty_out);
+  if ((_sv0t8 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int all_use = _sv0t9;
+  sv0_vec_push(all_use, 5);
+  sv0_vec_push(all_use, 6);
+  int _sv0t10 = sv0_vec_new();
+  int au_out = _sv0t10;
+  int _sv0t11 = strip_link_directives(all_use, au_out);
+  if ((_sv0t11 != 0)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_split_module_name(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int id1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int pp = _sv0t2;
+  sv0_vec_push(it, 6);
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(pp, 42);
+  int _sv0t3 = split_module_name(it, id1, pp, 99);
+  if ((_sv0t3 != 42)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = split_module_body_start(it);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_new();
+  int it2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int id1b = _sv0t6;
+  sv0_vec_push(it2, 0);
+  sv0_vec_push(id1b, 10);
+  int _sv0t7 = split_module_name(it2, id1b, pp, 99);
+  if ((_sv0t7 != 99)) {
+    return 3;
+  } else {
+  }
+  int _sv0t8 = split_module_body_start(it2);
+  if ((_sv0t8 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int empty = _sv0t9;
+  int _sv0t10 = split_module_name(empty, id1, pp, 77);
+  if ((_sv0t10 != 77)) {
+    return 5;
+  } else {
+  }
+  int _sv0t11 = split_module_body_start(empty);
+  if ((_sv0t11 != 0)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_is_sv0();
   int r1 = _sv0t0;
@@ -1229,6 +1389,20 @@ int main(void) {
   if ((r19 != 0)) {
     int _sv0t36 = (190 + r19);
     return _sv0t36;
+  } else {
+  }
+  int _sv0t37 = test_strip_link_directives();
+  int r20 = _sv0t37;
+  if ((r20 != 0)) {
+    int _sv0t38 = (200 + r20);
+    return _sv0t38;
+  } else {
+  }
+  int _sv0t39 = test_split_module_name();
+  int r21 = _sv0t39;
+  if ((r21 != 0)) {
+    int _sv0t40 = (210 + r21);
+    return _sv0t40;
   } else {
   }
   return 0;

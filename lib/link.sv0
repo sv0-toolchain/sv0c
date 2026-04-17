@@ -279,6 +279,48 @@ fn map_path_segs_rewrite_2(tops: Vec<i32>, mod_id: string,
     return first_str;
 }
 
+/* ── strip_link_directives (SML stripLinkDirectives) ─────────
+   Build a Vec of item indices that are NOT use/module directives.
+   The caller can iterate the output to process only real items. */
+
+fn strip_link_directives(item_tags: Vec<i32>,
+                         out_indices: Vec<i32>) -> i32 {
+    let len: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    while i < len {
+        let tag: i32 = vec_get(item_tags, i);
+        if is_link_directive(tag) != true {
+            vec_push(out_indices, i);
+        }
+        i = i + 1;
+    }
+    return vec_len(out_indices);
+}
+
+/* ── split_module_name (SML splitModule) ─────────────────────
+   If the first item is ItemModule (tag 6), extract the module
+   name handle from the path pool and return it.  Otherwise
+   return the default_name handle.  Also returns the index of
+   the first non-module item (0 if no wrapper, 1 if present). */
+
+fn split_module_name(item_tags: Vec<i32>, item_d1: Vec<i32>,
+                     pp: Vec<i32>,
+                     default_name: i32) -> i32 {
+    if vec_len(item_tags) == 0 { return default_name; }
+    let first: i32 = vec_get(item_tags, 0);
+    if first == 6 {
+        let pp_start: i32 = vec_get(item_d1, 0);
+        return vec_get(pp, pp_start);
+    }
+    return default_name;
+}
+
+fn split_module_body_start(item_tags: Vec<i32>) -> i32 {
+    if vec_len(item_tags) == 0 { return 0; }
+    if vec_get(item_tags, 0) == 6 { return 1; }
+    return 0;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_is_sv0() -> i32 {
@@ -491,6 +533,51 @@ fn test_map_path_segs() -> i32 {
     return 0;
 }
 
+fn test_strip_link_directives() -> i32 {
+    let it: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    vec_push(it, 5);
+    vec_push(it, 1);
+    vec_push(it, 6);
+    vec_push(it, 2);
+    let out: Vec<i32> = vec_new();
+    let n: i32 = strip_link_directives(it, out);
+    if n != 3 { return 1; }
+    if vec_get(out, 0) != 0 { return 2; }
+    if vec_get(out, 1) != 2 { return 3; }
+    if vec_get(out, 2) != 4 { return 4; }
+    let empty_it: Vec<i32> = vec_new();
+    let empty_out: Vec<i32> = vec_new();
+    if strip_link_directives(empty_it, empty_out) != 0 { return 5; }
+    let all_use: Vec<i32> = vec_new();
+    vec_push(all_use, 5);
+    vec_push(all_use, 6);
+    let au_out: Vec<i32> = vec_new();
+    if strip_link_directives(all_use, au_out) != 0 { return 6; }
+    return 0;
+}
+
+fn test_split_module_name() -> i32 {
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(it, 6);
+    vec_push(id1, 0);
+    vec_push(pp, 42);
+    if split_module_name(it, id1, pp, 99) != 42 { return 1; }
+    if split_module_body_start(it) != 1 { return 2; }
+    let it2: Vec<i32> = vec_new();
+    let id1b: Vec<i32> = vec_new();
+    vec_push(it2, 0);
+    vec_push(id1b, 10);
+    if split_module_name(it2, id1b, pp, 99) != 99 { return 3; }
+    if split_module_body_start(it2) != 0 { return 4; }
+    let empty: Vec<i32> = vec_new();
+    if split_module_name(empty, id1, pp, 77) != 77 { return 5; }
+    if split_module_body_start(empty) != 0 { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_sv0();
     if r1 != 0 { return r1; }
@@ -530,5 +617,9 @@ fn main() -> i32 {
     if r18 != 0 { return 180 + r18; }
     let r19: i32 = test_map_path_segs_rewrite();
     if r19 != 0 { return 190 + r19; }
+    let r20: i32 = test_strip_link_directives();
+    if r20 != 0 { return 200 + r20; }
+    let r21: i32 = test_split_module_name();
+    if r21 != 0 { return 210 + r21; }
     return 0;
 }

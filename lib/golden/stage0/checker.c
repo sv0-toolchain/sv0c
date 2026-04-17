@@ -100,6 +100,9 @@ static int stmt_returns_arena(int et, int ed1, int idx);
 static int last_stmt_returns_arena(int et, int ed1, int first_stmt, int stmt_count);
 static const char* chk_tok_str(const char* source, int starts, int ends, int pos);
 static int expr_references_result(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp);
+static int type_param_push(int type_params, int new_names, int new_tags);
+static int type_param_lookup(int type_params, int limit, int name);
+static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int idx);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -132,6 +135,8 @@ static int test_stmt_returns_arena(void);
 static int test_last_stmt_returns_arena(void);
 static int test_expr_references_result(void);
 static int test_ast_ty_types_tag(void);
+static int test_type_params(void);
+static int test_resolve_field_ty(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -1504,6 +1509,129 @@ static int expr_references_result(int et, int ed1, int ed2, int ed3, int ed4, in
   return 0;
 }
 
+static int type_param_push(int type_params, int new_names, int new_tags) {
+  int _sv0t0 = sv0_vec_len(type_params);
+  int saved = _sv0t0;
+  int _sv0t1 = sv0_vec_len(new_names);
+  int count = _sv0t1;
+  int i = 0;
+  while ((i < count)) {
+    int _sv0t2 = sv0_vec_get(new_names, i);
+    sv0_vec_push(type_params, _sv0t2);
+    int _sv0t3 = sv0_vec_get(new_tags, i);
+    sv0_vec_push(type_params, _sv0t3);
+    i = (i + 1);
+  }
+  return saved;
+}
+
+static int type_param_lookup(int type_params, int limit, int name) {
+  int i = (limit - 2);
+  while ((i >= 0)) {
+    int _sv0t0 = sv0_vec_get(type_params, i);
+    if ((_sv0t0 == name)) {
+      int _sv0t1 = (i + 1);
+      int _sv0t2 = sv0_vec_get(type_params, _sv0t1);
+      return _sv0t2;
+    } else {
+    }
+    i = (i - 2);
+  }
+  int _sv0t3 = (0 - 1);
+  return _sv0t3;
+}
+
+static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int idx) {
+  if ((idx < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(ty_tags, idx);
+  int tag = _sv0t1;
+  if ((tag == 6)) {
+    int _sv0t2 = TY_UNIT();
+    return _sv0t2;
+  } else {
+  }
+  if ((tag == 2)) {
+    int _sv0t3 = TY_REF();
+    return _sv0t3;
+  } else {
+  }
+  if ((tag == 3)) {
+    int _sv0t4 = TY_REFMUT();
+    return _sv0t4;
+  } else {
+  }
+  if ((tag == 7)) {
+    int _sv0t5 = TY_TUPLE();
+    return _sv0t5;
+  } else {
+  }
+  if ((tag == 0)) {
+    int _sv0t6 = sv0_vec_get(ty_d2, idx);
+    int seg_count = _sv0t6;
+    if ((seg_count == 1)) {
+      int _sv0t7 = sv0_vec_get(ty_d1, idx);
+      int pps = _sv0t7;
+      int _sv0t8 = sv0_vec_get(pp, pps);
+      int tok = _sv0t8;
+      int _sv0t9 = sv0_vec_get(starts, tok);
+      int s = _sv0t9;
+      int _sv0t10 = sv0_vec_get(ends, tok);
+      int e = _sv0t10;
+      int _sv0t11 = (e - s);
+      const char* _sv0t12 = sv0_string_substr(source, s, _sv0t11);
+      const char* name;
+      name = _sv0t12;
+      int _sv0t13 = ast_ty_to_types_tag(name);
+      int prim = _sv0t13;
+      if ((prim >= 0)) {
+        return prim;
+      } else {
+      }
+      int ni = 0;
+      int _sv0t14 = sv0_vec_len(struct_names);
+      while ((ni < _sv0t14)) {
+        int _sv0t15 = sv0_vec_get(struct_names, ni);
+        if ((_sv0t15 == tok)) {
+          int _sv0t16 = TY_STRUCT();
+          return _sv0t16;
+        } else {
+        }
+        ni = (ni + 1);
+      }
+      int ei = 0;
+      int _sv0t17 = sv0_vec_len(enum_names);
+      while ((ei < _sv0t17)) {
+        int _sv0t18 = sv0_vec_get(enum_names, ei);
+        if ((_sv0t18 == tok)) {
+          int _sv0t19 = TY_ENUM();
+          return _sv0t19;
+        } else {
+        }
+        ei = (ei + 1);
+      }
+      int _sv0t20 = type_param_lookup(type_params, tp_limit, tok);
+      int tp = _sv0t20;
+      if ((tp >= 0)) {
+        int _sv0t21 = TY_VAR();
+        return _sv0t21;
+      } else {
+      }
+      int _sv0t22 = (0 - 1);
+      return _sv0t22;
+    } else {
+    }
+    int _sv0t23 = (0 - 1);
+    return _sv0t23;
+  } else {
+  }
+  int _sv0t24 = (0 - 1);
+  return _sv0t24;
+}
+
 static int test_binop_class(void) {
   int _sv0t0 = binop_class(0);
   if ((_sv0t0 != 0)) {
@@ -2738,6 +2866,181 @@ static int test_ast_ty_types_tag(void) {
   return 0;
 }
 
+static int test_type_params(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tp = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int names = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int tags = _sv0t2;
+  sv0_vec_push(names, 10);
+  sv0_vec_push(tags, 16);
+  sv0_vec_push(names, 20);
+  sv0_vec_push(tags, 16);
+  int _sv0t3 = type_param_push(tp, names, tags);
+  int saved = _sv0t3;
+  if ((saved != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_len(tp);
+  if ((_sv0t4 != 4)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = type_param_lookup(tp, 4, 10);
+  if ((_sv0t5 != 16)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = type_param_lookup(tp, 4, 20);
+  if ((_sv0t6 != 16)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = type_param_lookup(tp, 4, 99);
+  int _sv0t8 = (0 - 1);
+  if ((_sv0t7 != _sv0t8)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int n2 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int t2 = _sv0t10;
+  sv0_vec_push(n2, 30);
+  sv0_vec_push(t2, 16);
+  int _sv0t11 = type_param_push(tp, n2, t2);
+  int saved2 = _sv0t11;
+  if ((saved2 != 4)) {
+    return 6;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_len(tp);
+  if ((_sv0t12 != 6)) {
+    return 7;
+  } else {
+  }
+  int _sv0t13 = type_param_lookup(tp, 6, 30);
+  if ((_sv0t13 != 16)) {
+    return 8;
+  } else {
+  }
+  int _sv0t14 = type_param_lookup(tp, saved2, 30);
+  int _sv0t15 = (0 - 1);
+  if ((_sv0t14 != _sv0t15)) {
+    return 9;
+  } else {
+  }
+  int _sv0t16 = type_param_lookup(tp, saved2, 10);
+  if ((_sv0t16 != 16)) {
+    return 10;
+  } else {
+  }
+  int _sv0t17 = type_param_lookup(tp, saved, 10);
+  int _sv0t18 = (0 - 1);
+  if ((_sv0t17 != _sv0t18)) {
+    return 11;
+  } else {
+  }
+  return 0;
+}
+
+static int test_resolve_field_ty(void) {
+  const char* source;
+  source = "i32 bool Foo";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 4);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 12);
+  int _sv0t2 = sv0_vec_new();
+  int tt = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int td1 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int td2 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int td3 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int pp = _sv0t6;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 1);
+  sv0_vec_push(td3, 0);
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td3, 0);
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(td1, 1);
+  sv0_vec_push(td2, 1);
+  sv0_vec_push(td3, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t7 = sv0_vec_new();
+  int sn = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int en = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int tp = _sv0t9;
+  int _sv0t10 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, 0);
+  int r0 = _sv0t10;
+  if ((r0 != 7)) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, 1);
+  int r1 = _sv0t11;
+  if ((r1 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, 2);
+  int r2 = _sv0t12;
+  if ((r2 != 1)) {
+    return 3;
+  } else {
+  }
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(td1, 2);
+  sv0_vec_push(td2, 1);
+  sv0_vec_push(td3, 0);
+  sv0_vec_push(pp, 2);
+  sv0_vec_push(sn, 2);
+  int _sv0t13 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, 3);
+  int r3 = _sv0t13;
+  if ((r3 != 6)) {
+    return 4;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_new();
+  int en2 = _sv0t14;
+  sv0_vec_push(en2, 2);
+  int _sv0t15 = sv0_vec_new();
+  int sn2 = _sv0t15;
+  int _sv0t16 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn2, en2, tp, 0, 3);
+  int r4 = _sv0t16;
+  if ((r4 != 7)) {
+    return 5;
+  } else {
+  }
+  int _sv0t17 = (0 - 1);
+  int _sv0t18 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, _sv0t17);
+  int r_bad = _sv0t18;
+  int _sv0t19 = (0 - 1);
+  if ((r_bad != _sv0t19)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -2960,6 +3263,20 @@ int main(void) {
   if ((r32 != 0)) {
     int _sv0t62 = (330 + r32);
     return _sv0t62;
+  } else {
+  }
+  int _sv0t63 = test_type_params();
+  int r33 = _sv0t63;
+  if ((r33 != 0)) {
+    int _sv0t64 = (340 + r33);
+    return _sv0t64;
+  } else {
+  }
+  int _sv0t65 = test_resolve_field_ty();
+  int r34 = _sv0t65;
+  if ((r34 != 0)) {
+    int _sv0t66 = (360 + r34);
+    return _sv0t66;
   } else {
   }
   return 0;
