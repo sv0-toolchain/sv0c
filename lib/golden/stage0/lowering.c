@@ -70,6 +70,9 @@ static int mentions_result(int et, int ed1, int ed2, int ed3, int ed4, int idx, 
 static int all_old_names_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp, int out);
 static int expr_init_cty(int et, int ed1, int ed2, int ed3, int ed4, int idx, int pp, int fn_names, int fn_ret_ctys, int aliases);
 static int scan_lets(int et, int ed1, int ed2, int ed3, int ed4, int block_idx, int pp, int fn_names, int fn_ret_ctys, int aliases, int out_names, int out_ctys);
+static int scrut_locals_push(int scrut_names, int scrut_types, int extra_names, int extra_types);
+static int scrut_local_lookup_bounded(int scrut_names, int limit, int name_h);
+static int lower_alias_replace(int target, int from_handles, int to_handles);
 static int test_fresh_tmp(void);
 static int test_split_qname(void);
 static int test_binop_to_c(void);
@@ -112,6 +115,8 @@ static int test_expr_init_cty(void);
 static int test_try_variant_lookup(void);
 static int test_find_variant_in_items(void);
 static int test_scan_lets(void);
+static int test_scrut_locals_push(void);
+static int test_alias_replace(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -1909,6 +1914,50 @@ static int scan_lets(int et, int ed1, int ed2, int ed3, int ed4, int block_idx, 
   return count;
 }
 
+static int scrut_locals_push(int scrut_names, int scrut_types, int extra_names, int extra_types) {
+  int _sv0t0 = sv0_vec_len(scrut_names);
+  int saved = _sv0t0;
+  int _sv0t1 = sv0_vec_len(extra_names);
+  int en = _sv0t1;
+  int i = 0;
+  while ((i < en)) {
+    int _sv0t2 = sv0_vec_get(extra_names, i);
+    sv0_vec_push(scrut_names, _sv0t2);
+    int _sv0t3 = sv0_vec_get(extra_types, i);
+    sv0_vec_push(scrut_types, _sv0t3);
+    i = (i + 1);
+  }
+  return saved;
+}
+
+static int scrut_local_lookup_bounded(int scrut_names, int limit, int name_h) {
+  int i = 0;
+  while ((i < limit)) {
+    int _sv0t0 = sv0_vec_get(scrut_names, i);
+    if ((_sv0t0 == name_h)) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t1 = (0 - 1);
+  return _sv0t1;
+}
+
+static int lower_alias_replace(int target, int from_handles, int to_handles) {
+  int _sv0t0 = sv0_vec_len(from_handles);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(from_handles, i);
+    sv0_vec_push(target, _sv0t1);
+    int _sv0t2 = sv0_vec_get(to_handles, i);
+    sv0_vec_push(target, _sv0t2);
+    i = (i + 1);
+  }
+  return n;
+}
+
 static int test_fresh_tmp(void) {
   int _sv0t0 = fresh_tmp_name(0);
   if ((_sv0t0 != 0)) {
@@ -3680,6 +3729,101 @@ static int test_scan_lets(void) {
   return 0;
 }
 
+static int test_scrut_locals_push(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  sv0_vec_push(sn, 100);
+  sv0_vec_push(st, 200);
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int et = _sv0t3;
+  sv0_vec_push(en, 300);
+  sv0_vec_push(et, 400);
+  int _sv0t4 = scrut_locals_push(sn, st, en, et);
+  int saved = _sv0t4;
+  if ((saved != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_len(sn);
+  if ((_sv0t5 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(sn, 1);
+  if ((_sv0t6 != 300)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = scrut_local_lookup_bounded(sn, saved, 300);
+  int r1 = _sv0t7;
+  int _sv0t8 = (0 - 1);
+  if ((r1 != _sv0t8)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = scrut_local_lookup_bounded(sn, 2, 300);
+  int r2 = _sv0t9;
+  if ((r2 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t10 = scrut_local_lookup_bounded(sn, 2, 100);
+  int r3 = _sv0t10;
+  if ((r3 != 0)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_alias_replace(void) {
+  int _sv0t0 = sv0_vec_new();
+  int from = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int to = _sv0t1;
+  sv0_vec_push(from, 10);
+  sv0_vec_push(from, 20);
+  sv0_vec_push(to, 11);
+  sv0_vec_push(to, 21);
+  int _sv0t2 = lower_alias_new();
+  int tgt = _sv0t2;
+  int _sv0t3 = lower_alias_replace(tgt, from, to);
+  int c = _sv0t3;
+  if ((c != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_len(tgt);
+  if ((_sv0t4 != 4)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = lower_alias_lookup(tgt, 10);
+  int r1 = _sv0t5;
+  if ((r1 != 11)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = lower_alias_lookup(tgt, 20);
+  int r2 = _sv0t6;
+  if ((r2 != 21)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = lower_alias_lookup(tgt, 99);
+  int r3 = _sv0t7;
+  int _sv0t8 = (0 - 1);
+  if ((r3 != _sv0t8)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -3972,6 +4116,20 @@ int main(void) {
   if ((r42 != 0)) {
     int _sv0t82 = (440 + r42);
     return _sv0t82;
+  } else {
+  }
+  int _sv0t83 = test_scrut_locals_push();
+  int r43 = _sv0t83;
+  if ((r43 != 0)) {
+    int _sv0t84 = (450 + r43);
+    return _sv0t84;
+  } else {
+  }
+  int _sv0t85 = test_alias_replace();
+  int r44 = _sv0t85;
+  if ((r44 != 0)) {
+    int _sv0t86 = (460 + r44);
+    return _sv0t86;
   } else {
   }
   return 0;

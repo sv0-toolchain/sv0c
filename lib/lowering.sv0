@@ -30,6 +30,10 @@
    tryVariantNames — full arena lookup with string-based Ok/Err/Some/None
    detection; returns success+failure variant handles), find_variant_in_items
    (SML findVariantAst — find variant flat index within an enum's item arena).
+   Scoped state helpers (batch 39): scrut_locals_push /
+   scrut_local_lookup_bounded (SML withScrutLocals — push extra
+   scrut bindings with logical-length restore), lower_alias_replace
+   (SML setImportAliases — bulk alias table fill from parallel Vecs).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -1258,6 +1262,58 @@ fn scan_lets(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return count;
 }
 
+/* ── scrut_locals_push (SML withScrutLocals) ─────────────────
+   Same logical-length model as type_param_push: scrut locals
+   are stride-2 (name_handle, type_string_handle) in parallel
+   Vecs.  Push returns the saved length; callers pass saved_len
+   as limit to scrut_local_lookup to restrict scope.
+   "restore" = use the saved_len as limit.                   */
+
+fn scrut_locals_push(scrut_names: Vec<i32>,
+                     scrut_types: Vec<i32>,
+                     extra_names: Vec<i32>,
+                     extra_types: Vec<i32>) -> i32 {
+    let saved: i32 = vec_len(scrut_names);
+    let en: i32 = vec_len(extra_names);
+    let mut i: i32 = 0;
+    while i < en {
+        vec_push(scrut_names, vec_get(extra_names, i));
+        vec_push(scrut_types, vec_get(extra_types, i));
+        i = i + 1;
+    }
+    return saved;
+}
+
+fn scrut_local_lookup_bounded(scrut_names: Vec<i32>,
+                              limit: i32,
+                              name_h: i32) -> i32 {
+    let mut i: i32 = 0;
+    while i < limit {
+        if vec_get(scrut_names, i) == name_h { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── lower_alias_replace (SML setImportAliases) ─────────────
+   Bulk replace the import alias table.  Takes source parallel
+   Vecs of (from, to) handles and fills the target alias Vec
+   (stride-2).  Returns the new count.  Callers allocate a
+   fresh Vec via lower_alias_new() before calling.           */
+
+fn lower_alias_replace(target: Vec<i32>,
+                       from_handles: Vec<i32>,
+                       to_handles: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(from_handles);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(target, vec_get(from_handles, i));
+        vec_push(target, vec_get(to_handles, i));
+        i = i + 1;
+    }
+    return n;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_fresh_tmp() -> i32 {
@@ -1911,6 +1967,48 @@ fn test_scan_lets() -> i32 {
     return 0;
 }
 
+fn test_scrut_locals_push() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    vec_push(sn, 100);
+    vec_push(st, 200);
+    let en: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    vec_push(en, 300);
+    vec_push(et, 400);
+    let saved: i32 = scrut_locals_push(sn, st, en, et);
+    if saved != 1 { return 1; }
+    if vec_len(sn) != 2 { return 2; }
+    if vec_get(sn, 1) != 300 { return 3; }
+    let r1: i32 = scrut_local_lookup_bounded(sn, saved, 300);
+    if r1 != 0 - 1 { return 4; }
+    let r2: i32 = scrut_local_lookup_bounded(sn, 2, 300);
+    if r2 != 1 { return 5; }
+    let r3: i32 = scrut_local_lookup_bounded(sn, 2, 100);
+    if r3 != 0 { return 6; }
+    return 0;
+}
+
+fn test_alias_replace() -> i32 {
+    let from: Vec<i32> = vec_new();
+    let to: Vec<i32> = vec_new();
+    vec_push(from, 10);
+    vec_push(from, 20);
+    vec_push(to, 11);
+    vec_push(to, 21);
+    let tgt: Vec<i32> = lower_alias_new();
+    let c: i32 = lower_alias_replace(tgt, from, to);
+    if c != 2 { return 1; }
+    if vec_len(tgt) != 4 { return 2; }
+    let r1: i32 = lower_alias_lookup(tgt, 10);
+    if r1 != 11 { return 3; }
+    let r2: i32 = lower_alias_lookup(tgt, 20);
+    if r2 != 21 { return 4; }
+    let r3: i32 = lower_alias_lookup(tgt, 99);
+    if r3 != 0 - 1 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -1996,5 +2094,9 @@ fn main() -> i32 {
     if r41 != 0 { return 430 + r41; }
     let r42: i32 = test_find_variant_in_items();
     if r42 != 0 { return 440 + r42; }
+    let r43: i32 = test_scrut_locals_push();
+    if r43 != 0 { return 450 + r43; }
+    let r44: i32 = test_alias_replace();
+    if r44 != 0 { return 460 + r44; }
     return 0;
 }
