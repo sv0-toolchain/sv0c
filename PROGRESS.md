@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 43 — checker.sv0.** `checker.sv0`: `scan_struct_field_names` (token re-scan for initTypes — extract struct field name positions from token stream using item arena metadata; handles pub fields and nested type syntax), `scan_enum_variant_names` (same for enum variant name positions — handles unit, tuple `()`, and struct `{}` variant shapes with balanced bracket tracking). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 44 — checker.sv0.** `checker.sv0`: `type_param_lookup_str` (string-based type param lookup — enables cross-position name comparison for token re-scan context), `scan_type_tag_at` (token-stream type resolver — resolves a type annotation at a token position to a checker type tag; handles primitives, struct/enum names via string comparison, type params, Vec/Box via balanced `<>`, unit `()`, tuples, `&T` refs, `&mut T` refmuts), `scan_struct_field_type_tags` (struct field type tag extraction — combines scan_struct_field_names positions with scan_type_tag_at for each field), `scan_fn_param_type_tags` (function parameter type tag extraction — walks fn signature tokens past optional generics through param list to extract each param's type tag; initTypes/modEnvFromProg prerequisite). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
