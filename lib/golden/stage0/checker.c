@@ -110,6 +110,7 @@ static int contract_expr_active(int flag);
 static int ty_import_alias_push(int aliases, int from_h, int to_h);
 static int alias_lookup_bounded(int names, int targets, int limit, int name);
 static int ctor_ty_tag(int shape, int param_count);
+static int try_success_validate(int variant_tags, int variant_enum_ids, int variant_shapes, int variant_field_counts, int enum_name, const char* source, int starts, int ends, int out_idx);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -147,6 +148,7 @@ static int test_resolve_field_ty(void);
 static int test_contract_expr_flag(void);
 static int test_ty_import_alias_push(void);
 static int test_ctor_ty_tag(void);
+static int test_try_success_validate(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -1708,6 +1710,94 @@ static int ctor_ty_tag(int shape, int param_count) {
   return _sv0t2;
 }
 
+static int try_success_validate(int variant_tags, int variant_enum_ids, int variant_shapes, int variant_field_counts, int enum_name, const char* source, int starts, int ends, int out_idx) {
+  int _sv0t0 = sv0_vec_len(variant_tags);
+  int nv = _sv0t0;
+  int has_ok = 0;
+  int has_err = 0;
+  int has_some = 0;
+  int has_none = 0;
+  int ok_idx = (0 - 1);
+  int some_idx = (0 - 1);
+  int j = 0;
+  while ((j < nv)) {
+    int _sv0t1 = sv0_vec_get(variant_enum_ids, j);
+    if ((_sv0t1 == enum_name)) {
+      int _sv0t2 = sv0_vec_get(variant_tags, j);
+      int vh = _sv0t2;
+      int _sv0t3 = sv0_vec_get(starts, vh);
+      int vs = _sv0t3;
+      int _sv0t4 = sv0_vec_get(ends, vh);
+      int ve = _sv0t4;
+      int _sv0t5 = (ve - vs);
+      const char* _sv0t6 = sv0_string_substr(source, vs, _sv0t5);
+      const char* vn;
+      vn = _sv0t6;
+      int _sv0t7 = sv0_string_eq(vn, "Ok");
+      if (_sv0t7) {
+        has_ok = 1;
+        ok_idx = j;
+      } else {
+      }
+      int _sv0t8 = sv0_string_eq(vn, "Err");
+      if (_sv0t8) {
+        has_err = 1;
+      } else {
+      }
+      int _sv0t9 = sv0_string_eq(vn, "Some");
+      if (_sv0t9) {
+        has_some = 1;
+        some_idx = j;
+      } else {
+      }
+      int _sv0t10 = sv0_string_eq(vn, "None");
+      if (_sv0t10) {
+        has_none = 1;
+      } else {
+      }
+    } else {
+    }
+    j = (j + 1);
+  }
+  if (has_ok) {
+    if (has_err) {
+      int _sv0t11 = sv0_vec_get(variant_shapes, ok_idx);
+      int sh = _sv0t11;
+      int _sv0t12 = sv0_vec_get(variant_field_counts, ok_idx);
+      int fc = _sv0t12;
+      int _sv0t13 = try_success_shape_valid(sh, fc);
+      if (_sv0t13) {
+        sv0_vec_push(out_idx, ok_idx);
+        return 1;
+      } else {
+      }
+      int _sv0t14 = (0 - 1);
+      return _sv0t14;
+    } else {
+    }
+  } else {
+  }
+  if (has_some) {
+    if (has_none) {
+      int _sv0t15 = sv0_vec_get(variant_shapes, some_idx);
+      int sh2 = _sv0t15;
+      int _sv0t16 = sv0_vec_get(variant_field_counts, some_idx);
+      int fc2 = _sv0t16;
+      int _sv0t17 = try_success_shape_valid(sh2, fc2);
+      if (_sv0t17) {
+        sv0_vec_push(out_idx, some_idx);
+        return 2;
+      } else {
+      }
+      int _sv0t18 = (0 - 1);
+      return _sv0t18;
+    } else {
+    }
+  } else {
+  }
+  return 0;
+}
+
 static int test_binop_class(void) {
   int _sv0t0 = binop_class(0);
   if ((_sv0t0 != 0)) {
@@ -3202,6 +3292,104 @@ static int test_ctor_ty_tag(void) {
   return 0;
 }
 
+static int test_try_success_validate(void) {
+  int _sv0t0 = sv0_vec_new();
+  int vt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int vei = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int vs = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int vfc = _sv0t3;
+  const char* src;
+  src = "OkErrSomeNoneFoo";
+  int _sv0t4 = sv0_vec_new();
+  int st = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int en = _sv0t5;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(st, 2);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 9);
+  sv0_vec_push(st, 9);
+  sv0_vec_push(en, 13);
+  sv0_vec_push(st, 13);
+  sv0_vec_push(en, 16);
+  sv0_vec_push(vt, 0);
+  sv0_vec_push(vei, 100);
+  sv0_vec_push(vs, 1);
+  sv0_vec_push(vfc, 1);
+  sv0_vec_push(vt, 1);
+  sv0_vec_push(vei, 100);
+  sv0_vec_push(vs, 1);
+  sv0_vec_push(vfc, 1);
+  int _sv0t6 = sv0_vec_new();
+  int oi1 = _sv0t6;
+  int _sv0t7 = try_success_validate(vt, vei, vs, vfc, 100, src, st, en, oi1);
+  int r1 = _sv0t7;
+  if ((r1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_len(oi1);
+  if ((_sv0t8 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(oi1, 0);
+  if ((_sv0t9 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_new();
+  int vt2 = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int vei2 = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int vs2 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int vfc2 = _sv0t13;
+  sv0_vec_push(vt2, 2);
+  sv0_vec_push(vei2, 200);
+  sv0_vec_push(vs2, 1);
+  sv0_vec_push(vfc2, 1);
+  sv0_vec_push(vt2, 3);
+  sv0_vec_push(vei2, 200);
+  sv0_vec_push(vs2, 0);
+  sv0_vec_push(vfc2, 0);
+  int _sv0t14 = sv0_vec_new();
+  int oi2 = _sv0t14;
+  int _sv0t15 = try_success_validate(vt2, vei2, vs2, vfc2, 200, src, st, en, oi2);
+  int r2 = _sv0t15;
+  if ((r2 != 2)) {
+    return 4;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_new();
+  int vt3 = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int vei3 = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int vs3 = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int vfc3 = _sv0t19;
+  sv0_vec_push(vt3, 4);
+  sv0_vec_push(vei3, 300);
+  sv0_vec_push(vs3, 0);
+  sv0_vec_push(vfc3, 0);
+  int _sv0t20 = sv0_vec_new();
+  int oi3 = _sv0t20;
+  int _sv0t21 = try_success_validate(vt3, vei3, vs3, vfc3, 300, src, st, en, oi3);
+  int r3 = _sv0t21;
+  if ((r3 != 0)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -3459,6 +3647,13 @@ int main(void) {
   if ((r37 != 0)) {
     int _sv0t72 = (390 + r37);
     return _sv0t72;
+  } else {
+  }
+  int _sv0t73 = test_try_success_validate();
+  int r38 = _sv0t73;
+  if ((r38 != 0)) {
+    int _sv0t74 = (400 + r38);
+    return _sv0t74;
   } else {
   }
   return 0;

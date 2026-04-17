@@ -34,6 +34,10 @@
    scrut_local_lookup_bounded (SML withScrutLocals — push extra
    scrut bindings with logical-length restore), lower_alias_replace
    (SML setImportAliases — bulk alias table fill from parallel Vecs).
+   Match/variant helpers (batch 40): match_scrut_cty (SML matchScrutCty
+   — determine type handle for match scrutinee via scrut locals, fn
+   params, enum ctor path, or callee return type), variant_shape_in_items
+   (enum variant shape+field count lookup from item arena flat arrays).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -1314,6 +1318,116 @@ fn lower_alias_replace(target: Vec<i32>,
     return n;
 }
 
+/* ── match_scrut_cty (SML matchScrutCty) ─────────────────────
+   Determine the C type name handle for a match scrutinee
+   expression.  Same dispatch as expr_init_cty but with
+   additional probes into scrut_locals and fn param tables for
+   single-segment paths.  Returns a type name token handle, or
+   -1 for "int" (default).
+   Tag reference: 0=ExprLit, 1=ExprPath, 4=ExprCall,
+                  25=ExprTuple. */
+
+fn match_scrut_cty(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                   ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                   pp: Vec<i32>,
+                   fn_names: Vec<i32>, fn_ret_ctys: Vec<i32>,
+                   aliases: Vec<i32>,
+                   scrut_names: Vec<i32>, scrut_ctys: Vec<i32>,
+                   scrut_limit: i32,
+                   param_names: Vec<i32>, param_ty_handles: Vec<i32>) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 1 {
+        let pps: i32 = vec_get(ed1, idx);
+        let ppc: i32 = vec_get(ed2, idx);
+        if ppc == 2 {
+            return vec_get(pp, pps);
+        }
+        if ppc == 1 {
+            let name_h: i32 = vec_get(pp, pps);
+            let si: i32 = scrut_local_lookup_bounded(scrut_names,
+                                                      scrut_limit, name_h);
+            if si >= 0 { return vec_get(scrut_ctys, si); }
+            let pi: i32 = param_ty_lookup(param_names, name_h);
+            if pi >= 0 { return vec_get(param_ty_handles, pi); }
+            return 0 - 1;
+        }
+        return 0 - 1;
+    }
+    if tag == 4 {
+        let callee: i32 = vec_get(ed1, idx);
+        if callee >= 0 {
+            let ct: i32 = vec_get(et, callee);
+            if ct == 1 {
+                let cpps: i32 = vec_get(ed1, callee);
+                let cppc: i32 = vec_get(ed2, callee);
+                if cppc == 2 {
+                    return vec_get(pp, cpps);
+                }
+                if cppc == 1 {
+                    let ftok: i32 = vec_get(pp, cpps);
+                    let fi: i32 = callee_fn_index(fn_names, aliases, ftok);
+                    if fi >= 0 {
+                        return vec_get(fn_ret_ctys, fi);
+                    }
+                    return 0 - 1;
+                }
+            }
+        }
+        return 0 - 1;
+    }
+    if tag == 25 {
+        let tc: i32 = vec_get(ed2, idx);
+        if tc == 1 {
+            let first: i32 = vec_get(ed1, idx);
+            return match_scrut_cty(et, ed1, ed2, ed3, ed4, first,
+                       pp, fn_names, fn_ret_ctys, aliases,
+                       scrut_names, scrut_ctys, scrut_limit,
+                       param_names, param_ty_handles);
+        }
+    }
+    return 0 - 1;
+}
+
+/* ── variant_field_count_in_items (building block) ──────────
+   Given an enum name handle and a variant flat index within
+   the enum, look up the variant's shape tag from a variant
+   shapes flat array.  The shapes flat array parallels the
+   variant names flat array (one entry per variant).
+   Returns:  0 = VSUnit, 1 = VSTuple, 2 = VSStruct, -1 = not found.
+   `field_count` is returned through the out_count Vec (single push). */
+
+fn variant_shape_in_items(item_tags: Vec<i32>, item_names: Vec<i32>,
+                          item_field_counts: Vec<i32>,
+                          variant_shapes_flat: Vec<i32>,
+                          variant_fcs_flat: Vec<i32>,
+                          enum_name: i32, variant_idx: i32,
+                          out_count: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    let mut vn_offset: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(item_tags, i);
+        let vc: i32 = vec_get(item_field_counts, i);
+        if tag == 2 {
+            if vec_get(item_names, i) == enum_name {
+                if variant_idx >= 0 {
+                    if variant_idx < vc {
+                        let shape: i32 = vec_get(variant_shapes_flat, vn_offset + variant_idx);
+                        let fc: i32 = vec_get(variant_fcs_flat, vn_offset + variant_idx);
+                        vec_push(out_count, fc);
+                        return shape;
+                    }
+                }
+                return 0 - 1;
+            }
+            vn_offset = vn_offset + vc;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_fresh_tmp() -> i32 {
@@ -2009,6 +2123,74 @@ fn test_alias_replace() -> i32 {
     return 0;
 }
 
+fn test_match_scrut_cty() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let fnn: Vec<i32> = vec_new();
+    let frc: Vec<i32> = vec_new();
+    let al: Vec<i32> = vec_new();
+    let sn: Vec<i32> = vec_new();
+    let sc: Vec<i32> = vec_new();
+    let pn: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    vec_push(pp, 42);
+    vec_push(pp, 99);
+    vec_push(et, 1);
+    vec_push(ed1, 0);
+    vec_push(ed2, 2);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let r1: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 0,
+                       pp, fnn, frc, al, sn, sc, 0, pn, pt);
+    if r1 != 42 { return 1; }
+    vec_push(et, 1);
+    vec_push(ed1, 0);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(sn, 42);
+    vec_push(sc, 77);
+    let r2: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 1,
+                       pp, fnn, frc, al, sn, sc, 1, pn, pt);
+    if r2 != 77 { return 2; }
+    let r3: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 0 - 1,
+                       pp, fnn, frc, al, sn, sc, 0, pn, pt);
+    if r3 != 0 - 1 { return 3; }
+    return 0;
+}
+
+fn test_variant_shape_in_items() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let nms: Vec<i32> = vec_new();
+    let fcs: Vec<i32> = vec_new();
+    let vsf: Vec<i32> = vec_new();
+    let vff: Vec<i32> = vec_new();
+    vec_push(tags, 2);
+    vec_push(nms, 10);
+    vec_push(fcs, 2);
+    vec_push(vsf, 0);
+    vec_push(vff, 0);
+    vec_push(vsf, 1);
+    vec_push(vff, 3);
+    let oc: Vec<i32> = vec_new();
+    let s1: i32 = variant_shape_in_items(tags, nms, fcs, vsf, vff, 10, 0, oc);
+    if s1 != 0 { return 1; }
+    if vec_len(oc) != 1 { return 2; }
+    if vec_get(oc, 0) != 0 { return 3; }
+    let oc2: Vec<i32> = vec_new();
+    let s2: i32 = variant_shape_in_items(tags, nms, fcs, vsf, vff, 10, 1, oc2);
+    if s2 != 1 { return 4; }
+    if vec_get(oc2, 0) != 3 { return 5; }
+    let oc3: Vec<i32> = vec_new();
+    let s3: i32 = variant_shape_in_items(tags, nms, fcs, vsf, vff, 99, 0, oc3);
+    if s3 != 0 - 1 { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -2098,5 +2280,9 @@ fn main() -> i32 {
     if r43 != 0 { return 450 + r43; }
     let r44: i32 = test_alias_replace();
     if r44 != 0 { return 460 + r44; }
+    let r45: i32 = test_match_scrut_cty();
+    if r45 != 0 { return 470 + r45; }
+    let r46: i32 = test_variant_shape_in_items();
+    if r46 != 0 { return 480 + r46; }
     return 0;
 }

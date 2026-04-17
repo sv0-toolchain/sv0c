@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 39 — checker.sv0, lowering.sv0.** `checker.sv0`: `contract_expr_new`/`enter`/`exit`/`active` (SML `withContractExpr` decomposed — scoped "in contract expr" flag via Vec tail), `ty_import_alias_push`/`alias_lookup_bounded` (SML `addTyImportAlias`/`clearTyImportAliases` — scoped push with logical-length restore), `ctor_ty_tag` (SML `ctorTy` — constructor type tag from shape). `lowering.sv0`: `scrut_locals_push`/`scrut_local_lookup_bounded` (SML `withScrutLocals` — push extra scrut bindings with logical-length restore), `lower_alias_replace` (SML `setImportAliases` — bulk alias table fill from parallel Vecs). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 40 — checker.sv0, lowering.sv0.** `checker.sv0`: `try_success_validate` (SML `trySuccessPayloadTy` — validates enum is valid `?` target: Result Ok/Err or Option Some/None with single-field tuple success variant). `lowering.sv0`: `match_scrut_cty` (SML `matchScrutCty` — determine type handle for match scrutinee via scrut locals, fn params, enum ctor path, or callee return), `variant_shape_in_items` (enum variant shape+field count lookup from item arena flat arrays). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

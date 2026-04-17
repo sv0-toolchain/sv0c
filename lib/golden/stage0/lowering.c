@@ -73,6 +73,8 @@ static int scan_lets(int et, int ed1, int ed2, int ed3, int ed4, int block_idx, 
 static int scrut_locals_push(int scrut_names, int scrut_types, int extra_names, int extra_types);
 static int scrut_local_lookup_bounded(int scrut_names, int limit, int name_h);
 static int lower_alias_replace(int target, int from_handles, int to_handles);
+static int match_scrut_cty(int et, int ed1, int ed2, int ed3, int ed4, int idx, int pp, int fn_names, int fn_ret_ctys, int aliases, int scrut_names, int scrut_ctys, int scrut_limit, int param_names, int param_ty_handles);
+static int variant_shape_in_items(int item_tags, int item_names, int item_field_counts, int variant_shapes_flat, int variant_fcs_flat, int enum_name, int variant_idx, int out_count);
 static int test_fresh_tmp(void);
 static int test_split_qname(void);
 static int test_binop_to_c(void);
@@ -117,6 +119,8 @@ static int test_find_variant_in_items(void);
 static int test_scan_lets(void);
 static int test_scrut_locals_push(void);
 static int test_alias_replace(void);
+static int test_match_scrut_cty(void);
+static int test_variant_shape_in_items(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -1956,6 +1960,143 @@ static int lower_alias_replace(int target, int from_handles, int to_handles) {
     i = (i + 1);
   }
   return n;
+}
+
+static int match_scrut_cty(int et, int ed1, int ed2, int ed3, int ed4, int idx, int pp, int fn_names, int fn_ret_ctys, int aliases, int scrut_names, int scrut_ctys, int scrut_limit, int param_names, int param_ty_handles) {
+  if ((idx < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(et, idx);
+  int tag = _sv0t1;
+  if ((tag == 1)) {
+    int _sv0t2 = sv0_vec_get(ed1, idx);
+    int pps = _sv0t2;
+    int _sv0t3 = sv0_vec_get(ed2, idx);
+    int ppc = _sv0t3;
+    if ((ppc == 2)) {
+      int _sv0t4 = sv0_vec_get(pp, pps);
+      return _sv0t4;
+    } else {
+    }
+    if ((ppc == 1)) {
+      int _sv0t5 = sv0_vec_get(pp, pps);
+      int name_h = _sv0t5;
+      int _sv0t6 = scrut_local_lookup_bounded(scrut_names, scrut_limit, name_h);
+      int si = _sv0t6;
+      if ((si >= 0)) {
+        int _sv0t7 = sv0_vec_get(scrut_ctys, si);
+        return _sv0t7;
+      } else {
+      }
+      int _sv0t8 = param_ty_lookup(param_names, name_h);
+      int pi = _sv0t8;
+      if ((pi >= 0)) {
+        int _sv0t9 = sv0_vec_get(param_ty_handles, pi);
+        return _sv0t9;
+      } else {
+      }
+      int _sv0t10 = (0 - 1);
+      return _sv0t10;
+    } else {
+    }
+    int _sv0t11 = (0 - 1);
+    return _sv0t11;
+  } else {
+  }
+  if ((tag == 4)) {
+    int _sv0t12 = sv0_vec_get(ed1, idx);
+    int callee = _sv0t12;
+    if ((callee >= 0)) {
+      int _sv0t13 = sv0_vec_get(et, callee);
+      int ct = _sv0t13;
+      if ((ct == 1)) {
+        int _sv0t14 = sv0_vec_get(ed1, callee);
+        int cpps = _sv0t14;
+        int _sv0t15 = sv0_vec_get(ed2, callee);
+        int cppc = _sv0t15;
+        if ((cppc == 2)) {
+          int _sv0t16 = sv0_vec_get(pp, cpps);
+          return _sv0t16;
+        } else {
+        }
+        if ((cppc == 1)) {
+          int _sv0t17 = sv0_vec_get(pp, cpps);
+          int ftok = _sv0t17;
+          int _sv0t18 = callee_fn_index(fn_names, aliases, ftok);
+          int fi = _sv0t18;
+          if ((fi >= 0)) {
+            int _sv0t19 = sv0_vec_get(fn_ret_ctys, fi);
+            return _sv0t19;
+          } else {
+          }
+          int _sv0t20 = (0 - 1);
+          return _sv0t20;
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    int _sv0t21 = (0 - 1);
+    return _sv0t21;
+  } else {
+  }
+  if ((tag == 25)) {
+    int _sv0t22 = sv0_vec_get(ed2, idx);
+    int tc = _sv0t22;
+    if ((tc == 1)) {
+      int _sv0t23 = sv0_vec_get(ed1, idx);
+      int first = _sv0t23;
+      int _sv0t24 = match_scrut_cty(et, ed1, ed2, ed3, ed4, first, pp, fn_names, fn_ret_ctys, aliases, scrut_names, scrut_ctys, scrut_limit, param_names, param_ty_handles);
+      return _sv0t24;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t25 = (0 - 1);
+  return _sv0t25;
+}
+
+static int variant_shape_in_items(int item_tags, int item_names, int item_field_counts, int variant_shapes_flat, int variant_fcs_flat, int enum_name, int variant_idx, int out_count) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  int i = 0;
+  int vn_offset = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(item_tags, i);
+    int tag = _sv0t1;
+    int _sv0t2 = sv0_vec_get(item_field_counts, i);
+    int vc = _sv0t2;
+    if ((tag == 2)) {
+      int _sv0t3 = sv0_vec_get(item_names, i);
+      if ((_sv0t3 == enum_name)) {
+        if ((variant_idx >= 0)) {
+          if ((variant_idx < vc)) {
+            int _sv0t4 = (vn_offset + variant_idx);
+            int _sv0t5 = sv0_vec_get(variant_shapes_flat, _sv0t4);
+            int shape = _sv0t5;
+            int _sv0t6 = (vn_offset + variant_idx);
+            int _sv0t7 = sv0_vec_get(variant_fcs_flat, _sv0t6);
+            int fc = _sv0t7;
+            sv0_vec_push(out_count, fc);
+            return shape;
+          } else {
+          }
+        } else {
+        }
+        int _sv0t8 = (0 - 1);
+        return _sv0t8;
+      } else {
+      }
+      vn_offset = (vn_offset + vc);
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t9 = (0 - 1);
+  return _sv0t9;
 }
 
 static int test_fresh_tmp(void) {
@@ -3824,6 +3965,131 @@ static int test_alias_replace(void) {
   return 0;
 }
 
+static int test_match_scrut_cty(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int fnn = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int frc = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int al = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int sn = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int sc = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int pn = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int pt = _sv0t12;
+  sv0_vec_push(pp, 42);
+  sv0_vec_push(pp, 99);
+  sv0_vec_push(et, 1);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 2);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t13 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 0, pp, fnn, frc, al, sn, sc, 0, pn, pt);
+  int r1 = _sv0t13;
+  if ((r1 != 42)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(et, 1);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 1);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(sn, 42);
+  sv0_vec_push(sc, 77);
+  int _sv0t14 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 1, pp, fnn, frc, al, sn, sc, 1, pn, pt);
+  int r2 = _sv0t14;
+  if ((r2 != 77)) {
+    return 2;
+  } else {
+  }
+  int _sv0t15 = (0 - 1);
+  int _sv0t16 = match_scrut_cty(et, ed1, ed2, ed3, ed4, _sv0t15, pp, fnn, frc, al, sn, sc, 0, pn, pt);
+  int r3 = _sv0t16;
+  int _sv0t17 = (0 - 1);
+  if ((r3 != _sv0t17)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_variant_shape_in_items(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int nms = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int fcs = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int vsf = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int vff = _sv0t4;
+  sv0_vec_push(tags, 2);
+  sv0_vec_push(nms, 10);
+  sv0_vec_push(fcs, 2);
+  sv0_vec_push(vsf, 0);
+  sv0_vec_push(vff, 0);
+  sv0_vec_push(vsf, 1);
+  sv0_vec_push(vff, 3);
+  int _sv0t5 = sv0_vec_new();
+  int oc = _sv0t5;
+  int _sv0t6 = variant_shape_in_items(tags, nms, fcs, vsf, vff, 10, 0, oc);
+  int s1 = _sv0t6;
+  if ((s1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(oc);
+  if ((_sv0t7 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(oc, 0);
+  if ((_sv0t8 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int oc2 = _sv0t9;
+  int _sv0t10 = variant_shape_in_items(tags, nms, fcs, vsf, vff, 10, 1, oc2);
+  int s2 = _sv0t10;
+  if ((s2 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(oc2, 0);
+  if ((_sv0t11 != 3)) {
+    return 5;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int oc3 = _sv0t12;
+  int _sv0t13 = variant_shape_in_items(tags, nms, fcs, vsf, vff, 99, 0, oc3);
+  int s3 = _sv0t13;
+  int _sv0t14 = (0 - 1);
+  if ((s3 != _sv0t14)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -4130,6 +4396,20 @@ int main(void) {
   if ((r44 != 0)) {
     int _sv0t86 = (460 + r44);
     return _sv0t86;
+  } else {
+  }
+  int _sv0t87 = test_match_scrut_cty();
+  int r45 = _sv0t87;
+  if ((r45 != 0)) {
+    int _sv0t88 = (470 + r45);
+    return _sv0t88;
+  } else {
+  }
+  int _sv0t89 = test_variant_shape_in_items();
+  int r46 = _sv0t89;
+  if ((r46 != 0)) {
+    int _sv0t90 = (480 + r46);
+    return _sv0t90;
   } else {
   }
   return 0;
