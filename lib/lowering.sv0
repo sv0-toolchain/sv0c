@@ -21,6 +21,11 @@
    result-slot injection), all_old_names_expr (SML allOldNames — recursive
    expr arena walk collecting old(x) token handles for contract pre/post
    variable setup; includes ExprBlock/stmt dispatch for LetStmt/SemiStmt).
+   lowerFn prereqs (batch 36): expr_init_cty (SML exprInitCty — infer
+   type handle from init expression shape: ExprStruct path, 2-segment
+   ExprPath for enum ctors, ExprCall callee return type, ExprTuple(1)
+   recursion; returns -1 for "int"), scan_lets (SML scanLets — walk
+   ExprBlock for LetStmt with init, collect name+type handle pairs).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
    needs deep AST traversal with slot/instr accumulation. */
 
@@ -1052,6 +1057,111 @@ fn all_old_names_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return 0;
 }
 
+/* ── expr_init_cty (SML exprInitCty) ────────────────────────
+   Infer the type name token handle from an expression's shape.
+   Used by scan_lets when no type annotation is stored in the arena.
+   Tag reference:  0=ExprLit, 1=ExprPath, 4=ExprCall, 24=ExprStruct,
+   25=ExprTuple.  Returns -1 for unresolvable cases (meaning "int").
+   Arena note: the parser discards type annotations into ephemeral
+   local Vecs, so we always infer from the init expression. */
+
+fn expr_init_cty(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                 ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                 pp: Vec<i32>,
+                 fn_names: Vec<i32>, fn_ret_ctys: Vec<i32>,
+                 aliases: Vec<i32>) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 24 {
+        let pps: i32 = vec_get(ed1, idx);
+        return vec_get(pp, pps);
+    }
+    if tag == 1 {
+        let pps2: i32 = vec_get(ed1, idx);
+        let ppc2: i32 = vec_get(ed2, idx);
+        if ppc2 == 2 {
+            return vec_get(pp, pps2);
+        }
+        return 0 - 1;
+    }
+    if tag == 4 {
+        let callee: i32 = vec_get(ed1, idx);
+        if callee >= 0 {
+            let ct: i32 = vec_get(et, callee);
+            if ct == 1 {
+                let cpps: i32 = vec_get(ed1, callee);
+                let cppc: i32 = vec_get(ed2, callee);
+                if cppc == 1 {
+                    let ftok: i32 = vec_get(pp, cpps);
+                    let fi: i32 = callee_fn_index(fn_names, aliases, ftok);
+                    if fi >= 0 {
+                        return vec_get(fn_ret_ctys, fi);
+                    }
+                    return 0 - 1;
+                }
+                if cppc == 2 {
+                    return vec_get(pp, cpps);
+                }
+            }
+        }
+        return 0 - 1;
+    }
+    if tag == 25 {
+        let tc: i32 = vec_get(ed2, idx);
+        if tc == 1 {
+            let first: i32 = vec_get(ed1, idx);
+            return expr_init_cty(et, ed1, ed2, ed3, ed4, first,
+                       pp, fn_names, fn_ret_ctys, aliases);
+        }
+    }
+    return 0 - 1;
+}
+
+/* ── scan_lets (SML scanLets) ──────────────────────────────────
+   Walk ExprBlock stmt children for LetStmt(27) with an init
+   expression, collecting (name_handle, type_handle) pairs.
+   Name handles go into out_names; type handles (from expr_init_cty)
+   go into out_ctys (-1 means "int").  Returns pair count.
+   Arena note: type annotations are not stored in the expr arena
+   (parser discards them into ephemeral local Vecs), so we always
+   infer via expr_init_cty — a known approximation until the
+   parser stores type annotation data. */
+
+fn scan_lets(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+             ed3: Vec<i32>, ed4: Vec<i32>,
+             block_idx: i32,
+             pp: Vec<i32>,
+             fn_names: Vec<i32>, fn_ret_ctys: Vec<i32>,
+             aliases: Vec<i32>,
+             out_names: Vec<i32>,
+             out_ctys: Vec<i32>) -> i32 {
+    if block_idx < 0 { return 0; }
+    let btag: i32 = vec_get(et, block_idx);
+    if btag != 9 { return 0; }
+    let sf: i32 = vec_get(ed1, block_idx);
+    let sc: i32 = vec_get(ed2, block_idx);
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < sc {
+        let sidx: i32 = sf + i;
+        let stag: i32 = vec_get(et, sidx);
+        if stag == 27 {
+            let init: i32 = vec_get(ed3, sidx);
+            if init >= 0 {
+                let nh: i32 = vec_get(ed1, sidx);
+                let th: i32 = expr_init_cty(et, ed1, ed2, ed3, ed4,
+                                  init, pp, fn_names, fn_ret_ctys,
+                                  aliases);
+                vec_push(out_names, nh);
+                vec_push(out_ctys, th);
+                count = count + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_fresh_tmp() -> i32 {
@@ -1553,6 +1663,91 @@ fn test_typedef_builders() -> i32 {
     return 0;
 }
 
+fn test_expr_init_cty() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let fnn: Vec<i32> = vec_new();
+    let frc: Vec<i32> = vec_new();
+    let al: Vec<i32> = vec_new();
+    vec_push(pp, 100);
+    vec_push(et, 24);
+    vec_push(ed1, 0);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let r1: i32 = expr_init_cty(et, ed1, ed2, ed3, ed4, 0,
+                      pp, fnn, frc, al);
+    if r1 != 100 { return 1; }
+    vec_push(pp, 200);
+    vec_push(et, 1);
+    vec_push(ed1, 0);
+    vec_push(ed2, 2);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let r2: i32 = expr_init_cty(et, ed1, ed2, ed3, ed4, 1,
+                      pp, fnn, frc, al);
+    if r2 != 100 { return 2; }
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let r3: i32 = expr_init_cty(et, ed1, ed2, ed3, ed4, 2,
+                      pp, fnn, frc, al);
+    if r3 != 0 - 1 { return 3; }
+    let r4: i32 = expr_init_cty(et, ed1, ed2, ed3, ed4, 0 - 1,
+                      pp, fnn, frc, al);
+    if r4 != 0 - 1 { return 4; }
+    return 0;
+}
+
+fn test_scan_lets() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let fnn: Vec<i32> = vec_new();
+    let frc: Vec<i32> = vec_new();
+    let al: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 5);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 27);
+    vec_push(ed1, 42);
+    vec_push(ed2, 0 - 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 9);
+    vec_push(ed1, 1);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0 - 1);
+    vec_push(ed4, 0);
+    let on: Vec<i32> = vec_new();
+    let oc: Vec<i32> = vec_new();
+    let c: i32 = scan_lets(et, ed1, ed2, ed3, ed4, 2,
+                     pp, fnn, frc, al, on, oc);
+    if c != 1 { return 1; }
+    if vec_get(on, 0) != 42 { return 2; }
+    if vec_get(oc, 0) != 0 - 1 { return 3; }
+    let on2: Vec<i32> = vec_new();
+    let oc2: Vec<i32> = vec_new();
+    let c2: i32 = scan_lets(et, ed1, ed2, ed3, ed4, 0 - 1,
+                      pp, fnn, frc, al, on2, oc2);
+    if c2 != 0 { return 4; }
+    let c3: i32 = scan_lets(et, ed1, ed2, ed3, ed4, 0,
+                      pp, fnn, frc, al, on2, oc2);
+    if c3 != 0 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -1630,5 +1825,9 @@ fn main() -> i32 {
     if r37 != 0 { return 390 + r37; }
     let r38: i32 = test_all_old_names();
     if r38 != 0 { return 400 + r38; }
+    let r39: i32 = test_expr_init_cty();
+    if r39 != 0 { return 410 + r39; }
+    let r40: i32 = test_scan_lets();
+    if r40 != 0 { return 420 + r40; }
     return 0;
 }
