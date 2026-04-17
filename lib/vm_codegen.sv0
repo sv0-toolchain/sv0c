@@ -37,8 +37,13 @@
    compute_arity (sum of param widths),
    emit_fn (SML emitFn — function-level orchestration: builds env via
    local_count_and_env, emits code via emit_instrs, computes arity,
-   pools label, appends stride-4 func_entry to ft_entries).
-   Remaining: top-level emit (program orchestration). */
+   pools label, appends stride-4 func_entry to ft_entries),
+   is_main_label (SML isMain — string equality check for "main"),
+   build_func_order (SML funcOrder — non-main first, main last),
+   emit_program (SML VmCodegen.emit — top-level program orchestration:
+   builds struct/enum layouts, reorders blocks, emits all functions via
+   emit_fn; returns pool + ft_entries for caller to encode via
+   bytecode.sv0's encode_strings / encode_file). */
 
 /* ── variant slot counting ──────────────────────────────────── */
 
@@ -1356,6 +1361,91 @@ fn emit_fn(label: i32,
     vec_push(ft_entries, lc);
     vec_push(ft_entries, code);
     return 0;
+}
+
+/* ── is_main_label (SML isMain) ────────────────────────────── */
+fn is_main_label(label: i32, source: string,
+                 starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    let s: string = handle_to_str(label, source, starts, ends);
+    return string_eq(s, "main");
+}
+
+/* ── build_func_order (SML funcOrder) ─────────────────────────
+   Populates `order` with block indices: non-main first, main last.
+   Returns the count of ordered functions. */
+fn build_func_order(block_labels: Vec<i32>, source: string,
+                    starts: Vec<i32>, ends: Vec<i32>,
+                    order: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(block_labels);
+    let mut main_idx: i32 = 0 - 1;
+    let mut i: i32 = 0;
+    while i < n {
+        let lab: i32 = vec_get(block_labels, i);
+        if is_main_label(lab, source, starts, ends) {
+            main_idx = i;
+        } else {
+            vec_push(order, i);
+        }
+        i = i + 1;
+    }
+    if main_idx >= 0 {
+        vec_push(order, main_idx);
+    }
+    return vec_len(order);
+}
+
+/* ── emit_program (SML VmCodegen.emit — top-level) ────────────
+   Program-level orchestration: builds struct/enum layouts from AST
+   items, reorders blocks (main last), builds fn_names table, emits
+   all functions via emit_fn.  Populates `out_pool` with the string
+   pool token handles and `out_ft` with the stride-4 function table
+   (see emit_fn).  The caller is responsible for encoding the pool
+   via encode_strings and assembling the final bytecode via
+   encode_file — those live in bytecode.sv0, a separate compilation
+   unit the SML driver already links.
+   Returns the function count on success, or -1 on error. */
+fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
+                item_field_counts: Vec<i32>,
+                item_variant_max_payload: Vec<i32>,
+                block_labels: Vec<i32>,
+                block_param_names: Vec<i32>,
+                block_param_ctys: Vec<i32>,
+                block_instrs: Vec<i32>,
+                source: string, starts: Vec<i32>, ends: Vec<i32>,
+                out_pool: Vec<i32>, out_ft: Vec<i32>) -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let sfc: Vec<i32> = vec_new();
+    struct_layouts_build(item_tags, item_names, item_field_counts,
+                         sn, sfc);
+    let enn: Vec<i32> = vec_new();
+    let enw: Vec<i32> = vec_new();
+    enum_layouts_build(item_tags, item_names, item_field_counts,
+                       item_variant_max_payload, enn, enw);
+    let func_order: Vec<i32> = vec_new();
+    let fc: i32 = build_func_order(block_labels, source,
+                                    starts, ends, func_order);
+    let fn_names: Vec<i32> = vec_new();
+    let mut fi: i32 = 0;
+    while fi < fc {
+        let bi: i32 = vec_get(func_order, fi);
+        vec_push(fn_names, vec_get(block_labels, bi));
+        fi = fi + 1;
+    }
+    fi = 0;
+    while fi < fc {
+        let bi2: i32 = vec_get(func_order, fi);
+        let pn: Vec<i32> = vec_get(block_param_names, bi2);
+        let pc: Vec<i32> = vec_get(block_param_ctys, bi2);
+        let ins: Vec<i32> = vec_get(block_instrs, bi2);
+        let lab: i32 = vec_get(block_labels, bi2);
+        let r: i32 = emit_fn(lab, pn, pc, ins,
+                              sn, sfc, enn, enw,
+                              out_pool, source, starts, ends,
+                              fn_names, out_ft);
+        if r < 0 { return 0 - 1; }
+        fi = fi + 1;
+    }
+    return fc;
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -2705,6 +2795,75 @@ fn test_local_count_and_env() -> i32 {
     return 0;
 }
 
+fn test_is_main_label() -> i32 {
+    let src: string = "main foo";
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(en, 4);
+    vec_push(st, 5); vec_push(en, 8);
+    if is_main_label(0, src, st, en) != true { return 1; }
+    if is_main_label(1, src, st, en) != false { return 2; }
+    return 0;
+}
+
+fn test_build_func_order() -> i32 {
+    let src: string = "main foo";
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(en, 4);
+    vec_push(st, 5); vec_push(en, 8);
+    let labs: Vec<i32> = vec_new();
+    vec_push(labs, 0);
+    vec_push(labs, 1);
+    let ord: Vec<i32> = vec_new();
+    let fc: i32 = build_func_order(labs, src, st, en, ord);
+    if fc != 2 { return 1; }
+    if vec_get(ord, 0) != 1 { return 2; }
+    if vec_get(ord, 1) != 0 { return 3; }
+    return 0;
+}
+
+fn emit_program_1fn(source: string, starts: Vec<i32>,
+                    ends: Vec<i32>, lab: i32,
+                    pn: Vec<i32>, pc: Vec<i32>,
+                    ins: Vec<i32>,
+                    pool: Vec<i32>, ft: Vec<i32>) -> i32 {
+    let it: Vec<i32> = vec_new();
+    let in2: Vec<i32> = vec_new();
+    let ifc: Vec<i32> = vec_new();
+    let ivp: Vec<i32> = vec_new();
+    let bl: Vec<i32> = vec_new();
+    vec_push(bl, lab);
+    let bpn: Vec<i32> = vec_new();
+    vec_push(bpn, pn);
+    let bpc: Vec<i32> = vec_new();
+    vec_push(bpc, pc);
+    let bi: Vec<i32> = vec_new();
+    vec_push(bi, ins);
+    return emit_program(it, in2, ifc, ivp, bl, bpn, bpc, bi,
+                         source, starts, ends, pool, ft);
+}
+
+fn test_emit_program() -> i32 {
+    let src: string = "main";
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(en, 4);
+    let pn: Vec<i32> = vec_new();
+    let pc: Vec<i32> = vec_new();
+    let ins: Vec<i32> = vec_new();
+    vec_push(ins, box_new(Instr::ReturnVal(
+        box_new(Value::VInt(42)))));
+    let pool: Vec<i32> = vec_new();
+    let ft: Vec<i32> = vec_new();
+    let fc: i32 = emit_program_1fn(src, st, en, 0, pn, pc, ins,
+                                    pool, ft);
+    if fc != 1 { return 1; }
+    if vec_len(ft) != 4 { return 2; }
+    if vec_get(ft, 1) != 0 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -2778,5 +2937,11 @@ fn main() -> i32 {
     if r35 != 0 { return 610 + r35; }
     let r36: i32 = test_emit_fn();
     if r36 != 0 { return 620 + r36; }
+    let r37: i32 = test_is_main_label();
+    if r37 != 0 { return 650 + r37; }
+    let r38: i32 = test_build_func_order();
+    if r38 != 0 { return 660 + r38; }
+    let r39: i32 = test_emit_program();
+    if r39 != 0 { return 670 + r39; }
     return 0;
 }
