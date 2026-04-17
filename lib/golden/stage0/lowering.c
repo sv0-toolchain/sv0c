@@ -66,6 +66,8 @@ static int build_enum_variants_data(int item_tags, int item_names, int item_fiel
 static const char* collect_typedefs_str(int item_tags, int item_names, int item_field_counts, int item_vmax, int sf_names, int sf_types, const char* source, int starts, int ends, int sn, int en);
 static int mentions_result(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp);
 static int all_old_names_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp, int out);
+static int expr_init_cty(int et, int ed1, int ed2, int ed3, int ed4, int idx, int pp, int fn_names, int fn_ret_ctys, int aliases);
+static int scan_lets(int et, int ed1, int ed2, int ed3, int ed4, int block_idx, int pp, int fn_names, int fn_ret_ctys, int aliases, int out_names, int out_ctys);
 static int test_fresh_tmp(void);
 static int test_split_qname(void);
 static int test_binop_to_c(void);
@@ -104,6 +106,8 @@ static int test_param_ty(void);
 static int test_mentions_result(void);
 static int test_all_old_names(void);
 static int test_typedef_builders(void);
+static int test_expr_init_cty(void);
+static int test_scan_lets(void);
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -1661,6 +1665,130 @@ static int all_old_names_expr(int et, int ed1, int ed2, int ed3, int ed4, int id
   return 0;
 }
 
+static int expr_init_cty(int et, int ed1, int ed2, int ed3, int ed4, int idx, int pp, int fn_names, int fn_ret_ctys, int aliases) {
+  if ((idx < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(et, idx);
+  int tag = _sv0t1;
+  if ((tag == 24)) {
+    int _sv0t2 = sv0_vec_get(ed1, idx);
+    int pps = _sv0t2;
+    int _sv0t3 = sv0_vec_get(pp, pps);
+    return _sv0t3;
+  } else {
+  }
+  if ((tag == 1)) {
+    int _sv0t4 = sv0_vec_get(ed1, idx);
+    int pps2 = _sv0t4;
+    int _sv0t5 = sv0_vec_get(ed2, idx);
+    int ppc2 = _sv0t5;
+    if ((ppc2 == 2)) {
+      int _sv0t6 = sv0_vec_get(pp, pps2);
+      return _sv0t6;
+    } else {
+    }
+    int _sv0t7 = (0 - 1);
+    return _sv0t7;
+  } else {
+  }
+  if ((tag == 4)) {
+    int _sv0t8 = sv0_vec_get(ed1, idx);
+    int callee = _sv0t8;
+    if ((callee >= 0)) {
+      int _sv0t9 = sv0_vec_get(et, callee);
+      int ct = _sv0t9;
+      if ((ct == 1)) {
+        int _sv0t10 = sv0_vec_get(ed1, callee);
+        int cpps = _sv0t10;
+        int _sv0t11 = sv0_vec_get(ed2, callee);
+        int cppc = _sv0t11;
+        if ((cppc == 1)) {
+          int _sv0t12 = sv0_vec_get(pp, cpps);
+          int ftok = _sv0t12;
+          int _sv0t13 = callee_fn_index(fn_names, aliases, ftok);
+          int fi = _sv0t13;
+          if ((fi >= 0)) {
+            int _sv0t14 = sv0_vec_get(fn_ret_ctys, fi);
+            return _sv0t14;
+          } else {
+          }
+          int _sv0t15 = (0 - 1);
+          return _sv0t15;
+        } else {
+        }
+        if ((cppc == 2)) {
+          int _sv0t16 = sv0_vec_get(pp, cpps);
+          return _sv0t16;
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    int _sv0t17 = (0 - 1);
+    return _sv0t17;
+  } else {
+  }
+  if ((tag == 25)) {
+    int _sv0t18 = sv0_vec_get(ed2, idx);
+    int tc = _sv0t18;
+    if ((tc == 1)) {
+      int _sv0t19 = sv0_vec_get(ed1, idx);
+      int first = _sv0t19;
+      int _sv0t20 = expr_init_cty(et, ed1, ed2, ed3, ed4, first, pp, fn_names, fn_ret_ctys, aliases);
+      return _sv0t20;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t21 = (0 - 1);
+  return _sv0t21;
+}
+
+static int scan_lets(int et, int ed1, int ed2, int ed3, int ed4, int block_idx, int pp, int fn_names, int fn_ret_ctys, int aliases, int out_names, int out_ctys) {
+  if ((block_idx < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(et, block_idx);
+  int btag = _sv0t0;
+  if ((btag != 9)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(ed1, block_idx);
+  int sf = _sv0t1;
+  int _sv0t2 = sv0_vec_get(ed2, block_idx);
+  int sc = _sv0t2;
+  int count = 0;
+  int i = 0;
+  while ((i < sc)) {
+    int sidx = (sf + i);
+    int _sv0t3 = sv0_vec_get(et, sidx);
+    int stag = _sv0t3;
+    if ((stag == 27)) {
+      int _sv0t4 = sv0_vec_get(ed3, sidx);
+      int init = _sv0t4;
+      if ((init >= 0)) {
+        int _sv0t5 = sv0_vec_get(ed1, sidx);
+        int nh = _sv0t5;
+        int _sv0t6 = expr_init_cty(et, ed1, ed2, ed3, ed4, init, pp, fn_names, fn_ret_ctys, aliases);
+        int th = _sv0t6;
+        sv0_vec_push(out_names, nh);
+        sv0_vec_push(out_ctys, th);
+        count = (count + 1);
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return count;
+}
+
 static int test_fresh_tmp(void) {
   int _sv0t0 = fresh_tmp_name(0);
   if ((_sv0t0 != 0)) {
@@ -3132,6 +3260,149 @@ static int test_typedef_builders(void) {
   return 0;
 }
 
+static int test_expr_init_cty(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int fnn = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int frc = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int al = _sv0t8;
+  sv0_vec_push(pp, 100);
+  sv0_vec_push(et, 24);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 1);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t9 = expr_init_cty(et, ed1, ed2, ed3, ed4, 0, pp, fnn, frc, al);
+  int r1 = _sv0t9;
+  if ((r1 != 100)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(pp, 200);
+  sv0_vec_push(et, 1);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 2);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t10 = expr_init_cty(et, ed1, ed2, ed3, ed4, 1, pp, fnn, frc, al);
+  int r2 = _sv0t10;
+  if ((r2 != 100)) {
+    return 2;
+  } else {
+  }
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t11 = expr_init_cty(et, ed1, ed2, ed3, ed4, 2, pp, fnn, frc, al);
+  int r3 = _sv0t11;
+  int _sv0t12 = (0 - 1);
+  if ((r3 != _sv0t12)) {
+    return 3;
+  } else {
+  }
+  int _sv0t13 = (0 - 1);
+  int _sv0t14 = expr_init_cty(et, ed1, ed2, ed3, ed4, _sv0t13, pp, fnn, frc, al);
+  int r4 = _sv0t14;
+  int _sv0t15 = (0 - 1);
+  if ((r4 != _sv0t15)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_scan_lets(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int fnn = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int frc = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int al = _sv0t8;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 5);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 27);
+  sv0_vec_push(ed1, 42);
+  int _sv0t9 = (0 - 1);
+  sv0_vec_push(ed2, _sv0t9);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 9);
+  sv0_vec_push(ed1, 1);
+  sv0_vec_push(ed2, 1);
+  int _sv0t10 = (0 - 1);
+  sv0_vec_push(ed3, _sv0t10);
+  sv0_vec_push(ed4, 0);
+  int _sv0t11 = sv0_vec_new();
+  int on = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int oc = _sv0t12;
+  int _sv0t13 = scan_lets(et, ed1, ed2, ed3, ed4, 2, pp, fnn, frc, al, on, oc);
+  int c = _sv0t13;
+  if ((c != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(on, 0);
+  if ((_sv0t14 != 42)) {
+    return 2;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_get(oc, 0);
+  int _sv0t16 = (0 - 1);
+  if ((_sv0t15 != _sv0t16)) {
+    return 3;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_new();
+  int on2 = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int oc2 = _sv0t18;
+  int _sv0t19 = (0 - 1);
+  int _sv0t20 = scan_lets(et, ed1, ed2, ed3, ed4, _sv0t19, pp, fnn, frc, al, on2, oc2);
+  int c2 = _sv0t20;
+  if ((c2 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t21 = scan_lets(et, ed1, ed2, ed3, ed4, 0, pp, fnn, frc, al, on2, oc2);
+  int c3 = _sv0t21;
+  if ((c3 != 0)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -3396,6 +3667,20 @@ int main(void) {
   if ((r38 != 0)) {
     int _sv0t74 = (400 + r38);
     return _sv0t74;
+  } else {
+  }
+  int _sv0t75 = test_expr_init_cty();
+  int r39 = _sv0t75;
+  if ((r39 != 0)) {
+    int _sv0t76 = (410 + r39);
+    return _sv0t76;
+  } else {
+  }
+  int _sv0t77 = test_scan_lets();
+  int r40 = _sv0t77;
+  if ((r40 != 0)) {
+    int _sv0t78 = (420 + r40);
+    return _sv0t78;
   } else {
   }
   return 0;
