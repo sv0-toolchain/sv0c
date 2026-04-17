@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 40 — checker.sv0, lowering.sv0.** `checker.sv0`: `try_success_validate` (SML `trySuccessPayloadTy` — validates enum is valid `?` target: Result Ok/Err or Option Some/None with single-field tuple success variant). `lowering.sv0`: `match_scrut_cty` (SML `matchScrutCty` — determine type handle for match scrutinee via scrut locals, fn params, enum ctor path, or callee return), `variant_shape_in_items` (enum variant shape+field count lookup from item arena flat arrays). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 41 — checker.sv0.** `checker.sv0`: `ast_ty_to_ty_payload` (SML `astTyToTy` full dispatch — type tag + payload: width for int/float, name handle for struct/enum, type param index for TyVar), `enum_ctor_count` (variant count for an enum by name handle), `item_fn_ret_ty_tag` (function return type resolution from arena index), `binop_result_ty_tag` / `unop_result_ty_tag` (operator result type helpers — Arith→TyInt, Logic/Cmp→TyBool, Neg/BitNot→TyInt, Not→TyBool). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
