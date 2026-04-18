@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 62 — lowering.sv0.** Batch 62: local IR enum types (Value 8v/Expr 5v/Instr 16v matching codegen.sv0 layout), `ir_value_tag`/`ir_expr_tag`/`ir_instr_tag` accessors, `ctr_fresh` (mutable temp counter via Vec<i32> + vec_set), `classify_assign_lhs_arena` (SML `classifyAssignLhs` — flat arena ExprPath(1-seg)/ExprField(ExprPath,field) classification). Next: core lowering dispatch functions (lowerExprToValue simplest cases — ExprLit/ExprPath/ExprBinop/ExprUnop/ExprField). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 63 — lowering.sv0.** Batch 63: `lower_lit_to_ir_value` (SML `lowerLit` → Value enum — literal tag + token pos to IR Value), `lower_expr_to_value` first 6 cases (SML `lowerExprToValue` — ExprLit/ExprPath/ExprUnop/ExprBinop/ExprField/ExprTuple with out-instrs accumulator and ctr_fresh temp allocation). Functions return `Value` enum directly; instructions accumulate in out-parameter `Vec<i32>`. Next: remaining ~38 AST forms in `lower_expr_to_value`. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

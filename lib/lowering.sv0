@@ -132,6 +132,104 @@ fn ir_instr_tag(ins: Instr) -> i32 {
     }
 }
 
+/* ── lower_lit_to_ir_value (SML lowerLit → Value enum) ────────
+   Converts a literal tag + token position to an IR Value.
+   Parser lit tags: 0=IntLit, 1=FloatLit, 3=StringLit, 5=BoolLit.
+   tok_tags needed to distinguish true (91) vs false (64). */
+
+fn lower_lit_to_ir_value(lit_tag: i32, tok_pos: i32,
+                          tok_tags: Vec<i32>) -> Value {
+    if lit_tag == 0 { return Value::VInt(tok_pos); }
+    if lit_tag == 5 {
+        let tt: i32 = vec_get(tok_tags, tok_pos);
+        if tt == 91 { return Value::VBoolTrue; }
+        return Value::VBoolFalse;
+    }
+    if lit_tag == 3 { return Value::VString(tok_pos); }
+    return Value::VUnit;
+}
+
+/* ── lower_expr_to_value (SML lowerExprToValue — first cases) ─
+   Walks the flat expression arena at `idx` and returns an IR
+   Value.  Instructions accumulate (as boxed Instr handles) in
+   out_instrs.  ctr is a single-element Vec for the temp counter.
+   Currently handles:
+     0 ExprLit     → lower_lit_to_ir_value
+     1 ExprPath    → VVar (1-seg only; 2-seg deferred)
+     2 ExprUnop    → recurse operand, Assign(tmp, Unop(...))
+     3 ExprBinop   → recurse lhs+rhs, Assign(tmp, Binop(...))
+     6 ExprField   → recurse obj, VMember(v, field)
+    25 ExprTuple   → unwrap 1-elem; otherwise VUnit
+   Other tags: VUnit (placeholder). */
+
+fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                        ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                        tok_tags: Vec<i32>,
+                        idx: i32, ctr: Vec<i32>,
+                        out_instrs: Vec<i32>) -> Value {
+    let tag: i32 = vec_get(et, idx);
+    if tag == 0 {
+        let lit_tag: i32 = vec_get(ed1, idx);
+        let tok_pos: i32 = vec_get(ed2, idx);
+        return lower_lit_to_ir_value(lit_tag, tok_pos, tok_tags);
+    }
+    if tag == 1 {
+        let pps: i32 = vec_get(ed1, idx);
+        let ppc: i32 = vec_get(ed2, idx);
+        if ppc == 1 {
+            let name_tok: i32 = vec_get(pp, pps);
+            return Value::VVar(name_tok);
+        }
+        return Value::VUnit;
+    }
+    if tag == 2 {
+        let unop_tag: i32 = vec_get(ed1, idx);
+        let operand_idx: i32 = vec_get(ed2, idx);
+        let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                            tok_tags, operand_idx, ctr,
+                                            out_instrs);
+        let t: i32 = ctr_fresh(ctr);
+        let expr: Expr = Expr::Unop(unop_tag, box_new(v));
+        let instr: Instr = Instr::Assign(t, box_new(expr));
+        vec_push(out_instrs, box_new(instr));
+        return Value::VVar(t);
+    }
+    if tag == 3 {
+        let binop_tag: i32 = vec_get(ed1, idx);
+        let lhs_idx: i32 = vec_get(ed2, idx);
+        let rhs_idx: i32 = vec_get(ed3, idx);
+        let vl: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, lhs_idx, ctr,
+                                             out_instrs);
+        let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, rhs_idx, ctr,
+                                             out_instrs);
+        let t: i32 = ctr_fresh(ctr);
+        let expr: Expr = Expr::Binop(binop_tag, box_new(vl), box_new(vr));
+        let instr: Instr = Instr::Assign(t, box_new(expr));
+        vec_push(out_instrs, box_new(instr));
+        return Value::VVar(t);
+    }
+    if tag == 6 {
+        let obj_idx: i32 = vec_get(ed1, idx);
+        let field_tok: i32 = vec_get(ed2, idx);
+        let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, obj_idx, ctr,
+                                             out_instrs);
+        return Value::VMember(box_new(v1), field_tok);
+    }
+    if tag == 25 {
+        let elem_count: i32 = vec_get(ed2, idx);
+        if elem_count == 1 {
+            let first_idx: i32 = vec_get(ed1, idx);
+            return lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                        tok_tags, first_idx, ctr,
+                                        out_instrs);
+        }
+    }
+    return Value::VUnit;
+}
+
 /* ── freshTmp ───────────────────────────────────────────────── */
 
 fn fresh_tmp_name(counter: i32) -> i32 {
@@ -2423,6 +2521,66 @@ fn test_classify_arena() -> i32 {
     return 0;
 }
 
+fn test_lower_lit_val() -> i32 {
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(tok_tags, 64);
+    vec_push(tok_tags, 0);
+    let v1: Value = lower_lit_to_ir_value(0, 2, tok_tags);
+    if ir_value_tag(v1) != 0 { return 1; }
+    let v2: Value = lower_lit_to_ir_value(5, 0, tok_tags);
+    if ir_value_tag(v2) != 1 { return 2; }
+    let v3: Value = lower_lit_to_ir_value(5, 1, tok_tags);
+    if ir_value_tag(v3) != 2 { return 3; }
+    let v4: Value = lower_lit_to_ir_value(3, 2, tok_tags);
+    if ir_value_tag(v4) != 5 { return 4; }
+    let v5: Value = lower_lit_to_ir_value(99, 0, tok_tags);
+    if ir_value_tag(v5) != 4 { return 5; }
+    return 0;
+}
+
+fn test_lower_expr_val() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 77);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                         0, ctr, out);
+    if ir_value_tag(v1) != 0 { return 1; }
+    vec_push(et, 1);
+    vec_push(ed1, 0);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let v2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                         1, ctr, out);
+    if ir_value_tag(v2) != 3 { return 2; }
+    vec_push(et, 3);
+    vec_push(ed1, 7);
+    vec_push(ed2, 0);
+    vec_push(ed3, 1);
+    vec_push(ed4, 0);
+    let v3: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                         2, ctr, out);
+    if ir_value_tag(v3) != 3 { return 3; }
+    if vec_len(out) != 1 { return 4; }
+    if vec_get(ctr, 0) != 1 { return 5; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -2522,5 +2680,9 @@ fn main() -> i32 {
     if r48 != 0 { return 510 + r48; }
     let r49: i32 = test_classify_arena();
     if r49 != 0 { return 520 + r49; }
+    let r50: i32 = test_lower_lit_val();
+    if r50 != 0 { return 540 + r50; }
+    let r51: i32 = test_lower_expr_val();
+    if r51 != 0 { return 560 + r51; }
     return 0;
 }
