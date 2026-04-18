@@ -146,6 +146,9 @@ static int resolve_fn_call(int fn_names, const char* source, int starts, int end
 static int edef_name_lookup_str(int edef_names, const char* source, int starts, int ends, const char* enum_name_str);
 static int ctor_type_from_edef(int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, const char* source, int starts, int ends, int enum_name_pos, const char* variant_name_str);
 static int resolve_ctor_path_ty(int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, const char* source, int starts, int ends, int seg1_tok_pos, int seg2_tok_pos);
+static int sdef_name_lookup_str(int sdef_names, const char* source, int starts, int ends, const char* struct_name_str);
+static int env_lookup_str(int env_names, int env_types, const char* source, int starts, int ends, const char* target_str);
+static int synth_call_ret_type(int fn_names, int fn_ret_types, const char* source, int starts, int ends, const char* callee_name_str, int is_builtin_out);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -204,6 +207,7 @@ static int test_init_enum_defs(void);
 static int test_builtin_fn_lookup(void);
 static int test_resolve_fn_call(void);
 static int test_enum_ctor_resolution(void);
+static int test_synth_building_blocks(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -3275,6 +3279,80 @@ static int resolve_ctor_path_ty(int edef_names, int edef_variant_offsets, int ed
   int enp = _sv0t10;
   int _sv0t11 = ctor_type_from_edef(edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, source, starts, ends, enp, variant_str);
   return _sv0t11;
+}
+
+static int sdef_name_lookup_str(int sdef_names, const char* source, int starts, int ends, const char* struct_name_str) {
+  int _sv0t0 = sv0_vec_len(sdef_names);
+  int ns = _sv0t0;
+  int k = 0;
+  while ((k < ns)) {
+    int _sv0t1 = sv0_vec_get(sdef_names, k);
+    int np = _sv0t1;
+    int _sv0t2 = sv0_vec_get(starts, np);
+    int s = _sv0t2;
+    int _sv0t3 = sv0_vec_get(ends, np);
+    int e = _sv0t3;
+    int _sv0t4 = (e - s);
+    const char* _sv0t5 = sv0_string_substr(source, s, _sv0t4);
+    const char* nm;
+    nm = _sv0t5;
+    int _sv0t6 = sv0_string_eq(nm, struct_name_str);
+    if (_sv0t6) {
+      return k;
+    } else {
+    }
+    k = (k + 1);
+  }
+  int _sv0t7 = (0 - 1);
+  return _sv0t7;
+}
+
+static int env_lookup_str(int env_names, int env_types, const char* source, int starts, int ends, const char* target_str) {
+  int _sv0t0 = sv0_vec_len(env_names);
+  int n = _sv0t0;
+  int i = (n - 1);
+  while ((i >= 0)) {
+    int _sv0t1 = sv0_vec_get(env_names, i);
+    int np = _sv0t1;
+    int _sv0t2 = sv0_vec_get(starts, np);
+    int s = _sv0t2;
+    int _sv0t3 = sv0_vec_get(ends, np);
+    int e = _sv0t3;
+    int _sv0t4 = (e - s);
+    const char* _sv0t5 = sv0_string_substr(source, s, _sv0t4);
+    const char* nm;
+    nm = _sv0t5;
+    int _sv0t6 = sv0_string_eq(nm, target_str);
+    if (_sv0t6) {
+      int _sv0t7 = sv0_vec_get(env_types, i);
+      return _sv0t7;
+    } else {
+    }
+    i = (i - 1);
+  }
+  int _sv0t8 = (0 - 1);
+  return _sv0t8;
+}
+
+static int synth_call_ret_type(int fn_names, int fn_ret_types, const char* source, int starts, int ends, const char* callee_name_str, int is_builtin_out) {
+  int _sv0t0 = resolve_fn_call(fn_names, source, starts, ends, callee_name_str, is_builtin_out);
+  int fid = _sv0t0;
+  if ((fid < 0)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_len(is_builtin_out);
+  int _sv0t3 = (_sv0t2 - 1);
+  int _sv0t4 = sv0_vec_get(is_builtin_out, _sv0t3);
+  int is_b = _sv0t4;
+  if ((is_b != 0)) {
+    int _sv0t5 = builtin_fn_ret_type(fid);
+    return _sv0t5;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(fn_ret_types, fid);
+  return _sv0t6;
 }
 
 static int test_binop_class(void) {
@@ -6616,6 +6694,111 @@ static int test_enum_ctor_resolution(void) {
   return 0;
 }
 
+static int test_synth_building_blocks(void) {
+  const char* source;
+  source = "fn foo ( x : i32 ) -> bool { }";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(starts, 3);
+  sv0_vec_push(ends, 6);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 12);
+  sv0_vec_push(starts, 13);
+  sv0_vec_push(ends, 16);
+  sv0_vec_push(starts, 17);
+  sv0_vec_push(ends, 18);
+  sv0_vec_push(starts, 19);
+  sv0_vec_push(ends, 21);
+  sv0_vec_push(starts, 22);
+  sv0_vec_push(ends, 26);
+  sv0_vec_push(starts, 27);
+  sv0_vec_push(ends, 28);
+  sv0_vec_push(starts, 29);
+  sv0_vec_push(ends, 30);
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int et = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int em = _sv0t4;
+  int _sv0t5 = TY_INT();
+  int _sv0t6 = env_extend(en, et, em, 3, _sv0t5, 0);
+  int _sv0t7 = env_lookup_str(en, et, source, starts, ends, "x");
+  int r1 = _sv0t7;
+  int _sv0t8 = TY_INT();
+  if ((r1 != _sv0t8)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = env_lookup_str(en, et, source, starts, ends, "y");
+  int r2 = _sv0t9;
+  int _sv0t10 = (0 - 1);
+  if ((r2 != _sv0t10)) {
+    return 2;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int sd_names = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int sd_foffs = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int sd_fcounts = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int sd_fn_flat = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int sd_ft_flat = _sv0t15;
+  sv0_vec_push(sd_names, 1);
+  sv0_vec_push(sd_foffs, 0);
+  sv0_vec_push(sd_fcounts, 0);
+  int _sv0t16 = sdef_name_lookup_str(sd_names, source, starts, ends, "foo");
+  int si = _sv0t16;
+  if ((si != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t17 = sdef_name_lookup_str(sd_names, source, starts, ends, "bar");
+  int si2 = _sv0t17;
+  int _sv0t18 = (0 - 1);
+  if ((si2 != _sv0t18)) {
+    return 4;
+  } else {
+  }
+  int _sv0t19 = sv0_vec_new();
+  int fnames = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int frtypes = _sv0t20;
+  sv0_vec_push(fnames, 1);
+  int _sv0t21 = TY_BOOL();
+  sv0_vec_push(frtypes, _sv0t21);
+  int _sv0t22 = sv0_vec_new();
+  int ibo = _sv0t22;
+  int _sv0t23 = synth_call_ret_type(fnames, frtypes, source, starts, ends, "foo", ibo);
+  int rt = _sv0t23;
+  int _sv0t24 = TY_BOOL();
+  if ((rt != _sv0t24)) {
+    return 5;
+  } else {
+  }
+  int _sv0t25 = sv0_vec_new();
+  int ibo2 = _sv0t25;
+  int _sv0t26 = synth_call_ret_type(fnames, frtypes, source, starts, ends, "println", ibo2);
+  int rt2 = _sv0t26;
+  int _sv0t27 = TY_UNIT();
+  if ((rt2 != _sv0t27)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -7020,6 +7203,13 @@ int main(void) {
   if ((r58 != 0)) {
     int _sv0t114 = (610 + r58);
     return _sv0t114;
+  } else {
+  }
+  int _sv0t115 = test_synth_building_blocks();
+  int r59 = _sv0t115;
+  if ((r59 != 0)) {
+    int _sv0t116 = (620 + r59);
+    return _sv0t116;
   } else {
   }
   return 0;
