@@ -481,6 +481,49 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return Value::VUnit;
 }
 
+/* ── value_to_expr (SML valueToExpr) ────────────────────────
+   VVar(x) → Load(x);  otherwise → Literal(v). */
+
+fn value_to_expr(v: Value) -> Expr {
+    let t: i32 = ir_value_tag(v);
+    if t == 3 {
+        match v {
+            Value::VVar(x) => { return Expr::Load(x); },
+            _ => { return Expr::Literal(box_new(v)); },
+        }
+    }
+    return Expr::Literal(box_new(v));
+}
+
+/* ── lower_expr_with_instrs (SML lowerExprWithInstrs) ───────
+   Returns (instrs via out_instrs, Expr).  Wrapper: calls
+   lower_expr_to_value then value_to_expr. */
+
+fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                           ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                           tok_tags: Vec<i32>,
+                           idx: i32, ctr: Vec<i32>,
+                           out_instrs: Vec<i32>) -> Expr {
+    let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                        tok_tags, idx, ctr, out_instrs);
+    return value_to_expr(v);
+}
+
+/* ── lower_for_effect (SML lowerExprForEffect — simplified) ─
+   Lowers an expression discarding the result value.
+   Returns the instruction list via out_instrs. */
+
+fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                    tok_tags: Vec<i32>,
+                    idx: i32, ctr: Vec<i32>,
+                    out_instrs: Vec<i32>) -> i32 {
+    let discard5: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                               tok_tags, idx, ctr,
+                                               out_instrs);
+    return 0;
+}
+
 /* ── freshTmp ───────────────────────────────────────────────── */
 
 fn fresh_tmp_name(counter: i32) -> i32 {
@@ -3056,6 +3099,78 @@ fn test_lower_cast() -> i32 {
     return 0;
 }
 
+fn test_value_to_expr_fn() -> i32 {
+    let v1: Value = Value::VInt(42);
+    let e1: Expr = value_to_expr(v1);
+    if ir_expr_tag(e1) != 0 { return 1; }
+    let v2: Value = Value::VVar(7);
+    let e2: Expr = value_to_expr(v2);
+    if ir_expr_tag(e2) != 1 { return 2; }
+    let v3: Value = Value::VUnit;
+    let e3: Expr = value_to_expr(v3);
+    if ir_expr_tag(e3) != 0 { return 3; }
+    let v4: Value = Value::VBoolTrue;
+    let e4: Expr = value_to_expr(v4);
+    if ir_expr_tag(e4) != 0 { return 4; }
+    return 0;
+}
+
+fn test_lower_with_instrs() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let e1: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
+                                            tok_tags, 0, ctr, out);
+    if ir_expr_tag(e1) != 0 { return 1; }
+    vec_push(et, 1);
+    vec_push(ed1, 0);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let e2: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
+                                            tok_tags, 1, ctr, out);
+    if ir_expr_tag(e2) != 1 { return 2; }
+    return 0;
+}
+
+fn test_lower_for_effect_fn() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let rc: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
+                                    tok_tags, 0, ctr, out);
+    if rc != 0 { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -3173,5 +3288,11 @@ fn main() -> i32 {
     if r57 != 0 { return 680 + r57; }
     let r58: i32 = test_lower_cast();
     if r58 != 0 { return 700 + r58; }
+    let r59: i32 = test_value_to_expr_fn();
+    if r59 != 0 { return 720 + r59; }
+    let r60: i32 = test_lower_with_instrs();
+    if r60 != 0 { return 740 + r60; }
+    let r61: i32 = test_lower_for_effect_fn();
+    if r61 != 0 { return 760 + r61; }
     return 0;
 }

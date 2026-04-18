@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 65 — lowering.sv0.** Batch 65: `lower_expr_to_value` extended to 22 of ~27 AST forms. New cases: ExprWhile (WhileLoop instr with lowered cond+body), ExprLoop (WhileLoop(true, body)), ExprBreak (Break instr), ExprContinue (Continue instr), ExprCast (Unop(99, v) simplified cast-to-int). ExprFor remains stub. 3 new test groups. Next: ExprCall builtins/2-seg ctor, ExprMatch, ExprStruct, ExprTry. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 66 — lowering.sv0.** Batch 66: expression lowering wrappers completing the mutual recursion cluster. `value_to_expr` (SML `valueToExpr` — VVar to Load, otherwise to Literal), `lower_expr_with_instrs` (SML `lowerExprWithInstrs` — wrapper returning Expr), `lower_for_effect` (SML `lowerExprForEffect` simplified — lower + discard value). 3 new test groups. Next: lowerStmt, lowerFn, and remaining ~5 lower_expr_to_value forms. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
