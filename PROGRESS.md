@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 63 — lowering.sv0.** Batch 63: `lower_lit_to_ir_value` (SML `lowerLit` → Value enum — literal tag + token pos to IR Value), `lower_expr_to_value` first 6 cases (SML `lowerExprToValue` — ExprLit/ExprPath/ExprUnop/ExprBinop/ExprField/ExprTuple with out-instrs accumulator and ctr_fresh temp allocation). Functions return `Value` enum directly; instructions accumulate in out-parameter `Vec<i32>`. Next: remaining ~38 AST forms in `lower_expr_to_value`. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 64 — lowering.sv0.** Batch 64: `lower_expr_to_value` extended to 17 of ~27 AST forms. New cases: ExprReturn (ReturnVal/ReturnVoid), ExprBlock (inline LetStmt DeclVar+Store / SemiStmt discard + tail expr), ExprIf (with-else: IfElse+DeclVar+Store+Load; no-else: IfElse→VUnit), ExprCall (1-seg general: lower args, Call instr, VVar), ExprAssign (classify LHS + Store/StoreField), ExprAssignOp (Load+Binop+Store), ExprUnop Borrow/BorrowMut on ExprPath → VAddrOf. Stubs: While/For/Loop/Break/Continue → VUnit. Next: ExprCall builtins/2-seg ctor, ExprMatch, ExprStruct, ExprCast, ExprTry. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
