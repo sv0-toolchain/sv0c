@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 56 — checker.sv0.** `synth_expr` extended with ExprCall (tag 4: delegate to synth_expr_call_simple), ExprIndex (tag 8: synth obj+index, return TY_INT simplified), ExprRange (tag 21: synth lo/hi, return TY_INT). Added `fn_names`+`fn_ret_types` parameters to `synth_expr`/`check_stmt_in_block` (threaded through ~27 recursive call sites) to enable ExprCall integration. synth_expr now handles 21 of ~27 expression tags. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 57 — checker.sv0.** `synth_expr` extended with ExprMethodCall (tag 5: synth obj + each arg, return TY_INT simplified), ExprField (tag 6: synth obj, return TY_INT simplified), ExprTupleField (tag 7: synth obj, return TY_INT simplified). synth_expr now handles 24 of ~27 expression tags. Remaining 3: ExprMatch/ExprStruct/ExprArray (require pattern binding or non-contiguous arena traversal). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
