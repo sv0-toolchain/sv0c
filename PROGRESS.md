@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 48 — checker.sv0.** `checker.sv0`: `edef_name_lookup_str` (string-based enum def table name lookup — returns edef index or -1), `ctor_type_from_edef` (enum ctor type from def table — variant shape to TY_ENUM for VSUnit or TY_FN for VSTuple/VSStruct), `resolve_ctor_path_ty` (2-segment path → ctor type tag — extracts enum+variant name strings from token positions, resolves via edef table — synth ExprPath building block). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 49 — checker.sv0.** `checker.sv0`: `sdef_name_lookup_str` (string-based struct def table name lookup — mirrors edef_name_lookup_str), `env_lookup_str` (string-based env variable lookup — walks env_names backward, extracts string at each token position, compares with target; needed for cross-scope name resolution in synth), `synth_call_ret_type` (function call return type — resolves callee name via fn_table/builtins and returns return type tag). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
