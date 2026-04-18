@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 67 — lowering.sv0.** Batch 67: statement and block lowering functions. `lower_return` (SML `lowerReturn` — lower expr + emit ReturnVal), `lower_stmt` (SML `lowerStmt` simplified — LetStmt: DeclVar+lower init+Store; SemiStmt: lower for effect), `lower_block` (SML `lowerBlock` — iterate stmts + optional tail return). 3 new test groups. Next: lowerFn and remaining ~5 lower_expr_to_value forms. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 68 — lowering.sv0.** Batch 68: function-level lowering. `lower_body` (SML `lowerBody` — ExprBlock dispatch to lower_block, otherwise lower_return), `lower_fn` (SML `lowerFn` simplified, no contracts — creates fresh ctr + delegates to lower_body). 2 new test groups. Next: `lower` (top-level program lowering) and remaining ~5 lower_expr_to_value forms. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

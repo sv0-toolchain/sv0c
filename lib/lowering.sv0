@@ -599,6 +599,44 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return 0;
 }
 
+/* ── lower_body (SML lowerBody) ─────────────────────────────
+   If body_idx points to ExprBlock, use lower_block;
+   otherwise treat it as a single return expression. */
+
+fn lower_body(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+              ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+              tok_tags: Vec<i32>,
+              body_idx: i32, ctr: Vec<i32>,
+              out_instrs: Vec<i32>) -> i32 {
+    let btag: i32 = vec_get(et, body_idx);
+    if btag == 9 {
+        let sf: i32 = vec_get(ed1, body_idx);
+        let sc: i32 = vec_get(ed2, body_idx);
+        let ti: i32 = vec_get(ed3, body_idx);
+        return lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                           sf, sc, ti, ctr, out_instrs);
+    }
+    return lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                        body_idx, ctr, out_instrs);
+}
+
+/* ── lower_fn (SML lowerFn — simplified, no contracts) ──────
+   Lowers a function body.  The caller provides the per-function
+   expression arena (et/ed1-ed4), the path pool (pp), and the
+   token tags array.  body_idx is the root expression index.
+   out_instrs accumulates the lowered instructions. */
+
+fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+            ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+            tok_tags: Vec<i32>,
+            body_idx: i32,
+            out_instrs: Vec<i32>) -> i32 {
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    return lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                      body_idx, ctr, out_instrs);
+}
+
 /* ── freshTmp ───────────────────────────────────────────────── */
 
 fn fresh_tmp_name(counter: i32) -> i32 {
@@ -3174,6 +3212,64 @@ fn test_lower_cast() -> i32 {
     return 0;
 }
 
+fn test_lower_body_fn() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let rc: i32 = lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                              0, ctr, out);
+    if rc != 0 { return 1; }
+    if vec_len(out) != 1 { return 2; }
+    return 0;
+}
+
+fn test_lower_fn_fn() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 27);
+    vec_push(ed1, 99);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 9);
+    vec_push(ed1, 1);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let rc: i32 = lower_fn(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                            2, out);
+    if rc != 0 { return 1; }
+    if vec_len(out) < 3 { return 2; }
+    return 0;
+}
+
 fn test_lower_return_fn() -> i32 {
     let mut et: Vec<i32> = vec_new();
     let mut ed1: Vec<i32> = vec_new();
@@ -3474,5 +3570,9 @@ fn main() -> i32 {
     if r63 != 0 { return 800 + r63; }
     let r64: i32 = test_lower_block_fn();
     if r64 != 0 { return 820 + r64; }
+    let r65: i32 = test_lower_body_fn();
+    if r65 != 0 { return 840 + r65; }
+    let r66: i32 = test_lower_fn_fn();
+    if r66 != 0 { return 860 + r66; }
     return 0;
 }
