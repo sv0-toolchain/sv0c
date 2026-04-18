@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 47 — checker.sv0.** `checker.sv0`: `builtin_fn_lookup` (maps builtin name string to integer ID — 13 builtins: println, string_*, vec_*, box_*), `builtin_fn_ret_type`/`builtin_fn_param_count`/`builtin_fn_param_type` (builtin type signature accessors; TY_VAR for polymorphic positions), `BUILTIN_COUNT` (constant 13), `resolve_fn_call` (unified user fn + builtin lookup for synth ExprCall — checks fn_table first, falls through to builtins). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 48 — checker.sv0.** `checker.sv0`: `edef_name_lookup_str` (string-based enum def table name lookup — returns edef index or -1), `ctor_type_from_edef` (enum ctor type from def table — variant shape to TY_ENUM for VSUnit or TY_FN for VSTuple/VSStruct), `resolve_ctor_path_ty` (2-segment path → ctor type tag — extracts enum+variant name strings from token positions, resolves via edef table — synth ExprPath building block). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
