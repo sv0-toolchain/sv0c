@@ -2402,6 +2402,88 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
         if loop_depth <= 0 { return 0 - 1; }
         return TY_UNIT();
     }
+    if tag == 12 {
+        let cond_idx: i32 = vec_get(ed1, idx);
+        let body_idx: i32 = vec_get(ed2, idx);
+        let cond_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                       source, starts, ends,
+                                       env_names, env_types,
+                                       edef_names, edef_variant_offsets,
+                                       edef_variant_counts,
+                                       edef_vnames_flat, edef_vshapes_flat,
+                                       ret_ty, loop_depth,
+                                       cond_idx);
+        if cond_ty < 0 { return 0 - 1; }
+        let body_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                       source, starts, ends,
+                                       env_names, env_types,
+                                       edef_names, edef_variant_offsets,
+                                       edef_variant_counts,
+                                       edef_vnames_flat, edef_vshapes_flat,
+                                       ret_ty, loop_depth + 1,
+                                       body_idx);
+        if body_ty < 0 { return 0 - 1; }
+        return TY_UNIT();
+    }
+    if tag == 14 {
+        let body_idx: i32 = vec_get(ed1, idx);
+        let body_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                       source, starts, ends,
+                                       env_names, env_types,
+                                       edef_names, edef_variant_offsets,
+                                       edef_variant_counts,
+                                       edef_vnames_flat, edef_vshapes_flat,
+                                       ret_ty, loop_depth + 1,
+                                       body_idx);
+        if body_ty < 0 { return 0 - 1; }
+        return TY_UNIT();
+    }
+    if tag == 18 {
+        let lhs_idx: i32 = vec_get(ed1, idx);
+        let rhs_idx: i32 = vec_get(ed2, idx);
+        let lhs_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                      source, starts, ends,
+                                      env_names, env_types,
+                                      edef_names, edef_variant_offsets,
+                                      edef_variant_counts,
+                                      edef_vnames_flat, edef_vshapes_flat,
+                                      ret_ty, loop_depth,
+                                      lhs_idx);
+        if lhs_ty < 0 { return 0 - 1; }
+        let rhs_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                      source, starts, ends,
+                                      env_names, env_types,
+                                      edef_names, edef_variant_offsets,
+                                      edef_variant_counts,
+                                      edef_vnames_flat, edef_vshapes_flat,
+                                      ret_ty, loop_depth,
+                                      rhs_idx);
+        if rhs_ty < 0 { return 0 - 1; }
+        return TY_UNIT();
+    }
+    if tag == 19 {
+        let lhs_idx: i32 = vec_get(ed2, idx);
+        let rhs_idx: i32 = vec_get(ed3, idx);
+        let lhs_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                      source, starts, ends,
+                                      env_names, env_types,
+                                      edef_names, edef_variant_offsets,
+                                      edef_variant_counts,
+                                      edef_vnames_flat, edef_vshapes_flat,
+                                      ret_ty, loop_depth,
+                                      lhs_idx);
+        if lhs_ty < 0 { return 0 - 1; }
+        let rhs_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                      source, starts, ends,
+                                      env_names, env_types,
+                                      edef_names, edef_variant_offsets,
+                                      edef_variant_counts,
+                                      edef_vnames_flat, edef_vshapes_flat,
+                                      ret_ty, loop_depth,
+                                      rhs_idx);
+        if rhs_ty < 0 { return 0 - 1; }
+        return TY_UNIT();
+    }
     return 0 - 1;
 }
 
@@ -3920,6 +4002,30 @@ fn test_synth_expr() -> i32 {
                                edn, edvo, edvc, edvn, edvs,
                                TY_INT(), 0, 10);
     if r10 != TY_UNIT() { return 11; }
+    vec_push(et, 12); vec_push(ed1, 1); vec_push(ed2, 0); vec_push(ed3, 0);
+    let r11: i32 = synth_expr(et, ed1, ed2, ed3, ppool,
+                               source, starts, ends, en, ety,
+                               edn, edvo, edvc, edvn, edvs,
+                               TY_INT(), 0, 11);
+    if r11 != TY_UNIT() { return 12; }
+    vec_push(et, 14); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0);
+    let r12: i32 = synth_expr(et, ed1, ed2, ed3, ppool,
+                               source, starts, ends, en, ety,
+                               edn, edvo, edvc, edvn, edvs,
+                               TY_INT(), 0, 12);
+    if r12 != TY_UNIT() { return 13; }
+    vec_push(et, 16); vec_push(ed1, 0 - 1); vec_push(ed2, 0); vec_push(ed3, 0);
+    let r13: i32 = synth_expr(et, ed1, ed2, ed3, ppool,
+                               source, starts, ends, en, ety,
+                               edn, edvo, edvc, edvn, edvs,
+                               TY_INT(), 1, 13);
+    if r13 != TY_UNIT() { return 14; }
+    vec_push(et, 18); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0);
+    let r14: i32 = synth_expr(et, ed1, ed2, ed3, ppool,
+                               source, starts, ends, en, ety,
+                               edn, edvo, edvc, edvn, edvs,
+                               TY_INT(), 0, 14);
+    if r14 != TY_UNIT() { return 15; }
     return 0;
 }
 
