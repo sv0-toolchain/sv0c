@@ -143,6 +143,9 @@ static int builtin_fn_ret_type(int bid);
 static int builtin_fn_param_count(int bid);
 static int builtin_fn_param_type(int bid, int idx);
 static int resolve_fn_call(int fn_names, const char* source, int starts, int ends, const char* name_str, int is_builtin_out);
+static int edef_name_lookup_str(int edef_names, const char* source, int starts, int ends, const char* enum_name_str);
+static int ctor_type_from_edef(int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, const char* source, int starts, int ends, int enum_name_pos, const char* variant_name_str);
+static int resolve_ctor_path_ty(int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, const char* source, int starts, int ends, int seg1_tok_pos, int seg2_tok_pos);
 static int test_binop_class(void);
 static int test_integral_ty(void);
 static int test_ast_type_names(void);
@@ -200,6 +203,7 @@ static int test_init_struct_defs(void);
 static int test_init_enum_defs(void);
 static int test_builtin_fn_lookup(void);
 static int test_resolve_fn_call(void);
+static int test_enum_ctor_resolution(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -3198,6 +3202,79 @@ static int resolve_fn_call(int fn_names, const char* source, int starts, int end
   }
   int _sv0t2 = (0 - 1);
   return _sv0t2;
+}
+
+static int edef_name_lookup_str(int edef_names, const char* source, int starts, int ends, const char* enum_name_str) {
+  int _sv0t0 = sv0_vec_len(edef_names);
+  int ne = _sv0t0;
+  int k = 0;
+  while ((k < ne)) {
+    int _sv0t1 = sv0_vec_get(edef_names, k);
+    int np = _sv0t1;
+    int _sv0t2 = sv0_vec_get(starts, np);
+    int s = _sv0t2;
+    int _sv0t3 = sv0_vec_get(ends, np);
+    int e = _sv0t3;
+    int _sv0t4 = (e - s);
+    const char* _sv0t5 = sv0_string_substr(source, s, _sv0t4);
+    const char* nm;
+    nm = _sv0t5;
+    int _sv0t6 = sv0_string_eq(nm, enum_name_str);
+    if (_sv0t6) {
+      return k;
+    } else {
+    }
+    k = (k + 1);
+  }
+  int _sv0t7 = (0 - 1);
+  return _sv0t7;
+}
+
+static int ctor_type_from_edef(int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, const char* source, int starts, int ends, int enum_name_pos, const char* variant_name_str) {
+  int _sv0t0 = enum_def_variant_shape_str(edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, source, starts, ends, enum_name_pos, variant_name_str);
+  int sh = _sv0t0;
+  if ((sh < 0)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  if ((sh == 0)) {
+    int _sv0t2 = TY_ENUM();
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = TY_FN();
+  return _sv0t3;
+}
+
+static int resolve_ctor_path_ty(int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, const char* source, int starts, int ends, int seg1_tok_pos, int seg2_tok_pos) {
+  int _sv0t0 = sv0_vec_get(starts, seg1_tok_pos);
+  int s1 = _sv0t0;
+  int _sv0t1 = sv0_vec_get(ends, seg1_tok_pos);
+  int e1 = _sv0t1;
+  int _sv0t2 = (e1 - s1);
+  const char* _sv0t3 = sv0_string_substr(source, s1, _sv0t2);
+  const char* enum_str;
+  enum_str = _sv0t3;
+  int _sv0t4 = edef_name_lookup_str(edef_names, source, starts, ends, enum_str);
+  int eidx = _sv0t4;
+  if ((eidx < 0)) {
+    int _sv0t5 = (0 - 1);
+    return _sv0t5;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(starts, seg2_tok_pos);
+  int s2 = _sv0t6;
+  int _sv0t7 = sv0_vec_get(ends, seg2_tok_pos);
+  int e2 = _sv0t7;
+  int _sv0t8 = (e2 - s2);
+  const char* _sv0t9 = sv0_string_substr(source, s2, _sv0t8);
+  const char* variant_str;
+  variant_str = _sv0t9;
+  int _sv0t10 = sv0_vec_get(edef_names, eidx);
+  int enp = _sv0t10;
+  int _sv0t11 = ctor_type_from_edef(edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, source, starts, ends, enp, variant_str);
+  return _sv0t11;
 }
 
 static int test_binop_class(void) {
@@ -6403,6 +6480,142 @@ static int test_resolve_fn_call(void) {
   return 0;
 }
 
+static int test_enum_ctor_resolution(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  sv0_vec_push(tt, 62);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 8);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 12);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 7);
+  sv0_vec_push(tt, 12);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 8);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 14);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 9);
+  sv0_vec_push(tt, 9);
+  const char* source;
+  source = "enum Color { Red , Green ( i32 ) , Blue { x : i32 } }";
+  int _sv0t1 = sv0_vec_new();
+  int starts = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ends = _sv0t2;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 4);
+  sv0_vec_push(starts, 5);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 12);
+  sv0_vec_push(starts, 13);
+  sv0_vec_push(ends, 16);
+  sv0_vec_push(starts, 17);
+  sv0_vec_push(ends, 18);
+  sv0_vec_push(starts, 19);
+  sv0_vec_push(ends, 24);
+  sv0_vec_push(starts, 25);
+  sv0_vec_push(ends, 26);
+  sv0_vec_push(starts, 27);
+  sv0_vec_push(ends, 30);
+  sv0_vec_push(starts, 31);
+  sv0_vec_push(ends, 32);
+  sv0_vec_push(starts, 33);
+  sv0_vec_push(ends, 34);
+  sv0_vec_push(starts, 35);
+  sv0_vec_push(ends, 39);
+  sv0_vec_push(starts, 40);
+  sv0_vec_push(ends, 41);
+  sv0_vec_push(starts, 42);
+  sv0_vec_push(ends, 43);
+  sv0_vec_push(starts, 44);
+  sv0_vec_push(ends, 45);
+  sv0_vec_push(starts, 46);
+  sv0_vec_push(ends, 49);
+  sv0_vec_push(starts, 50);
+  sv0_vec_push(ends, 51);
+  sv0_vec_push(starts, 52);
+  sv0_vec_push(ends, 53);
+  int _sv0t3 = sv0_vec_new();
+  int item_t = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int item_d1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int item_d2 = _sv0t5;
+  sv0_vec_push(item_t, 2);
+  sv0_vec_push(item_d1, 1);
+  sv0_vec_push(item_d2, 3);
+  int _sv0t6 = sv0_vec_new();
+  int ed_names = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int ed_voffs = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int ed_vcounts = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ed_vn_flat = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int ed_vs_flat = _sv0t10;
+  int _sv0t11 = init_enum_defs(tt, item_t, item_d1, item_d2, ed_names, ed_voffs, ed_vcounts, ed_vn_flat, ed_vs_flat);
+  int c = _sv0t11;
+  if ((c != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t12 = edef_name_lookup_str(ed_names, source, starts, ends, "Color");
+  int ei = _sv0t12;
+  if ((ei != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t13 = edef_name_lookup_str(ed_names, source, starts, ends, "Nope");
+  int ei2 = _sv0t13;
+  int _sv0t14 = (0 - 1);
+  if ((ei2 != _sv0t14)) {
+    return 3;
+  } else {
+  }
+  int _sv0t15 = ctor_type_from_edef(ed_names, ed_voffs, ed_vcounts, ed_vn_flat, ed_vs_flat, source, starts, ends, 1, "Red");
+  int ct0 = _sv0t15;
+  int _sv0t16 = TY_ENUM();
+  if ((ct0 != _sv0t16)) {
+    return 4;
+  } else {
+  }
+  int _sv0t17 = ctor_type_from_edef(ed_names, ed_voffs, ed_vcounts, ed_vn_flat, ed_vs_flat, source, starts, ends, 1, "Green");
+  int ct1 = _sv0t17;
+  int _sv0t18 = TY_FN();
+  if ((ct1 != _sv0t18)) {
+    return 5;
+  } else {
+  }
+  int _sv0t19 = ctor_type_from_edef(ed_names, ed_voffs, ed_vcounts, ed_vn_flat, ed_vs_flat, source, starts, ends, 1, "Blue");
+  int ct2 = _sv0t19;
+  int _sv0t20 = TY_FN();
+  if ((ct2 != _sv0t20)) {
+    return 6;
+  } else {
+  }
+  int _sv0t21 = resolve_ctor_path_ty(ed_names, ed_voffs, ed_vcounts, ed_vn_flat, ed_vs_flat, source, starts, ends, 1, 3);
+  int rp = _sv0t21;
+  int _sv0t22 = TY_ENUM();
+  if ((rp != _sv0t22)) {
+    return 7;
+  } else {
+  }
+  int _sv0t23 = resolve_ctor_path_ty(ed_names, ed_voffs, ed_vcounts, ed_vn_flat, ed_vs_flat, source, starts, ends, 1, 5);
+  int rp2 = _sv0t23;
+  int _sv0t24 = TY_FN();
+  if ((rp2 != _sv0t24)) {
+    return 8;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -6800,6 +7013,13 @@ int main(void) {
   if ((r57 != 0)) {
     int _sv0t112 = (600 + r57);
     return _sv0t112;
+  } else {
+  }
+  int _sv0t113 = test_enum_ctor_resolution();
+  int r58 = _sv0t113;
+  if ((r58 != 0)) {
+    int _sv0t114 = (610 + r58);
+    return _sv0t114;
   } else {
   }
   return 0;

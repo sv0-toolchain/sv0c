@@ -2097,6 +2097,92 @@ fn resolve_fn_call(fn_names: Vec<i32>, source: string,
     return 0 - 1;
 }
 
+/* ── enum def name lookup (string-based) ────────────────────
+   Finds the index of an enum in the edef table by comparing
+   the name string at each edef_names token position.  Returns
+   -1 if not found.                                            */
+
+fn edef_name_lookup_str(edef_names: Vec<i32>, source: string,
+                        starts: Vec<i32>, ends: Vec<i32>,
+                        enum_name_str: string) -> i32 {
+    let ne: i32 = vec_len(edef_names);
+    let mut k: i32 = 0;
+    while k < ne {
+        let np: i32 = vec_get(edef_names, k);
+        let s: i32 = vec_get(starts, np);
+        let e: i32 = vec_get(ends, np);
+        let nm: string = string_substr(source, s, e - s);
+        if string_eq(nm, enum_name_str) { return k; }
+        k = k + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── ctor_type_from_edef (enum ctor type from def table) ────
+   Given an enum name token position and a variant name string,
+   looks up the variant shape in the enum def table, then
+   returns the constructor type tag:
+     VSUnit → TY_ENUM   (nullary)
+     VSTuple/VSStruct → TY_FN  (parameterised)
+   Returns -1 if enum or variant not found.                   */
+
+fn ctor_type_from_edef(edef_names: Vec<i32>,
+                       edef_variant_offsets: Vec<i32>,
+                       edef_variant_counts: Vec<i32>,
+                       edef_vnames_flat: Vec<i32>,
+                       edef_vshapes_flat: Vec<i32>,
+                       source: string,
+                       starts: Vec<i32>, ends: Vec<i32>,
+                       enum_name_pos: i32,
+                       variant_name_str: string) -> i32 {
+    let sh: i32 = enum_def_variant_shape_str(
+        edef_names, edef_variant_offsets, edef_variant_counts,
+        edef_vnames_flat, edef_vshapes_flat,
+        source, starts, ends,
+        enum_name_pos, variant_name_str);
+    if sh < 0 { return 0 - 1; }
+    if sh == 0 { return TY_ENUM(); }
+    return TY_FN();
+}
+
+/* ── resolve_ctor_path_ty (2-segment path → ctor type tag) ──
+   Given two token positions for a 2-segment path (e.g.
+   Color::Red), resolves to the constructor type tag by:
+   1. Extracting enum name string from seg1 token
+   2. Looking up enum in edef table via edef_name_lookup_str
+   3. Extracting variant name string from seg2 token
+   4. Looking up variant shape and computing ctor type tag
+   Used by synth ExprPath for enum constructor references.
+   Returns -1 if not found.                                   */
+
+fn resolve_ctor_path_ty(edef_names: Vec<i32>,
+                        edef_variant_offsets: Vec<i32>,
+                        edef_variant_counts: Vec<i32>,
+                        edef_vnames_flat: Vec<i32>,
+                        edef_vshapes_flat: Vec<i32>,
+                        source: string,
+                        starts: Vec<i32>, ends: Vec<i32>,
+                        seg1_tok_pos: i32,
+                        seg2_tok_pos: i32) -> i32 {
+    let s1: i32 = vec_get(starts, seg1_tok_pos);
+    let e1: i32 = vec_get(ends, seg1_tok_pos);
+    let enum_str: string = string_substr(source, s1, e1 - s1);
+    let eidx: i32 = edef_name_lookup_str(edef_names, source,
+                                          starts, ends, enum_str);
+    if eidx < 0 { return 0 - 1; }
+    let s2: i32 = vec_get(starts, seg2_tok_pos);
+    let e2: i32 = vec_get(ends, seg2_tok_pos);
+    let variant_str: string = string_substr(source, s2, e2 - s2);
+    let enp: i32 = vec_get(edef_names, eidx);
+    return ctor_type_from_edef(edef_names,
+                                edef_variant_offsets,
+                                edef_variant_counts,
+                                edef_vnames_flat,
+                                edef_vshapes_flat,
+                                source, starts, ends,
+                                enp, variant_str);
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -3440,6 +3526,88 @@ fn test_resolve_fn_call() -> i32 {
     return 0;
 }
 
+fn test_enum_ctor_resolution() -> i32 {
+    /* enum Color { Red , Green ( i32 ) , Blue { x : i32 } }
+       tok 0=enum(62) 1=Color(5) 2={(8) 3=Red(5) 4=,(12)
+           5=Green(5) 6=((6) 7=i32(5) 8=)(7) 9=,(12)
+           10=Blue(5) 11={(8) 12=x(5) 13=:(14) 14=i32(5) 15=}(9)
+           16=}(9) */
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 62); vec_push(tt, 5);  vec_push(tt, 8);
+    vec_push(tt, 5);  vec_push(tt, 12); vec_push(tt, 5);
+    vec_push(tt, 6);  vec_push(tt, 5);  vec_push(tt, 7);
+    vec_push(tt, 12); vec_push(tt, 5);  vec_push(tt, 8);
+    vec_push(tt, 5);  vec_push(tt, 14); vec_push(tt, 5);
+    vec_push(tt, 9);  vec_push(tt, 9);
+    let source: string = "enum Color { Red , Green ( i32 ) , Blue { x : i32 } }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 4);
+    vec_push(starts, 5); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 24);
+    vec_push(starts, 25); vec_push(ends, 26);
+    vec_push(starts, 27); vec_push(ends, 30);
+    vec_push(starts, 31); vec_push(ends, 32);
+    vec_push(starts, 33); vec_push(ends, 34);
+    vec_push(starts, 35); vec_push(ends, 39);
+    vec_push(starts, 40); vec_push(ends, 41);
+    vec_push(starts, 42); vec_push(ends, 43);
+    vec_push(starts, 44); vec_push(ends, 45);
+    vec_push(starts, 46); vec_push(ends, 49);
+    vec_push(starts, 50); vec_push(ends, 51);
+    vec_push(starts, 52); vec_push(ends, 53);
+    let item_t: Vec<i32> = vec_new();
+    let item_d1: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
+    vec_push(item_t, 2);
+    vec_push(item_d1, 1);
+    vec_push(item_d2, 3);
+    let ed_names: Vec<i32> = vec_new();
+    let ed_voffs: Vec<i32> = vec_new();
+    let ed_vcounts: Vec<i32> = vec_new();
+    let ed_vn_flat: Vec<i32> = vec_new();
+    let ed_vs_flat: Vec<i32> = vec_new();
+    let c: i32 = init_enum_defs(tt, item_t, item_d1, item_d2,
+                                 ed_names, ed_voffs, ed_vcounts,
+                                 ed_vn_flat, ed_vs_flat);
+    if c != 1 { return 1; }
+    let ei: i32 = edef_name_lookup_str(ed_names, source,
+                                        starts, ends, "Color");
+    if ei != 0 { return 2; }
+    let ei2: i32 = edef_name_lookup_str(ed_names, source,
+                                         starts, ends, "Nope");
+    if ei2 != 0 - 1 { return 3; }
+    let ct0: i32 = ctor_type_from_edef(ed_names, ed_voffs, ed_vcounts,
+                                        ed_vn_flat, ed_vs_flat,
+                                        source, starts, ends,
+                                        1, "Red");
+    if ct0 != TY_ENUM() { return 4; }
+    let ct1: i32 = ctor_type_from_edef(ed_names, ed_voffs, ed_vcounts,
+                                        ed_vn_flat, ed_vs_flat,
+                                        source, starts, ends,
+                                        1, "Green");
+    if ct1 != TY_FN() { return 5; }
+    let ct2: i32 = ctor_type_from_edef(ed_names, ed_voffs, ed_vcounts,
+                                        ed_vn_flat, ed_vs_flat,
+                                        source, starts, ends,
+                                        1, "Blue");
+    if ct2 != TY_FN() { return 6; }
+    let rp: i32 = resolve_ctor_path_ty(ed_names, ed_voffs, ed_vcounts,
+                                        ed_vn_flat, ed_vs_flat,
+                                        source, starts, ends,
+                                        1, 3);
+    if rp != TY_ENUM() { return 7; }
+    let rp2: i32 = resolve_ctor_path_ty(ed_names, ed_voffs, ed_vcounts,
+                                         ed_vn_flat, ed_vs_flat,
+                                         source, starts, ends,
+                                         1, 5);
+    if rp2 != TY_FN() { return 8; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -3555,5 +3723,7 @@ fn main() -> i32 {
     if r56 != 0 { return 580 + r56; }
     let r57: i32 = test_resolve_fn_call();
     if r57 != 0 { return 600 + r57; }
+    let r58: i32 = test_enum_ctor_resolution();
+    if r58 != 0 { return 610 + r58; }
     return 0;
 }
