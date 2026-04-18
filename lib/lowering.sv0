@@ -637,6 +637,74 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                       body_idx, ctr, out_instrs);
 }
 
+/* ── lower (SML Lowering.lower — top-level program lowering) ──
+   Orchestrates the full lowering pass over a parsed program.
+   Builds struct/enum infrastructure, collects C typedefs, and
+   iterates ItemFn items to produce IR block metadata.
+
+   Body lowering for each ItemFn is deferred: lower_fn requires
+   per-function expression arenas (et/ed1-ed4) which are ephemeral
+   in parse_fn_body.  The caller must re-parse each function body
+   and call lower_fn with the resulting arenas.
+
+   Output:
+     out_block_labels — one name handle per ItemFn (insertion order)
+     out_struct_names / out_struct_offsets / out_struct_counts /
+       out_struct_flat — struct field-order data for downstream helpers
+     out_enum_names / out_enum_tag_offsets / out_enum_tag_flat /
+       out_enum_max — enum variant data
+   Returns the typedefs string (C typedef declarations). */
+
+fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
+         item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
+         item_field_counts: Vec<i32>, item_vmax: Vec<i32>,
+         struct_fnames_flat: Vec<i32>, enum_vnames_flat: Vec<i32>,
+         sf_names: Vec<i32>, sf_types: Vec<i32>,
+         source: string, starts: Vec<i32>, ends: Vec<i32>,
+         out_block_labels: Vec<i32>,
+         out_struct_names: Vec<i32>,
+         out_struct_offsets: Vec<i32>,
+         out_struct_counts: Vec<i32>,
+         out_struct_flat: Vec<i32>,
+         out_enum_names: Vec<i32>,
+         out_enum_tag_offsets: Vec<i32>,
+         out_enum_tag_counts: Vec<i32>,
+         out_enum_tag_flat: Vec<i32>,
+         out_enum_max: Vec<i32>) -> string {
+    let discard_so: i32 = build_struct_order(item_tags, item_names,
+                                              item_field_counts,
+                                              struct_fnames_flat,
+                                              out_struct_names,
+                                              out_struct_offsets,
+                                              out_struct_counts,
+                                              out_struct_flat);
+    let discard_ev: i32 = build_enum_variants_data(item_tags, item_names,
+                                                    item_field_counts,
+                                                    item_vmax,
+                                                    enum_vnames_flat,
+                                                    out_enum_names,
+                                                    out_enum_tag_offsets,
+                                                    out_enum_tag_counts,
+                                                    out_enum_tag_flat,
+                                                    out_enum_max);
+    let typedefs: string = collect_typedefs_str(item_tags, item_names,
+                                                 item_field_counts,
+                                                 item_vmax,
+                                                 sf_names, sf_types,
+                                                 source, starts, ends,
+                                                 out_struct_names,
+                                                 out_enum_names);
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 0 {
+            vec_push(out_block_labels, vec_get(item_names, i));
+        }
+        i = i + 1;
+    }
+    return typedefs;
+}
+
 /* ── freshTmp ───────────────────────────────────────────────── */
 
 fn fresh_tmp_name(counter: i32) -> i32 {
@@ -3270,6 +3338,75 @@ fn test_lower_fn_fn() -> i32 {
     return 0;
 }
 
+fn test_lower_program_fn() -> i32 {
+    let src: string = "fn foo() { } struct Bar { x: i32, } enum Qux { A, B, }";
+    let strt: Vec<i32> = vec_new();
+    let endi: Vec<i32> = vec_new();
+    let mut p: i32 = 0;
+    while p < 54 {
+        vec_push(strt, p);
+        vec_push(endi, p + 1);
+        p = p + 1;
+    }
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let ifc: Vec<i32> = vec_new();
+    let ivm: Vec<i32> = vec_new();
+    let sfn: Vec<i32> = vec_new();
+    let evn: Vec<i32> = vec_new();
+    let sfnames: Vec<i32> = vec_new();
+    let sftypes: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    vec_push(id1, 3);
+    vec_push(id2, 0);
+    vec_push(id3, 0);
+    vec_push(id4, 0);
+    vec_push(ifc, 0);
+    vec_push(ivm, 0);
+    vec_push(it, 1);
+    vec_push(id1, 14);
+    vec_push(id2, 1);
+    vec_push(id3, 0);
+    vec_push(id4, 0);
+    vec_push(ifc, 1);
+    vec_push(ivm, 0);
+    vec_push(sfn, 20);
+    vec_push(sfnames, 20);
+    vec_push(sftypes, 22);
+    vec_push(it, 2);
+    vec_push(id1, 30);
+    vec_push(id2, 2);
+    vec_push(id3, 0);
+    vec_push(id4, 0);
+    vec_push(ifc, 0);
+    vec_push(ivm, 0);
+    vec_push(evn, 40);
+    vec_push(evn, 45);
+    let ob: Vec<i32> = vec_new();
+    let osn: Vec<i32> = vec_new();
+    let oso: Vec<i32> = vec_new();
+    let osc: Vec<i32> = vec_new();
+    let osf: Vec<i32> = vec_new();
+    let oen: Vec<i32> = vec_new();
+    let oeto: Vec<i32> = vec_new();
+    let oetc: Vec<i32> = vec_new();
+    let oetf: Vec<i32> = vec_new();
+    let oem: Vec<i32> = vec_new();
+    let td: string = lower(it, id1, id2, id3, id4, ifc, ivm,
+                             sfn, evn, sfnames, sftypes,
+                             src, strt, endi,
+                             ob, osn, oso, osc, osf,
+                             oen, oeto, oetc, oetf, oem);
+    if vec_len(ob) != 1 { return 1; }
+    if vec_get(ob, 0) != 3 { return 2; }
+    if vec_len(osn) != 1 { return 3; }
+    if vec_len(oen) != 1 { return 4; }
+    return 0;
+}
+
 fn test_lower_return_fn() -> i32 {
     let mut et: Vec<i32> = vec_new();
     let mut ed1: Vec<i32> = vec_new();
@@ -3574,5 +3711,7 @@ fn main() -> i32 {
     if r65 != 0 { return 840 + r65; }
     let r66: i32 = test_lower_fn_fn();
     if r66 != 0 { return 860 + r66; }
+    let r67: i32 = test_lower_program_fn();
+    if r67 != 0 { return 880 + r67; }
     return 0;
 }
