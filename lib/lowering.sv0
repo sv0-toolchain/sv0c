@@ -167,7 +167,12 @@ fn lower_lit_to_ir_value(lit_tag: i32, tok_pos: i32,
     18 ExprAssign    → classify LHS + Store/StoreField → VUnit
     19 ExprAssignOp  → load + binop + store → VUnit
     25 ExprTuple     → unwrap 1-elem; otherwise VUnit
-    12-14,16-17      → VUnit stubs (While/For/Loop/Break/Continue) */
+    12 ExprWhile    → lower cond+body, WhileLoop instr → VUnit
+    14 ExprLoop     → WhileLoop(true, body) → VUnit
+    16 ExprBreak    → Break instr → VUnit
+    17 ExprContinue → Continue instr → VUnit
+    20 ExprCast     → recurse src, Assign(tmp, Unop(99,v)) → VVar(tmp)
+    13 ExprFor      → VUnit stub (needs desugar infra) */
 
 fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
@@ -424,11 +429,55 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         out_instrs);
         }
     }
-    if tag == 12 { return Value::VUnit; }
+    if tag == 12 {
+        let cond_idx2: i32 = vec_get(ed1, idx);
+        let body_idx2: i32 = vec_get(ed2, idx);
+        let vc2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                              tok_tags, cond_idx2, ctr,
+                                              out_instrs);
+        let ce2: Expr = Expr::Literal(box_new(vc2));
+        let mut body_is: Vec<i32> = vec_new();
+        let discard3: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                   tok_tags, body_idx2, ctr,
+                                                   body_is);
+        let wl: Instr = Instr::WhileLoop(box_new(ce2), body_is);
+        vec_push(out_instrs, box_new(wl));
+        return Value::VUnit;
+    }
     if tag == 13 { return Value::VUnit; }
-    if tag == 14 { return Value::VUnit; }
-    if tag == 16 { return Value::VUnit; }
-    if tag == 17 { return Value::VUnit; }
+    if tag == 14 {
+        let loop_body: i32 = vec_get(ed1, idx);
+        let true_v: Value = Value::VBoolTrue;
+        let true_e: Expr = Expr::Literal(box_new(true_v));
+        let mut loop_is: Vec<i32> = vec_new();
+        let discard4: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                   tok_tags, loop_body, ctr,
+                                                   loop_is);
+        let ll: Instr = Instr::WhileLoop(box_new(true_e), loop_is);
+        vec_push(out_instrs, box_new(ll));
+        return Value::VUnit;
+    }
+    if tag == 16 {
+        let brk: Instr = Instr::Break;
+        vec_push(out_instrs, box_new(brk));
+        return Value::VUnit;
+    }
+    if tag == 17 {
+        let cnt: Instr = Instr::Continue;
+        vec_push(out_instrs, box_new(cnt));
+        return Value::VUnit;
+    }
+    if tag == 20 {
+        let cast_src: i32 = vec_get(ed1, idx);
+        let cv: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, cast_src, ctr,
+                                             out_instrs);
+        let ct2: i32 = ctr_fresh(ctr);
+        let cast_e: Expr = Expr::Unop(99, box_new(cv));
+        let cast_i: Instr = Instr::Assign(ct2, box_new(cast_e));
+        vec_push(out_instrs, box_new(cast_i));
+        return Value::VVar(ct2);
+    }
     return Value::VUnit;
 }
 
@@ -2912,6 +2961,101 @@ fn test_lower_assign() -> i32 {
     return 0;
 }
 
+fn test_lower_while() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 5);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 4);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 12);
+    vec_push(ed1, 0);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                         2, ctr, out);
+    if ir_value_tag(v1) != 4 { return 1; }
+    if vec_len(out) != 1 { return 2; }
+    return 0;
+}
+
+fn test_lower_loop() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 16);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 14);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                         1, ctr, out);
+    if ir_value_tag(v1) != 4 { return 1; }
+    if vec_len(out) != 1 { return 2; }
+    return 0;
+}
+
+fn test_lower_cast() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 20);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                         1, ctr, out);
+    if ir_value_tag(v1) != 3 { return 1; }
+    if vec_len(out) != 1 { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -3023,5 +3167,11 @@ fn main() -> i32 {
     if r54 != 0 { return 620 + r54; }
     let r55: i32 = test_lower_assign();
     if r55 != 0 { return 640 + r55; }
+    let r56: i32 = test_lower_while();
+    if r56 != 0 { return 660 + r56; }
+    let r57: i32 = test_lower_loop();
+    if r57 != 0 { return 680 + r57; }
+    let r58: i32 = test_lower_cast();
+    if r58 != 0 { return 700 + r58; }
     return 0;
 }

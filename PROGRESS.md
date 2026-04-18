@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 64 — lowering.sv0.** Batch 64: `lower_expr_to_value` extended to 17 of ~27 AST forms. New cases: ExprReturn (ReturnVal/ReturnVoid), ExprBlock (inline LetStmt DeclVar+Store / SemiStmt discard + tail expr), ExprIf (with-else: IfElse+DeclVar+Store+Load; no-else: IfElse→VUnit), ExprCall (1-seg general: lower args, Call instr, VVar), ExprAssign (classify LHS + Store/StoreField), ExprAssignOp (Load+Binop+Store), ExprUnop Borrow/BorrowMut on ExprPath → VAddrOf. Stubs: While/For/Loop/Break/Continue → VUnit. Next: ExprCall builtins/2-seg ctor, ExprMatch, ExprStruct, ExprCast, ExprTry. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 65 — lowering.sv0.** Batch 65: `lower_expr_to_value` extended to 22 of ~27 AST forms. New cases: ExprWhile (WhileLoop instr with lowered cond+body), ExprLoop (WhileLoop(true, body)), ExprBreak (Break instr), ExprContinue (Continue instr), ExprCast (Unop(99, v) simplified cast-to-int). ExprFor remains stub. 3 new test groups. Next: ExprCall builtins/2-seg ctor, ExprMatch, ExprStruct, ExprTry. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
