@@ -22,6 +22,8 @@ typedef struct {
 static int ir_value_tag(Value v);
 static int ir_expr_tag(Expr e);
 static int ir_instr_tag(Instr ins);
+static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags);
+static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs);
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
 static const char* lower_digit(int d);
@@ -148,6 +150,8 @@ static int test_variant_shape_in_items(void);
 static int test_ir_types(void);
 static int test_ctr_fresh(void);
 static int test_classify_arena(void);
+static int test_lower_lit_val(void);
+static int test_lower_expr_val(void);
 
 static int ir_value_tag(Value v) {
   int _sv0t0;
@@ -307,6 +311,197 @@ static int ir_instr_tag(Instr ins) {
     }
   }
   return _sv0t0;
+}
+
+static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags) {
+  if ((lit_tag == 0)) {
+    Value _sv0t0;
+    _sv0t0.tag = 0;
+    _sv0t0.p0 = tok_pos;
+    return _sv0t0;
+  } else {
+  }
+  if ((lit_tag == 5)) {
+    int _sv0t1 = sv0_vec_get(tok_tags, tok_pos);
+    int tt = _sv0t1;
+    if ((tt == 91)) {
+      Value _sv0t2;
+      _sv0t2.tag = 1;
+      return _sv0t2;
+    } else {
+    }
+    Value _sv0t3;
+    _sv0t3.tag = 2;
+    return _sv0t3;
+  } else {
+  }
+  if ((lit_tag == 3)) {
+    Value _sv0t4;
+    _sv0t4.tag = 5;
+    _sv0t4.p0 = tok_pos;
+    return _sv0t4;
+  } else {
+  }
+  Value _sv0t5;
+  _sv0t5.tag = 4;
+  return _sv0t5;
+}
+
+static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs) {
+  int _sv0t0 = sv0_vec_get(et, idx);
+  int tag = _sv0t0;
+  if ((tag == 0)) {
+    int _sv0t1 = sv0_vec_get(ed1, idx);
+    int lit_tag = _sv0t1;
+    int _sv0t2 = sv0_vec_get(ed2, idx);
+    int tok_pos = _sv0t2;
+    Value _sv0t3 = lower_lit_to_ir_value(lit_tag, tok_pos, tok_tags);
+    return _sv0t3;
+  } else {
+  }
+  if ((tag == 1)) {
+    int _sv0t4 = sv0_vec_get(ed1, idx);
+    int pps = _sv0t4;
+    int _sv0t5 = sv0_vec_get(ed2, idx);
+    int ppc = _sv0t5;
+    if ((ppc == 1)) {
+      int _sv0t6 = sv0_vec_get(pp, pps);
+      int name_tok = _sv0t6;
+      Value _sv0t7;
+      _sv0t7.tag = 3;
+      _sv0t7.p0 = name_tok;
+      return _sv0t7;
+    } else {
+    }
+    Value _sv0t8;
+    _sv0t8.tag = 4;
+    return _sv0t8;
+  } else {
+  }
+  if ((tag == 2)) {
+    int _sv0t9 = sv0_vec_get(ed1, idx);
+    int unop_tag = _sv0t9;
+    int _sv0t10 = sv0_vec_get(ed2, idx);
+    int operand_idx = _sv0t10;
+    Value _sv0t11 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, operand_idx, ctr, out_instrs);
+    Value v;
+    v = _sv0t11;
+    int _sv0t12 = ctr_fresh(ctr);
+    int t = _sv0t12;
+    Expr expr;
+    int _sv0t13 = sv0_box_alloc(3);
+    sv0_box_store(_sv0t13, 0, v.tag);
+    sv0_box_store(_sv0t13, 1, v.p0);
+    sv0_box_store(_sv0t13, 2, v.p1);
+    expr.tag = 3;
+    expr.p0 = unop_tag;
+    expr.p1 = _sv0t13;
+    Instr instr;
+    int _sv0t14 = sv0_box_alloc(4);
+    sv0_box_store(_sv0t14, 0, expr.tag);
+    sv0_box_store(_sv0t14, 1, expr.p0);
+    sv0_box_store(_sv0t14, 2, expr.p1);
+    sv0_box_store(_sv0t14, 3, expr.p2);
+    instr.tag = 3;
+    instr.p0 = t;
+    instr.p1 = _sv0t14;
+    int _sv0t15 = sv0_box_alloc(5);
+    sv0_box_store(_sv0t15, 0, instr.tag);
+    sv0_box_store(_sv0t15, 1, instr.p0);
+    sv0_box_store(_sv0t15, 2, instr.p1);
+    sv0_box_store(_sv0t15, 3, instr.p2);
+    sv0_box_store(_sv0t15, 4, instr.p3);
+    sv0_vec_push(out_instrs, _sv0t15);
+    Value _sv0t16;
+    _sv0t16.tag = 3;
+    _sv0t16.p0 = t;
+    return _sv0t16;
+  } else {
+  }
+  if ((tag == 3)) {
+    int _sv0t17 = sv0_vec_get(ed1, idx);
+    int binop_tag = _sv0t17;
+    int _sv0t18 = sv0_vec_get(ed2, idx);
+    int lhs_idx = _sv0t18;
+    int _sv0t19 = sv0_vec_get(ed3, idx);
+    int rhs_idx = _sv0t19;
+    Value _sv0t20 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, lhs_idx, ctr, out_instrs);
+    Value vl;
+    vl = _sv0t20;
+    Value _sv0t21 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, rhs_idx, ctr, out_instrs);
+    Value vr;
+    vr = _sv0t21;
+    int _sv0t22 = ctr_fresh(ctr);
+    int t = _sv0t22;
+    Expr expr;
+    int _sv0t23 = sv0_box_alloc(3);
+    sv0_box_store(_sv0t23, 0, vl.tag);
+    sv0_box_store(_sv0t23, 1, vl.p0);
+    sv0_box_store(_sv0t23, 2, vl.p1);
+    int _sv0t24 = sv0_box_alloc(3);
+    sv0_box_store(_sv0t24, 0, vr.tag);
+    sv0_box_store(_sv0t24, 1, vr.p0);
+    sv0_box_store(_sv0t24, 2, vr.p1);
+    expr.tag = 2;
+    expr.p0 = binop_tag;
+    expr.p1 = _sv0t23;
+    expr.p2 = _sv0t24;
+    Instr instr;
+    int _sv0t25 = sv0_box_alloc(4);
+    sv0_box_store(_sv0t25, 0, expr.tag);
+    sv0_box_store(_sv0t25, 1, expr.p0);
+    sv0_box_store(_sv0t25, 2, expr.p1);
+    sv0_box_store(_sv0t25, 3, expr.p2);
+    instr.tag = 3;
+    instr.p0 = t;
+    instr.p1 = _sv0t25;
+    int _sv0t26 = sv0_box_alloc(5);
+    sv0_box_store(_sv0t26, 0, instr.tag);
+    sv0_box_store(_sv0t26, 1, instr.p0);
+    sv0_box_store(_sv0t26, 2, instr.p1);
+    sv0_box_store(_sv0t26, 3, instr.p2);
+    sv0_box_store(_sv0t26, 4, instr.p3);
+    sv0_vec_push(out_instrs, _sv0t26);
+    Value _sv0t27;
+    _sv0t27.tag = 3;
+    _sv0t27.p0 = t;
+    return _sv0t27;
+  } else {
+  }
+  if ((tag == 6)) {
+    int _sv0t28 = sv0_vec_get(ed1, idx);
+    int obj_idx = _sv0t28;
+    int _sv0t29 = sv0_vec_get(ed2, idx);
+    int field_tok = _sv0t29;
+    Value _sv0t30 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, obj_idx, ctr, out_instrs);
+    Value v1;
+    v1 = _sv0t30;
+    Value _sv0t31;
+    int _sv0t32 = sv0_box_alloc(3);
+    sv0_box_store(_sv0t32, 0, v1.tag);
+    sv0_box_store(_sv0t32, 1, v1.p0);
+    sv0_box_store(_sv0t32, 2, v1.p1);
+    _sv0t31.tag = 6;
+    _sv0t31.p0 = _sv0t32;
+    _sv0t31.p1 = field_tok;
+    return _sv0t31;
+  } else {
+  }
+  if ((tag == 25)) {
+    int _sv0t33 = sv0_vec_get(ed2, idx);
+    int elem_count = _sv0t33;
+    if ((elem_count == 1)) {
+      int _sv0t34 = sv0_vec_get(ed1, idx);
+      int first_idx = _sv0t34;
+      Value _sv0t35 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, first_idx, ctr, out_instrs);
+      return _sv0t35;
+    } else {
+    }
+  } else {
+  }
+  Value _sv0t36;
+  _sv0t36.tag = 4;
+  return _sv0t36;
 }
 
 static int fresh_tmp_name(int counter) {
@@ -4653,6 +4848,129 @@ static int test_classify_arena(void) {
   return 0;
 }
 
+static int test_lower_lit_val(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tok_tags = _sv0t0;
+  sv0_vec_push(tok_tags, 91);
+  sv0_vec_push(tok_tags, 64);
+  sv0_vec_push(tok_tags, 0);
+  Value _sv0t1 = lower_lit_to_ir_value(0, 2, tok_tags);
+  Value v1;
+  v1 = _sv0t1;
+  int _sv0t2 = ir_value_tag(v1);
+  if ((_sv0t2 != 0)) {
+    return 1;
+  } else {
+  }
+  Value _sv0t3 = lower_lit_to_ir_value(5, 0, tok_tags);
+  Value v2;
+  v2 = _sv0t3;
+  int _sv0t4 = ir_value_tag(v2);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  Value _sv0t5 = lower_lit_to_ir_value(5, 1, tok_tags);
+  Value v3;
+  v3 = _sv0t5;
+  int _sv0t6 = ir_value_tag(v3);
+  if ((_sv0t6 != 2)) {
+    return 3;
+  } else {
+  }
+  Value _sv0t7 = lower_lit_to_ir_value(3, 2, tok_tags);
+  Value v4;
+  v4 = _sv0t7;
+  int _sv0t8 = ir_value_tag(v4);
+  if ((_sv0t8 != 5)) {
+    return 4;
+  } else {
+  }
+  Value _sv0t9 = lower_lit_to_ir_value(99, 0, tok_tags);
+  Value v5;
+  v5 = _sv0t9;
+  int _sv0t10 = ir_value_tag(v5);
+  if ((_sv0t10 != 4)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lower_expr_val(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tok_tags = _sv0t6;
+  sv0_vec_push(tok_tags, 91);
+  sv0_vec_push(pp, 77);
+  int _sv0t7 = sv0_vec_new();
+  int ctr = _sv0t7;
+  sv0_vec_push(ctr, 0);
+  int _sv0t8 = sv0_vec_new();
+  int out = _sv0t8;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  Value _sv0t9 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, 0, ctr, out);
+  Value v1;
+  v1 = _sv0t9;
+  int _sv0t10 = ir_value_tag(v1);
+  if ((_sv0t10 != 0)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(et, 1);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 1);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  Value _sv0t11 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, 1, ctr, out);
+  Value v2;
+  v2 = _sv0t11;
+  int _sv0t12 = ir_value_tag(v2);
+  if ((_sv0t12 != 3)) {
+    return 2;
+  } else {
+  }
+  sv0_vec_push(et, 3);
+  sv0_vec_push(ed1, 7);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 1);
+  sv0_vec_push(ed4, 0);
+  Value _sv0t13 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, 2, ctr, out);
+  Value v3;
+  v3 = _sv0t13;
+  int _sv0t14 = ir_value_tag(v3);
+  if ((_sv0t14 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_len(out);
+  if ((_sv0t15 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_get(ctr, 0);
+  if ((_sv0t16 != 1)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -4994,6 +5312,20 @@ int main(void) {
   if ((r49 != 0)) {
     int _sv0t96 = (520 + r49);
     return _sv0t96;
+  } else {
+  }
+  int _sv0t97 = test_lower_lit_val();
+  int r50 = _sv0t97;
+  if ((r50 != 0)) {
+    int _sv0t98 = (540 + r50);
+    return _sv0t98;
+  } else {
+  }
+  int _sv0t99 = test_lower_expr_val();
+  int r51 = _sv0t99;
+  if ((r51 != 0)) {
+    int _sv0t100 = (560 + r51);
+    return _sv0t100;
   } else {
   }
   return 0;
