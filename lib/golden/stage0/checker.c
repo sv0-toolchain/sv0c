@@ -127,6 +127,7 @@ static int register_all_item_fns(int tok_tags, const char* source, int starts, i
 static int scan_fn_param_names(int tok_tags, int name_tok_pos, int param_count, int out_param_name_pos, int out_param_muts);
 static int check_fn_body(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, const char* source, int starts, int ends, int mod_env_names, int mod_env_types, int mod_env_muts, int param_name_pos, int param_type_tags, int param_muts, int param_count, int ret_ty, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types);
 static int process_item_use(const char* source, int starts, int ends, int pp, int id1, int id2, int item_idx, int fn_names, int fn_ret_types, int sdef_names, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int env_names, int env_types, int env_muts, int aliases, int alias_targets);
+static int build_mod_env(const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int fn_names, int fn_ret_types, int sdef_names, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int env_names, int env_types, int env_muts, int aliases, int alias_targets);
 static int contract_expr_new(void);
 static int contract_expr_enter(int flag);
 static int contract_expr_exit(int flag, int saved);
@@ -217,6 +218,7 @@ static int test_synth_expr(void);
 static int test_scan_fn_param_names(void);
 static int test_check_fn_body(void);
 static int test_process_item_use(void);
+static int test_build_mod_env(void);
 static int test_synth_building_blocks(void);
 
 static int BINOP_ARITH(void) {
@@ -2779,6 +2781,36 @@ static int process_item_use(const char* source, int starts, int ends, int pp, in
     }
     return 0;
   } else {
+  }
+  return 0;
+}
+
+static int build_mod_env(const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int fn_names, int fn_ret_types, int sdef_names, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int env_names, int env_types, int env_muts, int aliases, int alias_targets) {
+  int _sv0t0 = sv0_vec_len(it);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(it, i);
+    int tag = _sv0t1;
+    if ((tag == 0)) {
+      int _sv0t2 = sv0_vec_get(id1, i);
+      int np = _sv0t2;
+      int _sv0t3 = TY_FN();
+      int _sv0t4 = env_extend(env_names, env_types, env_muts, np, _sv0t3, 0);
+    } else {
+    }
+    i = (i + 1);
+  }
+  i = 0;
+  while ((i < n)) {
+    int _sv0t5 = sv0_vec_get(it, i);
+    int tag = _sv0t5;
+    if ((tag == 5)) {
+      int _sv0t6 = process_item_use(source, starts, ends, pp, id1, id2, i, fn_names, fn_ret_types, sdef_names, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, env_names, env_types, env_muts, aliases, alias_targets);
+      int _r = _sv0t6;
+    } else {
+    }
+    i = (i + 1);
   }
   return 0;
 }
@@ -8398,6 +8430,98 @@ static int test_process_item_use(void) {
   return 0;
 }
 
+static int test_build_mod_env(void) {
+  const char* source;
+  source = "fn foo ( ) { }";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(starts, 3);
+  sv0_vec_push(ends, 6);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 12);
+  sv0_vec_push(starts, 13);
+  sv0_vec_push(ends, 14);
+  int _sv0t2 = sv0_vec_new();
+  int pp = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int it = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int id1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int id2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int id3 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id4 = _sv0t7;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(id1, 1);
+  sv0_vec_push(id2, 0);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  sv0_vec_push(it, 1);
+  sv0_vec_push(id1, 1);
+  sv0_vec_push(id2, 0);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  int _sv0t8 = sv0_vec_new();
+  int fnn = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int fnrt = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int sdn = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int edn = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int edvo = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int edvc = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int edvn = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int edvs = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int en = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int et = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int em = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int al = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int at = _sv0t20;
+  int _sv0t21 = build_mod_env(source, starts, ends, pp, it, id1, id2, id3, id4, fnn, fnrt, sdn, edn, edvo, edvc, edvn, edvs, en, et, em, al, at);
+  int r = _sv0t21;
+  if ((r != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t22 = sv0_vec_len(en);
+  if ((_sv0t22 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t23 = sv0_vec_get(en, 0);
+  if ((_sv0t23 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t24 = sv0_vec_get(et, 0);
+  int _sv0t25 = TY_FN();
+  if ((_sv0t24 != _sv0t25)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 static int test_synth_building_blocks(void) {
   const char* source;
   source = "fn foo ( x : i32 ) -> bool { }";
@@ -8942,6 +9066,13 @@ int main(void) {
   if ((r63 != 0)) {
     int _sv0t124 = (670 + r63);
     return _sv0t124;
+  } else {
+  }
+  int _sv0t125 = test_build_mod_env();
+  int r64 = _sv0t125;
+  if ((r64 != 0)) {
+    int _sv0t126 = (680 + r64);
+    return _sv0t126;
   } else {
   }
   return 0;

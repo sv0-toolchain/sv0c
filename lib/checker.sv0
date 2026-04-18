@@ -79,8 +79,9 @@
    extend env with params, synth body, compare with return type).
    Batch 60: process_item_use (SML oneUse — ItemUse env import:
    2-segment use path → fn_table/sdef/edef lookup → env or alias).
-   Full type inference orchestration (initTypes + modEnvFromProg +
-   check loop) deferred — needs cross-module parse_block call.  */
+   Batch 61: build_mod_env (SML modEnvFromProg — module env builder:
+   register ItemFn names as TY_FN + process all ItemUse entries).
+   Full check loop deferred — needs cross-module parse_block.   */
 
 /* ── binop classification ───────────────────────────────────── */
 
@@ -1816,6 +1817,63 @@ fn process_item_use(
             vi = vi + 1;
         }
         return 0;
+    }
+    return 0;
+}
+
+/* ── build_mod_env (SML modEnvFromProg — module env builder) ──
+   Builds the checker module environment from the item arena.
+   Steps:
+     1. Walk all ItemFn (tag 0) → extend env with (name_pos, TY_FN)
+     2. Walk all ItemUse (tag 5) → call process_item_use
+   Builtins and enum ctors are resolved via the fn table and
+   edef tables respectively (no env entry needed — synth_expr
+   routes calls through synth_expr_call_simple which uses
+   resolve_fn_call + resolve_ctor_path_ty).
+   Returns 0 on success.                                      */
+
+fn build_mod_env(
+    source: string, starts: Vec<i32>, ends: Vec<i32>,
+    pp: Vec<i32>,
+    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+    id3: Vec<i32>, id4: Vec<i32>,
+    fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
+    sdef_names: Vec<i32>,
+    edef_names: Vec<i32>,
+    edef_variant_offsets: Vec<i32>,
+    edef_variant_counts: Vec<i32>,
+    edef_vnames_flat: Vec<i32>,
+    edef_vshapes_flat: Vec<i32>,
+    env_names: Vec<i32>, env_types: Vec<i32>,
+    env_muts: Vec<i32>,
+    aliases: Vec<i32>, alias_targets: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(it, i);
+        if tag == 0 {
+            let np: i32 = vec_get(id1, i);
+            env_extend(env_names, env_types, env_muts, np, TY_FN(), 0);
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < n {
+        let tag: i32 = vec_get(it, i);
+        if tag == 5 {
+            let _r: i32 = process_item_use(source, starts, ends, pp,
+                                            id1, id2, i,
+                                            fn_names, fn_ret_types,
+                                            sdef_names,
+                                            edef_names,
+                                            edef_variant_offsets,
+                                            edef_variant_counts,
+                                            edef_vnames_flat,
+                                            edef_vshapes_flat,
+                                            env_names, env_types, env_muts,
+                                            aliases, alias_targets);
+        }
+        i = i + 1;
     }
     return 0;
 }
@@ -5050,6 +5108,53 @@ fn test_process_item_use() -> i32 {
     return 0;
 }
 
+fn test_build_mod_env() -> i32 {
+    /* Item arena: 1 ItemFn at index 0 (name_pos=1), 1 ItemStruct at index 1.
+       Token source: "fn foo ( ) { }" — tok 0=fn(65) 1=foo(5) */
+    let source: string = "fn foo ( ) { }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(starts, 3); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 14);
+    let pp: Vec<i32> = vec_new();
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    vec_push(it, 0); vec_push(id1, 1); vec_push(id2, 0);
+    vec_push(id3, 0); vec_push(id4, 0);
+    vec_push(it, 1); vec_push(id1, 1); vec_push(id2, 0);
+    vec_push(id3, 0); vec_push(id4, 0);
+    let fnn: Vec<i32> = vec_new();
+    let fnrt: Vec<i32> = vec_new();
+    let sdn: Vec<i32> = vec_new();
+    let edn: Vec<i32> = vec_new();
+    let edvo: Vec<i32> = vec_new();
+    let edvc: Vec<i32> = vec_new();
+    let edvn: Vec<i32> = vec_new();
+    let edvs: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let em: Vec<i32> = vec_new();
+    let al: Vec<i32> = vec_new();
+    let at: Vec<i32> = vec_new();
+    let r: i32 = build_mod_env(source, starts, ends, pp,
+                                it, id1, id2, id3, id4,
+                                fnn, fnrt, sdn,
+                                edn, edvo, edvc, edvn, edvs,
+                                en, et, em, al, at);
+    if r != 0 { return 1; }
+    if vec_len(en) != 1 { return 2; }
+    if vec_get(en, 0) != 1 { return 3; }
+    if vec_get(et, 0) != TY_FN() { return 4; }
+    return 0;
+}
+
 fn test_synth_building_blocks() -> i32 {
     /* source: "fn foo ( x : i32 ) -> bool { }"
        tok: 0=fn(60) 1=foo(5) 2=((6) 3=x(5) 4=:(14) 5=i32(5)
@@ -5230,5 +5335,7 @@ fn main() -> i32 {
     if r62 != 0 { return 660 + r62; }
     let r63: i32 = test_process_item_use();
     if r63 != 0 { return 670 + r63; }
+    let r64: i32 = test_build_mod_env();
+    if r64 != 0 { return 680 + r64; }
     return 0;
 }
