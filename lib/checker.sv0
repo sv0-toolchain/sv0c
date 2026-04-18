@@ -74,8 +74,11 @@
    extract function type from item arena and register in fn table),
    register_all_item_fns (first part of modEnvFromProg — walk all
    ItemFn items and populate function type table).
-   Full type inference (synth/checkStmt/checkFn/initTypes) deferred —
-   needs deep AST traversal and unification. */
+   Batch 59: scan_fn_param_names (token re-scan for fn param name
+   positions + mutability flags), check_fn_body (SML checkFn core —
+   extend env with params, synth body, compare with return type).
+   Full type inference orchestration (initTypes + modEnvFromProg +
+   check loop) deferred — needs cross-module parse_block call.  */
 
 /* ── binop classification ───────────────────────────────────── */
 
@@ -1612,6 +1615,143 @@ fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
         i = i + 1;
     }
     return count;
+}
+
+/* ── scan_fn_param_names (token re-scan for fn param names) ──
+   Extracts parameter name token positions and mutability flags
+   from the token stream for a function at name_tok_pos with
+   param_count parameters.  Same token walking strategy as
+   scan_fn_param_type_tags but captures name positions and mut.
+   Outputs: out_param_name_pos receives one token pos per param,
+            out_param_muts receives 0=immutable or 1=mutable.
+   Returns 0 on success, -1 on unexpected tokens.             */
+
+fn scan_fn_param_names(tok_tags: Vec<i32>,
+                       name_tok_pos: i32, param_count: i32,
+                       out_param_name_pos: Vec<i32>,
+                       out_param_muts: Vec<i32>) -> i32 {
+    if param_count == 0 { return 0; }
+    let mut p: i32 = name_tok_pos + 1;
+    if vec_get(tok_tags, p) == 38 {
+        let mut depth: i32 = 1;
+        p = p + 1;
+        while depth > 0 {
+            let u: i32 = vec_get(tok_tags, p);
+            if u == 38 { depth = depth + 1; }
+            if u == 39 { depth = depth - 1; }
+            p = p + 1;
+        }
+    }
+    if vec_get(tok_tags, p) != 6 { return 0 - 1; }
+    p = p + 1;
+    let mut found: i32 = 0;
+    while found < param_count {
+        let mut is_mut: i32 = 0;
+        if vec_get(tok_tags, p) == 77 {
+            is_mut = 1;
+            p = p + 1;
+        }
+        let pt: i32 = vec_get(tok_tags, p);
+        if pt != 5 {
+            if pt != 86 { return 0 - 1; }
+        }
+        vec_push(out_param_name_pos, p);
+        vec_push(out_param_muts, is_mut);
+        p = p + 1;
+        if vec_get(tok_tags, p) != 14 { return 0 - 1; }
+        p = p + 1;
+        let mut tdepth: i32 = 0;
+        let mut done: bool = false;
+        while done != true {
+            let tt: i32 = vec_get(tok_tags, p);
+            if tt == 38 { tdepth = tdepth + 1; p = p + 1; }
+            else {
+                if tt == 39 { tdepth = tdepth - 1; p = p + 1; }
+                else {
+                    if tt == 6 { tdepth = tdepth + 1; p = p + 1; }
+                    else {
+                        if tt == 7 {
+                            if tdepth > 0 { tdepth = tdepth - 1; p = p + 1; }
+                            else { done = true; }
+                        } else {
+                            if tt == 12 {
+                                if tdepth == 0 { done = true; }
+                                else { p = p + 1; }
+                            } else { p = p + 1; }
+                        }
+                    }
+                }
+            }
+        }
+        found = found + 1;
+        if vec_get(tok_tags, p) == 12 { p = p + 1; }
+    }
+    return 0;
+}
+
+/* ── check_fn_body (SML checkFn core — function body checking) ─
+   Given pre-parsed body expression arenas, parameter metadata
+   (name positions + type tags + mutability), return type, module
+   environment, and all lookup tables, type-checks one function.
+   Steps:
+     1. Copy modEnv into a local env
+     2. Extend env with each parameter binding (name, type, mut)
+     3. Synthesise the body root expression via synth_expr
+     4. Compare result type against declared return type
+   Returns 0 on success (types match), -1 on type error.
+   The body root is assumed to be the last expression in the
+   body expression arena (vec_len(bet) - 1).                   */
+
+fn check_fn_body(
+    bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>,
+    bed4: Vec<i32>, bpp: Vec<i32>,
+    source: string, starts: Vec<i32>, ends: Vec<i32>,
+    mod_env_names: Vec<i32>, mod_env_types: Vec<i32>,
+    mod_env_muts: Vec<i32>,
+    param_name_pos: Vec<i32>, param_type_tags: Vec<i32>,
+    param_muts: Vec<i32>, param_count: i32,
+    ret_ty: i32,
+    edef_names: Vec<i32>,
+    edef_variant_offsets: Vec<i32>,
+    edef_variant_counts: Vec<i32>,
+    edef_vnames_flat: Vec<i32>,
+    edef_vshapes_flat: Vec<i32>,
+    fn_names: Vec<i32>, fn_ret_types: Vec<i32>) -> i32 {
+    let env_n: Vec<i32> = vec_new();
+    let env_t: Vec<i32> = vec_new();
+    let env_m: Vec<i32> = vec_new();
+    let me_len: i32 = vec_len(mod_env_names);
+    let mut j: i32 = 0;
+    while j < me_len {
+        vec_push(env_n, vec_get(mod_env_names, j));
+        vec_push(env_t, vec_get(mod_env_types, j));
+        vec_push(env_m, vec_get(mod_env_muts, j));
+        j = j + 1;
+    }
+    let mut pi: i32 = 0;
+    while pi < param_count {
+        env_extend(env_n, env_t, env_m,
+                   vec_get(param_name_pos, pi),
+                   vec_get(param_type_tags, pi),
+                   vec_get(param_muts, pi));
+        pi = pi + 1;
+    }
+    let body_root: i32 = vec_len(bet) - 1;
+    if body_root < 0 { return 0 - 1; }
+    let body_ty: i32 = synth_expr(bet, bed1, bed2, bed3, bed4, bpp,
+                                   source, starts, ends,
+                                   env_n, env_t, env_m,
+                                   edef_names,
+                                   edef_variant_offsets,
+                                   edef_variant_counts,
+                                   edef_vnames_flat,
+                                   edef_vshapes_flat,
+                                   fn_names, fn_ret_types,
+                                   ret_ty, 0, body_root);
+    if body_ty < 0 { return 0 - 1; }
+    if expect(body_ty, ret_ty) { return 0; }
+    if ret_ty == TY_UNIT() { return 0; }
+    return 0 - 1;
 }
 
 /* ── contract_expr scoped flag (SML withContractExpr) ────────
@@ -4702,6 +4842,93 @@ fn test_synth_expr() -> i32 {
     return 0;
 }
 
+fn test_scan_fn_param_names() -> i32 {
+    /* source: "fn foo ( mut x : i32 , y : bool ) -> i32 { 0 }"
+       tok: 0=fn(65)  1=foo(5)  2=((6)  3=mut(77)  4=x(5)  5=:(14)
+            6=i32(5)  7=,(12)  8=y(5)  9=:(14)  10=bool(5)
+            11=)(7)  12=->(19)  13=i32(5)  14={(8)  15=0(1)
+            16=}(9) */
+    let tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 65); vec_push(tok_tags, 5); vec_push(tok_tags, 6);
+    vec_push(tok_tags, 77); vec_push(tok_tags, 5); vec_push(tok_tags, 14);
+    vec_push(tok_tags, 5);  vec_push(tok_tags, 12); vec_push(tok_tags, 5);
+    vec_push(tok_tags, 14); vec_push(tok_tags, 5); vec_push(tok_tags, 7);
+    vec_push(tok_tags, 19); vec_push(tok_tags, 5); vec_push(tok_tags, 8);
+    vec_push(tok_tags, 1);  vec_push(tok_tags, 9);
+    let pn: Vec<i32> = vec_new();
+    let pm: Vec<i32> = vec_new();
+    let r: i32 = scan_fn_param_names(tok_tags, 1, 2, pn, pm);
+    if r != 0 { return 1; }
+    if vec_len(pn) != 2 { return 2; }
+    if vec_get(pn, 0) != 4 { return 3; }
+    if vec_get(pn, 1) != 8 { return 4; }
+    if vec_get(pm, 0) != 1 { return 5; }
+    if vec_get(pm, 1) != 0 { return 6; }
+    let pn0: Vec<i32> = vec_new();
+    let pm0: Vec<i32> = vec_new();
+    let r0: i32 = scan_fn_param_names(tok_tags, 1, 0, pn0, pm0);
+    if r0 != 0 { return 7; }
+    if vec_len(pn0) != 0 { return 8; }
+    return 0;
+}
+
+fn test_check_fn_body() -> i32 {
+    /* Test: function body is a single literal 42 (ExprLit IntLit).
+       Body arenas: et=[0], ed1=[0], ed2=[0], ed3=[0], ed4=[0]
+       (tag 0 = ExprLit, d1 = 0 = IntLit).
+       Source: "42" at tok pos 0. */
+    let source: string = "42";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    let bet: Vec<i32> = vec_new();
+    let bed1: Vec<i32> = vec_new();
+    let bed2: Vec<i32> = vec_new();
+    let bed3: Vec<i32> = vec_new();
+    let bed4: Vec<i32> = vec_new();
+    let bpp: Vec<i32> = vec_new();
+    vec_push(bet, 0); vec_push(bed1, 0); vec_push(bed2, 0);
+    vec_push(bed3, 0); vec_push(bed4, 0);
+    let men: Vec<i32> = vec_new();
+    let met: Vec<i32> = vec_new();
+    let mem: Vec<i32> = vec_new();
+    let ppn: Vec<i32> = vec_new();
+    let ppt: Vec<i32> = vec_new();
+    let ppm: Vec<i32> = vec_new();
+    let edn: Vec<i32> = vec_new();
+    let edvo: Vec<i32> = vec_new();
+    let edvc: Vec<i32> = vec_new();
+    let edvn: Vec<i32> = vec_new();
+    let edvs: Vec<i32> = vec_new();
+    let fnn: Vec<i32> = vec_new();
+    let fnrt: Vec<i32> = vec_new();
+    let r1: i32 = check_fn_body(bet, bed1, bed2, bed3, bed4, bpp,
+                                 source, starts, ends,
+                                 men, met, mem,
+                                 ppn, ppt, ppm, 0,
+                                 TY_INT(),
+                                 edn, edvo, edvc, edvn, edvs,
+                                 fnn, fnrt);
+    if r1 != 0 { return 1; }
+    let r2: i32 = check_fn_body(bet, bed1, bed2, bed3, bed4, bpp,
+                                 source, starts, ends,
+                                 men, met, mem,
+                                 ppn, ppt, ppm, 0,
+                                 TY_BOOL(),
+                                 edn, edvo, edvc, edvn, edvs,
+                                 fnn, fnrt);
+    if r2 != 0 - 1 { return 2; }
+    let r3: i32 = check_fn_body(bet, bed1, bed2, bed3, bed4, bpp,
+                                 source, starts, ends,
+                                 men, met, mem,
+                                 ppn, ppt, ppm, 0,
+                                 TY_UNIT(),
+                                 edn, edvo, edvc, edvn, edvs,
+                                 fnn, fnrt);
+    if r3 != 0 { return 3; }
+    return 0;
+}
+
 fn test_synth_building_blocks() -> i32 {
     /* source: "fn foo ( x : i32 ) -> bool { }"
        tok: 0=fn(60) 1=foo(5) 2=((6) 3=x(5) 4=:(14) 5=i32(5)
@@ -4876,5 +5103,9 @@ fn main() -> i32 {
     if r59 != 0 { return 620 + r59; }
     let r60: i32 = test_synth_expr();
     if r60 != 0 { return 630 + r60; }
+    let r61: i32 = test_scan_fn_param_names();
+    if r61 != 0 { return 650 + r61; }
+    let r62: i32 = test_check_fn_body();
+    if r62 != 0 { return 660 + r62; }
     return 0;
 }
