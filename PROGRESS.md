@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 51 — checker.sv0.** `checker.sv0`: `synth_expr` extended with ExprIf (tag 10: cond+then+else arms), ExprReturn (tag 15: synth value, return ret_ty), ExprBreak (tag 16: loop_depth validation), ExprContinue (tag 17: loop_depth validation). Added `ret_ty` and `loop_depth` parameters for proper control-flow typing. synth_expr now handles 8 of ~27 expression tags. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 52 — checker.sv0.** `checker.sv0`: `synth_expr` extended with ExprWhile (tag 12: cond + body with loop_depth+1), ExprLoop (tag 14: body with loop_depth+1), ExprAssign (tag 18: lhs + rhs → TY_UNIT), ExprAssignOp (tag 19: compound assign). synth_expr now handles 12 of ~27 expression tags. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
