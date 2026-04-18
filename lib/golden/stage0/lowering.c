@@ -1,5 +1,27 @@
 #include "sv0_runtime.h"
 
+typedef struct {
+  int tag;
+  int p0;
+  int p1;
+} Value;
+typedef struct {
+  int tag;
+  int p0;
+  int p1;
+  int p2;
+} Expr;
+typedef struct {
+  int tag;
+  int p0;
+  int p1;
+  int p2;
+  int p3;
+} Instr;
+
+static int ir_value_tag(Value v);
+static int ir_expr_tag(Expr e);
+static int ir_instr_tag(Instr ins);
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
 static const char* lower_digit(int d);
@@ -75,6 +97,8 @@ static int scrut_local_lookup_bounded(int scrut_names, int limit, int name_h);
 static int lower_alias_replace(int target, int from_handles, int to_handles);
 static int match_scrut_cty(int et, int ed1, int ed2, int ed3, int ed4, int idx, int pp, int fn_names, int fn_ret_ctys, int aliases, int scrut_names, int scrut_ctys, int scrut_limit, int param_names, int param_ty_handles);
 static int variant_shape_in_items(int item_tags, int item_names, int item_field_counts, int variant_shapes_flat, int variant_fcs_flat, int enum_name, int variant_idx, int out_count);
+static int ctr_fresh(int ctr);
+static int classify_assign_lhs_arena(int et, int ed1, int ed2, int pp, int idx, int out);
 static int test_fresh_tmp(void);
 static int test_split_qname(void);
 static int test_binop_to_c(void);
@@ -121,6 +145,169 @@ static int test_scrut_locals_push(void);
 static int test_alias_replace(void);
 static int test_match_scrut_cty(void);
 static int test_variant_shape_in_items(void);
+static int test_ir_types(void);
+static int test_ctr_fresh(void);
+static int test_classify_arena(void);
+
+static int ir_value_tag(Value v) {
+  int _sv0t0;
+  if ((v.tag == 0)) {
+    return 0;
+    _sv0t0 = 0;
+  } else {
+    if ((v.tag == 1)) {
+      return 1;
+      _sv0t0 = 0;
+    } else {
+      if ((v.tag == 2)) {
+        return 2;
+        _sv0t0 = 0;
+      } else {
+        if ((v.tag == 3)) {
+          return 3;
+          _sv0t0 = 0;
+        } else {
+          if ((v.tag == 4)) {
+            return 4;
+            _sv0t0 = 0;
+          } else {
+            if ((v.tag == 5)) {
+              return 5;
+              _sv0t0 = 0;
+            } else {
+              if ((v.tag == 6)) {
+                return 6;
+                _sv0t0 = 0;
+              } else {
+                if ((v.tag == 7)) {
+                  return 7;
+                  _sv0t0 = 0;
+                } else {
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return _sv0t0;
+}
+
+static int ir_expr_tag(Expr e) {
+  int _sv0t0;
+  if ((e.tag == 0)) {
+    return 0;
+    _sv0t0 = 0;
+  } else {
+    if ((e.tag == 1)) {
+      return 1;
+      _sv0t0 = 0;
+    } else {
+      if ((e.tag == 2)) {
+        return 2;
+        _sv0t0 = 0;
+      } else {
+        if ((e.tag == 3)) {
+          return 3;
+          _sv0t0 = 0;
+        } else {
+          if ((e.tag == 4)) {
+            return 4;
+            _sv0t0 = 0;
+          } else {
+          }
+        }
+      }
+    }
+  }
+  return _sv0t0;
+}
+
+static int ir_instr_tag(Instr ins) {
+  int _sv0t0;
+  if ((ins.tag == 0)) {
+    return 0;
+    _sv0t0 = 0;
+  } else {
+    if ((ins.tag == 1)) {
+      return 1;
+      _sv0t0 = 0;
+    } else {
+      if ((ins.tag == 2)) {
+        return 2;
+        _sv0t0 = 0;
+      } else {
+        if ((ins.tag == 3)) {
+          return 3;
+          _sv0t0 = 0;
+        } else {
+          if ((ins.tag == 4)) {
+            return 4;
+            _sv0t0 = 0;
+          } else {
+            if ((ins.tag == 5)) {
+              return 5;
+              _sv0t0 = 0;
+            } else {
+              if ((ins.tag == 6)) {
+                return 6;
+                _sv0t0 = 0;
+              } else {
+                if ((ins.tag == 7)) {
+                  return 7;
+                  _sv0t0 = 0;
+                } else {
+                  if ((ins.tag == 8)) {
+                    return 8;
+                    _sv0t0 = 0;
+                  } else {
+                    if ((ins.tag == 9)) {
+                      return 9;
+                      _sv0t0 = 0;
+                    } else {
+                      if ((ins.tag == 10)) {
+                        return 10;
+                        _sv0t0 = 0;
+                      } else {
+                        if ((ins.tag == 11)) {
+                          return 11;
+                          _sv0t0 = 0;
+                        } else {
+                          if ((ins.tag == 12)) {
+                            return 12;
+                            _sv0t0 = 0;
+                          } else {
+                            if ((ins.tag == 13)) {
+                              return 13;
+                              _sv0t0 = 0;
+                            } else {
+                              if ((ins.tag == 14)) {
+                                return 14;
+                                _sv0t0 = 0;
+                              } else {
+                                if ((ins.tag == 15)) {
+                                  return 15;
+                                  _sv0t0 = 0;
+                                } else {
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return _sv0t0;
+}
 
 static int fresh_tmp_name(int counter) {
   return counter;
@@ -2097,6 +2284,61 @@ static int variant_shape_in_items(int item_tags, int item_names, int item_field_
   }
   int _sv0t9 = (0 - 1);
   return _sv0t9;
+}
+
+static int ctr_fresh(int ctr) {
+  int _sv0t0 = sv0_vec_get(ctr, 0);
+  int n = _sv0t0;
+  int _sv0t1 = (n + 1);
+  sv0_vec_set(ctr, 0, _sv0t1);
+  return n;
+}
+
+static int classify_assign_lhs_arena(int et, int ed1, int ed2, int pp, int idx, int out) {
+  int _sv0t0 = sv0_vec_get(et, idx);
+  int tag = _sv0t0;
+  if ((tag == 1)) {
+    int _sv0t1 = sv0_vec_get(ed1, idx);
+    int pps = _sv0t1;
+    int _sv0t2 = sv0_vec_get(ed2, idx);
+    int ppc = _sv0t2;
+    if ((ppc == 1)) {
+      int _sv0t3 = sv0_vec_get(pp, pps);
+      sv0_vec_push(out, _sv0t3);
+      return 0;
+    } else {
+    }
+    int _sv0t4 = (0 - 1);
+    return _sv0t4;
+  } else {
+  }
+  if ((tag == 6)) {
+    int _sv0t5 = sv0_vec_get(ed1, idx);
+    int obj_idx = _sv0t5;
+    int _sv0t6 = sv0_vec_get(ed2, idx);
+    int field_tok = _sv0t6;
+    int _sv0t7 = sv0_vec_get(et, obj_idx);
+    int obj_tag = _sv0t7;
+    if ((obj_tag == 1)) {
+      int _sv0t8 = sv0_vec_get(ed1, obj_idx);
+      int opps = _sv0t8;
+      int _sv0t9 = sv0_vec_get(ed2, obj_idx);
+      int oppc = _sv0t9;
+      if ((oppc == 1)) {
+        int _sv0t10 = sv0_vec_get(pp, opps);
+        sv0_vec_push(out, _sv0t10);
+        sv0_vec_push(out, field_tok);
+        return 1;
+      } else {
+      }
+    } else {
+    }
+    int _sv0t11 = (0 - 1);
+    return _sv0t11;
+  } else {
+  }
+  int _sv0t12 = (0 - 1);
+  return _sv0t12;
 }
 
 static int test_fresh_tmp(void) {
@@ -4090,6 +4332,327 @@ static int test_variant_shape_in_items(void) {
   return 0;
 }
 
+static int test_ir_types(void) {
+  Value vi;
+  vi.tag = 0;
+  vi.p0 = 42;
+  int _sv0t0 = ir_value_tag(vi);
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  Value vb;
+  vb.tag = 1;
+  int _sv0t1 = ir_value_tag(vb);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  Value vf;
+  vf.tag = 2;
+  int _sv0t2 = ir_value_tag(vf);
+  if ((_sv0t2 != 2)) {
+    return 3;
+  } else {
+  }
+  Value vv;
+  vv.tag = 3;
+  vv.p0 = 10;
+  int _sv0t3 = ir_value_tag(vv);
+  if ((_sv0t3 != 3)) {
+    return 4;
+  } else {
+  }
+  Value vu;
+  vu.tag = 4;
+  int _sv0t4 = ir_value_tag(vu);
+  if ((_sv0t4 != 4)) {
+    return 5;
+  } else {
+  }
+  Value vs;
+  vs.tag = 5;
+  vs.p0 = 7;
+  int _sv0t5 = ir_value_tag(vs);
+  if ((_sv0t5 != 5)) {
+    return 6;
+  } else {
+  }
+  Value base;
+  base.tag = 3;
+  base.p0 = 3;
+  Value vm;
+  int _sv0t6 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t6, 0, base.tag);
+  sv0_box_store(_sv0t6, 1, base.p0);
+  sv0_box_store(_sv0t6, 2, base.p1);
+  vm.tag = 6;
+  vm.p0 = _sv0t6;
+  vm.p1 = 5;
+  int _sv0t7 = ir_value_tag(vm);
+  if ((_sv0t7 != 6)) {
+    return 7;
+  } else {
+  }
+  Value va;
+  va.tag = 7;
+  va.p0 = 9;
+  int _sv0t8 = ir_value_tag(va);
+  if ((_sv0t8 != 7)) {
+    return 8;
+  } else {
+  }
+  Expr el;
+  Value _sv0t9;
+  _sv0t9.tag = 0;
+  _sv0t9.p0 = 5;
+  int _sv0t10 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t10, 0, _sv0t9.tag);
+  sv0_box_store(_sv0t10, 1, _sv0t9.p0);
+  sv0_box_store(_sv0t10, 2, _sv0t9.p1);
+  el.tag = 0;
+  el.p0 = _sv0t10;
+  int _sv0t11 = ir_expr_tag(el);
+  if ((_sv0t11 != 0)) {
+    return 9;
+  } else {
+  }
+  Expr eld;
+  eld.tag = 1;
+  eld.p0 = 50;
+  int _sv0t12 = ir_expr_tag(eld);
+  if ((_sv0t12 != 1)) {
+    return 10;
+  } else {
+  }
+  Expr eb;
+  Value _sv0t13;
+  _sv0t13.tag = 0;
+  _sv0t13.p0 = 3;
+  int _sv0t14 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t14, 0, _sv0t13.tag);
+  sv0_box_store(_sv0t14, 1, _sv0t13.p0);
+  sv0_box_store(_sv0t14, 2, _sv0t13.p1);
+  Value _sv0t15;
+  _sv0t15.tag = 0;
+  _sv0t15.p0 = 4;
+  int _sv0t16 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t16, 0, _sv0t15.tag);
+  sv0_box_store(_sv0t16, 1, _sv0t15.p0);
+  sv0_box_store(_sv0t16, 2, _sv0t15.p1);
+  eb.tag = 2;
+  eb.p0 = 20;
+  eb.p1 = _sv0t14;
+  eb.p2 = _sv0t16;
+  int _sv0t17 = ir_expr_tag(eb);
+  if ((_sv0t17 != 2)) {
+    return 11;
+  } else {
+  }
+  Expr eu;
+  Value _sv0t18;
+  _sv0t18.tag = 1;
+  int _sv0t19 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t19, 0, _sv0t18.tag);
+  sv0_box_store(_sv0t19, 1, _sv0t18.p0);
+  sv0_box_store(_sv0t19, 2, _sv0t18.p1);
+  eu.tag = 3;
+  eu.p0 = 1;
+  eu.p1 = _sv0t19;
+  int _sv0t20 = ir_expr_tag(eu);
+  if ((_sv0t20 != 3)) {
+    return 12;
+  } else {
+  }
+  Expr ef;
+  Value _sv0t21;
+  _sv0t21.tag = 3;
+  _sv0t21.p0 = 60;
+  int _sv0t22 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t22, 0, _sv0t21.tag);
+  sv0_box_store(_sv0t22, 1, _sv0t21.p0);
+  sv0_box_store(_sv0t22, 2, _sv0t21.p1);
+  ef.tag = 4;
+  ef.p0 = _sv0t22;
+  ef.p1 = 61;
+  int _sv0t23 = ir_expr_tag(ef);
+  if ((_sv0t23 != 4)) {
+    return 13;
+  } else {
+  }
+  Instr i_nop;
+  i_nop.tag = 0;
+  int _sv0t24 = ir_instr_tag(i_nop);
+  if ((_sv0t24 != 0)) {
+    return 14;
+  } else {
+  }
+  Instr i_dv;
+  i_dv.tag = 1;
+  i_dv.p0 = 50;
+  int _sv0t25 = ir_instr_tag(i_dv);
+  if ((_sv0t25 != 1)) {
+    return 15;
+  } else {
+  }
+  Instr i_brk;
+  i_brk.tag = 9;
+  int _sv0t26 = ir_instr_tag(i_brk);
+  if ((_sv0t26 != 9)) {
+    return 16;
+  } else {
+  }
+  Instr i_cont;
+  i_cont.tag = 10;
+  int _sv0t27 = ir_instr_tag(i_cont);
+  if ((_sv0t27 != 10)) {
+    return 17;
+  } else {
+  }
+  Instr i_rv;
+  i_rv.tag = 14;
+  int _sv0t28 = ir_instr_tag(i_rv);
+  if ((_sv0t28 != 14)) {
+    return 18;
+  } else {
+  }
+  Instr i_ret;
+  Value _sv0t29;
+  _sv0t29.tag = 0;
+  _sv0t29.p0 = 0;
+  int _sv0t30 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t30, 0, _sv0t29.tag);
+  sv0_box_store(_sv0t30, 1, _sv0t29.p0);
+  sv0_box_store(_sv0t30, 2, _sv0t29.p1);
+  i_ret.tag = 15;
+  i_ret.p0 = _sv0t30;
+  int _sv0t31 = ir_instr_tag(i_ret);
+  if ((_sv0t31 != 15)) {
+    return 19;
+  } else {
+  }
+  Expr asgn_e;
+  asgn_e.tag = 1;
+  asgn_e.p0 = 70;
+  Instr i_asgn;
+  int _sv0t32 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t32, 0, asgn_e.tag);
+  sv0_box_store(_sv0t32, 1, asgn_e.p0);
+  sv0_box_store(_sv0t32, 2, asgn_e.p1);
+  sv0_box_store(_sv0t32, 3, asgn_e.p2);
+  i_asgn.tag = 3;
+  i_asgn.p0 = 71;
+  i_asgn.p1 = _sv0t32;
+  int _sv0t33 = ir_instr_tag(i_asgn);
+  if ((_sv0t33 != 3)) {
+    return 20;
+  } else {
+  }
+  return 0;
+}
+
+static int test_ctr_fresh(void) {
+  int _sv0t0 = sv0_vec_new();
+  int ctr = _sv0t0;
+  sv0_vec_push(ctr, 0);
+  int _sv0t1 = ctr_fresh(ctr);
+  int t0 = _sv0t1;
+  if ((t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = ctr_fresh(ctr);
+  int t1 = _sv0t2;
+  if ((t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = ctr_fresh(ctr);
+  int t2 = _sv0t3;
+  if ((t2 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(ctr, 0);
+  if ((_sv0t4 != 3)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_classify_arena(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(pp, 42);
+  sv0_vec_push(et, 1);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 1);
+  int _sv0t4 = sv0_vec_new();
+  int out1 = _sv0t4;
+  int _sv0t5 = classify_assign_lhs_arena(et, ed1, ed2, pp, 0, out1);
+  int r1 = _sv0t5;
+  if ((r1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_len(out1);
+  if ((_sv0t6 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(out1, 0);
+  if ((_sv0t7 != 42)) {
+    return 3;
+  } else {
+  }
+  sv0_vec_push(et, 6);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 99);
+  int _sv0t8 = sv0_vec_new();
+  int out2 = _sv0t8;
+  int _sv0t9 = classify_assign_lhs_arena(et, ed1, ed2, pp, 1, out2);
+  int r2 = _sv0t9;
+  if ((r2 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_len(out2);
+  if ((_sv0t10 != 2)) {
+    return 5;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(out2, 0);
+  if ((_sv0t11 != 42)) {
+    return 6;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(out2, 1);
+  if ((_sv0t12 != 99)) {
+    return 7;
+  } else {
+  }
+  sv0_vec_push(et, 3);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  int _sv0t13 = sv0_vec_new();
+  int out3 = _sv0t13;
+  int _sv0t14 = classify_assign_lhs_arena(et, ed1, ed2, pp, 2, out3);
+  int r3 = _sv0t14;
+  int _sv0t15 = (0 - 1);
+  if ((r3 != _sv0t15)) {
+    return 8;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -4410,6 +4973,27 @@ int main(void) {
   if ((r46 != 0)) {
     int _sv0t90 = (480 + r46);
     return _sv0t90;
+  } else {
+  }
+  int _sv0t91 = test_ir_types();
+  int r47 = _sv0t91;
+  if ((r47 != 0)) {
+    int _sv0t92 = (490 + r47);
+    return _sv0t92;
+  } else {
+  }
+  int _sv0t93 = test_ctr_fresh();
+  int r48 = _sv0t93;
+  if ((r48 != 0)) {
+    int _sv0t94 = (510 + r48);
+    return _sv0t94;
+  } else {
+  }
+  int _sv0t95 = test_classify_arena();
+  int r49 = _sv0t95;
+  if ((r49 != 0)) {
+    int _sv0t96 = (520 + r49);
+    return _sv0t96;
   } else {
   }
   return 0;
