@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 49 — checker.sv0.** `checker.sv0`: `sdef_name_lookup_str` (string-based struct def table name lookup — mirrors edef_name_lookup_str), `env_lookup_str` (string-based env variable lookup — walks env_names backward, extracts string at each token position, compares with target; needed for cross-scope name resolution in synth), `synth_call_ret_type` (function call return type — resolves callee name via fn_table/builtins and returns return type tag). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 50 — checker.sv0.** `checker.sv0`: `synth_expr` (SML `synth` expression dispatch — recursive type synthesis over expr arena; handles ExprLit, ExprPath 1-seg via env_lookup_str, ExprPath 2-seg via resolve_ctor_path_ty, ExprUnop, ExprBinop; returns -1 for unimplemented forms). **Bugfix**: `infer_lit` now returns checker TY_* constants (TY_INT, TY_BOOL, etc.) instead of types.sv0 enum ordinals — a latent inconsistency uncovered by synth integration. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
