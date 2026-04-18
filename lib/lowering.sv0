@@ -524,6 +524,81 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return 0;
 }
 
+/* ── lower_return (SML lowerReturn) ─────────────────────────
+   Lowers an expression and emits ReturnVal(v).
+   Appends instructions to out_instrs. */
+
+fn lower_return(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                tok_tags: Vec<i32>,
+                idx: i32, ctr: Vec<i32>,
+                out_instrs: Vec<i32>) -> i32 {
+    let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                        tok_tags, idx, ctr, out_instrs);
+    let ri: Instr = Instr::ReturnVal(box_new(v));
+    vec_push(out_instrs, box_new(ri));
+    return 0;
+}
+
+/* ── lower_stmt (SML lowerStmt — simplified) ────────────────
+   Processes a single stmt-arena node at `s_idx`.
+   LetStmt (27): DeclVar + lower init + Store.
+   SemiStmt (28): lower for effect. */
+
+fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+              ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+              tok_tags: Vec<i32>,
+              s_idx: i32, ctr: Vec<i32>,
+              out_instrs: Vec<i32>) -> i32 {
+    let s_tag: i32 = vec_get(et, s_idx);
+    if s_tag == 27 {
+        let name_tok: i32 = vec_get(ed1, s_idx);
+        let init_idx: i32 = vec_get(ed3, s_idx);
+        let decl: Instr = Instr::DeclVar(name_tok);
+        vec_push(out_instrs, box_new(decl));
+        if init_idx >= 0 {
+            let e: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
+                                                   tok_tags, init_idx, ctr,
+                                                   out_instrs);
+            let si: Instr = Instr::Store(name_tok, box_new(e));
+            vec_push(out_instrs, box_new(si));
+        }
+        return 0;
+    }
+    if s_tag == 28 {
+        let expr_idx: i32 = vec_get(ed1, s_idx);
+        let rc: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
+                                        tok_tags, expr_idx, ctr, out_instrs);
+        return 0;
+    }
+    return 0;
+}
+
+/* ── lower_block (SML lowerBlock) ───────────────────────────
+   Processes stmts via lower_stmt, optional tail via lower_return.
+   stmts_first/stmts_count/tail_idx come from ExprBlock d1/d2/d3. */
+
+fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+               ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+               tok_tags: Vec<i32>,
+               stmts_first: i32, stmts_count: i32, tail_idx: i32,
+               ctr: Vec<i32>,
+               out_instrs: Vec<i32>) -> i32 {
+    let mut si: i32 = 0;
+    loop {
+        if si >= stmts_count { break; }
+        let s_idx: i32 = stmts_first + si;
+        let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  s_idx, ctr, out_instrs);
+        si = si + 1;
+    }
+    if tail_idx >= 0 {
+        let rc2: i32 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                     tail_idx, ctr, out_instrs);
+    }
+    return 0;
+}
+
 /* ── freshTmp ───────────────────────────────────────────────── */
 
 fn fresh_tmp_name(counter: i32) -> i32 {
@@ -3099,6 +3174,105 @@ fn test_lower_cast() -> i32 {
     return 0;
 }
 
+fn test_lower_return_fn() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let rc: i32 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                0, ctr, out);
+    if rc != 0 { return 1; }
+    if vec_len(out) != 1 { return 2; }
+    return 0;
+}
+
+fn test_lower_stmt_fn() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 27);
+    vec_push(ed1, 99);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                              1, ctr, out);
+    if rc != 0 { return 1; }
+    if vec_len(out) != 2 { return 2; }
+    let mut out2: Vec<i32> = vec_new();
+    vec_push(et, 28);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let rc2: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                               2, ctr, out2);
+    if rc2 != 0 { return 3; }
+    return 0;
+}
+
+fn test_lower_block_fn() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 55);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 27);
+    vec_push(ed1, 99);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let rc: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                               1, 1, 0, ctr, out);
+    if rc != 0 { return 1; }
+    if vec_len(out) < 3 { return 2; }
+    let mut out2: Vec<i32> = vec_new();
+    let rc2: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                1, 1, 0 - 1, ctr, out2);
+    if rc2 != 0 { return 3; }
+    if vec_len(out2) != 2 { return 4; }
+    return 0;
+}
+
 fn test_value_to_expr_fn() -> i32 {
     let v1: Value = Value::VInt(42);
     let e1: Expr = value_to_expr(v1);
@@ -3294,5 +3468,11 @@ fn main() -> i32 {
     if r60 != 0 { return 740 + r60; }
     let r61: i32 = test_lower_for_effect_fn();
     if r61 != 0 { return 760 + r61; }
+    let r62: i32 = test_lower_return_fn();
+    if r62 != 0 { return 780 + r62; }
+    let r63: i32 = test_lower_stmt_fn();
+    if r63 != 0 { return 800 + r63; }
+    let r64: i32 = test_lower_block_fn();
+    if r64 != 0 { return 820 + r64; }
     return 0;
 }

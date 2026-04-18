@@ -27,6 +27,9 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
 static Expr value_to_expr(Value v);
 static Expr lower_expr_with_instrs(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs);
 static int lower_for_effect(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs);
+static int lower_return(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs);
+static int lower_stmt(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int s_idx, int ctr, int out_instrs);
+static int lower_block(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int stmts_first, int stmts_count, int tail_idx, int ctr, int out_instrs);
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
 static const char* lower_digit(int d);
@@ -162,6 +165,9 @@ static int test_lower_assign(void);
 static int test_lower_while(void);
 static int test_lower_loop(void);
 static int test_lower_cast(void);
+static int test_lower_return_fn(void);
+static int test_lower_stmt_fn(void);
+static int test_lower_block_fn(void);
 static int test_value_to_expr_fn(void);
 static int test_lower_with_instrs(void);
 static int test_lower_for_effect_fn(void);
@@ -1240,6 +1246,101 @@ static int lower_for_effect(int et, int ed1, int ed2, int ed3, int ed4, int pp, 
   Value _sv0t0 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, idx, ctr, out_instrs);
   Value discard5;
   discard5 = _sv0t0;
+  return 0;
+}
+
+static int lower_return(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs) {
+  Value _sv0t0 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, idx, ctr, out_instrs);
+  Value v;
+  v = _sv0t0;
+  Instr ri;
+  int _sv0t1 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t1, 0, v.tag);
+  sv0_box_store(_sv0t1, 1, v.p0);
+  sv0_box_store(_sv0t1, 2, v.p1);
+  ri.tag = 15;
+  ri.p0 = _sv0t1;
+  int _sv0t2 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t2, 0, ri.tag);
+  sv0_box_store(_sv0t2, 1, ri.p0);
+  sv0_box_store(_sv0t2, 2, ri.p1);
+  sv0_box_store(_sv0t2, 3, ri.p2);
+  sv0_box_store(_sv0t2, 4, ri.p3);
+  sv0_vec_push(out_instrs, _sv0t2);
+  return 0;
+}
+
+static int lower_stmt(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int s_idx, int ctr, int out_instrs) {
+  int _sv0t0 = sv0_vec_get(et, s_idx);
+  int s_tag = _sv0t0;
+  if ((s_tag == 27)) {
+    int _sv0t1 = sv0_vec_get(ed1, s_idx);
+    int name_tok = _sv0t1;
+    int _sv0t2 = sv0_vec_get(ed3, s_idx);
+    int init_idx = _sv0t2;
+    Instr decl;
+    decl.tag = 1;
+    decl.p0 = name_tok;
+    int _sv0t3 = sv0_box_alloc(5);
+    sv0_box_store(_sv0t3, 0, decl.tag);
+    sv0_box_store(_sv0t3, 1, decl.p0);
+    sv0_box_store(_sv0t3, 2, decl.p1);
+    sv0_box_store(_sv0t3, 3, decl.p2);
+    sv0_box_store(_sv0t3, 4, decl.p3);
+    sv0_vec_push(out_instrs, _sv0t3);
+    if ((init_idx >= 0)) {
+      Expr _sv0t4 = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, init_idx, ctr, out_instrs);
+      Expr e;
+      e = _sv0t4;
+      Instr si;
+      int _sv0t5 = sv0_box_alloc(4);
+      sv0_box_store(_sv0t5, 0, e.tag);
+      sv0_box_store(_sv0t5, 1, e.p0);
+      sv0_box_store(_sv0t5, 2, e.p1);
+      sv0_box_store(_sv0t5, 3, e.p2);
+      si.tag = 4;
+      si.p0 = name_tok;
+      si.p1 = _sv0t5;
+      int _sv0t6 = sv0_box_alloc(5);
+      sv0_box_store(_sv0t6, 0, si.tag);
+      sv0_box_store(_sv0t6, 1, si.p0);
+      sv0_box_store(_sv0t6, 2, si.p1);
+      sv0_box_store(_sv0t6, 3, si.p2);
+      sv0_box_store(_sv0t6, 4, si.p3);
+      sv0_vec_push(out_instrs, _sv0t6);
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  if ((s_tag == 28)) {
+    int _sv0t7 = sv0_vec_get(ed1, s_idx);
+    int expr_idx = _sv0t7;
+    int _sv0t8 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, expr_idx, ctr, out_instrs);
+    int rc = _sv0t8;
+    return 0;
+  } else {
+  }
+  return 0;
+}
+
+static int lower_block(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int stmts_first, int stmts_count, int tail_idx, int ctr, int out_instrs) {
+  int si = 0;
+  while (1) {
+    if ((si >= stmts_count)) {
+      break;
+    } else {
+    }
+    int s_idx = (stmts_first + si);
+    int _sv0t0 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags, s_idx, ctr, out_instrs);
+    int rc = _sv0t0;
+    si = (si + 1);
+  }
+  if ((tail_idx >= 0)) {
+    int _sv0t1 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags, tail_idx, ctr, out_instrs);
+    int rc2 = _sv0t1;
+  } else {
+  }
   return 0;
 }
 
@@ -6064,6 +6165,166 @@ static int test_lower_cast(void) {
   return 0;
 }
 
+static int test_lower_return_fn(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tok_tags = _sv0t6;
+  sv0_vec_push(tok_tags, 91);
+  sv0_vec_push(pp, 55);
+  int _sv0t7 = sv0_vec_new();
+  int ctr = _sv0t7;
+  sv0_vec_push(ctr, 0);
+  int _sv0t8 = sv0_vec_new();
+  int out = _sv0t8;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t9 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags, 0, ctr, out);
+  int rc = _sv0t9;
+  if ((rc != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_len(out);
+  if ((_sv0t10 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lower_stmt_fn(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tok_tags = _sv0t6;
+  sv0_vec_push(tok_tags, 91);
+  sv0_vec_push(pp, 55);
+  int _sv0t7 = sv0_vec_new();
+  int ctr = _sv0t7;
+  sv0_vec_push(ctr, 0);
+  int _sv0t8 = sv0_vec_new();
+  int out = _sv0t8;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 27);
+  sv0_vec_push(ed1, 99);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t9 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags, 1, ctr, out);
+  int rc = _sv0t9;
+  if ((rc != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_len(out);
+  if ((_sv0t10 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int out2 = _sv0t11;
+  sv0_vec_push(et, 28);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t12 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags, 2, ctr, out2);
+  int rc2 = _sv0t12;
+  if ((rc2 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lower_block_fn(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tok_tags = _sv0t6;
+  sv0_vec_push(tok_tags, 91);
+  sv0_vec_push(pp, 55);
+  int _sv0t7 = sv0_vec_new();
+  int ctr = _sv0t7;
+  sv0_vec_push(ctr, 0);
+  int _sv0t8 = sv0_vec_new();
+  int out = _sv0t8;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 27);
+  sv0_vec_push(ed1, 99);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t9 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags, 1, 1, 0, ctr, out);
+  int rc = _sv0t9;
+  if ((rc != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_len(out);
+  if ((_sv0t10 < 3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int out2 = _sv0t11;
+  int _sv0t12 = (0 - 1);
+  int _sv0t13 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags, 1, 1, _sv0t12, ctr, out2);
+  int rc2 = _sv0t13;
+  if ((rc2 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_len(out2);
+  if ((_sv0t14 != 2)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 static int test_value_to_expr_fn(void) {
   Value v1;
   v1.tag = 0;
@@ -6622,6 +6883,27 @@ int main(void) {
   if ((r61 != 0)) {
     int _sv0t120 = (760 + r61);
     return _sv0t120;
+  } else {
+  }
+  int _sv0t121 = test_lower_return_fn();
+  int r62 = _sv0t121;
+  if ((r62 != 0)) {
+    int _sv0t122 = (780 + r62);
+    return _sv0t122;
+  } else {
+  }
+  int _sv0t123 = test_lower_stmt_fn();
+  int r63 = _sv0t123;
+  if ((r63 != 0)) {
+    int _sv0t124 = (800 + r63);
+    return _sv0t124;
+  } else {
+  }
+  int _sv0t125 = test_lower_block_fn();
+  int r64 = _sv0t125;
+  if ((r64 != 0)) {
+    int _sv0t126 = (820 + r64);
+    return _sv0t126;
   } else {
   }
   return 0;

@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 66 — lowering.sv0.** Batch 66: expression lowering wrappers completing the mutual recursion cluster. `value_to_expr` (SML `valueToExpr` — VVar to Load, otherwise to Literal), `lower_expr_with_instrs` (SML `lowerExprWithInstrs` — wrapper returning Expr), `lower_for_effect` (SML `lowerExprForEffect` simplified — lower + discard value). 3 new test groups. Next: lowerStmt, lowerFn, and remaining ~5 lower_expr_to_value forms. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-18 (America/Denver; **Deep-function transliteration batch 67 — lowering.sv0.** Batch 67: statement and block lowering functions. `lower_return` (SML `lowerReturn` — lower expr + emit ReturnVal), `lower_stmt` (SML `lowerStmt` simplified — LetStmt: DeclVar+lower init+Store; SemiStmt: lower for effect), `lower_block` (SML `lowerBlock` — iterate stmts + optional tail return). 3 new test groups. Next: lowerFn and remaining ~5 lower_expr_to_value forms. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
