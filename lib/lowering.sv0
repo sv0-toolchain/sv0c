@@ -444,7 +444,48 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         vec_push(out_instrs, box_new(wl));
         return Value::VUnit;
     }
-    if tag == 13 { return Value::VUnit; }
+    if tag == 13 {
+        let pat_tok: i32 = vec_get(ed1, idx);
+        let range_idx: i32 = vec_get(ed2, idx);
+        let for_body: i32 = vec_get(ed3, idx);
+        let range_tag: i32 = vec_get(et, range_idx);
+        if range_tag == 21 {
+            let lo_idx: i32 = vec_get(ed1, range_idx);
+            let hi_idx: i32 = vec_get(ed2, range_idx);
+            let hi_t: i32 = ctr_fresh(ctr);
+            let i_t: i32 = ctr_fresh(ctr);
+            let v_hi: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4,
+                                                   pp, tok_tags, hi_idx,
+                                                   ctr, out_instrs);
+            let e_hi: Expr = value_to_expr(v_hi);
+            let assign_hi: Instr = Instr::Assign(hi_t, box_new(e_hi));
+            vec_push(out_instrs, box_new(assign_hi));
+            let v_lo: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4,
+                                                   pp, tok_tags, lo_idx,
+                                                   ctr, out_instrs);
+            let e_lo: Expr = value_to_expr(v_lo);
+            let assign_it: Instr = Instr::Assign(i_t, box_new(e_lo));
+            vec_push(out_instrs, box_new(assign_it));
+            let cond_e: Expr = Expr::Binop(7, box_new(Value::VVar(i_t)),
+                                            box_new(Value::VVar(hi_t)));
+            let assign_x: Instr = Instr::Assign(pat_tok,
+                                                  box_new(Expr::Load(i_t)));
+            let one_v: Value = Value::VInt(1);
+            let incr_e: Expr = Expr::Binop(0, box_new(Value::VVar(i_t)),
+                                             box_new(one_v));
+            let incr_i: Instr = Instr::Store(i_t, box_new(incr_e));
+            let mut loop_body: Vec<i32> = vec_new();
+            vec_push(loop_body, box_new(assign_x));
+            vec_push(loop_body, box_new(incr_i));
+            let discard_for: Value = lower_expr_to_value(et, ed1, ed2, ed3,
+                                                          ed4, pp, tok_tags,
+                                                          for_body, ctr,
+                                                          loop_body);
+            let wl: Instr = Instr::WhileLoop(box_new(cond_e), loop_body);
+            vec_push(out_instrs, box_new(wl));
+        }
+        return Value::VUnit;
+    }
     if tag == 14 {
         let loop_body: i32 = vec_get(ed1, idx);
         let true_v: Value = Value::VBoolTrue;
@@ -3338,6 +3379,50 @@ fn test_lower_fn_fn() -> i32 {
     return 0;
 }
 
+fn test_lower_for_loop() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1v: Vec<i32> = vec_new();
+    let mut ed2v: Vec<i32> = vec_new();
+    let mut ed3v: Vec<i32> = vec_new();
+    let mut ed4v: Vec<i32> = vec_new();
+    let mut ppv: Vec<i32> = vec_new();
+    let mut ttv: Vec<i32> = vec_new();
+    vec_push(ttv, 91);
+    vec_push(ppv, 55);
+    let mut out: Vec<i32> = vec_new();
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    vec_push(et, 0);
+    vec_push(ed1v, 0);
+    vec_push(ed2v, 0);
+    vec_push(ed3v, 0);
+    vec_push(ed4v, 0);
+    vec_push(et, 0);
+    vec_push(ed1v, 0);
+    vec_push(ed2v, 0);
+    vec_push(ed3v, 0);
+    vec_push(ed4v, 0);
+    vec_push(et, 21);
+    vec_push(ed1v, 0);
+    vec_push(ed2v, 1);
+    vec_push(ed3v, 0);
+    vec_push(ed4v, 0);
+    vec_push(et, 0);
+    vec_push(ed1v, 0);
+    vec_push(ed2v, 0);
+    vec_push(ed3v, 0);
+    vec_push(ed4v, 0);
+    vec_push(et, 13);
+    vec_push(ed1v, 99);
+    vec_push(ed2v, 2);
+    vec_push(ed3v, 3);
+    vec_push(ed4v, 0);
+    let rv: Value = lower_expr_to_value(et, ed1v, ed2v, ed3v, ed4v,
+                                         ppv, ttv, 4, ctr, out);
+    if vec_len(out) < 3 { return 1; }
+    return 0;
+}
+
 fn test_lower_program_fn() -> i32 {
     let src: string = "fn foo() { } struct Bar { x: i32, } enum Qux { A, B, }";
     let strt: Vec<i32> = vec_new();
@@ -3713,5 +3798,7 @@ fn main() -> i32 {
     if r66 != 0 { return 860 + r66; }
     let r67: i32 = test_lower_program_fn();
     if r67 != 0 { return 880 + r67; }
+    let r68: i32 = test_lower_for_loop();
+    if r68 != 0 { return 900 + r68; }
     return 0;
 }
