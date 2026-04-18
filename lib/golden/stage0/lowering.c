@@ -37,6 +37,8 @@ static int lower_stmt(int et, int ed1, int ed2, int ed3, int ed4, int pp, int to
 static int lower_block(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int stmts_first, int stmts_count, int tail_idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map);
 static int lower_body(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int body_idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map);
 static int lower_fn(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int body_idx, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map);
+static int build_builtin_map_classify(const char* s);
+static int build_builtin_map(int tok_tags, const char* source, int starts, int ends);
 static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max);
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
@@ -185,6 +187,7 @@ static int test_lower_with_instrs(void);
 static int test_lower_for_effect_fn(void);
 static int test_lower_enum_ctor(void);
 static int test_lower_try(void);
+static int test_build_builtin_map(void);
 
 static int ir_value_tag(Value v) {
   int _sv0t0;
@@ -2025,6 +2028,103 @@ static int lower_fn(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_
   sv0_vec_push(ctr, 0);
   int _sv0t1 = lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags, body_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map);
   return _sv0t1;
+}
+
+static int build_builtin_map_classify(const char* s) {
+  int _sv0t0 = sv0_string_eq(s, "println");
+  if (_sv0t0) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = sv0_string_eq(s, "string_len");
+  if (_sv0t1) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = sv0_string_eq(s, "string_eq");
+  if (_sv0t2) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = sv0_string_eq(s, "string_concat");
+  if (_sv0t3) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(s, "string_char_at");
+  if (_sv0t4) {
+    return 5;
+  } else {
+  }
+  int _sv0t5 = sv0_string_eq(s, "string_substr");
+  if (_sv0t5) {
+    return 6;
+  } else {
+  }
+  int _sv0t6 = sv0_string_eq(s, "vec_new");
+  if (_sv0t6) {
+    return 7;
+  } else {
+  }
+  int _sv0t7 = sv0_string_eq(s, "vec_push");
+  if (_sv0t7) {
+    return 8;
+  } else {
+  }
+  int _sv0t8 = sv0_string_eq(s, "vec_len");
+  if (_sv0t8) {
+    return 9;
+  } else {
+  }
+  int _sv0t9 = sv0_string_eq(s, "vec_get");
+  if (_sv0t9) {
+    return 10;
+  } else {
+  }
+  int _sv0t10 = sv0_string_eq(s, "vec_set");
+  if (_sv0t10) {
+    return 11;
+  } else {
+  }
+  int _sv0t11 = sv0_string_eq(s, "box_new");
+  if (_sv0t11) {
+    return 12;
+  } else {
+  }
+  int _sv0t12 = sv0_string_eq(s, "box_deref");
+  if (_sv0t12) {
+    return 13;
+  } else {
+  }
+  int _sv0t13 = sv0_string_eq(s, "no_alias");
+  if (_sv0t13) {
+    return 14;
+  } else {
+  }
+  return 0;
+}
+
+static int build_builtin_map(int tok_tags, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_len(tok_tags);
+  int n = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int bm = _sv0t1;
+  int i = 0;
+  while ((i < n)) {
+    int bid = 0;
+    int _sv0t2 = sv0_vec_get(tok_tags, i);
+    if ((_sv0t2 == 5)) {
+      const char* _sv0t3 = handle_to_str(i, source, starts, ends);
+      const char* s;
+      s = _sv0t3;
+      int _sv0t4 = build_builtin_map_classify(s);
+      bid = _sv0t4;
+    } else {
+    }
+    sv0_vec_push(bm, bid);
+    i = (i + 1);
+  }
+  return bm;
 }
 
 static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max) {
@@ -7865,6 +7965,73 @@ static int test_lower_try(void) {
   return 0;
 }
 
+static int test_build_builtin_map(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  const char* src;
+  src = "println vec_push foo vec_get no_alias bar";
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 7);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(st, 8);
+  sv0_vec_push(en, 16);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(st, 17);
+  sv0_vec_push(en, 20);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 28);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(st, 29);
+  sv0_vec_push(en, 37);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(st, 38);
+  sv0_vec_push(en, 41);
+  int _sv0t3 = build_builtin_map(tt, src, st, en);
+  int bm = _sv0t3;
+  int _sv0t4 = sv0_vec_len(bm);
+  if ((_sv0t4 != 6)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(bm, 0);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(bm, 1);
+  if ((_sv0t6 != 8)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(bm, 2);
+  if ((_sv0t7 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(bm, 3);
+  if ((_sv0t8 != 10)) {
+    return 5;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(bm, 4);
+  if ((_sv0t9 != 14)) {
+    return 6;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(bm, 5);
+  if ((_sv0t10 != 0)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -8353,6 +8520,13 @@ int main(void) {
   if ((r70 != 0)) {
     int _sv0t138 = (940 + r70);
     return _sv0t138;
+  } else {
+  }
+  int _sv0t139 = test_build_builtin_map();
+  int r71 = _sv0t139;
+  if ((r71 != 0)) {
+    int _sv0t140 = (960 + r71);
+    return _sv0t140;
   } else {
   }
   return 0;
