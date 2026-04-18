@@ -2183,6 +2183,74 @@ fn resolve_ctor_path_ty(edef_names: Vec<i32>,
                                 enp, variant_str);
 }
 
+/* ── sdef_name_lookup_str (string-based struct def lookup) ───
+   Finds the index of a struct in the sdef table by comparing
+   the name string at each sdef_names token position.  Returns
+   -1 if not found.  Mirrors edef_name_lookup_str.            */
+
+fn sdef_name_lookup_str(sdef_names: Vec<i32>, source: string,
+                        starts: Vec<i32>, ends: Vec<i32>,
+                        struct_name_str: string) -> i32 {
+    let ns: i32 = vec_len(sdef_names);
+    let mut k: i32 = 0;
+    while k < ns {
+        let np: i32 = vec_get(sdef_names, k);
+        let s: i32 = vec_get(starts, np);
+        let e: i32 = vec_get(ends, np);
+        let nm: string = string_substr(source, s, e - s);
+        if string_eq(nm, struct_name_str) { return k; }
+        k = k + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── env_lookup_str (string-based env lookup) ────────────────
+   Walks env_names backwards, extracts the string at each
+   token position, and compares with target_str.  Returns
+   the type tag from env_types if found, or -1 if not found.
+   Used by synth ExprPath and other cross-scope lookups
+   where integer token positions are not directly comparable. */
+
+fn env_lookup_str(env_names: Vec<i32>, env_types: Vec<i32>,
+                  source: string, starts: Vec<i32>, ends: Vec<i32>,
+                  target_str: string) -> i32 {
+    let n: i32 = vec_len(env_names);
+    let mut i: i32 = n - 1;
+    while i >= 0 {
+        let np: i32 = vec_get(env_names, i);
+        let s: i32 = vec_get(starts, np);
+        let e: i32 = vec_get(ends, np);
+        let nm: string = string_substr(source, s, e - s);
+        if string_eq(nm, target_str) {
+            return vec_get(env_types, i);
+        }
+        i = i - 1;
+    }
+    return 0 - 1;
+}
+
+/* ── synth_call_ret_type (function call return type) ─────────
+   Given a callee name string, resolves the function via
+   fn_table then builtins.  Returns the return type tag or
+   -1 if the function is not found.  Wraps resolve_fn_call
+   with the actual return type extraction.                    */
+
+fn synth_call_ret_type(fn_names: Vec<i32>,
+                       fn_ret_types: Vec<i32>,
+                       source: string,
+                       starts: Vec<i32>, ends: Vec<i32>,
+                       callee_name_str: string,
+                       is_builtin_out: Vec<i32>) -> i32 {
+    let fid: i32 = resolve_fn_call(fn_names, source, starts, ends,
+                                    callee_name_str, is_builtin_out);
+    if fid < 0 { return 0 - 1; }
+    let is_b: i32 = vec_get(is_builtin_out, vec_len(is_builtin_out) - 1);
+    if is_b != 0 {
+        return builtin_fn_ret_type(fid);
+    }
+    return vec_get(fn_ret_types, fid);
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_binop_class() -> i32 {
@@ -3608,6 +3676,59 @@ fn test_enum_ctor_resolution() -> i32 {
     return 0;
 }
 
+fn test_synth_building_blocks() -> i32 {
+    /* source: "fn foo ( x : i32 ) -> bool { }"
+       tok: 0=fn(60) 1=foo(5) 2=((6) 3=x(5) 4=:(14) 5=i32(5)
+            6=)(7) 7=->(18) 8=bool(5) 9={(8) 10=}(9) */
+    let source: string = "fn foo ( x : i32 ) -> bool { }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(starts, 3); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 21);
+    vec_push(starts, 22); vec_push(ends, 26);
+    vec_push(starts, 27); vec_push(ends, 28);
+    vec_push(starts, 29); vec_push(ends, 30);
+    let en: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let em: Vec<i32> = vec_new();
+    env_extend(en, et, em, 3, TY_INT(), 0);
+    let r1: i32 = env_lookup_str(en, et, source, starts, ends, "x");
+    if r1 != TY_INT() { return 1; }
+    let r2: i32 = env_lookup_str(en, et, source, starts, ends, "y");
+    if r2 != 0 - 1 { return 2; }
+    let sd_names: Vec<i32> = vec_new();
+    let sd_foffs: Vec<i32> = vec_new();
+    let sd_fcounts: Vec<i32> = vec_new();
+    let sd_fn_flat: Vec<i32> = vec_new();
+    let sd_ft_flat: Vec<i32> = vec_new();
+    vec_push(sd_names, 1);
+    vec_push(sd_foffs, 0);
+    vec_push(sd_fcounts, 0);
+    let si: i32 = sdef_name_lookup_str(sd_names, source, starts, ends, "foo");
+    if si != 0 { return 3; }
+    let si2: i32 = sdef_name_lookup_str(sd_names, source, starts, ends, "bar");
+    if si2 != 0 - 1 { return 4; }
+    let fnames: Vec<i32> = vec_new();
+    let frtypes: Vec<i32> = vec_new();
+    vec_push(fnames, 1);
+    vec_push(frtypes, TY_BOOL());
+    let ibo: Vec<i32> = vec_new();
+    let rt: i32 = synth_call_ret_type(fnames, frtypes, source,
+                                       starts, ends, "foo", ibo);
+    if rt != TY_BOOL() { return 5; }
+    let ibo2: Vec<i32> = vec_new();
+    let rt2: i32 = synth_call_ret_type(fnames, frtypes, source,
+                                        starts, ends, "println", ibo2);
+    if rt2 != TY_UNIT() { return 6; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -3725,5 +3846,7 @@ fn main() -> i32 {
     if r57 != 0 { return 600 + r57; }
     let r58: i32 = test_enum_ctor_resolution();
     if r58 != 0 { return 610 + r58; }
+    let r59: i32 = test_synth_building_blocks();
+    if r59 != 0 { return 620 + r59; }
     return 0;
 }
