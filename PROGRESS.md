@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 59 — checker.sv0.** `scan_fn_param_names` (token re-scan for fn param name positions + mutability flags — SML `checkFn` parameter extraction), `check_fn_body` (SML `checkFn` core — extend env with params, synth body via `synth_expr`, compare result with declared return type; function-level type checking). Next: full orchestration loop (`initTypes` + `modEnvFromProg` + per-fn check — needs cross-module `parse_block`). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batches 59–60 — checker.sv0.** Batch 59: `scan_fn_param_names` (fn param name extraction), `check_fn_body` (SML `checkFn` core — function-level type checking). Batch 60: `process_item_use` (SML `oneUse` — 2-segment use path import into env via fn_table/sdef/edef lookup). Next: remaining `modEnvFromProg` orchestration (builtin env registration, enum ctor env registration), then full `check` loop. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
