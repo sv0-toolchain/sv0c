@@ -2183,6 +2183,86 @@ fn resolve_ctor_path_ty(edef_names: Vec<i32>,
                                 enp, variant_str);
 }
 
+/* ── synth_expr_call_simple (simple function call typing) ────
+   Given a callee that is an ExprPath(1-seg), extracts the
+   function name, resolves via fn_table then builtins, and
+   returns the return type tag.  Synthesises each argument
+   (for future arity checking) but does not yet validate
+   argument types against parameter types.
+   Returns -1 if callee is not a 1-seg path or fn not found. */
+
+fn synth_expr_call_simple(
+    et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
+    pp: Vec<i32>,
+    source: string, starts: Vec<i32>, ends: Vec<i32>,
+    env_names: Vec<i32>, env_types: Vec<i32>,
+    edef_names: Vec<i32>,
+    edef_variant_offsets: Vec<i32>,
+    edef_variant_counts: Vec<i32>,
+    edef_vnames_flat: Vec<i32>,
+    edef_vshapes_flat: Vec<i32>,
+    fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
+    ret_ty: i32, loop_depth: i32,
+    callee_idx: i32, args_first: i32, args_count: i32) -> i32 {
+    let callee_tag: i32 = vec_get(et, callee_idx);
+    if callee_tag != 1 { return 0 - 1; }
+    let pps: i32 = vec_get(ed1, callee_idx);
+    let ppc: i32 = vec_get(ed2, callee_idx);
+    if ppc == 1 {
+        let tok_pos: i32 = vec_get(pp, pps);
+        let s: i32 = vec_get(starts, tok_pos);
+        let e: i32 = vec_get(ends, tok_pos);
+        let nm: string = string_substr(source, s, e - s);
+        let ibo: Vec<i32> = vec_new();
+        let rt: i32 = synth_call_ret_type(fn_names, fn_ret_types,
+                                           source, starts, ends,
+                                           nm, ibo);
+        if rt < 0 { return 0 - 1; }
+        let mut ai: i32 = 0;
+        while ai < args_count {
+            let arg_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                          source, starts, ends,
+                                          env_names, env_types,
+                                          edef_names, edef_variant_offsets,
+                                          edef_variant_counts,
+                                          edef_vnames_flat, edef_vshapes_flat,
+                                          ret_ty, loop_depth,
+                                          args_first + ai);
+            if arg_ty < 0 { return 0 - 1; }
+            ai = ai + 1;
+        }
+        return rt;
+    }
+    if ppc == 2 {
+        let seg1: i32 = vec_get(pp, pps);
+        let seg2: i32 = vec_get(pp, pps + 1);
+        let ctor_ty: i32 = resolve_ctor_path_ty(edef_names,
+                                                  edef_variant_offsets,
+                                                  edef_variant_counts,
+                                                  edef_vnames_flat,
+                                                  edef_vshapes_flat,
+                                                  source, starts, ends,
+                                                  seg1, seg2);
+        if ctor_ty >= 0 {
+            let mut ai: i32 = 0;
+            while ai < args_count {
+                let arg_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                              source, starts, ends,
+                                              env_names, env_types,
+                                              edef_names, edef_variant_offsets,
+                                              edef_variant_counts,
+                                              edef_vnames_flat, edef_vshapes_flat,
+                                              ret_ty, loop_depth,
+                                              args_first + ai);
+                if arg_ty < 0 { return 0 - 1; }
+                ai = ai + 1;
+            }
+            return TY_ENUM();
+        }
+    }
+    return 0 - 1;
+}
+
 /* ── sdef_name_lookup_str (string-based struct def lookup) ───
    Finds the index of a struct in the sdef table by comparing
    the name string at each sdef_names token position.  Returns
@@ -2262,7 +2342,10 @@ fn synth_call_ret_type(fn_names: Vec<i32>,
     15 ExprReturn   → synth value, expect matches ret_ty
     16 ExprBreak    → check loop_depth > 0, return TY_UNIT
     17 ExprContinue → check loop_depth > 0, return TY_UNIT
-    25 ExprTuple    → unsupported (multi) or unwrap (1-elem)
+    23 ExprAssert   → synth operand, return TY_UNIT
+    25 ExprTuple    → unwrap (1-elem) or unsupported (multi)
+   ExprCall (4) is handled by synth_expr_call_simple (separate
+   function with fn_table parameters).
    Returns -1 for unimplemented expression forms.            */
 
 fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
@@ -2483,6 +2566,34 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                       rhs_idx);
         if rhs_ty < 0 { return 0 - 1; }
         return TY_UNIT();
+    }
+    if tag == 23 {
+        let expr_idx: i32 = vec_get(ed1, idx);
+        let expr_ty: i32 = synth_expr(et, ed1, ed2, ed3, pp,
+                                       source, starts, ends,
+                                       env_names, env_types,
+                                       edef_names, edef_variant_offsets,
+                                       edef_variant_counts,
+                                       edef_vnames_flat, edef_vshapes_flat,
+                                       ret_ty, loop_depth,
+                                       expr_idx);
+        if expr_ty < 0 { return 0 - 1; }
+        return TY_UNIT();
+    }
+    if tag == 25 {
+        let first_idx: i32 = vec_get(ed1, idx);
+        let count: i32 = vec_get(ed2, idx);
+        if count == 1 {
+            return synth_expr(et, ed1, ed2, ed3, pp,
+                              source, starts, ends,
+                              env_names, env_types,
+                              edef_names, edef_variant_offsets,
+                              edef_variant_counts,
+                              edef_vnames_flat, edef_vshapes_flat,
+                              ret_ty, loop_depth,
+                              first_idx);
+        }
+        return 0 - 1;
     }
     return 0 - 1;
 }
@@ -4026,6 +4137,30 @@ fn test_synth_expr() -> i32 {
                                edn, edvo, edvc, edvn, edvs,
                                TY_INT(), 0, 14);
     if r14 != TY_UNIT() { return 15; }
+    vec_push(et, 25); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 0);
+    let r15: i32 = synth_expr(et, ed1, ed2, ed3, ppool,
+                               source, starts, ends, en, ety,
+                               edn, edvo, edvc, edvn, edvs,
+                               TY_INT(), 0, 15);
+    if r15 != TY_INT() { return 16; }
+    vec_push(et, 23); vec_push(ed1, 1); vec_push(ed2, 0); vec_push(ed3, 0);
+    let r16: i32 = synth_expr(et, ed1, ed2, ed3, ppool,
+                               source, starts, ends, en, ety,
+                               edn, edvo, edvc, edvn, edvs,
+                               TY_INT(), 0, 16);
+    if r16 != TY_UNIT() { return 17; }
+    let fnames: Vec<i32> = vec_new();
+    let frtypes: Vec<i32> = vec_new();
+    vec_push(fnames, 0);
+    vec_push(frtypes, TY_INT());
+    let rc: i32 = synth_expr_call_simple(
+        et, ed1, ed2, ed3, ppool,
+        source, starts, ends, en, ety,
+        edn, edvo, edvc, edvn, edvs,
+        fnames, frtypes,
+        TY_INT(), 0,
+        2, 0, 0);
+    if rc != TY_INT() { return 18; }
     return 0;
 }
 
