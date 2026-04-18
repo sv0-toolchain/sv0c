@@ -2410,14 +2410,20 @@ fn check_stmt_in_block(
     18 ExprAssign   → synth LHS and RHS, return TY_UNIT
     19 ExprAssignOp → synth LHS and RHS, return TY_UNIT
      4 ExprCall     → delegate to synth_expr_call_simple
+     5 ExprMethodCall → synth obj + args, return TY_INT (simplified)
+     6 ExprField    → synth obj, return TY_INT (simplified)
+     7 ExprTupleField → synth obj, return TY_INT (simplified)
      8 ExprIndex    → synth obj and index, return TY_INT (simplified)
+    11 ExprMatch    → synth scrutinee + each arm body/guard, return first arm ty
     13 ExprFor      → synth range lo/hi, extend env, synth body w/ loop_depth+1
     20 ExprCast     → synth source, return TY_INT (simplified)
     21 ExprRange    → synth lo/hi, return TY_INT
     22 ExprTry      → synth operand, return TY_INT (simplified)
     23 ExprAssert   → synth operand, return TY_UNIT
+    24 ExprStruct   → return TY_INT (simplified, field traversal deferred)
     25 ExprTuple    → unwrap (1-elem) or unsupported (multi)
-   Returns -1 for unimplemented expression forms.            */
+    26 ExprArray    → return TY_INT (simplified, element traversal deferred)
+   All 27 expression tags are now handled.                    */
 
 fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
               ed4: Vec<i32>, pp: Vec<i32>,
@@ -2662,6 +2668,53 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
         if loop_depth <= 0 { return 0 - 1; }
         return TY_UNIT();
     }
+    if tag == 11 {
+        let scrut_idx: i32 = vec_get(ed1, idx);
+        let arms_first: i32 = vec_get(ed2, idx);
+        let arms_count: i32 = vec_get(ed3, idx);
+        let scrut_ty: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                                        source, starts, ends,
+                                        env_names, env_types, env_muts,
+                                        edef_names, edef_variant_offsets,
+                                        edef_variant_counts,
+                                        edef_vnames_flat, edef_vshapes_flat,
+                                        fn_names, fn_ret_types,
+                                        ret_ty, loop_depth,
+                                        scrut_idx);
+        if scrut_ty < 0 { return 0 - 1; }
+        let mut first_body_ty: i32 = TY_INT();
+        let mut ai: i32 = 0;
+        while ai < arms_count {
+            let arm_idx: i32 = arms_first + ai;
+            let guard_idx: i32 = vec_get(ed3, arm_idx);
+            let body_idx: i32 = vec_get(ed4, arm_idx);
+            if guard_idx >= 0 {
+                let g_ty: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                                            source, starts, ends,
+                                            env_names, env_types, env_muts,
+                                            edef_names, edef_variant_offsets,
+                                            edef_variant_counts,
+                                            edef_vnames_flat, edef_vshapes_flat,
+                                            fn_names, fn_ret_types,
+                                            ret_ty, loop_depth,
+                                            guard_idx);
+                if g_ty < 0 { return 0 - 1; }
+            }
+            let b_ty: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                                        source, starts, ends,
+                                        env_names, env_types, env_muts,
+                                        edef_names, edef_variant_offsets,
+                                        edef_variant_counts,
+                                        edef_vnames_flat, edef_vshapes_flat,
+                                        fn_names, fn_ret_types,
+                                        ret_ty, loop_depth,
+                                        body_idx);
+            if b_ty < 0 { return 0 - 1; }
+            if ai == 0 { first_body_ty = b_ty; }
+            ai = ai + 1;
+        }
+        return first_body_ty;
+    }
     if tag == 12 {
         let cond_idx: i32 = vec_get(ed1, idx);
         let body_idx: i32 = vec_get(ed2, idx);
@@ -2867,6 +2920,9 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
         if expr_ty < 0 { return 0 - 1; }
         return TY_UNIT();
     }
+    if tag == 24 {
+        return TY_INT();
+    }
     if tag == 25 {
         let first_idx: i32 = vec_get(ed1, idx);
         let count: i32 = vec_get(ed2, idx);
@@ -2882,6 +2938,9 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                               first_idx);
         }
         return 0 - 1;
+    }
+    if tag == 26 {
+        return TY_INT();
     }
     if tag == 9 {
         let stmts_first: i32 = vec_get(ed1, idx);
@@ -4603,6 +4662,35 @@ fn test_synth_expr() -> i32 {
                                fnames, frtypes,
                                TY_INT(), 0, 31);
     if r27 != TY_INT() { return 29; }
+    /* ExprMatch: match scrutinee { arm => body }
+       idx32 = ExprMatchArm(pat_tag=1,pat_d1=0,guard=-1,body=0)
+       idx33 = ExprMatch(scrut=0, arms_first=32, arms_count=1) */
+    vec_push(et, 29); vec_push(ed1, 1); vec_push(ed2, 0); vec_push(ed3, 0 - 1); vec_push(ed4v, 0);
+    vec_push(et, 11); vec_push(ed1, 0); vec_push(ed2, 32); vec_push(ed3, 1); vec_push(ed4v, 0);
+    let r28: i32 = synth_expr(et, ed1, ed2, ed3, ed4v, ppool,
+                               src2, starts, ends, en, ety, em,
+                               edn, edvo, edvc, edvn, edvs,
+                               fnames, frtypes,
+                               TY_INT(), 0, 33);
+    if r28 != TY_INT() { return 30; }
+    /* ExprStruct: Foo { x: 42 } → TY_INT (simplified)
+       idx34 = ExprStruct(pp_start=0, pp_count=1, field_count=1) */
+    vec_push(et, 24); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 1); vec_push(ed4v, 0);
+    let r29: i32 = synth_expr(et, ed1, ed2, ed3, ed4v, ppool,
+                               src2, starts, ends, en, ety, em,
+                               edn, edvo, edvc, edvn, edvs,
+                               fnames, frtypes,
+                               TY_INT(), 0, 34);
+    if r29 != TY_INT() { return 31; }
+    /* ExprArray: [42, 43] → TY_INT (simplified)
+       idx35 = ExprArray(first=0, count=2) */
+    vec_push(et, 26); vec_push(ed1, 0); vec_push(ed2, 2); vec_push(ed3, 0); vec_push(ed4v, 0);
+    let r30: i32 = synth_expr(et, ed1, ed2, ed3, ed4v, ppool,
+                               src2, starts, ends, en, ety, em,
+                               edn, edvo, edvc, edvn, edvs,
+                               fnames, frtypes,
+                               TY_INT(), 0, 35);
+    if r30 != TY_INT() { return 32; }
     let rc: i32 = synth_expr_call_simple(
         et, ed1, ed2, ed3, ed4v, ppool,
         source, starts, ends, en, ety, em,
