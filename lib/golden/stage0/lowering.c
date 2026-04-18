@@ -32,6 +32,7 @@ static int lower_stmt(int et, int ed1, int ed2, int ed3, int ed4, int pp, int to
 static int lower_block(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int stmts_first, int stmts_count, int tail_idx, int ctr, int out_instrs);
 static int lower_body(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int body_idx, int ctr, int out_instrs);
 static int lower_fn(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int body_idx, int out_instrs);
+static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max);
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
 static const char* lower_digit(int d);
@@ -169,6 +170,7 @@ static int test_lower_loop(void);
 static int test_lower_cast(void);
 static int test_lower_body_fn(void);
 static int test_lower_fn_fn(void);
+static int test_lower_program_fn(void);
 static int test_lower_return_fn(void);
 static int test_lower_stmt_fn(void);
 static int test_lower_block_fn(void);
@@ -1372,6 +1374,29 @@ static int lower_fn(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_
   sv0_vec_push(ctr, 0);
   int _sv0t1 = lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags, body_idx, ctr, out_instrs);
   return _sv0t1;
+}
+
+static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max) {
+  int _sv0t0 = build_struct_order(item_tags, item_names, item_field_counts, struct_fnames_flat, out_struct_names, out_struct_offsets, out_struct_counts, out_struct_flat);
+  int discard_so = _sv0t0;
+  int _sv0t1 = build_enum_variants_data(item_tags, item_names, item_field_counts, item_vmax, enum_vnames_flat, out_enum_names, out_enum_tag_offsets, out_enum_tag_counts, out_enum_tag_flat, out_enum_max);
+  int discard_ev = _sv0t1;
+  const char* _sv0t2 = collect_typedefs_str(item_tags, item_names, item_field_counts, item_vmax, sf_names, sf_types, source, starts, ends, out_struct_names, out_enum_names);
+  const char* typedefs;
+  typedefs = _sv0t2;
+  int _sv0t3 = sv0_vec_len(item_tags);
+  int n = _sv0t3;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t4 = sv0_vec_get(item_tags, i);
+    if ((_sv0t4 == 0)) {
+      int _sv0t5 = sv0_vec_get(item_names, i);
+      sv0_vec_push(out_block_labels, _sv0t5);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return typedefs;
 }
 
 static int fresh_tmp_name(int counter) {
@@ -6284,6 +6309,114 @@ static int test_lower_fn_fn(void) {
   return 0;
 }
 
+static int test_lower_program_fn(void) {
+  const char* src;
+  src = "fn foo() { } struct Bar { x: i32, } enum Qux { A, B, }";
+  int _sv0t0 = sv0_vec_new();
+  int strt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int endi = _sv0t1;
+  int p = 0;
+  while ((p < 54)) {
+    sv0_vec_push(strt, p);
+    int _sv0t2 = (p + 1);
+    sv0_vec_push(endi, _sv0t2);
+    p = (p + 1);
+  }
+  int _sv0t3 = sv0_vec_new();
+  int it = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int id1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int id2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int id3 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id4 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int ifc = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ivm = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int sfn = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int evn = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int sfnames = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int sftypes = _sv0t13;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(id1, 3);
+  sv0_vec_push(id2, 0);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  sv0_vec_push(ifc, 0);
+  sv0_vec_push(ivm, 0);
+  sv0_vec_push(it, 1);
+  sv0_vec_push(id1, 14);
+  sv0_vec_push(id2, 1);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  sv0_vec_push(ifc, 1);
+  sv0_vec_push(ivm, 0);
+  sv0_vec_push(sfn, 20);
+  sv0_vec_push(sfnames, 20);
+  sv0_vec_push(sftypes, 22);
+  sv0_vec_push(it, 2);
+  sv0_vec_push(id1, 30);
+  sv0_vec_push(id2, 2);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  sv0_vec_push(ifc, 0);
+  sv0_vec_push(ivm, 0);
+  sv0_vec_push(evn, 40);
+  sv0_vec_push(evn, 45);
+  int _sv0t14 = sv0_vec_new();
+  int ob = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int osn = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int oso = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int osc = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int osf = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int oen = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int oeto = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int oetc = _sv0t21;
+  int _sv0t22 = sv0_vec_new();
+  int oetf = _sv0t22;
+  int _sv0t23 = sv0_vec_new();
+  int oem = _sv0t23;
+  const char* _sv0t24 = lower(it, id1, id2, id3, id4, ifc, ivm, sfn, evn, sfnames, sftypes, src, strt, endi, ob, osn, oso, osc, osf, oen, oeto, oetc, oetf, oem);
+  const char* td;
+  td = _sv0t24;
+  int _sv0t25 = sv0_vec_len(ob);
+  if ((_sv0t25 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t26 = sv0_vec_get(ob, 0);
+  if ((_sv0t26 != 3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t27 = sv0_vec_len(osn);
+  if ((_sv0t27 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t28 = sv0_vec_len(oen);
+  if ((_sv0t28 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 static int test_lower_return_fn(void) {
   int _sv0t0 = sv0_vec_new();
   int et = _sv0t0;
@@ -7037,6 +7170,13 @@ int main(void) {
   if ((r66 != 0)) {
     int _sv0t130 = (860 + r66);
     return _sv0t130;
+  } else {
+  }
+  int _sv0t131 = test_lower_program_fn();
+  int r67 = _sv0t131;
+  if ((r67 != 0)) {
+    int _sv0t132 = (880 + r67);
+    return _sv0t132;
   } else {
   }
   return 0;
