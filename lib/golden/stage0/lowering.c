@@ -24,6 +24,9 @@ static int ir_expr_tag(Expr e);
 static int ir_instr_tag(Instr ins);
 static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags);
 static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs);
+static Expr value_to_expr(Value v);
+static Expr lower_expr_with_instrs(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs);
+static int lower_for_effect(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs);
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
 static const char* lower_digit(int d);
@@ -159,6 +162,9 @@ static int test_lower_assign(void);
 static int test_lower_while(void);
 static int test_lower_loop(void);
 static int test_lower_cast(void);
+static int test_value_to_expr_fn(void);
+static int test_lower_with_instrs(void);
+static int test_lower_for_effect_fn(void);
 
 static int ir_value_tag(Value v) {
   int _sv0t0;
@@ -1182,6 +1188,59 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
   Value _sv0t166;
   _sv0t166.tag = 4;
   return _sv0t166;
+}
+
+static Expr value_to_expr(Value v) {
+  int _sv0t0 = ir_value_tag(v);
+  int t = _sv0t0;
+  if ((t == 3)) {
+    int _sv0t1;
+    if ((v.tag == 3)) {
+      int x = v.p0;
+      Expr _sv0t4;
+      _sv0t4.tag = 1;
+      _sv0t4.p0 = x;
+      return _sv0t4;
+      _sv0t1 = 0;
+    } else {
+      if (1) {
+        Expr _sv0t2;
+        int _sv0t3 = sv0_box_alloc(3);
+        sv0_box_store(_sv0t3, 0, v.tag);
+        sv0_box_store(_sv0t3, 1, v.p0);
+        sv0_box_store(_sv0t3, 2, v.p1);
+        _sv0t2.tag = 0;
+        _sv0t2.p0 = _sv0t3;
+        return _sv0t2;
+        _sv0t1 = 0;
+      } else {
+      }
+    }
+  } else {
+  }
+  Expr _sv0t5;
+  int _sv0t6 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t6, 0, v.tag);
+  sv0_box_store(_sv0t6, 1, v.p0);
+  sv0_box_store(_sv0t6, 2, v.p1);
+  _sv0t5.tag = 0;
+  _sv0t5.p0 = _sv0t6;
+  return _sv0t5;
+}
+
+static Expr lower_expr_with_instrs(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs) {
+  Value _sv0t0 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, idx, ctr, out_instrs);
+  Value v;
+  v = _sv0t0;
+  Expr _sv0t1 = value_to_expr(v);
+  return _sv0t1;
+}
+
+static int lower_for_effect(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs) {
+  Value _sv0t0 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, idx, ctr, out_instrs);
+  Value discard5;
+  discard5 = _sv0t0;
+  return 0;
 }
 
 static int fresh_tmp_name(int counter) {
@@ -6005,6 +6064,139 @@ static int test_lower_cast(void) {
   return 0;
 }
 
+static int test_value_to_expr_fn(void) {
+  Value v1;
+  v1.tag = 0;
+  v1.p0 = 42;
+  Expr _sv0t0 = value_to_expr(v1);
+  Expr e1;
+  e1 = _sv0t0;
+  int _sv0t1 = ir_expr_tag(e1);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  Value v2;
+  v2.tag = 3;
+  v2.p0 = 7;
+  Expr _sv0t2 = value_to_expr(v2);
+  Expr e2;
+  e2 = _sv0t2;
+  int _sv0t3 = ir_expr_tag(e2);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  Value v3;
+  v3.tag = 4;
+  Expr _sv0t4 = value_to_expr(v3);
+  Expr e3;
+  e3 = _sv0t4;
+  int _sv0t5 = ir_expr_tag(e3);
+  if ((_sv0t5 != 0)) {
+    return 3;
+  } else {
+  }
+  Value v4;
+  v4.tag = 1;
+  Expr _sv0t6 = value_to_expr(v4);
+  Expr e4;
+  e4 = _sv0t6;
+  int _sv0t7 = ir_expr_tag(e4);
+  if ((_sv0t7 != 0)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lower_with_instrs(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tok_tags = _sv0t6;
+  sv0_vec_push(tok_tags, 91);
+  sv0_vec_push(pp, 55);
+  int _sv0t7 = sv0_vec_new();
+  int ctr = _sv0t7;
+  sv0_vec_push(ctr, 0);
+  int _sv0t8 = sv0_vec_new();
+  int out = _sv0t8;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  Expr _sv0t9 = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, 0, ctr, out);
+  Expr e1;
+  e1 = _sv0t9;
+  int _sv0t10 = ir_expr_tag(e1);
+  if ((_sv0t10 != 0)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(et, 1);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 1);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  Expr _sv0t11 = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, 1, ctr, out);
+  Expr e2;
+  e2 = _sv0t11;
+  int _sv0t12 = ir_expr_tag(e2);
+  if ((_sv0t12 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_lower_for_effect_fn(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tok_tags = _sv0t6;
+  sv0_vec_push(tok_tags, 91);
+  sv0_vec_push(pp, 55);
+  int _sv0t7 = sv0_vec_new();
+  int ctr = _sv0t7;
+  sv0_vec_push(ctr, 0);
+  int _sv0t8 = sv0_vec_new();
+  int out = _sv0t8;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t9 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, 0, ctr, out);
+  int rc = _sv0t9;
+  if ((rc != 0)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_fresh_tmp();
   int r1 = _sv0t0;
@@ -6409,6 +6601,27 @@ int main(void) {
   if ((r58 != 0)) {
     int _sv0t114 = (700 + r58);
     return _sv0t114;
+  } else {
+  }
+  int _sv0t115 = test_value_to_expr_fn();
+  int r59 = _sv0t115;
+  if ((r59 != 0)) {
+    int _sv0t116 = (720 + r59);
+    return _sv0t116;
+  } else {
+  }
+  int _sv0t117 = test_lower_with_instrs();
+  int r60 = _sv0t117;
+  if ((r60 != 0)) {
+    int _sv0t118 = (740 + r60);
+    return _sv0t118;
+  } else {
+  }
+  int _sv0t119 = test_lower_for_effect_fn();
+  int r61 = _sv0t119;
+  if ((r61 != 0)) {
+    int _sv0t120 = (760 + r61);
+    return _sv0t120;
   } else {
   }
   return 0;
