@@ -77,6 +77,8 @@
    Batch 59: scan_fn_param_names (token re-scan for fn param name
    positions + mutability flags), check_fn_body (SML checkFn core —
    extend env with params, synth body, compare with return type).
+   Batch 60: process_item_use (SML oneUse — ItemUse env import:
+   2-segment use path → fn_table/sdef/edef lookup → env or alias).
    Full type inference orchestration (initTypes + modEnvFromProg +
    check loop) deferred — needs cross-module parse_block call.  */
 
@@ -1752,6 +1754,70 @@ fn check_fn_body(
     if expect(body_ty, ret_ty) { return 0; }
     if ret_ty == TY_UNIT() { return 0; }
     return 0 - 1;
+}
+
+/* ── process_item_use (SML oneUse — ItemUse env import) ───────
+   For an ItemUse (tag 5) entry with a 2-segment path [m, nm],
+   builds the qualified name q = "m__nm" and:
+     1. If q is in fn_table → extend env with (nm_tok, TY_FN, false)
+     2. Else if q is a struct name → add type import alias nm→q
+     3. Else if q is an enum name → add type import alias nm→q,
+        then extend env with each variant's ctor path under nm
+   Returns 0 on success (or no-op for non-2-segment uses).     */
+
+fn process_item_use(
+    source: string, starts: Vec<i32>, ends: Vec<i32>,
+    pp: Vec<i32>,
+    id1: Vec<i32>, id2: Vec<i32>, item_idx: i32,
+    fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
+    sdef_names: Vec<i32>,
+    edef_names: Vec<i32>,
+    edef_variant_offsets: Vec<i32>,
+    edef_variant_counts: Vec<i32>,
+    edef_vnames_flat: Vec<i32>,
+    edef_vshapes_flat: Vec<i32>,
+    env_names: Vec<i32>, env_types: Vec<i32>, env_muts: Vec<i32>,
+    aliases: Vec<i32>, alias_targets: Vec<i32>) -> i32 {
+    let pps: i32 = vec_get(id1, item_idx);
+    let ppc: i32 = vec_get(id2, item_idx);
+    if ppc != 2 { return 0; }
+    let m_tok: i32 = vec_get(pp, pps);
+    let nm_tok: i32 = vec_get(pp, pps + 1);
+    let ms: i32 = vec_get(starts, m_tok);
+    let me: i32 = vec_get(ends, m_tok);
+    let m_str: string = string_substr(source, ms, me - ms);
+    let ns: i32 = vec_get(starts, nm_tok);
+    let ne: i32 = vec_get(ends, nm_tok);
+    let nm_str: string = string_substr(source, ns, ne - ns);
+    let q: string = string_concat(string_concat(m_str, "__"), nm_str);
+    let fi: i32 = fn_table_lookup_str(fn_names, source, starts, ends, q);
+    if fi >= 0 {
+        env_extend(env_names, env_types, env_muts, nm_tok, TY_FN(), 0);
+        return 0;
+    }
+    let si: i32 = sdef_name_lookup_str(sdef_names, source, starts, ends, q);
+    if si >= 0 {
+        vec_push(aliases, nm_tok);
+        vec_push(alias_targets, m_tok);
+        return 0;
+    }
+    let ei: i32 = edef_name_lookup_str(edef_names, source, starts, ends, q);
+    if ei >= 0 {
+        vec_push(aliases, nm_tok);
+        vec_push(alias_targets, m_tok);
+        let voff: i32 = vec_get(edef_variant_offsets, ei);
+        let vc: i32 = vec_get(edef_variant_counts, ei);
+        let mut vi: i32 = 0;
+        while vi < vc {
+            let vshape: i32 = vec_get(edef_vshapes_flat, voff + vi);
+            let cty: i32 = ctor_ty_tag(vshape, 1);
+            let vn_tok: i32 = vec_get(edef_vnames_flat, voff + vi);
+            env_extend(env_names, env_types, env_muts, vn_tok, cty, 0);
+            vi = vi + 1;
+        }
+        return 0;
+    }
+    return 0;
 }
 
 /* ── contract_expr scoped flag (SML withContractExpr) ────────
@@ -4929,6 +4995,61 @@ fn test_check_fn_body() -> i32 {
     return 0;
 }
 
+fn test_process_item_use() -> i32 {
+    /* source: "use Mod :: bar fn Mod__bar ( ) -> i32 { 0 }"
+       tok: 0=use  1=Mod  2=::  3=bar  4=fn  5=Mod__bar
+            6=(  7=)  8=->  9=i32  10={  11=0  12=}
+       pp=[1, 3] for the 2-segment path */
+    let source: string = "use Mod :: bar fn Mod__bar ( ) -> i32 { 0 }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    vec_push(starts, 8); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 14);
+    vec_push(starts, 15); vec_push(ends, 17);
+    vec_push(starts, 18); vec_push(ends, 26);
+    vec_push(starts, 27); vec_push(ends, 28);
+    vec_push(starts, 29); vec_push(ends, 30);
+    vec_push(starts, 31); vec_push(ends, 33);
+    vec_push(starts, 34); vec_push(ends, 37);
+    vec_push(starts, 38); vec_push(ends, 39);
+    vec_push(starts, 40); vec_push(ends, 41);
+    vec_push(starts, 42); vec_push(ends, 43);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 1);
+    vec_push(pp, 3);
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    vec_push(id1, 0);
+    vec_push(id2, 2);
+    let fnn: Vec<i32> = vec_new();
+    let fnrt: Vec<i32> = vec_new();
+    vec_push(fnn, 5);
+    vec_push(fnrt, TY_INT());
+    let sdn: Vec<i32> = vec_new();
+    let edn: Vec<i32> = vec_new();
+    let edvo: Vec<i32> = vec_new();
+    let edvc: Vec<i32> = vec_new();
+    let edvn: Vec<i32> = vec_new();
+    let edvs: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let em: Vec<i32> = vec_new();
+    let al: Vec<i32> = vec_new();
+    let at: Vec<i32> = vec_new();
+    let r: i32 = process_item_use(source, starts, ends, pp,
+                                   id1, id2, 0,
+                                   fnn, fnrt, sdn,
+                                   edn, edvo, edvc, edvn, edvs,
+                                   en, et, em, al, at);
+    if r != 0 { return 1; }
+    if vec_len(en) != 1 { return 2; }
+    if vec_get(en, 0) != 3 { return 3; }
+    if vec_get(et, 0) != TY_FN() { return 4; }
+    return 0;
+}
+
 fn test_synth_building_blocks() -> i32 {
     /* source: "fn foo ( x : i32 ) -> bool { }"
        tok: 0=fn(60) 1=foo(5) 2=((6) 3=x(5) 4=:(14) 5=i32(5)
@@ -5107,5 +5228,7 @@ fn main() -> i32 {
     if r61 != 0 { return 650 + r61; }
     let r62: i32 = test_check_fn_body();
     if r62 != 0 { return 660 + r62; }
+    let r63: i32 = test_process_item_use();
+    if r63 != 0 { return 670 + r63; }
     return 0;
 }
