@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-17 (America/Denver; **Deep-function transliteration batch 53 — checker.sv0.** `checker.sv0`: `synth_expr_call_simple` (SML `synthExprCall` simplified — resolves 1-seg path callee via fn_table/builtins or 2-seg via ctor lookup; synthesises args; returns return type tag). `synth_expr` extended with ExprTuple (tag 25: 1-element unwrap) and ExprAssert (tag 23: synth operand → TY_UNIT). synth_expr now handles 14 of ~27 expression tags + call helper. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-12 (America/Denver; **Deep-function transliteration batch 54 — checker.sv0.** `checker.sv0`: `check_stmt_in_block` (SML `checkStmt` — processes LetStmt: synth init + extend env; SemiStmt: synth + discard). `synth_expr` extended with ExprBlock (tag 9: iterate stmts via check_stmt_in_block, synth tail). Added `env_muts`+`ed4` parameters to `synth_expr`/`synth_expr_call_simple` for proper let binding mutability tracking and stmt d4 access. synth_expr now handles 15 of ~27 expression tags. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
