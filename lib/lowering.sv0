@@ -39,7 +39,98 @@
    params, enum ctor path, or callee return type), variant_shape_in_items
    (enum variant shape+field count lookup from item arena flat arrays).
    Full IR emission (lowerExpr/lowerStmt/lowerFn/lower) deferred —
-   needs deep AST traversal with slot/instr accumulation. */
+   needs deep AST traversal with slot/instr accumulation.
+   IR enum types (batch 62): local Value/Expr/Instr definitions
+   matching codegen.sv0 layout for downstream compatibility,
+   ir_value_tag/ir_expr_tag/ir_instr_tag accessors,
+   ctr_fresh (mutable temp counter via Vec<i32> + vec_set),
+   classify_assign_lhs_arena (SML classifyAssignLhs — full
+   flat-arena LHS classification for ExprPath(1-seg) and
+   ExprField(ExprPath(1-seg), field)). */
+
+/* ── IR types (local copies, matching codegen.sv0 layout) ──── */
+
+enum Value {
+    VInt(i32),
+    VBoolTrue,
+    VBoolFalse,
+    VVar(i32),
+    VUnit,
+    VString(i32),
+    VMember(Box<Value>, i32),
+    VAddrOf(i32),
+}
+
+enum Expr {
+    Literal(Box<Value>),
+    Load(i32),
+    Binop(i32, Box<Value>, Box<Value>),
+    Unop(i32, Box<Value>),
+    FieldAccess(Box<Value>, i32),
+}
+
+enum Instr {
+    Nop,
+    DeclVar(i32),
+    DeclNamed(i32, i32),
+    Assign(i32, Box<Expr>),
+    Store(i32, Box<Expr>),
+    StoreField(i32, i32, Box<Expr>),
+    IfElse(Box<Expr>, Vec<i32>, Vec<i32>),
+    WhileLoop(Box<Expr>, Vec<i32>),
+    BlockInstr(Vec<i32>),
+    Break,
+    Continue,
+    Call(i32, i32, Vec<i32>, i32),
+    Requires(Box<Expr>, i32),
+    Ensures(Box<Expr>, i32),
+    ReturnVoid,
+    ReturnVal(Box<Value>),
+}
+
+fn ir_value_tag(v: Value) -> i32 {
+    match v {
+        Value::VInt(_) => { return 0; },
+        Value::VBoolTrue => { return 1; },
+        Value::VBoolFalse => { return 2; },
+        Value::VVar(_) => { return 3; },
+        Value::VUnit => { return 4; },
+        Value::VString(_) => { return 5; },
+        Value::VMember(_, _) => { return 6; },
+        Value::VAddrOf(_) => { return 7; },
+    }
+}
+
+fn ir_expr_tag(e: Expr) -> i32 {
+    match e {
+        Expr::Literal(_) => { return 0; },
+        Expr::Load(_) => { return 1; },
+        Expr::Binop(_, _, _) => { return 2; },
+        Expr::Unop(_, _) => { return 3; },
+        Expr::FieldAccess(_, _) => { return 4; },
+    }
+}
+
+fn ir_instr_tag(ins: Instr) -> i32 {
+    match ins {
+        Instr::Nop => { return 0; },
+        Instr::DeclVar(_) => { return 1; },
+        Instr::DeclNamed(_, _) => { return 2; },
+        Instr::Assign(_, _) => { return 3; },
+        Instr::Store(_, _) => { return 4; },
+        Instr::StoreField(_, _, _) => { return 5; },
+        Instr::IfElse(_, _, _) => { return 6; },
+        Instr::WhileLoop(_, _) => { return 7; },
+        Instr::BlockInstr(_) => { return 8; },
+        Instr::Break => { return 9; },
+        Instr::Continue => { return 10; },
+        Instr::Call(_, _, _, _) => { return 11; },
+        Instr::Requires(_, _) => { return 12; },
+        Instr::Ensures(_, _) => { return 13; },
+        Instr::ReturnVoid => { return 14; },
+        Instr::ReturnVal(_) => { return 15; },
+    }
+}
 
 /* ── freshTmp ───────────────────────────────────────────────── */
 
@@ -1428,6 +1519,56 @@ fn variant_shape_in_items(item_tags: Vec<i32>, item_names: Vec<i32>,
     return 0 - 1;
 }
 
+/* ── ctr_fresh (mutable temp counter via Vec<i32>) ─────────── */
+/* ctr is a single-element Vec<i32>; ctr[0] = current counter.
+   Returns the current value and increments it. */
+
+fn ctr_fresh(ctr: Vec<i32>) -> i32 {
+    let n: i32 = vec_get(ctr, 0);
+    vec_set(ctr, 0, n + 1);
+    return n;
+}
+
+/* ── classify_assign_lhs_arena (SML classifyAssignLhs) ────────
+   Examines the flat expression arena at `idx`.
+   Parser expr tags: 1=ExprPath, 6=ExprField.
+   If ExprPath (tag 1) with pp_count=1: pushes name_tok_pos to
+   out, returns 0 (ALVar).
+   If ExprField (tag 6) where obj is ExprPath(1-seg): pushes
+   base_tok_pos and field_tok to out, returns 1 (ALField).
+   Otherwise: returns -1 (invalid assignment target). */
+
+fn classify_assign_lhs_arena(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                              pp: Vec<i32>,
+                              idx: i32, out: Vec<i32>) -> i32 {
+    let tag: i32 = vec_get(et, idx);
+    if tag == 1 {
+        let pps: i32 = vec_get(ed1, idx);
+        let ppc: i32 = vec_get(ed2, idx);
+        if ppc == 1 {
+            vec_push(out, vec_get(pp, pps));
+            return 0;
+        }
+        return 0 - 1;
+    }
+    if tag == 6 {
+        let obj_idx: i32 = vec_get(ed1, idx);
+        let field_tok: i32 = vec_get(ed2, idx);
+        let obj_tag: i32 = vec_get(et, obj_idx);
+        if obj_tag == 1 {
+            let opps: i32 = vec_get(ed1, obj_idx);
+            let oppc: i32 = vec_get(ed2, obj_idx);
+            if oppc == 1 {
+                vec_push(out, vec_get(pp, opps));
+                vec_push(out, field_tok);
+                return 1;
+            }
+        }
+        return 0 - 1;
+    }
+    return 0 - 1;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_fresh_tmp() -> i32 {
@@ -2191,6 +2332,97 @@ fn test_variant_shape_in_items() -> i32 {
     return 0;
 }
 
+fn test_ir_types() -> i32 {
+    let vi: Value = Value::VInt(42);
+    if ir_value_tag(vi) != 0 { return 1; }
+    let vb: Value = Value::VBoolTrue;
+    if ir_value_tag(vb) != 1 { return 2; }
+    let vf: Value = Value::VBoolFalse;
+    if ir_value_tag(vf) != 2 { return 3; }
+    let vv: Value = Value::VVar(10);
+    if ir_value_tag(vv) != 3 { return 4; }
+    let vu: Value = Value::VUnit;
+    if ir_value_tag(vu) != 4 { return 5; }
+    let vs: Value = Value::VString(7);
+    if ir_value_tag(vs) != 5 { return 6; }
+    let base: Value = Value::VVar(3);
+    let vm: Value = Value::VMember(box_new(base), 5);
+    if ir_value_tag(vm) != 6 { return 7; }
+    let va: Value = Value::VAddrOf(9);
+    if ir_value_tag(va) != 7 { return 8; }
+    let el: Expr = Expr::Literal(box_new(Value::VInt(5)));
+    if ir_expr_tag(el) != 0 { return 9; }
+    let eld: Expr = Expr::Load(50);
+    if ir_expr_tag(eld) != 1 { return 10; }
+    let eb: Expr = Expr::Binop(20, box_new(Value::VInt(3)), box_new(Value::VInt(4)));
+    if ir_expr_tag(eb) != 2 { return 11; }
+    let eu: Expr = Expr::Unop(1, box_new(Value::VBoolTrue));
+    if ir_expr_tag(eu) != 3 { return 12; }
+    let ef: Expr = Expr::FieldAccess(box_new(Value::VVar(60)), 61);
+    if ir_expr_tag(ef) != 4 { return 13; }
+    let i_nop: Instr = Instr::Nop;
+    if ir_instr_tag(i_nop) != 0 { return 14; }
+    let i_dv: Instr = Instr::DeclVar(50);
+    if ir_instr_tag(i_dv) != 1 { return 15; }
+    let i_brk: Instr = Instr::Break;
+    if ir_instr_tag(i_brk) != 9 { return 16; }
+    let i_cont: Instr = Instr::Continue;
+    if ir_instr_tag(i_cont) != 10 { return 17; }
+    let i_rv: Instr = Instr::ReturnVoid;
+    if ir_instr_tag(i_rv) != 14 { return 18; }
+    let i_ret: Instr = Instr::ReturnVal(box_new(Value::VInt(0)));
+    if ir_instr_tag(i_ret) != 15 { return 19; }
+    let asgn_e: Expr = Expr::Load(70);
+    let i_asgn: Instr = Instr::Assign(71, box_new(asgn_e));
+    if ir_instr_tag(i_asgn) != 3 { return 20; }
+    return 0;
+}
+
+fn test_ctr_fresh() -> i32 {
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let t0: i32 = ctr_fresh(ctr);
+    if t0 != 0 { return 1; }
+    let t1: i32 = ctr_fresh(ctr);
+    if t1 != 1 { return 2; }
+    let t2: i32 = ctr_fresh(ctr);
+    if t2 != 2 { return 3; }
+    if vec_get(ctr, 0) != 3 { return 4; }
+    return 0;
+}
+
+fn test_classify_arena() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    vec_push(pp, 42);
+    vec_push(et, 1);
+    vec_push(ed1, 0);
+    vec_push(ed2, 1);
+    let out1: Vec<i32> = vec_new();
+    let r1: i32 = classify_assign_lhs_arena(et, ed1, ed2, pp, 0, out1);
+    if r1 != 0 { return 1; }
+    if vec_len(out1) != 1 { return 2; }
+    if vec_get(out1, 0) != 42 { return 3; }
+    vec_push(et, 6);
+    vec_push(ed1, 0);
+    vec_push(ed2, 99);
+    let out2: Vec<i32> = vec_new();
+    let r2: i32 = classify_assign_lhs_arena(et, ed1, ed2, pp, 1, out2);
+    if r2 != 1 { return 4; }
+    if vec_len(out2) != 2 { return 5; }
+    if vec_get(out2, 0) != 42 { return 6; }
+    if vec_get(out2, 1) != 99 { return 7; }
+    vec_push(et, 3);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    let out3: Vec<i32> = vec_new();
+    let r3: i32 = classify_assign_lhs_arena(et, ed1, ed2, pp, 2, out3);
+    if r3 != 0 - 1 { return 8; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_fresh_tmp();
     if r1 != 0 { return r1; }
@@ -2284,5 +2516,11 @@ fn main() -> i32 {
     if r45 != 0 { return 470 + r45; }
     let r46: i32 = test_variant_shape_in_items();
     if r46 != 0 { return 480 + r46; }
+    let r47: i32 = test_ir_types();
+    if r47 != 0 { return 490 + r47; }
+    let r48: i32 = test_ctr_fresh();
+    if r48 != 0 { return 510 + r48; }
+    let r49: i32 = test_classify_arena();
+    if r49 != 0 { return 520 + r49; }
     return 0;
 }
