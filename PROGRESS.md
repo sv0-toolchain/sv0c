@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-18 (America/Denver; **ExprTupleField (tag 7) in `lowering.sv0`** — **`VMember`** with synthetic field handle **500+field_num**; **`codegen.sv0`** **`name_of`** **500..599** → **`fN`** for C. **`test_lower_expr_tuple_field`**. Prior: **ExprRange (21)**, **ExprAssert (23)**. **`doc/transliteration-plan.md`**. Stage0 **`codegen.c`** + **`lowering.c`**, vm-parity **97** **`.sv0b`**. Next: ExprStruct **ppc≠1**; match pattern stubs; tags **5/8/26**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-18 (America/Denver; **`lowering.sv0`** **ExprMethodCall (5)** / **ExprIndex (8)** / **ExprArray (26)** — `lower_for_effect` side effects → **`VUnit`**; **`test_lower_expr_index_effect`**, **`test_lower_expr_method_call_effect`**, **`test_lower_expr_array_effect`**; **`test_lower_while`** arena fix (while cond was bogus **expr tag 5** → literal bool **tag 0**). **`doc/transliteration-plan.md`**. Stage0 **`lowering.c`**, vm-parity **97**. Next: real method **Call** / index **value** / array **value**; ExprStruct **ppc≠1**; match pattern stubs. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
