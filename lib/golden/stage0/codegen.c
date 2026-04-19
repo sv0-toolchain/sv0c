@@ -233,6 +233,16 @@ static const char* name_of(int h) {
     return "i";
   } else {
   }
+  if ((h >= 500)) {
+    if ((h < 600)) {
+      int n = (h - 500);
+      const char* _sv0t0 = int_to_string(n);
+      const char* _sv0t1 = sv0_string_concat("f", _sv0t0);
+      return _sv0t1;
+    } else {
+    }
+  } else {
+  }
   return "?";
 }
 

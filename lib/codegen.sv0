@@ -66,6 +66,12 @@ fn name_of(h: i32) -> string {
     if h == 13 { return "bar"; }
     if h == 14 { return "result"; }
     if h == 15 { return "i"; }
+    if h >= 500 {
+        if h < 600 {
+            let n: i32 = h - 500;
+            return string_concat("f", int_to_string(n));
+        }
+    }
     return "?";
 }
 

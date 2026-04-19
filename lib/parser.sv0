@@ -1172,7 +1172,10 @@ fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     21 ExprRange    : d1=lo_idx(-1=none), d2=hi_idx(-1=none)
     22 ExprTry      : d1=expr_idx
     23 ExprAssert   : d1=expr_idx
-    24 ExprStruct   : d1=pp_start, d2=pp_count, d3=field_count
+    24 ExprStruct   : d1=pp_start, d2=pp_count, d3=field_count,
+                     d4=sf_names_start (index into parse_fn_body `body_sf`
+                     field-name token positions; lowering reads
+                     `lit_sf_names[sf_names_start + i]` for each field)
     25 ExprTuple    : d1=first_elem_idx, d2=elem_count
     26 ExprArray    : d1=first_elem_idx, d2=elem_count
 
@@ -1314,7 +1317,7 @@ fn parse_primary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 vec_push(ed1, pps);
                 vec_push(ed2, ppc);
                 vec_push(ed3, fc);
-                vec_push(ed4, 0);
+                vec_push(ed4, fc_before);
                 return pf;
             }
         }

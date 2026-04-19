@@ -2509,7 +2509,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
         sv0_vec_push(ed1, pps);
         sv0_vec_push(ed2, ppc);
         sv0_vec_push(ed3, fc);
-        sv0_vec_push(ed4, 0);
+        sv0_vec_push(ed4, fc_before);
         return pf;
       } else {
       }
