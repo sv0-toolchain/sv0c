@@ -692,6 +692,61 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let fh: i32 = 500 + field_num;
         return Value::VMember(box_new(vobj), fh);
     }
+    /* ExprMethodCall (tag 5): evaluate receiver + each argument for
+       side effects only; method dispatch and real `Call` lowering
+       deferred (SML lowers to callee + args). */
+    if tag == 5 {
+        let rcv: i32 = vec_get(ed1, idx);
+        let args_first_m: i32 = vec_get(ed3, idx);
+        let args_count_m: i32 = vec_get(ed4, idx);
+        lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, rcv,
+                         ctr, out_instrs, enum_names, enum_tag_offsets,
+                         enum_tag_counts, enum_tags_flat, fn_ctx,
+                         builtin_map, lit_sf_names);
+        let mut aj: i32 = 0;
+        loop {
+            if aj >= args_count_m { break; }
+            let ax: i32 = args_first_m + aj;
+            lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ax,
+                             ctr, out_instrs, enum_names, enum_tag_offsets,
+                             enum_tag_counts, enum_tags_flat, fn_ctx,
+                             builtin_map, lit_sf_names);
+            aj = aj + 1;
+        }
+        return Value::VUnit;
+    }
+    /* ExprIndex (tag 8): obj[index] — side effects on subexpressions;
+       IndexAccess / value load deferred. */
+    if tag == 8 {
+        let ob: i32 = vec_get(ed1, idx);
+        let ix: i32 = vec_get(ed2, idx);
+        lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ob,
+                         ctr, out_instrs, enum_names, enum_tag_offsets,
+                         enum_tag_counts, enum_tags_flat, fn_ctx,
+                         builtin_map, lit_sf_names);
+        lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ix,
+                         ctr, out_instrs, enum_names, enum_tag_offsets,
+                         enum_tag_counts, enum_tags_flat, fn_ctx,
+                         builtin_map, lit_sf_names);
+        return Value::VUnit;
+    }
+    /* ExprArray (tag 26): element expr roots occupy the `elem_count`
+       slots immediately before this node (same packing as ExprStruct
+       field exprs). */
+    if tag == 26 {
+        let elem_count_a: i32 = vec_get(ed2, idx);
+        let mut ak: i32 = 0;
+        loop {
+            if ak >= elem_count_a { break; }
+            let ek: i32 = idx - elem_count_a + ak;
+            lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ek,
+                             ctr, out_instrs, enum_names, enum_tag_offsets,
+                             enum_tag_counts, enum_tags_flat, fn_ctx,
+                             builtin_map, lit_sf_names);
+            ak = ak + 1;
+        }
+        return Value::VUnit;
+    }
     /* ExprRange: lo..hi has no scalar IR in this seed; evaluate
        optional endpoints for side effects (SML `lowerExprToValue`
        fallback would assign from `lowerExprWithInstrs`; full range
@@ -4080,8 +4135,10 @@ fn test_lower_while() -> i32 {
     let mut ctr: Vec<i32> = vec_new();
     vec_push(ctr, 0);
     let mut out: Vec<i32> = vec_new();
-    vec_push(et, 5);
-    vec_push(ed1, 0);
+    /* Condition: literal bool true (tag 0), not expr tag 5 — tag 5 is
+       ExprMethodCall and would recurse if mis-encoded as rcv=self. */
+    vec_push(et, 0);
+    vec_push(ed1, 5);
     vec_push(ed2, 0);
     vec_push(ed3, 0);
     vec_push(ed4, 0);
@@ -4445,6 +4502,129 @@ fn test_lower_expr_tuple_field() -> i32 {
                                         1, ctr, out, en_n, en_to, en_tc,
                                         en_tf, fn_ctx, builtin_map, lit_sf_names);
     if ir_value_tag(v) != 6 { return 1; }
+    return 0;
+}
+
+fn test_lower_expr_index_effect() -> i32 {
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    let en_n: Vec<i32> = vec_new();
+    let en_to: Vec<i32> = vec_new();
+    let en_tc: Vec<i32> = vec_new();
+    let en_tf: Vec<i32> = vec_new();
+    let fn_ctx: Vec<i32> = vec_new();
+    let builtin_map: Vec<i32> = vec_new();
+    let lit_sf_names: Vec<i32> = vec_new();
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 8);
+    vec_push(ed1, 0);
+    vec_push(ed2, 1);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                       2, ctr, out, en_n, en_to, en_tc, en_tf,
+                                       fn_ctx, builtin_map, lit_sf_names);
+    if ir_value_tag(v) != 4 { return 1; }
+    return 0;
+}
+
+fn test_lower_expr_method_call_effect() -> i32 {
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    let en_n: Vec<i32> = vec_new();
+    let en_to: Vec<i32> = vec_new();
+    let en_tc: Vec<i32> = vec_new();
+    let en_tf: Vec<i32> = vec_new();
+    let fn_ctx: Vec<i32> = vec_new();
+    let builtin_map: Vec<i32> = vec_new();
+    let lit_sf_names: Vec<i32> = vec_new();
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 5);
+    vec_push(ed1, 0);
+    vec_push(ed2, 99);
+    vec_push(ed3, 1);
+    vec_push(ed4, 1);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                       2, ctr, out, en_n, en_to, en_tc, en_tf,
+                                       fn_ctx, builtin_map, lit_sf_names);
+    if ir_value_tag(v) != 4 { return 1; }
+    return 0;
+}
+
+fn test_lower_expr_array_effect() -> i32 {
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    let en_n: Vec<i32> = vec_new();
+    let en_to: Vec<i32> = vec_new();
+    let en_tc: Vec<i32> = vec_new();
+    let en_tf: Vec<i32> = vec_new();
+    let fn_ctx: Vec<i32> = vec_new();
+    let builtin_map: Vec<i32> = vec_new();
+    let lit_sf_names: Vec<i32> = vec_new();
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 26);
+    vec_push(ed1, 0);
+    vec_push(ed2, 2);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                       2, ctr, out, en_n, en_to, en_tc, en_tf,
+                                       fn_ctx, builtin_map, lit_sf_names);
+    if ir_value_tag(v) != 4 { return 1; }
     return 0;
 }
 
@@ -5057,6 +5237,12 @@ fn main() -> i32 {
     if r68ar != 0 { return 904 + r68ar; }
     let r68tf: i32 = test_lower_expr_tuple_field();
     if r68tf != 0 { return 906 + r68tf; }
+    let r68ix: i32 = test_lower_expr_index_effect();
+    if r68ix != 0 { return 907 + r68ix; }
+    let r68mc: i32 = test_lower_expr_method_call_effect();
+    if r68mc != 0 { return 908 + r68mc; }
+    let r68arr: i32 = test_lower_expr_array_effect();
+    if r68arr != 0 { return 909 + r68arr; }
     let r68b: i32 = test_lower_expr_struct();
     if r68b != 0 { return 905 + r68b; }
     let r69: i32 = test_lower_enum_ctor();
