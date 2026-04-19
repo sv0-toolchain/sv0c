@@ -898,6 +898,107 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return 0;
 }
 
+/* ── lower_into_var_instrs (SML lowerIntoVarInstrs — simplified)
+   Lowers body_idx and emits Store(dest, expr).
+   The SML version optimises for blocks/literals/if-exprs; this
+   simplified version always goes through lower_expr_with_instrs.
+   Tests omitted: SML compiler function budget (~172 fn limit). */
+
+fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                          ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                          tok_tags: Vec<i32>,
+                          body_idx: i32, dest: i32,
+                          ctr: Vec<i32>,
+                          out_instrs: Vec<i32>,
+                          enum_names: Vec<i32>,
+                          enum_tag_offsets: Vec<i32>,
+                          enum_tag_counts: Vec<i32>,
+                          enum_tags_flat: Vec<i32>,
+                          fn_ctx: Vec<i32>,
+                          builtin_map: Vec<i32>) -> i32 {
+    let ee: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
+                                           tok_tags, body_idx, ctr,
+                                           out_instrs, enum_names,
+                                           enum_tag_offsets,
+                                           enum_tag_counts,
+                                           enum_tags_flat, fn_ctx, builtin_map);
+    let si: Instr = Instr::Store(dest, box_new(ee));
+    vec_push(out_instrs, box_new(si));
+    return 0;
+}
+
+/* ── bind_scrut_var (SML bindScrutVar) ───────────────────────
+   Lowers the match scrutinee and ensures it is in a named temp.
+   Returns the temp ID (either the original VVar handle or a fresh
+   ctr temp).  Side-effect instructions go to out_instrs.
+   scrut_cty: type handle from match_scrut_cty (-1 = unknown).
+   Tests omitted: SML compiler function budget (~172 fn limit). */
+
+fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                   ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                   tok_tags: Vec<i32>,
+                   scrut_idx: i32, ctr: Vec<i32>,
+                   out_instrs: Vec<i32>,
+                   enum_names: Vec<i32>,
+                   enum_tag_offsets: Vec<i32>,
+                   enum_tag_counts: Vec<i32>,
+                   enum_tags_flat: Vec<i32>,
+                   fn_ctx: Vec<i32>,
+                   builtin_map: Vec<i32>,
+                   scrut_cty: i32,
+                   source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                        tok_tags, scrut_idx, ctr,
+                                        out_instrs, enum_names,
+                                        enum_tag_offsets,
+                                        enum_tag_counts, enum_tags_flat,
+                                        fn_ctx, builtin_map);
+    let vtag: i32 = ir_value_tag(v);
+    if vtag == 3 {
+        match v {
+            Value::VVar(x) => { return x; },
+            _ => { return 0 - 1; },
+        }
+    }
+    if vtag == 0 {
+        let t: i32 = ctr_fresh(ctr);
+        let ai: Instr = Instr::Assign(t, box_new(Expr::Literal(box_new(v))));
+        vec_push(out_instrs, box_new(ai));
+        return t;
+    }
+    if vtag == 1 {
+        let t: i32 = ctr_fresh(ctr);
+        let ai: Instr = Instr::Assign(t, box_new(Expr::Literal(box_new(v))));
+        vec_push(out_instrs, box_new(ai));
+        return t;
+    }
+    if vtag == 2 {
+        let t: i32 = ctr_fresh(ctr);
+        let ai: Instr = Instr::Assign(t, box_new(Expr::Literal(box_new(v))));
+        vec_push(out_instrs, box_new(ai));
+        return t;
+    }
+    let t: i32 = ctr_fresh(ctr);
+    let ee: Expr = value_to_expr(v);
+    let mut is_scalar: i32 = 0;
+    if scrut_cty < 0 { is_scalar = 1; }
+    if is_scalar == 0 {
+        let tname: string = handle_to_str(scrut_cty, source, starts, ends);
+        if string_eq(tname, "i32") { is_scalar = 1; }
+        if string_eq(tname, "bool") { is_scalar = 1; }
+    }
+    if is_scalar == 1 {
+        let ai2: Instr = Instr::Assign(t, box_new(ee));
+        vec_push(out_instrs, box_new(ai2));
+    } else {
+        let di: Instr = Instr::DeclNamed(scrut_cty, t);
+        let si: Instr = Instr::Store(t, box_new(ee));
+        vec_push(out_instrs, box_new(di));
+        vec_push(out_instrs, box_new(si));
+    }
+    return t;
+}
+
 /* ── lower_return (SML lowerReturn) ─────────────────────────
    Lowers an expression and emits ReturnVal(v).
    Appends instructions to out_instrs. */
