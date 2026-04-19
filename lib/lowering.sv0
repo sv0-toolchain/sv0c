@@ -1407,7 +1407,12 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          out_enum_tag_offsets: Vec<i32>,
          out_enum_tag_counts: Vec<i32>,
          out_enum_tag_flat: Vec<i32>,
-         out_enum_max: Vec<i32>) -> string {
+         out_enum_max: Vec<i32>,
+         body_et: Vec<i32>, body_ed1: Vec<i32>,
+         body_ed2: Vec<i32>, body_ed3: Vec<i32>,
+         body_ed4: Vec<i32>, body_sf: Vec<i32>,
+         tok_tags: Vec<i32>,
+         out_blocks: Vec<i32>) -> string {
     let discard_so: i32 = build_struct_order(item_tags, item_names,
                                               item_field_counts,
                                               struct_fnames_flat,
@@ -1431,11 +1436,39 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
                                                  source, starts, ends,
                                                  out_struct_names,
                                                  out_enum_names);
+    let has_body_arenas: i32 = vec_len(body_et);
+    let mut builtin_map: Vec<i32> = vec_new();
+    if has_body_arenas > 0 {
+        builtin_map = build_builtin_map(tok_tags, source, starts, ends);
+    }
+    let pp: Vec<i32> = vec_new();
+    let fn_ctx: Vec<i32> = vec_new();
     let n: i32 = vec_len(item_tags);
     let mut i: i32 = 0;
     while i < n {
         if vec_get(item_tags, i) == 0 {
-            vec_push(out_block_labels, vec_get(item_names, i));
+            let label_h: i32 = vec_get(item_names, i);
+            vec_push(out_block_labels, label_h);
+            let body_root: i32 = vec_get(item_d4, i);
+            let instrs: Vec<i32> = vec_new();
+            if has_body_arenas > 0 {
+                if body_root >= 0 {
+                    let discard_lf: i32 = lower_fn(body_et, body_ed1, body_ed2,
+                                                    body_ed3, body_ed4, pp,
+                                                    tok_tags, body_root, instrs,
+                                                    out_enum_names,
+                                                    out_enum_tag_offsets,
+                                                    out_enum_tag_counts,
+                                                    out_enum_tag_flat,
+                                                    fn_ctx, builtin_map);
+                }
+            }
+            let params: Vec<i32> = vec_new();
+            let ret_h: i32 = 9;
+            vec_push(out_blocks, label_h);
+            vec_push(out_blocks, ret_h);
+            vec_push(out_blocks, box_new(params));
+            vec_push(out_blocks, box_new(instrs));
         }
         i = i + 1;
     }
@@ -4242,15 +4275,27 @@ fn test_lower_program_fn() -> i32 {
     let oetc: Vec<i32> = vec_new();
     let oetf: Vec<i32> = vec_new();
     let oem: Vec<i32> = vec_new();
+    let bet: Vec<i32> = vec_new();
+    let be1: Vec<i32> = vec_new();
+    let be2: Vec<i32> = vec_new();
+    let be3: Vec<i32> = vec_new();
+    let be4: Vec<i32> = vec_new();
+    let bsf: Vec<i32> = vec_new();
+    let ttags: Vec<i32> = vec_new();
+    let oblks: Vec<i32> = vec_new();
     let td: string = lower(it, id1, id2, id3, id4, ifc, ivm,
                              sfn, evn, sfnames, sftypes,
                              src, strt, endi,
                              ob, osn, oso, osc, osf,
-                             oen, oeto, oetc, oetf, oem);
+                             oen, oeto, oetc, oetf, oem,
+                             bet, be1, be2, be3, be4, bsf,
+                             ttags, oblks);
     if vec_len(ob) != 1 { return 1; }
     if vec_get(ob, 0) != 3 { return 2; }
     if vec_len(osn) != 1 { return 3; }
     if vec_len(oen) != 1 { return 4; }
+    if vec_len(oblks) != 4 { return 5; }
+    if vec_get(oblks, 0) != 3 { return 6; }
     return 0;
 }
 
