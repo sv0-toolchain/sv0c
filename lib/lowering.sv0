@@ -692,28 +692,70 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let fh: i32 = 500 + field_num;
         return Value::VMember(box_new(vobj), fh);
     }
-    /* ExprMethodCall (tag 5): evaluate receiver + each argument for
-       side effects only; method dispatch and real `Call` lowering
-       deferred (SML lowers to callee + args). */
+    /* ExprMethodCall (tag 5): `rcv.method(args…)` — same IR as a direct
+       call with the receiver prepended: `method(rcv, args…)` (token
+       position in ed2 matches `builtin_map` / codegen name resolution,
+       same as ExprPath callee positions in `pp`). */
     if tag == 5 {
-        let rcv: i32 = vec_get(ed1, idx);
-        let args_first_m: i32 = vec_get(ed3, idx);
-        let args_count_m: i32 = vec_get(ed4, idx);
-        lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, rcv,
-                         ctr, out_instrs, enum_names, enum_tag_offsets,
-                         enum_tag_counts, enum_tags_flat, fn_ctx,
-                         builtin_map, lit_sf_names);
-        let mut aj: i32 = 0;
+        let rcv_mc: i32 = vec_get(ed1, idx);
+        let method_tok: i32 = vec_get(ed2, idx);
+        let args_first_mc: i32 = vec_get(ed3, idx);
+        let args_count_mc: i32 = vec_get(ed4, idx);
+        let v_rcv: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                tok_tags, rcv_mc, ctr,
+                                                out_instrs, enum_names,
+                                                enum_tag_offsets,
+                                                enum_tag_counts,
+                                                enum_tags_flat, fn_ctx,
+                                                builtin_map, lit_sf_names);
+        let mut arg_vals_mc: Vec<i32> = vec_new();
+        vec_push(arg_vals_mc, box_new(v_rcv));
+        let mut aj_mc: i32 = 0;
         loop {
-            if aj >= args_count_m { break; }
-            let ax: i32 = args_first_m + aj;
-            lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ax,
-                             ctr, out_instrs, enum_names, enum_tag_offsets,
-                             enum_tag_counts, enum_tags_flat, fn_ctx,
-                             builtin_map, lit_sf_names);
-            aj = aj + 1;
+            if aj_mc >= args_count_mc { break; }
+            let ax_mc: i32 = args_first_mc + aj_mc;
+            let av_mc: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                   tok_tags, ax_mc, ctr,
+                                                   out_instrs, enum_names,
+                                                   enum_tag_offsets,
+                                                   enum_tag_counts,
+                                                   enum_tags_flat, fn_ctx,
+                                                   builtin_map, lit_sf_names);
+            vec_push(arg_vals_mc, box_new(av_mc));
+            aj_mc = aj_mc + 1;
         }
-        return Value::VUnit;
+        let t_mc: i32 = ctr_fresh(ctr);
+        let mut bid_mc: i32 = 0;
+        if method_tok >= 0 {
+            if method_tok < vec_len(builtin_map) {
+                bid_mc = vec_get(builtin_map, method_tok);
+            }
+        }
+        if bid_mc == 0 {
+            let call_mc: Instr = Instr::Call(t_mc, method_tok, arg_vals_mc, 0);
+            vec_push(out_instrs, box_new(call_mc));
+            return Value::VVar(t_mc);
+        }
+        if bid_mc == 14 {
+            if vec_len(arg_vals_mc) >= 2 {
+                let na_mv: Value = box_deref(vec_get(arg_vals_mc, 1));
+                return na_mv;
+            }
+            return Value::VUnit;
+        }
+        let mut is_void_mc: i32 = 0;
+        if bid_mc == 1 { is_void_mc = 1; }
+        if bid_mc == 8 { is_void_mc = 1; }
+        if bid_mc == 11 { is_void_mc = 1; }
+        let fn_sent_mc: i32 = 0 - bid_mc;
+        if is_void_mc == 1 {
+            let vc_mc: Instr = Instr::Call(0, fn_sent_mc, arg_vals_mc, 0);
+            vec_push(out_instrs, box_new(vc_mc));
+            return Value::VUnit;
+        }
+        let bc_mc: Instr = Instr::Call(t_mc, fn_sent_mc, arg_vals_mc, 0);
+        vec_push(out_instrs, box_new(bc_mc));
+        return Value::VVar(t_mc);
     }
     /* ExprIndex (tag 8): obj[index] — Vec element load via sv0_vec_get
        (CALL_BUILTIN 10), matching ExprCall(vec_get, ...) lowering. */
@@ -4600,7 +4642,7 @@ fn test_lower_expr_method_call_effect() -> i32 {
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
                                        fn_ctx, builtin_map, lit_sf_names);
-    if ir_value_tag(v) != 4 { return 1; }
+    if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
 

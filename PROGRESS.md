@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-20 (America/Denver; **`lowering.sv0`** **ExprIndex (tag 8)** → **`Instr::Call`** **`sv0_vec_get`** (**`fn_h = 0 - 10`**) + **`VVar`**; **`vm_codegen.sv0`** **`emit_instr` `Call`**: negative **`fn_h`** = **builtin id** **`0 - fn_h`** (matches **`lower_tag_call`** sentinel). **`test_lower_expr_index_effect`** expects **`VVar`**; **`doc/transliteration-plan.md`**. Stage0 **`lowering.c`** + **`vm_codegen.c`**, vm-parity **97**. Next: real method **Call**; array **value**; match pattern stubs. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-20 (America/Denver; **`lowering.sv0`** **ExprMethodCall (tag 5)** → **`Instr::Call`** with callee token **`ed2`** and args **`[receiver, …]`** (same **`builtin_map`** / user-fn path as **`lower_tag_call`**; **`bid==14`** uses **`arg_vals[1]`**); **`test_lower_expr_method_call_effect`** → **`VVar`**. **`doc/transliteration-plan.md`**. Stage0 **`lowering.c`**, vm-parity **97**. Next: **ExprArray** scalar/value; match pattern stubs. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
