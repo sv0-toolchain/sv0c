@@ -928,13 +928,17 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let ppc_s: i32 = vec_get(ed2, idx);
         let fc_s: i32 = vec_get(ed3, idx);
         let sf0: i32 = vec_get(ed4, idx);
-        if ppc_s != 1 {
+        if ppc_s < 1 {
             return Value::VUnit;
         }
         if fc_s <= 0 {
             return Value::VUnit;
         }
-        let sty_tok: i32 = vec_get(pp, pps_s);
+        /* `pp[pps_s .. pps_s+ppc_s)` holds path segment token indices.
+           Single-seg matches SML `hd path`. For `Mod::Struct { ... }`,
+           use the **last** segment as the struct typename for DeclNamed. */
+        let sty_idx: i32 = pps_s + ppc_s - 1;
+        let sty_tok: i32 = vec_get(pp, sty_idx);
         let t_s: i32 = ctr_fresh(ctr);
         let decl_s: Instr = Instr::DeclNamed(sty_tok, t_s);
         vec_push(out_instrs, box_new(decl_s));
@@ -4673,6 +4677,52 @@ fn test_lower_expr_struct() -> i32 {
     return 0;
 }
 
+fn test_lower_expr_struct_qualified_path() -> i32 {
+    let mut et: Vec<i32> = vec_new();
+    let mut ed1: Vec<i32> = vec_new();
+    let mut ed2: Vec<i32> = vec_new();
+    let mut ed3: Vec<i32> = vec_new();
+    let mut ed4: Vec<i32> = vec_new();
+    let mut pp: Vec<i32> = vec_new();
+    let mut tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 91);
+    vec_push(pp, 50);
+    vec_push(pp, 100);
+    let mut ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let mut out: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(et, 24);
+    vec_push(ed1, 0);
+    vec_push(ed2, 2);
+    vec_push(ed3, 2);
+    vec_push(ed4, 0);
+    let en_n: Vec<i32> = vec_new();
+    let en_to: Vec<i32> = vec_new();
+    let en_tc: Vec<i32> = vec_new();
+    let en_tf: Vec<i32> = vec_new();
+    let fn_ctx: Vec<i32> = vec_new();
+    let builtin_map: Vec<i32> = vec_new();
+    let lit_sf_names: Vec<i32> = vec_new();
+    vec_push(lit_sf_names, 201);
+    vec_push(lit_sf_names, 202);
+    let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                        2, ctr, out, en_n, en_to, en_tc,
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names);
+    if ir_value_tag(v) != 3 { return 1; }
+    if vec_len(out) < 3 { return 2; }
+    return 0;
+}
+
 fn test_lower_program_fn() -> i32 {
     let src: string = "fn foo() { } struct Bar { x: i32, } enum Qux { A, B, }";
     let strt: Vec<i32> = vec_new();
@@ -5245,6 +5295,8 @@ fn main() -> i32 {
     if r68arr != 0 { return 909 + r68arr; }
     let r68b: i32 = test_lower_expr_struct();
     if r68b != 0 { return 905 + r68b; }
+    let r68bq: i32 = test_lower_expr_struct_qualified_path();
+    if r68bq != 0 { return 910 + r68bq; }
     let r69: i32 = test_lower_enum_ctor();
     if r69 != 0 { return 920 + r69; }
     let r70: i32 = test_lower_try();
