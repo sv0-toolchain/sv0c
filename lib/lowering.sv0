@@ -715,20 +715,33 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         }
         return Value::VUnit;
     }
-    /* ExprIndex (tag 8): obj[index] — side effects on subexpressions;
-       IndexAccess / value load deferred. */
+    /* ExprIndex (tag 8): obj[index] — Vec element load via sv0_vec_get
+       (CALL_BUILTIN 10), matching ExprCall(vec_get, ...) lowering. */
     if tag == 8 {
         let ob: i32 = vec_get(ed1, idx);
         let ix: i32 = vec_get(ed2, idx);
-        lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ob,
-                         ctr, out_instrs, enum_names, enum_tag_offsets,
-                         enum_tag_counts, enum_tags_flat, fn_ctx,
-                         builtin_map, lit_sf_names);
-        lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ix,
-                         ctr, out_instrs, enum_names, enum_tag_offsets,
-                         enum_tag_counts, enum_tags_flat, fn_ctx,
-                         builtin_map, lit_sf_names);
-        return Value::VUnit;
+        let v_o: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, ob, ctr,
+                                             out_instrs, enum_names,
+                                             enum_tag_offsets,
+                                             enum_tag_counts,
+                                             enum_tags_flat, fn_ctx,
+                                             builtin_map, lit_sf_names);
+        let v_i: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, ix, ctr,
+                                             out_instrs, enum_names,
+                                             enum_tag_offsets,
+                                             enum_tag_counts,
+                                             enum_tags_flat, fn_ctx,
+                                             builtin_map, lit_sf_names);
+        let t_ix: i32 = ctr_fresh(ctr);
+        let mut arg_ix: Vec<i32> = vec_new();
+        vec_push(arg_ix, box_new(v_o));
+        vec_push(arg_ix, box_new(v_i));
+        let vec_get_fn_h: i32 = 0 - 10;
+        let call_ix: Instr = Instr::Call(t_ix, vec_get_fn_h, arg_ix, 0);
+        vec_push(out_instrs, box_new(call_ix));
+        return Value::VVar(t_ix);
     }
     /* ExprArray (tag 26): element expr roots occupy the `elem_count`
        slots immediately before this node (same packing as ExprStruct
@@ -4546,7 +4559,7 @@ fn test_lower_expr_index_effect() -> i32 {
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
                                        fn_ctx, builtin_map, lit_sf_names);
-    if ir_value_tag(v) != 4 { return 1; }
+    if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
 
