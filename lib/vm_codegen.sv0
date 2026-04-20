@@ -1008,8 +1008,16 @@ fn emit_instr(ins: Instr,
             return 2;
         },
         Instr::Call(dst_h, fn_h, args, rt_h) => {
-            let fn_name: string = handle_to_str(fn_h, source, starts, ends);
-            let bid: i32 = builtin_id(fn_name);
+            /* Negative fn_h encodes CALL_BUILTIN id N as fn_h = 0 - N
+               (see lowering.sv0 lower_tag_call: fn_sentinel = 0 - bid).
+               Positive fn_h is a source token index resolved via handle_to_str. */
+            let mut bid: i32 = 0 - 1;
+            if fn_h < 0 {
+                bid = 0 - fn_h;
+            } else {
+                let fn_name: string = handle_to_str(fn_h, source, starts, ends);
+                bid = builtin_id(fn_name);
+            }
             let nargs_vec: i32 = vec_len(args);
             let mut total: i32 = 0;
             if bid >= 0 {

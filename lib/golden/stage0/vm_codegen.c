@@ -1815,11 +1815,16 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                           int fn_h = ins.p1;
                           int args = ins.p2;
                           int rt_h = ins.p3;
-                          const char* _sv0t29 = handle_to_str(fn_h, source, starts, ends);
-                          const char* fn_name;
-                          fn_name = _sv0t29;
-                          int _sv0t30 = builtin_id(fn_name);
-                          int bid = _sv0t30;
+                          int bid = (0 - 1);
+                          if ((fn_h < 0)) {
+                            bid = (0 - fn_h);
+                          } else {
+                            const char* _sv0t29 = handle_to_str(fn_h, source, starts, ends);
+                            const char* fn_name;
+                            fn_name = _sv0t29;
+                            int _sv0t30 = builtin_id(fn_name);
+                            bid = _sv0t30;
+                          }
                           int _sv0t31 = sv0_vec_len(args);
                           int nargs_vec = _sv0t31;
                           int total = 0;
