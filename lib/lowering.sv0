@@ -785,22 +785,39 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         vec_push(out_instrs, box_new(call_ix));
         return Value::VVar(t_ix);
     }
-    /* ExprArray (tag 26): element expr roots occupy the `elem_count`
-       slots immediately before this node (same packing as ExprStruct
-       field exprs). */
+    /* ExprArray (tag 26): `[e0,…]` — children-before-parent: element
+       roots at `idx - elem_count + k`. Lower to `sv0_vec_new` then
+       `sv0_vec_push` per element (builtin ids **7** / **8**, same as
+       `lower_tag_call` sentinels). */
     if tag == 26 {
-        let elem_count_a: i32 = vec_get(ed2, idx);
-        let mut ak: i32 = 0;
+        let elem_count_ar: i32 = vec_get(ed2, idx);
+        let t_ar: i32 = ctr_fresh(ctr);
+        let mut args_new: Vec<i32> = vec_new();
+        let bid_new: i32 = 7;
+        let fn_new: i32 = 0 - bid_new;
+        let ins_new: Instr = Instr::Call(t_ar, fn_new, args_new, 0);
+        vec_push(out_instrs, box_new(ins_new));
+        let mut ak_ar: i32 = 0;
         loop {
-            if ak >= elem_count_a { break; }
-            let ek: i32 = idx - elem_count_a + ak;
-            lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, ek,
-                             ctr, out_instrs, enum_names, enum_tag_offsets,
-                             enum_tag_counts, enum_tags_flat, fn_ctx,
-                             builtin_map, lit_sf_names);
-            ak = ak + 1;
+            if ak_ar >= elem_count_ar { break; }
+            let ek_ar: i32 = idx - elem_count_ar + ak_ar;
+            let v_el: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                  tok_tags, ek_ar, ctr,
+                                                  out_instrs, enum_names,
+                                                  enum_tag_offsets,
+                                                  enum_tag_counts,
+                                                  enum_tags_flat, fn_ctx,
+                                                  builtin_map, lit_sf_names);
+            let mut args_push: Vec<i32> = vec_new();
+            vec_push(args_push, box_new(Value::VVar(t_ar)));
+            vec_push(args_push, box_new(v_el));
+            let bid_push: i32 = 8;
+            let fn_push: i32 = 0 - bid_push;
+            let ins_push: Instr = Instr::Call(0, fn_push, args_push, 0);
+            vec_push(out_instrs, box_new(ins_push));
+            ak_ar = ak_ar + 1;
         }
-        return Value::VUnit;
+        return Value::VVar(t_ar);
     }
     /* ExprRange: lo..hi has no scalar IR in this seed; evaluate
        optional endpoints for side effects (SML `lowerExprToValue`
@@ -4683,7 +4700,7 @@ fn test_lower_expr_array_effect() -> i32 {
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
                                        fn_ctx, builtin_map, lit_sf_names);
-    if ir_value_tag(v) != 4 { return 1; }
+    if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
 
