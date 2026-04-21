@@ -2687,7 +2687,8 @@ fn check_stmt_in_block(
     24 ExprStruct   → return TY_INT (simplified, field traversal deferred)
     25 ExprTuple    → unwrap (1-elem) or unsupported (multi)
     26 ExprArray    → return TY_INT (simplified, element traversal deferred)
-   All 27 expression tags are now handled.                    */
+    30 ExprPatExtra → match-arm pattern payload; no value type (TY_UNIT)
+   All handled expression tags through 30 (PatExtra is auxiliary). */
 
 fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
               ed4: Vec<i32>, pp: Vec<i32>,
@@ -3236,6 +3237,9 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                               ret_ty, loop_depth,
                               tail_idx);
         }
+        return TY_UNIT();
+    }
+    if tag == 30 {
         return TY_UNIT();
     }
     return 0 - 1;
