@@ -1259,8 +1259,8 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    (tag 30): `==` on scrut; int literals parsed from source (incl. `-n`
    via parser is_neg + positive int token); negated non-int still stub;
    PatEnum(5) with ExprPatExtra when path has >=2 segments: tag field
-   `VMember(scrut,-1)` vs variant discriminant; PatStruct(4) still
-   always-true stub until field-wise compare exists.
+   `VMember(scrut,-1)` vs variant discriminant; PatStruct(4) same tag
+   compare when path has >=2 segments (field bindPre still deferred).
    Tests omitted: SML compiler function budget (~172 fn limit). */
 
 fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
@@ -1326,14 +1326,25 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     let lt2: i32 = vec_get(ed1, paux2);
                     let tp2: i32 = vec_get(ed2, paux2);
                     if lt2 == 0 {
-                        let mut vi: i32 = parse_decimal_i32_from_tok(
-                            source, starts, ends, tp2);
-                        if is_neg2 == 1 {
-                            vi = 0 - vi;
-                        }
-                        let rv2: Value = Value::VInt(vi);
                         let lv2: Value = Value::VVar(scrut_var);
-                        cexp = Expr::Binop(4, box_new(lv2), box_new(rv2));
+                        if string_len(source) == 0 {
+                            if is_neg2 == 1 {
+                                cexp = Expr::Literal(box_new(Value::VBoolTrue));
+                            } else {
+                                let rv0: Value = lower_lit_to_ir_value(0, tp2,
+                                                                        tok_tags);
+                                cexp = Expr::Binop(4, box_new(lv2),
+                                                    box_new(rv0));
+                            }
+                        } else {
+                            let mut vi: i32 = parse_decimal_i32_from_tok(
+                                source, starts, ends, tp2);
+                            if is_neg2 == 1 {
+                                vi = 0 - vi;
+                            }
+                            let rv2: Value = Value::VInt(vi);
+                            cexp = Expr::Binop(4, box_new(lv2), box_new(rv2));
+                        }
                     } else {
                         if is_neg2 == 1 {
                             cexp = Expr::Literal(box_new(Value::VBoolTrue));
@@ -1385,7 +1396,37 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             }
         }
         if pat_tag == 4 {
-            cexp = Expr::Literal(box_new(Value::VBoolTrue));
+            let paux4: i32 = vec_get(ed2, arm_idx);
+            let pxt4: i32 = vec_get(et, paux4);
+            if pxt4 == 30 {
+                let k4: i32 = vec_get(ed4, paux4);
+                if k4 == 4 {
+                    let pp_s4: i32 = vec_get(ed1, paux4);
+                    let pp_c4: i32 = vec_get(ed2, paux4);
+                    if pp_c4 >= 2 {
+                        let en_h4: i32 = vec_get(pp, pp_s4);
+                        let vn_h4: i32 = vec_get(pp, pp_s4 + 1);
+                        let kv4: i32 = enum_tag_lookup(enum_names,
+                            enum_tags_flat, enum_tag_offsets,
+                            enum_tag_counts, en_h4, vn_h4);
+                        if kv4 < 0 {
+                            cexp = Expr::Literal(box_new(Value::VBoolFalse));
+                        } else {
+                            let tag_m4: Value = Value::VMember(
+                                box_new(Value::VVar(scrut_var)), 0 - 1);
+                            let kv_v4: Value = Value::VInt(kv4);
+                            cexp = Expr::Binop(4, box_new(tag_m4),
+                                                box_new(kv_v4));
+                        }
+                    } else {
+                        cexp = Expr::Literal(box_new(Value::VBoolTrue));
+                    }
+                } else {
+                    cexp = Expr::Literal(box_new(Value::VBoolFalse));
+                }
+            } else {
+                cexp = Expr::Literal(box_new(Value::VBoolFalse));
+            }
         }
         let mut body_is: Vec<i32> = vec_new();
         let bli: i32 = vec_len(bind_instrs);
