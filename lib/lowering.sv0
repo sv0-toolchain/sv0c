@@ -1053,6 +1053,9 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                          builtin_map, lit_sf_names);
         return Value::VUnit;
     }
+    if tag == 30 {
+        return Value::VUnit;
+    }
     return Value::VUnit;
 }
 
@@ -1226,8 +1229,11 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    optional guard.  Appends the resulting IfElse instruction tree to
    out_instrs.  `out` is the dest variable for the match result.
    `scrut_var` is the temp holding the scrutinee value.
-   Pattern support: PatWild(0), PatBind(1); PatLit(2)/PatEnum(5)/
-   PatStruct(4) stubs — full support needs parser arena enhancement.
+   Pattern support: PatWild(0), PatBind(1); PatLit(2) with ExprPatExtra
+   (tag 30): `==` on scrut (negated literal deferred — still true stub);
+   PatEnum(5) with ExprPatExtra when path has >=2 segments: tag field
+   `VMember(scrut,-1)` vs variant discriminant; PatStruct(4) still
+   always-true stub until field-wise compare exists.
    Tests omitted: SML compiler function budget (~172 fn limit). */
 
 fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
@@ -1284,10 +1290,61 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             }
         }
         if pat_tag == 2 {
-            cexp = Expr::Literal(box_new(Value::VBoolTrue));
+            let paux2: i32 = vec_get(ed2, arm_idx);
+            let pxt2: i32 = vec_get(et, paux2);
+            if pxt2 == 30 {
+                let k2: i32 = vec_get(ed4, paux2);
+                if k2 == 2 {
+                    let is_neg2: i32 = vec_get(ed3, paux2);
+                    if is_neg2 == 1 {
+                        cexp = Expr::Literal(box_new(Value::VBoolTrue));
+                    } else {
+                        let lt2: i32 = vec_get(ed1, paux2);
+                        let tp2: i32 = vec_get(ed2, paux2);
+                        let rv2: Value = lower_lit_to_ir_value(lt2, tp2,
+                                                                tok_tags);
+                        let lv2: Value = Value::VVar(scrut_var);
+                        cexp = Expr::Binop(4, box_new(lv2), box_new(rv2));
+                    }
+                } else {
+                    cexp = Expr::Literal(box_new(Value::VBoolFalse));
+                }
+            } else {
+                cexp = Expr::Literal(box_new(Value::VBoolFalse));
+            }
         }
         if pat_tag == 5 {
-            cexp = Expr::Literal(box_new(Value::VBoolTrue));
+            let paux5: i32 = vec_get(ed2, arm_idx);
+            let pxt5: i32 = vec_get(et, paux5);
+            if pxt5 == 30 {
+                let k5: i32 = vec_get(ed4, paux5);
+                if k5 == 5 {
+                    let pp_s5: i32 = vec_get(ed1, paux5);
+                    let pp_c5: i32 = vec_get(ed2, paux5);
+                    if pp_c5 >= 2 {
+                        let en_h: i32 = vec_get(pp, pp_s5);
+                        let vn_h: i32 = vec_get(pp, pp_s5 + 1);
+                        let kv: i32 = enum_tag_lookup(enum_names,
+                            enum_tags_flat, enum_tag_offsets,
+                            enum_tag_counts, en_h, vn_h);
+                        if kv < 0 {
+                            cexp = Expr::Literal(box_new(Value::VBoolFalse));
+                        } else {
+                            let tag_m: Value = Value::VMember(
+                                box_new(Value::VVar(scrut_var)), 0 - 1);
+                            let kv_v: Value = Value::VInt(kv);
+                            cexp = Expr::Binop(4, box_new(tag_m),
+                                                box_new(kv_v));
+                        }
+                    } else {
+                        cexp = Expr::Literal(box_new(Value::VBoolTrue));
+                    }
+                } else {
+                    cexp = Expr::Literal(box_new(Value::VBoolFalse));
+                }
+            } else {
+                cexp = Expr::Literal(box_new(Value::VBoolFalse));
+            }
         }
         if pat_tag == 4 {
             cexp = Expr::Literal(box_new(Value::VBoolTrue));
@@ -2621,6 +2678,9 @@ fn mentions_result(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         }
         return false;
     }
+    if tag == 30 {
+        return false;
+    }
     return false;
 }
 
@@ -2805,6 +2865,9 @@ fn all_old_names_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             all_old_names_expr(et, ed1, ed2, ed3, ed4,
                                tail, source, starts, ends, pp, out);
         }
+        return 0;
+    }
+    if tag == 30 {
         return 0;
     }
     return 0;
