@@ -23,6 +23,7 @@ static int ir_value_tag(Value v);
 static int ir_expr_tag(Expr e);
 static int ir_instr_tag(Instr ins);
 static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags);
+static int parse_decimal_i32_from_tok(const char* source, int starts, int ends, int tok_pos);
 static Value lower_tag_call(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names);
 static Value lower_tag_block(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names);
 static Value lower_tag_if(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names);
@@ -168,6 +169,7 @@ static int test_variant_shape_in_items(void);
 static int test_ir_types(void);
 static int test_ctr_fresh(void);
 static int test_classify_arena(void);
+static int test_parse_decimal_i32_from_tok(void);
 static int test_lower_lit_val(void);
 static int test_lower_expr_val(void);
 static int test_lower_return(void);
@@ -391,6 +393,54 @@ static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags) {
   Value _sv0t5;
   _sv0t5.tag = 4;
   return _sv0t5;
+}
+
+static int parse_decimal_i32_from_tok(const char* source, int starts, int ends, int tok_pos) {
+  if ((tok_pos < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(starts);
+  if ((tok_pos >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(ends);
+  if ((tok_pos >= _sv0t1)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(starts, tok_pos);
+  int s = _sv0t2;
+  int _sv0t3 = sv0_vec_get(ends, tok_pos);
+  int e = _sv0t3;
+  if ((s < 0)) {
+    return 0;
+  } else {
+  }
+  if ((e <= s)) {
+    return 0;
+  } else {
+  }
+  int acc = 0;
+  int i = s;
+  while ((i < e)) {
+    int _sv0t4 = sv0_string_char_at(source, i);
+    int c = _sv0t4;
+    if ((c < 48)) {
+      return 0;
+    } else {
+    }
+    if ((c > 57)) {
+      return 0;
+    } else {
+    }
+    int d = (c - 48);
+    int _sv0t5 = (acc * 10);
+    acc = (_sv0t5 + d);
+    i = (i + 1);
+  }
+  return acc;
 }
 
 static Value lower_tag_call(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names) {
@@ -2661,250 +2711,279 @@ static int lower_match_arms(int et, int ed1, int ed2, int ed3, int ed4, int pp, 
         if ((k2 == 2)) {
           int _sv0t29 = sv0_vec_get(ed3, paux2);
           int is_neg2 = _sv0t29;
-          if ((is_neg2 == 1)) {
-            Expr _sv0t30;
-            Value _sv0t31;
-            _sv0t31.tag = 1;
-            int _sv0t32 = sv0_box_alloc(3);
-            sv0_box_store(_sv0t32, 0, _sv0t31.tag);
-            sv0_box_store(_sv0t32, 1, _sv0t31.p0);
-            sv0_box_store(_sv0t32, 2, _sv0t31.p1);
-            _sv0t30.tag = 0;
-            _sv0t30.p0 = _sv0t32;
-            cexp = _sv0t30;
-          } else {
-            int _sv0t33 = sv0_vec_get(ed1, paux2);
-            int lt2 = _sv0t33;
-            int _sv0t34 = sv0_vec_get(ed2, paux2);
-            int tp2 = _sv0t34;
-            Value _sv0t35 = lower_lit_to_ir_value(lt2, tp2, tok_tags);
+          int _sv0t30 = sv0_vec_get(ed1, paux2);
+          int lt2 = _sv0t30;
+          int _sv0t31 = sv0_vec_get(ed2, paux2);
+          int tp2 = _sv0t31;
+          if ((lt2 == 0)) {
+            int _sv0t32 = parse_decimal_i32_from_tok(source, starts, ends, tp2);
+            int vi = _sv0t32;
+            if ((is_neg2 == 1)) {
+              vi = (0 - vi);
+            } else {
+            }
             Value rv2;
-            rv2 = _sv0t35;
+            rv2.tag = 0;
+            rv2.p0 = vi;
             Value lv2;
             lv2.tag = 3;
             lv2.p0 = scrut_var;
-            Expr _sv0t36;
-            int _sv0t37 = sv0_box_alloc(3);
-            sv0_box_store(_sv0t37, 0, lv2.tag);
-            sv0_box_store(_sv0t37, 1, lv2.p0);
-            sv0_box_store(_sv0t37, 2, lv2.p1);
-            int _sv0t38 = sv0_box_alloc(3);
-            sv0_box_store(_sv0t38, 0, rv2.tag);
-            sv0_box_store(_sv0t38, 1, rv2.p0);
-            sv0_box_store(_sv0t38, 2, rv2.p1);
-            _sv0t36.tag = 2;
-            _sv0t36.p0 = 4;
-            _sv0t36.p1 = _sv0t37;
-            _sv0t36.p2 = _sv0t38;
-            cexp = _sv0t36;
+            Expr _sv0t33;
+            int _sv0t34 = sv0_box_alloc(3);
+            sv0_box_store(_sv0t34, 0, lv2.tag);
+            sv0_box_store(_sv0t34, 1, lv2.p0);
+            sv0_box_store(_sv0t34, 2, lv2.p1);
+            int _sv0t35 = sv0_box_alloc(3);
+            sv0_box_store(_sv0t35, 0, rv2.tag);
+            sv0_box_store(_sv0t35, 1, rv2.p0);
+            sv0_box_store(_sv0t35, 2, rv2.p1);
+            _sv0t33.tag = 2;
+            _sv0t33.p0 = 4;
+            _sv0t33.p1 = _sv0t34;
+            _sv0t33.p2 = _sv0t35;
+            cexp = _sv0t33;
+          } else {
+            if ((is_neg2 == 1)) {
+              Expr _sv0t36;
+              Value _sv0t37;
+              _sv0t37.tag = 1;
+              int _sv0t38 = sv0_box_alloc(3);
+              sv0_box_store(_sv0t38, 0, _sv0t37.tag);
+              sv0_box_store(_sv0t38, 1, _sv0t37.p0);
+              sv0_box_store(_sv0t38, 2, _sv0t37.p1);
+              _sv0t36.tag = 0;
+              _sv0t36.p0 = _sv0t38;
+              cexp = _sv0t36;
+            } else {
+              Value _sv0t39 = lower_lit_to_ir_value(lt2, tp2, tok_tags);
+              Value rv3;
+              rv3 = _sv0t39;
+              Value lv3;
+              lv3.tag = 3;
+              lv3.p0 = scrut_var;
+              Expr _sv0t40;
+              int _sv0t41 = sv0_box_alloc(3);
+              sv0_box_store(_sv0t41, 0, lv3.tag);
+              sv0_box_store(_sv0t41, 1, lv3.p0);
+              sv0_box_store(_sv0t41, 2, lv3.p1);
+              int _sv0t42 = sv0_box_alloc(3);
+              sv0_box_store(_sv0t42, 0, rv3.tag);
+              sv0_box_store(_sv0t42, 1, rv3.p0);
+              sv0_box_store(_sv0t42, 2, rv3.p1);
+              _sv0t40.tag = 2;
+              _sv0t40.p0 = 4;
+              _sv0t40.p1 = _sv0t41;
+              _sv0t40.p2 = _sv0t42;
+              cexp = _sv0t40;
+            }
           }
         } else {
-          Expr _sv0t39;
-          Value _sv0t40;
-          _sv0t40.tag = 2;
-          int _sv0t41 = sv0_box_alloc(3);
-          sv0_box_store(_sv0t41, 0, _sv0t40.tag);
-          sv0_box_store(_sv0t41, 1, _sv0t40.p0);
-          sv0_box_store(_sv0t41, 2, _sv0t40.p1);
-          _sv0t39.tag = 0;
-          _sv0t39.p0 = _sv0t41;
-          cexp = _sv0t39;
+          Expr _sv0t43;
+          Value _sv0t44;
+          _sv0t44.tag = 2;
+          int _sv0t45 = sv0_box_alloc(3);
+          sv0_box_store(_sv0t45, 0, _sv0t44.tag);
+          sv0_box_store(_sv0t45, 1, _sv0t44.p0);
+          sv0_box_store(_sv0t45, 2, _sv0t44.p1);
+          _sv0t43.tag = 0;
+          _sv0t43.p0 = _sv0t45;
+          cexp = _sv0t43;
         }
       } else {
-        Expr _sv0t42;
-        Value _sv0t43;
-        _sv0t43.tag = 2;
-        int _sv0t44 = sv0_box_alloc(3);
-        sv0_box_store(_sv0t44, 0, _sv0t43.tag);
-        sv0_box_store(_sv0t44, 1, _sv0t43.p0);
-        sv0_box_store(_sv0t44, 2, _sv0t43.p1);
-        _sv0t42.tag = 0;
-        _sv0t42.p0 = _sv0t44;
-        cexp = _sv0t42;
+        Expr _sv0t46;
+        Value _sv0t47;
+        _sv0t47.tag = 2;
+        int _sv0t48 = sv0_box_alloc(3);
+        sv0_box_store(_sv0t48, 0, _sv0t47.tag);
+        sv0_box_store(_sv0t48, 1, _sv0t47.p0);
+        sv0_box_store(_sv0t48, 2, _sv0t47.p1);
+        _sv0t46.tag = 0;
+        _sv0t46.p0 = _sv0t48;
+        cexp = _sv0t46;
       }
     } else {
     }
     if ((pat_tag == 5)) {
-      int _sv0t45 = sv0_vec_get(ed2, arm_idx);
-      int paux5 = _sv0t45;
-      int _sv0t46 = sv0_vec_get(et, paux5);
-      int pxt5 = _sv0t46;
+      int _sv0t49 = sv0_vec_get(ed2, arm_idx);
+      int paux5 = _sv0t49;
+      int _sv0t50 = sv0_vec_get(et, paux5);
+      int pxt5 = _sv0t50;
       if ((pxt5 == 30)) {
-        int _sv0t47 = sv0_vec_get(ed4, paux5);
-        int k5 = _sv0t47;
+        int _sv0t51 = sv0_vec_get(ed4, paux5);
+        int k5 = _sv0t51;
         if ((k5 == 5)) {
-          int _sv0t48 = sv0_vec_get(ed1, paux5);
-          int pp_s5 = _sv0t48;
-          int _sv0t49 = sv0_vec_get(ed2, paux5);
-          int pp_c5 = _sv0t49;
+          int _sv0t52 = sv0_vec_get(ed1, paux5);
+          int pp_s5 = _sv0t52;
+          int _sv0t53 = sv0_vec_get(ed2, paux5);
+          int pp_c5 = _sv0t53;
           if ((pp_c5 >= 2)) {
-            int _sv0t50 = sv0_vec_get(pp, pp_s5);
-            int en_h = _sv0t50;
-            int _sv0t51 = (pp_s5 + 1);
-            int _sv0t52 = sv0_vec_get(pp, _sv0t51);
-            int vn_h = _sv0t52;
-            int _sv0t53 = enum_tag_lookup(enum_names, enum_tags_flat, enum_tag_offsets, enum_tag_counts, en_h, vn_h);
-            int kv = _sv0t53;
+            int _sv0t54 = sv0_vec_get(pp, pp_s5);
+            int en_h = _sv0t54;
+            int _sv0t55 = (pp_s5 + 1);
+            int _sv0t56 = sv0_vec_get(pp, _sv0t55);
+            int vn_h = _sv0t56;
+            int _sv0t57 = enum_tag_lookup(enum_names, enum_tags_flat, enum_tag_offsets, enum_tag_counts, en_h, vn_h);
+            int kv = _sv0t57;
             if ((kv < 0)) {
-              Expr _sv0t54;
-              Value _sv0t55;
-              _sv0t55.tag = 2;
-              int _sv0t56 = sv0_box_alloc(3);
-              sv0_box_store(_sv0t56, 0, _sv0t55.tag);
-              sv0_box_store(_sv0t56, 1, _sv0t55.p0);
-              sv0_box_store(_sv0t56, 2, _sv0t55.p1);
-              _sv0t54.tag = 0;
-              _sv0t54.p0 = _sv0t56;
-              cexp = _sv0t54;
+              Expr _sv0t58;
+              Value _sv0t59;
+              _sv0t59.tag = 2;
+              int _sv0t60 = sv0_box_alloc(3);
+              sv0_box_store(_sv0t60, 0, _sv0t59.tag);
+              sv0_box_store(_sv0t60, 1, _sv0t59.p0);
+              sv0_box_store(_sv0t60, 2, _sv0t59.p1);
+              _sv0t58.tag = 0;
+              _sv0t58.p0 = _sv0t60;
+              cexp = _sv0t58;
             } else {
               Value tag_m;
-              Value _sv0t57;
-              _sv0t57.tag = 3;
-              _sv0t57.p0 = scrut_var;
-              int _sv0t58 = sv0_box_alloc(3);
-              sv0_box_store(_sv0t58, 0, _sv0t57.tag);
-              sv0_box_store(_sv0t58, 1, _sv0t57.p0);
-              sv0_box_store(_sv0t58, 2, _sv0t57.p1);
-              int _sv0t59 = (0 - 1);
+              Value _sv0t61;
+              _sv0t61.tag = 3;
+              _sv0t61.p0 = scrut_var;
+              int _sv0t62 = sv0_box_alloc(3);
+              sv0_box_store(_sv0t62, 0, _sv0t61.tag);
+              sv0_box_store(_sv0t62, 1, _sv0t61.p0);
+              sv0_box_store(_sv0t62, 2, _sv0t61.p1);
+              int _sv0t63 = (0 - 1);
               tag_m.tag = 6;
-              tag_m.p0 = _sv0t58;
-              tag_m.p1 = _sv0t59;
+              tag_m.p0 = _sv0t62;
+              tag_m.p1 = _sv0t63;
               Value kv_v;
               kv_v.tag = 0;
               kv_v.p0 = kv;
-              Expr _sv0t60;
-              int _sv0t61 = sv0_box_alloc(3);
-              sv0_box_store(_sv0t61, 0, tag_m.tag);
-              sv0_box_store(_sv0t61, 1, tag_m.p0);
-              sv0_box_store(_sv0t61, 2, tag_m.p1);
-              int _sv0t62 = sv0_box_alloc(3);
-              sv0_box_store(_sv0t62, 0, kv_v.tag);
-              sv0_box_store(_sv0t62, 1, kv_v.p0);
-              sv0_box_store(_sv0t62, 2, kv_v.p1);
-              _sv0t60.tag = 2;
-              _sv0t60.p0 = 4;
-              _sv0t60.p1 = _sv0t61;
-              _sv0t60.p2 = _sv0t62;
-              cexp = _sv0t60;
+              Expr _sv0t64;
+              int _sv0t65 = sv0_box_alloc(3);
+              sv0_box_store(_sv0t65, 0, tag_m.tag);
+              sv0_box_store(_sv0t65, 1, tag_m.p0);
+              sv0_box_store(_sv0t65, 2, tag_m.p1);
+              int _sv0t66 = sv0_box_alloc(3);
+              sv0_box_store(_sv0t66, 0, kv_v.tag);
+              sv0_box_store(_sv0t66, 1, kv_v.p0);
+              sv0_box_store(_sv0t66, 2, kv_v.p1);
+              _sv0t64.tag = 2;
+              _sv0t64.p0 = 4;
+              _sv0t64.p1 = _sv0t65;
+              _sv0t64.p2 = _sv0t66;
+              cexp = _sv0t64;
             }
           } else {
-            Expr _sv0t63;
-            Value _sv0t64;
-            _sv0t64.tag = 1;
-            int _sv0t65 = sv0_box_alloc(3);
-            sv0_box_store(_sv0t65, 0, _sv0t64.tag);
-            sv0_box_store(_sv0t65, 1, _sv0t64.p0);
-            sv0_box_store(_sv0t65, 2, _sv0t64.p1);
-            _sv0t63.tag = 0;
-            _sv0t63.p0 = _sv0t65;
-            cexp = _sv0t63;
+            Expr _sv0t67;
+            Value _sv0t68;
+            _sv0t68.tag = 1;
+            int _sv0t69 = sv0_box_alloc(3);
+            sv0_box_store(_sv0t69, 0, _sv0t68.tag);
+            sv0_box_store(_sv0t69, 1, _sv0t68.p0);
+            sv0_box_store(_sv0t69, 2, _sv0t68.p1);
+            _sv0t67.tag = 0;
+            _sv0t67.p0 = _sv0t69;
+            cexp = _sv0t67;
           }
         } else {
-          Expr _sv0t66;
-          Value _sv0t67;
-          _sv0t67.tag = 2;
-          int _sv0t68 = sv0_box_alloc(3);
-          sv0_box_store(_sv0t68, 0, _sv0t67.tag);
-          sv0_box_store(_sv0t68, 1, _sv0t67.p0);
-          sv0_box_store(_sv0t68, 2, _sv0t67.p1);
-          _sv0t66.tag = 0;
-          _sv0t66.p0 = _sv0t68;
-          cexp = _sv0t66;
+          Expr _sv0t70;
+          Value _sv0t71;
+          _sv0t71.tag = 2;
+          int _sv0t72 = sv0_box_alloc(3);
+          sv0_box_store(_sv0t72, 0, _sv0t71.tag);
+          sv0_box_store(_sv0t72, 1, _sv0t71.p0);
+          sv0_box_store(_sv0t72, 2, _sv0t71.p1);
+          _sv0t70.tag = 0;
+          _sv0t70.p0 = _sv0t72;
+          cexp = _sv0t70;
         }
       } else {
-        Expr _sv0t69;
-        Value _sv0t70;
-        _sv0t70.tag = 2;
-        int _sv0t71 = sv0_box_alloc(3);
-        sv0_box_store(_sv0t71, 0, _sv0t70.tag);
-        sv0_box_store(_sv0t71, 1, _sv0t70.p0);
-        sv0_box_store(_sv0t71, 2, _sv0t70.p1);
-        _sv0t69.tag = 0;
-        _sv0t69.p0 = _sv0t71;
-        cexp = _sv0t69;
+        Expr _sv0t73;
+        Value _sv0t74;
+        _sv0t74.tag = 2;
+        int _sv0t75 = sv0_box_alloc(3);
+        sv0_box_store(_sv0t75, 0, _sv0t74.tag);
+        sv0_box_store(_sv0t75, 1, _sv0t74.p0);
+        sv0_box_store(_sv0t75, 2, _sv0t74.p1);
+        _sv0t73.tag = 0;
+        _sv0t73.p0 = _sv0t75;
+        cexp = _sv0t73;
       }
     } else {
     }
     if ((pat_tag == 4)) {
-      Expr _sv0t72;
-      Value _sv0t73;
-      _sv0t73.tag = 1;
-      int _sv0t74 = sv0_box_alloc(3);
-      sv0_box_store(_sv0t74, 0, _sv0t73.tag);
-      sv0_box_store(_sv0t74, 1, _sv0t73.p0);
-      sv0_box_store(_sv0t74, 2, _sv0t73.p1);
-      _sv0t72.tag = 0;
-      _sv0t72.p0 = _sv0t74;
-      cexp = _sv0t72;
+      Expr _sv0t76;
+      Value _sv0t77;
+      _sv0t77.tag = 1;
+      int _sv0t78 = sv0_box_alloc(3);
+      sv0_box_store(_sv0t78, 0, _sv0t77.tag);
+      sv0_box_store(_sv0t78, 1, _sv0t77.p0);
+      sv0_box_store(_sv0t78, 2, _sv0t77.p1);
+      _sv0t76.tag = 0;
+      _sv0t76.p0 = _sv0t78;
+      cexp = _sv0t76;
     } else {
     }
-    int _sv0t75 = sv0_vec_new();
-    int body_is = _sv0t75;
-    int _sv0t76 = sv0_vec_len(bind_instrs);
-    int bli = _sv0t76;
+    int _sv0t79 = sv0_vec_new();
+    int body_is = _sv0t79;
+    int _sv0t80 = sv0_vec_len(bind_instrs);
+    int bli = _sv0t80;
     int bi = 0;
     while ((bi < bli)) {
-      int _sv0t77 = sv0_vec_get(bind_instrs, bi);
-      sv0_vec_push(body_is, _sv0t77);
+      int _sv0t81 = sv0_vec_get(bind_instrs, bi);
+      sv0_vec_push(body_is, _sv0t81);
       bi = (bi + 1);
     }
-    int _sv0t78 = lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, body_idx, out_var, ctr, body_is, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names);
-    int discard_body = _sv0t78;
+    int _sv0t82 = lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, body_idx, out_var, ctr, body_is, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names);
+    int discard_body = _sv0t82;
     int th = body_is;
     if ((guard_idx >= 0)) {
-      int _sv0t79 = sv0_vec_new();
-      int guard_is = _sv0t79;
-      Expr _sv0t80 = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, guard_idx, ctr, guard_is, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names);
+      int _sv0t83 = sv0_vec_new();
+      int guard_is = _sv0t83;
+      Expr _sv0t84 = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, guard_idx, ctr, guard_is, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names);
       Expr ge;
-      ge = _sv0t80;
+      ge = _sv0t84;
       Instr guard_if;
-      int _sv0t81 = sv0_box_alloc(4);
-      sv0_box_store(_sv0t81, 0, ge.tag);
-      sv0_box_store(_sv0t81, 1, ge.p0);
-      sv0_box_store(_sv0t81, 2, ge.p1);
-      sv0_box_store(_sv0t81, 3, ge.p2);
+      int _sv0t85 = sv0_box_alloc(4);
+      sv0_box_store(_sv0t85, 0, ge.tag);
+      sv0_box_store(_sv0t85, 1, ge.p0);
+      sv0_box_store(_sv0t85, 2, ge.p1);
+      sv0_box_store(_sv0t85, 3, ge.p2);
       guard_if.tag = 6;
-      guard_if.p0 = _sv0t81;
+      guard_if.p0 = _sv0t85;
       guard_if.p1 = body_is;
       guard_if.p2 = result_instrs;
-      int _sv0t82 = sv0_box_alloc(5);
-      sv0_box_store(_sv0t82, 0, guard_if.tag);
-      sv0_box_store(_sv0t82, 1, guard_if.p0);
-      sv0_box_store(_sv0t82, 2, guard_if.p1);
-      sv0_box_store(_sv0t82, 3, guard_if.p2);
-      sv0_box_store(_sv0t82, 4, guard_if.p3);
-      sv0_vec_push(guard_is, _sv0t82);
+      int _sv0t86 = sv0_box_alloc(5);
+      sv0_box_store(_sv0t86, 0, guard_if.tag);
+      sv0_box_store(_sv0t86, 1, guard_if.p0);
+      sv0_box_store(_sv0t86, 2, guard_if.p1);
+      sv0_box_store(_sv0t86, 3, guard_if.p2);
+      sv0_box_store(_sv0t86, 4, guard_if.p3);
+      sv0_vec_push(guard_is, _sv0t86);
       th = guard_is;
     } else {
     }
     Instr arm_if;
-    int _sv0t83 = sv0_box_alloc(4);
-    sv0_box_store(_sv0t83, 0, cexp.tag);
-    sv0_box_store(_sv0t83, 1, cexp.p0);
-    sv0_box_store(_sv0t83, 2, cexp.p1);
-    sv0_box_store(_sv0t83, 3, cexp.p2);
+    int _sv0t87 = sv0_box_alloc(4);
+    sv0_box_store(_sv0t87, 0, cexp.tag);
+    sv0_box_store(_sv0t87, 1, cexp.p0);
+    sv0_box_store(_sv0t87, 2, cexp.p1);
+    sv0_box_store(_sv0t87, 3, cexp.p2);
     arm_if.tag = 6;
-    arm_if.p0 = _sv0t83;
+    arm_if.p0 = _sv0t87;
     arm_if.p1 = th;
     arm_if.p2 = result_instrs;
-    int _sv0t84 = sv0_vec_new();
-    int new_result = _sv0t84;
-    int _sv0t85 = sv0_box_alloc(5);
-    sv0_box_store(_sv0t85, 0, arm_if.tag);
-    sv0_box_store(_sv0t85, 1, arm_if.p0);
-    sv0_box_store(_sv0t85, 2, arm_if.p1);
-    sv0_box_store(_sv0t85, 3, arm_if.p2);
-    sv0_box_store(_sv0t85, 4, arm_if.p3);
-    sv0_vec_push(new_result, _sv0t85);
+    int _sv0t88 = sv0_vec_new();
+    int new_result = _sv0t88;
+    int _sv0t89 = sv0_box_alloc(5);
+    sv0_box_store(_sv0t89, 0, arm_if.tag);
+    sv0_box_store(_sv0t89, 1, arm_if.p0);
+    sv0_box_store(_sv0t89, 2, arm_if.p1);
+    sv0_box_store(_sv0t89, 3, arm_if.p2);
+    sv0_box_store(_sv0t89, 4, arm_if.p3);
+    sv0_vec_push(new_result, _sv0t89);
     result_instrs = new_result;
     ai = (ai - 1);
   }
-  int _sv0t86 = sv0_vec_len(result_instrs);
-  int rlen = _sv0t86;
+  int _sv0t90 = sv0_vec_len(result_instrs);
+  int rlen = _sv0t90;
   int ri = 0;
   while ((ri < rlen)) {
-    int _sv0t87 = sv0_vec_get(result_instrs, ri);
-    sv0_vec_push(out_instrs, _sv0t87);
+    int _sv0t91 = sv0_vec_get(result_instrs, ri);
+    sv0_vec_push(out_instrs, _sv0t91);
     ri = (ri + 1);
   }
   return 0;
@@ -7512,6 +7591,37 @@ static int test_classify_arena(void) {
   return 0;
 }
 
+static int test_parse_decimal_i32_from_tok(void) {
+  const char* src;
+  src = "let x = 12045;";
+  int _sv0t0 = sv0_vec_new();
+  int st = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int en = _sv0t1;
+  sv0_vec_push(st, 8);
+  sv0_vec_push(en, 13);
+  int _sv0t2 = parse_decimal_i32_from_tok(src, st, en, 0);
+  int v = _sv0t2;
+  if ((v != 12045)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = parse_decimal_i32_from_tok(src, st, en, 1);
+  int v2 = _sv0t3;
+  if ((v2 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = (0 - 1);
+  int _sv0t5 = parse_decimal_i32_from_tok(src, st, en, _sv0t4);
+  int v3 = _sv0t5;
+  if ((v3 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 static int test_lower_lit_val(void) {
   int _sv0t0 = sv0_vec_new();
   int tok_tags = _sv0t0;
@@ -9975,214 +10085,221 @@ int main(void) {
     return _sv0t93;
   } else {
   }
-  int _sv0t94 = test_lower_lit_val();
-  int r50 = _sv0t94;
-  if ((r50 != 0)) {
-    int _sv0t95 = (540 + r50);
+  int _sv0t94 = test_parse_decimal_i32_from_tok();
+  int r49b = _sv0t94;
+  if ((r49b != 0)) {
+    int _sv0t95 = (525 + r49b);
     return _sv0t95;
   } else {
   }
-  int _sv0t96 = test_lower_expr_val();
-  int r51 = _sv0t96;
-  if ((r51 != 0)) {
-    int _sv0t97 = (560 + r51);
+  int _sv0t96 = test_lower_lit_val();
+  int r50 = _sv0t96;
+  if ((r50 != 0)) {
+    int _sv0t97 = (540 + r50);
     return _sv0t97;
   } else {
   }
-  int _sv0t98 = test_lower_return();
-  int r52 = _sv0t98;
-  if ((r52 != 0)) {
-    int _sv0t99 = (580 + r52);
+  int _sv0t98 = test_lower_expr_val();
+  int r51 = _sv0t98;
+  if ((r51 != 0)) {
+    int _sv0t99 = (560 + r51);
     return _sv0t99;
   } else {
   }
-  int _sv0t100 = test_lower_if();
-  int r53 = _sv0t100;
-  if ((r53 != 0)) {
-    int _sv0t101 = (600 + r53);
+  int _sv0t100 = test_lower_return();
+  int r52 = _sv0t100;
+  if ((r52 != 0)) {
+    int _sv0t101 = (580 + r52);
     return _sv0t101;
   } else {
   }
-  int _sv0t102 = test_lower_block();
-  int r54 = _sv0t102;
-  if ((r54 != 0)) {
-    int _sv0t103 = (620 + r54);
+  int _sv0t102 = test_lower_if();
+  int r53 = _sv0t102;
+  if ((r53 != 0)) {
+    int _sv0t103 = (600 + r53);
     return _sv0t103;
   } else {
   }
-  int _sv0t104 = test_lower_assign();
-  int r55 = _sv0t104;
-  if ((r55 != 0)) {
-    int _sv0t105 = (640 + r55);
+  int _sv0t104 = test_lower_block();
+  int r54 = _sv0t104;
+  if ((r54 != 0)) {
+    int _sv0t105 = (620 + r54);
     return _sv0t105;
   } else {
   }
-  int _sv0t106 = test_lower_while();
-  int r56 = _sv0t106;
-  if ((r56 != 0)) {
-    int _sv0t107 = (660 + r56);
+  int _sv0t106 = test_lower_assign();
+  int r55 = _sv0t106;
+  if ((r55 != 0)) {
+    int _sv0t107 = (640 + r55);
     return _sv0t107;
   } else {
   }
-  int _sv0t108 = test_lower_loop();
-  int r57 = _sv0t108;
-  if ((r57 != 0)) {
-    int _sv0t109 = (680 + r57);
+  int _sv0t108 = test_lower_while();
+  int r56 = _sv0t108;
+  if ((r56 != 0)) {
+    int _sv0t109 = (660 + r56);
     return _sv0t109;
   } else {
   }
-  int _sv0t110 = test_lower_cast();
-  int r58 = _sv0t110;
-  if ((r58 != 0)) {
-    int _sv0t111 = (700 + r58);
+  int _sv0t110 = test_lower_loop();
+  int r57 = _sv0t110;
+  if ((r57 != 0)) {
+    int _sv0t111 = (680 + r57);
     return _sv0t111;
   } else {
   }
-  int _sv0t112 = test_value_to_expr_fn();
-  int r59 = _sv0t112;
-  if ((r59 != 0)) {
-    int _sv0t113 = (720 + r59);
+  int _sv0t112 = test_lower_cast();
+  int r58 = _sv0t112;
+  if ((r58 != 0)) {
+    int _sv0t113 = (700 + r58);
     return _sv0t113;
   } else {
   }
-  int _sv0t114 = test_lower_with_instrs();
-  int r60 = _sv0t114;
-  if ((r60 != 0)) {
-    int _sv0t115 = (740 + r60);
+  int _sv0t114 = test_value_to_expr_fn();
+  int r59 = _sv0t114;
+  if ((r59 != 0)) {
+    int _sv0t115 = (720 + r59);
     return _sv0t115;
   } else {
   }
-  int _sv0t116 = test_lower_for_effect_fn();
-  int r61 = _sv0t116;
-  if ((r61 != 0)) {
-    int _sv0t117 = (760 + r61);
+  int _sv0t116 = test_lower_with_instrs();
+  int r60 = _sv0t116;
+  if ((r60 != 0)) {
+    int _sv0t117 = (740 + r60);
     return _sv0t117;
   } else {
   }
-  int _sv0t118 = test_lower_return_fn();
-  int r62 = _sv0t118;
-  if ((r62 != 0)) {
-    int _sv0t119 = (780 + r62);
+  int _sv0t118 = test_lower_for_effect_fn();
+  int r61 = _sv0t118;
+  if ((r61 != 0)) {
+    int _sv0t119 = (760 + r61);
     return _sv0t119;
   } else {
   }
-  int _sv0t120 = test_lower_stmt_fn();
-  int r63 = _sv0t120;
-  if ((r63 != 0)) {
-    int _sv0t121 = (800 + r63);
+  int _sv0t120 = test_lower_return_fn();
+  int r62 = _sv0t120;
+  if ((r62 != 0)) {
+    int _sv0t121 = (780 + r62);
     return _sv0t121;
   } else {
   }
-  int _sv0t122 = test_lower_block_fn();
-  int r64 = _sv0t122;
-  if ((r64 != 0)) {
-    int _sv0t123 = (820 + r64);
+  int _sv0t122 = test_lower_stmt_fn();
+  int r63 = _sv0t122;
+  if ((r63 != 0)) {
+    int _sv0t123 = (800 + r63);
     return _sv0t123;
   } else {
   }
-  int _sv0t124 = test_lower_body_fn();
-  int r65 = _sv0t124;
-  if ((r65 != 0)) {
-    int _sv0t125 = (840 + r65);
+  int _sv0t124 = test_lower_block_fn();
+  int r64 = _sv0t124;
+  if ((r64 != 0)) {
+    int _sv0t125 = (820 + r64);
     return _sv0t125;
   } else {
   }
-  int _sv0t126 = test_lower_fn_fn();
-  int r66 = _sv0t126;
-  if ((r66 != 0)) {
-    int _sv0t127 = (860 + r66);
+  int _sv0t126 = test_lower_body_fn();
+  int r65 = _sv0t126;
+  if ((r65 != 0)) {
+    int _sv0t127 = (840 + r65);
     return _sv0t127;
   } else {
   }
-  int _sv0t128 = test_lower_program_fn();
-  int r67 = _sv0t128;
-  if ((r67 != 0)) {
-    int _sv0t129 = (880 + r67);
+  int _sv0t128 = test_lower_fn_fn();
+  int r66 = _sv0t128;
+  if ((r66 != 0)) {
+    int _sv0t129 = (860 + r66);
     return _sv0t129;
   } else {
   }
-  int _sv0t130 = test_lower_for_loop();
-  int r68 = _sv0t130;
-  if ((r68 != 0)) {
-    int _sv0t131 = (900 + r68);
+  int _sv0t130 = test_lower_program_fn();
+  int r67 = _sv0t130;
+  if ((r67 != 0)) {
+    int _sv0t131 = (880 + r67);
     return _sv0t131;
   } else {
   }
-  int _sv0t132 = test_lower_expr_assert();
-  int r68a = _sv0t132;
-  if ((r68a != 0)) {
-    int _sv0t133 = (903 + r68a);
+  int _sv0t132 = test_lower_for_loop();
+  int r68 = _sv0t132;
+  if ((r68 != 0)) {
+    int _sv0t133 = (900 + r68);
     return _sv0t133;
   } else {
   }
-  int _sv0t134 = test_lower_expr_range();
-  int r68ar = _sv0t134;
-  if ((r68ar != 0)) {
-    int _sv0t135 = (904 + r68ar);
+  int _sv0t134 = test_lower_expr_assert();
+  int r68a = _sv0t134;
+  if ((r68a != 0)) {
+    int _sv0t135 = (903 + r68a);
     return _sv0t135;
   } else {
   }
-  int _sv0t136 = test_lower_expr_tuple_field();
-  int r68tf = _sv0t136;
-  if ((r68tf != 0)) {
-    int _sv0t137 = (906 + r68tf);
+  int _sv0t136 = test_lower_expr_range();
+  int r68ar = _sv0t136;
+  if ((r68ar != 0)) {
+    int _sv0t137 = (904 + r68ar);
     return _sv0t137;
   } else {
   }
-  int _sv0t138 = test_lower_expr_index_effect();
-  int r68ix = _sv0t138;
-  if ((r68ix != 0)) {
-    int _sv0t139 = (907 + r68ix);
+  int _sv0t138 = test_lower_expr_tuple_field();
+  int r68tf = _sv0t138;
+  if ((r68tf != 0)) {
+    int _sv0t139 = (906 + r68tf);
     return _sv0t139;
   } else {
   }
-  int _sv0t140 = test_lower_expr_method_call_effect();
-  int r68mc = _sv0t140;
-  if ((r68mc != 0)) {
-    int _sv0t141 = (908 + r68mc);
+  int _sv0t140 = test_lower_expr_index_effect();
+  int r68ix = _sv0t140;
+  if ((r68ix != 0)) {
+    int _sv0t141 = (907 + r68ix);
     return _sv0t141;
   } else {
   }
-  int _sv0t142 = test_lower_expr_array_effect();
-  int r68arr = _sv0t142;
-  if ((r68arr != 0)) {
-    int _sv0t143 = (909 + r68arr);
+  int _sv0t142 = test_lower_expr_method_call_effect();
+  int r68mc = _sv0t142;
+  if ((r68mc != 0)) {
+    int _sv0t143 = (908 + r68mc);
     return _sv0t143;
   } else {
   }
-  int _sv0t144 = test_lower_expr_struct();
-  int r68b = _sv0t144;
-  if ((r68b != 0)) {
-    int _sv0t145 = (905 + r68b);
+  int _sv0t144 = test_lower_expr_array_effect();
+  int r68arr = _sv0t144;
+  if ((r68arr != 0)) {
+    int _sv0t145 = (909 + r68arr);
     return _sv0t145;
   } else {
   }
-  int _sv0t146 = test_lower_expr_struct_qualified_path();
-  int r68bq = _sv0t146;
-  if ((r68bq != 0)) {
-    int _sv0t147 = (910 + r68bq);
+  int _sv0t146 = test_lower_expr_struct();
+  int r68b = _sv0t146;
+  if ((r68b != 0)) {
+    int _sv0t147 = (905 + r68b);
     return _sv0t147;
   } else {
   }
-  int _sv0t148 = test_lower_enum_ctor();
-  int r69 = _sv0t148;
-  if ((r69 != 0)) {
-    int _sv0t149 = (920 + r69);
+  int _sv0t148 = test_lower_expr_struct_qualified_path();
+  int r68bq = _sv0t148;
+  if ((r68bq != 0)) {
+    int _sv0t149 = (910 + r68bq);
     return _sv0t149;
   } else {
   }
-  int _sv0t150 = test_lower_try();
-  int r70 = _sv0t150;
-  if ((r70 != 0)) {
-    int _sv0t151 = (940 + r70);
+  int _sv0t150 = test_lower_enum_ctor();
+  int r69 = _sv0t150;
+  if ((r69 != 0)) {
+    int _sv0t151 = (920 + r69);
     return _sv0t151;
   } else {
   }
-  int _sv0t152 = test_build_builtin_map();
-  int r71 = _sv0t152;
-  if ((r71 != 0)) {
-    int _sv0t153 = (960 + r71);
+  int _sv0t152 = test_lower_try();
+  int r70 = _sv0t152;
+  if ((r70 != 0)) {
+    int _sv0t153 = (940 + r70);
     return _sv0t153;
+  } else {
+  }
+  int _sv0t154 = test_build_builtin_map();
+  int r71 = _sv0t154;
+  if ((r71 != 0)) {
+    int _sv0t155 = (960 + r71);
+    return _sv0t155;
   } else {
   }
   return 0;

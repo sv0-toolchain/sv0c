@@ -149,6 +149,32 @@ fn lower_lit_to_ir_value(lit_tag: i32, tok_pos: i32,
     return Value::VUnit;
 }
 
+/* Parse decimal digits from `source[starts[tok_pos]..ends[tok_pos])`.
+   Used for PatLit int match arms where the arena stores a token index,
+   not the numeric value. Returns 0 on bad bounds or non-digit run. */
+
+fn parse_decimal_i32_from_tok(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                              tok_pos: i32) -> i32 {
+    if tok_pos < 0 { return 0; }
+    if tok_pos >= vec_len(starts) { return 0; }
+    if tok_pos >= vec_len(ends) { return 0; }
+    let s: i32 = vec_get(starts, tok_pos);
+    let e: i32 = vec_get(ends, tok_pos);
+    if s < 0 { return 0; }
+    if e <= s { return 0; }
+    let mut acc: i32 = 0;
+    let mut i: i32 = s;
+    while i < e {
+        let c: i32 = string_char_at(source, i);
+        if c < 48 { return 0; }
+        if c > 57 { return 0; }
+        let d: i32 = c - 48;
+        acc = acc * 10 + d;
+        i = i + 1;
+    }
+    return acc;
+}
+
 /* ── lower_expr_to_value (SML lowerExprToValue) ───────────────
    Walks the flat expression arena at `idx` and returns an IR
    Value.  Instructions accumulate (as boxed Instr handles) in
@@ -1230,7 +1256,8 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    out_instrs.  `out` is the dest variable for the match result.
    `scrut_var` is the temp holding the scrutinee value.
    Pattern support: PatWild(0), PatBind(1); PatLit(2) with ExprPatExtra
-   (tag 30): `==` on scrut (negated literal deferred — still true stub);
+   (tag 30): `==` on scrut; int literals parsed from source (incl. `-n`
+   via parser is_neg + positive int token); negated non-int still stub;
    PatEnum(5) with ExprPatExtra when path has >=2 segments: tag field
    `VMember(scrut,-1)` vs variant discriminant; PatStruct(4) still
    always-true stub until field-wise compare exists.
@@ -1296,15 +1323,26 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 let k2: i32 = vec_get(ed4, paux2);
                 if k2 == 2 {
                     let is_neg2: i32 = vec_get(ed3, paux2);
-                    if is_neg2 == 1 {
-                        cexp = Expr::Literal(box_new(Value::VBoolTrue));
-                    } else {
-                        let lt2: i32 = vec_get(ed1, paux2);
-                        let tp2: i32 = vec_get(ed2, paux2);
-                        let rv2: Value = lower_lit_to_ir_value(lt2, tp2,
-                                                                tok_tags);
+                    let lt2: i32 = vec_get(ed1, paux2);
+                    let tp2: i32 = vec_get(ed2, paux2);
+                    if lt2 == 0 {
+                        let mut vi: i32 = parse_decimal_i32_from_tok(
+                            source, starts, ends, tp2);
+                        if is_neg2 == 1 {
+                            vi = 0 - vi;
+                        }
+                        let rv2: Value = Value::VInt(vi);
                         let lv2: Value = Value::VVar(scrut_var);
                         cexp = Expr::Binop(4, box_new(lv2), box_new(rv2));
+                    } else {
+                        if is_neg2 == 1 {
+                            cexp = Expr::Literal(box_new(Value::VBoolTrue));
+                        } else {
+                            let rv3: Value = lower_lit_to_ir_value(lt2, tp2,
+                                                                    tok_tags);
+                            let lv3: Value = Value::VVar(scrut_var);
+                            cexp = Expr::Binop(4, box_new(lv3), box_new(rv3));
+                        }
                     }
                 } else {
                     cexp = Expr::Literal(box_new(Value::VBoolFalse));
@@ -4029,6 +4067,21 @@ fn test_classify_arena() -> i32 {
     return 0;
 }
 
+fn test_parse_decimal_i32_from_tok() -> i32 {
+    let src: string = "let x = 12045;";
+    let mut st: Vec<i32> = vec_new();
+    let mut en: Vec<i32> = vec_new();
+    vec_push(st, 8);
+    vec_push(en, 13);
+    let v: i32 = parse_decimal_i32_from_tok(src, st, en, 0);
+    if v != 12045 { return 1; }
+    let v2: i32 = parse_decimal_i32_from_tok(src, st, en, 1);
+    if v2 != 0 { return 2; }
+    let v3: i32 = parse_decimal_i32_from_tok(src, st, en, 0 - 1);
+    if v3 != 0 { return 3; }
+    return 0;
+}
+
 fn test_lower_lit_val() -> i32 {
     let mut tok_tags: Vec<i32> = vec_new();
     vec_push(tok_tags, 91);
@@ -5378,6 +5431,8 @@ fn main() -> i32 {
     if r48 != 0 { return 510 + r48; }
     let r49: i32 = test_classify_arena();
     if r49 != 0 { return 520 + r49; }
+    let r49b: i32 = test_parse_decimal_i32_from_tok();
+    if r49b != 0 { return 525 + r49b; }
     let r50: i32 = test_lower_lit_val();
     if r50 != 0 { return 540 + r50; }
     let r51: i32 = test_lower_expr_val();
