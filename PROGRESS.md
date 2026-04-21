@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-21 (America/Denver; **M3 task** § **language surface gap** reconciled with **Phase 0 Tier 1** already in-tree; execution priority **Track C** (errors) + **T0-8** (file I/O) before **slice A** (`PatStruct` / **PatLit** / **`lower_tag_match`**). Prior slice: **`parser.sv0`** **ExprPatExtra (30)**; **`lower_match_arms`** PatLit + PatEnum (PatStruct stub). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-21 (America/Denver; **M3 slice A — PatLit:** **`lower_match_arms`** int **`PatLit`** compares **`scrut ==` parsed decimal** from `source`/`starts`/`ends` (fixes token-index misuse); **`-` literal** via parser **`is_neg`**. **`parse_decimal_i32_from_tok`** + **`test_parse_decimal_i32_from_tok`**. Negated non-int literal match still stub (**`VBoolTrue`**). Execution priority unchanged: **Track C** + **T0-8** before **`PatStruct`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
