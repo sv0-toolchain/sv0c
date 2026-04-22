@@ -14,6 +14,10 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 2. **Phase / row-level** tracking lives in **`task/sv0-toolchain-milestone-3-checklist.Rmd`** — link it from decomposition notes; do not fork a second full inventory here.
 3. **Regenerate the snapshot** below after material **`bootstrap-sources.list`**, **`self-host-sv0-loop.list`**, stage0 goldens, or vm-parity manifest churn (counts are advisory; CI truth is the files).
 
+**Session notes (non-normative)**
+
+- **2026-04-22:** **`lower_match_arms`** **`PatEnum`** tuple ctor arms (`Enum::Var(pat,…)`) — parser **`ExprPatEnumMeta` (33)** + **`ExprPatFieldEmbed`** rows with payload slot index; lowering **`Assign`** from **`VMember(scrut, 0-10-pi)`** (SML **`VariantTuple`** **`bindPre`**).
+
 **Snapshot (replace on churn)**
 
 | Metric | Source | Count (this revision) |

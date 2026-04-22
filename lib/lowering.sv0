@@ -1303,7 +1303,9 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    true); unary `-` inverts which branch fires; other literal kinds with
    negation remain stubbed;
    PatEnum(5) with ExprPatExtra when path has >=2 segments: tag field
-   `VMember(scrut,-1)` vs variant discriminant; PatStruct(4) same tag
+   `VMember(scrut,-1)` vs variant discriminant; tuple args: ExprPatEnumMeta
+   (33) + ExprPatFieldEmbed rows with ed2 = payload index → Assign to
+   `VMember(scrut, 0-10-pi)`; PatStruct(4) same tag
    compare when path has >=2 segments. Parser embeds field rows as
    ExprPatFieldEmbed(31) + ExprPatStructMeta(32) immediately before
    ExprPatExtra(30); PatStruct field bindPre lowers PatBind rows via
@@ -1461,6 +1463,38 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             let kv_v: Value = Value::VInt(kv);
                             cexp = Expr::Binop(4, box_new(tag_m),
                                                 box_new(kv_v));
+                            let argc5: i32 = vec_get(ed3, paux5);
+                            if argc5 > 0 {
+                                let meta_idx5: i32 = paux5 - 1;
+                                let mtag5: i32 = vec_get(et, meta_idx5);
+                                if mtag5 == 33 {
+                                    let ac5: i32 = vec_get(ed1, meta_idx5);
+                                    let first_e5: i32 = vec_get(ed2, meta_idx5);
+                                    let mut ej: i32 = 0;
+                                    while ej < ac5 {
+                                        let eidx5: i32 = first_e5 + ej;
+                                        let etg5: i32 = vec_get(et, eidx5);
+                                        if etg5 == 31 {
+                                            let ipt5: i32 = vec_get(ed4, eidx5);
+                                            if ipt5 == 1 {
+                                                let bind_tok5: i32 = vec_get(ed1, eidx5);
+                                                let pi5: i32 = vec_get(ed2, eidx5);
+                                                if pi5 >= 0 {
+                                                    let pay5: i32 = 0 - 10 - pi5;
+                                                    let rhsv5: Value = Value::VMember(
+                                                        box_new(Value::VVar(scrut_var)), pay5);
+                                                    let asgx5: Instr = Instr::Assign(
+                                                        bind_tok5,
+                                                        box_new(Expr::Literal(
+                                                            box_new(rhsv5))));
+                                                    vec_push(bind_instrs, box_new(asgx5));
+                                                }
+                                            }
+                                        }
+                                        ej = ej + 1;
+                                    }
+                                }
+                            }
                         }
                     } else {
                         cexp = Expr::Literal(box_new(Value::VBoolTrue));
