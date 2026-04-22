@@ -1257,7 +1257,10 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    `scrut_var` is the temp holding the scrutinee value.
    Pattern support: PatWild(0), PatBind(1); PatLit(2) with ExprPatExtra
    (tag 30): `==` on scrut; int literals parsed from source (incl. `-n`
-   via parser is_neg + positive int token); negated non-int still stub;
+   via parser is_neg + positive int token); bool literals (`lit_tag` 5)
+   match SML: `true` → scrutinee `!= 0`, `false` → `== 0` (token 91 =
+   true); unary `-` inverts which branch fires; other literal kinds with
+   negation remain stubbed;
    PatEnum(5) with ExprPatExtra when path has >=2 segments: tag field
    `VMember(scrut,-1)` vs variant discriminant; PatStruct(4) same tag
    compare when path has >=2 segments (field bindPre still deferred).
@@ -1346,13 +1349,39 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             cexp = Expr::Binop(4, box_new(lv2), box_new(rv2));
                         }
                     } else {
-                        if is_neg2 == 1 {
-                            cexp = Expr::Literal(box_new(Value::VBoolTrue));
+                        if lt2 == 5 {
+                            let tt_b: i32 = vec_get(tok_tags, tp2);
+                            let mut nz: i32 = 0;
+                            if tt_b == 91 {
+                                nz = 1;
+                            }
+                            if is_neg2 == 1 {
+                                if nz == 1 {
+                                    nz = 0;
+                                } else {
+                                    nz = 1;
+                                }
+                            }
+                            let lv_b: Value = Value::VVar(scrut_var);
+                            let zv: Value = Value::VInt(0);
+                            if nz == 1 {
+                                cexp = Expr::Binop(5, box_new(lv_b),
+                                                    box_new(zv));
+                            } else {
+                                cexp = Expr::Binop(4, box_new(lv_b),
+                                                    box_new(zv));
+                            }
                         } else {
-                            let rv3: Value = lower_lit_to_ir_value(lt2, tp2,
-                                                                    tok_tags);
-                            let lv3: Value = Value::VVar(scrut_var);
-                            cexp = Expr::Binop(4, box_new(lv3), box_new(rv3));
+                            if is_neg2 == 1 {
+                                cexp = Expr::Literal(
+                                    box_new(Value::VBoolTrue));
+                            } else {
+                                let rv3: Value = lower_lit_to_ir_value(
+                                    lt2, tp2, tok_tags);
+                                let lv3: Value = Value::VVar(scrut_var);
+                                cexp = Expr::Binop(4, box_new(lv3),
+                                                    box_new(rv3));
+                            }
                         }
                     }
                 } else {
