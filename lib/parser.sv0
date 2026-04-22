@@ -877,7 +877,9 @@ fn parse_type(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 
    Arena encoding (parallel Vec<i32>s, children before parents):
      0 PatWild   : (no payload)
-     1 PatBind   : data1=name_tok_pos, data2=is_mut
+     1 PatBind   : data1=name_tok_pos, data2=is_mut,
+                   data3=struct field name tok when PatStruct row uses
+                   `field: pat` (0 = shorthand: field name is data1)
      2 PatLit    : data1=lit_tag, data2=tok_pos, data3=is_neg
      3 PatTuple  : data1=first_elem_idx, data2=elem_count
      4 PatStruct : data1=pp_start, data2=pp_count, data3=field_count
@@ -926,6 +928,8 @@ fn path_pattern_from(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                          pat_tags, pat_data1, pat_data2,
                                          pat_data3, path_pool);
                 if pv < 0 { return 0 - 1; }
+                let last_pat: i32 = vec_len(pat_tags) - 1;
+                vec_set(pat_data3, last_pat, fname_pos);
                 p = pv;
             } else {
                 vec_push(pat_tags, 1);
