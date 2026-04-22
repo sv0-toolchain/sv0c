@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-22 (America/Denver; **M3 slice A — `PatLit` bool match:** **`lower_match_arms`** **`lit_tag` 5** arms now mirror SML **`matchArmSetup`**: **`true`** → scrutinee **`!= 0`**, **`false`** → **`== 0`** (lexer token **91** = true); unary **`is_neg`** inverts. Prior **M3 match** int / enum / struct tag work unchanged. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-22 (America/Denver; **M3 slice B — `PatStruct` match parser embed:** **`parse_match_expr`** copies each struct-field sub-pattern from the pat temp arena into the expr arena as **`ExprPatFieldEmbed` (31)** plus **`ExprPatStructMeta` (32)** before **`ExprPatExtra` (30)**; **`synth_expr`** treats **31/32** as **`TY_UNIT`**. Lowers **PatStruct** field **`bindPre`** still deferred (comment only). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

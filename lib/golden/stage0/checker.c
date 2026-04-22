@@ -4335,8 +4335,18 @@ static int synth_expr(int et, int ed1, int ed2, int ed3, int ed4, int pp, const 
     return _sv0t164;
   } else {
   }
-  int _sv0t165 = (0 - 1);
-  return _sv0t165;
+  if ((tag == 31)) {
+    int _sv0t165 = TY_UNIT();
+    return _sv0t165;
+  } else {
+  }
+  if ((tag == 32)) {
+    int _sv0t166 = TY_UNIT();
+    return _sv0t166;
+  } else {
+  }
+  int _sv0t167 = (0 - 1);
+  return _sv0t167;
 }
 
 static int test_binop_class(void) {

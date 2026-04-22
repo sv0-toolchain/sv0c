@@ -1263,7 +1263,9 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    negation remain stubbed;
    PatEnum(5) with ExprPatExtra when path has >=2 segments: tag field
    `VMember(scrut,-1)` vs variant discriminant; PatStruct(4) same tag
-   compare when path has >=2 segments (field bindPre still deferred).
+   compare when path has >=2 segments. Parser embeds field rows as
+   ExprPatFieldEmbed(31) + ExprPatStructMeta(32) immediately before
+   ExprPatExtra(30) (field bindPre in lowering still deferred).
    Tests omitted: SML compiler function budget (~172 fn limit). */
 
 fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,

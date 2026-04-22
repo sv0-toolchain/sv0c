@@ -1187,7 +1187,12 @@ fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     29 ExprMatchArm : d1=pat_tag, d2=pat_d1 or pat_extra_idx, d3=guard_idx(-1=none), d4=body_idx
     30 ExprPatExtra : pattern payload for match arms (PatLit/PatStruct/PatEnum);
                      d1,d2,d3 = parse_pat **root** row data (root = last pat row;
-                     children precede parent in pat arena); d4 = pat_tag (2/4/5) */
+                     children precede parent in pat arena); d4 = pat_tag (2/4/5)
+    31 ExprPatFieldEmbed : one struct-field sub-pattern row copied from the pat
+                     arena (PatBind/PatLit/…); d1–d3 = pat data1–3, d4 = pat tag
+    32 ExprPatStructMeta : precedes ExprPatExtra for PatStruct(4) arms only;
+                     d1=field_count, d2=first ExprPatFieldEmbed index (-1 if none),
+                     d3–d4 reserved */
 
 fn parse_arg_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                   source: string, pos: i32,
@@ -2704,6 +2709,29 @@ fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             let body_idx: i32 = vec_len(et) - 1;
             let mut arm_ed2: i32 = pat_d1;
             if pat_tag == 2 || pat_tag == 4 || pat_tag == 5 {
+                if pat_tag == 4 {
+                    let fc: i32 = vec_get(pd3v, pr);
+                    let first_embed: i32 = vec_len(et);
+                    let mut fj: i32 = 0;
+                    while fj < fc {
+                        let row: i32 = pr - fc + fj;
+                        vec_push(et, 31);
+                        vec_push(ed1, vec_get(pd1v, row));
+                        vec_push(ed2, vec_get(pd2v, row));
+                        vec_push(ed3, vec_get(pd3v, row));
+                        vec_push(ed4, vec_get(pt, row));
+                        fj = fj + 1;
+                    }
+                    vec_push(et, 32);
+                    vec_push(ed1, fc);
+                    if fc > 0 {
+                        vec_push(ed2, first_embed);
+                    } else {
+                        vec_push(ed2, 0 - 1);
+                    }
+                    vec_push(ed3, 0);
+                    vec_push(ed4, 0);
+                }
                 vec_push(et, 30);
                 vec_push(ed1, vec_get(pd1v, pr));
                 vec_push(ed2, vec_get(pd2v, pr));
