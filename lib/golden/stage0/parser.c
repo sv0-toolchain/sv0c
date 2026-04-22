@@ -4447,16 +4447,48 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
       int _sv0t36 = (_sv0t34 || _sv0t35);
       int _sv0t37 = (pat_tag == 5);
       if ((_sv0t36 || _sv0t37)) {
+        if ((pat_tag == 4)) {
+          int _sv0t38 = sv0_vec_get(pd3v, pr);
+          int fc = _sv0t38;
+          int _sv0t39 = sv0_vec_len(et);
+          int first_embed = _sv0t39;
+          int fj = 0;
+          while ((fj < fc)) {
+            int _sv0t40 = (pr - fc);
+            int row = (_sv0t40 + fj);
+            sv0_vec_push(et, 31);
+            int _sv0t41 = sv0_vec_get(pd1v, row);
+            sv0_vec_push(ed1, _sv0t41);
+            int _sv0t42 = sv0_vec_get(pd2v, row);
+            sv0_vec_push(ed2, _sv0t42);
+            int _sv0t43 = sv0_vec_get(pd3v, row);
+            sv0_vec_push(ed3, _sv0t43);
+            int _sv0t44 = sv0_vec_get(pt, row);
+            sv0_vec_push(ed4, _sv0t44);
+            fj = (fj + 1);
+          }
+          sv0_vec_push(et, 32);
+          sv0_vec_push(ed1, fc);
+          if ((fc > 0)) {
+            sv0_vec_push(ed2, first_embed);
+          } else {
+            int _sv0t45 = (0 - 1);
+            sv0_vec_push(ed2, _sv0t45);
+          }
+          sv0_vec_push(ed3, 0);
+          sv0_vec_push(ed4, 0);
+        } else {
+        }
         sv0_vec_push(et, 30);
-        int _sv0t38 = sv0_vec_get(pd1v, pr);
-        sv0_vec_push(ed1, _sv0t38);
-        int _sv0t39 = sv0_vec_get(pd2v, pr);
-        sv0_vec_push(ed2, _sv0t39);
-        int _sv0t40 = sv0_vec_get(pd3v, pr);
-        sv0_vec_push(ed3, _sv0t40);
+        int _sv0t46 = sv0_vec_get(pd1v, pr);
+        sv0_vec_push(ed1, _sv0t46);
+        int _sv0t47 = sv0_vec_get(pd2v, pr);
+        sv0_vec_push(ed2, _sv0t47);
+        int _sv0t48 = sv0_vec_get(pd3v, pr);
+        sv0_vec_push(ed3, _sv0t48);
         sv0_vec_push(ed4, pat_tag);
-        int _sv0t41 = sv0_vec_len(et);
-        arm_ed2 = (_sv0t41 - 1);
+        int _sv0t49 = sv0_vec_len(et);
+        arm_ed2 = (_sv0t49 - 1);
       } else {
       }
       sv0_vec_push(et, 29);
@@ -4465,13 +4497,13 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
       sv0_vec_push(ed3, guard_idx);
       sv0_vec_push(ed4, body_idx);
       if ((arms_first < 0)) {
-        int _sv0t42 = sv0_vec_len(et);
-        arms_first = (_sv0t42 - 1);
+        int _sv0t50 = sv0_vec_len(et);
+        arms_first = (_sv0t50 - 1);
       } else {
       }
       arm_count = (arm_count + 1);
-      int _sv0t43 = ps_peek(tags, body_pos);
-      if ((_sv0t43 == 12)) {
+      int _sv0t51 = ps_peek(tags, body_pos);
+      if ((_sv0t51 == 12)) {
         p = (body_pos + 1);
       } else {
         p = body_pos;
@@ -4483,8 +4515,8 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
   sv0_vec_push(ed2, arms_first);
   sv0_vec_push(ed3, arm_count);
   sv0_vec_push(ed4, 0);
-  int _sv0t44 = (p + 1);
-  return _sv0t44;
+  int _sv0t52 = (p + 1);
+  return _sv0t52;
 }
 
 static int parse_quant(int tags, int starts, int ends, const char* source, int pos, int is_forall, int et, int ed1, int ed2, int ed3, int ed4, int pp) {
