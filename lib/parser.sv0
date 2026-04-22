@@ -1193,9 +1193,13 @@ fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                      d1,d2,d3 = parse_pat **root** row data (root = last pat row;
                      children precede parent in pat arena); d4 = pat_tag (2/4/5)
     31 ExprPatFieldEmbed : one struct-field sub-pattern row copied from the pat
-                     arena (PatBind/PatLit/…); d1–d3 = pat data1–3, d4 = pat tag
+                     arena (PatBind/PatLit/…); d1–d3 = pat data1–3, d4 = pat tag.
+                     For PatEnum tuple arms, d2 = payload slot index (0..n-1).
     32 ExprPatStructMeta : precedes ExprPatExtra for PatStruct(4) arms only;
                      d1=field_count, d2=first ExprPatFieldEmbed index (-1 if none),
+                     d3–d4 reserved
+    33 ExprPatEnumMeta : precedes ExprPatExtra for PatEnum(5) arms with `(` … `)`
+                     tuple args only; d1=arg_count, d2=first ExprPatFieldEmbed index,
                      d3–d4 reserved */
 
 fn parse_arg_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
@@ -2735,6 +2739,27 @@ fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     }
                     vec_push(ed3, 0);
                     vec_push(ed4, 0);
+                }
+                if pat_tag == 5 {
+                    let ac: i32 = vec_get(pd3v, pr);
+                    if ac > 0 {
+                        let first_emb_e: i32 = vec_len(et);
+                        let mut aj: i32 = 0;
+                        while aj < ac {
+                            let row_e: i32 = pr - ac + aj;
+                            vec_push(et, 31);
+                            vec_push(ed1, vec_get(pd1v, row_e));
+                            vec_push(ed2, aj);
+                            vec_push(ed3, vec_get(pd3v, row_e));
+                            vec_push(ed4, vec_get(pt, row_e));
+                            aj = aj + 1;
+                        }
+                        vec_push(et, 33);
+                        vec_push(ed1, ac);
+                        vec_push(ed2, first_emb_e);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                    }
                 }
                 vec_push(et, 30);
                 vec_push(ed1, vec_get(pd1v, pr));
@@ -4946,6 +4971,51 @@ fn test_parse_match_guard() -> i32 {
     return 0;
 }
 
+fn test_parse_match_enum_tuple_arm() -> i32 {
+    let src: string = "match x { Foo::Bar(y) => y }";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 74); vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 8); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 5); vec_push(starts, 10); vec_push(ends, 12);
+    vec_push(tags, 15); vec_push(starts, 13); vec_push(ends, 15);
+    vec_push(tags, 5); vec_push(starts, 16); vec_push(ends, 18);
+    vec_push(tags, 6); vec_push(starts, 19); vec_push(ends, 20);
+    vec_push(tags, 5); vec_push(starts, 21); vec_push(ends, 22);
+    vec_push(tags, 7); vec_push(starts, 23); vec_push(ends, 24);
+    vec_push(tags, 20); vec_push(starts, 25); vec_push(ends, 27);
+    vec_push(tags, 5); vec_push(starts, 28); vec_push(ends, 29);
+    vec_push(tags, 9); vec_push(starts, 30); vec_push(ends, 31);
+    vec_push(tags, 97); vec_push(starts, 32); vec_push(ends, 32);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, src, 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 12 { return 1; }
+    let n: i32 = vec_len(et);
+    let mut found33: i32 = 0;
+    let mut found30enum: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(et, i) == 33 { found33 = 1; }
+        if vec_get(et, i) == 30 {
+            if vec_get(ed4v, i) == 5 {
+                if vec_get(ed3v, i) == 1 { found30enum = 1; }
+            }
+        }
+        i = i + 1;
+    }
+    if found33 != 1 { return 2; }
+    if found30enum != 1 { return 3; }
+    return 0;
+}
+
 fn test_parse_quant() -> i32 {
     let tags: Vec<i32> = vec_new();
     let starts: Vec<i32> = vec_new();
@@ -5463,6 +5533,8 @@ fn main() -> i32 {
     if r61 != 0 { return 720 + r61; }
     let r62: i32 = test_parse_match_guard();
     if r62 != 0 { return 730 + r62; }
+    let r62b: i32 = test_parse_match_enum_tuple_arm();
+    if r62b != 0 { return 735 + r62b; }
     let r63: i32 = test_parse_quant();
     if r63 != 0 { return 740 + r63; }
     let r64: i32 = test_parse_old();

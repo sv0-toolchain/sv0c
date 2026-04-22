@@ -3250,6 +3250,9 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
     if tag == 32 {
         return TY_UNIT();
     }
+    if tag == 33 {
+        return TY_UNIT();
+    }
     return 0 - 1;
 }
 

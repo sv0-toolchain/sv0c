@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-22 (America/Denver; **M3 slice C — `PatStruct` match lowering + parser field names:** **`path_pattern_from`** sets **`PatBind` `pat_data3`** to the explicit field-name token for **`field: pat`** ( **`0`** = shorthand). **`lower_match_arms`** threads real **`source`/`starts`/`ends`** and item tables; **`PatStruct`** after tag match emits **`Assign(bind_tok, Literal(VMember(scrut, 0-10-pi)))`** via **`lower_pat_struct_field_payload_index`** (name → payload index). Stage0 **`parser.c`/`lowering.c`**, vm-parity **`.sv0b`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-22 (America/Denver; **M3 slice D — `PatEnum` tuple match arms:** **`parse_match_expr`** embeds tuple arg rows as **`ExprPatFieldEmbed` (31)** with **`ed2` = payload slot index**, then **`ExprPatEnumMeta` (33)** before **`ExprPatExtra` (30)**; **`lower_match_arms`** **`PatEnum`** emits **`Assign`** from **`VMember(scrut, 0-10-pi)`** for each inner **`PatBind`** (SML **`VariantTuple`** **`bindPre`**). **`checker.sv0`** **`synth_expr`** accepts tag **33**. Parser **`test_parse_match_enum_tuple_arm`**. Stage0 **`parser.c`/`lowering.c`/`checker.c`**, vm-parity **`.sv0b`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
