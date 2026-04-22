@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-22 (America/Denver; **M3 slice B — `PatStruct` match parser embed:** **`parse_match_expr`** copies each struct-field sub-pattern from the pat temp arena into the expr arena as **`ExprPatFieldEmbed` (31)** plus **`ExprPatStructMeta` (32)** before **`ExprPatExtra` (30)**; **`synth_expr`** treats **31/32** as **`TY_UNIT`**. Lowers **PatStruct** field **`bindPre`** still deferred (comment only). Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-22 (America/Denver; **M3 slice C — `PatStruct` match lowering + parser field names:** **`path_pattern_from`** sets **`PatBind` `pat_data3`** to the explicit field-name token for **`field: pat`** ( **`0`** = shorthand). **`lower_match_arms`** threads real **`source`/`starts`/`ends`** and item tables; **`PatStruct`** after tag match emits **`Assign(bind_tok, Literal(VMember(scrut, 0-10-pi)))`** via **`lower_pat_struct_field_payload_index`** (name → payload index). Stage0 **`parser.c`/`lowering.c`**, vm-parity **`.sv0b`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
