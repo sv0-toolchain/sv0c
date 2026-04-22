@@ -1621,8 +1621,11 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
 /* ── lower_tag_match (ExprMatch — tag 11 dispatch)
    SML: ExprMatch(scrut, arms, _) in lowerExprToValue.
    Lowers scrutinee via bind_scrut_var, allocates output temp, delegates
-   to lower_match_arms.  scrut_cty defaults to -1 (unknown/scalar) here;
-   full type-aware dispatch requires item-level context from `lower`.
+   to lower_match_arms.
+   `scrut_cty` comes from match_scrut_cty on the scrutinee expression.
+   Empty fn/param/scrut-local tables are passed until `lower_fn` threads
+   real per-function context; 2-seg ExprPath / ExprCall shapes still
+   resolve enum/struct type handles via `pp` (ctor scrutinees, paths).
    Tests omitted: SML compiler function budget (~172 fn limit). */
 
 fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
@@ -1643,7 +1646,17 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let scrut_idx: i32 = vec_get(ed1, idx);
     let arms_first: i32 = vec_get(ed2, idx);
     let arm_count: i32 = vec_get(ed3, idx);
-    let sct: i32 = 0 - 1;
+    let fn_names_mt: Vec<i32> = vec_new();
+    let fn_ret_mt: Vec<i32> = vec_new();
+    let aliases_mt: Vec<i32> = vec_new();
+    let scrut_names_mt: Vec<i32> = vec_new();
+    let scrut_ctys_mt: Vec<i32> = vec_new();
+    let param_names_mt: Vec<i32> = vec_new();
+    let param_ty_mt: Vec<i32> = vec_new();
+    let sct: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, scrut_idx, pp,
+        fn_names_mt, fn_ret_mt, aliases_mt,
+        scrut_names_mt, scrut_ctys_mt, 0,
+        param_names_mt, param_ty_mt);
     let scrut_var: i32 = bind_scrut_var(et, ed1, ed2, ed3, ed4, pp,
                                          tok_tags, scrut_idx, ctr,
                                          out_instrs, enum_names,
