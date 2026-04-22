@@ -2653,9 +2653,85 @@ fn parse_loop_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     return pb;
 }
 
+/* ── pat_leftmost_subtree_rows ────────────────────────────────
+   Row count of one `parse_pat_atom` / `parse_pat` subtree in the
+   flat pat arena (children-before-parent). `s` is the leftmost row
+   index of that subtree. Used to split PatOr alternatives into
+   separate match arms in `parse_match_expr`. */
+
+fn pat_leftmost_subtree_rows(pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                             pat_d2: Vec<i32>, pat_d3: Vec<i32>,
+                             s: i32) -> i32 {
+    let t: i32 = vec_get(pat_tags, s);
+    if t == 0 {
+        return 1;
+    }
+    if t == 1 {
+        return 1;
+    }
+    if t == 2 {
+        return 1;
+    }
+    if t == 3 {
+        let ef: i32 = vec_get(pat_d1, s);
+        let ec: i32 = vec_get(pat_d2, s);
+        let mut cur: i32 = ef;
+        let mut tot: i32 = 0;
+        let mut j: i32 = 0;
+        while j < ec {
+            let part: i32 = pat_leftmost_subtree_rows(pat_tags, pat_d1,
+                pat_d2, pat_d3, cur);
+            tot = tot + part;
+            cur = cur + part;
+            j = j + 1;
+        }
+        let one: i32 = 1;
+        return tot + one;
+    }
+    if t == 4 {
+        let fc: i32 = vec_get(pat_d3, s);
+        let first_f: i32 = s - fc;
+        let mut cur2: i32 = first_f;
+        let mut tot2: i32 = 0;
+        let mut j2: i32 = 0;
+        while j2 < fc {
+            let part2: i32 = pat_leftmost_subtree_rows(pat_tags, pat_d1,
+                pat_d2, pat_d3, cur2);
+            tot2 = tot2 + part2;
+            cur2 = cur2 + part2;
+            j2 = j2 + 1;
+        }
+        let one2: i32 = 1;
+        return tot2 + one2;
+    }
+    if t == 5 {
+        let ac: i32 = vec_get(pat_d3, s);
+        let first_a: i32 = s - ac;
+        let mut cur3: i32 = first_a;
+        let mut tot3: i32 = 0;
+        let mut j3: i32 = 0;
+        while j3 < ac {
+            let part3: i32 = pat_leftmost_subtree_rows(pat_tags, pat_d1,
+                pat_d2, pat_d3, cur3);
+            tot3 = tot3 + part3;
+            cur3 = cur3 + part3;
+            j3 = j3 + 1;
+        }
+        let one3: i32 = 1;
+        return tot3 + one3;
+    }
+    if t == 6 {
+        let fo: i32 = vec_get(pat_d1, s);
+        let span: i32 = s - fo + 1;
+        return span;
+    }
+    return 1;
+}
+
 /* ── match expressions + contract quantifiers ─────────────────
    SML: parseMatchExpr, parseMatchArms, parseQuant.
    Match arms encoded as ExprMatchArm(29) in the expr arena.
+   PatOr(6) expands to one arm per alternative (same guard/body).
    Quantifiers (forall/exists) and old/no_alias encoded as ExprCall. */
 
 fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
@@ -2715,66 +2791,91 @@ fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             }
             if body_pos < 0 { return 0 - 1; }
             let body_idx: i32 = vec_len(et) - 1;
-            let mut arm_ed2: i32 = pat_d1;
-            if pat_tag == 2 || pat_tag == 4 || pat_tag == 5 {
-                if pat_tag == 4 {
-                    let fc: i32 = vec_get(pd3v, pr);
-                    let first_embed: i32 = vec_len(et);
-                    let mut fj: i32 = 0;
-                    while fj < fc {
-                        let row: i32 = pr - fc + fj;
-                        vec_push(et, 31);
-                        vec_push(ed1, vec_get(pd1v, row));
-                        vec_push(ed2, vec_get(pd2v, row));
-                        vec_push(ed3, vec_get(pd3v, row));
-                        vec_push(ed4, vec_get(pt, row));
-                        fj = fj + 1;
-                    }
-                    vec_push(et, 32);
-                    vec_push(ed1, fc);
-                    if fc > 0 {
-                        vec_push(ed2, first_embed);
-                    } else {
-                        vec_push(ed2, 0 - 1);
-                    }
-                    vec_push(ed3, 0);
-                    vec_push(ed4, 0);
+            let alt_roots: Vec<i32> = vec_new();
+            if pat_tag == 6 {
+                let pof: i32 = vec_get(pd1v, pr);
+                let poc: i32 = vec_get(pd2v, pr);
+                let mut crs: i32 = pof;
+                let mut aix: i32 = 0;
+                while aix < poc {
+                    let spro: i32 = pat_leftmost_subtree_rows(pt, pd1v, pd2v,
+                        pd3v, crs);
+                    let aroot: i32 = crs + spro - 1;
+                    vec_push(alt_roots, aroot);
+                    crs = crs + spro;
+                    aix = aix + 1;
                 }
-                if pat_tag == 5 {
-                    let ac: i32 = vec_get(pd3v, pr);
-                    if ac > 0 {
-                        let first_emb_e: i32 = vec_len(et);
-                        let mut aj: i32 = 0;
-                        while aj < ac {
-                            let row_e: i32 = pr - ac + aj;
+            } else {
+                vec_push(alt_roots, pr);
+            }
+            let naltarms: i32 = vec_len(alt_roots);
+            let mut am: i32 = 0;
+            while am < naltarms {
+                let pr_u: i32 = vec_get(alt_roots, am);
+                let pat_tag_u: i32 = vec_get(pt, pr_u);
+                let pat_d1_u: i32 = vec_get(pd1v, pr_u);
+                let mut arm_ed2: i32 = pat_d1_u;
+                if pat_tag_u == 2 || pat_tag_u == 4 || pat_tag_u == 5 {
+                    if pat_tag_u == 4 {
+                        let fc_u: i32 = vec_get(pd3v, pr_u);
+                        let first_embed: i32 = vec_len(et);
+                        let mut fj: i32 = 0;
+                        while fj < fc_u {
+                            let row: i32 = pr_u - fc_u + fj;
                             vec_push(et, 31);
-                            vec_push(ed1, vec_get(pd1v, row_e));
-                            vec_push(ed2, aj);
-                            vec_push(ed3, vec_get(pd3v, row_e));
-                            vec_push(ed4, vec_get(pt, row_e));
-                            aj = aj + 1;
+                            vec_push(ed1, vec_get(pd1v, row));
+                            vec_push(ed2, vec_get(pd2v, row));
+                            vec_push(ed3, vec_get(pd3v, row));
+                            vec_push(ed4, vec_get(pt, row));
+                            fj = fj + 1;
                         }
-                        vec_push(et, 33);
-                        vec_push(ed1, ac);
-                        vec_push(ed2, first_emb_e);
+                        vec_push(et, 32);
+                        vec_push(ed1, fc_u);
+                        if fc_u > 0 {
+                            vec_push(ed2, first_embed);
+                        } else {
+                            vec_push(ed2, 0 - 1);
+                        }
                         vec_push(ed3, 0);
                         vec_push(ed4, 0);
                     }
+                    if pat_tag_u == 5 {
+                        let ac_u: i32 = vec_get(pd3v, pr_u);
+                        if ac_u > 0 {
+                            let first_emb_e: i32 = vec_len(et);
+                            let mut aj: i32 = 0;
+                            while aj < ac_u {
+                                let row_e: i32 = pr_u - ac_u + aj;
+                                vec_push(et, 31);
+                                vec_push(ed1, vec_get(pd1v, row_e));
+                                vec_push(ed2, aj);
+                                vec_push(ed3, vec_get(pd3v, row_e));
+                                vec_push(ed4, vec_get(pt, row_e));
+                                aj = aj + 1;
+                            }
+                            vec_push(et, 33);
+                            vec_push(ed1, ac_u);
+                            vec_push(ed2, first_emb_e);
+                            vec_push(ed3, 0);
+                            vec_push(ed4, 0);
+                        }
+                    }
+                    vec_push(et, 30);
+                    vec_push(ed1, vec_get(pd1v, pr_u));
+                    vec_push(ed2, vec_get(pd2v, pr_u));
+                    vec_push(ed3, vec_get(pd3v, pr_u));
+                    vec_push(ed4, pat_tag_u);
+                    arm_ed2 = vec_len(et) - 1;
                 }
-                vec_push(et, 30);
-                vec_push(ed1, vec_get(pd1v, pr));
-                vec_push(ed2, vec_get(pd2v, pr));
-                vec_push(ed3, vec_get(pd3v, pr));
-                vec_push(ed4, pat_tag);
-                arm_ed2 = vec_len(et) - 1;
+                vec_push(et, 29);
+                vec_push(ed1, pat_tag_u);
+                vec_push(ed2, arm_ed2);
+                vec_push(ed3, guard_idx);
+                vec_push(ed4, body_idx);
+                if arms_first < 0 { arms_first = vec_len(et) - 1; }
+                arm_count = arm_count + 1;
+                am = am + 1;
             }
-            vec_push(et, 29);
-            vec_push(ed1, pat_tag);
-            vec_push(ed2, arm_ed2);
-            vec_push(ed3, guard_idx);
-            vec_push(ed4, body_idx);
-            if arms_first < 0 { arms_first = vec_len(et) - 1; }
-            arm_count = arm_count + 1;
             if ps_peek(tags, body_pos) == 12 {
                 p = body_pos + 1;
             } else {
@@ -5016,6 +5117,44 @@ fn test_parse_match_enum_tuple_arm() -> i32 {
     return 0;
 }
 
+fn test_parse_match_pat_or() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 74); vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 8); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tags, 0); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 29); vec_push(starts, 12); vec_push(ends, 13);
+    vec_push(tags, 0); vec_push(starts, 14); vec_push(ends, 15);
+    vec_push(tags, 20); vec_push(starts, 16); vec_push(ends, 18);
+    vec_push(tags, 0); vec_push(starts, 19); vec_push(ends, 20);
+    vec_push(tags, 9); vec_push(starts, 21); vec_push(ends, 22);
+    vec_push(tags, 97); vec_push(starts, 22); vec_push(ends, 22);
+    let et: Vec<i32> = vec_new();
+    let ed1v: Vec<i32> = vec_new();
+    let ed2v: Vec<i32> = vec_new();
+    let ed3v: Vec<i32> = vec_new();
+    let ed4v: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "match x { 1 | 2 => 3 }", 0,
+                             et, ed1v, ed2v, ed3v, ed4v, pp, 1);
+    if p != 9 { return 1; }
+    let n: i32 = vec_len(et);
+    let mut arm29: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(et, i) == 29 {
+            arm29 = arm29 + 1;
+        }
+        i = i + 1;
+    }
+    if arm29 != 2 { return 2; }
+    if vec_get(et, n - 1) != 11 { return 3; }
+    if vec_get(ed3v, n - 1) != 2 { return 4; }
+    return 0;
+}
+
 fn test_parse_quant() -> i32 {
     let tags: Vec<i32> = vec_new();
     let starts: Vec<i32> = vec_new();
@@ -5534,7 +5673,9 @@ fn main() -> i32 {
     let r62: i32 = test_parse_match_guard();
     if r62 != 0 { return 730 + r62; }
     let r62b: i32 = test_parse_match_enum_tuple_arm();
+    let r62c: i32 = test_parse_match_pat_or();
     if r62b != 0 { return 735 + r62b; }
+    if r62c != 0 { return 736 + r62c; }
     let r63: i32 = test_parse_quant();
     if r63 != 0 { return 740 + r63; }
     let r64: i32 = test_parse_old();

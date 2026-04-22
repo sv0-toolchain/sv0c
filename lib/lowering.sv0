@@ -181,7 +181,7 @@ fn parse_decimal_i32_from_tok(source: string, starts: Vec<i32>, ends: Vec<i32>,
    out_instrs.  ctr is a single-element Vec for the temp counter.
    Handles:
      0 ExprLit       → lower_lit_to_ir_value
-     1 ExprPath      → VVar (1-seg); 2-seg deferred
+     1 ExprPath      → VVar (1-seg); 2-seg enum path → nullary ctor
      2 ExprUnop      → Borrow/BorrowMut on ExprPath → VAddrOf;
                         otherwise recurse + Assign(tmp, Unop)
      3 ExprBinop     → recurse lhs+rhs, Assign(tmp, Binop)
@@ -1301,7 +1301,7 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    via parser is_neg + positive int token); bool literals (`lit_tag` 5)
    match SML: `true` → scrutinee `!= 0`, `false` → `== 0` (token 91 =
    true); unary `-` inverts which branch fires; other literal kinds with
-   negation remain stubbed;
+   non-int/bool literals use `!=` when `is_neg` is set;
    PatEnum(5) with ExprPatExtra when path has >=2 segments: tag field
    `VMember(scrut,-1)` vs variant discriminant; tuple args: ExprPatEnumMeta
    (33) + ExprPatFieldEmbed rows with ed2 = payload index → Assign to
@@ -1423,8 +1423,11 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             }
                         } else {
                             if is_neg2 == 1 {
-                                cexp = Expr::Literal(
-                                    box_new(Value::VBoolTrue));
+                                let rv_n: Value = lower_lit_to_ir_value(
+                                    lt2, tp2, tok_tags);
+                                let lv_n: Value = Value::VVar(scrut_var);
+                                cexp = Expr::Binop(5, box_new(lv_n),
+                                                    box_new(rv_n));
                             } else {
                                 let rv3: Value = lower_lit_to_ir_value(
                                     lt2, tp2, tok_tags);
@@ -3386,7 +3389,7 @@ fn lower_alias_replace(target: Vec<i32>,
    single-segment paths.  Returns a type name token handle, or
    -1 for "int" (default).
    Tag reference: 0=ExprLit, 1=ExprPath, 4=ExprCall,
-                  25=ExprTuple. */
+                  24=ExprStruct, 25=ExprTuple. */
 
 fn match_scrut_cty(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
@@ -3398,6 +3401,10 @@ fn match_scrut_cty(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    param_names: Vec<i32>, param_ty_handles: Vec<i32>) -> i32 {
     if idx < 0 { return 0 - 1; }
     let tag: i32 = vec_get(et, idx);
+    if tag == 24 {
+        let pps24: i32 = vec_get(ed1, idx);
+        return vec_get(pp, pps24);
+    }
     if tag == 1 {
         let pps: i32 = vec_get(ed1, idx);
         let ppc: i32 = vec_get(ed2, idx);
