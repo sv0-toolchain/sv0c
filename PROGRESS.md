@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-22 (America/Denver; **M3 slice E — `lower_tag_match` scrutinee typing:** **`lower_tag_match`** calls **`match_scrut_cty`** on the scrutinee (empty fn/param/scrut-local tables until orchestrator threads them) so **`bind_scrut_var`** / **`PatBind`** use **`DeclNamed`** when a non-scalar type handle resolves from **`pp`** / callee shape. Stage0 **`lowering.c`**, vm-parity **`lowering.sv0b`**. Prior **slice D** (`PatEnum` tuple **`bindPre`**) unchanged. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-22 (America/Denver; **M3 slice F — match `PatOr` + scrut typing + `PatLit` neg:** **`parse_match_expr`** expands **`PatOr`** to one arm per alternative (**`pat_leftmost_subtree_rows`**); **`match_scrut_cty`** **`ExprStruct` (24)**; **`lower_match_arms`** non-int/bool **`PatLit`** **`is_neg`** → **`!=`**. Stage0 **`parser.c`/`lowering.c`**, vm-parity **`parser.sv0b`/`lowering.sv0b`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
