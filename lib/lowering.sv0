@@ -1621,14 +1621,37 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return 0;
 }
 
+/* ── lower_top_fn_tables_for_match ───────────────────────────
+   Push every top-level ItemFn (item tag 0) name handle from the item
+   arena in program order into `fn_names`, with a parallel `fn_ret`
+   entry per function.  Return type handles are **-1** placeholders until
+   a later slice threads real typedef token positions from signatures;
+   `callee_fn_index` can still resolve the callee slot for diagnostics
+   and future ret-type wiring. */
+
+fn lower_top_fn_tables_for_match(item_tags: Vec<i32>, item_names: Vec<i32>,
+                                  fn_names: Vec<i32>, fn_ret: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 0 {
+            vec_push(fn_names, vec_get(item_names, i));
+            vec_push(fn_ret, 0 - 1);
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
 /* ── lower_tag_match (ExprMatch — tag 11 dispatch)
    SML: ExprMatch(scrut, arms, _) in lowerExprToValue.
    Lowers scrutinee via bind_scrut_var, allocates output temp, delegates
    to lower_match_arms.
    `scrut_cty` comes from match_scrut_cty on the scrutinee expression.
-   Empty fn/param/scrut-local tables are passed until `lower_fn` threads
-   real per-function context; 2-seg ExprPath / ExprCall shapes still
-   resolve enum/struct type handles via `pp` (ctor scrutinees, paths).
+   Top-level ItemFn names populate `match_scrut_cty` callee lookup;
+   param / scrut-local tables and real per-fn return typedefs remain
+   future slices.  2-seg ExprPath / ExprCall shapes still resolve
+   enum/struct type handles via `pp` (ctor scrutinees, paths).
    Tests omitted: SML compiler function budget (~172 fn limit). */
 
 fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
@@ -1651,6 +1674,8 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let arm_count: i32 = vec_get(ed3, idx);
     let fn_names_mt: Vec<i32> = vec_new();
     let fn_ret_mt: Vec<i32> = vec_new();
+    let discard_ft: i32 = lower_top_fn_tables_for_match(item_tags,
+        item_names, fn_names_mt, fn_ret_mt);
     let aliases_mt: Vec<i32> = vec_new();
     let scrut_names_mt: Vec<i32> = vec_new();
     let scrut_ctys_mt: Vec<i32> = vec_new();
@@ -1919,10 +1944,10 @@ fn build_builtin_map(tok_tags: Vec<i32>, source: string,
    Builds struct/enum infrastructure, collects C typedefs, and
    iterates ItemFn items to produce IR block metadata.
 
-   Body lowering for each ItemFn is deferred: lower_fn requires
-   per-function expression arenas (et/ed1-ed4) which are ephemeral
-   in parse_fn_body.  The caller must re-parse each function body
-   and call lower_fn with the resulting arenas.
+   Body lowering uses the shared `body_et`/`body_ed*` arenas plus the
+   parser path pool `body_pp` (same `pp` passed to `parse_program` /
+   `parse_fn_body`) so ExprPath indices resolve.  Callers must supply
+   arenas and `body_pp` from the same parse pass.
 
    Output:
      out_block_labels — one name handle per ItemFn (insertion order)
@@ -1949,8 +1974,9 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          out_enum_tag_flat: Vec<i32>,
          out_enum_max: Vec<i32>,
          body_et: Vec<i32>, body_ed1: Vec<i32>,
-         body_ed2: Vec<i32>, body_ed3: Vec<i32>,
+         body_ed2: Vec<i32>,          body_ed3: Vec<i32>,
          body_ed4: Vec<i32>, body_sf: Vec<i32>,
+         body_pp: Vec<i32>,
          tok_tags: Vec<i32>,
          out_blocks: Vec<i32>) -> string {
     let discard_so: i32 = build_struct_order(item_tags, item_names,
@@ -1981,7 +2007,6 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
     if has_body_arenas > 0 {
         builtin_map = build_builtin_map(tok_tags, source, starts, ends);
     }
-    let pp: Vec<i32> = vec_new();
     let fn_ctx: Vec<i32> = vec_new();
     let n: i32 = vec_len(item_tags);
     let mut i: i32 = 0;
@@ -1994,7 +2019,7 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
             if has_body_arenas > 0 {
                 if body_root >= 0 {
                     let discard_lf: i32 = lower_fn(body_et, body_ed1, body_ed2,
-                                                    body_ed3, body_ed4, pp,
+                                                    body_ed3, body_ed4, body_pp,
                                                     tok_tags, body_root, instrs,
                                                     out_enum_names,
                                                     out_enum_tag_offsets,
@@ -3401,6 +3426,11 @@ fn match_scrut_cty(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    param_names: Vec<i32>, param_ty_handles: Vec<i32>) -> i32 {
     if idx < 0 { return 0 - 1; }
     let tag: i32 = vec_get(et, idx);
+    /* ExprLit scrutinee: treat like unknown scalar (-1), same as
+       expr_init_cty default for literals. */
+    if tag == 0 {
+        return 0 - 1;
+    }
     if tag == 24 {
         let pps24: i32 = vec_get(ed1, idx);
         return vec_get(pp, pps24);
@@ -4263,6 +4293,24 @@ fn test_match_scrut_cty() -> i32 {
     let r3: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 0 - 1,
                        pp, fnn, frc, al, sn, sc, 0, pn, pt);
     if r3 != 0 - 1 { return 3; }
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    let r4: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 2,
+                       pp, fnn, frc, al, sn, sc, 0, pn, pt);
+    if r4 != 0 - 1 { return 4; }
+    vec_push(et, 4);
+    vec_push(ed1, 1);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
+    vec_push(fnn, 42);
+    vec_push(frc, 200);
+    let r5: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, 3,
+                       pp, fnn, frc, al, sn, sc, 0, pn, pt);
+    if r5 != 200 { return 5; }
     return 0;
 }
 
@@ -5427,6 +5475,7 @@ fn test_lower_program_fn() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let bpp: Vec<i32> = vec_new();
     let ttags: Vec<i32> = vec_new();
     let oblks: Vec<i32> = vec_new();
     let td: string = lower(it, id1, id2, id3, id4, ifc, ivm,
@@ -5435,7 +5484,7 @@ fn test_lower_program_fn() -> i32 {
                              ob, osn, oso, osc, osf,
                              oen, oeto, oetc, oetf, oem,
                              bet, be1, be2, be3, be4, bsf,
-                             ttags, oblks);
+                             bpp, ttags, oblks);
     if vec_len(ob) != 1 { return 1; }
     if vec_get(ob, 0) != 3 { return 2; }
     if vec_len(osn) != 1 { return 3; }
