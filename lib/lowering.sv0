@@ -1713,6 +1713,71 @@ fn lower_scan_fn_ret_ty_tok(tok_tags: Vec<i32>, source: string,
     return p3;
 }
 
+/* ── lower_match_env (packed Vec<i32> — option B) ───────────
+   Versioned header + contiguous sub-slices for match-time callee /
+   param / scrut tables.  See `doc/transliteration-plan.md` §Lowering
+   match environment.  `magic == 0` or `len < 11` = legacy path: build
+   `fn_names` / `fn_ret` locally (current `lower_tag_match`). */
+
+fn lower_match_env_hdr_len() -> i32 {
+    return 11;
+}
+
+fn lower_match_env_magic_legacy() -> i32 {
+    return 0;
+}
+
+fn lower_match_env_magic_v0() -> i32 {
+    return 1297235969;
+}
+
+fn lower_match_env_version_v0() -> i32 {
+    return 1;
+}
+
+fn lower_match_env_is_legacy_path(env: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(env);
+    let h: i32 = lower_match_env_hdr_len();
+    if n < h {
+        return 1;
+    }
+    if vec_get(env, 0) == lower_match_env_magic_legacy() {
+        return 1;
+    }
+    return 0;
+}
+
+fn lower_match_env_is_packed_v0(env: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(env);
+    let h: i32 = lower_match_env_hdr_len();
+    if n < h {
+        return 0;
+    }
+    if vec_get(env, 0) != lower_match_env_magic_v0() {
+        return 0;
+    }
+    if vec_get(env, 1) != lower_match_env_version_v0() {
+        return 0;
+    }
+    return 1;
+}
+
+fn lower_match_env_alloc_v0_empty_header() -> Vec<i32> {
+    let e: Vec<i32> = vec_new();
+    vec_push(e, lower_match_env_magic_v0());
+    vec_push(e, lower_match_env_version_v0());
+    vec_push(e, 0 - 1);
+    vec_push(e, 0 - 1);
+    vec_push(e, 0);
+    vec_push(e, 0 - 1);
+    vec_push(e, 0 - 1);
+    vec_push(e, 0);
+    vec_push(e, 0 - 1);
+    vec_push(e, 0 - 1);
+    vec_push(e, 0);
+    return e;
+}
+
 /* ── lower_top_fn_tables_for_match ───────────────────────────
    Push every top-level ItemFn (item tag 0) name handle from the item
    arena in program order into `fn_names`, with a parallel `fn_ret`
@@ -6018,6 +6083,28 @@ fn test_build_builtin_map() -> i32 {
     return 0;
 }
 
+fn test_lower_match_env_helpers() -> i32 {
+    let empty: Vec<i32> = vec_new();
+    if lower_match_env_is_legacy_path(empty) != 1 { return 1; }
+    if lower_match_env_is_packed_v0(empty) != 0 { return 2; }
+    let hdr: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    if vec_len(hdr) != lower_match_env_hdr_len() { return 3; }
+    if lower_match_env_is_packed_v0(hdr) != 1 { return 4; }
+    if lower_match_env_is_legacy_path(hdr) != 0 { return 5; }
+    if vec_get(hdr, 0) != lower_match_env_magic_v0() { return 6; }
+    if vec_get(hdr, 4) != 0 { return 7; }
+    let mut bad: Vec<i32> = vec_new();
+    vec_push(bad, lower_match_env_magic_v0());
+    vec_push(bad, 2);
+    let mut k: i32 = 2;
+    while k < lower_match_env_hdr_len() {
+        vec_push(bad, 0);
+        k = k + 1;
+    }
+    if lower_match_env_is_packed_v0(bad) != 0 { return 8; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r3: i32 = test_binop_to_c();
     if r3 != 0 { return 30 + r3; }
@@ -6173,6 +6260,8 @@ fn main() -> i32 {
     if r69 != 0 { return 920 + r69; }
     let r70: i32 = test_lower_try();
     if r70 != 0 { return 940 + r70; }
+    let r70e: i32 = test_lower_match_env_helpers();
+    if r70e != 0 { return 955 + r70e; }
     let r71: i32 = test_build_builtin_map();
     if r71 != 0 { return 960 + r71; }
     return 0;

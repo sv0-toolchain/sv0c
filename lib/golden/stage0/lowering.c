@@ -41,6 +41,13 @@ static int lower_match_skip_generic_params(int tags, int pos);
 static int lower_match_skip_bracket_group(int tags, int pos);
 static int lower_skip_paren_group_with_generics(int tags, int open_pos);
 static int lower_scan_fn_ret_ty_tok(int tok_tags, const char* source, int starts, int ends, int name_tok);
+static int lower_match_env_hdr_len(void);
+static int lower_match_env_magic_legacy(void);
+static int lower_match_env_magic_v0(void);
+static int lower_match_env_version_v0(void);
+static int lower_match_env_is_legacy_path(int env);
+static int lower_match_env_is_packed_v0(int env);
+static int lower_match_env_alloc_v0_empty_header(void);
 static int lower_top_fn_tables_for_match(int item_tags, int item_names, int item_d2, const char* source, int starts, int ends, int tok_tags, int fn_names, int fn_ret);
 static Value lower_tag_match(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_field_counts, int enum_vnames_flat);
 static int lower_return(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_field_counts, int enum_vnames_flat);
@@ -208,6 +215,7 @@ static int test_lower_for_effect_fn(void);
 static int test_lower_enum_ctor(void);
 static int test_lower_try(void);
 static int test_build_builtin_map(void);
+static int test_lower_match_env_helpers(void);
 
 static int ir_value_tag(Value v) {
   int _sv0t0;
@@ -3499,6 +3507,89 @@ static int lower_scan_fn_ret_ty_tok(int tok_tags, const char* source, int starts
   } else {
   }
   return p3;
+}
+
+static int lower_match_env_hdr_len(void) {
+  return 11;
+}
+
+static int lower_match_env_magic_legacy(void) {
+  return 0;
+}
+
+static int lower_match_env_magic_v0(void) {
+  return 1297235969;
+}
+
+static int lower_match_env_version_v0(void) {
+  return 1;
+}
+
+static int lower_match_env_is_legacy_path(int env) {
+  int _sv0t0 = sv0_vec_len(env);
+  int n = _sv0t0;
+  int _sv0t1 = lower_match_env_hdr_len();
+  int h = _sv0t1;
+  if ((n < h)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(env, 0);
+  int _sv0t3 = lower_match_env_magic_legacy();
+  if ((_sv0t2 == _sv0t3)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int lower_match_env_is_packed_v0(int env) {
+  int _sv0t0 = sv0_vec_len(env);
+  int n = _sv0t0;
+  int _sv0t1 = lower_match_env_hdr_len();
+  int h = _sv0t1;
+  if ((n < h)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(env, 0);
+  int _sv0t3 = lower_match_env_magic_v0();
+  if ((_sv0t2 != _sv0t3)) {
+    return 0;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(env, 1);
+  int _sv0t5 = lower_match_env_version_v0();
+  if ((_sv0t4 != _sv0t5)) {
+    return 0;
+  } else {
+  }
+  return 1;
+}
+
+static int lower_match_env_alloc_v0_empty_header(void) {
+  int _sv0t0 = sv0_vec_new();
+  int e = _sv0t0;
+  int _sv0t1 = lower_match_env_magic_v0();
+  sv0_vec_push(e, _sv0t1);
+  int _sv0t2 = lower_match_env_version_v0();
+  sv0_vec_push(e, _sv0t2);
+  int _sv0t3 = (0 - 1);
+  sv0_vec_push(e, _sv0t3);
+  int _sv0t4 = (0 - 1);
+  sv0_vec_push(e, _sv0t4);
+  sv0_vec_push(e, 0);
+  int _sv0t5 = (0 - 1);
+  sv0_vec_push(e, _sv0t5);
+  int _sv0t6 = (0 - 1);
+  sv0_vec_push(e, _sv0t6);
+  sv0_vec_push(e, 0);
+  int _sv0t7 = (0 - 1);
+  sv0_vec_push(e, _sv0t7);
+  int _sv0t8 = (0 - 1);
+  sv0_vec_push(e, _sv0t8);
+  sv0_vec_push(e, 0);
+  return e;
 }
 
 static int lower_top_fn_tables_for_match(int item_tags, int item_names, int item_d2, const char* source, int starts, int ends, int tok_tags, int fn_names, int fn_ret) {
@@ -10882,6 +10973,67 @@ static int test_build_builtin_map(void) {
   return 0;
 }
 
+static int test_lower_match_env_helpers(void) {
+  int _sv0t0 = sv0_vec_new();
+  int empty = _sv0t0;
+  int _sv0t1 = lower_match_env_is_legacy_path(empty);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = lower_match_env_is_packed_v0(empty);
+  if ((_sv0t2 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = lower_match_env_alloc_v0_empty_header();
+  int hdr = _sv0t3;
+  int _sv0t4 = sv0_vec_len(hdr);
+  int _sv0t5 = lower_match_env_hdr_len();
+  if ((_sv0t4 != _sv0t5)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = lower_match_env_is_packed_v0(hdr);
+  if ((_sv0t6 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = lower_match_env_is_legacy_path(hdr);
+  if ((_sv0t7 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(hdr, 0);
+  int _sv0t9 = lower_match_env_magic_v0();
+  if ((_sv0t8 != _sv0t9)) {
+    return 6;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(hdr, 4);
+  if ((_sv0t10 != 0)) {
+    return 7;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int bad = _sv0t11;
+  int _sv0t12 = lower_match_env_magic_v0();
+  sv0_vec_push(bad, _sv0t12);
+  sv0_vec_push(bad, 2);
+  int k = 2;
+  int _sv0t13 = lower_match_env_hdr_len();
+  while ((k < _sv0t13)) {
+    sv0_vec_push(bad, 0);
+    k = (k + 1);
+  }
+  int _sv0t14 = lower_match_env_is_packed_v0(bad);
+  if ((_sv0t14 != 0)) {
+    return 8;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_to_c();
   int r3 = _sv0t0;
@@ -11422,11 +11574,18 @@ int main(void) {
     return _sv0t153;
   } else {
   }
-  int _sv0t154 = test_build_builtin_map();
-  int r71 = _sv0t154;
-  if ((r71 != 0)) {
-    int _sv0t155 = (960 + r71);
+  int _sv0t154 = test_lower_match_env_helpers();
+  int r70e = _sv0t154;
+  if ((r70e != 0)) {
+    int _sv0t155 = (955 + r70e);
     return _sv0t155;
+  } else {
+  }
+  int _sv0t156 = test_build_builtin_map();
+  int r71 = _sv0t156;
+  if ((r71 != 0)) {
+    int _sv0t157 = (960 + r71);
+    return _sv0t157;
   } else {
   }
   return 0;
