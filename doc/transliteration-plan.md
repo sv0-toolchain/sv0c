@@ -14,8 +14,33 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 2. **Phase / row-level** tracking lives in **`task/sv0-toolchain-milestone-3-checklist.Rmd`** — link it from decomposition notes; do not fork a second full inventory here.
 3. **Regenerate the snapshot** below after material **`bootstrap-sources.list`**, **`self-host-sv0-loop.list`**, stage0 goldens, or vm-parity manifest churn (counts are advisory; CI truth is the files).
 
+## Lowering match environment (design — option **B**)
+
+**Stakeholder choice (2026-04-23):** Thread match-time context beyond the item arena (**`item_tags` / `item_names` / `item_d2` / …**) using **(B) a documented packed `Vec<i32>`** (plus existing program-level vecs where they already exist), **not** **(A)** an ever-growing tail of parallel parameters on **`lower_expr_to_value`** and every tag helper.
+
+**Rationale:** new fields (**per-fn param name/type pairs**, scrut-local stacks, future import-alias slices) should land as **new regions** in one **versioned** buffer with a single pack/unpack story. That maximizes **flexibility** and keeps **comprehensive** SML parity work from re-touching dozens of signatures (and from fighting bootstrap **function-count** / per-function **expression-depth** limits) every time the match pipeline gains another table.
+
+**Sketch: `lower_match_env: Vec<i32>` v0 (indices are element offsets into the same vec)**
+
+1. **`[0]`** — **`magic`**: sentinel **`0x4D450001`** (**`1297235969`** as **`i32`**) if the vec is a real env, or **`0`** when callers pass an **empty** vec and callees synthesize fresh callee tables locally (today’s **`lower_tag_match`** behaviour).
+2. **`[1]`** — **`version`**: **`1`** for this layout.
+3. **`[2]`** — **`fn_names_base`**: start index of the **`fn_names`** flat run (**`-1`** if none inlined).
+4. **`[3]`** — **`fn_ret_base`**: parallel **`fn_ret`** run (**`-1`** if none).
+5. **`[4]`** — **`fn_count`**: length of those two parallel runs ( **`0`** when tables are built fresh per match).
+6. **`[5]`** — **`param_names_base`**: stride-1 name-token handles (**`-1`** until **`lower_fn`** threads params).
+7. **`[6]`** — **`param_ty_base`**: stride-1 typedef / token handles (**`-1`** until wired).
+8. **`[7]`** — **`param_count`**: **`0`** until wired.
+9. **`[8]`** — **`scrut_names_base`**: reserved for scrut-local name handles (mirror **`scrut_locals_push`**).
+10. **`[9]`** — **`scrut_ty_base`**: parallel scrut-local type handles.
+11. **`[10]`** — **`scrut_count`**: scrut-local pair count (**`0`** until wired).
+
+**Packing rule:** regions are **contiguous** sub-slices of **`lower_match_env`**; bases are **absolute indices**; lengths live in the header. Helpers **`lower_match_env_alloc`**, **`lower_match_env_slice`**, **`lower_match_env_set_fn_table`** (names) keep call sites small.
+
+**Migration order:** (1) introduce vec + helpers + **`magic=0`** “legacy empty” path with **no** behaviour change — **landed in code:** **`lower_match_env_*`** in **`lib/lowering.sv0`** + **`test_lower_match_env_helpers`** (packed v0 header alloc + legacy / packed probes; **`lower_tag_match`** still builds callee tables locally); (2) move **`lower_top_fn_tables_for_match`** output into a packed region for **`lower_tag_match`**; (3) thread **`lower_fn`**-built param slices into **`[5..7]`**; (4) fold scrut-local **`Vec`s** into **`[8..10]`** when lowering nested match inside the same function.
+
 **Session notes (non-normative)**
 
+- **2026-04-23 (match env packaging):** Stakeholder direction **(B)** — **`lower_match_env_*`** helpers + **`test_lower_match_env_helpers`** in **`lib/lowering.sv0`** (migration step (1)); **`lower_tag_match`** still uses local **`fn_names_mt`/`fn_ret_mt`**. Next: pack callee tables into **`lower_match_env`** for **`lower_tag_match`** (migration step (2)).
 - **2026-04-22 (match context plumbing):** **`lower`** takes shared parser **`body_pp`** (path pool) and passes it to **`lower_fn`** (was empty **`Vec`**); **`lower_top_fn_tables_for_match`** fills **`match_scrut_cty`** callee **`fn_names`** from ItemFn rows with **`-1`** return-type placeholders; **`match_scrut_cty`** **`ExprLit` (0)** → **`-1`**; extended **`test_match_scrut_cty`**. Next: param / scrut-local **`Vec`**s + real per-fn return typedef handles from signatures.
 - **2026-04-22 (later — `fn_ret` handles):** **`item_d2`** threaded through the lowering expression pipeline; **`lower_scan_fn_ret_ty_tok`** rescans from each ItemFn **name** token (fn generics + **`(`**…**`)`** skip with **`<>`** / **`[]`**, then **`->`**) and records the **first return-type token** for **`match_scrut_cty`** / **`expr_init_cty`** when **`has_ret`** (**`item_d2 % 2`**) is set; otherwise **`-1`**. Does **not** call **`parse_type`** (self-host TU order); exotic return shapes may still fall back to **`-1`**. Next: param / scrut-local **`Vec`**s; optional **`parse_type`** alignment once link order allows.
 - **2026-04-22:** **`lower_match_arms`** **`PatEnum`** tuple ctor arms (`Enum::Var(pat,…)`) — parser **`ExprPatEnumMeta` (33)** + **`ExprPatFieldEmbed`** rows with payload slot index; lowering **`Assign`** from **`VMember(scrut, 0-10-pi)`** (SML **`VariantTuple`** **`bindPre`**).

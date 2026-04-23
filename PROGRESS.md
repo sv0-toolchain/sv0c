@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-22 (America/Denver; **M3 — match `fn_ret` token rescan + `item_d2` plumbing:** **`item_d2: Vec<i32>`** threaded through **`lower_expr_to_value`** / tag helpers / **`lower_fn`**; **`lower_scan_fn_ret_ty_tok`** (lexer-only skip after ItemFn name → **`->`** head token); **`lower_top_fn_tables_for_match`** fills real return-type handles when **`item_d2`** **`has_ret`** and scan succeed (**`-1`** fallback); tests + stage0 **`lowering.c`** + vm-parity **`lowering.sv0b`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-23 (America/Denver; **M3 — match env:** **(B)** design in **`doc/transliteration-plan.md`** / **`lib/LAYOUT.md`**; **code slice:** **`lower_match_env_*`** helpers + **`test_lower_match_env_helpers`** in **`lib/lowering.sv0`** (migration step 1 — no **`lower_tag_match`** table move yet); stage0 + vm-parity **`lowering`** goldens refreshed. Prior **2026-04-22:** **`item_d2`** + **`lower_scan_fn_ret_ty_tok`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
