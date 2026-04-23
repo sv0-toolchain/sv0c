@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-23 (America/Denver; **M3 — match env (B):** migration **(2)** — **`lower_tag_match`** builds packed **`lower_match_env`** with top-level **`fn_names`/`fn_ret`**, unpacks for **`match_scrut_cty`**; **`test_lower_match_env_fn_pack_roundtrip`**; stage0 + vm-parity **`lowering`** goldens. Prior same day: **(1)** env header helpers. Prior **2026-04-22:** **`item_d2`** + **`lower_scan_fn_ret_ty_tok`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-23 (America/Denver; **M3 — match env (B):** migration **(3)** + callee read-through — **`item_d3`/`item_d4`/`item_fn_row`** through lowering expr pipeline; **`lower_match_env_append_item_fn_param_rows`** + **`lower_scan_item_fn_param_names_ty_toks`**; **`match_scrut_cty`** reads callee **`[2..4]`** and param **`[5..7]`** from packed **`match_env`** (**`callee_fn_index_match_env`**); **`lower_tag_match`** drops unpack copy; test fixtures + **`test_match_scrut_cty`** updated; stage0 **`lowering.c`** + full vm-parity **`bash scripts/capture_vm_parity_goldens.sh`** refresh. Prior same day: **(2)** pack→unpack step; **(1)** header helpers. Prior **2026-04-22:** **`item_d2`** + **`lower_scan_fn_ret_ty_tok`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
