@@ -1778,6 +1778,84 @@ fn lower_match_env_alloc_v0_empty_header() -> Vec<i32> {
     return e;
 }
 
+/* Appends parallel `fn_names` / `fn_ret` runs after the v0 header and
+   patches `[2]`..`[4]` (`fn_names_base`, `fn_ret_base`, `fn_count`).
+   Requires `lower_match_env_is_packed_v0(env)`.  Empty program yields
+   `fn_count == 0` and bases **-1**. */
+
+fn lower_match_env_append_top_fn_match_tables(env: Vec<i32>,
+    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
+    source: string, starts: Vec<i32>, ends: Vec<i32>,
+    tok_tags: Vec<i32>) -> i32 {
+    if lower_match_env_is_packed_v0(env) != 1 {
+        return 0 - 1;
+    }
+    let names_tmp: Vec<i32> = vec_new();
+    let ret_tmp: Vec<i32> = vec_new();
+    let discard_tbl: i32 = lower_top_fn_tables_for_match(item_tags,
+        item_names, item_d2, source, starts, ends, tok_tags, names_tmp,
+        ret_tmp);
+    let fc: i32 = vec_len(names_tmp);
+    if fc != vec_len(ret_tmp) {
+        return 0 - 2;
+    }
+    if fc == 0 {
+        vec_set(env, 2, 0 - 1);
+        vec_set(env, 3, 0 - 1);
+        vec_set(env, 4, 0);
+        return 0;
+    }
+    let bfn: i32 = vec_len(env);
+    let mut i: i32 = 0;
+    while i < fc {
+        vec_push(env, vec_get(names_tmp, i));
+        i = i + 1;
+    }
+    let brt: i32 = vec_len(env);
+    i = 0;
+    while i < fc {
+        vec_push(env, vec_get(ret_tmp, i));
+        i = i + 1;
+    }
+    vec_set(env, 2, bfn);
+    vec_set(env, 3, brt);
+    vec_set(env, 4, fc);
+    return 0;
+}
+
+/* Copies packed callee tables into standalone vecs for `match_scrut_cty`
+   (until that helper reads env offsets directly). */
+
+fn lower_match_env_unpack_fn_tables_for_match(env: Vec<i32>,
+    fn_names_out: Vec<i32>, fn_ret_out: Vec<i32>) -> i32 {
+    if lower_match_env_is_packed_v0(env) != 1 {
+        return 0 - 1;
+    }
+    let fc: i32 = vec_get(env, 4);
+    if fc == 0 {
+        return 0;
+    }
+    let bfn: i32 = vec_get(env, 2);
+    let brt: i32 = vec_get(env, 3);
+    if bfn < 0 {
+        return 0 - 2;
+    }
+    if brt < 0 {
+        return 0 - 3;
+    }
+    let mut j: i32 = 0;
+    while j < fc {
+        vec_push(fn_names_out, vec_get(env, bfn + j));
+        j = j + 1;
+    }
+    j = 0;
+    while j < fc {
+        vec_push(fn_ret_out, vec_get(env, brt + j));
+        j = j + 1;
+    }
+    return 0;
+}
+
 /* ── lower_top_fn_tables_for_match ───────────────────────────
    Push every top-level ItemFn (item tag 0) name handle from the item
    arena in program order into `fn_names`, with a parallel `fn_ret`
@@ -1815,9 +1893,10 @@ fn lower_top_fn_tables_for_match(item_tags: Vec<i32>, item_names: Vec<i32>,
    Lowers scrutinee via bind_scrut_var, allocates output temp, delegates
    to lower_match_arms.
    `scrut_cty` comes from match_scrut_cty on the scrutinee expression.
-   Top-level ItemFn names populate `match_scrut_cty` callee lookup, with
-   per-fn return type token handles from `item_d2` + rescan when present.
-   Param / scrut-local tables remain future slices.  2-seg ExprPath /
+   Callee **`fn_names` / `fn_ret`** are stored in a packed **`lower_match_env`**
+   then unpacked for **`match_scrut_cty`** (migration step 2 — single
+   canonical buffer for future threading).  Param / scrut-local tables
+   remain future slices.  2-seg ExprPath /
    ExprCall shapes still resolve
    enum/struct type handles via `pp` (ctor scrutinees, paths).
    Tests omitted: SML compiler function budget (~172 fn limit). */
@@ -1840,11 +1919,14 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let scrut_idx: i32 = vec_get(ed1, idx);
     let arms_first: i32 = vec_get(ed2, idx);
     let arm_count: i32 = vec_get(ed3, idx);
+    let match_env: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    let discard_ap: i32 = lower_match_env_append_top_fn_match_tables(
+        match_env, item_tags, item_names, item_d2, source, starts, ends,
+        tok_tags);
     let fn_names_mt: Vec<i32> = vec_new();
     let fn_ret_mt: Vec<i32> = vec_new();
-    let discard_ft: i32 = lower_top_fn_tables_for_match(item_tags,
-        item_names, item_d2, source, starts, ends, tok_tags,
-        fn_names_mt, fn_ret_mt);
+    let discard_un: i32 = lower_match_env_unpack_fn_tables_for_match(
+        match_env, fn_names_mt, fn_ret_mt);
     let aliases_mt: Vec<i32> = vec_new();
     let scrut_names_mt: Vec<i32> = vec_new();
     let scrut_ctys_mt: Vec<i32> = vec_new();
@@ -6105,6 +6187,44 @@ fn test_lower_match_env_helpers() -> i32 {
     return 0;
 }
 
+fn test_lower_match_env_fn_pack_roundtrip() -> i32 {
+    let env: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    let tags: Vec<i32> = vec_new();
+    let names: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    vec_push(tags, 0);
+    vec_push(names, 100);
+    vec_push(d2, 0);
+    let src: string = "";
+    let sts: Vec<i32> = vec_new();
+    let ens: Vec<i32> = vec_new();
+    let tt: Vec<i32> = vec_new();
+    let ap: i32 = lower_match_env_append_top_fn_match_tables(env, tags,
+        names, d2, src, sts, ens, tt);
+    if ap != 0 { return 1; }
+    let from_env_n: Vec<i32> = vec_new();
+    let from_env_r: Vec<i32> = vec_new();
+    let un: i32 = lower_match_env_unpack_fn_tables_for_match(env,
+        from_env_n, from_env_r);
+    if un != 0 { return 2; }
+    let direct_n: Vec<i32> = vec_new();
+    let direct_r: Vec<i32> = vec_new();
+    let du: i32 = lower_top_fn_tables_for_match(tags, names, d2, src,
+        sts, ens, tt, direct_n, direct_r);
+    if du != 0 { return 3; }
+    if vec_len(from_env_n) != vec_len(direct_n) { return 4; }
+    if vec_len(from_env_r) != vec_len(direct_r) { return 5; }
+    let mut j: i32 = 0;
+    let nlen: i32 = vec_len(direct_n);
+    while j < nlen {
+        if vec_get(from_env_n, j) != vec_get(direct_n, j) { return 6; }
+        if vec_get(from_env_r, j) != vec_get(direct_r, j) { return 7; }
+        j = j + 1;
+    }
+    if vec_get(env, 4) != 1 { return 8; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r3: i32 = test_binop_to_c();
     if r3 != 0 { return 30 + r3; }
@@ -6262,6 +6382,8 @@ fn main() -> i32 {
     if r70 != 0 { return 940 + r70; }
     let r70e: i32 = test_lower_match_env_helpers();
     if r70e != 0 { return 955 + r70e; }
+    let r70f: i32 = test_lower_match_env_fn_pack_roundtrip();
+    if r70f != 0 { return 956 + r70f; }
     let r71: i32 = test_build_builtin_map();
     if r71 != 0 { return 960 + r71; }
     return 0;
