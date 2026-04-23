@@ -218,7 +218,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    fn_ctx: Vec<i32>,
                    builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> Value {
     let callee_idx: i32 = vec_get(ed1, idx);
@@ -235,7 +235,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_offsets,
                                              enum_tag_counts,
                                              enum_tags_flat, fn_ctx,
-                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         vec_push(arg_vals, box_new(av));
         ai = ai + 1;
     }
@@ -321,7 +321,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     fn_ctx: Vec<i32>,
                     builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> Value {
     let stmts_first: i32 = vec_get(ed1, idx);
@@ -344,7 +344,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                      enum_names,
                                                      enum_tag_offsets,
                                                      enum_tag_counts,
-                                                     enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                     enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
                 let lit_e: Expr = Expr::Literal(box_new(iv));
                 let asgn: Instr = Instr::Store(name_tok, box_new(lit_e));
                 vec_push(out_instrs, box_new(asgn));
@@ -359,7 +359,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                        enum_names,
                                                        enum_tag_offsets,
                                                        enum_tag_counts,
-                                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         }
         si = si + 1;
     }
@@ -368,7 +368,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                     tail_idx, ctr, out_instrs,
                                     enum_names, enum_tag_offsets,
                                     enum_tag_counts, enum_tags_flat,
-                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     return Value::VUnit;
 }
@@ -385,7 +385,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                  fn_ctx: Vec<i32>,
                  builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> Value {
     let cond_idx: i32 = vec_get(ed1, idx);
@@ -395,7 +395,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                          tok_tags, cond_idx, ctr,
                                          out_instrs, enum_names,
                                          enum_tag_offsets, enum_tag_counts,
-                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     let cond_expr: Expr = Expr::Literal(box_new(vc));
     if else_idx >= 0 {
         let t: i32 = ctr_fresh(ctr);
@@ -406,7 +406,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              then_instrs, enum_names,
                                              enum_tag_offsets,
                                              enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let t_lit: Expr = Expr::Literal(box_new(vt));
         let t_store: Instr = Instr::Store(u, box_new(t_lit));
         vec_push(then_instrs, box_new(t_store));
@@ -416,7 +416,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              else_instrs, enum_names,
                                              enum_tag_offsets,
                                              enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let e_lit: Expr = Expr::Literal(box_new(ve));
         let e_store: Instr = Instr::Store(u, box_new(e_lit));
         vec_push(else_instrs, box_new(e_store));
@@ -438,7 +438,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                then_only, enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     let mut no_else: Vec<i32> = vec_new();
     let if_no_el: Instr = Instr::IfElse(box_new(cond_expr),
                                           then_only, no_else);
@@ -458,7 +458,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                   fn_ctx: Vec<i32>,
                   builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> Value {
     let pat_tok: i32 = vec_get(ed1, idx);
@@ -476,7 +476,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let e_hi: Expr = value_to_expr(v_hi);
         let assign_hi: Instr = Instr::Assign(hi_t, box_new(e_hi));
         vec_push(out_instrs, box_new(assign_hi));
@@ -486,7 +486,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let e_lo: Expr = value_to_expr(v_lo);
         let assign_it: Instr = Instr::Assign(i_t, box_new(e_lo));
         vec_push(out_instrs, box_new(assign_it));
@@ -508,7 +508,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                       enum_names,
                                                       enum_tag_offsets,
                                                       enum_tag_counts,
-                                                      enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                      enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let wl: Instr = Instr::WhileLoop(box_new(cond_e), loop_body);
         vec_push(out_instrs, box_new(wl));
     }
@@ -533,7 +533,7 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                   fn_ctx: Vec<i32>,
                   builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> Value {
     let inner: i32 = vec_get(ed1, idx);
@@ -582,7 +582,7 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                               out_instrs, enum_names,
                                               enum_tag_offsets,
                                               enum_tag_counts,
-                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     let u: i32 = ctr_fresh(ctr);
     let decl_u: Instr = Instr::DeclNamed(enum_name, u);
     vec_push(out_instrs, box_new(decl_u));
@@ -624,7 +624,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         builtin_map: Vec<i32>,
                         lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> Value {
     let tag: i32 = vec_get(et, idx);
@@ -683,7 +683,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             tok_tags, operand_idx, ctr,
                                             out_instrs, enum_names,
                                             enum_tag_offsets, enum_tag_counts,
-                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let t: i32 = ctr_fresh(ctr);
         let expr: Expr = Expr::Unop(unop_tag, box_new(v));
         let instr: Instr = Instr::Assign(t, box_new(expr));
@@ -698,12 +698,12 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              tok_tags, lhs_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, rhs_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let t: i32 = ctr_fresh(ctr);
         let expr: Expr = Expr::Binop(binop_tag, box_new(vl), box_new(vr));
         let instr: Instr = Instr::Assign(t, box_new(expr));
@@ -714,7 +714,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         return lower_tag_call(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                idx, ctr, out_instrs, enum_names,
                                enum_tag_offsets, enum_tag_counts,
-                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     if tag == 6 {
         let obj_idx: i32 = vec_get(ed1, idx);
@@ -723,7 +723,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              tok_tags, obj_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         return Value::VMember(box_new(v1), field_tok);
     }
     /* ExprTupleField: obj.N — encode tuple projection as VMember with
@@ -738,7 +738,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_tag_offsets,
                                                enum_tag_counts,
                                                enum_tags_flat, fn_ctx,
-                                               builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                               builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let fh: i32 = 500 + field_num;
         return Value::VMember(box_new(vobj), fh);
     }
@@ -757,7 +757,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                 enum_tag_offsets,
                                                 enum_tag_counts,
                                                 enum_tags_flat, fn_ctx,
-                                                builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let mut arg_vals_mc: Vec<i32> = vec_new();
         vec_push(arg_vals_mc, box_new(v_rcv));
         let mut aj_mc: i32 = 0;
@@ -770,7 +770,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx,
-                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
             vec_push(arg_vals_mc, box_new(av_mc));
             aj_mc = aj_mc + 1;
         }
@@ -818,14 +818,14 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_offsets,
                                              enum_tag_counts,
                                              enum_tags_flat, fn_ctx,
-                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let v_i: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, ix, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets,
                                              enum_tag_counts,
                                              enum_tags_flat, fn_ctx,
-                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let t_ix: i32 = ctr_fresh(ctr);
         let mut arg_ix: Vec<i32> = vec_new();
         vec_push(arg_ix, box_new(v_o));
@@ -857,7 +857,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                   enum_tag_offsets,
                                                   enum_tag_counts,
                                                   enum_tags_flat, fn_ctx,
-                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
             let mut args_push: Vec<i32> = vec_new();
             vec_push(args_push, box_new(Value::VVar(t_ar)));
             vec_push(args_push, box_new(v_el));
@@ -880,13 +880,13 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, lo_ix,
                              ctr, out_instrs, enum_names, enum_tag_offsets,
                              enum_tag_counts, enum_tags_flat, fn_ctx,
-                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         }
         if hi_ix >= 0 {
             lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, hi_ix,
                              ctr, out_instrs, enum_names, enum_tag_offsets,
                              enum_tag_counts, enum_tags_flat, fn_ctx,
-                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         }
         return Value::VUnit;
     }
@@ -894,19 +894,19 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         return lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 idx, ctr, out_instrs, enum_names,
                                 enum_tag_offsets, enum_tag_counts,
-                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     if tag == 10 {
         return lower_tag_if(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                              idx, ctr, out_instrs, enum_names,
                              enum_tag_offsets, enum_tag_counts,
-                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     if tag == 11 {
         return lower_tag_match(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 idx, ctr, out_instrs, enum_names,
                                 enum_tag_offsets, enum_tag_counts,
-                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     if tag == 12 {
         let cond_idx2: i32 = vec_get(ed1, idx);
@@ -916,7 +916,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                               out_instrs, enum_names,
                                               enum_tag_offsets,
                                               enum_tag_counts,
-                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let ce2: Expr = Expr::Literal(box_new(vc2));
         let mut body_is: Vec<i32> = vec_new();
         let discard3: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
@@ -924,7 +924,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    body_is, enum_names,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
-                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let wl: Instr = Instr::WhileLoop(box_new(ce2), body_is);
         vec_push(out_instrs, box_new(wl));
         return Value::VUnit;
@@ -933,7 +933,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         return lower_tag_for(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                               idx, ctr, out_instrs, enum_names,
                               enum_tag_offsets, enum_tag_counts,
-                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     if tag == 14 {
         let loop_body: i32 = vec_get(ed1, idx);
@@ -945,7 +945,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    loop_is, enum_names,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
-                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let ll: Instr = Instr::WhileLoop(box_new(true_e), loop_is);
         vec_push(out_instrs, box_new(ll));
         return Value::VUnit;
@@ -958,7 +958,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                  out_instrs, enum_names,
                                                  enum_tag_offsets,
                                                  enum_tag_counts,
-                                                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
             let ret_instr: Instr = Instr::ReturnVal(box_new(rv));
             vec_push(out_instrs, box_new(ret_instr));
             return Value::VUnit;
@@ -985,7 +985,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                 out_instrs, enum_names,
                                                 enum_tag_offsets,
                                                 enum_tag_counts,
-                                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let rhs_e: Expr = Expr::Literal(box_new(rhs_v));
         let mut aout: Vec<i32> = vec_new();
         let cls: i32 = classify_assign_lhs_arena(et, ed1, ed2, pp, lhs_idx,
@@ -1018,7 +1018,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                   out_instrs, enum_names,
                                                   enum_tag_offsets,
                                                   enum_tag_counts,
-                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
             let be: Expr = Expr::Binop(op_tag, box_new(cur), box_new(rv2));
             let st2: Instr = Instr::Store(var_tok2, box_new(be));
             vec_push(out_instrs, box_new(st2));
@@ -1031,7 +1031,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              tok_tags, cast_src, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let ct2: i32 = ctr_fresh(ctr);
         let cast_e: Expr = Expr::Unop(99, box_new(cv));
         let cast_i: Instr = Instr::Assign(ct2, box_new(cast_e));
@@ -1044,7 +1044,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                               enum_tag_offsets, enum_tag_counts,
                               enum_tags_flat, fn_ctx, builtin_map,
                               lit_sf_names, source, starts, ends,
-                              item_tags, item_names, item_field_counts,
+                              item_tags, item_names, item_d2, item_field_counts,
                               enum_vnames_flat);
     }
     if tag == 24 {
@@ -1075,7 +1075,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                   enum_tag_offsets,
                                                   enum_tag_counts,
                                                   enum_tags_flat, fn_ctx,
-                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
             let fe_s: Expr = value_to_expr(fv_s);
             let fnm_s: i32 = vec_get(lit_sf_names, sf0 + fi_s);
             let stf_s: Instr = Instr::StoreField(t_s, fnm_s, box_new(fe_s));
@@ -1092,7 +1092,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         tok_tags, first_idx, ctr,
                                         out_instrs, enum_names,
                                         enum_tag_offsets, enum_tag_counts,
-                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         }
     }
     /* ExprAssert: evaluate condition for side effects only; runtime
@@ -1102,7 +1102,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, assert_expr,
                          ctr, out_instrs, enum_names, enum_tag_offsets,
                          enum_tag_counts, enum_tags_flat, fn_ctx,
-                         builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                         builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         return Value::VUnit;
     }
     if tag == 30 {
@@ -1141,14 +1141,14 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                            fn_ctx: Vec<i32>,
                            builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                            source: string, starts: Vec<i32>, ends: Vec<i32>,
-                           item_tags: Vec<i32>, item_names: Vec<i32>,
+                           item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                            item_field_counts: Vec<i32>,
                            enum_vnames_flat: Vec<i32>) -> Expr {
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                         tok_tags, idx, ctr, out_instrs,
                                         enum_names, enum_tag_offsets,
                                         enum_tag_counts, enum_tags_flat,
-                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     return value_to_expr(v);
 }
 
@@ -1168,7 +1168,7 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     fn_ctx: Vec<i32>,
                     builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> i32 {
     let discard5: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
@@ -1176,7 +1176,7 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                out_instrs, enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     return 0;
 }
 
@@ -1199,7 +1199,7 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                           fn_ctx: Vec<i32>,
                           builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> i32 {
     let ee: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
@@ -1207,7 +1207,7 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                            out_instrs, enum_names,
                                            enum_tag_offsets,
                                            enum_tag_counts,
-                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     let si: Instr = Instr::Store(dest, box_new(ee));
     vec_push(out_instrs, box_new(si));
     return 0;
@@ -1232,7 +1232,7 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    fn_ctx: Vec<i32>,
                    builtin_map: Vec<i32>,
                    lit_sf_names: Vec<i32>,
-                   item_tags: Vec<i32>, item_names: Vec<i32>,
+                   item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                    item_field_counts: Vec<i32>,
                    enum_vnames_flat: Vec<i32>,
                    scrut_cty: i32,
@@ -1242,7 +1242,7 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         out_instrs, enum_names,
                                         enum_tag_offsets,
                                         enum_tag_counts, enum_tags_flat,
-                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     let vtag: i32 = ir_value_tag(v);
     if vtag == 3 {
         match v {
@@ -1328,7 +1328,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     fn_ctx: Vec<i32>,
                     builtin_map: Vec<i32>,
                     lit_sf_names: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>,
                     source: string, starts: Vec<i32>,
@@ -1590,7 +1590,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let discard_body: i32 = lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp,
                                   tok_tags, body_idx, out_var, ctr, body_is,
                                   enum_names, enum_tag_offsets, enum_tag_counts,
-                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         let mut th: Vec<i32> = body_is;
         if guard_idx >= 0 {
             let mut guard_is: Vec<i32> = vec_new();
@@ -1600,7 +1600,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx,
-                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
             let guard_if: Instr = Instr::IfElse(box_new(ge), body_is,
                                                   result_instrs);
             vec_push(guard_is, box_new(guard_if));
@@ -1621,22 +1621,124 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return 0;
 }
 
+/* ── lower_match_ps_peek / skip helpers (signature rescan) ───
+   Mirror lexer navigation for ItemFn signatures without depending on
+   `parser.sv0` link order in the self-host compilation unit. */
+
+fn lower_match_ps_peek(tags: Vec<i32>, pos: i32) -> i32 {
+    if pos >= vec_len(tags) { return 97; }
+    return vec_get(tags, pos);
+}
+
+fn lower_match_skip_generic_params(tags: Vec<i32>, pos: i32) -> i32 {
+    if lower_match_ps_peek(tags, pos) != 38 { return pos; }
+    let mut p: i32 = pos + 1;
+    let mut depth: i32 = 1;
+    while depth > 0 {
+        let t: i32 = lower_match_ps_peek(tags, p);
+        if t == 97 { return p; }
+        if t == 38 { depth = depth + 1; }
+        if t == 39 { depth = depth - 1; }
+        p = p + 1;
+    }
+    return p;
+}
+
+fn lower_match_skip_bracket_group(tags: Vec<i32>, pos: i32) -> i32 {
+    if lower_match_ps_peek(tags, pos) != 10 { return pos; }
+    let mut p: i32 = pos + 1;
+    let mut depth: i32 = 1;
+    while depth > 0 {
+        let t: i32 = lower_match_ps_peek(tags, p);
+        if t == 97 { return 0 - 1; }
+        if t == 10 { depth = depth + 1; }
+        if t == 11 { depth = depth - 1; }
+        p = p + 1;
+    }
+    return p;
+}
+
+/* Skip a `(` … `)` group honoring nested (), `<>`, and `[]`. */
+
+fn lower_skip_paren_group_with_generics(tags: Vec<i32>, open_pos: i32) -> i32 {
+    if lower_match_ps_peek(tags, open_pos) != 6 { return 0 - 1; }
+    let mut p: i32 = open_pos + 1;
+    let mut depth: i32 = 1;
+    while depth > 0 {
+        if p >= vec_len(tags) { return 0 - 1; }
+        let t: i32 = lower_match_ps_peek(tags, p);
+        if t == 97 { return 0 - 1; }
+        if t == 38 {
+            p = lower_match_skip_generic_params(tags, p);
+        } else {
+            if t == 10 {
+                p = lower_match_skip_bracket_group(tags, p);
+            } else {
+                if t == 6 { depth = depth + 1; }
+                if t == 7 { depth = depth - 1; }
+                p = p + 1;
+            }
+        }
+    }
+    return p;
+}
+
+/* ── lower_scan_fn_ret_ty_tok ─────────────────────────────────
+   Given an ItemFn name token index (`name_tok`), locate `->` after
+   optional fn generics + the param paren group, and return the **first
+   token index** of the return type head (IDENT, `(`, `&`, or `[` open).
+   Returns **-1** when the shape is not recognized.  Full `parse_type`
+   validation is deferred — this is a match-time best-effort handle. */
+
+fn lower_scan_fn_ret_ty_tok(tok_tags: Vec<i32>, source: string,
+                            starts: Vec<i32>, ends: Vec<i32>,
+                            name_tok: i32) -> i32 {
+    let bound_ok: i32 = vec_len(starts) + vec_len(ends) + string_len(source);
+    if bound_ok < 0 { return 0 - 1; }
+    let mut p: i32 = name_tok + 1;
+    p = lower_match_skip_generic_params(tok_tags, p);
+    if lower_match_ps_peek(tok_tags, p) != 6 { return 0 - 1; }
+    let after_params: i32 = lower_skip_paren_group_with_generics(tok_tags, p);
+    if after_params < 0 { return 0 - 1; }
+    if lower_match_ps_peek(tok_tags, after_params) != 19 { return 0 - 1; }
+    let p3: i32 = after_params + 1;
+    let t0: i32 = lower_match_ps_peek(tok_tags, p3);
+    if t0 != 5 {
+        if t0 != 6 {
+            if t0 != 27 {
+                if t0 != 10 { return 0 - 1; }
+            }
+        }
+    }
+    return p3;
+}
+
 /* ── lower_top_fn_tables_for_match ───────────────────────────
    Push every top-level ItemFn (item tag 0) name handle from the item
    arena in program order into `fn_names`, with a parallel `fn_ret`
-   entry per function.  Return type handles are **-1** placeholders until
-   a later slice threads real typedef token positions from signatures;
-   `callee_fn_index` can still resolve the callee slot for diagnostics
-   and future ret-type wiring. */
+   entry holding the **first return-type token** when `item_d2` records
+   `has_ret == 1` and token rescan succeeds; otherwise **-1**. */
 
 fn lower_top_fn_tables_for_match(item_tags: Vec<i32>, item_names: Vec<i32>,
+                                  item_d2: Vec<i32>,
+                                  source: string, starts: Vec<i32>, ends: Vec<i32>,
+                                  tok_tags: Vec<i32>,
                                   fn_names: Vec<i32>, fn_ret: Vec<i32>) -> i32 {
     let n: i32 = vec_len(item_tags);
     let mut i: i32 = 0;
     while i < n {
         if vec_get(item_tags, i) == 0 {
-            vec_push(fn_names, vec_get(item_names, i));
-            vec_push(fn_ret, 0 - 1);
+            let nm: i32 = vec_get(item_names, i);
+            let packed: i32 = vec_get(item_d2, i);
+            let has_ret: i32 = packed % 2;
+            let mut rh: i32 = 0 - 1;
+            if has_ret == 1 {
+                let got: i32 = lower_scan_fn_ret_ty_tok(tok_tags, source,
+                    starts, ends, nm);
+                rh = got;
+            }
+            vec_push(fn_names, nm);
+            vec_push(fn_ret, rh);
         }
         i = i + 1;
     }
@@ -1648,9 +1750,10 @@ fn lower_top_fn_tables_for_match(item_tags: Vec<i32>, item_names: Vec<i32>,
    Lowers scrutinee via bind_scrut_var, allocates output temp, delegates
    to lower_match_arms.
    `scrut_cty` comes from match_scrut_cty on the scrutinee expression.
-   Top-level ItemFn names populate `match_scrut_cty` callee lookup;
-   param / scrut-local tables and real per-fn return typedefs remain
-   future slices.  2-seg ExprPath / ExprCall shapes still resolve
+   Top-level ItemFn names populate `match_scrut_cty` callee lookup, with
+   per-fn return type token handles from `item_d2` + rescan when present.
+   Param / scrut-local tables remain future slices.  2-seg ExprPath /
+   ExprCall shapes still resolve
    enum/struct type handles via `pp` (ctor scrutinees, paths).
    Tests omitted: SML compiler function budget (~172 fn limit). */
 
@@ -1666,7 +1769,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    fn_ctx: Vec<i32>,
                    builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> Value {
     let scrut_idx: i32 = vec_get(ed1, idx);
@@ -1675,7 +1778,8 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let fn_names_mt: Vec<i32> = vec_new();
     let fn_ret_mt: Vec<i32> = vec_new();
     let discard_ft: i32 = lower_top_fn_tables_for_match(item_tags,
-        item_names, fn_names_mt, fn_ret_mt);
+        item_names, item_d2, source, starts, ends, tok_tags,
+        fn_names_mt, fn_ret_mt);
     let aliases_mt: Vec<i32> = vec_new();
     let scrut_names_mt: Vec<i32> = vec_new();
     let scrut_ctys_mt: Vec<i32> = vec_new();
@@ -1691,7 +1795,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                          enum_tag_offsets, enum_tag_counts,
                                          enum_tags_flat, fn_ctx,
                                          builtin_map, lit_sf_names,
-                                         item_tags, item_names,
+                                         item_tags, item_names, item_d2,
                                          item_field_counts, enum_vnames_flat,
                                          sct, source, starts, ends);
     let out: i32 = ctr_fresh(ctr);
@@ -1704,7 +1808,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             enum_tag_offsets, enum_tag_counts,
                                             enum_tags_flat, fn_ctx,
                                             builtin_map, lit_sf_names,
-                                            item_tags, item_names,
+                                            item_tags, item_names, item_d2,
                                             item_field_counts, enum_vnames_flat,
                                             source, starts, ends);
     return Value::VVar(out);
@@ -1726,14 +1830,14 @@ fn lower_return(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 fn_ctx: Vec<i32>,
                 builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> i32 {
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                         tok_tags, idx, ctr, out_instrs,
                                         enum_names, enum_tag_offsets,
                                         enum_tag_counts, enum_tags_flat,
-                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     let ri: Instr = Instr::ReturnVal(box_new(v));
     vec_push(out_instrs, box_new(ri));
     return 0;
@@ -1756,7 +1860,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
               fn_ctx: Vec<i32>,
               builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> i32 {
     let s_tag: i32 = vec_get(et, s_idx);
@@ -1771,7 +1875,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    out_instrs, enum_names,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
-                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
             let si: Instr = Instr::Store(name_tok, box_new(e));
             vec_push(out_instrs, box_new(si));
         }
@@ -1783,7 +1887,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         tok_tags, expr_idx, ctr,
                                         out_instrs, enum_names,
                                         enum_tag_offsets, enum_tag_counts,
-                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         return 0;
     }
     return 0;
@@ -1806,7 +1910,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                fn_ctx: Vec<i32>,
                builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> i32 {
     let mut si: i32 = 0;
@@ -1816,7 +1920,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                   s_idx, ctr, out_instrs, enum_names,
                                   enum_tag_offsets, enum_tag_counts,
-                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
         si = si + 1;
     }
     if tail_idx >= 0 {
@@ -1824,7 +1928,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                      tail_idx, ctr, out_instrs,
                                      enum_names, enum_tag_offsets,
                                      enum_tag_counts, enum_tags_flat,
-                                     fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                     fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     return 0;
 }
@@ -1845,7 +1949,7 @@ fn lower_body(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
               fn_ctx: Vec<i32>,
               builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> i32 {
     let btag: i32 = vec_get(et, body_idx);
@@ -1857,13 +1961,13 @@ fn lower_body(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                            sf, sc, ti, ctr, out_instrs,
                            enum_names, enum_tag_offsets,
                            enum_tag_counts, enum_tags_flat,
-                           fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                           fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     }
     return lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                         body_idx, ctr, out_instrs,
                         enum_names, enum_tag_offsets,
                         enum_tag_counts, enum_tags_flat,
-                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
 }
 
 /* ── lower_fn (SML lowerFn — simplified, no contracts) ──────
@@ -1884,7 +1988,7 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             fn_ctx: Vec<i32>,
             builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
-                    item_tags: Vec<i32>, item_names: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>) -> i32 {
     let mut ctr: Vec<i32> = vec_new();
@@ -1893,7 +1997,7 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                       body_idx, ctr, out_instrs,
                       enum_names, enum_tag_offsets,
                       enum_tag_counts, enum_tags_flat,
-                      fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                      fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
 }
 
 /* ── build_builtin_map ──────────────────────────────────────────
@@ -2028,6 +2132,7 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
                                                     fn_ctx, builtin_map, body_sf,
                                                     source, starts, ends,
                                                     item_tags, item_names,
+                                                    item_d2,
                                                     item_field_counts,
                                                     enum_vnames_flat);
                 }
@@ -4491,6 +4596,7 @@ fn test_lower_expr_val() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     vec_push(et, 0);
@@ -4500,7 +4606,7 @@ fn test_lower_expr_val() -> i32 {
     vec_push(ed4, 0);
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          0, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 0 { return 1; }
     vec_push(et, 1);
     vec_push(ed1, 0);
@@ -4509,7 +4615,7 @@ fn test_lower_expr_val() -> i32 {
     vec_push(ed4, 0);
     let v2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v2) != 3 { return 2; }
     vec_push(et, 3);
     vec_push(ed1, 7);
@@ -4518,7 +4624,7 @@ fn test_lower_expr_val() -> i32 {
     vec_push(ed4, 0);
     let v3: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v3) != 3 { return 3; }
     if vec_len(out) != 1 { return 4; }
     if vec_get(ctr, 0) != 1 { return 5; }
@@ -4553,11 +4659,12 @@ fn test_lower_return() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          0, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -4602,11 +4709,12 @@ fn test_lower_if() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -4647,11 +4755,12 @@ fn test_lower_block() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 0 { return 1; }
     vec_push(et, 9);
     vec_push(ed1, 0);
@@ -4660,7 +4769,7 @@ fn test_lower_block() -> i32 {
     vec_push(ed4, 0);
     let v2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v2) != 4 { return 2; }
     return 0;
 }
@@ -4705,11 +4814,12 @@ fn test_lower_assign() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -4757,11 +4867,12 @@ fn test_lower_while() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -4802,11 +4913,12 @@ fn test_lower_loop() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -4847,11 +4959,12 @@ fn test_lower_cast() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 3 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -4887,11 +5000,12 @@ fn test_lower_body_fn() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                               0, ctr, out, en_n, en_to, en_tc, en_tf,
-                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc != 0 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -4935,11 +5049,12 @@ fn test_lower_fn_fn() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_fn(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                             2, out, en_n, en_to, en_tc, en_tf,
-                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc != 0 { return 1; }
     if vec_len(out) < 3 { return 2; }
     return 0;
@@ -4995,12 +5110,13 @@ fn test_lower_for_loop() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rv: Value = lower_expr_to_value(et, ed1v, ed2v, ed3v, ed4v,
                                          ppv, ttv, 4, ctr, out,
                                          en_n, en_to, en_tc, en_tf,
-                                         fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if vec_len(out) < 3 { return 1; }
     return 0;
 }
@@ -5039,11 +5155,12 @@ fn test_lower_expr_assert() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         1, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v) != 4 { return 1; }
     return 0;
 }
@@ -5087,11 +5204,12 @@ fn test_lower_expr_range() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v2) != 4 { return 1; }
     let mut et2: Vec<i32> = vec_new();
     let mut ed1b: Vec<i32> = vec_new();
@@ -5113,7 +5231,7 @@ fn test_lower_expr_range() -> i32 {
                                          0, ctr2, out2, en_n, en_to, en_tc,
                                          en_tf, fn_ctx, builtin_map, lit_sf_names,
                                          source, starts, ends, item_tags,
-                                         item_names, item_field_counts,
+                                         item_names, item_d2, item_field_counts,
                                          enum_vnames_flat);
     if ir_value_tag(v3) != 4 { return 2; }
     return 0;
@@ -5154,11 +5272,12 @@ fn test_lower_expr_tuple_field() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         1, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v) != 6 { return 1; }
     return 0;
 }
@@ -5178,6 +5297,7 @@ fn test_lower_expr_index_effect() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let mut et: Vec<i32> = vec_new();
@@ -5206,7 +5326,7 @@ fn test_lower_expr_index_effect() -> i32 {
     let mut out: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
-                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
@@ -5226,6 +5346,7 @@ fn test_lower_expr_method_call_effect() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let mut et: Vec<i32> = vec_new();
@@ -5254,7 +5375,7 @@ fn test_lower_expr_method_call_effect() -> i32 {
     let mut out: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
-                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
@@ -5274,6 +5395,7 @@ fn test_lower_expr_array_effect() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let mut et: Vec<i32> = vec_new();
@@ -5302,7 +5424,7 @@ fn test_lower_expr_array_effect() -> i32 {
     let mut out: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
-                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
@@ -5347,13 +5469,14 @@ fn test_lower_expr_struct() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     vec_push(lit_sf_names, 201);
     vec_push(lit_sf_names, 202);
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v) != 3 { return 1; }
     if vec_len(out) < 3 { return 2; }
     return 0;
@@ -5400,13 +5523,14 @@ fn test_lower_expr_struct_qualified_path() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     vec_push(lit_sf_names, 201);
     vec_push(lit_sf_names, 202);
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v) != 3 { return 1; }
     if vec_len(out) < 3 { return 2; }
     return 0;
@@ -5524,11 +5648,12 @@ fn test_lower_return_fn() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 0, ctr, out, en_n, en_to, en_tc, en_tf,
-                                fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc != 0 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -5569,11 +5694,12 @@ fn test_lower_stmt_fn() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                               1, ctr, out, en_n, en_to, en_tc, en_tf,
-                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc != 0 { return 1; }
     if vec_len(out) != 2 { return 2; }
     let mut out2: Vec<i32> = vec_new();
@@ -5584,7 +5710,7 @@ fn test_lower_stmt_fn() -> i32 {
     vec_push(ed4, 0);
     let rc2: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                2, ctr, out2, en_n, en_to, en_tc, en_tf,
-                               fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                               fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc2 != 0 { return 3; }
     return 0;
 }
@@ -5624,17 +5750,18 @@ fn test_lower_block_fn() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                1, 1, 0, ctr, out, en_n, en_to, en_tc,
-                               en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                               en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc != 0 { return 1; }
     if vec_len(out) < 3 { return 2; }
     let mut out2: Vec<i32> = vec_new();
     let rc2: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 1, 1, 0 - 1, ctr, out2,
-                                en_n, en_to, en_tc, en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                en_n, en_to, en_tc, en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc2 != 0 { return 3; }
     if vec_len(out2) != 2 { return 4; }
     return 0;
@@ -5686,12 +5813,13 @@ fn test_lower_with_instrs() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let e1: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, 0, ctr, out,
                                             en_n, en_to, en_tc, en_tf,
-                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_expr_tag(e1) != 0 { return 1; }
     vec_push(et, 1);
     vec_push(ed1, 0);
@@ -5701,7 +5829,7 @@ fn test_lower_with_instrs() -> i32 {
     let e2: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, 1, ctr, out,
                                             en_n, en_to, en_tc, en_tf,
-                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_expr_tag(e2) != 1 { return 2; }
     return 0;
 }
@@ -5736,12 +5864,13 @@ fn test_lower_for_effect_fn() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
                                     tok_tags, 0, ctr, out,
                                     en_n, en_to, en_tc, en_tf,
-                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if rc != 0 { return 1; }
     return 0;
 }
@@ -5770,6 +5899,7 @@ fn test_lower_enum_ctor() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     vec_push(en_n, 100);
@@ -5788,7 +5918,7 @@ fn test_lower_enum_ctor() -> i32 {
     vec_push(ed4, 0);
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          0, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 3 { return 1; }
     if vec_len(out) != 2 { return 2; }
     return 0;
@@ -5842,6 +5972,7 @@ fn test_lower_try() -> i32 {
     let ends: Vec<i32> = vec_new();
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     vec_push(fn_ctx, 1);
@@ -5849,7 +5980,7 @@ fn test_lower_try() -> i32 {
     vec_push(fn_ctx, 500);
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_field_counts, enum_vnames_flat);
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_field_counts, enum_vnames_flat);
     if ir_value_tag(v1) != 3 { return 1; }
     if vec_len(out) < 4 { return 2; }
     let i0: Instr = box_deref(vec_get(out, 0));
