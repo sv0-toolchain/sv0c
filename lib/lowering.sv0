@@ -6637,6 +6637,54 @@ fn test_lower_match_env_fn_pack_roundtrip() -> i32 {
     return 0;
 }
 
+fn test_lower_match_env_scrut_merge_roundtrip() -> i32 {
+    let parent: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    let ap1: i32 = lower_match_env_append_scrut_pair(parent, 501, 701);
+    if ap1 != 0 { return 1; }
+    let ap2: i32 = lower_match_env_append_scrut_pair(parent, 502, 702);
+    if ap2 != 0 { return 2; }
+    if vec_get(parent, 10) != 2 { return 3; }
+    let dst: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    let mg: i32 = lower_match_env_merge_parent_scrut(dst, parent);
+    if mg != 0 { return 4; }
+    if vec_get(dst, 10) != 2 { return 5; }
+    let ty_a: i32 = lower_match_env_scrut_ty_lookup(dst, 99, 501);
+    if ty_a != 701 { return 6; }
+    let ty_b: i32 = lower_match_env_scrut_ty_lookup(dst, 99, 502);
+    if ty_b != 702 { return 7; }
+    let ty_lim: i32 = lower_match_env_scrut_ty_lookup(dst, 1, 502);
+    if ty_lim != 0 - 2 { return 8; }
+    let ty_miss: i32 = lower_match_env_scrut_ty_lookup(dst, 99, 999);
+    if ty_miss != 0 - 2 { return 9; }
+    let leg: Vec<i32> = vec_new();
+    vec_push(leg, 0);
+    let mg2: i32 = lower_match_env_merge_parent_scrut(dst, leg);
+    if mg2 != 0 { return 10; }
+    if vec_get(dst, 10) != 2 { return 11; }
+    let bad_dst: Vec<i32> = vec_new();
+    vec_push(bad_dst, 0);
+    let mg3: i32 = lower_match_env_merge_parent_scrut(bad_dst, parent);
+    if mg3 != 0 - 1 { return 12; }
+    let par_alt: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    let nm0: i32 = vec_len(par_alt);
+    vec_push(par_alt, 601);
+    vec_push(par_alt, 602);
+    let ty0: i32 = vec_len(par_alt);
+    vec_push(par_alt, 801);
+    vec_push(par_alt, 802);
+    vec_set(par_alt, 8, nm0);
+    vec_set(par_alt, 9, ty0);
+    vec_set(par_alt, 10, 2);
+    let dst2: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    let mg4: i32 = lower_match_env_merge_parent_scrut(dst2, par_alt);
+    if mg4 != 0 { return 13; }
+    let ty_c: i32 = lower_match_env_scrut_ty_lookup(dst2, 99, 601);
+    if ty_c != 801 { return 14; }
+    let ty_d: i32 = lower_match_env_scrut_ty_lookup(dst2, 99, 602);
+    if ty_d != 802 { return 15; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r3: i32 = test_binop_to_c();
     if r3 != 0 { return 30 + r3; }
@@ -6796,6 +6844,8 @@ fn main() -> i32 {
     if r70e != 0 { return 955 + r70e; }
     let r70f: i32 = test_lower_match_env_fn_pack_roundtrip();
     if r70f != 0 { return 956 + r70f; }
+    let r70g: i32 = test_lower_match_env_scrut_merge_roundtrip();
+    if r70g != 0 { return 957 + r70g; }
     let r71: i32 = test_build_builtin_map();
     if r71 != 0 { return 960 + r71; }
     return 0;
