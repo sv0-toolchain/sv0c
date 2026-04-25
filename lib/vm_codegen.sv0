@@ -711,6 +711,30 @@ fn emit_value(v: Value,
             return width * 2;
         },
         Value::VMember(bv, f) => {
+            let base_v: Value = box_deref(bv);
+            match base_v {
+                Value::VVar(x) => {
+                    let si: i32 = lookup_slot(env_names, env_bases, env_widths, x);
+                    if si < 0 { return 0 - 1; }
+                    let base: i32 = slot_base(env_bases, si);
+                    let width: i32 = slot_width(env_widths, si);
+                    if width <= 0 { return 0 - 1; }
+                    let mut off: i32 = f;
+                    if f == 0 - 1 { off = 0; }
+                    if off < 0 { return 0 - 1; }
+                    if off >= width { return 0 - 1; }
+                    vec_push(out, 96);
+                    vec_push(out, base + off);
+                    return 2;
+                },
+                Value::VInt(n) => { return 0 - 1; },
+                Value::VFloat(h) => { return 0 - 1; },
+                Value::VBool(b) => { return 0 - 1; },
+                Value::VString(s) => { return 0 - 1; },
+                Value::VUnit => { return 0 - 1; },
+                Value::VMember(bv2, f2) => { return 0 - 1; },
+                Value::VAddrOf(h2) => { return 0 - 1; },
+            }
             return 0 - 1;
         },
         Value::VAddrOf(x) => {
@@ -1822,6 +1846,22 @@ fn test_emit_value() -> i32 {
     if r7 != 2 { return 24; }
     if vec_get(out8, 0) != 4 { return 25; }
     if vec_get(out8, 1) != 2 { return 26; }
+    let out9: Vec<i32> = vec_new();
+    let vm0: Value = Value::VMember(box_new(Value::VVar(60)), 0);
+    let r8: i32 = emit_value(vm0, en, eb, ew, pool, out9);
+    if r8 != 2 { return 27; }
+    if vec_get(out9, 0) != 96 { return 28; }
+    if vec_get(out9, 1) != 5 { return 29; }
+    let out10: Vec<i32> = vec_new();
+    let vm_tag: Value = Value::VMember(box_new(Value::VVar(60)), 0 - 1);
+    let r9: i32 = emit_value(vm_tag, en, eb, ew, pool, out10);
+    if r9 != 2 { return 30; }
+    if vec_get(out10, 0) != 96 { return 31; }
+    if vec_get(out10, 1) != 5 { return 32; }
+    let out11: Vec<i32> = vec_new();
+    let vm_oob: Value = Value::VMember(box_new(Value::VVar(60)), 3);
+    let r10: i32 = emit_value(vm_oob, en, eb, ew, pool, out11);
+    if r10 != 0 - 1 { return 33; }
     return 0;
 }
 
