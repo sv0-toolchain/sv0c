@@ -1,8 +1,12 @@
 use lib::forty_two;
+use lib::neg_one;
 
 fn main() -> i32 {
-  return match forty_two() {
-    42 => 0,
+  if forty_two() != 42 {
+    return 10;
+  }
+  return match neg_one() {
+    -1 => 0,
     _ => 1,
   };
 }
