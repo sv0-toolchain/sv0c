@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 — lowering import-alias merge:** **`lower(...)`** always runs **`lower_fill_import_aliases_from_use_items`** so **`ItemUse`** rows merge into caller-supplied alias vecs (SML **`importAliases`** ∪ use materialization). **`test_fill_import_aliases_merges_with_preload`**. Stage0 **`lowering.c`** + vm-parity **`lowering.sv0b`**. Prior **`import_use_match`** VM integration + **`ItemUse`** auto-fill + **vm_codegen** parity. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 — include_expand in-memory expand:** **`expand_text_table2`** + **`table_lookup_body`** (2-slot path→body table, depth guard **E0323**, miss **E0322**) + **`test_expand_text_table2_*`**; vm-parity **`include_expand.sv0b`**. Prior **lowering** import-alias merge (**`ItemUse`** always merged), **`import_use_match`**, **vm_codegen** parity. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

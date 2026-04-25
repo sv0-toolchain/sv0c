@@ -14,6 +14,11 @@ static const char* get_split_line(const char* source, int starts, int lens, int 
 static int include_cycle_check(int visited, int path_handle);
 static const char* path_dir(const char* path);
 static const char* path_join(const char* dir, const char* rel);
+static const char* table_lookup_body(const char* p0, const char* b0, const char* p1, const char* b1, const char* merged);
+static const char* expand_text_table2(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, int depth);
+static int test_expand_text_table2_simple(void);
+static int test_expand_text_table2_nested(void);
+static int test_expand_text_table2_miss(void);
 static int test_is_space(void);
 static int test_path_ok(void);
 static int test_has_include_prefix(void);
@@ -319,6 +324,164 @@ static const char* path_join(const char* dir, const char* rel) {
   const char* _sv0t2 = sv0_string_concat(out, rel);
   out = _sv0t2;
   return out;
+}
+
+static const char* table_lookup_body(const char* p0, const char* b0, const char* p1, const char* b1, const char* merged) {
+  int _sv0t0 = sv0_string_len(p0);
+  if ((_sv0t0 > 0)) {
+    int _sv0t1 = sv0_string_eq(p0, merged);
+    if (_sv0t1) {
+      return b0;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t2 = sv0_string_len(p1);
+  if ((_sv0t2 > 0)) {
+    int _sv0t3 = sv0_string_eq(p1, merged);
+    if (_sv0t3) {
+      return b1;
+    } else {
+    }
+  } else {
+  }
+  return "";
+}
+
+static const char* expand_text_table2(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, int depth) {
+  if ((depth > 24)) {
+    return "E0323";
+  } else {
+  }
+  int dd = (depth + 1);
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int lens = _sv0t1;
+  int _sv0t2 = split_lines(source, starts, lens);
+  int count = _sv0t2;
+  const char* bo;
+  bo = "";
+  int li = 0;
+  while ((li < count)) {
+    if ((li > 0)) {
+      const char* _sv0t3 = sv0_string_concat(bo, "\n");
+      bo = _sv0t3;
+    } else {
+    }
+    const char* _sv0t4 = get_split_line(source, starts, lens, li);
+    const char* line;
+    line = _sv0t4;
+    const char* _sv0t5 = parse_include_line(line);
+    const char* rel;
+    rel = _sv0t5;
+    int _sv0t6 = sv0_string_len(rel);
+    if ((_sv0t6 == 0)) {
+      const char* _sv0t7 = sv0_string_concat(bo, line);
+      bo = _sv0t7;
+    } else {
+      const char* _sv0t8 = path_dir(host_abs);
+      const char* dir;
+      dir = _sv0t8;
+      const char* _sv0t9 = path_join(dir, rel);
+      const char* merged;
+      merged = _sv0t9;
+      const char* _sv0t10 = table_lookup_body(p0, b0, p1, b1, merged);
+      const char* body;
+      body = _sv0t10;
+      int _sv0t11 = sv0_string_len(body);
+      if ((_sv0t11 == 0)) {
+        const char* _sv0t12 = sv0_string_concat(bo, "E0322");
+        bo = _sv0t12;
+      } else {
+        const char* _sv0t13 = expand_text_table2(merged, body, p0, b0, p1, b1, dd);
+        const char* inner;
+        inner = _sv0t13;
+        const char* _sv0t14 = sv0_string_concat(bo, inner);
+        bo = _sv0t14;
+      }
+    }
+    li = (li + 1);
+  }
+  return bo;
+}
+
+static int test_expand_text_table2_simple(void) {
+  const char* host;
+  host = "/tmp/pkg/main.sv0";
+  const char* src;
+  src = "include \"inc.sv0\";\nfn x() -> i32 { 1 }";
+  const char* p0;
+  p0 = "/tmp/pkg/inc.sv0";
+  const char* b0;
+  b0 = "fn inc() -> i32 { 2 }";
+  const char* p1;
+  p1 = "";
+  const char* b1;
+  b1 = "";
+  const char* _sv0t0 = expand_text_table2(host, src, p0, b0, p1, b1, 0);
+  const char* got;
+  got = _sv0t0;
+  const char* exp;
+  exp = "fn inc() -> i32 { 2 }\nfn x() -> i32 { 1 }";
+  int _sv0t1 = sv0_string_eq(got, exp);
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_expand_text_table2_nested(void) {
+  const char* host;
+  host = "/tmp/pkg/a.sv0";
+  const char* src;
+  src = "include \"b.sv0\";\nAA";
+  const char* p0;
+  p0 = "/tmp/pkg/a.sv0";
+  const char* b0;
+  b0 = "";
+  const char* p1;
+  p1 = "/tmp/pkg/b.sv0";
+  const char* b1;
+  b1 = "BB";
+  const char* _sv0t0 = expand_text_table2(host, src, p0, b0, p1, b1, 0);
+  const char* got;
+  got = _sv0t0;
+  const char* exp;
+  exp = "BB\nAA";
+  int _sv0t1 = sv0_string_eq(got, exp);
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_expand_text_table2_miss(void) {
+  const char* host;
+  host = "/tmp/pkg/main.sv0";
+  const char* src;
+  src = "include \"missing.sv0\";\ntail";
+  const char* p0;
+  p0 = "/tmp/pkg/other.sv0";
+  const char* b0;
+  b0 = "x";
+  const char* p1;
+  p1 = "";
+  const char* b1;
+  b1 = "";
+  const char* _sv0t0 = expand_text_table2(host, src, p0, b0, p1, b1, 0);
+  const char* got;
+  got = _sv0t0;
+  const char* exp;
+  exp = "E0322\ntail";
+  int _sv0t1 = sv0_string_eq(got, exp);
+  if ((_sv0t1 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
 }
 
 static int test_is_space(void) {
@@ -768,6 +931,27 @@ int main(void) {
   if ((r11 != 0)) {
     int _sv0t20 = (100 + r11);
     return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_expand_text_table2_simple();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (110 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_expand_text_table2_nested();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (120 + r13);
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_expand_text_table2_miss();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (130 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;
