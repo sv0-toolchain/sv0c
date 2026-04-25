@@ -2615,6 +2615,11 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          tok_tags: Vec<i32>,
          out_blocks: Vec<i32>,
          import_aliases: Vec<i32>) -> string {
+    if vec_len(import_aliases) == 0 {
+        let discard_fill_alias: i32 = lower_fill_import_aliases_from_use_items(
+            import_aliases, item_tags, item_names, item_d2, item_d3, body_pp,
+            source, starts, ends);
+    }
     let discard_so: i32 = build_struct_order(item_tags, item_names,
                                               item_field_counts,
                                               struct_fnames_flat,
@@ -2746,6 +2751,66 @@ fn resolve_fn_callee(aliases: Vec<i32>, name_h: i32) -> i32 {
     let target: i32 = lower_alias_lookup(aliases, name_h);
     if target < 0 { return name_h; }
     return target;
+}
+
+fn lower_find_item_fn_name_by_text(item_tags: Vec<i32>,
+                                   item_names: Vec<i32>,
+                                   source: string,
+                                   starts: Vec<i32>,
+                                   ends: Vec<i32>,
+                                   target_name: string) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 0 {
+            let name_h: i32 = vec_get(item_names, i);
+            let name_s: string = handle_to_str(name_h, source, starts, ends);
+            if string_eq(name_s, target_name) { return name_h; }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── lower_fill_import_aliases_from_use_items ────────────────
+   Build lowering alias rows from ItemUse entries:
+     use mod::foo;  =>  foo -> mod__foo (if ItemFn exists).
+   This mirrors resolver.apply_use_clause value aliases enough for
+   lowering call-site resolution, while skipping type-only aliases. */
+fn lower_fill_import_aliases_from_use_items(aliases: Vec<i32>,
+                                            item_tags: Vec<i32>,
+                                            item_names: Vec<i32>,
+                                            item_d2: Vec<i32>,
+                                            item_d3: Vec<i32>,
+                                            pp: Vec<i32>,
+                                            source: string,
+                                            starts: Vec<i32>,
+                                            ends: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 5 {
+            let pps: i32 = vec_get(item_d2, i);
+            let ppc: i32 = vec_get(item_d3, i);
+            if ppc == 2 {
+                let mod_h: i32 = vec_get(pp, pps);
+                let short_h: i32 = vec_get(pp, pps + 1);
+                let mod_s: string = handle_to_str(mod_h, source, starts, ends);
+                let short_s: string = handle_to_str(short_h, source, starts, ends);
+                let mut target: string = string_concat(mod_s, "__");
+                target = string_concat(target, short_s);
+                let to_h: i32 = lower_find_item_fn_name_by_text(item_tags,
+                    item_names, source, starts, ends, target);
+                if to_h >= 0 {
+                    if lower_alias_lookup(aliases, short_h) < 0 {
+                        let discard_add: i32 = lower_alias_add(aliases, short_h, to_h);
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return vec_len(aliases) / 2;
 }
 
 fn resolve_enum_ctor_path(ctor_from_enum: Vec<i32>, ctor_from_var: Vec<i32>,
@@ -4943,6 +5008,43 @@ fn test_alias_replace() -> i32 {
     return 0;
 }
 
+fn test_fill_import_aliases_from_use_items() -> i32 {
+    let item_tags: Vec<i32> = vec_new();
+    let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
+    let item_d3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let aliases: Vec<i32> = lower_alias_new();
+    let source: string = "mod foo mod__foo";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    /* handles: 0=>"mod", 1=>"foo", 2=>"mod__foo" */
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    vec_push(starts, 8); vec_push(ends, 16);
+    /* ItemFn name: mod__foo */
+    vec_push(item_tags, 0);
+    vec_push(item_names, 2);
+    vec_push(item_d2, 0);
+    vec_push(item_d3, 0);
+    /* ItemUse path: mod::foo */
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    vec_push(item_tags, 5);
+    vec_push(item_names, 0);
+    vec_push(item_d2, 0);
+    vec_push(item_d3, 2);
+    let c: i32 = lower_fill_import_aliases_from_use_items(aliases, item_tags,
+        item_names, item_d2, item_d3, pp, source, starts, ends);
+    if c != 1 { return 1; }
+    if lower_alias_lookup(aliases, 1) != 2 { return 2; }
+    let c2: i32 = lower_fill_import_aliases_from_use_items(aliases, item_tags,
+        item_names, item_d2, item_d3, pp, source, starts, ends);
+    if c2 != 1 { return 3; }
+    if vec_len(aliases) != 2 { return 4; }
+    return 0;
+}
+
 fn test_match_scrut_cty() -> i32 {
     let me: Vec<i32> = lower_match_env_alloc_v0_empty_header();
     let et: Vec<i32> = vec_new();
@@ -6902,6 +7004,8 @@ fn main() -> i32 {
     if r43 != 0 { return 450 + r43; }
     let r44: i32 = test_alias_replace();
     if r44 != 0 { return 460 + r44; }
+    let r44a: i32 = test_fill_import_aliases_from_use_items();
+    if r44a != 0 { return 465 + r44a; }
     let r45: i32 = test_match_scrut_cty();
     if r45 != 0 { return 470 + r45; }
     let r46: i32 = test_variant_shape_in_items();
