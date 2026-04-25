@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-25 (America/Denver; **M3 — harness docs:** **`test/integration/README.md`** (table aligned with **`02-integration-test.sh`**); **`lib/LAYOUT.md`** cross-links integration + **`lower_match_env`** clone test. Prior same day: **`test_lower_match_env_clone_scrut_roundtrip`**; **`PatEnum`** / **`PatStruct`** **`append_scrut_pair`**; **`doc/transliteration-plan.md`**. Prior **2026-04-22:** **`test_lower_match_env_scrut_merge_roundtrip`**. Prior **2026-04-23:** scrut **`[8..10]`** + **`match_env_inherit`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-24 (America/Los_Angeles; **M3 — vm_codegen member-load parity:** **`lib/vm_codegen.sv0`** now lowers `VMember(VVar, field)` to `LOAD_LOCAL` with enum-tag sentinel handling + bounds checks; refreshed **`lib/golden/stage0/vm_codegen.c`** and **`test/vm-parity/golden/sml/vm_codegen.sv0b`**. Prior **2026-04-25 (America/Denver):** harness docs (**`test/integration/README.md`**, **`lib/LAYOUT.md`**) and packed match-env clone/scrut fixes in `lowering.sv0`. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
