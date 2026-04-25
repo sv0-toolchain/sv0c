@@ -1,0 +1,8 @@
+use lib::forty_two;
+
+fn main() -> i32 {
+  return match forty_two() {
+    42 => 0,
+    _ => 1,
+  };
+}

@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — lowering import-alias materialization:** **`lib/lowering.sv0`** now derives function alias pairs from **`ItemUse`** rows (`use mod::f` -> `f => mod__f` when an ItemFn exists), fills **`import_aliases`** inside **`lower(...)`** when callers pass empty vecs, and adds **`test_fill_import_aliases_from_use_items`**. Stage0 **`lowering.c`** + **97** vm-parity goldens refreshed. Prior **vm_codegen** member/field **`LOAD_LOCAL`** parity + **2026-04-25 (America/Denver)** harness docs (**`test/integration/README.md`**, **`lib/LAYOUT.md`**) and match-env clone/scrut work. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — VM integration:** **`test/integration/import_use_match/`** project — `use lib::forty_two` + **`match forty_two()`** (`PatLit` arm) exercises lowering import-alias fill on **`ExprCall`** scrutinees end-to-end on **`--target=vm`**. README case table updated. Prior **lowering** **`ItemUse` → `import_aliases`** materialization + stage0/vm-parity goldens; **vm_codegen** parity; harness docs. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
