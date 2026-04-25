@@ -1321,7 +1321,10 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    ExprPatFieldEmbed(31) + ExprPatStructMeta(32) immediately before
    ExprPatExtra(30); PatStruct field bindPre lowers PatBind rows via
    `lower_pat_struct_field_payload_index` (parser PatBind.data3 holds
-   field name tok for `field: pat` rows).
+   field name tok for `field: pat` rows). After cloning `arm_menv`,
+   tuple/struct payload bindings are registered in packed scrut pairs
+   (same `scrut_cty` as PatBind) so nested `match_scrut_cty` on those
+   names resolves during the arm body.
    Tests omitted: SML compiler function budget (~172 fn limit). */
 
 fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
@@ -1596,6 +1599,106 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if pat_tag == 1 {
             let dap: i32 = lower_match_env_append_scrut_pair(arm_menv, pat_d1,
                 scrut_cty);
+        }
+        if pat_tag == 5 {
+            let paux5s: i32 = vec_get(ed2, arm_idx);
+            let pxt5s: i32 = vec_get(et, paux5s);
+            if pxt5s == 30 {
+                let k5s: i32 = vec_get(ed4, paux5s);
+                if k5s == 5 {
+                    let pp_c5s: i32 = vec_get(ed2, paux5s);
+                    if pp_c5s >= 2 {
+                        let pp_s5s: i32 = vec_get(ed1, paux5s);
+                        let en_hs: i32 = vec_get(pp, pp_s5s);
+                        let vn_hs: i32 = vec_get(pp, pp_s5s + 1);
+                        let kvs: i32 = enum_tag_lookup(enum_names,
+                            enum_tags_flat, enum_tag_offsets,
+                            enum_tag_counts, en_hs, vn_hs);
+                        if kvs >= 0 {
+                            let argc5s: i32 = vec_get(ed3, paux5s);
+                            if argc5s > 0 {
+                                let meta_idx5s: i32 = paux5s - 1;
+                                if vec_get(et, meta_idx5s) == 33 {
+                                    let ac5s: i32 = vec_get(ed1, meta_idx5s);
+                                    let first_e5s: i32 = vec_get(ed2, meta_idx5s);
+                                    let mut ejs: i32 = 0;
+                                    while ejs < ac5s {
+                                        let eidx5s: i32 = first_e5s + ejs;
+                                        let etg5s: i32 = vec_get(et, eidx5s);
+                                        if etg5s == 31 {
+                                            let ipt5s: i32 = vec_get(ed4, eidx5s);
+                                            if ipt5s == 1 {
+                                                let bind_tok5s: i32 = vec_get(ed1, eidx5s);
+                                                let pi5s: i32 = vec_get(ed2, eidx5s);
+                                                if bind_tok5s >= 0 {
+                                                    if pi5s >= 0 {
+                                                        let das: i32 = lower_match_env_append_scrut_pair(
+                                                            arm_menv, bind_tok5s, scrut_cty);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        ejs = ejs + 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if pat_tag == 4 {
+            let paux4s: i32 = vec_get(ed2, arm_idx);
+            let pxt4s: i32 = vec_get(et, paux4s);
+            if pxt4s == 30 {
+                let k4s: i32 = vec_get(ed4, paux4s);
+                if k4s == 4 {
+                    let pp_c4s: i32 = vec_get(ed2, paux4s);
+                    if pp_c4s >= 2 {
+                        let pp_s4s: i32 = vec_get(ed1, paux4s);
+                        let en_h4s: i32 = vec_get(pp, pp_s4s);
+                        let vn_h4s: i32 = vec_get(pp, pp_s4s + 1);
+                        let kv4s: i32 = enum_tag_lookup(enum_names,
+                            enum_tags_flat, enum_tag_offsets,
+                            enum_tag_counts, en_h4s, vn_h4s);
+                        if kv4s >= 0 {
+                            let meta_idxs: i32 = paux4s - 1;
+                            if vec_get(et, meta_idxs) == 32 {
+                                let sfc4s: i32 = vec_get(ed1, meta_idxs);
+                                let first_embs: i32 = vec_get(ed2, meta_idxs);
+                                if sfc4s > 0 {
+                                    let mut fjs: i32 = 0;
+                                    while fjs < sfc4s {
+                                        let eidxs: i32 = first_embs + fjs;
+                                        let etgs: i32 = vec_get(et, eidxs);
+                                        if etgs == 31 {
+                                            let ipts: i32 = vec_get(ed4, eidxs);
+                                            if ipts == 1 {
+                                                let bind_toks: i32 = vec_get(ed1, eidxs);
+                                                let fld_metas: i32 = vec_get(ed3, eidxs);
+                                                let mut fnam_toks: i32 = bind_toks;
+                                                if fld_metas != 0 {
+                                                    fnam_toks = fld_metas;
+                                                }
+                                                let pis: i32 = lower_pat_struct_field_payload_index(
+                                                    tok_tags, source, starts, ends,
+                                                    vn_h4s, sfc4s, fnam_toks);
+                                                if bind_toks >= 0 {
+                                                    if pis >= 0 {
+                                                        let dss: i32 = lower_match_env_append_scrut_pair(
+                                                            arm_menv, bind_toks, scrut_cty);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        fjs = fjs + 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         let mut body_is: Vec<i32> = vec_new();
         let bli: i32 = vec_len(bind_instrs);
