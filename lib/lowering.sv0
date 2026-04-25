@@ -2615,11 +2615,11 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          tok_tags: Vec<i32>,
          out_blocks: Vec<i32>,
          import_aliases: Vec<i32>) -> string {
-    if vec_len(import_aliases) == 0 {
-        let discard_fill_alias: i32 = lower_fill_import_aliases_from_use_items(
-            import_aliases, item_tags, item_names, item_d2, item_d3, body_pp,
-            source, starts, ends);
-    }
+    /* Merge ItemUse value imports into any caller-provided alias table
+       (SML lowering sees resolver importAliases ∪ synthetic use rows). */
+    let discard_fill_alias: i32 = lower_fill_import_aliases_from_use_items(
+        import_aliases, item_tags, item_names, item_d2, item_d3, body_pp,
+        source, starts, ends);
     let discard_so: i32 = build_struct_order(item_tags, item_names,
                                               item_field_counts,
                                               struct_fnames_flat,
@@ -5045,6 +5045,44 @@ fn test_fill_import_aliases_from_use_items() -> i32 {
     return 0;
 }
 
+fn test_fill_import_aliases_merges_with_preload() -> i32 {
+    let item_tags: Vec<i32> = vec_new();
+    let item_names: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
+    let item_d3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let aliases: Vec<i32> = lower_alias_new();
+    let source: string = "mod foo mod__foo other__fn";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    vec_push(starts, 8); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 25);
+    vec_push(item_tags, 0);
+    vec_push(item_names, 2);
+    vec_push(item_d2, 0);
+    vec_push(item_d3, 0);
+    vec_push(item_tags, 0);
+    vec_push(item_names, 3);
+    vec_push(item_d2, 0);
+    vec_push(item_d3, 0);
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    vec_push(item_tags, 5);
+    vec_push(item_names, 0);
+    vec_push(item_d2, 0);
+    vec_push(item_d3, 2);
+    let discard_pre: i32 = lower_alias_add(aliases, 9, 10);
+    let c: i32 = lower_fill_import_aliases_from_use_items(aliases, item_tags,
+        item_names, item_d2, item_d3, pp, source, starts, ends);
+    if c != 2 { return 1; }
+    if lower_alias_lookup(aliases, 9) != 10 { return 2; }
+    if lower_alias_lookup(aliases, 1) != 2 { return 3; }
+    if lower_alias_lookup(aliases, 1) == 10 { return 4; }
+    return 0;
+}
+
 fn test_match_scrut_cty() -> i32 {
     let me: Vec<i32> = lower_match_env_alloc_v0_empty_header();
     let et: Vec<i32> = vec_new();
@@ -7006,6 +7044,8 @@ fn main() -> i32 {
     if r44 != 0 { return 460 + r44; }
     let r44a: i32 = test_fill_import_aliases_from_use_items();
     if r44a != 0 { return 465 + r44a; }
+    let r44b: i32 = test_fill_import_aliases_merges_with_preload();
+    if r44b != 0 { return 467 + r44b; }
     let r45: i32 = test_match_scrut_cty();
     if r45 != 0 { return 470 + r45; }
     let r46: i32 = test_variant_shape_in_items();
