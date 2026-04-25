@@ -668,6 +668,30 @@ fn index_of_fn(fn_h: i32, fn_names: Vec<i32>,
    Vec elements pushed, or -1 on error.
    VMember deferred — requires per-slot field name data. */
 
+fn member_offset_from_field(width: i32, field_h: i32) -> i32 {
+    if width <= 0 { return 0 - 1; }
+    let mut off: i32 = field_h;
+    if field_h == 0 - 1 { off = 0; }
+    if off < 0 { return 0 - 1; }
+    if off >= width { return 0 - 1; }
+    return off;
+}
+
+fn emit_member_load_from_var(x: i32, field_h: i32,
+                             env_names: Vec<i32>, env_bases: Vec<i32>,
+                             env_widths: Vec<i32>,
+                             out: Vec<i32>) -> i32 {
+    let si: i32 = lookup_slot(env_names, env_bases, env_widths, x);
+    if si < 0 { return 0 - 1; }
+    let base: i32 = slot_base(env_bases, si);
+    let width: i32 = slot_width(env_widths, si);
+    let off: i32 = member_offset_from_field(width, field_h);
+    if off < 0 { return 0 - 1; }
+    vec_push(out, 96);
+    vec_push(out, base + off);
+    return 2;
+}
+
 fn emit_value(v: Value,
               env_names: Vec<i32>, env_bases: Vec<i32>,
               env_widths: Vec<i32>,
@@ -714,18 +738,9 @@ fn emit_value(v: Value,
             let base_v: Value = box_deref(bv);
             match base_v {
                 Value::VVar(x) => {
-                    let si: i32 = lookup_slot(env_names, env_bases, env_widths, x);
-                    if si < 0 { return 0 - 1; }
-                    let base: i32 = slot_base(env_bases, si);
-                    let width: i32 = slot_width(env_widths, si);
-                    if width <= 0 { return 0 - 1; }
-                    let mut off: i32 = f;
-                    if f == 0 - 1 { off = 0; }
-                    if off < 0 { return 0 - 1; }
-                    if off >= width { return 0 - 1; }
-                    vec_push(out, 96);
-                    vec_push(out, base + off);
-                    return 2;
+                    return emit_member_load_from_var(x, f,
+                                                     env_names, env_bases,
+                                                     env_widths, out);
                 },
                 Value::VInt(n) => { return 0 - 1; },
                 Value::VFloat(h) => { return 0 - 1; },
@@ -801,6 +816,21 @@ fn emit_expr(e: Expr,
             return n;
         },
         Expr::FieldAccess(bv, f) => {
+            let base_v: Value = box_deref(bv);
+            match base_v {
+                Value::VVar(x) => {
+                    return emit_member_load_from_var(x, f,
+                                                     env_names, env_bases,
+                                                     env_widths, out);
+                },
+                Value::VInt(n) => { return 0 - 1; },
+                Value::VFloat(h) => { return 0 - 1; },
+                Value::VBool(b) => { return 0 - 1; },
+                Value::VString(s) => { return 0 - 1; },
+                Value::VUnit => { return 0 - 1; },
+                Value::VMember(bv2, f2) => { return 0 - 1; },
+                Value::VAddrOf(h2) => { return 0 - 1; },
+            }
             return 0 - 1;
         },
         Expr::IndexAccess(bv1, bv2) => {
@@ -1919,6 +1949,23 @@ fn test_emit_expr() -> i32 {
     if r6 != 2 { return 21; }
     if vec_get(out6, 0) != 4 { return 22; }
     if vec_get(out6, 1) != 9 { return 23; }
+    vec_push(en, 80); vec_push(eb, 4); vec_push(ew, 3);
+    let out7: Vec<i32> = vec_new();
+    let f0: Expr = Expr::FieldAccess(box_new(Value::VVar(80)), 0);
+    let r7: i32 = emit_expr(f0, en, eb, ew, pool, source, starts, ends, out7);
+    if r7 != 2 { return 24; }
+    if vec_get(out7, 0) != 96 { return 25; }
+    if vec_get(out7, 1) != 4 { return 26; }
+    let out8: Vec<i32> = vec_new();
+    let ftag: Expr = Expr::FieldAccess(box_new(Value::VVar(80)), 0 - 1);
+    let r8: i32 = emit_expr(ftag, en, eb, ew, pool, source, starts, ends, out8);
+    if r8 != 2 { return 27; }
+    if vec_get(out8, 0) != 96 { return 28; }
+    if vec_get(out8, 1) != 4 { return 29; }
+    let out9: Vec<i32> = vec_new();
+    let foob: Expr = Expr::FieldAccess(box_new(Value::VVar(80)), 3);
+    let r9: i32 = emit_expr(foob, en, eb, ew, pool, source, starts, ends, out9);
+    if r9 != 0 - 1 { return 30; }
     return 0;
 }
 
