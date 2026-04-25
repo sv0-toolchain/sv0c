@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-25 (America/Denver; **M3 — `lower_match_arms`:** **`PatEnum`** / **`PatStruct`** payload field bindings now register packed scrut-local **`(name_h, ty_h)`** pairs (**`lower_match_env_append_scrut_pair`**, same **`scrut_cty`** as **`PatBind`**) so **`match_scrut_cty`** resolves those names inside nested matches; stage0 **`lowering.c`** + vm-parity **`lowering.sv0b`**; **`doc/transliteration-plan.md`**. Prior **2026-04-22:** **`test_lower_match_env_scrut_merge_roundtrip`**. Prior **2026-04-23:** migration **(4)** scrut **`[8..10]`** + **`match_env_inherit`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-25 (America/Denver; **M3 — packed match env tests:** **`test_lower_match_env_clone_scrut_roundtrip`** (**`lower_match_env_clone`** copies scrut tail; append on clone does not mutate parent **`scrut_count`**). Prior same day: **`PatEnum`** / **`PatStruct`** **`append_scrut_pair`** in **`lower_match_arms`**; **`doc/transliteration-plan.md`**. Prior **2026-04-22:** **`test_lower_match_env_scrut_merge_roundtrip`**. Prior **2026-04-23:** migration **(4)** scrut **`[8..10]`** + **`match_env_inherit`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
