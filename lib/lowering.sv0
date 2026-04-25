@@ -6788,6 +6788,27 @@ fn test_lower_match_env_scrut_merge_roundtrip() -> i32 {
     return 0;
 }
 
+/* Clone must copy scrut tail so per-arm `lower_match_env_clone` keeps
+   outer scrut + payload bindings visible; appending on the clone must
+   not mutate the parent env. */
+
+fn test_lower_match_env_clone_scrut_roundtrip() -> i32 {
+    let parent: Vec<i32> = lower_match_env_alloc_v0_empty_header();
+    let ap0: i32 = lower_match_env_append_scrut_pair(parent, 1001, 2001);
+    if ap0 != 0 { return 1; }
+    let arm: Vec<i32> = lower_match_env_clone(parent);
+    if vec_get(arm, 10) != 1 { return 2; }
+    let ty1: i32 = lower_match_env_scrut_ty_lookup(arm, 99, 1001);
+    if ty1 != 2001 { return 3; }
+    let ap1: i32 = lower_match_env_append_scrut_pair(arm, 1002, 2002);
+    if ap1 != 0 { return 4; }
+    if vec_get(arm, 10) != 2 { return 5; }
+    if vec_get(parent, 10) != 1 { return 6; }
+    let ty2: i32 = lower_match_env_scrut_ty_lookup(arm, 99, 1002);
+    if ty2 != 2002 { return 7; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r3: i32 = test_binop_to_c();
     if r3 != 0 { return 30 + r3; }
@@ -6949,6 +6970,8 @@ fn main() -> i32 {
     if r70f != 0 { return 956 + r70f; }
     let r70g: i32 = test_lower_match_env_scrut_merge_roundtrip();
     if r70g != 0 { return 957 + r70g; }
+    let r70h: i32 = test_lower_match_env_clone_scrut_roundtrip();
+    if r70h != 0 { return 958 + r70h; }
     let r71: i32 = test_build_builtin_map();
     if r71 != 0 { return 960 + r71; }
     return 0;

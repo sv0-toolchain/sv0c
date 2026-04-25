@@ -227,6 +227,7 @@ static int test_build_builtin_map(void);
 static int test_lower_match_env_helpers(void);
 static int test_lower_match_env_fn_pack_roundtrip(void);
 static int test_lower_match_env_scrut_merge_roundtrip(void);
+static int test_lower_match_env_clone_scrut_roundtrip(void);
 
 static int ir_value_tag(Value v) {
   int _sv0t0;
@@ -12135,6 +12136,53 @@ static int test_lower_match_env_scrut_merge_roundtrip(void) {
   return 0;
 }
 
+static int test_lower_match_env_clone_scrut_roundtrip(void) {
+  int _sv0t0 = lower_match_env_alloc_v0_empty_header();
+  int parent = _sv0t0;
+  int _sv0t1 = lower_match_env_append_scrut_pair(parent, 1001, 2001);
+  int ap0 = _sv0t1;
+  if ((ap0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = lower_match_env_clone(parent);
+  int arm = _sv0t2;
+  int _sv0t3 = sv0_vec_get(arm, 10);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = lower_match_env_scrut_ty_lookup(arm, 99, 1001);
+  int ty1 = _sv0t4;
+  if ((ty1 != 2001)) {
+    return 3;
+  } else {
+  }
+  int _sv0t5 = lower_match_env_append_scrut_pair(arm, 1002, 2002);
+  int ap1 = _sv0t5;
+  if ((ap1 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(arm, 10);
+  if ((_sv0t6 != 2)) {
+    return 5;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(parent, 10);
+  if ((_sv0t7 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t8 = lower_match_env_scrut_ty_lookup(arm, 99, 1002);
+  int ty2 = _sv0t8;
+  if ((ty2 != 2002)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_to_c();
   int r3 = _sv0t0;
@@ -12696,11 +12744,18 @@ int main(void) {
     return _sv0t159;
   } else {
   }
-  int _sv0t160 = test_build_builtin_map();
-  int r71 = _sv0t160;
-  if ((r71 != 0)) {
-    int _sv0t161 = (960 + r71);
+  int _sv0t160 = test_lower_match_env_clone_scrut_roundtrip();
+  int r70h = _sv0t160;
+  if ((r70h != 0)) {
+    int _sv0t161 = (958 + r70h);
     return _sv0t161;
+  } else {
+  }
+  int _sv0t162 = test_build_builtin_map();
+  int r71 = _sv0t162;
+  if ((r71 != 0)) {
+    int _sv0t163 = (960 + r71);
+    return _sv0t163;
   } else {
   }
   return 0;
