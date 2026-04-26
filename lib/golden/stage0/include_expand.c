@@ -23,6 +23,7 @@ static int test_expand_text_table2_simple(void);
 static int test_expand_text_table2_nested(void);
 static int test_expand_text_table2_miss(void);
 static int test_expand_text_table3_chain(void);
+static int test_expand_text_table3_depth_limit(void);
 static int test_is_space(void);
 static int test_path_ok(void);
 static int test_has_include_prefix(void);
@@ -618,6 +619,34 @@ static int test_expand_text_table3_chain(void) {
   return 0;
 }
 
+static int test_expand_text_table3_depth_limit(void) {
+  const char* root_host;
+  root_host = "/tmp/pkg/root.sv0";
+  const char* root_src;
+  root_src = "include \"mid.sv0\";\nROOT";
+  const char* pm;
+  pm = "/tmp/pkg/mid.sv0";
+  const char* bm;
+  bm = "include \"leaf.sv0\";\nMID";
+  const char* pl;
+  pl = "/tmp/pkg/leaf.sv0";
+  const char* bl;
+  bl = "LEAF";
+  const char* px;
+  px = "";
+  const char* bx;
+  bx = "";
+  const char* _sv0t0 = expand_text_table3(root_host, root_src, pm, bm, pl, bl, px, bx, 1);
+  const char* got;
+  got = _sv0t0;
+  int _sv0t1 = sv0_string_eq(got, "E0323\nMID\nROOT");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_is_space(void) {
   int _sv0t0 = is_space(32);
   if ((_sv0t0 != 1)) {
@@ -1136,6 +1165,13 @@ int main(void) {
   if ((r15 != 0)) {
     int _sv0t30 = (140 + r15);
     return _sv0t30;
+  } else {
+  }
+  int _sv0t31 = test_expand_text_table3_depth_limit();
+  int r16 = _sv0t31;
+  if ((r16 != 0)) {
+    int _sv0t32 = (150 + r16);
+    return _sv0t32;
   } else {
   }
   return 0;
