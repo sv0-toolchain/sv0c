@@ -636,10 +636,10 @@ static int test_expand_text_table3_depth_limit(void) {
   px = "";
   const char* bx;
   bx = "";
-  const char* _sv0t0 = expand_text_table3(root_host, root_src, pm, bm, pl, bl, px, bx, 1);
+  const char* _sv0t0 = expand_text_table3(root_host, root_src, pm, bm, pl, bl, px, bx, 25);
   const char* got;
   got = _sv0t0;
-  int _sv0t1 = sv0_string_eq(got, "E0323\nMID\nROOT");
+  int _sv0t1 = sv0_string_eq(got, "E0323");
   if ((_sv0t1 != 1)) {
     return 1;
   } else {
