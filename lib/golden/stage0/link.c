@@ -9,6 +9,7 @@ static const char* file_stem(const char* path);
 static const char* mangle(const char* mod_id, const char* x);
 static const char* fn_name_for_link(const char* mod_id, const char* name);
 static const char* link_dir_from_entry(const char* entry_path);
+static const char* module_id_from_entry_path(const char* entry_path);
 static int is_top_defining(int tag);
 static int collect_tops_count(int item_tags);
 static int collect_top_names(int item_tags, int item_names, int out);
@@ -42,6 +43,7 @@ static int test_file_stem(void);
 static int test_mangle(void);
 static int test_fn_name_for_link(void);
 static int test_link_dir_from_entry(void);
+static int test_module_id_from_entry_path(void);
 static int test_is_top_defining(void);
 static int test_collect_tops_count(void);
 static int test_is_link_directive(void);
@@ -184,6 +186,11 @@ static const char* link_dir_from_entry(const char* entry_path) {
   }
   const char* _sv0t1 = sv0_string_substr(entry_path, 0, slash);
   return _sv0t1;
+}
+
+static const char* module_id_from_entry_path(const char* entry_path) {
+  const char* _sv0t0 = file_stem(entry_path);
+  return _sv0t0;
 }
 
 static int is_top_defining(int tag) {
@@ -730,6 +737,34 @@ static int test_link_dir_from_entry(void) {
   }
   const char* _sv0t6 = link_dir_from_entry("/foo.sv0");
   int _sv0t7 = sv0_string_eq(_sv0t6, "/");
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_module_id_from_entry_path(void) {
+  const char* _sv0t0 = module_id_from_entry_path("src/foo.sv0");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "foo");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = module_id_from_entry_path("main.sv0");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "main");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = module_id_from_entry_path("/a/b/c.sv0");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "c");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = module_id_from_entry_path("plain");
+  int _sv0t7 = sv0_string_eq(_sv0t6, "plain");
   if ((_sv0t7 != 1)) {
     return 4;
   } else {
@@ -1418,39 +1453,46 @@ int main(void) {
     return _sv0t32;
   } else {
   }
-  int _sv0t33 = test_map_path_segs();
-  int r17 = _sv0t33;
-  if ((r17 != 0)) {
-    int _sv0t34 = (170 + r17);
+  int _sv0t33 = test_module_id_from_entry_path();
+  int r16b = _sv0t33;
+  if ((r16b != 0)) {
+    int _sv0t34 = (165 + r16b);
     return _sv0t34;
   } else {
   }
-  int _sv0t35 = test_collect_top_names();
-  int r18 = _sv0t35;
-  if ((r18 != 0)) {
-    int _sv0t36 = (180 + r18);
+  int _sv0t35 = test_map_path_segs();
+  int r17 = _sv0t35;
+  if ((r17 != 0)) {
+    int _sv0t36 = (170 + r17);
     return _sv0t36;
   } else {
   }
-  int _sv0t37 = test_map_path_segs_rewrite();
-  int r19 = _sv0t37;
-  if ((r19 != 0)) {
-    int _sv0t38 = (190 + r19);
+  int _sv0t37 = test_collect_top_names();
+  int r18 = _sv0t37;
+  if ((r18 != 0)) {
+    int _sv0t38 = (180 + r18);
     return _sv0t38;
   } else {
   }
-  int _sv0t39 = test_strip_link_directives();
-  int r20 = _sv0t39;
-  if ((r20 != 0)) {
-    int _sv0t40 = (200 + r20);
+  int _sv0t39 = test_map_path_segs_rewrite();
+  int r19 = _sv0t39;
+  if ((r19 != 0)) {
+    int _sv0t40 = (190 + r19);
     return _sv0t40;
   } else {
   }
-  int _sv0t41 = test_split_module_name();
-  int r21 = _sv0t41;
-  if ((r21 != 0)) {
-    int _sv0t42 = (210 + r21);
+  int _sv0t41 = test_strip_link_directives();
+  int r20 = _sv0t41;
+  if ((r20 != 0)) {
+    int _sv0t42 = (200 + r20);
     return _sv0t42;
+  } else {
+  }
+  int _sv0t43 = test_split_module_name();
+  int r21 = _sv0t43;
+  if ((r21 != 0)) {
+    int _sv0t44 = (210 + r21);
+    return _sv0t44;
   } else {
   }
   return 0;

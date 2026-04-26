@@ -86,6 +86,10 @@ fn link_dir_from_entry(entry_path: string) -> string {
     return string_substr(entry_path, 0, slash);
 }
 
+fn module_id_from_entry_path(entry_path: string) -> string {
+    return file_stem(entry_path);
+}
+
 /* ── top-level name collection ──────────────────────────────── */
 
 /* Item tags from ast.sv0: 0=ItemFn, 1=ItemStruct, 2=ItemEnum,
@@ -387,6 +391,14 @@ fn test_link_dir_from_entry() -> i32 {
     return 0;
 }
 
+fn test_module_id_from_entry_path() -> i32 {
+    if string_eq(module_id_from_entry_path("src/foo.sv0"), "foo") != true { return 1; }
+    if string_eq(module_id_from_entry_path("main.sv0"), "main") != true { return 2; }
+    if string_eq(module_id_from_entry_path("/a/b/c.sv0"), "c") != true { return 3; }
+    if string_eq(module_id_from_entry_path("plain"), "plain") != true { return 4; }
+    return 0;
+}
+
 fn test_is_top_defining() -> i32 {
     if is_top_defining(0) != true { return 1; }
     if is_top_defining(1) != true { return 2; }
@@ -627,6 +639,8 @@ fn main() -> i32 {
     if r15 != 0 { return 150 + r15; }
     let r16: i32 = test_link_dir_from_entry();
     if r16 != 0 { return 160 + r16; }
+    let r16b: i32 = test_module_id_from_entry_path();
+    if r16b != 0 { return 165 + r16b; }
     let r17: i32 = test_map_path_segs();
     if r17 != 0 { return 170 + r17; }
     let r18: i32 = test_collect_top_names();
