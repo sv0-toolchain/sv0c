@@ -127,6 +127,7 @@ static int test_encode_decode_roundtrip(void);
 static int test_encode_decode_all(void);
 static int test_encode_file(void);
 static int test_decode_file_roundtrip(void);
+static int test_logical_opcode_cluster(void);
 
 static int magic_byte_0(void) {
   return 83;
@@ -3171,6 +3172,30 @@ static int test_decode_file_roundtrip(void) {
   return 0;
 }
 
+static int test_logical_opcode_cluster(void) {
+  int _sv0t0 = OP_AND();
+  if ((_sv0t0 != 80)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = OP_OR();
+  if ((_sv0t1 != 81)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = OP_NOT();
+  if ((_sv0t2 != 82)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = OP_EQ();
+  if ((_sv0t3 != 64)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_magic();
   int r1 = _sv0t0;
@@ -3185,137 +3210,144 @@ int main(void) {
     return _sv0t2;
   } else {
   }
-  int _sv0t3 = test_insn_sizes();
-  int r3 = _sv0t3;
-  if ((r3 != 0)) {
-    int _sv0t4 = (30 + r3);
+  int _sv0t3 = test_logical_opcode_cluster();
+  int r2b = _sv0t3;
+  if ((r2b != 0)) {
+    int _sv0t4 = (15 + r2b);
     return _sv0t4;
   } else {
   }
-  int _sv0t5 = test_opcode_classify();
-  int r4 = _sv0t5;
-  if ((r4 != 0)) {
-    int _sv0t6 = (50 + r4);
+  int _sv0t5 = test_insn_sizes();
+  int r3 = _sv0t5;
+  if ((r3 != 0)) {
+    int _sv0t6 = (30 + r3);
     return _sv0t6;
   } else {
   }
-  int _sv0t7 = test_le_bytes();
-  int r5 = _sv0t7;
-  if ((r5 != 0)) {
-    int _sv0t8 = (70 + r5);
+  int _sv0t7 = test_opcode_classify();
+  int r4 = _sv0t7;
+  if ((r4 != 0)) {
+    int _sv0t8 = (50 + r4);
     return _sv0t8;
   } else {
   }
-  int _sv0t9 = test_file_layout();
-  int r6 = _sv0t9;
-  if ((r6 != 0)) {
-    int _sv0t10 = (80 + r6);
+  int _sv0t9 = test_le_bytes();
+  int r5 = _sv0t9;
+  if ((r5 != 0)) {
+    int _sv0t10 = (70 + r5);
     return _sv0t10;
   } else {
   }
-  int _sv0t11 = test_encode_le();
-  int r7 = _sv0t11;
-  if ((r7 != 0)) {
-    int _sv0t12 = (90 + r7);
+  int _sv0t11 = test_file_layout();
+  int r6 = _sv0t11;
+  if ((r6 != 0)) {
+    int _sv0t12 = (80 + r6);
     return _sv0t12;
   } else {
   }
-  int _sv0t13 = test_encode_header();
-  int r8 = _sv0t13;
-  if ((r8 != 0)) {
-    int _sv0t14 = (110 + r8);
+  int _sv0t13 = test_encode_le();
+  int r7 = _sv0t13;
+  if ((r7 != 0)) {
+    int _sv0t14 = (90 + r7);
     return _sv0t14;
   } else {
   }
-  int _sv0t15 = test_decode_at();
-  int r9 = _sv0t15;
-  if ((r9 != 0)) {
-    int _sv0t16 = (120 + r9);
+  int _sv0t15 = test_encode_header();
+  int r8 = _sv0t15;
+  if ((r8 != 0)) {
+    int _sv0t16 = (110 + r8);
     return _sv0t16;
   } else {
   }
-  int _sv0t17 = test_verify_magic();
-  int r10 = _sv0t17;
-  if ((r10 != 0)) {
-    int _sv0t18 = (130 + r10);
+  int _sv0t17 = test_decode_at();
+  int r9 = _sv0t17;
+  if ((r9 != 0)) {
+    int _sv0t18 = (120 + r9);
     return _sv0t18;
   } else {
   }
-  int _sv0t19 = test_encode_decode_strings();
-  int r11 = _sv0t19;
-  if ((r11 != 0)) {
-    int _sv0t20 = (140 + r11);
+  int _sv0t19 = test_verify_magic();
+  int r10 = _sv0t19;
+  if ((r10 != 0)) {
+    int _sv0t20 = (130 + r10);
     return _sv0t20;
   } else {
   }
-  int _sv0t21 = test_encode_string_literals();
-  int r12 = _sv0t21;
-  if ((r12 != 0)) {
-    int _sv0t22 = (150 + r12);
+  int _sv0t21 = test_encode_decode_strings();
+  int r11 = _sv0t21;
+  if ((r11 != 0)) {
+    int _sv0t22 = (140 + r11);
     return _sv0t22;
   } else {
   }
-  int _sv0t23 = test_encode_insn_simple();
-  int r13 = _sv0t23;
-  if ((r13 != 0)) {
-    int _sv0t24 = (160 + r13);
+  int _sv0t23 = test_encode_string_literals();
+  int r12 = _sv0t23;
+  if ((r12 != 0)) {
+    int _sv0t24 = (150 + r12);
     return _sv0t24;
   } else {
   }
-  int _sv0t25 = test_encode_insn_payload();
-  int r14 = _sv0t25;
-  if ((r14 != 0)) {
-    int _sv0t26 = (170 + r14);
+  int _sv0t25 = test_encode_insn_simple();
+  int r13 = _sv0t25;
+  if ((r13 != 0)) {
+    int _sv0t26 = (160 + r13);
     return _sv0t26;
   } else {
   }
-  int _sv0t27 = test_encode_insn_multi();
-  int r15 = _sv0t27;
-  if ((r15 != 0)) {
-    int _sv0t28 = (190 + r15);
+  int _sv0t27 = test_encode_insn_payload();
+  int r14 = _sv0t27;
+  if ((r14 != 0)) {
+    int _sv0t28 = (170 + r14);
     return _sv0t28;
   } else {
   }
-  int _sv0t29 = test_decode_insn_simple();
-  int r16 = _sv0t29;
-  if ((r16 != 0)) {
-    int _sv0t30 = (204 + r16);
+  int _sv0t29 = test_encode_insn_multi();
+  int r15 = _sv0t29;
+  if ((r15 != 0)) {
+    int _sv0t30 = (190 + r15);
     return _sv0t30;
   } else {
   }
-  int _sv0t31 = test_decode_insn_payload();
-  int r17 = _sv0t31;
-  if ((r17 != 0)) {
-    int _sv0t32 = (212 + r17);
+  int _sv0t31 = test_decode_insn_simple();
+  int r16 = _sv0t31;
+  if ((r16 != 0)) {
+    int _sv0t32 = (204 + r16);
     return _sv0t32;
   } else {
   }
-  int _sv0t33 = test_encode_decode_roundtrip();
-  int r18 = _sv0t33;
-  if ((r18 != 0)) {
-    int _sv0t34 = (222 + r18);
+  int _sv0t33 = test_decode_insn_payload();
+  int r17 = _sv0t33;
+  if ((r17 != 0)) {
+    int _sv0t34 = (212 + r17);
     return _sv0t34;
   } else {
   }
-  int _sv0t35 = test_encode_decode_all();
-  int r19 = _sv0t35;
-  if ((r19 != 0)) {
-    int _sv0t36 = (236 + r19);
+  int _sv0t35 = test_encode_decode_roundtrip();
+  int r18 = _sv0t35;
+  if ((r18 != 0)) {
+    int _sv0t36 = (222 + r18);
     return _sv0t36;
   } else {
   }
-  int _sv0t37 = test_encode_file();
-  int r20 = _sv0t37;
-  if ((r20 != 0)) {
-    int _sv0t38 = (246 + r20);
+  int _sv0t37 = test_encode_decode_all();
+  int r19 = _sv0t37;
+  if ((r19 != 0)) {
+    int _sv0t38 = (236 + r19);
     return _sv0t38;
   } else {
   }
-  int _sv0t39 = test_decode_file_roundtrip();
-  int r21 = _sv0t39;
-  if ((r21 != 0)) {
-    int _sv0t40 = (10 + r21);
+  int _sv0t39 = test_encode_file();
+  int r20 = _sv0t39;
+  if ((r20 != 0)) {
+    int _sv0t40 = (246 + r20);
     return _sv0t40;
+  } else {
+  }
+  int _sv0t41 = test_decode_file_roundtrip();
+  int r21 = _sv0t41;
+  if ((r21 != 0)) {
+    int _sv0t42 = (10 + r21);
+    return _sv0t42;
   } else {
   }
   return 0;
