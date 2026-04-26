@@ -1313,11 +1313,21 @@ fn test_decode_file_roundtrip() -> i32 {
     return 0;
 }
 
+fn test_logical_opcode_cluster() -> i32 {
+    if OP_AND() != 80 { return 1; }
+    if OP_OR() != 81 { return 2; }
+    if OP_NOT() != 82 { return 3; }
+    if OP_EQ() != 64 { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_magic();
     if r1 != 0 { return r1; }
     let r2: i32 = test_opcodes();
     if r2 != 0 { return 10 + r2; }
+    let r2b: i32 = test_logical_opcode_cluster();
+    if r2b != 0 { return 15 + r2b; }
     let r3: i32 = test_insn_sizes();
     if r3 != 0 { return 30 + r3; }
     let r4: i32 = test_opcode_classify();
