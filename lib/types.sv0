@@ -354,5 +354,68 @@ fn main() -> i32 {
         Ty::TyNamed(id, ag) => { return 25; },
     }
 
+    let tw: Ty = Ty::TyUint(128);
+    if ty_tag(tw) != 8 { return 26; }
+    let tf: Ty = Ty::TyFloat(64);
+    if ty_tag(tf) != 9 { return 27; }
+
+    let rmb: Ty = Ty::TyBool;
+    let rmt: Ty = Ty::TyRefMut(box_new(rmb));
+    if ty_tag(rmt) != 14 { return 28; }
+    match rmt {
+        Ty::TyRefMut(bxm) => {
+            let imx: Ty = box_deref(bxm);
+            if ty_tag(imx) != 1 { return 29; }
+        },
+        Ty::TyUnit => { return 29; },
+        Ty::TyBool => { return 29; },
+        Ty::TyChar => { return 29; },
+        Ty::TyString => { return 29; },
+        Ty::TyIsize => { return 29; },
+        Ty::TyUsize => { return 29; },
+        Ty::TyError => { return 29; },
+        Ty::TyInt(w) => { return 29; },
+        Ty::TyUint(w) => { return 29; },
+        Ty::TyFloat(w) => { return 29; },
+        Ty::TyVar(n) => { return 29; },
+        Ty::TyStruct(id) => { return 29; },
+        Ty::TyEnum(id) => { return 29; },
+        Ty::TyRef(bt) => { return 29; },
+        Ty::TySlice(bt) => { return 29; },
+        Ty::TyArray(bt, n) => { return 29; },
+        Ty::TyTuple(v) => { return 29; },
+        Ty::TyFn(ps, rb) => { return 29; },
+        Ty::TyNamed(id, ag) => { return 29; },
+    }
+
+    let sli: Ty = Ty::TyString;
+    let slt: Ty = Ty::TySlice(box_new(sli));
+    if ty_tag(slt) != 15 { return 30; }
+    match slt {
+        Ty::TySlice(bxs) => {
+            let inns: Ty = box_deref(bxs);
+            if ty_tag(inns) != 3 { return 31; }
+        },
+        Ty::TyUnit => { return 31; },
+        Ty::TyBool => { return 31; },
+        Ty::TyChar => { return 31; },
+        Ty::TyString => { return 31; },
+        Ty::TyIsize => { return 31; },
+        Ty::TyUsize => { return 31; },
+        Ty::TyError => { return 31; },
+        Ty::TyInt(w) => { return 31; },
+        Ty::TyUint(w) => { return 31; },
+        Ty::TyFloat(w) => { return 31; },
+        Ty::TyVar(n) => { return 31; },
+        Ty::TyStruct(id) => { return 31; },
+        Ty::TyEnum(id) => { return 31; },
+        Ty::TyRef(bt) => { return 31; },
+        Ty::TyRefMut(bt) => { return 31; },
+        Ty::TyArray(bt, n) => { return 31; },
+        Ty::TyTuple(v) => { return 31; },
+        Ty::TyFn(ps, rb) => { return 31; },
+        Ty::TyNamed(id, ag) => { return 31; },
+    }
+
     return 0;
 }
