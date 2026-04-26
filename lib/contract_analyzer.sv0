@@ -11,5 +11,7 @@ fn main() -> i32 {
     if r != 42 { return 1; }
     let r2: i32 = analyze(0);
     if r2 != 0 { return 2; }
+    let r3: i32 = analyze(analyze(99));
+    if r3 != 99 { return 3; }
     return 0;
 }
