@@ -2,8 +2,8 @@
    Textual include expansion: character classification, whitespace
    trimming, path validation, include-line parsing, line splitting/
    joining, cycle detection (Vec-based visited list).
-   `expand_text_table2` mirrors SML `expand` line-wise using a 2-slot
-   in-memory path→body table (tests; no OS). `expand`/`expandFile`
+   `expand_text_table2` / `expand_text_table3` mirror SML `expand` line-wise
+   using 2- and 3-slot in-memory path→body tables (tests; no OS). `expand`/`expandFile`
    remain deferred (host file I/O). */
 
 fn is_space(c: i32) -> bool {
@@ -186,7 +186,8 @@ fn path_join(dir: string, rel: string) -> string {
    path_join(path_dir(host_abs), rel), body loaded from a fixed 2-slot
    path→text table (empty slot keys are ignored). Recursive expansion
    uses the merged absolute path as the nested host. Depth > 24 →
-   literal `E0323` (cycle / runaway guard). Missing table entry → `E0322`. */
+   literal `E0323` (cycle / runaway guard). Missing table entry → `E0322`.
+   `expand_text_table3` extends the same model to a 3-slot table. */
 
 fn table_lookup_body(p0: string, b0: string, p1: string, b1: string, merged: string) -> string {
     if string_len(p0) > 0 {
@@ -197,6 +198,20 @@ fn table_lookup_body(p0: string, b0: string, p1: string, b1: string, merged: str
     if string_len(p1) > 0 {
         if string_eq(p1, merged) {
             return b1;
+        }
+    }
+    return "";
+}
+
+fn table_lookup_body3(p0: string, b0: string, p1: string, b1: string, p2: string, b2: string,
+                      merged: string) -> string {
+    let r01: string = table_lookup_body(p0, b0, p1, b1, merged);
+    if string_len(r01) > 0 {
+        return r01;
+    }
+    if string_len(p2) > 0 {
+        if string_eq(p2, merged) {
+            return b2;
         }
     }
     return "";
@@ -237,6 +252,41 @@ fn expand_text_table2(host_abs: string, source: string, p0: string, b0: string, 
     return bo;
 }
 
+fn expand_text_table3(host_abs: string, source: string, p0: string, b0: string, p1: string, b1: string,
+                      p2: string, b2: string, depth: i32) -> string {
+    if depth > 24 {
+        return "E0323";
+    }
+    let dd3: i32 = depth + 1;
+    let s3: Vec<i32> = vec_new();
+    let l3: Vec<i32> = vec_new();
+    let n3: i32 = split_lines(source, s3, l3);
+    let mut out3: string = "";
+    let mut i3: i32 = 0;
+    while i3 < n3 {
+        if i3 > 0 {
+            out3 = string_concat(out3, "\n");
+        }
+        let ln3: string = get_split_line(source, s3, l3, i3);
+        let rel3: string = parse_include_line(ln3);
+        if string_len(rel3) == 0 {
+            out3 = string_concat(out3, ln3);
+        } else {
+            let d3: string = path_dir(host_abs);
+            let m3: string = path_join(d3, rel3);
+            let bd3: string = table_lookup_body3(p0, b0, p1, b1, p2, b2, m3);
+            if string_len(bd3) == 0 {
+                out3 = string_concat(out3, "E0322");
+            } else {
+                let in3: string = expand_text_table3(m3, bd3, p0, b0, p1, b1, p2, b2, dd3);
+                out3 = string_concat(out3, in3);
+            }
+        }
+        i3 = i3 + 1;
+    }
+    return out3;
+}
+
 fn test_expand_text_table2_simple() -> i32 {
     let host: string = "/tmp/pkg/main.sv0";
     let src: string = "include \"inc.sv0\";\nfn x() -> i32 { 1 }";
@@ -273,6 +323,21 @@ fn test_expand_text_table2_miss() -> i32 {
     let got: string = expand_text_table2(host, src, p0, b0, p1, b1, 0);
     let exp: string = "E0322\ntail";
     if string_eq(got, exp) != true { return 3; }
+    return 0;
+}
+
+fn test_expand_text_table3_chain() -> i32 {
+    let root_host: string = "/tmp/pkg/root.sv0";
+    let root_src: string = "include \"mid.sv0\";\nROOT";
+    let pm: string = "/tmp/pkg/mid.sv0";
+    let bm: string = "include \"leaf.sv0\";\nMID";
+    let pl: string = "/tmp/pkg/leaf.sv0";
+    let bl: string = "LEAF";
+    let px: string = "";
+    let bx: string = "";
+    let got3: string = expand_text_table3(root_host, root_src, pm, bm, pl, bl, px, bx, 0);
+    let exp3: string = "LEAF\nMID\nROOT";
+    if string_eq(got3, exp3) != true { return 4; }
     return 0;
 }
 
@@ -441,5 +506,7 @@ fn main() -> i32 {
     if r13 != 0 { return 120 + r13; }
     let r14: i32 = test_expand_text_table2_miss();
     if r14 != 0 { return 130 + r14; }
+    let r15: i32 = test_expand_text_table3_chain();
+    if r15 != 0 { return 140 + r15; }
     return 0;
 }
