@@ -98,6 +98,10 @@ fn vm_output_sv0b_for_entry(has_main_file: bool) -> string {
     return vm_output_sv0b_path(has_main_sv0(has_main_file));
 }
 
+fn vm_output_sv0b_for_input_path(path: string) -> string {
+    return vm_output_sv0b_path(base_name_sv0(path));
+}
+
 /* ── pipeline phase ordering ────────────────────────────────── */
 
 fn PHASE_RESOLVE() -> i32 { return 0; }
@@ -195,6 +199,8 @@ fn test_vm_output() -> i32 {
     if string_eq(vm_output_sv0b_path("foo"), "build/vm/foo.sv0b") != true { return 5; }
     if string_eq(vm_output_sv0b_for_entry(true), "build/vm/main.sv0b") != true { return 6; }
     if string_eq(vm_output_sv0b_for_entry(false), "build/vm/program.sv0b") != true { return 7; }
+    if string_eq(vm_output_sv0b_for_input_path("src/app.sv0"), "build/vm/app.sv0b") != true { return 8; }
+    if string_eq(vm_output_sv0b_for_input_path("tool"), "build/vm/tool.sv0b") != true { return 9; }
     return 0;
 }
 

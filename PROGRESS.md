@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — `lowering.sv0`:** scrut-local lookup now prefers newest binding (**`lower_match_env_scrut_ty_lookup`** reverse scan) + regression in `test_lower_match_env_scrut_merge_roundtrip`; refreshed stage0/vm-parity `lowering` goldens. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — `main.sv0`:** added **`vm_output_sv0b_for_input_path`** (`path` → stem → `build/vm/<stem>.sv0b`) with unit coverage; refreshed stage0/vm-parity `main` goldens. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
