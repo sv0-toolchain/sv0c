@@ -20,3 +20,7 @@ fn one() -> i32 {
 fn two() -> i32 {
   return 2;
 }
+
+fn three() -> i32 {
+  return 3;
+}
