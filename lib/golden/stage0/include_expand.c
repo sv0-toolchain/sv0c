@@ -16,10 +16,13 @@ static int include_cycle_check(int visited, int path_handle);
 static const char* path_dir(const char* path);
 static const char* path_join(const char* dir, const char* rel);
 static const char* table_lookup_body(const char* p0, const char* b0, const char* p1, const char* b1, const char* merged);
+static const char* table_lookup_body3(const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, const char* merged);
 static const char* expand_text_table2(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, int depth);
+static const char* expand_text_table3(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, int depth);
 static int test_expand_text_table2_simple(void);
 static int test_expand_text_table2_nested(void);
 static int test_expand_text_table2_miss(void);
+static int test_expand_text_table3_chain(void);
 static int test_is_space(void);
 static int test_path_ok(void);
 static int test_has_include_prefix(void);
@@ -370,6 +373,27 @@ static const char* table_lookup_body(const char* p0, const char* b0, const char*
   return "";
 }
 
+static const char* table_lookup_body3(const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, const char* merged) {
+  const char* _sv0t0 = table_lookup_body(p0, b0, p1, b1, merged);
+  const char* r01;
+  r01 = _sv0t0;
+  int _sv0t1 = sv0_string_len(r01);
+  if ((_sv0t1 > 0)) {
+    return r01;
+  } else {
+  }
+  int _sv0t2 = sv0_string_len(p2);
+  if ((_sv0t2 > 0)) {
+    int _sv0t3 = sv0_string_eq(p2, merged);
+    if (_sv0t3) {
+      return b2;
+    } else {
+    }
+  } else {
+  }
+  return "";
+}
+
 static const char* expand_text_table2(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, int depth) {
   if ((depth > 24)) {
     return "E0323";
@@ -426,6 +450,64 @@ static const char* expand_text_table2(const char* host_abs, const char* source, 
     li = (li + 1);
   }
   return bo;
+}
+
+static const char* expand_text_table3(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, int depth) {
+  if ((depth > 24)) {
+    return "E0323";
+  } else {
+  }
+  int dd3 = (depth + 1);
+  int _sv0t0 = sv0_vec_new();
+  int s3 = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int l3 = _sv0t1;
+  int _sv0t2 = split_lines(source, s3, l3);
+  int n3 = _sv0t2;
+  const char* out3;
+  out3 = "";
+  int i3 = 0;
+  while ((i3 < n3)) {
+    if ((i3 > 0)) {
+      const char* _sv0t3 = sv0_string_concat(out3, "\n");
+      out3 = _sv0t3;
+    } else {
+    }
+    const char* _sv0t4 = get_split_line(source, s3, l3, i3);
+    const char* ln3;
+    ln3 = _sv0t4;
+    const char* _sv0t5 = parse_include_line(ln3);
+    const char* rel3;
+    rel3 = _sv0t5;
+    int _sv0t6 = sv0_string_len(rel3);
+    if ((_sv0t6 == 0)) {
+      const char* _sv0t7 = sv0_string_concat(out3, ln3);
+      out3 = _sv0t7;
+    } else {
+      const char* _sv0t8 = path_dir(host_abs);
+      const char* d3;
+      d3 = _sv0t8;
+      const char* _sv0t9 = path_join(d3, rel3);
+      const char* m3;
+      m3 = _sv0t9;
+      const char* _sv0t10 = table_lookup_body3(p0, b0, p1, b1, p2, b2, m3);
+      const char* bd3;
+      bd3 = _sv0t10;
+      int _sv0t11 = sv0_string_len(bd3);
+      if ((_sv0t11 == 0)) {
+        const char* _sv0t12 = sv0_string_concat(out3, "E0322");
+        out3 = _sv0t12;
+      } else {
+        const char* _sv0t13 = expand_text_table3(m3, bd3, p0, b0, p1, b1, p2, b2, dd3);
+        const char* in3;
+        in3 = _sv0t13;
+        const char* _sv0t14 = sv0_string_concat(out3, in3);
+        out3 = _sv0t14;
+      }
+    }
+    i3 = (i3 + 1);
+  }
+  return out3;
 }
 
 static int test_expand_text_table2_simple(void) {
@@ -501,6 +583,36 @@ static int test_expand_text_table2_miss(void) {
   int _sv0t1 = sv0_string_eq(got, exp);
   if ((_sv0t1 != 1)) {
     return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_expand_text_table3_chain(void) {
+  const char* root_host;
+  root_host = "/tmp/pkg/root.sv0";
+  const char* root_src;
+  root_src = "include \"mid.sv0\";\nROOT";
+  const char* pm;
+  pm = "/tmp/pkg/mid.sv0";
+  const char* bm;
+  bm = "include \"leaf.sv0\";\nMID";
+  const char* pl;
+  pl = "/tmp/pkg/leaf.sv0";
+  const char* bl;
+  bl = "LEAF";
+  const char* px;
+  px = "";
+  const char* bx;
+  bx = "";
+  const char* _sv0t0 = expand_text_table3(root_host, root_src, pm, bm, pl, bl, px, bx, 0);
+  const char* got3;
+  got3 = _sv0t0;
+  const char* exp3;
+  exp3 = "LEAF\nMID\nROOT";
+  int _sv0t1 = sv0_string_eq(got3, exp3);
+  if ((_sv0t1 != 1)) {
+    return 4;
   } else {
   }
   return 0;
@@ -1017,6 +1129,13 @@ int main(void) {
   if ((r14 != 0)) {
     int _sv0t28 = (130 + r14);
     return _sv0t28;
+  } else {
+  }
+  int _sv0t29 = test_expand_text_table3_chain();
+  int r15 = _sv0t29;
+  if ((r15 != 0)) {
+    int _sv0t30 = (140 + r15);
+    return _sv0t30;
   } else {
   }
   return 0;
