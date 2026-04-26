@@ -18,6 +18,7 @@ static int test_ref_cross_unify(void);
 static int test_tyvar_wildcard(void);
 static int test_list_len(void);
 static int test_unify_list(void);
+static int test_nested_slice_ref(void);
 
 static int ty_tag(Ty t) {
   int _sv0t0;
@@ -1318,6 +1319,68 @@ static int test_unify_list(void) {
   return 0;
 }
 
+static int test_nested_slice_ref(void) {
+  Ty inner1;
+  Ty _sv0t0;
+  _sv0t0.tag = 1;
+  int _sv0t1 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t1, 0, _sv0t0.tag);
+  sv0_box_store(_sv0t1, 1, _sv0t0.p0);
+  sv0_box_store(_sv0t1, 2, _sv0t0.p1);
+  inner1.tag = 13;
+  inner1.p0 = _sv0t1;
+  Ty s1;
+  int _sv0t2 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t2, 0, inner1.tag);
+  sv0_box_store(_sv0t2, 1, inner1.p0);
+  sv0_box_store(_sv0t2, 2, inner1.p1);
+  s1.tag = 15;
+  s1.p0 = _sv0t2;
+  Ty inner2;
+  Ty _sv0t3;
+  _sv0t3.tag = 1;
+  int _sv0t4 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t4, 0, _sv0t3.tag);
+  sv0_box_store(_sv0t4, 1, _sv0t3.p0);
+  sv0_box_store(_sv0t4, 2, _sv0t3.p1);
+  inner2.tag = 13;
+  inner2.p0 = _sv0t4;
+  Ty s2;
+  int _sv0t5 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t5, 0, inner2.tag);
+  sv0_box_store(_sv0t5, 1, inner2.p0);
+  sv0_box_store(_sv0t5, 2, inner2.p1);
+  s2.tag = 15;
+  s2.p0 = _sv0t5;
+  int _sv0t6 = unify(s1, s2);
+  if ((_sv0t6 != 1)) {
+    return 1;
+  } else {
+  }
+  Ty inner3;
+  Ty _sv0t7;
+  _sv0t7.tag = 2;
+  int _sv0t8 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t8, 0, _sv0t7.tag);
+  sv0_box_store(_sv0t8, 1, _sv0t7.p0);
+  sv0_box_store(_sv0t8, 2, _sv0t7.p1);
+  inner3.tag = 13;
+  inner3.p0 = _sv0t8;
+  Ty s3;
+  int _sv0t9 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t9, 0, inner3.tag);
+  sv0_box_store(_sv0t9, 1, inner3.p0);
+  sv0_box_store(_sv0t9, 2, inner3.p1);
+  s3.tag = 15;
+  s3.p0 = _sv0t9;
+  int _sv0t10 = unify(s1, s3);
+  if ((_sv0t10 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_unit_variants();
   int r1 = _sv0t0;
@@ -1365,6 +1428,13 @@ int main(void) {
   if ((r7 != 0)) {
     int _sv0t12 = (80 + r7);
     return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_nested_slice_ref();
+  int r8 = _sv0t13;
+  if ((r8 != 0)) {
+    int _sv0t14 = (90 + r8);
+    return _sv0t14;
   } else {
   }
   return 0;
