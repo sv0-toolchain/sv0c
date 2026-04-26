@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — `contract_analyzer.sv0`:** chained **`analyze(analyze(..))`** smoke in **`main`**; stage0/vm-parity **`contract_analyzer`** goldens refreshed. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — integration `import_use_match`:** fifth **`use lib::two`** + **`two()`** guard + lib export; **`test/integration/README.md`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
