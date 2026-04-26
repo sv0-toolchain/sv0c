@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 — integration `import_use_match`:** second **`use lib::neg_one`** + **`neg_one()`** in **`match`** (exercises merged **`ItemUse`** alias table). Prior **include_expand** **`expand_text_table2`**, **lowering** import-alias merge, **vm_codegen** parity. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-24 (America/Los_Angeles; **M3 — `include_expand`:** **`join_lines`** (rejoin **`split_lines`** segments; **`test_join_lines_roundtrip`**). Prior **import_use_match** dual-**`use`**, **`expand_text_table2`**, **lowering** import-alias merge, **vm_codegen** parity. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 

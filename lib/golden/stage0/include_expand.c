@@ -11,6 +11,7 @@ static const char* chomp_cr(const char* line);
 static const char* parse_include_line(const char* line);
 static int split_lines(const char* source, int starts, int lens);
 static const char* get_split_line(const char* source, int starts, int lens, int idx);
+static const char* join_lines(const char* source, int starts, int lens, int count);
 static int include_cycle_check(int visited, int path_handle);
 static const char* path_dir(const char* path);
 static const char* path_join(const char* dir, const char* rel);
@@ -27,6 +28,7 @@ static int test_trim(void);
 static int test_chomp_cr(void);
 static int test_parse_include_line(void);
 static int test_split_lines(void);
+static int test_join_lines_roundtrip(void);
 static int test_cycle_check(void);
 static int test_path_dir(void);
 static int test_path_join(void);
@@ -271,6 +273,26 @@ static const char* get_split_line(const char* source, int starts, int lens, int 
   }
   const char* _sv0t2 = sv0_string_substr(source, s, l);
   return _sv0t2;
+}
+
+static const char* join_lines(const char* source, int starts, int lens, int count) {
+  const char* bo;
+  bo = "";
+  int li = 0;
+  while ((li < count)) {
+    if ((li > 0)) {
+      const char* _sv0t0 = sv0_string_concat(bo, "\n");
+      bo = _sv0t0;
+    } else {
+    }
+    const char* _sv0t1 = get_split_line(source, starts, lens, li);
+    const char* seg;
+    seg = _sv0t1;
+    const char* _sv0t2 = sv0_string_concat(bo, seg);
+    bo = _sv0t2;
+    li = (li + 1);
+  }
+  return bo;
 }
 
 static int include_cycle_check(int visited, int path_handle) {
@@ -777,6 +799,42 @@ static int test_split_lines(void) {
   return 0;
 }
 
+static int test_join_lines_roundtrip(void) {
+  const char* src;
+  src = "alpha\nbeta\ngamma";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int lens = _sv0t1;
+  int _sv0t2 = split_lines(src, starts, lens);
+  int count = _sv0t2;
+  const char* _sv0t3 = join_lines(src, starts, lens, count);
+  const char* got;
+  got = _sv0t3;
+  int _sv0t4 = sv0_string_eq(got, src);
+  if ((_sv0t4 != 1)) {
+    return 7;
+  } else {
+  }
+  const char* src2;
+  src2 = "a\n";
+  int _sv0t5 = sv0_vec_new();
+  int s2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int l2 = _sv0t6;
+  int _sv0t7 = split_lines(src2, s2, l2);
+  int c2 = _sv0t7;
+  const char* _sv0t8 = join_lines(src2, s2, l2, c2);
+  const char* got2;
+  got2 = _sv0t8;
+  int _sv0t9 = sv0_string_eq(got2, src2);
+  if ((_sv0t9 != 1)) {
+    return 8;
+  } else {
+  }
+  return 0;
+}
+
 static int test_cycle_check(void) {
   int _sv0t0 = sv0_vec_new();
   int visited = _sv0t0;
@@ -912,46 +970,53 @@ int main(void) {
     return _sv0t14;
   } else {
   }
-  int _sv0t15 = test_cycle_check();
-  int r9 = _sv0t15;
-  if ((r9 != 0)) {
-    int _sv0t16 = (80 + r9);
+  int _sv0t15 = test_join_lines_roundtrip();
+  int r8b = _sv0t15;
+  if ((r8b != 0)) {
+    int _sv0t16 = (75 + r8b);
     return _sv0t16;
   } else {
   }
-  int _sv0t17 = test_path_dir();
-  int r10 = _sv0t17;
-  if ((r10 != 0)) {
-    int _sv0t18 = (90 + r10);
+  int _sv0t17 = test_cycle_check();
+  int r9 = _sv0t17;
+  if ((r9 != 0)) {
+    int _sv0t18 = (80 + r9);
     return _sv0t18;
   } else {
   }
-  int _sv0t19 = test_path_join();
-  int r11 = _sv0t19;
-  if ((r11 != 0)) {
-    int _sv0t20 = (100 + r11);
+  int _sv0t19 = test_path_dir();
+  int r10 = _sv0t19;
+  if ((r10 != 0)) {
+    int _sv0t20 = (90 + r10);
     return _sv0t20;
   } else {
   }
-  int _sv0t21 = test_expand_text_table2_simple();
-  int r12 = _sv0t21;
-  if ((r12 != 0)) {
-    int _sv0t22 = (110 + r12);
+  int _sv0t21 = test_path_join();
+  int r11 = _sv0t21;
+  if ((r11 != 0)) {
+    int _sv0t22 = (100 + r11);
     return _sv0t22;
   } else {
   }
-  int _sv0t23 = test_expand_text_table2_nested();
-  int r13 = _sv0t23;
-  if ((r13 != 0)) {
-    int _sv0t24 = (120 + r13);
+  int _sv0t23 = test_expand_text_table2_simple();
+  int r12 = _sv0t23;
+  if ((r12 != 0)) {
+    int _sv0t24 = (110 + r12);
     return _sv0t24;
   } else {
   }
-  int _sv0t25 = test_expand_text_table2_miss();
-  int r14 = _sv0t25;
-  if ((r14 != 0)) {
-    int _sv0t26 = (130 + r14);
+  int _sv0t25 = test_expand_text_table2_nested();
+  int r13 = _sv0t25;
+  if ((r13 != 0)) {
+    int _sv0t26 = (120 + r13);
     return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_expand_text_table2_miss();
+  int r14 = _sv0t27;
+  if ((r14 != 0)) {
+    int _sv0t28 = (130 + r14);
+    return _sv0t28;
   } else {
   }
   return 0;
