@@ -1147,6 +1147,20 @@ static int test_diag_int_to_str(void) {
     return 4;
   } else {
   }
+  int _sv0t8 = (-7);
+  const char* _sv0t9 = diag_int_to_str(_sv0t8);
+  int _sv0t10 = sv0_string_eq(_sv0t9, "-7");
+  if ((_sv0t10 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t11 = (-100);
+  const char* _sv0t12 = diag_int_to_str(_sv0t11);
+  int _sv0t13 = sv0_string_eq(_sv0t12, "-100");
+  if ((_sv0t13 != 1)) {
+    return 6;
+  } else {
+  }
   return 0;
 }
 
