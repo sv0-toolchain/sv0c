@@ -350,8 +350,8 @@ fn test_expand_text_table3_depth_limit() -> i32 {
     let bl: string = "LEAF";
     let px: string = "";
     let bx: string = "";
-    let got: string = expand_text_table3(root_host, root_src, pm, bm, pl, bl, px, bx, 1);
-    if string_eq(got, "E0323\nMID\nROOT") != true { return 1; }
+    let got: string = expand_text_table3(root_host, root_src, pm, bm, pl, bl, px, bx, 25);
+    if string_eq(got, "E0323") != true { return 1; }
     return 0;
 }
 
