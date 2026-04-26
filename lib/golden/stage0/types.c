@@ -1567,6 +1567,316 @@ int main(void) {
       }
     }
   }
+  Ty tw;
+  tw.tag = 8;
+  tw.p0 = 128;
+  int _sv0t59 = ty_tag(tw);
+  if ((_sv0t59 != 8)) {
+    return 26;
+  } else {
+  }
+  Ty tf;
+  tf.tag = 9;
+  tf.p0 = 64;
+  int _sv0t60 = ty_tag(tf);
+  if ((_sv0t60 != 9)) {
+    return 27;
+  } else {
+  }
+  Ty rmb;
+  rmb.tag = 1;
+  Ty rmt;
+  int _sv0t61 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t61, 0, rmb.tag);
+  sv0_box_store(_sv0t61, 1, rmb.p0);
+  sv0_box_store(_sv0t61, 2, rmb.p1);
+  rmt.tag = 14;
+  rmt.p0 = _sv0t61;
+  int _sv0t62 = ty_tag(rmt);
+  if ((_sv0t62 != 14)) {
+    return 28;
+  } else {
+  }
+  int _sv0t63;
+  if ((rmt.tag == 14)) {
+    int bxm = rmt.p0;
+    Ty _sv0t64;
+    int _sv0t65 = sv0_box_load(bxm, 0);
+    _sv0t64.tag = _sv0t65;
+    int _sv0t66 = sv0_box_load(bxm, 1);
+    _sv0t64.p0 = _sv0t66;
+    int _sv0t67 = sv0_box_load(bxm, 2);
+    _sv0t64.p1 = _sv0t67;
+    Ty imx;
+    imx.tag = (_sv0t64).tag;
+    imx.p0 = (_sv0t64).p0;
+    imx.p1 = (_sv0t64).p1;
+    int _sv0t68 = ty_tag(imx);
+    if ((_sv0t68 != 1)) {
+      return 29;
+      _sv0t63 = 0;
+    } else {
+      _sv0t63 = 0;
+    }
+  } else {
+    if ((rmt.tag == 0)) {
+      return 29;
+      _sv0t63 = 0;
+    } else {
+      if ((rmt.tag == 1)) {
+        return 29;
+        _sv0t63 = 0;
+      } else {
+        if ((rmt.tag == 2)) {
+          return 29;
+          _sv0t63 = 0;
+        } else {
+          if ((rmt.tag == 3)) {
+            return 29;
+            _sv0t63 = 0;
+          } else {
+            if ((rmt.tag == 4)) {
+              return 29;
+              _sv0t63 = 0;
+            } else {
+              if ((rmt.tag == 5)) {
+                return 29;
+                _sv0t63 = 0;
+              } else {
+                if ((rmt.tag == 6)) {
+                  return 29;
+                  _sv0t63 = 0;
+                } else {
+                  if ((rmt.tag == 7)) {
+                    int w = rmt.p0;
+                    return 29;
+                    _sv0t63 = 0;
+                  } else {
+                    if ((rmt.tag == 8)) {
+                      int w = rmt.p0;
+                      return 29;
+                      _sv0t63 = 0;
+                    } else {
+                      if ((rmt.tag == 9)) {
+                        int w = rmt.p0;
+                        return 29;
+                        _sv0t63 = 0;
+                      } else {
+                        if ((rmt.tag == 10)) {
+                          int n = rmt.p0;
+                          return 29;
+                          _sv0t63 = 0;
+                        } else {
+                          if ((rmt.tag == 11)) {
+                            int id = rmt.p0;
+                            return 29;
+                            _sv0t63 = 0;
+                          } else {
+                            if ((rmt.tag == 12)) {
+                              int id = rmt.p0;
+                              return 29;
+                              _sv0t63 = 0;
+                            } else {
+                              if ((rmt.tag == 13)) {
+                                int bt = rmt.p0;
+                                return 29;
+                                _sv0t63 = 0;
+                              } else {
+                                if ((rmt.tag == 15)) {
+                                  int bt = rmt.p0;
+                                  return 29;
+                                  _sv0t63 = 0;
+                                } else {
+                                  if ((rmt.tag == 16)) {
+                                    int bt = rmt.p0;
+                                    int n = rmt.p1;
+                                    return 29;
+                                    _sv0t63 = 0;
+                                  } else {
+                                    if ((rmt.tag == 17)) {
+                                      int v = rmt.p0;
+                                      return 29;
+                                      _sv0t63 = 0;
+                                    } else {
+                                      if ((rmt.tag == 18)) {
+                                        int ps = rmt.p0;
+                                        int rb = rmt.p1;
+                                        return 29;
+                                        _sv0t63 = 0;
+                                      } else {
+                                        if ((rmt.tag == 19)) {
+                                          int id = rmt.p0;
+                                          int ag = rmt.p1;
+                                          return 29;
+                                          _sv0t63 = 0;
+                                        } else {
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  Ty sli;
+  sli.tag = 3;
+  Ty slt;
+  int _sv0t69 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t69, 0, sli.tag);
+  sv0_box_store(_sv0t69, 1, sli.p0);
+  sv0_box_store(_sv0t69, 2, sli.p1);
+  slt.tag = 15;
+  slt.p0 = _sv0t69;
+  int _sv0t70 = ty_tag(slt);
+  if ((_sv0t70 != 15)) {
+    return 30;
+  } else {
+  }
+  int _sv0t71;
+  if ((slt.tag == 15)) {
+    int bxs = slt.p0;
+    Ty _sv0t72;
+    int _sv0t73 = sv0_box_load(bxs, 0);
+    _sv0t72.tag = _sv0t73;
+    int _sv0t74 = sv0_box_load(bxs, 1);
+    _sv0t72.p0 = _sv0t74;
+    int _sv0t75 = sv0_box_load(bxs, 2);
+    _sv0t72.p1 = _sv0t75;
+    Ty inns;
+    inns.tag = (_sv0t72).tag;
+    inns.p0 = (_sv0t72).p0;
+    inns.p1 = (_sv0t72).p1;
+    int _sv0t76 = ty_tag(inns);
+    if ((_sv0t76 != 3)) {
+      return 31;
+      _sv0t71 = 0;
+    } else {
+      _sv0t71 = 0;
+    }
+  } else {
+    if ((slt.tag == 0)) {
+      return 31;
+      _sv0t71 = 0;
+    } else {
+      if ((slt.tag == 1)) {
+        return 31;
+        _sv0t71 = 0;
+      } else {
+        if ((slt.tag == 2)) {
+          return 31;
+          _sv0t71 = 0;
+        } else {
+          if ((slt.tag == 3)) {
+            return 31;
+            _sv0t71 = 0;
+          } else {
+            if ((slt.tag == 4)) {
+              return 31;
+              _sv0t71 = 0;
+            } else {
+              if ((slt.tag == 5)) {
+                return 31;
+                _sv0t71 = 0;
+              } else {
+                if ((slt.tag == 6)) {
+                  return 31;
+                  _sv0t71 = 0;
+                } else {
+                  if ((slt.tag == 7)) {
+                    int w = slt.p0;
+                    return 31;
+                    _sv0t71 = 0;
+                  } else {
+                    if ((slt.tag == 8)) {
+                      int w = slt.p0;
+                      return 31;
+                      _sv0t71 = 0;
+                    } else {
+                      if ((slt.tag == 9)) {
+                        int w = slt.p0;
+                        return 31;
+                        _sv0t71 = 0;
+                      } else {
+                        if ((slt.tag == 10)) {
+                          int n = slt.p0;
+                          return 31;
+                          _sv0t71 = 0;
+                        } else {
+                          if ((slt.tag == 11)) {
+                            int id = slt.p0;
+                            return 31;
+                            _sv0t71 = 0;
+                          } else {
+                            if ((slt.tag == 12)) {
+                              int id = slt.p0;
+                              return 31;
+                              _sv0t71 = 0;
+                            } else {
+                              if ((slt.tag == 13)) {
+                                int bt = slt.p0;
+                                return 31;
+                                _sv0t71 = 0;
+                              } else {
+                                if ((slt.tag == 14)) {
+                                  int bt = slt.p0;
+                                  return 31;
+                                  _sv0t71 = 0;
+                                } else {
+                                  if ((slt.tag == 16)) {
+                                    int bt = slt.p0;
+                                    int n = slt.p1;
+                                    return 31;
+                                    _sv0t71 = 0;
+                                  } else {
+                                    if ((slt.tag == 17)) {
+                                      int v = slt.p0;
+                                      return 31;
+                                      _sv0t71 = 0;
+                                    } else {
+                                      if ((slt.tag == 18)) {
+                                        int ps = slt.p0;
+                                        int rb = slt.p1;
+                                        return 31;
+                                        _sv0t71 = 0;
+                                      } else {
+                                        if ((slt.tag == 19)) {
+                                          int id = slt.p0;
+                                          int ag = slt.p1;
+                                          return 31;
+                                          _sv0t71 = 0;
+                                        } else {
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
   return 0;
 }
 
