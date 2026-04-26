@@ -266,6 +266,16 @@ fn test_structs() -> i32 {
     return 0;
 }
 
+fn test_index_access_expr() -> i32 {
+    let base_v: Value = Value::VVar(1);
+    let idx_v: Value = Value::VInt(2);
+    let base: Expr = Expr::Literal(box_new(base_v));
+    let idx: Expr = Expr::Literal(box_new(idx_v));
+    let e: Expr = Expr::IndexAccess(box_new(base), box_new(idx));
+    if expr_tag(e) != 5 { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_values();
     if r1 != 0 { return r1; }
@@ -279,5 +289,7 @@ fn main() -> i32 {
     if r5 != 0 { return 40 + r5; }
     let r6: i32 = test_structs();
     if r6 != 0 { return 50 + r6; }
+    let r7: i32 = test_index_access_expr();
+    if r7 != 0 { return 60 + r7; }
     return 0;
 }

@@ -37,6 +37,7 @@ static int test_instrs(void);
 static int test_call_variant(void);
 static int test_ifelse_variant(void);
 static int test_structs(void);
+static int test_index_access_expr(void);
 
 static int value_tag(Value v) {
   int _sv0t0;
@@ -868,6 +869,49 @@ static int test_structs(void) {
   return 0;
 }
 
+static int test_index_access_expr(void) {
+  Value base_v;
+  base_v.tag = 5;
+  base_v.p0 = 1;
+  Value idx_v;
+  idx_v.tag = 0;
+  idx_v.p0 = 2;
+  Expr base;
+  int _sv0t0 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t0, 0, base_v.tag);
+  sv0_box_store(_sv0t0, 1, base_v.p0);
+  sv0_box_store(_sv0t0, 2, base_v.p1);
+  base.tag = 0;
+  base.p0 = _sv0t0;
+  Expr idx;
+  int _sv0t1 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t1, 0, idx_v.tag);
+  sv0_box_store(_sv0t1, 1, idx_v.p0);
+  sv0_box_store(_sv0t1, 2, idx_v.p1);
+  idx.tag = 0;
+  idx.p0 = _sv0t1;
+  Expr e;
+  int _sv0t2 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t2, 0, base.tag);
+  sv0_box_store(_sv0t2, 1, base.p0);
+  sv0_box_store(_sv0t2, 2, base.p1);
+  sv0_box_store(_sv0t2, 3, base.p2);
+  int _sv0t3 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t3, 0, idx.tag);
+  sv0_box_store(_sv0t3, 1, idx.p0);
+  sv0_box_store(_sv0t3, 2, idx.p1);
+  sv0_box_store(_sv0t3, 3, idx.p2);
+  e.tag = 5;
+  e.p0 = _sv0t2;
+  e.p1 = _sv0t3;
+  int _sv0t4 = expr_tag(e);
+  if ((_sv0t4 != 5)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_values();
   int r1 = _sv0t0;
@@ -908,6 +952,13 @@ int main(void) {
   if ((r6 != 0)) {
     int _sv0t10 = (50 + r6);
     return _sv0t10;
+  } else {
+  }
+  int _sv0t11 = test_index_access_expr();
+  int r7 = _sv0t11;
+  if ((r7 != 0)) {
+    int _sv0t12 = (60 + r7);
+    return _sv0t12;
   } else {
   }
   return 0;
