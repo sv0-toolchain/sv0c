@@ -340,6 +340,18 @@ fn test_unify_list() -> i32 {
     return 0;
 }
 
+fn test_nested_slice_ref() -> i32 {
+    let inner1: Ty = Ty::TyRef(box_new(Ty::TyBool));
+    let s1: Ty = Ty::TySlice(box_new(inner1));
+    let inner2: Ty = Ty::TyRef(box_new(Ty::TyBool));
+    let s2: Ty = Ty::TySlice(box_new(inner2));
+    if unify(s1, s2) != true { return 1; }
+    let inner3: Ty = Ty::TyRef(box_new(Ty::TyChar));
+    let s3: Ty = Ty::TySlice(box_new(inner3));
+    if unify(s1, s3) != false { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_unit_variants();
     if r1 != 0 { return r1; }
@@ -355,5 +367,7 @@ fn main() -> i32 {
     if r6 != 0 { return 70 + r6; }
     let r7: i32 = test_unify_list();
     if r7 != 0 { return 80 + r7; }
+    let r8: i32 = test_nested_slice_ref();
+    if r8 != 0 { return 90 + r8; }
     return 0;
 }
