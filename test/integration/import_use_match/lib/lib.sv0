@@ -16,3 +16,7 @@ fn zero() -> i32 {
 fn one() -> i32 {
   return 1;
 }
+
+fn two() -> i32 {
+  return 2;
+}
