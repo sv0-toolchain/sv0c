@@ -35,6 +35,7 @@ static int test_merge(void);
 static int test_pos_to_string(void);
 static int test_span_to_string(void);
 static int test_int_to_str(void);
+static int test_int_to_str_negative(void);
 
 static Pos pos_new(int l, int c, int off) {
   Pos _sv0t0;
@@ -432,6 +433,24 @@ static int test_int_to_str(void) {
   return 0;
 }
 
+static int test_int_to_str_negative(void) {
+  int _sv0t0 = (-1);
+  const char* _sv0t1 = span_int_to_str(_sv0t0);
+  int _sv0t2 = sv0_string_eq(_sv0t1, "-1");
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = (-42);
+  const char* _sv0t4 = span_int_to_str(_sv0t3);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "-42");
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_basics();
   int r1 = _sv0t0;
@@ -465,6 +484,13 @@ int main(void) {
   if ((r5 != 0)) {
     int _sv0t8 = (50 + r5);
     return _sv0t8;
+  } else {
+  }
+  int _sv0t9 = test_int_to_str_negative();
+  int r6 = _sv0t9;
+  if ((r6 != 0)) {
+    int _sv0t10 = (60 + r6);
+    return _sv0t10;
   } else {
   }
   return 0;
