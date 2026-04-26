@@ -128,6 +128,20 @@ fn get_split_line(source: string, starts: Vec<i32>, lens: Vec<i32>, idx: i32) ->
     return string_substr(source, s, l);
 }
 
+fn join_lines(source: string, starts: Vec<i32>, lens: Vec<i32>, count: i32) -> string {
+    let mut bo: string = "";
+    let mut li: i32 = 0;
+    while li < count {
+        if li > 0 {
+            bo = string_concat(bo, "\n");
+        }
+        let seg: string = get_split_line(source, starts, lens, li);
+        bo = string_concat(bo, seg);
+        li = li + 1;
+    }
+    return bo;
+}
+
 /* ── cycle detection ───────────────────────────────────────────
    visited is a Vec<i32> of interned path handles.
    Returns true if handle is already in the list. */
@@ -353,6 +367,22 @@ fn test_split_lines() -> i32 {
     return 0;
 }
 
+fn test_join_lines_roundtrip() -> i32 {
+    let src: string = "alpha\nbeta\ngamma";
+    let starts: Vec<i32> = vec_new();
+    let lens: Vec<i32> = vec_new();
+    let count: i32 = split_lines(src, starts, lens);
+    let got: string = join_lines(src, starts, lens, count);
+    if string_eq(got, src) != true { return 7; }
+    let src2: string = "a\n";
+    let s2: Vec<i32> = vec_new();
+    let l2: Vec<i32> = vec_new();
+    let c2: i32 = split_lines(src2, s2, l2);
+    let got2: string = join_lines(src2, s2, l2, c2);
+    if string_eq(got2, src2) != true { return 8; }
+    return 0;
+}
+
 fn test_cycle_check() -> i32 {
     let visited: Vec<i32> = vec_new();
     if include_cycle_check(visited, 42) != false { return 1; }
@@ -397,6 +427,8 @@ fn main() -> i32 {
     if r7 != 0 { return 60 + r7; }
     let r8: i32 = test_split_lines();
     if r8 != 0 { return 70 + r8; }
+    let r8b: i32 = test_join_lines_roundtrip();
+    if r8b != 0 { return 75 + r8b; }
     let r9: i32 = test_cycle_check();
     if r9 != 0 { return 80 + r9; }
     let r10: i32 = test_path_dir();
