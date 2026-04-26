@@ -39,6 +39,7 @@ static int test_ty_alias(void);
 static int test_value_alias(void);
 static int test_lookup_type(void);
 static int test_type_is_registered(void);
+static int test_type_is_registered_by_handle_only(void);
 
 static int is_prelude_type(const char* name) {
   int _sv0t0 = sv0_string_eq(name, "i8");
@@ -784,6 +785,28 @@ static int test_type_is_registered(void) {
   return 0;
 }
 
+static int test_type_is_registered_by_handle_only(void) {
+  int _sv0t0 = env_new_mod_tys();
+  int mt = _sv0t0;
+  int _sv0t1 = type_is_registered_by_handle(7, mt);
+  if ((_sv0t1 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = register_module_type(mt, 7);
+  int _sv0t3 = type_is_registered_by_handle(7, mt);
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = type_is_registered_by_handle(8, mt);
+  if ((_sv0t4 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_prelude_types();
   int r1 = _sv0t0;
@@ -859,6 +882,13 @@ int main(void) {
   if ((r11 != 0)) {
     int _sv0t20 = (100 + r11);
     return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_type_is_registered_by_handle_only();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (110 + r12);
+    return _sv0t22;
   } else {
   }
   return 0;
