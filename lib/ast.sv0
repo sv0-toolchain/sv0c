@@ -372,6 +372,14 @@ fn test_items() -> i32 {
     return 0;
 }
 
+fn test_expr_loop_try_tags() -> i32 {
+    let eloop: Expr = Expr::ExprLoop(box_new(Expr::ExprLit(0, 0)), 0);
+    if expr_tag(eloop) != 14 { return 1; }
+    let etry: Expr = Expr::ExprTry(box_new(Expr::ExprLit(0, 0)), 0);
+    if expr_tag(etry) != 22 { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_literals();
     if r1 != 0 { return r1; }
@@ -387,5 +395,7 @@ fn main() -> i32 {
     if r6 != 0 { return 50 + r6; }
     let r7: i32 = test_items();
     if r7 != 0 { return 60 + r7; }
+    let r8: i32 = test_expr_loop_try_tags();
+    if r8 != 0 { return 70 + r8; }
     return 0;
 }
