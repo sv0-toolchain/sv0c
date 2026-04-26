@@ -108,6 +108,7 @@ static int test_pat(void);
 static int test_expr(void);
 static int test_stmt(void);
 static int test_items(void);
+static int test_expr_loop_try_tags(void);
 
 static int literal_tag(Literal l) {
   int _sv0t0;
@@ -1051,6 +1052,48 @@ static int test_items(void) {
   return 0;
 }
 
+static int test_expr_loop_try_tags(void) {
+  Expr eloop;
+  Expr _sv0t0;
+  _sv0t0.tag = 0;
+  _sv0t0.p0 = 0;
+  _sv0t0.p1 = 0;
+  int _sv0t1 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t1, 0, _sv0t0.tag);
+  sv0_box_store(_sv0t1, 1, _sv0t0.p0);
+  sv0_box_store(_sv0t1, 2, _sv0t0.p1);
+  sv0_box_store(_sv0t1, 3, _sv0t0.p2);
+  sv0_box_store(_sv0t1, 4, _sv0t0.p3);
+  eloop.tag = 14;
+  eloop.p0 = _sv0t1;
+  eloop.p1 = 0;
+  int _sv0t2 = expr_tag(eloop);
+  if ((_sv0t2 != 14)) {
+    return 1;
+  } else {
+  }
+  Expr etry;
+  Expr _sv0t3;
+  _sv0t3.tag = 0;
+  _sv0t3.p0 = 0;
+  _sv0t3.p1 = 0;
+  int _sv0t4 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t4, 0, _sv0t3.tag);
+  sv0_box_store(_sv0t4, 1, _sv0t3.p0);
+  sv0_box_store(_sv0t4, 2, _sv0t3.p1);
+  sv0_box_store(_sv0t4, 3, _sv0t3.p2);
+  sv0_box_store(_sv0t4, 4, _sv0t3.p3);
+  etry.tag = 22;
+  etry.p0 = _sv0t4;
+  etry.p1 = 0;
+  int _sv0t5 = expr_tag(etry);
+  if ((_sv0t5 != 22)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_literals();
   int r1 = _sv0t0;
@@ -1098,6 +1141,13 @@ int main(void) {
   if ((r7 != 0)) {
     int _sv0t12 = (60 + r7);
     return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_expr_loop_try_tags();
+  int r8 = _sv0t13;
+  if ((r8 != 0)) {
+    int _sv0t14 = (70 + r8);
+    return _sv0t14;
   } else {
   }
   return 0;

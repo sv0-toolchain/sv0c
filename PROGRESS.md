@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — `ir.sv0`:** `test_index_access_expr` for `Expr::IndexAccess` tag; stage0/vm-parity **`ir`** goldens refreshed. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — `ast.sv0`:** `test_expr_loop_try_tags` for `ExprLoop`/`ExprTry` tags; stage0/vm-parity **`ast`** goldens refreshed. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
