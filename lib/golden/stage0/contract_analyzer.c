@@ -19,6 +19,13 @@ int main(void) {
     return 2;
   } else {
   }
+  int _sv0t2 = analyze(99);
+  int _sv0t3 = analyze(_sv0t2);
+  int r3 = _sv0t3;
+  if ((r3 != 99)) {
+    return 3;
+  } else {
+  }
   return 0;
 }
 
