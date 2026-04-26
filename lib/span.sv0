@@ -180,6 +180,12 @@ fn test_int_to_str() -> i32 {
     return 0;
 }
 
+fn test_int_to_str_negative() -> i32 {
+    if string_eq(span_int_to_str(-1), "-1") != true { return 1; }
+    if string_eq(span_int_to_str(-42), "-42") != true { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_basics();
     if r1 != 0 { return r1; }
@@ -191,5 +197,7 @@ fn main() -> i32 {
     if r4 != 0 { return 40 + r4; }
     let r5: i32 = test_int_to_str();
     if r5 != 0 { return 50 + r5; }
+    let r6: i32 = test_int_to_str_negative();
+    if r6 != 0 { return 60 + r6; }
     return 0;
 }
