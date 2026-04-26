@@ -952,6 +952,14 @@ fn test_tokenize_string() -> i32 {
     return 0;
 }
 
+fn test_digit_class_edges() -> i32 {
+    if is_bin_digit(50) != false { return 1; }
+    if is_oct_digit(56) != false { return 2; }
+    if is_oct_digit(55) != true { return 3; }
+    if is_hex_digit(103) != false { return 4; }
+    return 0;
+}
+
 fn test_scan_escape() -> i32 {
     let r1: Vec<i32> = vec_new();
     let p1: i32 = scan_escape("n", 0, r1);
@@ -1011,5 +1019,7 @@ fn main() -> i32 {
     if r16 != 0 { return 250 + r16; }
     let r17: i32 = test_scan_escape();
     if r17 != 0 { return 260 + r17; }
+    let r18: i32 = test_digit_class_edges();
+    if r18 != 0 { return 270 + r18; }
     return 0;
 }

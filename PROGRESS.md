@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — `bytecode.sv0`:** **`test_logical_opcode_cluster`** for compare vs logical opcode bands; stage0/vm-parity **`bytecode`** goldens refreshed. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-25 (America/Los_Angeles; **M3 — `lexer.sv0`:** **`test_digit_class_edges`** for bin/oct/hex digit class boundaries; stage0/vm-parity **`lexer`** goldens refreshed. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
