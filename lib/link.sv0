@@ -26,6 +26,11 @@ fn is_hidden(name: string) -> bool {
     return first == 46;
 }
 
+fn is_link_source_file(name: string) -> bool {
+    if is_hidden(name) { return false; }
+    return is_sv0(name);
+}
+
 /* ── name extraction ────────────────────────────────────────── */
 
 fn find_last_slash(path: string) -> i32 {
@@ -343,6 +348,15 @@ fn test_is_hidden() -> i32 {
     return 0;
 }
 
+fn test_is_link_source_file() -> i32 {
+    if is_link_source_file("main.sv0") != true { return 1; }
+    if is_link_source_file("lib.sv0") != true { return 2; }
+    if is_link_source_file(".main.sv0") != false { return 3; }
+    if is_link_source_file("README.md") != false { return 4; }
+    if is_link_source_file("sv0") != false { return 5; }
+    return 0;
+}
+
 fn test_file_stem() -> i32 {
     if string_eq(file_stem("test.sv0"), "test") != true { return 1; }
     if string_eq(file_stem("src/foo.sv0"), "foo") != true { return 2; }
@@ -583,6 +597,8 @@ fn main() -> i32 {
     if r1 != 0 { return r1; }
     let r2: i32 = test_is_hidden();
     if r2 != 0 { return 10 + r2; }
+    let r2b: i32 = test_is_link_source_file();
+    if r2b != 0 { return 15 + r2b; }
     let r3: i32 = test_file_stem();
     if r3 != 0 { return 20 + r3; }
     let r4: i32 = test_mangle();

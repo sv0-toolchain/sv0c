@@ -2,6 +2,7 @@
 
 static int is_sv0(const char* name);
 static int is_hidden(const char* name);
+static int is_link_source_file(const char* name);
 static int find_last_slash(const char* path);
 static int find_last_dot(const char* s, int start);
 static const char* file_stem(const char* path);
@@ -36,6 +37,7 @@ static int split_module_name(int item_tags, int item_d1, int pp, int default_nam
 static int split_module_body_start(int item_tags);
 static int test_is_sv0(void);
 static int test_is_hidden(void);
+static int test_is_link_source_file(void);
 static int test_file_stem(void);
 static int test_mangle(void);
 static int test_fn_name_for_link(void);
@@ -82,6 +84,16 @@ static int is_hidden(const char* name) {
   int first = _sv0t1;
   int _sv0t2 = (first == 46);
   return _sv0t2;
+}
+
+static int is_link_source_file(const char* name) {
+  int _sv0t0 = is_hidden(name);
+  if (_sv0t0) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = is_sv0(name);
+  return _sv0t1;
 }
 
 static int find_last_slash(const char* path) {
@@ -591,6 +603,35 @@ static int test_is_hidden(void) {
   int _sv0t5 = is_hidden("src");
   if ((_sv0t5 != 0)) {
     return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_is_link_source_file(void) {
+  int _sv0t0 = is_link_source_file("main.sv0");
+  if ((_sv0t0 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = is_link_source_file("lib.sv0");
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = is_link_source_file(".main.sv0");
+  if ((_sv0t2 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = is_link_source_file("README.md");
+  if ((_sv0t3 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = is_link_source_file("sv0");
+  if ((_sv0t4 != 0)) {
+    return 5;
   } else {
   }
   return 0;
@@ -1272,137 +1313,144 @@ int main(void) {
     return _sv0t2;
   } else {
   }
-  int _sv0t3 = test_file_stem();
-  int r3 = _sv0t3;
-  if ((r3 != 0)) {
-    int _sv0t4 = (20 + r3);
+  int _sv0t3 = test_is_link_source_file();
+  int r2b = _sv0t3;
+  if ((r2b != 0)) {
+    int _sv0t4 = (15 + r2b);
     return _sv0t4;
   } else {
   }
-  int _sv0t5 = test_mangle();
-  int r4 = _sv0t5;
-  if ((r4 != 0)) {
-    int _sv0t6 = (30 + r4);
+  int _sv0t5 = test_file_stem();
+  int r3 = _sv0t5;
+  if ((r3 != 0)) {
+    int _sv0t6 = (20 + r3);
     return _sv0t6;
   } else {
   }
-  int _sv0t7 = test_is_top_defining();
-  int r5 = _sv0t7;
-  if ((r5 != 0)) {
-    int _sv0t8 = (40 + r5);
+  int _sv0t7 = test_mangle();
+  int r4 = _sv0t7;
+  if ((r4 != 0)) {
+    int _sv0t8 = (30 + r4);
     return _sv0t8;
   } else {
   }
-  int _sv0t9 = test_collect_tops_count();
-  int r6 = _sv0t9;
-  if ((r6 != 0)) {
-    int _sv0t10 = (50 + r6);
+  int _sv0t9 = test_is_top_defining();
+  int r5 = _sv0t9;
+  if ((r5 != 0)) {
+    int _sv0t10 = (40 + r5);
     return _sv0t10;
   } else {
   }
-  int _sv0t11 = test_is_link_directive();
-  int r7 = _sv0t11;
-  if ((r7 != 0)) {
-    int _sv0t12 = (60 + r7);
+  int _sv0t11 = test_collect_tops_count();
+  int r6 = _sv0t11;
+  if ((r6 != 0)) {
+    int _sv0t12 = (50 + r6);
     return _sv0t12;
   } else {
   }
-  int _sv0t13 = test_strip_directives_count();
-  int r8 = _sv0t13;
-  if ((r8 != 0)) {
-    int _sv0t14 = (70 + r8);
+  int _sv0t13 = test_is_link_directive();
+  int r7 = _sv0t13;
+  if ((r7 != 0)) {
+    int _sv0t14 = (60 + r7);
     return _sv0t14;
   } else {
   }
-  int _sv0t15 = test_has_module_prefix();
-  int r9 = _sv0t15;
-  if ((r9 != 0)) {
-    int _sv0t16 = (80 + r9);
+  int _sv0t15 = test_strip_directives_count();
+  int r8 = _sv0t15;
+  if ((r8 != 0)) {
+    int _sv0t16 = (70 + r8);
     return _sv0t16;
   } else {
   }
-  int _sv0t17 = test_in_tops();
-  int r10 = _sv0t17;
-  if ((r10 != 0)) {
-    int _sv0t18 = (90 + r10);
+  int _sv0t17 = test_has_module_prefix();
+  int r9 = _sv0t17;
+  if ((r9 != 0)) {
+    int _sv0t18 = (80 + r9);
     return _sv0t18;
   } else {
   }
-  int _sv0t19 = test_path_seg_needs_mangle();
-  int r11 = _sv0t19;
-  if ((r11 != 0)) {
-    int _sv0t20 = (100 + r11);
+  int _sv0t19 = test_in_tops();
+  int r10 = _sv0t19;
+  if ((r10 != 0)) {
+    int _sv0t20 = (90 + r10);
     return _sv0t20;
   } else {
   }
-  int _sv0t21 = test_split_module();
-  int r12 = _sv0t21;
-  if ((r12 != 0)) {
-    int _sv0t22 = (110 + r12);
+  int _sv0t21 = test_path_seg_needs_mangle();
+  int r11 = _sv0t21;
+  if ((r11 != 0)) {
+    int _sv0t22 = (100 + r11);
     return _sv0t22;
   } else {
   }
-  int _sv0t23 = test_map_ty_kind();
-  int r13 = _sv0t23;
-  if ((r13 != 0)) {
-    int _sv0t24 = (120 + r13);
+  int _sv0t23 = test_split_module();
+  int r12 = _sv0t23;
+  if ((r12 != 0)) {
+    int _sv0t24 = (110 + r12);
     return _sv0t24;
   } else {
   }
-  int _sv0t25 = test_item_rewrite();
-  int r14 = _sv0t25;
-  if ((r14 != 0)) {
-    int _sv0t26 = (140 + r14);
+  int _sv0t25 = test_map_ty_kind();
+  int r13 = _sv0t25;
+  if ((r13 != 0)) {
+    int _sv0t26 = (120 + r13);
     return _sv0t26;
   } else {
   }
-  int _sv0t27 = test_fn_name_for_link();
-  int r15 = _sv0t27;
-  if ((r15 != 0)) {
-    int _sv0t28 = (150 + r15);
+  int _sv0t27 = test_item_rewrite();
+  int r14 = _sv0t27;
+  if ((r14 != 0)) {
+    int _sv0t28 = (140 + r14);
     return _sv0t28;
   } else {
   }
-  int _sv0t29 = test_link_dir_from_entry();
-  int r16 = _sv0t29;
-  if ((r16 != 0)) {
-    int _sv0t30 = (160 + r16);
+  int _sv0t29 = test_fn_name_for_link();
+  int r15 = _sv0t29;
+  if ((r15 != 0)) {
+    int _sv0t30 = (150 + r15);
     return _sv0t30;
   } else {
   }
-  int _sv0t31 = test_map_path_segs();
-  int r17 = _sv0t31;
-  if ((r17 != 0)) {
-    int _sv0t32 = (170 + r17);
+  int _sv0t31 = test_link_dir_from_entry();
+  int r16 = _sv0t31;
+  if ((r16 != 0)) {
+    int _sv0t32 = (160 + r16);
     return _sv0t32;
   } else {
   }
-  int _sv0t33 = test_collect_top_names();
-  int r18 = _sv0t33;
-  if ((r18 != 0)) {
-    int _sv0t34 = (180 + r18);
+  int _sv0t33 = test_map_path_segs();
+  int r17 = _sv0t33;
+  if ((r17 != 0)) {
+    int _sv0t34 = (170 + r17);
     return _sv0t34;
   } else {
   }
-  int _sv0t35 = test_map_path_segs_rewrite();
-  int r19 = _sv0t35;
-  if ((r19 != 0)) {
-    int _sv0t36 = (190 + r19);
+  int _sv0t35 = test_collect_top_names();
+  int r18 = _sv0t35;
+  if ((r18 != 0)) {
+    int _sv0t36 = (180 + r18);
     return _sv0t36;
   } else {
   }
-  int _sv0t37 = test_strip_link_directives();
-  int r20 = _sv0t37;
-  if ((r20 != 0)) {
-    int _sv0t38 = (200 + r20);
+  int _sv0t37 = test_map_path_segs_rewrite();
+  int r19 = _sv0t37;
+  if ((r19 != 0)) {
+    int _sv0t38 = (190 + r19);
     return _sv0t38;
   } else {
   }
-  int _sv0t39 = test_split_module_name();
-  int r21 = _sv0t39;
-  if ((r21 != 0)) {
-    int _sv0t40 = (210 + r21);
+  int _sv0t39 = test_strip_link_directives();
+  int r20 = _sv0t39;
+  if ((r20 != 0)) {
+    int _sv0t40 = (200 + r20);
     return _sv0t40;
+  } else {
+  }
+  int _sv0t41 = test_split_module_name();
+  int r21 = _sv0t41;
+  if ((r21 != 0)) {
+    int _sv0t42 = (210 + r21);
+    return _sv0t42;
   } else {
   }
   return 0;
