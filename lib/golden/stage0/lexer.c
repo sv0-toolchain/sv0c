@@ -50,6 +50,7 @@ static int test_scan_number(void);
 static int test_tokenize_simple(void);
 static int test_tokenize_ops(void);
 static int test_tokenize_string(void);
+static int test_digit_class_edges(void);
 static int test_scan_escape(void);
 
 static int is_ident_start(int c) {
@@ -2200,6 +2201,30 @@ static int test_tokenize_string(void) {
   return 0;
 }
 
+static int test_digit_class_edges(void) {
+  int _sv0t0 = is_bin_digit(50);
+  if ((_sv0t0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = is_oct_digit(56);
+  if ((_sv0t1 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = is_oct_digit(55);
+  if ((_sv0t2 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = is_hex_digit(103);
+  if ((_sv0t3 != 0)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 static int test_scan_escape(void) {
   int _sv0t0 = sv0_vec_new();
   int r1 = _sv0t0;
@@ -2386,6 +2411,13 @@ int main(void) {
   if ((r17 != 0)) {
     int _sv0t32 = (260 + r17);
     return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_digit_class_edges();
+  int r18 = _sv0t33;
+  if ((r18 != 0)) {
+    int _sv0t34 = (270 + r18);
+    return _sv0t34;
   } else {
   }
   return 0;
