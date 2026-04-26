@@ -11,6 +11,8 @@ static const char* sv0b_ext(void);
 static const char* vm_entry_stem_main(void);
 static const char* vm_entry_stem_program(void);
 static const char* has_main_sv0(int has_main_file);
+static const char* vm_output_sv0b_path(const char* stem);
+static const char* vm_output_sv0b_for_entry(int has_main_file);
 static int PHASE_RESOLVE(void);
 static int PHASE_CHECK(void);
 static int PHASE_ANALYZE(void);
@@ -187,6 +189,24 @@ static const char* has_main_sv0(int has_main_file) {
   } else {
   }
   return "program";
+}
+
+static const char* vm_output_sv0b_path(const char* stem) {
+  const char* _sv0t0 = vm_build_dir();
+  const char* out;
+  out = _sv0t0;
+  const char* _sv0t1 = sv0_string_concat(out, stem);
+  out = _sv0t1;
+  const char* _sv0t2 = sv0b_ext();
+  const char* _sv0t3 = sv0_string_concat(out, _sv0t2);
+  out = _sv0t3;
+  return out;
+}
+
+static const char* vm_output_sv0b_for_entry(int has_main_file) {
+  const char* _sv0t0 = has_main_sv0(has_main_file);
+  const char* _sv0t1 = vm_output_sv0b_path(_sv0t0);
+  return _sv0t1;
 }
 
 static int PHASE_RESOLVE(void) {
@@ -428,6 +448,24 @@ static int test_vm_output(void) {
   int _sv0t7 = sv0_string_eq(_sv0t6, "program");
   if ((_sv0t7 != 1)) {
     return 4;
+  } else {
+  }
+  const char* _sv0t8 = vm_output_sv0b_path("foo");
+  int _sv0t9 = sv0_string_eq(_sv0t8, "build/vm/foo.sv0b");
+  if ((_sv0t9 != 1)) {
+    return 5;
+  } else {
+  }
+  const char* _sv0t10 = vm_output_sv0b_for_entry(1);
+  int _sv0t11 = sv0_string_eq(_sv0t10, "build/vm/main.sv0b");
+  if ((_sv0t11 != 1)) {
+    return 6;
+  } else {
+  }
+  const char* _sv0t12 = vm_output_sv0b_for_entry(0);
+  int _sv0t13 = sv0_string_eq(_sv0t12, "build/vm/program.sv0b");
+  if ((_sv0t13 != 1)) {
+    return 7;
   } else {
   }
   return 0;
