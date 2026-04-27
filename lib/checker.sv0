@@ -5223,6 +5223,18 @@ fn test_synth_building_blocks() -> i32 {
     return 0;
 }
 
+fn test_named_only_ty_basic() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    vec_push(sn, 7);
+    vec_push(sn, 8);
+    let en: Vec<i32> = vec_new();
+    vec_push(en, 9);
+    if named_only_ty(sn, en, 7) != 1 { return 1; }
+    if named_only_ty(sn, en, 9) != 2 { return 2; }
+    if named_only_ty(sn, en, 99) != 0 { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -5352,5 +5364,7 @@ fn main() -> i32 {
     if r63 != 0 { return 670 + r63; }
     let r64: i32 = test_build_mod_env();
     if r64 != 0 { return 680 + r64; }
+    let r65: i32 = test_named_only_ty_basic();
+    if r65 != 0 { return 690 + r65; }
     return 0;
 }

@@ -220,6 +220,7 @@ static int test_check_fn_body(void);
 static int test_process_item_use(void);
 static int test_build_mod_env(void);
 static int test_synth_building_blocks(void);
+static int test_named_only_ty_basic(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -8647,6 +8648,32 @@ static int test_synth_building_blocks(void) {
   return 0;
 }
 
+static int test_named_only_ty_basic(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  sv0_vec_push(sn, 7);
+  sv0_vec_push(sn, 8);
+  int _sv0t1 = sv0_vec_new();
+  int en = _sv0t1;
+  sv0_vec_push(en, 9);
+  int _sv0t2 = named_only_ty(sn, en, 7);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = named_only_ty(sn, en, 9);
+  if ((_sv0t3 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = named_only_ty(sn, en, 99);
+  if ((_sv0t4 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -9093,6 +9120,13 @@ int main(void) {
   if ((r64 != 0)) {
     int _sv0t126 = (680 + r64);
     return _sv0t126;
+  } else {
+  }
+  int _sv0t127 = test_named_only_ty_basic();
+  int r65 = _sv0t127;
+  if ((r65 != 0)) {
+    int _sv0t128 = (690 + r65);
+    return _sv0t128;
   } else {
   }
   return 0;
