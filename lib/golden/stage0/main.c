@@ -377,55 +377,60 @@ static int test_path_helpers(void) {
     return 1;
   } else {
   }
-  int _sv0t1 = find_last_slash("bar.sv0");
-  int _sv0t2 = (0 - 1);
-  if ((_sv0t1 != _sv0t2)) {
+  int _sv0t1 = find_last_slash("x\\y.sv0");
+  if ((_sv0t1 != 1)) {
+    return 12;
+  } else {
+  }
+  int _sv0t2 = find_last_slash("bar.sv0");
+  int _sv0t3 = (0 - 1);
+  if ((_sv0t2 != _sv0t3)) {
     return 2;
   } else {
   }
-  int _sv0t3 = find_last_slash("a/b/c.sv0");
-  if ((_sv0t3 != 3)) {
+  int _sv0t4 = find_last_slash("a/b/c.sv0");
+  if ((_sv0t4 != 3)) {
     return 3;
   } else {
   }
-  int _sv0t4 = find_last_dot("bar.sv0", 0);
-  if ((_sv0t4 != 3)) {
+  int _sv0t5 = find_last_dot("bar.sv0", 0);
+  if ((_sv0t5 != 3)) {
     return 4;
   } else {
   }
-  int _sv0t5 = find_last_dot("noext", 0);
-  int _sv0t6 = (0 - 1);
-  if ((_sv0t5 != _sv0t6)) {
+  int _sv0t6 = find_last_dot("noext", 0);
+  int _sv0t7 = (0 - 1);
+  if ((_sv0t6 != _sv0t7)) {
     return 5;
   } else {
   }
-  int _sv0t7 = path_has_sv0_ext("test.sv0");
-  if ((_sv0t7 != 1)) {
+  int _sv0t8 = path_has_sv0_ext("test.sv0");
+  if ((_sv0t8 != 1)) {
     return 6;
   } else {
   }
-  int _sv0t8 = path_has_sv0_ext("test.c");
-  if ((_sv0t8 != 0)) {
+  int _sv0t9 = path_has_sv0_ext("test.c");
+  if ((_sv0t9 != 0)) {
     return 7;
   } else {
   }
-  int _sv0t9 = path_has_sv0_ext("a.sv0");
-  if ((_sv0t9 != 1)) {
+  int _sv0t10 = path_has_sv0_ext("a.sv0");
+  if ((_sv0t10 != 1)) {
     return 8;
   } else {
   }
-  int _sv0t10 = path_has_sv0_ext(".sv0");
-  if ((_sv0t10 != 0)) {
+  int _sv0t11 = path_has_sv0_ext(".sv0");
+  if ((_sv0t11 != 0)) {
     return 9;
   } else {
   }
-  int _sv0t11 = base_name_stem_end("test.sv0");
-  if ((_sv0t11 != 4)) {
+  int _sv0t12 = base_name_stem_end("test.sv0");
+  if ((_sv0t12 != 4)) {
     return 10;
   } else {
   }
-  int _sv0t12 = base_name_stem_end("test.c");
-  if ((_sv0t12 != 6)) {
+  int _sv0t13 = base_name_stem_end("test.c");
+  if ((_sv0t13 != 6)) {
     return 11;
   } else {
   }
@@ -608,33 +613,39 @@ static int test_base_name_sv0(void) {
     return 1;
   } else {
   }
-  const char* _sv0t2 = base_name_sv0("bar.sv0");
-  int _sv0t3 = sv0_string_eq(_sv0t2, "bar");
+  const char* _sv0t2 = base_name_sv0("pkg\\app.sv0");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "app");
   if ((_sv0t3 != 1)) {
+    return 7;
+  } else {
+  }
+  const char* _sv0t4 = base_name_sv0("bar.sv0");
+  int _sv0t5 = sv0_string_eq(_sv0t4, "bar");
+  if ((_sv0t5 != 1)) {
     return 2;
   } else {
   }
-  const char* _sv0t4 = base_name_sv0("a/b/main.sv0");
-  int _sv0t5 = sv0_string_eq(_sv0t4, "main");
-  if ((_sv0t5 != 1)) {
+  const char* _sv0t6 = base_name_sv0("a/b/main.sv0");
+  int _sv0t7 = sv0_string_eq(_sv0t6, "main");
+  if ((_sv0t7 != 1)) {
     return 3;
   } else {
   }
-  const char* _sv0t6 = base_name_sv0("test.c");
-  int _sv0t7 = sv0_string_eq(_sv0t6, "test.c");
-  if ((_sv0t7 != 1)) {
+  const char* _sv0t8 = base_name_sv0("test.c");
+  int _sv0t9 = sv0_string_eq(_sv0t8, "test.c");
+  if ((_sv0t9 != 1)) {
     return 4;
   } else {
   }
-  const char* _sv0t8 = base_name_sv0("noext");
-  int _sv0t9 = sv0_string_eq(_sv0t8, "noext");
-  if ((_sv0t9 != 1)) {
+  const char* _sv0t10 = base_name_sv0("noext");
+  int _sv0t11 = sv0_string_eq(_sv0t10, "noext");
+  if ((_sv0t11 != 1)) {
     return 5;
   } else {
   }
-  const char* _sv0t10 = base_name_sv0("/abs/path/lib.sv0");
-  int _sv0t11 = sv0_string_eq(_sv0t10, "lib");
-  if ((_sv0t11 != 1)) {
+  const char* _sv0t12 = base_name_sv0("/abs/path/lib.sv0");
+  int _sv0t13 = sv0_string_eq(_sv0t12, "lib");
+  if ((_sv0t13 != 1)) {
     return 6;
   } else {
   }
