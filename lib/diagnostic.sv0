@@ -395,6 +395,14 @@ fn report(formatted: string) -> () {
     println(formatted);
 }
 
+/* M3-S-021: emit multiple formatted blocks (stdout; stderr/file when
+   runtime adds those sinks). */
+
+fn report_all(first: string, second: string) -> () {
+    println(first);
+    println(second);
+}
+
 fn test_severity_tags() -> i32 {
     if severity_tag(Severity::Error) != 0 { return 1; }
     if severity_tag(Severity::Warning) != 1 { return 2; }

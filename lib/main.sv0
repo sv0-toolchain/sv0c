@@ -5,9 +5,11 @@
    VM output path construction, CLI arg parsing helpers (target tag,
    project flag, usage), error prefix constants.
    Host text I/O uses read_file / write_file / read_dir (T0-8).
-   Higher-level compileFile / compileProjectDir remain incremental.
+   compile_read_source / compile_write_text are compile-oriented aliases.
+   Higher-level compileFile / compileProjectDir remain incremental (G6).
    M3-S-003: tokenize-phase Result boundary sketch (pre-lexer) keeps
-   explicit success/error plumbing in sv0 driver code. */
+   explicit success/error plumbing; M3-S-018: sketch loads source via
+   read_file after path validation. */
 
 enum MainPhaseResult {
     Ok(i32),
@@ -21,6 +23,10 @@ fn DRIVER_TOKENIZE_ERR_BAD_EXT() -> i32 { return 2; }
 /* Thin alias for driver code that prefers a compile-oriented name. */
 fn compile_read_source(path: string) -> string {
     return read_file(path);
+}
+
+fn compile_write_text(path: string, text: string) -> () {
+    write_file(path, text);
 }
 
 /* ── path helpers ───────────────────────────────────────────── */
@@ -199,7 +205,8 @@ fn driver_tokenize_sketch(source_path: string) -> MainPhaseResult {
     if path_has_sv0_ext(source_path) != true {
         return MainPhaseResult::Err(DRIVER_TOKENIZE_ERR_BAD_EXT());
     }
-    return MainPhaseResult::Ok(0);
+    let src: string = read_file(source_path);
+    return MainPhaseResult::Ok(string_len(src));
 }
 
 fn driver_result_code(r: MainPhaseResult) -> i32 {
@@ -272,9 +279,11 @@ fn test_error_prefix() -> i32 {
 }
 
 fn test_driver_tokenize_sketch() -> i32 {
-    let ok1: MainPhaseResult = driver_tokenize_sketch("x.sv0");
+    let probe: string = "/tmp/sv0_g2_main_tokenize.sv0";
+    write_file(probe, "//\n");
+    let ok1: MainPhaseResult = driver_tokenize_sketch(probe);
     let v1: i32 = driver_result_code(ok1);
-    if v1 != 0 { return 1; }
+    if v1 != 3 { return 1; }
     let bad_empty: MainPhaseResult = driver_tokenize_sketch("");
     let c2: i32 = driver_result_code(bad_empty);
     if c2 != 0 - DRIVER_TOKENIZE_ERR_EMPTY() { return 2; }

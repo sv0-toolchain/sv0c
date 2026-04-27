@@ -4,6 +4,9 @@ static int is_sv0(const char* name);
 static int is_hidden(const char* name);
 static int is_link_source_file(const char* name);
 static const char* list_sv0(const char* dir);
+static const char* walk_sv0(const char* dir);
+static const char* parse_file(const char* path);
+static const char* link_project_dir(const char* dir);
 static int find_last_slash(const char* path);
 static int find_last_dot(const char* s, int start);
 static const char* file_stem(const char* path);
@@ -59,6 +62,7 @@ static int test_collect_top_names(void);
 static int test_map_path_segs_rewrite(void);
 static int test_map_path_segs(void);
 static int test_strip_link_directives(void);
+static int test_g2_link_host_io_aliases(void);
 static int test_split_module_name(void);
 
 static int is_sv0(const char* name) {
@@ -101,6 +105,21 @@ static int is_link_source_file(const char* name) {
 
 static const char* list_sv0(const char* dir) {
   const char* _sv0t0 = sv0_read_dir(dir);
+  return _sv0t0;
+}
+
+static const char* walk_sv0(const char* dir) {
+  const char* _sv0t0 = sv0_read_dir(dir);
+  return _sv0t0;
+}
+
+static const char* parse_file(const char* path) {
+  const char* _sv0t0 = sv0_read_file(path);
+  return _sv0t0;
+}
+
+static const char* link_project_dir(const char* dir) {
+  const char* _sv0t0 = list_sv0(dir);
   return _sv0t0;
 }
 
@@ -1301,6 +1320,34 @@ static int test_strip_link_directives(void) {
   return 0;
 }
 
+static int test_g2_link_host_io_aliases(void) {
+  const char* base;
+  base = "/tmp";
+  const char* p;
+  p = "/tmp/sv0_g2_link_parse.sv0";
+  sv0_write_file(p, "probe");
+  const char* _sv0t0 = parse_file(p);
+  const char* s;
+  s = _sv0t0;
+  int _sv0t1 = sv0_string_eq(s, "probe");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = walk_sv0(base);
+  const char* w;
+  w = _sv0t2;
+  const char* _sv0t3 = link_project_dir(base);
+  const char* l;
+  l = _sv0t3;
+  int _sv0t4 = sv0_string_eq(w, l);
+  if ((_sv0t4 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 static int test_split_module_name(void) {
   int _sv0t0 = sv0_vec_new();
   int it = _sv0t0;
@@ -1511,6 +1558,13 @@ int main(void) {
   if ((r21 != 0)) {
     int _sv0t44 = (210 + r21);
     return _sv0t44;
+  } else {
+  }
+  int _sv0t45 = test_g2_link_host_io_aliases();
+  int r22 = _sv0t45;
+  if ((r22 != 0)) {
+    int _sv0t46 = (220 + r22);
+    return _sv0t46;
   } else {
   }
   return 0;

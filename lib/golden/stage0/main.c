@@ -8,6 +8,7 @@ typedef struct {
 static int DRIVER_TOKENIZE_ERR_EMPTY(void);
 static int DRIVER_TOKENIZE_ERR_BAD_EXT(void);
 static const char* compile_read_source(const char* path);
+static void compile_write_text(const char* path, const char* text);
 static int find_last_slash(const char* path);
 static int find_last_dot(const char* s, int start);
 static int path_has_sv0_ext(const char* path);
@@ -63,6 +64,10 @@ static int DRIVER_TOKENIZE_ERR_BAD_EXT(void) {
 static const char* compile_read_source(const char* path) {
   const char* _sv0t0 = sv0_read_file(path);
   return _sv0t0;
+}
+
+static void compile_write_text(const char* path, const char* text) {
+  sv0_write_file(path, text);
 }
 
 static int find_last_slash(const char* path) {
@@ -414,10 +419,14 @@ static MainPhaseResult driver_tokenize_sketch(const char* source_path) {
     return _sv0t4;
   } else {
   }
-  MainPhaseResult _sv0t6;
-  _sv0t6.tag = 0;
-  _sv0t6.p0 = 0;
-  return _sv0t6;
+  const char* _sv0t6 = sv0_read_file(source_path);
+  const char* src;
+  src = _sv0t6;
+  MainPhaseResult _sv0t7;
+  int _sv0t8 = sv0_string_len(src);
+  _sv0t7.tag = 0;
+  _sv0t7.p0 = _sv0t8;
+  return _sv0t7;
 }
 
 static int driver_result_code(MainPhaseResult r) {
@@ -671,12 +680,15 @@ static int test_error_prefix(void) {
 }
 
 static int test_driver_tokenize_sketch(void) {
-  MainPhaseResult _sv0t0 = driver_tokenize_sketch("x.sv0");
+  const char* probe;
+  probe = "/tmp/sv0_g2_main_tokenize.sv0";
+  sv0_write_file(probe, "//\n");
+  MainPhaseResult _sv0t0 = driver_tokenize_sketch(probe);
   MainPhaseResult ok1;
   ok1 = _sv0t0;
   int _sv0t1 = driver_result_code(ok1);
   int v1 = _sv0t1;
-  if ((v1 != 0)) {
+  if ((v1 != 3)) {
     return 1;
   } else {
   }
