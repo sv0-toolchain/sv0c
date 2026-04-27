@@ -4,6 +4,7 @@ use lib::zero;
 use lib::one;
 use lib::two;
 use lib::three;
+use lib::four;
 
 fn main() -> i32 {
   if forty_two() != 42 {
@@ -20,6 +21,9 @@ fn main() -> i32 {
   }
   if three() != 3 {
     return 14;
+  }
+  if four() != 4 {
+    return 15;
   }
   return match neg_one() {
     -1 => 0,
