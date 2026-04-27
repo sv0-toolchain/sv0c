@@ -67,6 +67,10 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 2. **VM + C backends:** Both paths support the same corpus policies (VM parity manifest + allowlist; stage0 C goldens for bootstrap seeds).
 3. **Self-host:** Native **`SV0_SELF_HOST_COMPILER`** can rebuild the compiler sources; **`bootstrap-sml-final`** tag and **`sml-legacy/`** layout when SML leaves the default path.
 
+## Slice backlog (authoritative IDs)
+
+**Milestone-3 execution slices** (stable **`M3-S-###`** IDs, acceptance criteria, dependencies) live in **`task/sv0-toolchain-milestone-3-self-host.Rmd`** section **“documented M3 slice backlog”**. This **`transliteration-plan.md`** file remains the **module inventory** and **SML ↔ sv0 “next focus”** map; when a slice lands, update the relevant inventory rows here and **`lib/LAYOUT.md`** in the same integration when practical.
+
 ## Inventory: major `sml/` subtrees
 
 | Area | SML path | sv0 today | Next focus |
