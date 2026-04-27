@@ -2277,7 +2277,16 @@ fn try_assign_stmt(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    ed3: Vec<i32>, ed4: Vec<i32>,
                    pp: Vec<i32>, sf_names: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 5 { return 0 - 2; }
-    let nt: i32 = ps_peek(tags, pos + 1);
+    let mut lhs_field_tok: i32 = 0 - 1;
+    let mut op_pos: i32 = pos + 1;
+    let mut rhs_pos: i32 = pos + 2;
+    if ps_peek(tags, pos + 1) == 15 {
+        if ps_peek(tags, pos + 2) != 5 { return 0 - 2; }
+        lhs_field_tok = pos + 2;
+        op_pos = pos + 3;
+        rhs_pos = pos + 4;
+    }
+    let nt: i32 = ps_peek(tags, op_pos);
     if nt == 35 {
         let pps: i32 = vec_len(pp);
         vec_push(pp, pos);
@@ -2286,8 +2295,16 @@ fn try_assign_stmt(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(ed2, 1);
         vec_push(ed3, 0);
         vec_push(ed4, 0);
-        let lhs_idx: i32 = vec_len(et) - 1;
-        let pe: i32 = parse_expr(tags, starts, ends, source, pos + 2,
+        let mut lhs_idx: i32 = vec_len(et) - 1;
+        if lhs_field_tok >= 0 {
+            vec_push(et, 6);
+            vec_push(ed1, lhs_idx);
+            vec_push(ed2, lhs_field_tok);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            lhs_idx = vec_len(et) - 1;
+        }
+        let pe: i32 = parse_expr(tags, starts, ends, source, rhs_pos,
                                   et, ed1, ed2, ed3, ed4, pp, 1);
         if pe < 0 { return 0 - 1; }
         let rhs_idx: i32 = vec_len(et) - 1;
@@ -2314,8 +2331,16 @@ fn try_assign_stmt(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(ed2, 1);
         vec_push(ed3, 0);
         vec_push(ed4, 0);
-        let lhs_idx: i32 = vec_len(et) - 1;
-        let pe: i32 = parse_expr(tags, starts, ends, source, pos + 2,
+        let mut lhs_idx: i32 = vec_len(et) - 1;
+        if lhs_field_tok >= 0 {
+            vec_push(et, 6);
+            vec_push(ed1, lhs_idx);
+            vec_push(ed2, lhs_field_tok);
+            vec_push(ed3, 0);
+            vec_push(ed4, 0);
+            lhs_idx = vec_len(et) - 1;
+        }
+        let pe: i32 = parse_expr(tags, starts, ends, source, rhs_pos,
                                   et, ed1, ed2, ed3, ed4, pp, 1);
         if pe < 0 { return 0 - 1; }
         let rhs_idx: i32 = vec_len(et) - 1;
@@ -4960,6 +4985,31 @@ fn test_parse_assign() -> i32 {
     if vec_get(ed2v, 2) != 1 { return 6; }
     if vec_get(et, 3) != 28 { return 7; }
     if vec_get(et, 4) != 9 { return 8; }
+
+    let tags2: Vec<i32> = vec_new();
+    let starts2: Vec<i32> = vec_new();
+    let ends2: Vec<i32> = vec_new();
+    vec_push(tags2, 8); vec_push(starts2, 0); vec_push(ends2, 1);
+    vec_push(tags2, 5); vec_push(starts2, 2); vec_push(ends2, 3);
+    vec_push(tags2, 15); vec_push(starts2, 3); vec_push(ends2, 4);
+    vec_push(tags2, 5); vec_push(starts2, 4); vec_push(ends2, 5);
+    vec_push(tags2, 35); vec_push(starts2, 6); vec_push(ends2, 7);
+    vec_push(tags2, 0); vec_push(starts2, 8); vec_push(ends2, 9);
+    vec_push(tags2, 13); vec_push(starts2, 9); vec_push(ends2, 10);
+    vec_push(tags2, 9); vec_push(starts2, 11); vec_push(ends2, 12);
+    vec_push(tags2, 97); vec_push(starts2, 12); vec_push(ends2, 12);
+    let et2: Vec<i32> = vec_new();
+    let ed1b: Vec<i32> = vec_new();
+    let ed2b: Vec<i32> = vec_new();
+    let ed3b: Vec<i32> = vec_new();
+    let ed4b: Vec<i32> = vec_new();
+    let pp2: Vec<i32> = vec_new();
+    let p2: i32 = parse_expr(tags2, starts2, ends2, "{ x.y = 1; }", 0,
+                              et2, ed1b, ed2b, ed3b, ed4b, pp2, 1);
+    if p2 != 8 { return 9; }
+    if vec_get(et2, 1) != 6 { return 10; }
+    if vec_get(et2, 3) != 18 { return 11; }
+    if vec_get(ed1b, 3) != 1 { return 12; }
     return 0;
 }
 
