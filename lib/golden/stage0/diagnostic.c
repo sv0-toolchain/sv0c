@@ -36,6 +36,7 @@ static const char* format_related(int gutter_width, const char* msg, const char*
 static const char* format_help(int gutter_width, const char* help_text);
 static const char* format_diagnostic_full(int sev_tag, const char* message, const char* code, const char* file, const char* source, int line, int col, int span_len);
 static void report(const char* formatted);
+static void report_all(const char* first, const char* second);
 static int test_severity_tags(void);
 static int test_constructors(void);
 static int test_has_errors(void);
@@ -703,6 +704,11 @@ static const char* format_diagnostic_full(int sev_tag, const char* message, cons
 
 static void report(const char* formatted) {
   sv0_println(formatted);
+}
+
+static void report_all(const char* first, const char* second) {
+  sv0_println(first);
+  sv0_println(second);
 }
 
 static int test_severity_tags(void) {

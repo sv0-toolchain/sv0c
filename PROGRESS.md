@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-27 (America/Los_Angeles; **M3 G2 (T0-8 host I/O):** **`read_file` / `write_file` / `read_dir`** in checker/lowering/VM (**`CALL_BUILTIN` 15–17**), C runtime **`sv0_runtime.{h,c}`**, transliterated **`lib/checker.sv0`**, **`lowering.sv0`**, **`vm_codegen.sv0`**, **`include_expand.sv0`** (**`expand_file`**), **`link.sv0`** (**`list_sv0`**), **`main.sv0`** (**`compile_read_source`**), **`diagnostic.sv0`** (**`report`**); stage0 + vm-parity goldens refreshed.)
+**Last updated:** 2026-04-27 (America/Los_Angeles; **M3 G2 (T0-8 host I/O) — slice closure:** **`read_file` / `write_file` / `read_dir`** (**`CALL_BUILTIN` 15–17** + C **`sv0_runtime.{h,c}`**). **`lib/main.sv0`** — **`compile_write_text`**, **`driver_tokenize_sketch`** reads source; **`lib/link.sv0`** — **`walk_sv0` / `parse_file` / `link_project_dir`**; **`include_expand.sv0`** — **`expand`**, **`expand_from_file`**; **`diagnostic.sv0`** — **`report_all`** (dual **`println`**; no unit call — sv0-emitted C **`void` temp** limitation). Host I/O tests use **`/tmp/…`** paths so **`bootstrap-build`** (**`sv0vm/`** cwd) matches VM runs. Stage0 + vm-parity goldens refreshed.)
 
 ## Checklist (local source of truth)
 

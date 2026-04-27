@@ -6,9 +6,9 @@
    Vec<i32> collection), link directive stripping (stripLinkDirectives),
    split-module detection, map_path_segs (SML mapPathSegs — 1/2-segment
    path mangling with rewrite).
-   AST map functions (mapTy/mapPat/mapExpr/mapItem) and I/O
-   (walkSv0, parseFile, linkProjectDir) deferred — need full AST
-   enum traversal with Box support and host filesystem. */
+   G2 (M3-S-019): walk_sv0 / parse_file / link_project_dir expose host
+   I/O for orchestration (read_dir / read_file / listing). Full AST
+   map passes remain deferred to G6 (M3-S-039). */
 
 /* ── file classification ────────────────────────────────────── */
 
@@ -35,6 +35,18 @@ fn is_link_source_file(name: string) -> bool {
    sorted lexicographically — see sv0doc/compiler/bootstrap-host-io.md. */
 fn list_sv0(dir: string) -> string {
     return read_dir(dir);
+}
+
+fn walk_sv0(dir: string) -> string {
+    return read_dir(dir);
+}
+
+fn parse_file(path: string) -> string {
+    return read_file(path);
+}
+
+fn link_project_dir(dir: string) -> string {
+    return list_sv0(dir);
 }
 
 /* ── name extraction ────────────────────────────────────────── */
@@ -591,6 +603,18 @@ fn test_strip_link_directives() -> i32 {
     return 0;
 }
 
+fn test_g2_link_host_io_aliases() -> i32 {
+    let base: string = "/tmp";
+    let p: string = "/tmp/sv0_g2_link_parse.sv0";
+    write_file(p, "probe");
+    let s: string = parse_file(p);
+    if string_eq(s, "probe") != true { return 1; }
+    let w: string = walk_sv0(base);
+    let l: string = link_project_dir(base);
+    if string_eq(w, l) != true { return 2; }
+    return 0;
+}
+
 fn test_split_module_name() -> i32 {
     let it: Vec<i32> = vec_new();
     let id1: Vec<i32> = vec_new();
@@ -659,5 +683,7 @@ fn main() -> i32 {
     if r20 != 0 { return 200 + r20; }
     let r21: i32 = test_split_module_name();
     if r21 != 0 { return 210 + r21; }
+    let r22: i32 = test_g2_link_host_io_aliases();
+    if r22 != 0 { return 220 + r22; }
     return 0;
 }

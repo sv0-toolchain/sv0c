@@ -20,6 +20,10 @@ static const char* table_lookup_body3(const char* p0, const char* b0, const char
 static const char* expand_text_table2(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, int depth);
 static const char* expand_text_table3(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, int depth);
 static const char* expand_file(const char* host_abs, const char* source, int depth);
+static const char* expand(const char* host_abs, const char* source);
+static const char* expand_from_file(const char* host_abs);
+static int test_expand_alias_matches_expand_file(void);
+static int test_expand_from_file_smoke(void);
 static int test_expand_text_table2_simple(void);
 static int test_expand_text_table2_nested(void);
 static int test_expand_text_table2_miss(void);
@@ -562,6 +566,53 @@ static const char* expand_file(const char* host_abs, const char* source, int dep
     li = (li + 1);
   }
   return bo;
+}
+
+static const char* expand(const char* host_abs, const char* source) {
+  const char* _sv0t0 = expand_file(host_abs, source, 0);
+  return _sv0t0;
+}
+
+static const char* expand_from_file(const char* host_abs) {
+  const char* _sv0t0 = sv0_read_file(host_abs);
+  const char* body;
+  body = _sv0t0;
+  const char* _sv0t1 = expand_file(host_abs, body, 0);
+  return _sv0t1;
+}
+
+static int test_expand_alias_matches_expand_file(void) {
+  const char* host;
+  host = "/tmp/pkg/e.sv0";
+  const char* src;
+  src = "a";
+  const char* _sv0t0 = expand(host, src);
+  const char* got;
+  got = _sv0t0;
+  const char* _sv0t1 = expand_file(host, src, 0);
+  const char* exp;
+  exp = _sv0t1;
+  int _sv0t2 = sv0_string_eq(got, exp);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_expand_from_file_smoke(void) {
+  const char* p;
+  p = "/tmp/sv0_g2_inc_from_file.sv0";
+  sv0_write_file(p, "line\n");
+  const char* _sv0t0 = expand_from_file(p);
+  const char* got;
+  got = _sv0t0;
+  int _sv0t1 = sv0_string_eq(got, "line\n");
+  if ((_sv0t1 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
 }
 
 static int test_expand_text_table2_simple(void) {
@@ -1233,6 +1284,20 @@ int main(void) {
   if ((r16 != 0)) {
     int _sv0t32 = (150 + r16);
     return _sv0t32;
+  } else {
+  }
+  int _sv0t33 = test_expand_alias_matches_expand_file();
+  int r17 = _sv0t33;
+  if ((r17 != 0)) {
+    int _sv0t34 = (160 + r17);
+    return _sv0t34;
+  } else {
+  }
+  int _sv0t35 = test_expand_from_file_smoke();
+  int r18 = _sv0t35;
+  if ((r18 != 0)) {
+    int _sv0t36 = (170 + r18);
+    return _sv0t36;
   } else {
   }
   return 0;

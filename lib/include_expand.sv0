@@ -321,6 +321,35 @@ fn expand_file(host_abs: string, source: string, depth: i32) -> string {
     return bo;
 }
 
+/* M3-S-020: expand / expand_from_file names match milestone table;
+   expand is depth-zero expand_file; expand_from_file reads root first. */
+
+fn expand(host_abs: string, source: string) -> string {
+    return expand_file(host_abs, source, 0);
+}
+
+fn expand_from_file(host_abs: string) -> string {
+    let body: string = read_file(host_abs);
+    return expand_file(host_abs, body, 0);
+}
+
+fn test_expand_alias_matches_expand_file() -> i32 {
+    let host: string = "/tmp/pkg/e.sv0";
+    let src: string = "a";
+    let got: string = expand(host, src);
+    let exp: string = expand_file(host, src, 0);
+    if string_eq(got, exp) != true { return 1; }
+    return 0;
+}
+
+fn test_expand_from_file_smoke() -> i32 {
+    let p: string = "/tmp/sv0_g2_inc_from_file.sv0";
+    write_file(p, "line\n");
+    let got: string = expand_from_file(p);
+    if string_eq(got, "line\n") != true { return 2; }
+    return 0;
+}
+
 fn test_expand_text_table2_simple() -> i32 {
     let host: string = "/tmp/pkg/main.sv0";
     let src: string = "include \"inc.sv0\";\nfn x() -> i32 { 1 }";
@@ -560,5 +589,9 @@ fn main() -> i32 {
     if r15 != 0 { return 140 + r15; }
     let r16: i32 = test_expand_text_table3_depth_limit();
     if r16 != 0 { return 150 + r16; }
+    let r17: i32 = test_expand_alias_matches_expand_file();
+    if r17 != 0 { return 160 + r17; }
+    let r18: i32 = test_expand_from_file_smoke();
+    if r18 != 0 { return 170 + r18; }
     return 0;
 }
