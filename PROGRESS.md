@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 — `lib/link.sv0`:** backslash path segments in **`file_stem`** / **`link_dir_from_entry`**. Prior: **`lib/ir.sv0`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 — `lib/main.sv0`:** **`find_last_slash`** / **`base_name_sv0`** backslash paths. Prior: **`lib/link.sv0`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
