@@ -23,6 +23,26 @@ struct Span {
     stop_offset: i32,
 }
 
+/* M3 Track C: unified compile-time failure carrier (message + span).
+   Struct form (not enum tuple) so sv0-emitted C self-host matches SML.
+   Normative contract: sv0doc/compiler/bootstrap-diagnostics.md */
+struct CompileError {
+    message: string,
+    span: Span,
+}
+
+fn compile_error_new(msg: string, sp: Span) -> CompileError {
+    return CompileError { message: msg, span: sp };
+}
+
+fn compile_error_message(e: CompileError) -> string {
+    return e.message;
+}
+
+fn compile_error_span(e: CompileError) -> Span {
+    return e.span;
+}
+
 fn pos_new(l: i32, c: i32, off: i32) -> Pos {
     return Pos { line: l, col: c, offset: off };
 }
@@ -186,6 +206,17 @@ fn test_int_to_str_negative() -> i32 {
     return 0;
 }
 
+fn test_compile_error_roundtrip() -> i32 {
+    let z: Pos = pos_new(4, 5, 9);
+    let sp: Span = span_new("x.sv0", z, z);
+    let e: CompileError = compile_error_new("E0999: probe", sp);
+    let m: string = compile_error_message(e);
+    if string_len(m) < 8 { return 1; }
+    let sp2: Span = compile_error_span(e);
+    if string_eq(span_file(sp2), "x.sv0") != true { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_basics();
     if r1 != 0 { return r1; }
@@ -199,5 +230,7 @@ fn main() -> i32 {
     if r5 != 0 { return 50 + r5; }
     let r6: i32 = test_int_to_str_negative();
     if r6 != 0 { return 60 + r6; }
+    let r7: i32 = test_compile_error_roundtrip();
+    if r7 != 0 { return 70 + r7; }
     return 0;
 }

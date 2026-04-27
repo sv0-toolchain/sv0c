@@ -14,7 +14,14 @@ typedef struct {
   int stop_col;
   int stop_offset;
 } Span;
+typedef struct {
+  const char* message;
+  Span span;
+} CompileError;
 
+static CompileError compile_error_new(const char* msg, Span sp);
+static const char* compile_error_message(CompileError e);
+static Span compile_error_span(CompileError e);
 static Pos pos_new(int l, int c, int off);
 static Span span_new(const char* f, Pos s, Pos e);
 static Span span_bogus(void);
@@ -36,6 +43,22 @@ static int test_pos_to_string(void);
 static int test_span_to_string(void);
 static int test_int_to_str(void);
 static int test_int_to_str_negative(void);
+static int test_compile_error_roundtrip(void);
+
+static CompileError compile_error_new(const char* msg, Span sp) {
+  CompileError _sv0t0;
+  _sv0t0.message = msg;
+  _sv0t0.span = sp;
+  return _sv0t0;
+}
+
+static const char* compile_error_message(CompileError e) {
+  return e.message;
+}
+
+static Span compile_error_span(CompileError e) {
+  return e.span;
+}
 
 static Pos pos_new(int l, int c, int off) {
   Pos _sv0t0;
@@ -451,6 +474,36 @@ static int test_int_to_str_negative(void) {
   return 0;
 }
 
+static int test_compile_error_roundtrip(void) {
+  Pos _sv0t0 = pos_new(4, 5, 9);
+  Pos z;
+  z = _sv0t0;
+  Span _sv0t1 = span_new("x.sv0", z, z);
+  Span sp;
+  sp = _sv0t1;
+  CompileError _sv0t2 = compile_error_new("E0999: probe", sp);
+  CompileError e;
+  e = _sv0t2;
+  const char* _sv0t3 = compile_error_message(e);
+  const char* m;
+  m = _sv0t3;
+  int _sv0t4 = sv0_string_len(m);
+  if ((_sv0t4 < 8)) {
+    return 1;
+  } else {
+  }
+  Span _sv0t5 = compile_error_span(e);
+  Span sp2;
+  sp2 = _sv0t5;
+  const char* _sv0t6 = span_file(sp2);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "x.sv0");
+  if ((_sv0t7 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_basics();
   int r1 = _sv0t0;
@@ -491,6 +544,13 @@ int main(void) {
   if ((r6 != 0)) {
     int _sv0t10 = (60 + r6);
     return _sv0t10;
+  } else {
+  }
+  int _sv0t11 = test_compile_error_roundtrip();
+  int r7 = _sv0t11;
+  if ((r7 != 0)) {
+    int _sv0t12 = (70 + r7);
+    return _sv0t12;
   } else {
   }
   return 0;
