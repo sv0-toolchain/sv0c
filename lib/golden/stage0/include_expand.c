@@ -881,6 +881,14 @@ static int test_parse_include_line(void) {
     return 7;
   } else {
   }
+  const char* _sv0t14 = parse_include_line("include \"g.sv0\" \t;");
+  const char* r8;
+  r8 = _sv0t14;
+  int _sv0t15 = sv0_string_eq(r8, "g.sv0");
+  if ((_sv0t15 != 1)) {
+    return 8;
+  } else {
+  }
   return 0;
 }
 

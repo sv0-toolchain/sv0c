@@ -423,6 +423,8 @@ fn test_parse_include_line() -> i32 {
     if string_eq(r6, "") != true { return 6; }
     let r7: string = parse_include_line("include \"sub/mod.sv0\";");
     if string_eq(r7, "sub/mod.sv0") != true { return 7; }
+    let r8: string = parse_include_line("include \"g.sv0\" \t;");
+    if string_eq(r8, "g.sv0") != true { return 8; }
     return 0;
 }
 
