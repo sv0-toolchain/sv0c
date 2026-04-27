@@ -24,3 +24,7 @@ fn two() -> i32 {
 fn three() -> i32 {
   return 3;
 }
+
+fn four() -> i32 {
+  return 4;
+}
