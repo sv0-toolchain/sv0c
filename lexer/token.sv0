@@ -177,6 +177,18 @@ fn test_keywords() -> i32 {
     return 0;
 }
 
+fn test_compound_assign_cluster() -> i32 {
+    let pe: Token = Token::PLUSEQ;
+    if token_tag(pe) != 44 { return 1; }
+    let ge: Token = Token::GTGTEQ;
+    if token_tag(ge) != 53 { return 2; }
+    let lte: Token = Token::LTLTEQ;
+    if token_tag(lte) != 52 { return 3; }
+    let fa: Token = Token::FATARROW;
+    if token_tag(fa) != 20 { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_literals();
     if r1 != 0 { return r1; }
@@ -186,5 +198,7 @@ fn main() -> i32 {
     if r3 != 0 { return 20 + r3; }
     let r4: i32 = test_keywords();
     if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_compound_assign_cluster();
+    if r5 != 0 { return 40 + r5; }
     return 0;
 }
