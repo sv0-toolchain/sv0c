@@ -2236,21 +2236,22 @@ fn enum_def_variant_shape_str(edef_names: Vec<i32>,
 }
 
 /* ── builtin function table (SML modEnvFromProg builtins) ────
-   The SML checker extends the env with 13 built-in functions
-   (println, string_*, vec_*, box_*).  In sv0 we use integer
-   builtin IDs instead of string env entries; synth ExprCall
-   checks user fns via fn_table first, then falls through to
-   builtin lookup.
+   The SML checker extends the env with 16 built-in functions
+   (println, string_*, vec_*, box_*, read_file, write_file, read_dir).
+   In sv0 we use integer builtin IDs instead of string env entries;
+   synth ExprCall checks user fns via fn_table first, then falls
+   through to builtin lookup.
 
    Builtin IDs:
      0=println 1=string_len 2=string_eq 3=string_concat
      4=string_char_at 5=string_substr 6=vec_new 7=vec_push
      8=vec_len 9=vec_get 10=vec_set 11=box_new 12=box_deref
+     13=read_file 14=write_file 15=read_dir
 
    For generic builtins (vec/box), return/param types use
    TY_VAR to signal polymorphism.                             */
 
-fn BUILTIN_COUNT() -> i32 { return 13; }
+fn BUILTIN_COUNT() -> i32 { return 16; }
 
 fn builtin_fn_lookup(name_str: string) -> i32 {
     if string_eq(name_str, "println") { return 0; }
@@ -2266,6 +2267,9 @@ fn builtin_fn_lookup(name_str: string) -> i32 {
     if string_eq(name_str, "vec_set") { return 10; }
     if string_eq(name_str, "box_new") { return 11; }
     if string_eq(name_str, "box_deref") { return 12; }
+    if string_eq(name_str, "read_file") { return 13; }
+    if string_eq(name_str, "write_file") { return 14; }
+    if string_eq(name_str, "read_dir") { return 15; }
     return 0 - 1;
 }
 
@@ -2283,6 +2287,9 @@ fn builtin_fn_ret_type(bid: i32) -> i32 {
     if bid == 10 { return TY_UNIT(); }
     if bid == 11 { return TY_NAMED(); }
     if bid == 12 { return TY_VAR(); }
+    if bid == 13 { return TY_STRING(); }
+    if bid == 14 { return TY_UNIT(); }
+    if bid == 15 { return TY_STRING(); }
     return 0 - 1;
 }
 
@@ -2300,6 +2307,9 @@ fn builtin_fn_param_count(bid: i32) -> i32 {
     if bid == 10 { return 3; }
     if bid == 11 { return 1; }
     if bid == 12 { return 1; }
+    if bid == 13 { return 1; }
+    if bid == 14 { return 2; }
+    if bid == 15 { return 1; }
     return 0 - 1;
 }
 
@@ -2332,6 +2342,12 @@ fn builtin_fn_param_type(bid: i32, idx: i32) -> i32 {
     }
     if bid == 11 { return TY_VAR(); }
     if bid == 12 { return TY_NAMED(); }
+    if bid == 13 { return TY_STRING(); }
+    if bid == 14 {
+        if idx == 0 { return TY_STRING(); }
+        return TY_STRING();
+    }
+    if bid == 15 { return TY_STRING(); }
     return 0 - 1;
 }
 

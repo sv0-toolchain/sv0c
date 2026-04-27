@@ -483,6 +483,14 @@ structure VmCodegen :> VM_CODEGEN = struct
         | I.Call (SOME d, "sv0_box_load", [vh, vo], _) =>
             let val {base, ...} = lookupSlot env d
             in emitValue structs enums env pool vh @ emitValue structs enums env pool vo @ [B.CALL_BUILTIN 14, B.STORE_LOCAL base] end
+        | I.Call (SOME d, "sv0_read_file", [v], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool v @ [B.CALL_BUILTIN 15, B.STORE_LOCAL base] end
+        | I.Call (NONE, "sv0_write_file", [vp, vc], _) =>
+            emitValue structs enums env pool vp @ emitValue structs enums env pool vc @ [B.CALL_BUILTIN 16]
+        | I.Call (SOME d, "sv0_read_dir", [v], _) =>
+            let val {base, ...} = lookupSlot env d
+            in emitValue structs enums env pool v @ [B.CALL_BUILTIN 17, B.STORE_LOCAL base] end
         | I.Call (NONE, f, vs, _) =>
             let
               val nargs =

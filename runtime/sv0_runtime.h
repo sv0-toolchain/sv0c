@@ -143,4 +143,9 @@ static inline intptr_t sv0_box_load(int32_t h, int32_t off) {
   return sv0_box_pool[h + off];
 }
 
+/* Host filesystem (T0-8 / M3 G2): see sv0doc/compiler/bootstrap-host-io.md */
+const char *sv0_read_file(const char *path);
+void sv0_write_file(const char *path, const char *contents);
+const char *sv0_read_dir(const char *dir);
+
 #endif /* SV0_RUNTIME_H */

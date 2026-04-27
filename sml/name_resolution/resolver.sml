@@ -403,8 +403,11 @@ structure Resolver :> RESOLVER = struct
       val e14 = Env.registerFnArity (Env.registerModuleValue e13 "vec_get") "vec_get" 2
       val e15 = Env.registerFnArity (Env.registerModuleValue e14 "vec_set") "vec_set" 3
       val e16 = Env.registerFnArity (Env.registerModuleValue e15 "box_new") "box_new" 1
+      val e17 = Env.registerFnArity (Env.registerModuleValue e16 "box_deref") "box_deref" 1
+      val e18 = Env.registerFnArity (Env.registerModuleValue e17 "read_file") "read_file" 1
+      val e19 = Env.registerFnArity (Env.registerModuleValue e18 "write_file") "write_file" 2
     in
-      Env.registerFnArity (Env.registerModuleValue e16 "box_deref") "box_deref" 1
+      Env.registerFnArity (Env.registerModuleValue e19 "read_dir") "read_dir" 1
     end
 
   fun resolve (prog : Ast.program) : Ast.program =

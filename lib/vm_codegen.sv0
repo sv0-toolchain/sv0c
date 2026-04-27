@@ -363,6 +363,9 @@ fn builtin_id(name: string) -> i32 {
     if string_eq(name, "sv0_box_alloc") { return 12; }
     if string_eq(name, "sv0_box_store") { return 13; }
     if string_eq(name, "sv0_box_load") { return 14; }
+    if string_eq(name, "sv0_read_file") { return 15; }
+    if string_eq(name, "sv0_write_file") { return 16; }
+    if string_eq(name, "sv0_read_dir") { return 17; }
     return 0 - 1;
 }
 
@@ -375,6 +378,7 @@ fn builtin_has_result(name: string) -> bool {
     if string_eq(name, "sv0_vec_push") { return false; }
     if string_eq(name, "sv0_vec_set") { return false; }
     if string_eq(name, "sv0_box_store") { return false; }
+    if string_eq(name, "sv0_write_file") { return false; }
     return true;
 }
 
@@ -394,6 +398,9 @@ fn builtin_arg_count(name: string) -> i32 {
     if string_eq(name, "sv0_box_alloc") { return 1; }
     if string_eq(name, "sv0_box_store") { return 3; }
     if string_eq(name, "sv0_box_load") { return 2; }
+    if string_eq(name, "sv0_read_file") { return 1; }
+    if string_eq(name, "sv0_write_file") { return 2; }
+    if string_eq(name, "sv0_read_dir") { return 1; }
     return 0;
 }
 
@@ -1643,13 +1650,16 @@ fn test_builtin_id() -> i32 {
     if builtin_id("sv0_string_len") != 2 { return 2; }
     if builtin_id("sv0_vec_new") != 7 { return 3; }
     if builtin_id("sv0_box_load") != 14 { return 4; }
-    if builtin_id("unknown") != 0 - 1 { return 5; }
-    if is_builtin("sv0_println") != true { return 6; }
-    if is_builtin("foo") != false { return 7; }
-    if builtin_has_result("sv0_println") != false { return 8; }
-    if builtin_has_result("sv0_string_len") != true { return 9; }
-    if builtin_arg_count("sv0_println") != 1 { return 10; }
-    if builtin_arg_count("sv0_string_substr") != 3 { return 11; }
+    if builtin_id("sv0_read_file") != 15 { return 5; }
+    if builtin_id("sv0_write_file") != 16 { return 6; }
+    if builtin_id("sv0_read_dir") != 17 { return 7; }
+    if builtin_id("unknown") != 0 - 1 { return 8; }
+    if is_builtin("sv0_println") != true { return 9; }
+    if is_builtin("foo") != false { return 10; }
+    if builtin_has_result("sv0_println") != false { return 11; }
+    if builtin_has_result("sv0_string_len") != true { return 12; }
+    if builtin_arg_count("sv0_println") != 1 { return 13; }
+    if builtin_arg_count("sv0_string_substr") != 3 { return 14; }
     return 0;
 }
 

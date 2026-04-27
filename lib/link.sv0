@@ -31,6 +31,12 @@ fn is_link_source_file(name: string) -> bool {
     return is_sv0(name);
 }
 
+/* Newline-separated full paths to .sv0 files under dir (recursive),
+   sorted lexicographically — see sv0doc/compiler/bootstrap-host-io.md. */
+fn list_sv0(dir: string) -> string {
+    return read_dir(dir);
+}
+
 /* ── name extraction ────────────────────────────────────────── */
 
 fn find_last_slash(path: string) -> i32 {
