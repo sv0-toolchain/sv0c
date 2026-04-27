@@ -6,9 +6,8 @@
    project flag, usage), error prefix constants.
    Full I/O (readFile, writeBytes, compileFile, compileFileVm,
    compileProjectDir) deferred — needs filesystem runtime.
-   M3-S-003: driver_tokenize_sketch is a Result-shaped boundary for the
-   first pipeline phase. Err uses i32 codes until C codegen supports
-   string enum payloads (then string / CompileError per bootstrap-diagnostics). */
+   M3-S-003: tokenize-phase Result boundary sketch (pre-lexer) keeps
+   explicit success/error plumbing in sv0 driver code. */
 
 enum MainPhaseResult {
     Ok(i32),
@@ -17,6 +16,7 @@ enum MainPhaseResult {
 
 fn DRIVER_TOKENIZE_ERR_EMPTY() -> i32 { return 1; }
 fn DRIVER_TOKENIZE_ERR_BAD_EXT() -> i32 { return 2; }
+
 
 /* ── path helpers ───────────────────────────────────────────── */
 
@@ -197,6 +197,13 @@ fn driver_tokenize_sketch(source_path: string) -> MainPhaseResult {
     return MainPhaseResult::Ok(0);
 }
 
+fn driver_result_code(r: MainPhaseResult) -> i32 {
+    return match r {
+        MainPhaseResult::Ok(v) => v,
+        MainPhaseResult::Err(e) => 0 - e,
+    };
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_path_helpers() -> i32 {
@@ -261,23 +268,14 @@ fn test_error_prefix() -> i32 {
 
 fn test_driver_tokenize_sketch() -> i32 {
     let ok1: MainPhaseResult = driver_tokenize_sketch("x.sv0");
-    let v1: i32 = match ok1 {
-        MainPhaseResult::Ok(n) => n,
-        MainPhaseResult::Err(_) => 99,
-    };
+    let v1: i32 = driver_result_code(ok1);
     if v1 != 0 { return 1; }
     let bad_empty: MainPhaseResult = driver_tokenize_sketch("");
-    let c2: i32 = match bad_empty {
-        MainPhaseResult::Ok(_) => 0 - 1,
-        MainPhaseResult::Err(e) => e,
-    };
-    if c2 != DRIVER_TOKENIZE_ERR_EMPTY() { return 2; }
+    let c2: i32 = driver_result_code(bad_empty);
+    if c2 != 0 - DRIVER_TOKENIZE_ERR_EMPTY() { return 2; }
     let bad_ext: MainPhaseResult = driver_tokenize_sketch("x.c");
-    let c3: i32 = match bad_ext {
-        MainPhaseResult::Ok(_) => 0 - 1,
-        MainPhaseResult::Err(e) => e,
-    };
-    if c3 != DRIVER_TOKENIZE_ERR_BAD_EXT() { return 3; }
+    let c3: i32 = driver_result_code(bad_ext);
+    if c3 != 0 - DRIVER_TOKENIZE_ERR_BAD_EXT() { return 3; }
     return 0;
 }
 

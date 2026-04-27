@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 G0:** spec diagnostics + **`struct CompileError`** (**`lib/span.sv0`**) + **M3-S-003** driver **`MainPhaseResult`** / **`driver_tokenize_sketch`** in **`lib/main.sv0`** with stage0 + vm-parity **`main`** goldens; **`doc/transliteration-plan.md`** driver row. Run **`grep -cve '^\s*$\|^\s*#'`** on list files before citing counts.)
+**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 G0/G1:** **`struct CompileError`** in **`lib/span.sv0`** with goldens + **M3-S-003** driver **`MainPhaseResult`** / **`driver_tokenize_sketch`** / **`driver_result_code`** in **`lib/main.sv0`**; **`doc/transliteration-plan.md`** span + driver rows. Run **`grep -cve '^\s*$\|^\s*#'`** on list files before citing counts.)
 
 ## Checklist (local source of truth)
 
