@@ -9,3 +9,9 @@ Each **M3-S-00x** subsection records a scoped search for the **`raise`** keyword
 - **Paths:** `lib/checker.sv0`
 - **Check:** `rg '\braise(\s|\()' lib/checker.sv0` from **`sv0c/`** root
 - **Outcome:** no matches (`rg` exit **1** = zero hits), 2026-04-27
+
+## M3-S-008 — checker batch B
+
+- **Paths:** `lib/checker.sv0` (second tranche / remainder — same file as M3-S-007)
+- **Check:** `rg '\braise(\s|\()' lib/checker.sv0` from **`sv0c/`** root
+- **Outcome:** no matches (`rg` exit **1**), 2026-04-27
