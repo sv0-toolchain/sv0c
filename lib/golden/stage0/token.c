@@ -10,6 +10,7 @@ static int test_literals(void);
 static int test_delimiters(void);
 static int test_operators(void);
 static int test_keywords(void);
+static int test_compound_assign_cluster(void);
 
 static int token_tag(Token t) {
   int _sv0t0;
@@ -623,6 +624,38 @@ static int test_keywords(void) {
   return 0;
 }
 
+static int test_compound_assign_cluster(void) {
+  Token pe;
+  pe.tag = 44;
+  int _sv0t0 = token_tag(pe);
+  if ((_sv0t0 != 44)) {
+    return 1;
+  } else {
+  }
+  Token ge;
+  ge.tag = 53;
+  int _sv0t1 = token_tag(ge);
+  if ((_sv0t1 != 53)) {
+    return 2;
+  } else {
+  }
+  Token lte;
+  lte.tag = 52;
+  int _sv0t2 = token_tag(lte);
+  if ((_sv0t2 != 52)) {
+    return 3;
+  } else {
+  }
+  Token fa;
+  fa.tag = 20;
+  int _sv0t3 = token_tag(fa);
+  if ((_sv0t3 != 20)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_literals();
   int r1 = _sv0t0;
@@ -649,6 +682,13 @@ int main(void) {
   if ((r4 != 0)) {
     int _sv0t6 = (30 + r4);
     return _sv0t6;
+  } else {
+  }
+  int _sv0t7 = test_compound_assign_cluster();
+  int r5 = _sv0t7;
+  if ((r5 != 0)) {
+    int _sv0t8 = (40 + r5);
+    return _sv0t8;
   } else {
   }
   return 0;

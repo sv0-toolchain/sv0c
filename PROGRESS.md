@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 — `lib/types.sv0`:** top-level **`TyUint`/`TyFloat`** tags + **`TyRefMut`/`TySlice`** box roundtrips in **`main`**; stage0/vm goldens. Prior: **`import_use_match`** sixth **`use`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
+**Last updated:** 2026-04-26 (America/Los_Angeles; **M3 — `lexer/token.sv0`:** **`test_compound_assign_cluster`** (PLUSEQ/GTGTEQ/LTLTEQ/FATARROW tags). Prior: **`lib/types.sv0`**. Metrics: bootstrap 97, self-host 97, stage0 21, vm-parity **97**)
 
 ## Checklist (local source of truth)
 
