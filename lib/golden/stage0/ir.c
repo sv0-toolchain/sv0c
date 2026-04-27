@@ -38,6 +38,7 @@ static int test_call_variant(void);
 static int test_ifelse_variant(void);
 static int test_structs(void);
 static int test_index_access_expr(void);
+static int test_branch_jump_instr_tags(void);
 
 static int value_tag(Value v) {
   int _sv0t0;
@@ -912,6 +913,35 @@ static int test_index_access_expr(void) {
   return 0;
 }
 
+static int test_branch_jump_instr_tags(void) {
+  Value tb;
+  tb.tag = 2;
+  tb.p0 = 1;
+  Instr br;
+  int _sv0t0 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t0, 0, tb.tag);
+  sv0_box_store(_sv0t0, 1, tb.p0);
+  sv0_box_store(_sv0t0, 2, tb.p1);
+  br.tag = 12;
+  br.p0 = _sv0t0;
+  br.p1 = 1;
+  br.p2 = 2;
+  int _sv0t1 = instr_tag(br);
+  if ((_sv0t1 != 12)) {
+    return 1;
+  } else {
+  }
+  Instr j;
+  j.tag = 13;
+  j.p0 = 400;
+  int _sv0t2 = instr_tag(j);
+  if ((_sv0t2 != 13)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_values();
   int r1 = _sv0t0;
@@ -959,6 +989,13 @@ int main(void) {
   if ((r7 != 0)) {
     int _sv0t12 = (60 + r7);
     return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_branch_jump_instr_tags();
+  int r8 = _sv0t13;
+  if ((r8 != 0)) {
+    int _sv0t14 = (70 + r8);
+    return _sv0t14;
   } else {
   }
   return 0;
