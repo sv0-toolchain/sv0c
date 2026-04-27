@@ -657,21 +657,27 @@ static int test_file_stem(void) {
     return 2;
   } else {
   }
-  const char* _sv0t4 = file_stem("bar");
+  const char* _sv0t4 = file_stem("src\\bar.sv0");
   int _sv0t5 = sv0_string_eq(_sv0t4, "bar");
   if ((_sv0t5 != 1)) {
+    return 6;
+  } else {
+  }
+  const char* _sv0t6 = file_stem("bar");
+  int _sv0t7 = sv0_string_eq(_sv0t6, "bar");
+  if ((_sv0t7 != 1)) {
     return 3;
   } else {
   }
-  const char* _sv0t6 = file_stem("/a/b/c.txt");
-  int _sv0t7 = sv0_string_eq(_sv0t6, "c");
-  if ((_sv0t7 != 1)) {
+  const char* _sv0t8 = file_stem("/a/b/c.txt");
+  int _sv0t9 = sv0_string_eq(_sv0t8, "c");
+  if ((_sv0t9 != 1)) {
     return 4;
   } else {
   }
-  const char* _sv0t8 = file_stem("noext");
-  int _sv0t9 = sv0_string_eq(_sv0t8, "noext");
-  if ((_sv0t9 != 1)) {
+  const char* _sv0t10 = file_stem("noext");
+  int _sv0t11 = sv0_string_eq(_sv0t10, "noext");
+  if ((_sv0t11 != 1)) {
     return 5;
   } else {
   }
@@ -723,21 +729,27 @@ static int test_link_dir_from_entry(void) {
     return 1;
   } else {
   }
-  const char* _sv0t2 = link_dir_from_entry("foo.sv0");
-  int _sv0t3 = sv0_string_eq(_sv0t2, ".");
+  const char* _sv0t2 = link_dir_from_entry("src\\foo.sv0");
+  int _sv0t3 = sv0_string_eq(_sv0t2, "src");
   if ((_sv0t3 != 1)) {
+    return 5;
+  } else {
+  }
+  const char* _sv0t4 = link_dir_from_entry("foo.sv0");
+  int _sv0t5 = sv0_string_eq(_sv0t4, ".");
+  if ((_sv0t5 != 1)) {
     return 2;
   } else {
   }
-  const char* _sv0t4 = link_dir_from_entry("/a/b/c.sv0");
-  int _sv0t5 = sv0_string_eq(_sv0t4, "/a/b");
-  if ((_sv0t5 != 1)) {
+  const char* _sv0t6 = link_dir_from_entry("/a/b/c.sv0");
+  int _sv0t7 = sv0_string_eq(_sv0t6, "/a/b");
+  if ((_sv0t7 != 1)) {
     return 3;
   } else {
   }
-  const char* _sv0t6 = link_dir_from_entry("/foo.sv0");
-  int _sv0t7 = sv0_string_eq(_sv0t6, "/");
-  if ((_sv0t7 != 1)) {
+  const char* _sv0t8 = link_dir_from_entry("/foo.sv0");
+  int _sv0t9 = sv0_string_eq(_sv0t8, "/");
+  if ((_sv0t9 != 1)) {
     return 4;
   } else {
   }

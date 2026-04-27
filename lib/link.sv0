@@ -364,6 +364,7 @@ fn test_is_link_source_file() -> i32 {
 fn test_file_stem() -> i32 {
     if string_eq(file_stem("test.sv0"), "test") != true { return 1; }
     if string_eq(file_stem("src/foo.sv0"), "foo") != true { return 2; }
+    if string_eq(file_stem("src\\bar.sv0"), "bar") != true { return 6; }
     if string_eq(file_stem("bar"), "bar") != true { return 3; }
     if string_eq(file_stem("/a/b/c.txt"), "c") != true { return 4; }
     if string_eq(file_stem("noext"), "noext") != true { return 5; }
@@ -385,6 +386,7 @@ fn test_fn_name_for_link() -> i32 {
 
 fn test_link_dir_from_entry() -> i32 {
     if string_eq(link_dir_from_entry("src/foo.sv0"), "src") != true { return 1; }
+    if string_eq(link_dir_from_entry("src\\foo.sv0"), "src") != true { return 5; }
     if string_eq(link_dir_from_entry("foo.sv0"), ".") != true { return 2; }
     if string_eq(link_dir_from_entry("/a/b/c.sv0"), "/a/b") != true { return 3; }
     if string_eq(link_dir_from_entry("/foo.sv0"), "/") != true { return 4; }
