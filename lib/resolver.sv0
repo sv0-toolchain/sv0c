@@ -1963,6 +1963,25 @@ fn test_apply_use_clause_unknown() -> i32 {
     return 0;
 }
 
+fn test_path_join_vec_three() -> i32 {
+    let source: string = "a b c";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 1);
+    vec_push(starts, 2);
+    vec_push(ends, 3);
+    vec_push(starts, 4);
+    vec_push(ends, 5);
+    let path: Vec<i32> = vec_new();
+    vec_push(path, 0);
+    vec_push(path, 1);
+    vec_push(path, 2);
+    let out: string = path_join_vec(source, starts, ends, path);
+    if string_eq(out, "a::b::c") != true { return 1; }
+    return 0;
+}
+
 fn test_resolve_program() -> i32 {
     let source: string = "main 0";
     let starts: Vec<i32> = vec_new();
@@ -2070,5 +2089,7 @@ fn main() -> i32 {
     if r37 != 0 { return 159 + r37; }
     let r38: i32 = test_resolve_program();
     if r38 != 0 { return 162 + r38; }
+    let r39: i32 = test_path_join_vec_three();
+    if r39 != 0 { return 165 + r39; }
     return 0;
 }

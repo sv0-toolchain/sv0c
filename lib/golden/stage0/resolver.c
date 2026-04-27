@@ -95,6 +95,7 @@ static int test_resolve_stmt_let(void);
 static int test_apply_use_clause_value(void);
 static int test_apply_use_clause_type(void);
 static int test_apply_use_clause_unknown(void);
+static int test_path_join_vec_three(void);
 static int test_resolve_program(void);
 
 static const char* path_join2(const char* a, const char* b) {
@@ -3522,6 +3523,35 @@ static int test_apply_use_clause_unknown(void) {
   return 0;
 }
 
+static int test_path_join_vec_three(void) {
+  const char* source;
+  source = "a b c";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 1);
+  sv0_vec_push(starts, 2);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 4);
+  sv0_vec_push(ends, 5);
+  int _sv0t2 = sv0_vec_new();
+  int path = _sv0t2;
+  sv0_vec_push(path, 0);
+  sv0_vec_push(path, 1);
+  sv0_vec_push(path, 2);
+  const char* _sv0t3 = path_join_vec(source, starts, ends, path);
+  const char* out;
+  out = _sv0t3;
+  int _sv0t4 = sv0_string_eq(out, "a::b::c");
+  if ((_sv0t4 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_resolve_program(void) {
   const char* source;
   source = "main 0";
@@ -3840,6 +3870,13 @@ int main(void) {
   if ((r38 != 0)) {
     int _sv0t74 = (162 + r38);
     return _sv0t74;
+  } else {
+  }
+  int _sv0t75 = test_path_join_vec_three();
+  int r39 = _sv0t75;
+  if ((r39 != 0)) {
+    int _sv0t76 = (165 + r39);
+    return _sv0t76;
   } else {
   }
   return 0;
