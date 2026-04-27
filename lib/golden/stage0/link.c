@@ -1321,8 +1321,6 @@ static int test_strip_link_directives(void) {
 }
 
 static int test_g2_link_host_io_aliases(void) {
-  const char* base;
-  base = "/tmp";
   const char* p;
   p = "/tmp/sv0_g2_link_parse.sv0";
   sv0_write_file(p, "probe");
@@ -1334,10 +1332,10 @@ static int test_g2_link_host_io_aliases(void) {
     return 1;
   } else {
   }
-  const char* _sv0t2 = walk_sv0(base);
+  const char* _sv0t2 = walk_sv0(".");
   const char* w;
   w = _sv0t2;
-  const char* _sv0t3 = link_project_dir(base);
+  const char* _sv0t3 = link_project_dir(".");
   const char* l;
   l = _sv0t3;
   int _sv0t4 = sv0_string_eq(w, l);
