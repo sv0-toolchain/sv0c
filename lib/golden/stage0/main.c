@@ -1,5 +1,12 @@
 #include "sv0_runtime.h"
 
+typedef struct {
+  int tag;
+  int p0;
+} MainPhaseResult;
+
+static int DRIVER_TOKENIZE_ERR_EMPTY(void);
+static int DRIVER_TOKENIZE_ERR_BAD_EXT(void);
 static int find_last_slash(const char* path);
 static int find_last_dot(const char* s, int start);
 static int path_has_sv0_ext(const char* path);
@@ -34,12 +41,22 @@ static int is_project_flag(const char* arg);
 static int classify_cli(int argc, int has_vm, int has_project);
 static const char* error_prefix(void);
 static const char* error_cannot_open(void);
+static MainPhaseResult driver_tokenize_sketch(const char* source_path);
 static int test_path_helpers(void);
 static int test_vm_output(void);
 static int test_phases(void);
 static int test_cli(void);
 static int test_error_prefix(void);
+static int test_driver_tokenize_sketch(void);
 static int test_base_name_sv0(void);
+
+static int DRIVER_TOKENIZE_ERR_EMPTY(void) {
+  return 1;
+}
+
+static int DRIVER_TOKENIZE_ERR_BAD_EXT(void) {
+  return 2;
+}
 
 static int find_last_slash(const char* path) {
   int _sv0t0 = sv0_string_len(path);
@@ -371,6 +388,31 @@ static const char* error_cannot_open(void) {
   return "sv0c error: cannot open ";
 }
 
+static MainPhaseResult driver_tokenize_sketch(const char* source_path) {
+  int _sv0t0 = sv0_string_len(source_path);
+  if ((_sv0t0 == 0)) {
+    MainPhaseResult _sv0t1;
+    int _sv0t2 = DRIVER_TOKENIZE_ERR_EMPTY();
+    _sv0t1.tag = 1;
+    _sv0t1.p0 = _sv0t2;
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t3 = path_has_sv0_ext(source_path);
+  if ((_sv0t3 != 1)) {
+    MainPhaseResult _sv0t4;
+    int _sv0t5 = DRIVER_TOKENIZE_ERR_BAD_EXT();
+    _sv0t4.tag = 1;
+    _sv0t4.p0 = _sv0t5;
+    return _sv0t4;
+  } else {
+  }
+  MainPhaseResult _sv0t6;
+  _sv0t6.tag = 0;
+  _sv0t6.p0 = 0;
+  return _sv0t6;
+}
+
 static int test_path_helpers(void) {
   int _sv0t0 = find_last_slash("foo/bar.sv0");
   if ((_sv0t0 != 3)) {
@@ -606,6 +648,66 @@ static int test_error_prefix(void) {
   return 0;
 }
 
+static int test_driver_tokenize_sketch(void) {
+  MainPhaseResult _sv0t0 = driver_tokenize_sketch("x.sv0");
+  MainPhaseResult ok1;
+  ok1 = _sv0t0;
+  int _sv0t1;
+  if ((ok1.tag == 0)) {
+    int n = ok1.p0;
+    _sv0t1 = n;
+  } else {
+    if ((ok1.tag == 1)) {
+      _sv0t1 = 99;
+    } else {
+    }
+  }
+  int v1 = _sv0t1;
+  if ((v1 != 0)) {
+    return 1;
+  } else {
+  }
+  MainPhaseResult _sv0t2 = driver_tokenize_sketch("");
+  MainPhaseResult bad_empty;
+  bad_empty = _sv0t2;
+  int _sv0t3;
+  if ((bad_empty.tag == 0)) {
+    _sv0t3 = (0 - 1);
+  } else {
+    if ((bad_empty.tag == 1)) {
+      int e = bad_empty.p0;
+      _sv0t3 = e;
+    } else {
+    }
+  }
+  int c2 = _sv0t3;
+  int _sv0t4 = DRIVER_TOKENIZE_ERR_EMPTY();
+  if ((c2 != _sv0t4)) {
+    return 2;
+  } else {
+  }
+  MainPhaseResult _sv0t5 = driver_tokenize_sketch("x.c");
+  MainPhaseResult bad_ext;
+  bad_ext = _sv0t5;
+  int _sv0t6;
+  if ((bad_ext.tag == 0)) {
+    _sv0t6 = (0 - 1);
+  } else {
+    if ((bad_ext.tag == 1)) {
+      int e = bad_ext.p0;
+      _sv0t6 = e;
+    } else {
+    }
+  }
+  int c3 = _sv0t6;
+  int _sv0t7 = DRIVER_TOKENIZE_ERR_BAD_EXT();
+  if ((c3 != _sv0t7)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 static int test_base_name_sv0(void) {
   const char* _sv0t0 = base_name_sv0("foo/bar.sv0");
   int _sv0t1 = sv0_string_eq(_sv0t0, "bar");
@@ -687,11 +789,18 @@ int main(void) {
     return _sv0t8;
   } else {
   }
-  int _sv0t9 = test_base_name_sv0();
-  int r6 = _sv0t9;
-  if ((r6 != 0)) {
-    int _sv0t10 = (60 + r6);
+  int _sv0t9 = test_driver_tokenize_sketch();
+  int r5b = _sv0t9;
+  if ((r5b != 0)) {
+    int _sv0t10 = (55 + r5b);
     return _sv0t10;
+  } else {
+  }
+  int _sv0t11 = test_base_name_sv0();
+  int r6 = _sv0t11;
+  if ((r6 != 0)) {
+    int _sv0t12 = (60 + r6);
+    return _sv0t12;
   } else {
   }
   return 0;
