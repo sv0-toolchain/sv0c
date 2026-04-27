@@ -22,8 +22,32 @@ Each **M3-S-00x** subsection records a scoped search for the **`raise`** keyword
 - **Check:** `rg '\braise(\s|\()' lib/lowering.sv0` from **`sv0c/`** root
 - **Outcome:** no matches (`rg` exit **1**), 2026-04-27
 
-## M3-S-009 — lowering
+## M3-S-010 — resolver
 
-- **Paths:** `lib/lowering.sv0`
-- **Check:** `rg '\braise(\s|\()' lib/lowering.sv0` from **`sv0c/`** root
+- **Paths:** `lib/resolver.sv0`
+- **Check:** `rg '\braise(\s|\()' lib/resolver.sv0` from **`sv0c/`** root
 - **Outcome:** no matches (`rg` exit **1**), 2026-04-27
+
+## M3-S-011 — VM codegen
+
+- **Paths:** `lib/vm_codegen.sv0`
+- **Check:** `rg '\braise(\s|\()' lib/vm_codegen.sv0` from **`sv0c/`** root
+- **Outcome:** no matches (`rg` exit **1**), 2026-04-27
+
+## M3-S-012 — C codegen / bytecode / env
+
+- **Paths:** `lib/codegen.sv0`, `lib/bytecode.sv0`, `lib/env.sv0`
+- **Check:** `rg '\braise(\s|\()' lib/codegen.sv0 lib/bytecode.sv0 lib/env.sv0` from **`sv0c/`** root
+- **Outcome:** no matches (`rg` exit **1**), 2026-04-27
+
+## M3-S-013 — link / lexer / include_expand / unify / diagnostic
+
+- **Paths:** `lib/link.sv0`, `lib/lexer.sv0`, `lib/include_expand.sv0`, `lib/unify.sv0`, `lib/diagnostic.sv0`
+- **Check:** `rg '\braise(\s|\()' lib/link.sv0 lib/lexer.sv0 lib/include_expand.sv0 lib/unify.sv0 lib/diagnostic.sv0` from **`sv0c/`** root
+- **Outcome:** no matches (`rg` exit **1**), 2026-04-27
+
+## M3-S-014 — Track C closure (full compiler `.sv0` scan)
+
+- **Paths:** all **`*.sv0`** under **`lib/`**, **`lexer/`**, and **`parser/`** (same roots as **`scripts/verify_compiler_sv0_no_raise.py`** in the meta-repo).
+- **Check:** **`python3 scripts/verify_compiler_sv0_no_raise.py --root <meta>`** and **`python3 scripts/verify_m3_g1_track_c.py --root <meta>`** with **`scripts/m3_g1_active_slices.txt`** listing **M3-S-004** … **M3-S-014**.
+- **Outcome:** both scripts **exit 0** on **2026-04-27** (mechanical closure — no **`raise`** token in those trees).
