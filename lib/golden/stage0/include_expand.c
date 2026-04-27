@@ -19,6 +19,7 @@ static const char* table_lookup_body(const char* p0, const char* b0, const char*
 static const char* table_lookup_body3(const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, const char* merged);
 static const char* expand_text_table2(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, int depth);
 static const char* expand_text_table3(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, int depth);
+static const char* expand_file(const char* host_abs, const char* source, int depth);
 static int test_expand_text_table2_simple(void);
 static int test_expand_text_table2_nested(void);
 static int test_expand_text_table2_miss(void);
@@ -509,6 +510,58 @@ static const char* expand_text_table3(const char* host_abs, const char* source, 
     i3 = (i3 + 1);
   }
   return out3;
+}
+
+static const char* expand_file(const char* host_abs, const char* source, int depth) {
+  if ((depth > 24)) {
+    return "E0323";
+  } else {
+  }
+  int dd = (depth + 1);
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int lens = _sv0t1;
+  int _sv0t2 = split_lines(source, starts, lens);
+  int count = _sv0t2;
+  const char* bo;
+  bo = "";
+  int li = 0;
+  while ((li < count)) {
+    if ((li > 0)) {
+      const char* _sv0t3 = sv0_string_concat(bo, "\n");
+      bo = _sv0t3;
+    } else {
+    }
+    const char* _sv0t4 = get_split_line(source, starts, lens, li);
+    const char* line;
+    line = _sv0t4;
+    const char* _sv0t5 = parse_include_line(line);
+    const char* rel;
+    rel = _sv0t5;
+    int _sv0t6 = sv0_string_len(rel);
+    if ((_sv0t6 == 0)) {
+      const char* _sv0t7 = sv0_string_concat(bo, line);
+      bo = _sv0t7;
+    } else {
+      const char* _sv0t8 = path_dir(host_abs);
+      const char* dir;
+      dir = _sv0t8;
+      const char* _sv0t9 = path_join(dir, rel);
+      const char* merged;
+      merged = _sv0t9;
+      const char* _sv0t10 = sv0_read_file(merged);
+      const char* body;
+      body = _sv0t10;
+      const char* _sv0t11 = expand_file(merged, body, dd);
+      const char* inner;
+      inner = _sv0t11;
+      const char* _sv0t12 = sv0_string_concat(bo, inner);
+      bo = _sv0t12;
+    }
+    li = (li + 1);
+  }
+  return bo;
 }
 
 static int test_expand_text_table2_simple(void) {

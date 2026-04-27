@@ -758,8 +758,23 @@ static int builtin_id(const char* name) {
     return 14;
   } else {
   }
-  int _sv0t15 = (0 - 1);
-  return _sv0t15;
+  int _sv0t15 = sv0_string_eq(name, "sv0_read_file");
+  if (_sv0t15) {
+    return 15;
+  } else {
+  }
+  int _sv0t16 = sv0_string_eq(name, "sv0_write_file");
+  if (_sv0t16) {
+    return 16;
+  } else {
+  }
+  int _sv0t17 = sv0_string_eq(name, "sv0_read_dir");
+  if (_sv0t17) {
+    return 17;
+  } else {
+  }
+  int _sv0t18 = (0 - 1);
+  return _sv0t18;
 }
 
 static int is_builtin(const char* name) {
@@ -786,6 +801,11 @@ static int builtin_has_result(const char* name) {
   }
   int _sv0t3 = sv0_string_eq(name, "sv0_box_store");
   if (_sv0t3) {
+    return 0;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(name, "sv0_write_file");
+  if (_sv0t4) {
     return 0;
   } else {
   }
@@ -866,6 +886,21 @@ static int builtin_arg_count(const char* name) {
   int _sv0t14 = sv0_string_eq(name, "sv0_box_load");
   if (_sv0t14) {
     return 2;
+  } else {
+  }
+  int _sv0t15 = sv0_string_eq(name, "sv0_read_file");
+  if (_sv0t15) {
+    return 1;
+  } else {
+  }
+  int _sv0t16 = sv0_string_eq(name, "sv0_write_file");
+  if (_sv0t16) {
+    return 2;
+  } else {
+  }
+  int _sv0t17 = sv0_string_eq(name, "sv0_read_dir");
+  if (_sv0t17) {
+    return 1;
   } else {
   }
   return 0;
@@ -3047,40 +3082,55 @@ static int test_builtin_id(void) {
     return 4;
   } else {
   }
-  int _sv0t4 = builtin_id("unknown");
-  int _sv0t5 = (0 - 1);
-  if ((_sv0t4 != _sv0t5)) {
+  int _sv0t4 = builtin_id("sv0_read_file");
+  if ((_sv0t4 != 15)) {
     return 5;
   } else {
   }
-  int _sv0t6 = is_builtin("sv0_println");
-  if ((_sv0t6 != 1)) {
+  int _sv0t5 = builtin_id("sv0_write_file");
+  if ((_sv0t5 != 16)) {
     return 6;
   } else {
   }
-  int _sv0t7 = is_builtin("foo");
-  if ((_sv0t7 != 0)) {
+  int _sv0t6 = builtin_id("sv0_read_dir");
+  if ((_sv0t6 != 17)) {
     return 7;
   } else {
   }
-  int _sv0t8 = builtin_has_result("sv0_println");
-  if ((_sv0t8 != 0)) {
+  int _sv0t7 = builtin_id("unknown");
+  int _sv0t8 = (0 - 1);
+  if ((_sv0t7 != _sv0t8)) {
     return 8;
   } else {
   }
-  int _sv0t9 = builtin_has_result("sv0_string_len");
+  int _sv0t9 = is_builtin("sv0_println");
   if ((_sv0t9 != 1)) {
     return 9;
   } else {
   }
-  int _sv0t10 = builtin_arg_count("sv0_println");
-  if ((_sv0t10 != 1)) {
+  int _sv0t10 = is_builtin("foo");
+  if ((_sv0t10 != 0)) {
     return 10;
   } else {
   }
-  int _sv0t11 = builtin_arg_count("sv0_string_substr");
-  if ((_sv0t11 != 3)) {
+  int _sv0t11 = builtin_has_result("sv0_println");
+  if ((_sv0t11 != 0)) {
     return 11;
+  } else {
+  }
+  int _sv0t12 = builtin_has_result("sv0_string_len");
+  if ((_sv0t12 != 1)) {
+    return 12;
+  } else {
+  }
+  int _sv0t13 = builtin_arg_count("sv0_println");
+  if ((_sv0t13 != 1)) {
+    return 13;
+  } else {
+  }
+  int _sv0t14 = builtin_arg_count("sv0_string_substr");
+  if ((_sv0t14 != 3)) {
+    return 14;
   } else {
   }
   return 0;

@@ -3185,7 +3185,7 @@ static int enum_def_variant_shape_str(int edef_names, int edef_variant_offsets, 
 }
 
 static int BUILTIN_COUNT(void) {
-  return 13;
+  return 16;
 }
 
 static int builtin_fn_lookup(const char* name_str) {
@@ -3254,8 +3254,23 @@ static int builtin_fn_lookup(const char* name_str) {
     return 12;
   } else {
   }
-  int _sv0t13 = (0 - 1);
-  return _sv0t13;
+  int _sv0t13 = sv0_string_eq(name_str, "read_file");
+  if (_sv0t13) {
+    return 13;
+  } else {
+  }
+  int _sv0t14 = sv0_string_eq(name_str, "write_file");
+  if (_sv0t14) {
+    return 14;
+  } else {
+  }
+  int _sv0t15 = sv0_string_eq(name_str, "read_dir");
+  if (_sv0t15) {
+    return 15;
+  } else {
+  }
+  int _sv0t16 = (0 - 1);
+  return _sv0t16;
 }
 
 static int builtin_fn_ret_type(int bid) {
@@ -3324,8 +3339,23 @@ static int builtin_fn_ret_type(int bid) {
     return _sv0t12;
   } else {
   }
-  int _sv0t13 = (0 - 1);
-  return _sv0t13;
+  if ((bid == 13)) {
+    int _sv0t13 = TY_STRING();
+    return _sv0t13;
+  } else {
+  }
+  if ((bid == 14)) {
+    int _sv0t14 = TY_UNIT();
+    return _sv0t14;
+  } else {
+  }
+  if ((bid == 15)) {
+    int _sv0t15 = TY_STRING();
+    return _sv0t15;
+  } else {
+  }
+  int _sv0t16 = (0 - 1);
+  return _sv0t16;
 }
 
 static int builtin_fn_param_count(int bid) {
@@ -3378,6 +3408,18 @@ static int builtin_fn_param_count(int bid) {
   } else {
   }
   if ((bid == 12)) {
+    return 1;
+  } else {
+  }
+  if ((bid == 13)) {
+    return 1;
+  } else {
+  }
+  if ((bid == 14)) {
+    return 2;
+  } else {
+  }
+  if ((bid == 15)) {
     return 1;
   } else {
   }
@@ -3476,8 +3518,28 @@ static int builtin_fn_param_type(int bid, int idx) {
     return _sv0t17;
   } else {
   }
-  int _sv0t18 = (0 - 1);
-  return _sv0t18;
+  if ((bid == 13)) {
+    int _sv0t18 = TY_STRING();
+    return _sv0t18;
+  } else {
+  }
+  if ((bid == 14)) {
+    if ((idx == 0)) {
+      int _sv0t19 = TY_STRING();
+      return _sv0t19;
+    } else {
+    }
+    int _sv0t20 = TY_STRING();
+    return _sv0t20;
+  } else {
+  }
+  if ((bid == 15)) {
+    int _sv0t21 = TY_STRING();
+    return _sv0t21;
+  } else {
+  }
+  int _sv0t22 = (0 - 1);
+  return _sv0t22;
 }
 
 static int resolve_fn_call(int fn_names, const char* source, int starts, int ends, const char* name_str, int is_builtin_out) {

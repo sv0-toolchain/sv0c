@@ -1033,12 +1033,18 @@ structure Checker :> CHECKER = struct
       val acc1j = extend acc1i "vec_set" (Types.TyFn ([Types.TyNamed ("Vec", [Types.freshVar ()]), Types.TyInt 32, Types.freshVar ()], Types.TyUnit)) false
       val acc1k = extend acc1j "box_new" (Types.TyFn ([Types.freshVar ()], Types.TyNamed ("Box", [Types.freshVar ()]))) false
       val acc1l = extend acc1k "box_deref" (Types.TyFn ([Types.TyNamed ("Box", [Types.freshVar ()])], Types.freshVar ())) false
+      val acc1m =
+        extend acc1l "read_file" (Types.TyFn ([Types.TyString], Types.TyString)) false
+      val acc1n =
+        extend acc1m "write_file"
+          (Types.TyFn ([Types.TyString, Types.TyString], Types.TyUnit)) false
+      val acc1o = extend acc1n "read_dir" (Types.TyFn ([Types.TyString], Types.TyString)) false
       val acc2 =
         List.foldl
           (fn ((en, vars), acc) =>
              List.foldl
                (fn ((vn, sh), a) =>
-                  extend a (pathKey [en, vn]) (ctorTy en sh) false) acc vars) acc1l
+                  extend a (pathKey [en, vn]) (ctorTy en sh) false) acc vars) acc1o
           (!enumDefs)
       fun oneUse (it : Ast.item, acc : venv) : venv =
         case it of

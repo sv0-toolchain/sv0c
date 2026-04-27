@@ -3,8 +3,8 @@
    trimming, path validation, include-line parsing, line splitting/
    joining, cycle detection (Vec-based visited list).
    `expand_text_table2` / `expand_text_table3` mirror SML `expand` line-wise
-   using 2- and 3-slot in-memory path→body tables (tests; no OS). `expand`/`expandFile`
-   remain deferred (host file I/O). */
+   using 2- and 3-slot in-memory path→body tables (tests; no OS). `expand_file`
+   uses host `read_file` for include bodies (M3 G2). */
 
 fn is_space(c: i32) -> bool {
     if c == 32 { return true; }
@@ -285,6 +285,40 @@ fn expand_text_table3(host_abs: string, source: string, p0: string, b0: string, 
         i3 = i3 + 1;
     }
     return out3;
+}
+
+/* Host-backed expansion: bodies loaded via read_file(merged); depth
+   guard matches expand_text_table2 (E0323). read_file panics on
+   missing paths (same as bootstrap-host-io). */
+
+fn expand_file(host_abs: string, source: string, depth: i32) -> string {
+    if depth > 24 {
+        return "E0323";
+    }
+    let dd: i32 = depth + 1;
+    let starts: Vec<i32> = vec_new();
+    let lens: Vec<i32> = vec_new();
+    let count: i32 = split_lines(source, starts, lens);
+    let mut bo: string = "";
+    let mut li: i32 = 0;
+    while li < count {
+        if li > 0 {
+            bo = string_concat(bo, "\n");
+        }
+        let line: string = get_split_line(source, starts, lens, li);
+        let rel: string = parse_include_line(line);
+        if string_len(rel) == 0 {
+            bo = string_concat(bo, line);
+        } else {
+            let dir: string = path_dir(host_abs);
+            let merged: string = path_join(dir, rel);
+            let body: string = read_file(merged);
+            let inner: string = expand_file(merged, body, dd);
+            bo = string_concat(bo, inner);
+        }
+        li = li + 1;
+    }
+    return bo;
 }
 
 fn test_expand_text_table2_simple() -> i32 {

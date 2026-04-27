@@ -7,6 +7,7 @@ typedef struct {
 
 static int DRIVER_TOKENIZE_ERR_EMPTY(void);
 static int DRIVER_TOKENIZE_ERR_BAD_EXT(void);
+static const char* compile_read_source(const char* path);
 static int find_last_slash(const char* path);
 static int find_last_dot(const char* s, int start);
 static int path_has_sv0_ext(const char* path);
@@ -57,6 +58,11 @@ static int DRIVER_TOKENIZE_ERR_EMPTY(void) {
 
 static int DRIVER_TOKENIZE_ERR_BAD_EXT(void) {
   return 2;
+}
+
+static const char* compile_read_source(const char* path) {
+  const char* _sv0t0 = sv0_read_file(path);
+  return _sv0t0;
 }
 
 static int find_last_slash(const char* path) {

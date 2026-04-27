@@ -658,6 +658,18 @@ structure Lowering :> LOWERING = struct
             val (il, vl) = lowerExprToValue len
             val t = freshTmp ()
         in (is @ ist @ il @ [Ir.Call (SOME t, "sv0_string_substr", [vs, vst, vl], "const char*")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["read_file"], _), [arg], _) =>
+        let val (is, v) = lowerExprToValue arg
+            val t = freshTmp ()
+        in (is @ [Ir.Call (SOME t, "sv0_read_file", [v], "const char*")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["write_file"], _), [a, b], _) =>
+        let val (ia, va) = lowerExprToValue a
+            val (ib, vb) = lowerExprToValue b
+        in (ia @ ib @ [Ir.Call (NONE, "sv0_write_file", [va, vb], "void")], Ir.VUnit) end
+    | Ast.ExprCall (Ast.ExprPath (["read_dir"], _), [arg], _) =>
+        let val (is, v) = lowerExprToValue arg
+            val t = freshTmp ()
+        in (is @ [Ir.Call (SOME t, "sv0_read_dir", [v], "const char*")], Ir.VVar t) end
     | Ast.ExprCall (Ast.ExprPath (["vec_new"], _), [], _) =>
         let val t = freshTmp ()
         in ([Ir.Call (SOME t, "sv0_vec_new", [], "int")], Ir.VVar t) end

@@ -35,6 +35,7 @@ static const char* format_snippet_numbered(const char* source, int line_no, int 
 static const char* format_related(int gutter_width, const char* msg, const char* file, int line, int col);
 static const char* format_help(int gutter_width, const char* help_text);
 static const char* format_diagnostic_full(int sev_tag, const char* message, const char* code, const char* file, const char* source, int line, int col, int span_len);
+static void report(const char* formatted);
 static int test_severity_tags(void);
 static int test_constructors(void);
 static int test_has_errors(void);
@@ -698,6 +699,10 @@ static const char* format_diagnostic_full(int sev_tag, const char* message, cons
   const char* _sv0t8 = sv0_string_concat(out, "\n");
   out = _sv0t8;
   return out;
+}
+
+static void report(const char* formatted) {
+  sv0_println(formatted);
 }
 
 static int test_severity_tags(void) {

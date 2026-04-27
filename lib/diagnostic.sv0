@@ -11,7 +11,7 @@
    format_help (SML `helpStr` — "= help: ..."),
    format_gutter (SML `gutter`/`blank` — numbered + blank gutter lines),
    format_snippet_numbered (SML full numbered snippet with gutter).
-   Remaining: full report/reportAll (I/O output). */
+   report: stderr-oriented bootstrap surface (println until eprintln). */
 
 enum Severity { Error, Warning, Note }
 
@@ -389,6 +389,10 @@ fn format_diagnostic_full(sev_tag: i32, message: string, code: string,
     }
     out = string_concat(out, "\n");
     return out;
+}
+
+fn report(formatted: string) -> () {
+    println(formatted);
 }
 
 fn test_severity_tags() -> i32 {

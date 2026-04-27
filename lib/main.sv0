@@ -4,8 +4,8 @@
    ordering constants (resolve → check → analyze → strip → lower → emit),
    VM output path construction, CLI arg parsing helpers (target tag,
    project flag, usage), error prefix constants.
-   Full I/O (readFile, writeBytes, compileFile, compileFileVm,
-   compileProjectDir) deferred — needs filesystem runtime.
+   Host text I/O uses read_file / write_file / read_dir (T0-8).
+   Higher-level compileFile / compileProjectDir remain incremental.
    M3-S-003: tokenize-phase Result boundary sketch (pre-lexer) keeps
    explicit success/error plumbing in sv0 driver code. */
 
@@ -17,6 +17,11 @@ enum MainPhaseResult {
 fn DRIVER_TOKENIZE_ERR_EMPTY() -> i32 { return 1; }
 fn DRIVER_TOKENIZE_ERR_BAD_EXT() -> i32 { return 2; }
 
+
+/* Thin alias for driver code that prefers a compile-oriented name. */
+fn compile_read_source(path: string) -> string {
+    return read_file(path);
+}
 
 /* ── path helpers ───────────────────────────────────────────── */
 

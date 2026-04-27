@@ -3,6 +3,7 @@
 static int is_sv0(const char* name);
 static int is_hidden(const char* name);
 static int is_link_source_file(const char* name);
+static const char* list_sv0(const char* dir);
 static int find_last_slash(const char* path);
 static int find_last_dot(const char* s, int start);
 static const char* file_stem(const char* path);
@@ -96,6 +97,11 @@ static int is_link_source_file(const char* name) {
   }
   int _sv0t1 = is_sv0(name);
   return _sv0t1;
+}
+
+static const char* list_sv0(const char* dir) {
+  const char* _sv0t0 = sv0_read_dir(dir);
+  return _sv0t0;
 }
 
 static int find_last_slash(const char* path) {
