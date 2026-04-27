@@ -604,13 +604,14 @@ fn test_strip_link_directives() -> i32 {
 }
 
 fn test_g2_link_host_io_aliases() -> i32 {
-    let base: string = "/tmp";
     let p: string = "/tmp/sv0_g2_link_parse.sv0";
     write_file(p, "probe");
     let s: string = parse_file(p);
     if string_eq(s, "probe") != true { return 1; }
-    let w: string = walk_sv0(base);
-    let l: string = link_project_dir(base);
+    /* read_dir(".") from VM cwd (sv0vm during bootstrap-build); avoid
+       "/tmp" — recursive walk can hit unreadable entries on Linux CI. */
+    let w: string = walk_sv0(".");
+    let l: string = link_project_dir(".");
     if string_eq(w, l) != true { return 2; }
     return 0;
 }
