@@ -276,6 +276,15 @@ fn test_index_access_expr() -> i32 {
     return 0;
 }
 
+fn test_branch_jump_instr_tags() -> i32 {
+    let tb: Value = Value::VBool(true);
+    let br: Instr = Instr::Branch(box_new(tb), 1, 2);
+    if instr_tag(br) != 12 { return 1; }
+    let j: Instr = Instr::Jump(400);
+    if instr_tag(j) != 13 { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_values();
     if r1 != 0 { return r1; }
@@ -291,5 +300,7 @@ fn main() -> i32 {
     if r6 != 0 { return 50 + r6; }
     let r7: i32 = test_index_access_expr();
     if r7 != 0 { return 60 + r7; }
+    let r8: i32 = test_branch_jump_instr_tags();
+    if r8 != 0 { return 70 + r8; }
     return 0;
 }
