@@ -5,7 +5,18 @@
    VM output path construction, CLI arg parsing helpers (target tag,
    project flag, usage), error prefix constants.
    Full I/O (readFile, writeBytes, compileFile, compileFileVm,
-   compileProjectDir) deferred — needs filesystem runtime. */
+   compileProjectDir) deferred — needs filesystem runtime.
+   M3-S-003: driver_tokenize_sketch is a Result-shaped boundary for the
+   first pipeline phase. Err uses i32 codes until C codegen supports
+   string enum payloads (then string / CompileError per bootstrap-diagnostics). */
+
+enum MainPhaseResult {
+    Ok(i32),
+    Err(i32),
+}
+
+fn DRIVER_TOKENIZE_ERR_EMPTY() -> i32 { return 1; }
+fn DRIVER_TOKENIZE_ERR_BAD_EXT() -> i32 { return 2; }
 
 /* ── path helpers ───────────────────────────────────────────── */
 
@@ -174,6 +185,18 @@ fn error_prefix() -> string { return "sv0c error: "; }
 
 fn error_cannot_open() -> string { return "sv0c error: cannot open "; }
 
+/* ── M3-S-003: tokenize-phase Result sketch (no real lexer yet) ─ */
+
+fn driver_tokenize_sketch(source_path: string) -> MainPhaseResult {
+    if string_len(source_path) == 0 {
+        return MainPhaseResult::Err(DRIVER_TOKENIZE_ERR_EMPTY());
+    }
+    if path_has_sv0_ext(source_path) != true {
+        return MainPhaseResult::Err(DRIVER_TOKENIZE_ERR_BAD_EXT());
+    }
+    return MainPhaseResult::Ok(0);
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_path_helpers() -> i32 {
@@ -236,6 +259,28 @@ fn test_error_prefix() -> i32 {
     return 0;
 }
 
+fn test_driver_tokenize_sketch() -> i32 {
+    let ok1: MainPhaseResult = driver_tokenize_sketch("x.sv0");
+    let v1: i32 = match ok1 {
+        MainPhaseResult::Ok(n) => n,
+        MainPhaseResult::Err(_) => 99,
+    };
+    if v1 != 0 { return 1; }
+    let bad_empty: MainPhaseResult = driver_tokenize_sketch("");
+    let c2: i32 = match bad_empty {
+        MainPhaseResult::Ok(_) => 0 - 1,
+        MainPhaseResult::Err(e) => e,
+    };
+    if c2 != DRIVER_TOKENIZE_ERR_EMPTY() { return 2; }
+    let bad_ext: MainPhaseResult = driver_tokenize_sketch("x.c");
+    let c3: i32 = match bad_ext {
+        MainPhaseResult::Ok(_) => 0 - 1,
+        MainPhaseResult::Err(e) => e,
+    };
+    if c3 != DRIVER_TOKENIZE_ERR_BAD_EXT() { return 3; }
+    return 0;
+}
+
 fn test_base_name_sv0() -> i32 {
     if string_eq(base_name_sv0("foo/bar.sv0"), "bar") != true { return 1; }
     if string_eq(base_name_sv0("pkg\\app.sv0"), "app") != true { return 7; }
@@ -258,6 +303,8 @@ fn main() -> i32 {
     if r4 != 0 { return 40 + r4; }
     let r5: i32 = test_error_prefix();
     if r5 != 0 { return 50 + r5; }
+    let r5b: i32 = test_driver_tokenize_sketch();
+    if r5b != 0 { return 55 + r5b; }
     let r6: i32 = test_base_name_sv0();
     if r6 != 0 { return 60 + r6; }
     return 0;
