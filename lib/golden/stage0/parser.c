@@ -193,6 +193,7 @@ static int parse_expr(int tags, int starts, int ends, const char* source, int po
 static int expr_ends_with_braced_block(int et, int idx);
 static int parse_return_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
 static int parse_let_stmt(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
+static int parse_assign_target_op_pos(int tags, int pos, int out);
 static int try_assign_stmt(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
 static int try_stmt(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
 static int parse_block(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
@@ -3775,16 +3776,15 @@ static int parse_let_stmt(int tags, int starts, int ends, const char* source, in
   return _sv0t23;
 }
 
-static int try_assign_stmt(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names) {
+static int parse_assign_target_op_pos(int tags, int pos, int out) {
   int _sv0t0 = ps_peek(tags, pos);
   if ((_sv0t0 != 5)) {
     int _sv0t1 = (0 - 2);
     return _sv0t1;
   } else {
   }
-  int lhs_field_tok = (0 - 1);
+  int field_tok = (0 - 1);
   int op_pos = (pos + 1);
-  int rhs_pos = (pos + 2);
   int _sv0t2 = (pos + 1);
   int _sv0t3 = ps_peek(tags, _sv0t2);
   if ((_sv0t3 == 15)) {
@@ -3795,47 +3795,63 @@ static int try_assign_stmt(int tags, int starts, int ends, const char* source, i
       return _sv0t6;
     } else {
     }
-    lhs_field_tok = (pos + 2);
+    field_tok = (pos + 2);
     op_pos = (pos + 3);
-    rhs_pos = (pos + 4);
   } else {
   }
-  int _sv0t7 = ps_peek(tags, op_pos);
-  int nt = _sv0t7;
+  sv0_vec_push(out, field_tok);
+  sv0_vec_push(out, op_pos);
+  return op_pos;
+}
+
+static int try_assign_stmt(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names) {
+  int _sv0t0 = sv0_vec_new();
+  int tmp = _sv0t0;
+  int _sv0t1 = parse_assign_target_op_pos(tags, pos, tmp);
+  int op_pos = _sv0t1;
+  if ((op_pos < 0)) {
+    return op_pos;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(tmp, 0);
+  int lhs_field_tok = _sv0t2;
+  int rhs_pos = (op_pos + 1);
+  int _sv0t3 = ps_peek(tags, op_pos);
+  int nt = _sv0t3;
   if ((nt == 35)) {
-    int _sv0t8 = sv0_vec_len(pp);
-    int pps = _sv0t8;
+    int _sv0t4 = sv0_vec_len(pp);
+    int pps = _sv0t4;
     sv0_vec_push(pp, pos);
     sv0_vec_push(et, 1);
     sv0_vec_push(ed1, pps);
     sv0_vec_push(ed2, 1);
     sv0_vec_push(ed3, 0);
     sv0_vec_push(ed4, 0);
-    int _sv0t9 = sv0_vec_len(et);
-    int lhs_idx = (_sv0t9 - 1);
+    int _sv0t5 = sv0_vec_len(et);
+    int lhs_idx = (_sv0t5 - 1);
     if ((lhs_field_tok >= 0)) {
       sv0_vec_push(et, 6);
       sv0_vec_push(ed1, lhs_idx);
       sv0_vec_push(ed2, lhs_field_tok);
       sv0_vec_push(ed3, 0);
       sv0_vec_push(ed4, 0);
-      int _sv0t10 = sv0_vec_len(et);
-      lhs_idx = (_sv0t10 - 1);
+      int _sv0t6 = sv0_vec_len(et);
+      lhs_idx = (_sv0t6 - 1);
     } else {
     }
-    int _sv0t11 = parse_expr(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, 1);
-    int pe = _sv0t11;
+    int _sv0t7 = parse_expr(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, 1);
+    int pe = _sv0t7;
     if ((pe < 0)) {
-      int _sv0t12 = (0 - 1);
-      return _sv0t12;
+      int _sv0t8 = (0 - 1);
+      return _sv0t8;
     } else {
     }
-    int _sv0t13 = sv0_vec_len(et);
-    int rhs_idx = (_sv0t13 - 1);
-    int _sv0t14 = ps_peek(tags, pe);
-    if ((_sv0t14 != 13)) {
-      int _sv0t15 = (0 - 1);
-      return _sv0t15;
+    int _sv0t9 = sv0_vec_len(et);
+    int rhs_idx = (_sv0t9 - 1);
+    int _sv0t10 = ps_peek(tags, pe);
+    if ((_sv0t10 != 13)) {
+      int _sv0t11 = (0 - 1);
+      return _sv0t11;
     } else {
     }
     sv0_vec_push(et, 18);
@@ -3843,54 +3859,54 @@ static int try_assign_stmt(int tags, int starts, int ends, const char* source, i
     sv0_vec_push(ed2, rhs_idx);
     sv0_vec_push(ed3, 0);
     sv0_vec_push(ed4, 0);
-    int _sv0t16 = sv0_vec_len(et);
-    int ai = (_sv0t16 - 1);
+    int _sv0t12 = sv0_vec_len(et);
+    int ai = (_sv0t12 - 1);
     sv0_vec_push(et, 28);
     sv0_vec_push(ed1, ai);
     sv0_vec_push(ed2, 0);
     sv0_vec_push(ed3, 0);
     sv0_vec_push(ed4, 0);
-    int _sv0t17 = (pe + 1);
-    return _sv0t17;
+    int _sv0t13 = (pe + 1);
+    return _sv0t13;
   } else {
   }
-  int _sv0t18 = has_assign_binop(nt);
-  if ((_sv0t18 == 1)) {
-    int _sv0t19 = assign_binop(nt);
-    int bop = _sv0t19;
-    int _sv0t20 = sv0_vec_len(pp);
-    int pps = _sv0t20;
+  int _sv0t14 = has_assign_binop(nt);
+  if ((_sv0t14 == 1)) {
+    int _sv0t15 = assign_binop(nt);
+    int bop = _sv0t15;
+    int _sv0t16 = sv0_vec_len(pp);
+    int pps = _sv0t16;
     sv0_vec_push(pp, pos);
     sv0_vec_push(et, 1);
     sv0_vec_push(ed1, pps);
     sv0_vec_push(ed2, 1);
     sv0_vec_push(ed3, 0);
     sv0_vec_push(ed4, 0);
-    int _sv0t21 = sv0_vec_len(et);
-    int lhs_idx = (_sv0t21 - 1);
+    int _sv0t17 = sv0_vec_len(et);
+    int lhs_idx = (_sv0t17 - 1);
     if ((lhs_field_tok >= 0)) {
       sv0_vec_push(et, 6);
       sv0_vec_push(ed1, lhs_idx);
       sv0_vec_push(ed2, lhs_field_tok);
       sv0_vec_push(ed3, 0);
       sv0_vec_push(ed4, 0);
-      int _sv0t22 = sv0_vec_len(et);
-      lhs_idx = (_sv0t22 - 1);
+      int _sv0t18 = sv0_vec_len(et);
+      lhs_idx = (_sv0t18 - 1);
     } else {
     }
-    int _sv0t23 = parse_expr(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, 1);
-    int pe = _sv0t23;
+    int _sv0t19 = parse_expr(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, 1);
+    int pe = _sv0t19;
     if ((pe < 0)) {
-      int _sv0t24 = (0 - 1);
-      return _sv0t24;
+      int _sv0t20 = (0 - 1);
+      return _sv0t20;
     } else {
     }
-    int _sv0t25 = sv0_vec_len(et);
-    int rhs_idx = (_sv0t25 - 1);
-    int _sv0t26 = ps_peek(tags, pe);
-    if ((_sv0t26 != 13)) {
-      int _sv0t27 = (0 - 1);
-      return _sv0t27;
+    int _sv0t21 = sv0_vec_len(et);
+    int rhs_idx = (_sv0t21 - 1);
+    int _sv0t22 = ps_peek(tags, pe);
+    if ((_sv0t22 != 13)) {
+      int _sv0t23 = (0 - 1);
+      return _sv0t23;
     } else {
     }
     sv0_vec_push(et, 19);
@@ -3898,19 +3914,19 @@ static int try_assign_stmt(int tags, int starts, int ends, const char* source, i
     sv0_vec_push(ed2, lhs_idx);
     sv0_vec_push(ed3, rhs_idx);
     sv0_vec_push(ed4, 0);
-    int _sv0t28 = sv0_vec_len(et);
-    int ai = (_sv0t28 - 1);
+    int _sv0t24 = sv0_vec_len(et);
+    int ai = (_sv0t24 - 1);
     sv0_vec_push(et, 28);
     sv0_vec_push(ed1, ai);
     sv0_vec_push(ed2, 0);
     sv0_vec_push(ed3, 0);
     sv0_vec_push(ed4, 0);
-    int _sv0t29 = (pe + 1);
-    return _sv0t29;
+    int _sv0t25 = (pe + 1);
+    return _sv0t25;
   } else {
   }
-  int _sv0t30 = (0 - 2);
-  return _sv0t30;
+  int _sv0t26 = (0 - 2);
+  return _sv0t26;
 }
 
 static int try_stmt(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names) {
@@ -9826,6 +9842,77 @@ static int test_parse_assign(void) {
   int _sv0t29 = sv0_vec_get(ed1b, 3);
   if ((_sv0t29 != 1)) {
     return 12;
+  } else {
+  }
+  int _sv0t30 = sv0_vec_new();
+  int tags3 = _sv0t30;
+  int _sv0t31 = sv0_vec_new();
+  int starts3 = _sv0t31;
+  int _sv0t32 = sv0_vec_new();
+  int ends3 = _sv0t32;
+  sv0_vec_push(tags3, 8);
+  sv0_vec_push(starts3, 0);
+  sv0_vec_push(ends3, 1);
+  sv0_vec_push(tags3, 5);
+  sv0_vec_push(starts3, 2);
+  sv0_vec_push(ends3, 3);
+  sv0_vec_push(tags3, 15);
+  sv0_vec_push(starts3, 3);
+  sv0_vec_push(ends3, 4);
+  sv0_vec_push(tags3, 5);
+  sv0_vec_push(starts3, 4);
+  sv0_vec_push(ends3, 5);
+  sv0_vec_push(tags3, 44);
+  sv0_vec_push(starts3, 6);
+  sv0_vec_push(ends3, 8);
+  sv0_vec_push(tags3, 0);
+  sv0_vec_push(starts3, 8);
+  sv0_vec_push(ends3, 9);
+  sv0_vec_push(tags3, 13);
+  sv0_vec_push(starts3, 9);
+  sv0_vec_push(ends3, 10);
+  sv0_vec_push(tags3, 9);
+  sv0_vec_push(starts3, 11);
+  sv0_vec_push(ends3, 12);
+  sv0_vec_push(tags3, 97);
+  sv0_vec_push(starts3, 12);
+  sv0_vec_push(ends3, 12);
+  int _sv0t33 = sv0_vec_new();
+  int et3 = _sv0t33;
+  int _sv0t34 = sv0_vec_new();
+  int ed1c = _sv0t34;
+  int _sv0t35 = sv0_vec_new();
+  int ed2c = _sv0t35;
+  int _sv0t36 = sv0_vec_new();
+  int ed3c = _sv0t36;
+  int _sv0t37 = sv0_vec_new();
+  int ed4c = _sv0t37;
+  int _sv0t38 = sv0_vec_new();
+  int pp3 = _sv0t38;
+  int _sv0t39 = parse_expr(tags3, starts3, ends3, "{ x.y += 1; }", 0, et3, ed1c, ed2c, ed3c, ed4c, pp3, 1);
+  int p3 = _sv0t39;
+  if ((p3 != 8)) {
+    return 13;
+  } else {
+  }
+  int _sv0t40 = sv0_vec_get(et3, 3);
+  if ((_sv0t40 != 19)) {
+    return 14;
+  } else {
+  }
+  int _sv0t41 = sv0_vec_get(ed1c, 3);
+  if ((_sv0t41 != 0)) {
+    return 15;
+  } else {
+  }
+  int _sv0t42 = sv0_vec_get(ed2c, 3);
+  if ((_sv0t42 != 1)) {
+    return 16;
+  } else {
+  }
+  int _sv0t43 = sv0_vec_get(ed3c, 3);
+  if ((_sv0t43 != 2)) {
+    return 17;
   } else {
   }
   return 0;
