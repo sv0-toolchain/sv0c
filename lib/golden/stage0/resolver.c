@@ -56,8 +56,8 @@ static int resolve_stmt(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
 static int resolve_contract(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
 static int apply_use_clause(int it, int id1, int id2, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
 static int apply_use_clauses(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
-static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5, int idx, int et, int ed1, int ed2, int ed3, int ed4, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
-static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
+static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5, int idx, int et, int ed1, int ed2, int ed3, int ed4, int fn_param_name_toks, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
+static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
 static int test_path_join(void);
 static int test_mangle_use(void);
 static int test_is_intrinsic(void);
@@ -96,6 +96,7 @@ static int test_apply_use_clause_value(void);
 static int test_apply_use_clause_type(void);
 static int test_apply_use_clause_unknown(void);
 static int test_path_join_vec_three(void);
+static int test_resolve_top_item_struct_field(void);
 static int test_resolve_program(void);
 
 static const char* path_join2(const char* a, const char* b) {
@@ -1849,7 +1850,7 @@ static int apply_use_clauses(int it, int id1, int id2, int id3, int id4, const c
   return 0;
 }
 
-static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5, int idx, int et, int ed1, int ed2, int ed3, int ed4, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5, int idx, int et, int ed1, int ed2, int ed3, int ed4, int fn_param_name_toks, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
   int _sv0t0 = sv0_vec_get(it, idx);
   int tag = _sv0t0;
   if ((tag == 5)) {
@@ -1885,10 +1886,38 @@ static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5,
     return _sv0t9;
   } else {
   }
+  if ((tag == 1)) {
+    int _sv0t10 = sv0_vec_get(id2, idx);
+    int fc = _sv0t10;
+    int _sv0t11 = sv0_vec_get(id3, idx);
+    int sfb = _sv0t11;
+    int fi = 0;
+    while ((fi < fc)) {
+      int _sv0t12 = (sfb + fi);
+      int _sv0t13 = sv0_vec_get(struct_field_ty_root, _sv0t12);
+      int tr = _sv0t13;
+      int _sv0t14 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, pp);
+      int rr = _sv0t14;
+      if ((rr != 0)) {
+        return rr;
+      } else {
+      }
+      fi = (fi + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((tag == 7)) {
+    int _sv0t15 = sv0_vec_get(id2, idx);
+    int alias_root = _sv0t15;
+    int _sv0t16 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, alias_root, source, starts, ends, mod_tys, pp);
+    return _sv0t16;
+  } else {
+  }
   return 0;
 }
 
-static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
   int _sv0t0 = register_items(it, id1, id2, id3, id4, mod_vals, mod_tys, fn_arities);
   int _sv0t1 = apply_use_clauses(it, id1, id2, id3, id4, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
   int ru = _sv0t1;
@@ -1900,7 +1929,7 @@ static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, i
   int len = _sv0t2;
   int i = 0;
   while ((i < len)) {
-    int _sv0t3 = resolve_top_item(it, id1, id2, id3, id4, id5, i, et, ed1, ed2, ed3, ed4, fn_param_name_toks, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
+    int _sv0t3 = resolve_top_item(it, id1, id2, id3, id4, id5, i, et, ed1, ed2, ed3, ed4, fn_param_name_toks, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
     int r = _sv0t3;
     if ((r != 0)) {
       return r;
@@ -3577,6 +3606,85 @@ static int test_path_join_vec_three(void) {
   return 0;
 }
 
+static int test_resolve_top_item_struct_field(void) {
+  const char* source;
+  source = "i32";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  int _sv0t2 = sv0_vec_new();
+  int mt = _sv0t2;
+  sv0_vec_push(mt, 99);
+  int _sv0t3 = sv0_vec_new();
+  int mv = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(pp, 0);
+  int _sv0t6 = sv0_vec_new();
+  int pty_tt = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int pty_td1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int pty_td2 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int pty_td3 = _sv0t9;
+  sv0_vec_push(pty_tt, 0);
+  sv0_vec_push(pty_td1, 0);
+  sv0_vec_push(pty_td2, 1);
+  sv0_vec_push(pty_td3, 0);
+  int _sv0t10 = sv0_vec_new();
+  int it = _sv0t10;
+  sv0_vec_push(it, 1);
+  int _sv0t11 = sv0_vec_new();
+  int id1 = _sv0t11;
+  sv0_vec_push(id1, 0);
+  int _sv0t12 = sv0_vec_new();
+  int id2 = _sv0t12;
+  sv0_vec_push(id2, 1);
+  int _sv0t13 = sv0_vec_new();
+  int id3 = _sv0t13;
+  sv0_vec_push(id3, 0);
+  int _sv0t14 = sv0_vec_new();
+  int id4 = _sv0t14;
+  sv0_vec_push(id4, 1);
+  int _sv0t15 = sv0_vec_new();
+  int id5 = _sv0t15;
+  int _sv0t16 = (0 - 1);
+  sv0_vec_push(id5, _sv0t16);
+  int _sv0t17 = sv0_vec_new();
+  int et = _sv0t17;
+  sv0_vec_push(et, 0);
+  int _sv0t18 = sv0_vec_new();
+  int ed1 = _sv0t18;
+  sv0_vec_push(ed1, 0);
+  int _sv0t19 = sv0_vec_new();
+  int ed2 = _sv0t19;
+  sv0_vec_push(ed2, 0);
+  int _sv0t20 = sv0_vec_new();
+  int ed3 = _sv0t20;
+  sv0_vec_push(ed3, 0);
+  int _sv0t21 = sv0_vec_new();
+  int ed4 = _sv0t21;
+  sv0_vec_push(ed4, 0);
+  int _sv0t22 = sv0_vec_new();
+  int fn_ptoks = _sv0t22;
+  int _sv0t23 = sv0_vec_new();
+  int sf_root = _sv0t23;
+  sv0_vec_push(sf_root, 0);
+  int _sv0t24 = resolve_top_item(it, id1, id2, id3, id4, id5, 0, et, ed1, ed2, ed3, ed4, fn_ptoks, pty_tt, pty_td1, pty_td2, pty_td3, sf_root, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t24;
+  if ((r != 0)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_resolve_program(void) {
   const char* source;
   source = "main 0";
@@ -3632,20 +3740,30 @@ static int test_resolve_program(void) {
   sv0_vec_push(id4, 0);
   sv0_vec_push(id5, 0);
   sv0_vec_push(fn_ptoks, 0);
-  int _sv0t18 = resolve_program(et, ed1, ed2, ed3, ed4, it, id1, id2, id3, id4, id5, fn_ptoks, source, starts, ends, mv, mt, fa, pp);
-  int r = _sv0t18;
+  int _sv0t18 = sv0_vec_new();
+  int pty_tt = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int pty_td1 = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int pty_td2 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int pty_td3 = _sv0t21;
+  int _sv0t22 = sv0_vec_new();
+  int sf_tr = _sv0t22;
+  int _sv0t23 = resolve_program(et, ed1, ed2, ed3, ed4, it, id1, id2, id3, id4, id5, fn_ptoks, pty_tt, pty_td1, pty_td2, pty_td3, sf_tr, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t23;
   if ((r != 0)) {
     return 1;
   } else {
   }
-  int _sv0t19 = sv0_vec_new();
-  int _sv0t20 = res_full_value_exists(mv, _sv0t19, "main", source, starts, ends);
-  if ((_sv0t20 != 1)) {
+  int _sv0t24 = sv0_vec_new();
+  int _sv0t25 = res_full_value_exists(mv, _sv0t24, "main", source, starts, ends);
+  if ((_sv0t25 != 1)) {
     return 2;
   } else {
   }
-  int _sv0t21 = res_lookup_fn_arity_str(fa, "main", source, starts, ends);
-  if ((_sv0t21 != 1)) {
+  int _sv0t26 = res_lookup_fn_arity_str(fa, "main", source, starts, ends);
+  if ((_sv0t26 != 1)) {
     return 3;
   } else {
   }
@@ -3911,18 +4029,25 @@ int main(void) {
     return _sv0t72;
   } else {
   }
-  int _sv0t73 = test_resolve_program();
-  int r38 = _sv0t73;
-  if ((r38 != 0)) {
-    int _sv0t74 = (162 + r38);
+  int _sv0t73 = test_resolve_top_item_struct_field();
+  int r37b = _sv0t73;
+  if ((r37b != 0)) {
+    int _sv0t74 = (161 + r37b);
     return _sv0t74;
   } else {
   }
-  int _sv0t75 = test_path_join_vec_three();
-  int r39 = _sv0t75;
-  if ((r39 != 0)) {
-    int _sv0t76 = (165 + r39);
+  int _sv0t75 = test_resolve_program();
+  int r38 = _sv0t75;
+  if ((r38 != 0)) {
+    int _sv0t76 = (162 + r38);
     return _sv0t76;
+  } else {
+  }
+  int _sv0t77 = test_path_join_vec_three();
+  int r39 = _sv0t77;
+  if ((r39 != 0)) {
+    int _sv0t78 = (165 + r39);
+    return _sv0t78;
   } else {
   }
   return 0;
