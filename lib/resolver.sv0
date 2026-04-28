@@ -1235,10 +1235,15 @@ fn apply_use_clauses(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
 /* ── resolve_top_item (SML resolveTopItem) ────────────────────
    Dispatcher by item tag. Item-body resolution (resolveFn,
    resolveStruct, resolveEnum, resolveTrait, resolveImpl) is
-   deferred — requires parser arena enrichment to retain param
-   types, field types, contract expressions, and function bodies
-   across the parse boundary. Currently a stub that validates
-   item existence in the environment. */
+   deferred to milestone slices **M3-S-027** … — needs full walks.
+   **M3 G3 (parser) enrichment landed:** ItemFn **id4** is the
+   **body_root** index into the shared per-program expr arena; ItemFn
+   **id2** packs **has_ret** (id2%2) and **contract_count** (id2/2);
+   ItemEnum/ItemStruct **id3/id4** index program-local sidecar Vecs
+   (**enum_variant_name_toks**, **struct_field_name_toks**) filled by
+   **parse_program** and **parse_item** (see **parser.sv0** item header).
+   This stub still returns 0 for defining items until **resolve_expr**
+   orchestration wires those roots (G4). */
 
 fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                     id3: Vec<i32>, id4: Vec<i32>, idx: i32,
