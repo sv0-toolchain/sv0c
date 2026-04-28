@@ -698,6 +698,32 @@ fn dup_variant_names(names: Vec<i32>) -> i32 {
     return 0 - 1;
 }
 
+/* ── dup_variant_names_str (SML dupVariants — spelling) ───────
+   Like dup_variant_names but compares substring at each name tok
+   for duplicate variant spellings (distinct token indices).      */
+fn dup_variant_names_str(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                         name_toks: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(name_toks);
+    let mut i: i32 = 0;
+    while i < n {
+        let ti: i32 = vec_get(name_toks, i);
+        let si: i32 = vec_get(starts, ti);
+        let ei: i32 = vec_get(ends, ti);
+        let stri: string = string_substr(source, si, ei - si);
+        let mut j: i32 = 0;
+        while j < i {
+            let tj: i32 = vec_get(name_toks, j);
+            let sj: i32 = vec_get(starts, tj);
+            let ej: i32 = vec_get(ends, tj);
+            let strj: string = string_substr(source, sj, ej - sj);
+            if string_eq(stri, strj) { return i; }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 /* ── struct_enum_name_clash (SML initTypes clash check) ───────
    Given a Vec of struct name handles and a Vec of enum name handles,
    return the first struct name that also appears as an enum, or -1. */
@@ -711,6 +737,34 @@ fn struct_enum_name_clash(struct_names: Vec<i32>,
         let mut j: i32 = 0;
         while j < en {
             if vec_get(enum_names, j) == s { return s; }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* ── struct_enum_name_clash_str (SML initTypes — name spelling) ─
+   Same as struct_enum_name_clash but compares identifier spellings
+   at token spans (distinct structs/enums can reuse the same name
+   string at different source positions).                       */
+fn struct_enum_name_clash_str(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                              struct_names: Vec<i32>, enum_names: Vec<i32>) -> i32 {
+    let sn: i32 = vec_len(struct_names);
+    let en: i32 = vec_len(enum_names);
+    let mut i: i32 = 0;
+    while i < sn {
+        let st: i32 = vec_get(struct_names, i);
+        let ss: i32 = vec_get(starts, st);
+        let se: i32 = vec_get(ends, st);
+        let sstr: string = string_substr(source, ss, se - ss);
+        let mut j: i32 = 0;
+        while j < en {
+            let et: i32 = vec_get(enum_names, j);
+            let es: i32 = vec_get(starts, et);
+            let ee: i32 = vec_get(ends, et);
+            let estr: string = string_substr(source, es, ee - es);
+            if string_eq(sstr, estr) { return st; }
             j = j + 1;
         }
         i = i + 1;
@@ -1911,6 +1965,9 @@ fn check_program(
         }
         ni = ni + 1;
     }
+    let clash_se: i32 = struct_enum_name_clash_str(source, starts, ends,
+                                                   struct_names, enum_names);
+    if clash_se != 0 - 1 { return 0 - 1; }
     let sdef_names: Vec<i32> = vec_new();
     let sdef_field_offsets: Vec<i32> = vec_new();
     let sdef_field_counts: Vec<i32> = vec_new();
@@ -1928,10 +1985,12 @@ fn check_program(
     let edef_variant_counts: Vec<i32> = vec_new();
     let edef_vnames_flat: Vec<i32> = vec_new();
     let edef_vshapes_flat: Vec<i32> = vec_new();
-    let _ec: i32 = init_enum_defs(tok_tags, it, id1, id2,
+    let _ec: i32 = init_enum_defs(tok_tags, source, starts, ends,
+                                   it, id1, id2,
                                    edef_names, edef_variant_offsets,
                                    edef_variant_counts, edef_vnames_flat,
                                    edef_vshapes_flat);
+    if _ec < 0 { return 0 - 1; }
     let fn_names: Vec<i32> = vec_new();
     let fn_param_counts: Vec<i32> = vec_new();
     let fn_ret_types: Vec<i32> = vec_new();
@@ -2238,9 +2297,12 @@ fn init_struct_defs(tok_tags: Vec<i32>, source: string,
      edef_variant_counts    — variant count per enum
      edef_vnames_flat       — all variant name positions, flattened
      edef_vshapes_flat      — all variant shapes, flattened
-   Returns the number of enums registered.                    */
+   Returns the number of enums registered, or -1 if duplicate
+   variant spellings (dupVariants in SML).                   */
 
 fn init_enum_defs(tok_tags: Vec<i32>,
+                  source: string,
+                  starts: Vec<i32>, ends: Vec<i32>,
                   it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                   edef_names: Vec<i32>,
                   edef_variant_offsets: Vec<i32>,
@@ -2264,6 +2326,9 @@ fn init_enum_defs(tok_tags: Vec<i32>,
                                                        variant_count,
                                                        vnames);
                 if r0 == 0 {
+                    let dup_v: i32 = dup_variant_names_str(source, starts,
+                                                           ends, vnames);
+                    if dup_v != 0 - 1 { return 0 - 1; }
                     let vshapes: Vec<i32> = vec_new();
                     let r1: i32 = scan_enum_variant_shapes(tok_tags,
                                                             vnames,
@@ -3698,6 +3763,17 @@ fn test_dup_variant_names() -> i32 {
     if dup_variant_names(v2) != 2 { return 2; }
     let v3: Vec<i32> = vec_new();
     if dup_variant_names(v3) != 0 - 1 { return 3; }
+    let src_dv: string = "Red Blue Red";
+    let st_dv: Vec<i32> = vec_new();
+    let en_dv: Vec<i32> = vec_new();
+    vec_push(st_dv, 0); vec_push(en_dv, 3);
+    vec_push(st_dv, 4); vec_push(en_dv, 8);
+    vec_push(st_dv, 9); vec_push(en_dv, 12);
+    let vn_dv: Vec<i32> = vec_new();
+    vec_push(vn_dv, 0);
+    vec_push(vn_dv, 1);
+    vec_push(vn_dv, 2);
+    if dup_variant_names_str(src_dv, st_dv, en_dv, vn_dv) != 2 { return 4; }
     return 0;
 }
 
@@ -3714,6 +3790,30 @@ fn test_struct_enum_clash() -> i32 {
     let e2: Vec<i32> = vec_new();
     let s2: Vec<i32> = vec_new();
     if struct_enum_name_clash(s2, e2) != 0 - 1 { return 3; }
+    let src_se: string = "Point Point";
+    let st_se: Vec<i32> = vec_new();
+    let en_se: Vec<i32> = vec_new();
+    vec_push(st_se, 0); vec_push(en_se, 5);
+    vec_push(st_se, 6); vec_push(en_se, 11);
+    let sns: Vec<i32> = vec_new();
+    let ens: Vec<i32> = vec_new();
+    vec_push(sns, 0);
+    vec_push(ens, 1);
+    if struct_enum_name_clash_str(src_se, st_se, en_se, sns, ens) == 0 - 1 {
+        return 4;
+    }
+    let src_nc: string = "Point Color";
+    let st_nc: Vec<i32> = vec_new();
+    let en_nc: Vec<i32> = vec_new();
+    vec_push(st_nc, 0); vec_push(en_nc, 5);
+    vec_push(st_nc, 6); vec_push(en_nc, 11);
+    let sns_nc: Vec<i32> = vec_new();
+    let ens_nc: Vec<i32> = vec_new();
+    vec_push(sns_nc, 0);
+    vec_push(ens_nc, 1);
+    if struct_enum_name_clash_str(src_nc, st_nc, en_nc, sns_nc, ens_nc) != 0 - 1 {
+        return 5;
+    }
     return 0;
 }
 
@@ -4657,7 +4757,8 @@ fn test_init_enum_defs() -> i32 {
     let ed_vcounts: Vec<i32> = vec_new();
     let ed_vn_flat: Vec<i32> = vec_new();
     let ed_vs_flat: Vec<i32> = vec_new();
-    let c: i32 = init_enum_defs(tt, item_t, item_d1, item_d2,
+    let c: i32 = init_enum_defs(tt, source, starts, ends,
+                                 item_t, item_d1, item_d2,
                                  ed_names, ed_voffs, ed_vcounts,
                                  ed_vn_flat, ed_vs_flat);
     if c != 1 { return 1; }
@@ -4688,6 +4789,41 @@ fn test_init_enum_defs() -> i32 {
                                               source, starts, ends,
                                               1, "Yellow");
     if s3 != 0 - 1 { return 12; }
+    return 0;
+}
+
+fn test_init_enum_defs_dup_variants() -> i32 {
+    /* enum E { Red , Red } — duplicate variant spellings */
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 62); vec_push(tt, 5); vec_push(tt, 8);
+    vec_push(tt, 5); vec_push(tt, 12); vec_push(tt, 5);
+    vec_push(tt, 9);
+    let source: string = "enum E { Red , Red }";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 4);
+    vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 14);
+    vec_push(starts, 15); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 20);
+    let item_t: Vec<i32> = vec_new();
+    let item_d1: Vec<i32> = vec_new();
+    let item_d2: Vec<i32> = vec_new();
+    vec_push(item_t, 2);
+    vec_push(item_d1, 1);
+    vec_push(item_d2, 2);
+    let ed_names: Vec<i32> = vec_new();
+    let ed_voffs: Vec<i32> = vec_new();
+    let ed_vcounts: Vec<i32> = vec_new();
+    let ed_vn_flat: Vec<i32> = vec_new();
+    let ed_vs_flat: Vec<i32> = vec_new();
+    let c: i32 = init_enum_defs(tt, source, starts, ends,
+                                 item_t, item_d1, item_d2,
+                                 ed_names, ed_voffs, ed_vcounts,
+                                 ed_vn_flat, ed_vs_flat);
+    if c != 0 - 1 { return 1; }
     return 0;
 }
 
@@ -4789,7 +4925,8 @@ fn test_enum_ctor_resolution() -> i32 {
     let ed_vcounts: Vec<i32> = vec_new();
     let ed_vn_flat: Vec<i32> = vec_new();
     let ed_vs_flat: Vec<i32> = vec_new();
-    let c: i32 = init_enum_defs(tt, item_t, item_d1, item_d2,
+    let c: i32 = init_enum_defs(tt, source, starts, ends,
+                                 item_t, item_d1, item_d2,
                                  ed_names, ed_voffs, ed_vcounts,
                                  ed_vn_flat, ed_vs_flat);
     if c != 1 { return 1; }
@@ -5598,6 +5735,8 @@ fn main() -> i32 {
     if r54 != 0 { return 560 + r54; }
     let r55: i32 = test_init_enum_defs();
     if r55 != 0 { return 570 + r55; }
+    let r55d: i32 = test_init_enum_defs_dup_variants();
+    if r55d != 0 { return 574 + r55d; }
     let r56: i32 = test_builtin_fn_lookup();
     if r56 != 0 { return 580 + r56; }
     let r57: i32 = test_resolve_fn_call();
