@@ -23,15 +23,11 @@
    resolve_contract (SML resolveContract — thin wrapper),
    apply_use_clause/apply_use_clauses (SML applyUseClause — use clause
    alias registration; enum variant aliases deferred — variant names
-   local to parser), resolve_top_item (stub — item-body resolution
-   deferred; requires parser arena enrichment to retain param types,
-   field types, contracts, and function bodies), resolve_program
-   (SML resolve — top-level orchestration: register_items →
-   apply_use_clauses → resolve_top_items; intrinsic registration
-   owned by caller).
-   Remaining: resolveFn, resolveStruct/Enum/Trait/Impl body traversals
-   (blocked on parser arena enrichment — sub-tree data local to parser
-   call sites, not stored in item arena). */
+   local to parser),
+   resolve_top_item / resolve_program (ItemFn body walk + param locals;
+   resolve_ty on struct fields / enum payloads / contracts still deferred).
+   Remaining vs SML: persisted type arenas for resolve_ty on items;
+   contract expr roots merged into shared expr arena for requires and ensures. */
 
 /* ── path joining ───────────────────────────────────────────── */
 
@@ -1233,20 +1229,19 @@ fn apply_use_clauses(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
 }
 
 /* ── resolve_top_item (SML resolveTopItem) ────────────────────
-   Dispatcher by item tag. Item-body resolution (resolveFn,
-   resolveStruct, resolveEnum, resolveTrait, resolveImpl) is
-   deferred to milestone slices **M3-S-027** … — needs full walks.
-   **M3 G3 (parser) enrichment landed:** ItemFn **id4** is the
-   **body_root** index into the shared per-program expr arena; ItemFn
-   **id2** packs **has_ret** (id2%2) and **contract_count** (id2/2);
-   ItemEnum/ItemStruct **id3/id4** index program-local sidecar Vecs
-   (**enum_variant_name_toks**, **struct_field_name_toks**) filled by
-   **parse_program** and **parse_item** (see **parser.sv0** item header).
-   This stub still returns 0 for defining items until **resolve_expr**
-   orchestration wires those roots (G4). */
+   ItemFn (tag 0): bind param names (fn_param_name_toks slice from id5 for
+   id3 slots; -1 means wildcard) then resolve_expr on id4 (body_root).
+   Contracts, return, and param resolve_ty need persisted type arenas (deferred).
+   ItemTrait / ItemImpl (tags 3 and 4): method ItemFn rows appear earlier in
+   the flat item list and are resolved when visited; parent row is a no-op.
+   ItemStruct, ItemEnum, type-alias: field or variant resolve_ty deferred. */
 
 fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                    id3: Vec<i32>, id4: Vec<i32>, idx: i32,
+                    id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
+                    idx: i32,
+                    et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>,
+                    fn_param_name_toks: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     mod_vals: Vec<i32>, mod_tys: Vec<i32>,
                     fn_arities: Vec<i32>,
@@ -1254,6 +1249,24 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
     let tag: i32 = vec_get(it, idx);
     if tag == 5 { return 0; }
     if tag == 6 { return 0; }
+    if tag == 0 {
+        let body_root: i32 = vec_get(id4, idx);
+        let param_count: i32 = vec_get(id3, idx);
+        let pbase: i32 = vec_get(id5, idx);
+        let frames: Vec<i32> = vec_new();
+        res_enter_scope(frames);
+        let mut pi: i32 = 0;
+        while pi < param_count {
+            let tok: i32 = vec_get(fn_param_name_toks, pbase + pi);
+            if tok >= 0 {
+                res_bind_local(frames, tok);
+            }
+            pi = pi + 1;
+        }
+        return resolve_expr(et, ed1, ed2, ed3, ed4, body_root,
+                             source, starts, ends,
+                             mod_vals, mod_tys, fn_arities, frames, pp);
+    }
     return 0;
 }
 
@@ -1268,8 +1281,11 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
    from the program's token stream). This function orchestrates:
    register_items → apply_use_clauses → resolve_top_items. */
 
-fn resolve_program(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                   id3: Vec<i32>, id4: Vec<i32>,
+fn resolve_program(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                   ed3: Vec<i32>, ed4: Vec<i32>,
+                   it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                   id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
+                   fn_param_name_toks: Vec<i32>,
                    source: string, starts: Vec<i32>, ends: Vec<i32>,
                    mod_vals: Vec<i32>, mod_tys: Vec<i32>,
                    fn_arities: Vec<i32>,
@@ -1284,7 +1300,9 @@ fn resolve_program(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
     let len: i32 = vec_len(it);
     let mut i: i32 = 0;
     while i < len {
-        let r: i32 = resolve_top_item(it, id1, id2, id3, id4, i,
+        let r: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, i,
+                                       et, ed1, ed2, ed3, ed4,
+                                       fn_param_name_toks,
                                        source, starts, ends,
                                        mod_vals, mod_tys,
                                        fn_arities, pp);
@@ -1997,17 +2015,33 @@ fn test_resolve_program() -> i32 {
     let mt: Vec<i32> = vec_new();
     let fa: Vec<i32> = vec_new();
     let pp: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    vec_push(ed1, 0);
+    vec_push(ed2, 0);
+    vec_push(ed3, 0);
+    vec_push(ed4, 0);
     let it: Vec<i32> = vec_new();
     let id1: Vec<i32> = vec_new();
     let id2: Vec<i32> = vec_new();
     let id3: Vec<i32> = vec_new();
     let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     vec_push(it, 0);
     vec_push(id1, 0);
     vec_push(id2, 0);
     vec_push(id3, 1);
     vec_push(id4, 0);
-    let r: i32 = resolve_program(it, id1, id2, id3, id4,
+    vec_push(id5, 0);
+    vec_push(fn_ptoks, 0);
+    let r: i32 = resolve_program(et, ed1, ed2, ed3, ed4,
+                                  it, id1, id2, id3, id4, id5,
+                                  fn_ptoks,
                                   source, starts, ends,
                                   mv, mt, fa, pp);
     if r != 0 { return 1; }
