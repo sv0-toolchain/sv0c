@@ -2970,7 +2970,8 @@ fn parse_quant(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
    Item arena (parallel Vec<i32>s: it, id1, id2, id3, id4):
      0 ItemFn         : d1=name_tok_pos,
                        d2=packed — has_ret (d2%2) + contract_count*2 (d2/2),
-                       d3=param_count, d4=body_root (expr arena index in shared body_et)
+                       d3=param_count, d4=body_root (expr arena index in shared body_et),
+                       d5=fn_param_name_toks_base (offset; wildcard `_` stores -1)
      1 ItemStruct     : d1=name_tok_pos, d2=field_count,
                        d3=struct_field_name_toks_base (offset into struct_field_name_toks),
                        d4=field_count (sanity mirror of d2; slice is [d3..d3+d4))
@@ -2982,18 +2983,24 @@ fn parse_quant(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
      5 ItemUse        : d1=pp_start, d2=pp_count
      6 ItemModule     : d1=pp_start, d2=pp_count
      7 ItemTypeAlias  : d1=name_tok_pos
+   d5 for non-ItemFn items is **-1** (unused).
    Sidecar Vecs (program-local, parallel to parse): enum_variant_name_toks holds each
-   variant’s IDENT token index; struct_field_name_toks holds each field’s IDENT token index.
+   variant’s IDENT token index; struct_field_name_toks holds each field’s IDENT token index;
+   fn_param_name_toks holds each parameter’s IDENT token index (or **-1** for `_`).
    Children-before-parents: trait/impl push method ItemFn entries
    before the parent ItemTrait/ItemImpl entry. */
 
 fn parse_param(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
-               source: string, pos: i32, pp: Vec<i32>) -> i32 {
+               source: string, pos: i32, pp: Vec<i32>,
+               fn_param_name_toks: Vec<i32>) -> i32 {
     let mut p: i32 = pos;
     if ps_peek(tags, p) == 77 { p = p + 1; }
     let t: i32 = ps_peek(tags, p);
-    if t != 5 {
+    if t == 5 {
+        vec_push(fn_param_name_toks, p);
+    } else {
         if t != 86 { return 0 - 1; }
+        vec_push(fn_param_name_toks, 0 - 1);
     }
     p = p + 1;
     if ps_peek(tags, p) != 14 { return 0 - 1; }
@@ -3009,9 +3016,11 @@ fn parse_param(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 
 fn parse_param_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     source: string, pos: i32, pp: Vec<i32>,
-                    count_out: Vec<i32>) -> i32 {
+                    count_out: Vec<i32>,
+                    fn_param_name_toks: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) == 7 { vec_push(count_out, 0); return pos; }
-    let p1: i32 = parse_param(tags, starts, ends, source, pos, pp);
+    let p1: i32 = parse_param(tags, starts, ends, source, pos, pp,
+                               fn_param_name_toks);
     if p1 < 0 { return 0 - 1; }
     let mut count: i32 = 1;
     let mut p: i32 = p1;
@@ -3022,7 +3031,8 @@ fn parse_param_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 p = p + 1;
                 done = true;
             } else {
-                let pn: i32 = parse_param(tags, starts, ends, source, p + 1, pp);
+                let pn: i32 = parse_param(tags, starts, ends, source, p + 1,
+                                           pp, fn_param_name_toks);
                 if pn < 0 { return 0 - 1; }
                 count = count + 1;
                 p = pn;
@@ -3078,8 +3088,9 @@ fn parse_contracts(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 fn parse_fn_body(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                  source: string, pos: i32,
                  it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                 id3: Vec<i32>, id4: Vec<i32>,
+                 id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                  pp: Vec<i32>,
+                 fn_param_name_toks: Vec<i32>,
                  body_et: Vec<i32>, body_ed1: Vec<i32>,
                  body_ed2: Vec<i32>, body_ed3: Vec<i32>,
                  body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3090,8 +3101,10 @@ fn parse_fn_body(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     let gp: Vec<i32> = vec_new();
     let p1: i32 = parse_generic_params(tags, p0 + 2, gp);
     if ps_peek(tags, p1) != 6 { return 0 - 1; }
+    let pbase: i32 = vec_len(fn_param_name_toks);
     let pc: Vec<i32> = vec_new();
-    let p2: i32 = parse_param_list(tags, starts, ends, source, p1 + 1, pp, pc);
+    let p2: i32 = parse_param_list(tags, starts, ends, source, p1 + 1, pp, pc,
+                                    fn_param_name_toks);
     if p2 < 0 { return 0 - 1; }
     if ps_peek(tags, p2) != 7 { return 0 - 1; }
     let param_count: i32 = vec_get(pc, 0);
@@ -3123,13 +3136,14 @@ fn parse_fn_body(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(id2, has_ret + contract_count * 2);
     vec_push(id3, param_count);
     vec_push(id4, body_root);
+    vec_push(id5, pbase);
     return p6;
 }
 
 fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                      source: string, pos: i32,
                      it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                     id3: Vec<i32>, id4: Vec<i32>,
+                     id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                      pp: Vec<i32>,
                      struct_field_name_toks: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 89 { return 0 - 1; }
@@ -3171,13 +3185,14 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(id2, field_count);
     vec_push(id3, sf_base);
     vec_push(id4, field_count);
+    vec_push(id5, 0 - 1);
     return p + 1;
 }
 
 fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    source: string, pos: i32,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                   id3: Vec<i32>, id4: Vec<i32>,
+                   id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                    pp: Vec<i32>,
                    enum_variant_name_toks: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 62 { return 0 - 1; }
@@ -3269,13 +3284,14 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(id2, variant_count);
     vec_push(id3, ev_base);
     vec_push(id4, variant_count);
+    vec_push(id5, 0 - 1);
     return p + 1;
 }
 
 fn parse_type_alias_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                          source: string, pos: i32,
                          it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                         id3: Vec<i32>, id4: Vec<i32>,
+                         id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                          pp: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 92 { return 0 - 1; }
     if ps_peek(tags, pos + 1) != 5 { return 0 - 1; }
@@ -3295,14 +3311,16 @@ fn parse_type_alias_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(id2, 0);
     vec_push(id3, 0);
     vec_push(id4, 0);
+    vec_push(id5, 0 - 1);
     return pt + 1;
 }
 
 fn parse_trait_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     source: string, pos: i32,
                     it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                    id3: Vec<i32>, id4: Vec<i32>,
+                    id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                     pp: Vec<i32>,
+                    fn_param_name_toks: Vec<i32>,
                     body_et: Vec<i32>, body_ed1: Vec<i32>,
                     body_ed2: Vec<i32>, body_ed3: Vec<i32>,
                     body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3318,7 +3336,8 @@ fn parse_trait_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         if ps_peek(tags, p) == 9 { done = true; }
         else {
             let pm: i32 = parse_fn_body(tags, starts, ends, source, p,
-                                         it, id1, id2, id3, id4, pp,
+                                         it, id1, id2, id3, id4, id5, pp,
+                                         fn_param_name_toks,
                                          body_et, body_ed1, body_ed2,
                                          body_ed3, body_ed4, body_sf);
             if pm < 0 { return 0 - 1; }
@@ -3331,14 +3350,16 @@ fn parse_trait_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(id2, method_count);
     vec_push(id3, 0);
     vec_push(id4, 0 - 1);
+    vec_push(id5, 0 - 1);
     return p + 1;
 }
 
 fn parse_impl_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    source: string, pos: i32,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                   id3: Vec<i32>, id4: Vec<i32>,
+                   id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                    pp: Vec<i32>,
+                   fn_param_name_toks: Vec<i32>,
                    body_et: Vec<i32>, body_ed1: Vec<i32>,
                    body_ed2: Vec<i32>, body_ed3: Vec<i32>,
                    body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3373,7 +3394,8 @@ fn parse_impl_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         if ps_peek(tags, p) == 9 { done = true; }
         else {
             let pm: i32 = parse_fn_body(tags, starts, ends, source, p,
-                                         it, id1, id2, id3, id4, pp,
+                                         it, id1, id2, id3, id4, id5, pp,
+                                         fn_param_name_toks,
                                          body_et, body_ed1, body_ed2,
                                          body_ed3, body_ed4, body_sf);
             if pm < 0 { return 0 - 1; }
@@ -3386,16 +3408,18 @@ fn parse_impl_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(id2, items_count);
     vec_push(id3, 0);
     vec_push(id4, 0 - 1);
+    vec_push(id5, 0 - 1);
     return p + 1;
 }
 
 fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
               source: string, pos: i32,
               it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-              id3: Vec<i32>, id4: Vec<i32>,
+              id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
               pp: Vec<i32>,
               enum_variant_name_toks: Vec<i32>,
               struct_field_name_toks: Vec<i32>,
+              fn_param_name_toks: Vec<i32>,
               body_et: Vec<i32>, body_ed1: Vec<i32>,
               body_ed2: Vec<i32>, body_ed3: Vec<i32>,
               body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3411,6 +3435,7 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(id2, ppc);
         vec_push(id3, 0);
         vec_push(id4, 0 - 1);
+        vec_push(id5, 0 - 1);
         return pm;
     }
     if t == 94 {
@@ -3423,45 +3448,50 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(id2, ppc);
         vec_push(id3, 0);
         vec_push(id4, 0 - 1);
+        vec_push(id5, 0 - 1);
         return pu;
     }
     if t == 65 {
         return parse_fn_body(tags, starts, ends, source, p0,
-                             it, id1, id2, id3, id4, pp,
+                             it, id1, id2, id3, id4, id5, pp,
+                             fn_param_name_toks,
                              body_et, body_ed1, body_ed2,
                              body_ed3, body_ed4, body_sf);
     }
     if t == 93 {
         return parse_fn_body(tags, starts, ends, source, p0,
-                             it, id1, id2, id3, id4, pp,
+                             it, id1, id2, id3, id4, id5, pp,
+                             fn_param_name_toks,
                              body_et, body_ed1, body_ed2,
                              body_ed3, body_ed4, body_sf);
     }
     if t == 89 {
         return parse_struct_item(tags, starts, ends, source, p0,
-                                 it, id1, id2, id3, id4, pp,
+                                 it, id1, id2, id3, id4, id5, pp,
                                  struct_field_name_toks);
     }
     if t == 62 {
         return parse_enum_item(tags, starts, ends, source, p0,
-                               it, id1, id2, id3, id4, pp,
+                               it, id1, id2, id3, id4, id5, pp,
                                enum_variant_name_toks);
     }
     if t == 90 {
         return parse_trait_item(tags, starts, ends, source, p0,
-                                it, id1, id2, id3, id4, pp,
+                                it, id1, id2, id3, id4, id5, pp,
+                                fn_param_name_toks,
                                 body_et, body_ed1, body_ed2,
                                 body_ed3, body_ed4, body_sf);
     }
     if t == 69 {
         return parse_impl_item(tags, starts, ends, source, p0,
-                               it, id1, id2, id3, id4, pp,
+                               it, id1, id2, id3, id4, id5, pp,
+                               fn_param_name_toks,
                                body_et, body_ed1, body_ed2,
                                body_ed3, body_ed4, body_sf);
     }
     if t == 92 {
         return parse_type_alias_item(tags, starts, ends, source, p0,
-                                     it, id1, id2, id3, id4, pp);
+                                     it, id1, id2, id3, id4, id5, pp);
     }
     return 0 - 1;
 }
@@ -3469,10 +3499,11 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                  source: string, pos: i32,
                  it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
-                 id3: Vec<i32>, id4: Vec<i32>,
+                 id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                  pp: Vec<i32>,
                  enum_variant_name_toks: Vec<i32>,
                  struct_field_name_toks: Vec<i32>,
+                 fn_param_name_toks: Vec<i32>,
                  body_et: Vec<i32>, body_ed1: Vec<i32>,
                  body_ed2: Vec<i32>, body_ed3: Vec<i32>,
                  body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3483,9 +3514,10 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         if ps_peek(tags, p0) == 97 { done = true; }
         else {
             let pi: i32 = parse_item(tags, starts, ends, source, p0,
-                                      it, id1, id2, id3, id4, pp,
+                                      it, id1, id2, id3, id4, id5, pp,
                                       enum_variant_name_toks,
                                       struct_field_name_toks,
+                                      fn_param_name_toks,
                                       body_et, body_ed1, body_ed2,
                                       body_ed3, body_ed4, body_sf);
             if pi < 0 { return 0 - 1; }
@@ -5426,9 +5458,11 @@ fn test_parse_fn_simple() -> i32 {
     let bsf: Vec<i32> = vec_new();
     let ev_ntoks: Vec<i32> = vec_new();
     let sf_ntoks: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
-                             it, id1, id2, id3, id4, pp,
-                             ev_ntoks, sf_ntoks,
+                             it, id1, id2, id3, id4, id5, pp,
+                             ev_ntoks, sf_ntoks, fn_ptoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 6 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5436,6 +5470,8 @@ fn test_parse_fn_simple() -> i32 {
     if vec_get(id2, 0) != 0 { return 4; }
     if vec_get(id3, 0) != 0 { return 5; }
     if vec_get(id4, 0) < 0 { return 6; }
+    if vec_get(id5, 0) != 0 { return 7; }
+    if vec_len(fn_ptoks) != 0 { return 8; }
     return 0;
 }
 
@@ -5471,9 +5507,11 @@ fn test_parse_fn_ret() -> i32 {
     let bsf: Vec<i32> = vec_new();
     let ev_ntoks: Vec<i32> = vec_new();
     let sf_ntoks: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
-                             it, id1, id2, id3, id4, pp,
-                             ev_ntoks, sf_ntoks,
+                             it, id1, id2, id3, id4, id5, pp,
+                             ev_ntoks, sf_ntoks, fn_ptoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 12 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5481,6 +5519,9 @@ fn test_parse_fn_ret() -> i32 {
     if vec_get(id2, 0) != 1 { return 4; }
     if vec_get(id3, 0) != 1 { return 5; }
     if vec_get(id4, 0) < 0 { return 6; }
+    if vec_get(id5, 0) != 0 { return 7; }
+    if vec_len(fn_ptoks) != 1 { return 8; }
+    if vec_get(fn_ptoks, 0) != 3 { return 9; }
     return 0;
 }
 
@@ -5515,9 +5556,11 @@ fn test_parse_struct() -> i32 {
     let bsf: Vec<i32> = vec_new();
     let ev_ntoks: Vec<i32> = vec_new();
     let sf_ntoks: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
-                             it, id1, id2, id3, id4, pp,
-                             ev_ntoks, sf_ntoks,
+                             it, id1, id2, id3, id4, id5, pp,
+                             ev_ntoks, sf_ntoks, fn_ptoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 11 { return 1; }
     if vec_get(it, 0) != 1 { return 2; }
@@ -5561,9 +5604,11 @@ fn test_parse_enum_mixed() -> i32 {
     let bsf: Vec<i32> = vec_new();
     let ev_ntoks: Vec<i32> = vec_new();
     let sf_ntoks: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
-                             it, id1, id2, id3, id4, pp,
-                             ev_ntoks, sf_ntoks,
+                             it, id1, id2, id3, id4, id5, pp,
+                             ev_ntoks, sf_ntoks, fn_ptoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_get(it, 0) != 2 { return 2; }
@@ -5607,9 +5652,11 @@ fn test_parse_impl() -> i32 {
     let bsf: Vec<i32> = vec_new();
     let ev_ntoks: Vec<i32> = vec_new();
     let sf_ntoks: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
-                             it, id1, id2, id3, id4, pp,
-                             ev_ntoks, sf_ntoks,
+                             it, id1, id2, id3, id4, id5, pp,
+                             ev_ntoks, sf_ntoks, fn_ptoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_len(it) != 2 { return 2; }
@@ -5651,9 +5698,11 @@ fn test_parse_fn_contract() -> i32 {
     let bsf: Vec<i32> = vec_new();
     let ev_ntoks: Vec<i32> = vec_new();
     let sf_ntoks: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
-                             it, id1, id2, id3, id4, pp,
-                             ev_ntoks, sf_ntoks,
+                             it, id1, id2, id3, id4, id5, pp,
+                             ev_ntoks, sf_ntoks, fn_ptoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5695,9 +5744,11 @@ fn test_parse_program() -> i32 {
     let bsf: Vec<i32> = vec_new();
     let ev_ntoks: Vec<i32> = vec_new();
     let sf_ntoks: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
     let r: i32 = parse_program(tags, starts, ends, source, 0,
-                                it, id1, id2, id3, id4, pp,
-                                ev_ntoks, sf_ntoks,
+                                it, id1, id2, id3, id4, id5, pp,
+                                ev_ntoks, sf_ntoks, fn_ptoks,
                                 bet, be1, be2, be3, be4, bsf);
     if r != 12 { return 1; }
     if vec_len(it) != 2 { return 2; }

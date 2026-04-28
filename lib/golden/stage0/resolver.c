@@ -56,8 +56,8 @@ static int resolve_stmt(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
 static int resolve_contract(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
 static int apply_use_clause(int it, int id1, int id2, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
 static int apply_use_clauses(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
-static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
-static int resolve_program(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
+static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5, int idx, int et, int ed1, int ed2, int ed3, int ed4, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
+static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
 static int test_path_join(void);
 static int test_mangle_use(void);
 static int test_is_intrinsic(void);
@@ -1849,7 +1849,7 @@ static int apply_use_clauses(int it, int id1, int id2, int id3, int id4, const c
   return 0;
 }
 
-static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5, int idx, int et, int ed1, int ed2, int ed3, int ed4, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
   int _sv0t0 = sv0_vec_get(it, idx);
   int tag = _sv0t0;
   if ((tag == 5)) {
@@ -1860,10 +1860,35 @@ static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int idx,
     return 0;
   } else {
   }
+  if ((tag == 0)) {
+    int _sv0t1 = sv0_vec_get(id4, idx);
+    int body_root = _sv0t1;
+    int _sv0t2 = sv0_vec_get(id3, idx);
+    int param_count = _sv0t2;
+    int _sv0t3 = sv0_vec_get(id5, idx);
+    int pbase = _sv0t3;
+    int _sv0t4 = sv0_vec_new();
+    int frames = _sv0t4;
+    int _sv0t5 = res_enter_scope(frames);
+    int pi = 0;
+    while ((pi < param_count)) {
+      int _sv0t6 = (pbase + pi);
+      int _sv0t7 = sv0_vec_get(fn_param_name_toks, _sv0t6);
+      int tok = _sv0t7;
+      if ((tok >= 0)) {
+        int _sv0t8 = res_bind_local(frames, tok);
+      } else {
+      }
+      pi = (pi + 1);
+    }
+    int _sv0t9 = resolve_expr(et, ed1, ed2, ed3, ed4, body_root, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t9;
+  } else {
+  }
   return 0;
 }
 
-static int resolve_program(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
+static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
   int _sv0t0 = register_items(it, id1, id2, id3, id4, mod_vals, mod_tys, fn_arities);
   int _sv0t1 = apply_use_clauses(it, id1, id2, id3, id4, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
   int ru = _sv0t1;
@@ -1875,7 +1900,7 @@ static int resolve_program(int it, int id1, int id2, int id3, int id4, const cha
   int len = _sv0t2;
   int i = 0;
   while ((i < len)) {
-    int _sv0t3 = resolve_top_item(it, id1, id2, id3, id4, i, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
+    int _sv0t3 = resolve_top_item(it, id1, id2, id3, id4, id5, i, et, ed1, ed2, ed3, ed4, fn_param_name_toks, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
     int r = _sv0t3;
     if ((r != 0)) {
       return r;
@@ -3572,34 +3597,55 @@ static int test_resolve_program(void) {
   int _sv0t5 = sv0_vec_new();
   int pp = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int it = _sv0t6;
+  int et = _sv0t6;
   int _sv0t7 = sv0_vec_new();
-  int id1 = _sv0t7;
+  int ed1 = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int id2 = _sv0t8;
+  int ed2 = _sv0t8;
   int _sv0t9 = sv0_vec_new();
-  int id3 = _sv0t9;
+  int ed3 = _sv0t9;
   int _sv0t10 = sv0_vec_new();
-  int id4 = _sv0t10;
+  int ed4 = _sv0t10;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t11 = sv0_vec_new();
+  int it = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int id1 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int id2 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int id3 = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int id4 = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int id5 = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int fn_ptoks = _sv0t17;
   sv0_vec_push(it, 0);
   sv0_vec_push(id1, 0);
   sv0_vec_push(id2, 0);
   sv0_vec_push(id3, 1);
   sv0_vec_push(id4, 0);
-  int _sv0t11 = resolve_program(it, id1, id2, id3, id4, source, starts, ends, mv, mt, fa, pp);
-  int r = _sv0t11;
+  sv0_vec_push(id5, 0);
+  sv0_vec_push(fn_ptoks, 0);
+  int _sv0t18 = resolve_program(et, ed1, ed2, ed3, ed4, it, id1, id2, id3, id4, id5, fn_ptoks, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t18;
   if ((r != 0)) {
     return 1;
   } else {
   }
-  int _sv0t12 = sv0_vec_new();
-  int _sv0t13 = res_full_value_exists(mv, _sv0t12, "main", source, starts, ends);
-  if ((_sv0t13 != 1)) {
+  int _sv0t19 = sv0_vec_new();
+  int _sv0t20 = res_full_value_exists(mv, _sv0t19, "main", source, starts, ends);
+  if ((_sv0t20 != 1)) {
     return 2;
   } else {
   }
-  int _sv0t14 = res_lookup_fn_arity_str(fa, "main", source, starts, ends);
-  if ((_sv0t14 != 1)) {
+  int _sv0t21 = res_lookup_fn_arity_str(fa, "main", source, starts, ends);
+  if ((_sv0t21 != 1)) {
     return 3;
   } else {
   }

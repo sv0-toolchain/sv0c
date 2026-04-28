@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-27 (America/Los_Angeles; **M3 G3 — parser item arena + program sidecars:** **`parse_program`** fills **`enum_variant_name_toks`** / **`struct_field_name_toks`**; **`ItemFn`** **id2** packs **has_ret**/**contract_count** (helpers **`item_fn_*_packed`**); **`ItemEnum`**/**ItemStruct`** **id3**/**id4** index sidecars; **`resolve_top_item`** stub documents **G4** wiring; **`doc/transliteration-plan.md`** § **M3 G3** + **`lib/LAYOUT.md`**. Prior **M3 G2** closure (**`read_file`**/**`write_file`**/**`read_dir`**, **`lib/main.sv0`** … **`diagnostic.sv0`**) remains in Notes below. Stage0 **`parser.c`** + vm-parity **`parser.sv0b`** refreshed.)
+**Last updated:** 2026-04-28 (America/Los_Angeles; **M3 G4 initial — param name sidecars + ItemFn resolve:** **`parse_program`** appends **`fn_param_name_toks`**; **`ItemFn.id5`** base; **`resolve_program`** / **`resolve_top_item`** — param frame + **`resolve_expr`** on **`id4`**. Docs: **`doc/transliteration-plan.md`** (G4 initial + resolver inventory row), **`lib/LAYOUT.md`**. Remaining **G4** (**M3-S-028…032**): struct/enum **`resolve_ty`**, trait/impl, checker **`check`**, **`initTypes`**, integration. Stage0 **`parser.c`** / **`resolver.c`** + vm-parity goldens refreshed. Prior **M3 G3** / **G2** notes below.)
 
 ## Checklist (local source of truth)
 
