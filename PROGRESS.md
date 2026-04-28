@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-27 (America/Los_Angeles; **M3 G4 — `initTypes` spelling parity:** **`struct_enum_name_clash_str`** in **`check_program`** (struct vs enum name spelling like SML **`initTypes`**); **`dup_variant_names_str`** in **`init_enum_defs`** (**`-1`** on duplicate variant spellings — **`dupVariants`**). Tests **`test_struct_enum_clash`** / **`test_dup_variant_names`** / **`test_init_enum_defs_dup_variants`**. **`M3-S-031`** **Partial** (remaining: formal/contract **`resolve_ty`**, **`ItemEnum`** payload roots). Open **G4**: integration (**M3-S-032**). Stage0/vm **`checker`** goldens refreshed. Prior **M3 G3** / **G2** notes below.)
+**Last updated:** 2026-04-28 (America/Los_Angeles; **M3 G4 closure:** parser sidecars for function signature/contract + enum payload roots (**`fn_param_ty_root`**, **`fn_ret_ty_root_by_item`**, **`fn_contract_root`**/**base**, **`enum_variant_payload_ty_root`**/**base/count**), resolver wiring in **`resolve_top_item`** / **`resolve_program`** (formal+return **`resolve_ty`**, contract **`resolve_contract`**, enum payload **`resolve_ty`**), and prelude-aware **`resolve_ty`** type lookup. Added integration fixture **`test/integration/g4_resolver_checker/g4_resolver_checker.sv0`** and harness/README wiring. G4 slices **M3-S-027 … M3-S-032** now **Done** in the owning milestone task. Stage0/vm goldens refreshed for parser/resolver.)
 
 ## Checklist (local source of truth)
 

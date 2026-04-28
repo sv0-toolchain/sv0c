@@ -20,6 +20,7 @@ These **`.sv0`** programs are exercised by **`task/sv0vm-milestone-2/02-integrat
 | option_result | `option_result/option_result.sv0` | 0 |
 | box_expr | `box_expr/box_expr.sv0` | 0 |
 | ast_types | `ast_types/ast_types.sv0` | 0 |
+| g4_resolver_checker | `g4_resolver_checker/g4_resolver_checker.sv0` (G4 signature + contract + enum payload integration path) | 0 |
 | import_use_match | `import_use_match/main.sv0` (project: eight **`use lib::…`** lines + guards + **`match`** on imported callees; `lib/lib.sv0`) | 0 |
 
 Additional harness steps in the same script: **multi-file project** (`modules/`, exit **42**), **`println_ok`** golden, optional **gcd**, and **`test/data/golden/pass/no_alias_requires.sv0`**.

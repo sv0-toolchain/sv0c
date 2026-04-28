@@ -599,7 +599,9 @@ fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
         }
         let ps: string = path_join_vec(source, starts, ends, path);
         if res_type_exists(mod_tys, ps, source, starts, ends) != true {
-            return 301;
+            if res_is_prelude_type(ps) != true {
+                return 301;
+            }
         }
         let mut ti: i32 = 0;
         while ti < tac {
@@ -1241,6 +1243,13 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                     et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     ed3: Vec<i32>, ed4: Vec<i32>,
                     fn_param_name_toks: Vec<i32>,
+                    fn_param_ty_root: Vec<i32>,
+                    fn_ret_ty_root_by_item: Vec<i32>,
+                    fn_contract_base_by_item: Vec<i32>,
+                    fn_contract_root: Vec<i32>,
+                    enum_variant_payload_ty_root: Vec<i32>,
+                    enum_variant_payload_base_by_item: Vec<i32>,
+                    enum_variant_payload_count_by_item: Vec<i32>,
                     pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
                     pty_td3: Vec<i32>, struct_field_ty_root: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
@@ -1255,6 +1264,20 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
         let param_count: i32 = vec_get(id3, idx);
         let pbase: i32 = vec_get(id5, idx);
         let frames: Vec<i32> = vec_new();
+        let mut pti: i32 = 0;
+        while pti < param_count {
+            let tr: i32 = vec_get(fn_param_ty_root, pbase + pti);
+            let rty: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
+                                      source, starts, ends, mod_tys, pp);
+            if rty != 0 { return rty; }
+            pti = pti + 1;
+        }
+        let ret_root: i32 = vec_get(fn_ret_ty_root_by_item, idx);
+        if ret_root >= 0 {
+            let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, ret_root,
+                                     source, starts, ends, mod_tys, pp);
+            if rr != 0 { return rr; }
+        }
         res_enter_scope(frames);
         let mut pi: i32 = 0;
         while pi < param_count {
@@ -1263,6 +1286,18 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                 res_bind_local(frames, tok);
             }
             pi = pi + 1;
+        }
+        let cbase: i32 = vec_get(fn_contract_base_by_item, idx);
+        let ccount: i32 = vec_get(id2, idx) / 2;
+        let mut ci: i32 = 0;
+        while ci < ccount {
+            let cr: i32 = vec_get(fn_contract_root, cbase + ci);
+            let rc: i32 = resolve_contract(et, ed1, ed2, ed3, ed4, cr,
+                                           source, starts, ends,
+                                           mod_vals, mod_tys,
+                                           fn_arities, frames, pp);
+            if rc != 0 { return rc; }
+            ci = ci + 1;
         }
         return resolve_expr(et, ed1, ed2, ed3, ed4, body_root,
                              source, starts, ends,
@@ -1278,6 +1313,19 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                                       source, starts, ends, mod_tys, pp);
             if rr != 0 { return rr; }
             fi = fi + 1;
+        }
+        return 0;
+    }
+    if tag == 2 {
+        let base: i32 = vec_get(enum_variant_payload_base_by_item, idx);
+        let cnt: i32 = vec_get(enum_variant_payload_count_by_item, idx);
+        let mut vi: i32 = 0;
+        while vi < cnt {
+            let tr: i32 = vec_get(enum_variant_payload_ty_root, base + vi);
+            let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
+                                     source, starts, ends, mod_tys, pp);
+            if rr != 0 { return rr; }
+            vi = vi + 1;
         }
         return 0;
     }
@@ -1305,6 +1353,13 @@ fn resolve_program(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                    id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                    fn_param_name_toks: Vec<i32>,
+                   fn_param_ty_root: Vec<i32>,
+                   fn_ret_ty_root_by_item: Vec<i32>,
+                   fn_contract_base_by_item: Vec<i32>,
+                   fn_contract_root: Vec<i32>,
+                   enum_variant_payload_ty_root: Vec<i32>,
+                   enum_variant_payload_base_by_item: Vec<i32>,
+                   enum_variant_payload_count_by_item: Vec<i32>,
                    pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
                    pty_td3: Vec<i32>, struct_field_ty_root: Vec<i32>,
                    source: string, starts: Vec<i32>, ends: Vec<i32>,
@@ -1324,6 +1379,13 @@ fn resolve_program(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let r: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, i,
                                        et, ed1, ed2, ed3, ed4,
                                        fn_param_name_toks,
+                                       fn_param_ty_root,
+                                       fn_ret_ty_root_by_item,
+                                       fn_contract_base_by_item,
+                                       fn_contract_root,
+                                       enum_variant_payload_ty_root,
+                                       enum_variant_payload_base_by_item,
+                                       enum_variant_payload_count_by_item,
                                        pty_tt, pty_td1, pty_td2, pty_td3,
                                        struct_field_ty_root,
                                        source, starts, ends,
@@ -2071,26 +2133,167 @@ fn test_resolve_top_item_struct_field() -> i32 {
     let ed4: Vec<i32> = vec_new();
     vec_push(ed4, 0);
     let fn_ptoks: Vec<i32> = vec_new();
+    let fn_p_ty_root: Vec<i32> = vec_new();
+    let fn_ret_root: Vec<i32> = vec_new();
+    let fn_contract_base: Vec<i32> = vec_new();
+    let fn_contract_root: Vec<i32> = vec_new();
+    let enum_payload_ty_root: Vec<i32> = vec_new();
+    let enum_payload_base: Vec<i32> = vec_new();
+    let enum_payload_count: Vec<i32> = vec_new();
     let sf_root: Vec<i32> = vec_new();
     vec_push(sf_root, 0);
+    vec_push(fn_ret_root, 0 - 1);
+    vec_push(fn_contract_base, 0 - 1);
+    vec_push(enum_payload_base, 0 - 1);
+    vec_push(enum_payload_count, 0);
     let r: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, 0,
                                    et, ed1, ed2, ed3, ed4, fn_ptoks,
+                                   fn_p_ty_root, fn_ret_root,
+                                   fn_contract_base, fn_contract_root,
+                                   enum_payload_ty_root,
+                                   enum_payload_base, enum_payload_count,
                                    pty_tt, pty_td1, pty_td2, pty_td3, sf_root,
                                    source, starts, ends, mv, mt, fa, pp);
     if r != 0 { return 1; }
     return 0;
 }
 
-fn test_resolve_program() -> i32 {
-    let source: string = "main 0";
+fn test_resolve_top_item_fn_signature_contracts() -> i32 {
+    let source: string = "x i32";
     let starts: Vec<i32> = vec_new();
     let ends: Vec<i32> = vec_new();
-    vec_push(starts, 0); vec_push(ends, 4);
-    vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(starts, 2); vec_push(ends, 5);
     let mv: Vec<i32> = vec_new();
     let mt: Vec<i32> = vec_new();
     let fa: Vec<i32> = vec_new();
     let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    let it: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    let id1: Vec<i32> = vec_new();
+    vec_push(id1, 0);
+    let id2: Vec<i32> = vec_new();
+    vec_push(id2, 3); /* has_ret=1, contract_count=1 */
+    let id3: Vec<i32> = vec_new();
+    vec_push(id3, 1);
+    let id4: Vec<i32> = vec_new();
+    vec_push(id4, 1);
+    let id5: Vec<i32> = vec_new();
+    vec_push(id5, 0);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 0); vec_push(ed4, 0); /* contract: x */
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 0); vec_push(ed4, 0); /* body: lit at tok 0 */
+    let fn_ptoks: Vec<i32> = vec_new();
+    vec_push(fn_ptoks, 0);
+    let fn_p_ty_root: Vec<i32> = vec_new();
+    vec_push(fn_p_ty_root, 0);
+    let fn_ret_root: Vec<i32> = vec_new();
+    vec_push(fn_ret_root, 1);
+    let fn_contract_base: Vec<i32> = vec_new();
+    vec_push(fn_contract_base, 0);
+    let fn_contract_root: Vec<i32> = vec_new();
+    vec_push(fn_contract_root, 0);
+    let enum_payload_ty_root: Vec<i32> = vec_new();
+    let enum_payload_base: Vec<i32> = vec_new();
+    let enum_payload_count: Vec<i32> = vec_new();
+    vec_push(enum_payload_base, 0 - 1);
+    vec_push(enum_payload_count, 0);
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    vec_push(pty_tt, 0); vec_push(pty_td1, 1); vec_push(pty_td2, 1); vec_push(pty_td3, 0);
+    vec_push(pty_tt, 0); vec_push(pty_td1, 1); vec_push(pty_td2, 1); vec_push(pty_td3, 0);
+    let sf_root: Vec<i32> = vec_new();
+    let r: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, 0,
+                                   et, ed1, ed2, ed3, ed4,
+                                   fn_ptoks,
+                                   fn_p_ty_root, fn_ret_root,
+                                   fn_contract_base, fn_contract_root,
+                                   enum_payload_ty_root,
+                                   enum_payload_base, enum_payload_count,
+                                   pty_tt, pty_td1, pty_td2, pty_td3, sf_root,
+                                   source, starts, ends, mv, mt, fa, pp);
+    if r != 0 { return 1; }
+    return 0;
+}
+
+fn test_resolve_top_item_enum_payload_type() -> i32 {
+    let source: string = "Foo";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let it: Vec<i32> = vec_new();
+    vec_push(it, 2);
+    let id1: Vec<i32> = vec_new();
+    vec_push(id1, 0);
+    let id2: Vec<i32> = vec_new();
+    vec_push(id2, 1);
+    let id3: Vec<i32> = vec_new();
+    vec_push(id3, 0);
+    let id4: Vec<i32> = vec_new();
+    vec_push(id4, 1);
+    let id5: Vec<i32> = vec_new();
+    vec_push(id5, 0 - 1);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
+    let fn_p_ty_root: Vec<i32> = vec_new();
+    let fn_ret_root: Vec<i32> = vec_new();
+    vec_push(fn_ret_root, 0 - 1);
+    let fn_contract_base: Vec<i32> = vec_new();
+    vec_push(fn_contract_base, 0 - 1);
+    let fn_contract_root: Vec<i32> = vec_new();
+    let enum_payload_ty_root: Vec<i32> = vec_new();
+    vec_push(enum_payload_ty_root, 0);
+    let enum_payload_base: Vec<i32> = vec_new();
+    vec_push(enum_payload_base, 0);
+    let enum_payload_count: Vec<i32> = vec_new();
+    vec_push(enum_payload_count, 1);
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    vec_push(pty_tt, 0); vec_push(pty_td1, 0); vec_push(pty_td2, 1); vec_push(pty_td3, 0);
+    let sf_root: Vec<i32> = vec_new();
+    let r: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, 0,
+                                   et, ed1, ed2, ed3, ed4,
+                                   fn_ptoks,
+                                   fn_p_ty_root, fn_ret_root,
+                                   fn_contract_base, fn_contract_root,
+                                   enum_payload_ty_root,
+                                   enum_payload_base, enum_payload_count,
+                                   pty_tt, pty_td1, pty_td2, pty_td3, sf_root,
+                                   source, starts, ends, mv, mt, fa, pp);
+    if r != 301 { return 1; }
+    return 0;
+}
+
+fn test_resolve_program() -> i32 {
+    let source: string = "main i32";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 4);
+    vec_push(starts, 5); vec_push(ends, 8);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 1);
     let et: Vec<i32> = vec_new();
     let ed1: Vec<i32> = vec_new();
     let ed2: Vec<i32> = vec_new();
@@ -2108,6 +2311,13 @@ fn test_resolve_program() -> i32 {
     let id4: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let fn_p_ty_root: Vec<i32> = vec_new();
+    let fn_ret_root: Vec<i32> = vec_new();
+    let fn_contract_base: Vec<i32> = vec_new();
+    let fn_contract_root: Vec<i32> = vec_new();
+    let enum_payload_ty_root: Vec<i32> = vec_new();
+    let enum_payload_base: Vec<i32> = vec_new();
+    let enum_payload_count: Vec<i32> = vec_new();
     vec_push(it, 0);
     vec_push(id1, 0);
     vec_push(id2, 0);
@@ -2115,14 +2325,30 @@ fn test_resolve_program() -> i32 {
     vec_push(id4, 0);
     vec_push(id5, 0);
     vec_push(fn_ptoks, 0);
+    vec_push(fn_p_ty_root, 0);
+    vec_push(fn_ret_root, 0 - 1);
+    vec_push(fn_contract_base, 0 - 1);
+    vec_push(enum_payload_base, 0 - 1);
+    vec_push(enum_payload_count, 0);
     let pty_tt: Vec<i32> = vec_new();
     let pty_td1: Vec<i32> = vec_new();
     let pty_td2: Vec<i32> = vec_new();
     let pty_td3: Vec<i32> = vec_new();
+    vec_push(pty_tt, 0);
+    vec_push(pty_td1, 0);
+    vec_push(pty_td2, 1);
+    vec_push(pty_td3, 0);
     let sf_tr: Vec<i32> = vec_new();
     let r: i32 = resolve_program(et, ed1, ed2, ed3, ed4,
                                   it, id1, id2, id3, id4, id5,
                                   fn_ptoks,
+                                  fn_p_ty_root,
+                                  fn_ret_root,
+                                  fn_contract_base,
+                                  fn_contract_root,
+                                  enum_payload_ty_root,
+                                  enum_payload_base,
+                                  enum_payload_count,
                                   pty_tt, pty_td1, pty_td2, pty_td3, sf_tr,
                                   source, starts, ends,
                                   mv, mt, fa, pp);
@@ -2210,9 +2436,13 @@ fn main() -> i32 {
     if r37 != 0 { return 159 + r37; }
     let r37b: i32 = test_resolve_top_item_struct_field();
     if r37b != 0 { return 161 + r37b; }
+    let r37c: i32 = test_resolve_top_item_fn_signature_contracts();
+    if r37c != 0 { return 162 + r37c; }
+    let r37d: i32 = test_resolve_top_item_enum_payload_type();
+    if r37d != 0 { return 163 + r37d; }
     let r38: i32 = test_resolve_program();
-    if r38 != 0 { return 162 + r38; }
+    if r38 != 0 { return 164 + r38; }
     let r39: i32 = test_path_join_vec_three();
-    if r39 != 0 { return 165 + r39; }
+    if r39 != 0 { return 167 + r39; }
     return 0;
 }

@@ -132,3 +132,9 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 - **`doc/self-host-sv0-loop.md`** — pilot loop and **`SV0_SELF_HOST_COMPILER`**.
 - **`doc/compiler-passes.md`** — phase mapping for the current SML pipeline.
 - **`doc/tooling-formatter-linter.md`** — **`sv0-formatter`** / **`sv0-linter`** design sketch (tooling; not spec).
+
+## 2026-04-28 note (M3 G4 closure)
+
+- Parser now persists function signature/contract and enum payload roots needed for resolver parity (`fn_param_ty_root`, `fn_ret_ty_root_by_item`, `fn_contract_root`/base, `enum_variant_payload_ty_root`/base/count).
+- Resolver consumes those sidecars in `resolve_top_item` / `resolve_program` (formal+return `resolve_ty`, contract `resolve_contract`, enum payload `resolve_ty`) and treats prelude type names as registered.
+- Integration hardening landed with `test/integration/g4_resolver_checker/g4_resolver_checker.sv0` and harness wiring.
