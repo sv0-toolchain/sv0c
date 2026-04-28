@@ -2968,14 +2968,22 @@ fn parse_quant(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
 
 /* ── item-level parsing (SML parseFnBody…parseItem…val parse) ─
    Item arena (parallel Vec<i32>s: it, id1, id2, id3, id4):
-     0 ItemFn         : d1=name_tok_pos, d2=has_ret(0/1), d3=param_count, d4=contract_count
-     1 ItemStruct     : d1=name_tok_pos, d2=field_count
-     2 ItemEnum       : d1=name_tok_pos, d2=variant_count
-     3 ItemTrait      : d1=name_tok_pos, d2=method_count
-     4 ItemImpl       : d1=has_trait(0/1), d2=items_count
+     0 ItemFn         : d1=name_tok_pos,
+                       d2=packed — has_ret (d2%2) + contract_count*2 (d2/2),
+                       d3=param_count, d4=body_root (expr arena index in shared body_et)
+     1 ItemStruct     : d1=name_tok_pos, d2=field_count,
+                       d3=struct_field_name_toks_base (offset into struct_field_name_toks),
+                       d4=field_count (sanity mirror of d2; slice is [d3..d3+d4))
+     2 ItemEnum       : d1=name_tok_pos, d2=variant_count,
+                       d3=enum_variant_name_toks_base (offset into enum_variant_name_toks),
+                       d4=variant_count (mirror of d2; slice is [d3..d3+d4))
+     3 ItemTrait      : d1=name_tok_pos, d2=method_count, d3=0, d4=-1 sentinel
+     4 ItemImpl       : d1=has_trait(0/1), d2=items_count, d3=0, d4=-1 sentinel
      5 ItemUse        : d1=pp_start, d2=pp_count
      6 ItemModule     : d1=pp_start, d2=pp_count
      7 ItemTypeAlias  : d1=name_tok_pos
+   Sidecar Vecs (program-local, parallel to parse): enum_variant_name_toks holds each
+   variant’s IDENT token index; struct_field_name_toks holds each field’s IDENT token index.
    Children-before-parents: trait/impl push method ItemFn entries
    before the parent ItemTrait/ItemImpl entry. */
 
@@ -3122,7 +3130,8 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                      source: string, pos: i32,
                      it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                      id3: Vec<i32>, id4: Vec<i32>,
-                     pp: Vec<i32>) -> i32 {
+                     pp: Vec<i32>,
+                     struct_field_name_toks: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 89 { return 0 - 1; }
     if ps_peek(tags, pos + 1) != 5 { return 0 - 1; }
     let name_pos: i32 = pos + 1;
@@ -3131,6 +3140,7 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     if ps_peek(tags, p1) != 8 { return 0 - 1; }
     let mut p: i32 = p1 + 1;
     let mut field_count: i32 = 0;
+    let sf_base: i32 = vec_len(struct_field_name_toks);
     let mut done: bool = false;
     while done != true {
         if ps_peek(tags, p) == 9 {
@@ -3138,6 +3148,7 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         } else {
             let fp: i32 = ps_skip_optional_pub(tags, p);
             if ps_peek(tags, fp) != 5 { return 0 - 1; }
+            vec_push(struct_field_name_toks, fp);
             if ps_peek(tags, fp + 1) != 14 { return 0 - 1; }
             let tt: Vec<i32> = vec_new();
             let td1v: Vec<i32> = vec_new();
@@ -3158,8 +3169,8 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(it, 1);
     vec_push(id1, name_pos);
     vec_push(id2, field_count);
-    vec_push(id3, 0);
-    vec_push(id4, 0);
+    vec_push(id3, sf_base);
+    vec_push(id4, field_count);
     return p + 1;
 }
 
@@ -3167,7 +3178,8 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    source: string, pos: i32,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                    id3: Vec<i32>, id4: Vec<i32>,
-                   pp: Vec<i32>) -> i32 {
+                   pp: Vec<i32>,
+                   enum_variant_name_toks: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 62 { return 0 - 1; }
     if ps_peek(tags, pos + 1) != 5 { return 0 - 1; }
     let name_pos: i32 = pos + 1;
@@ -3176,12 +3188,14 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     if ps_peek(tags, p1) != 8 { return 0 - 1; }
     let mut p: i32 = p1 + 1;
     let mut variant_count: i32 = 0;
+    let ev_base: i32 = vec_len(enum_variant_name_toks);
     let mut done: bool = false;
     while done != true {
         if ps_peek(tags, p) == 9 {
             done = true;
         } else {
             if ps_peek(tags, p) != 5 { return 0 - 1; }
+            vec_push(enum_variant_name_toks, p);
             let vp: i32 = p + 1;
             if ps_peek(tags, vp) == 6 {
                 let mut tp: i32 = vp + 1;
@@ -3253,8 +3267,8 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(it, 2);
     vec_push(id1, name_pos);
     vec_push(id2, variant_count);
-    vec_push(id3, 0);
-    vec_push(id4, 0);
+    vec_push(id3, ev_base);
+    vec_push(id4, variant_count);
     return p + 1;
 }
 
@@ -3380,6 +3394,8 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
               it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
               id3: Vec<i32>, id4: Vec<i32>,
               pp: Vec<i32>,
+              enum_variant_name_toks: Vec<i32>,
+              struct_field_name_toks: Vec<i32>,
               body_et: Vec<i32>, body_ed1: Vec<i32>,
               body_ed2: Vec<i32>, body_ed3: Vec<i32>,
               body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3423,11 +3439,13 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     }
     if t == 89 {
         return parse_struct_item(tags, starts, ends, source, p0,
-                                 it, id1, id2, id3, id4, pp);
+                                 it, id1, id2, id3, id4, pp,
+                                 struct_field_name_toks);
     }
     if t == 62 {
         return parse_enum_item(tags, starts, ends, source, p0,
-                               it, id1, id2, id3, id4, pp);
+                               it, id1, id2, id3, id4, pp,
+                               enum_variant_name_toks);
     }
     if t == 90 {
         return parse_trait_item(tags, starts, ends, source, p0,
@@ -3453,6 +3471,8 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                  it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                  id3: Vec<i32>, id4: Vec<i32>,
                  pp: Vec<i32>,
+                 enum_variant_name_toks: Vec<i32>,
+                 struct_field_name_toks: Vec<i32>,
                  body_et: Vec<i32>, body_ed1: Vec<i32>,
                  body_ed2: Vec<i32>, body_ed3: Vec<i32>,
                  body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3464,6 +3484,8 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         else {
             let pi: i32 = parse_item(tags, starts, ends, source, p0,
                                       it, id1, id2, id3, id4, pp,
+                                      enum_variant_name_toks,
+                                      struct_field_name_toks,
                                       body_et, body_ed1, body_ed2,
                                       body_ed3, body_ed4, body_sf);
             if pi < 0 { return 0 - 1; }
@@ -3473,7 +3495,31 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     return p;
 }
 
+/* ── ItemFn id2 packing (M3 G3 — resolver/checker helpers) ────
+   parse_fn_body stores id2 = has_ret + 2*contract_count (each ≥ 0). */
+
+fn item_fn_has_ret_packed(item_id2: i32) -> i32 {
+    let m: i32 = item_id2 % 2;
+    return m;
+}
+
+fn item_fn_contract_count_packed(item_id2: i32) -> i32 {
+    return item_id2 / 2;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
+
+fn test_item_fn_id2_pack_roundtrip() -> i32 {
+    let x: i32 = item_fn_has_ret_packed(7);
+    if x != 1 { return 1; }
+    let c: i32 = item_fn_contract_count_packed(7);
+    if c != 3 { return 2; }
+    let x2: i32 = item_fn_has_ret_packed(6);
+    if x2 != 0 { return 3; }
+    let c2: i32 = item_fn_contract_count_packed(6);
+    if c2 != 3 { return 4; }
+    return 0;
+}
 
 fn test_binop_of() -> i32 {
     if binop_of(22) != 0 { return 1; }
@@ -5378,8 +5424,11 @@ fn test_parse_fn_simple() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let ev_ntoks: Vec<i32> = vec_new();
+    let sf_ntoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, pp,
+                             ev_ntoks, sf_ntoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 6 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5420,8 +5469,11 @@ fn test_parse_fn_ret() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let ev_ntoks: Vec<i32> = vec_new();
+    let sf_ntoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, pp,
+                             ev_ntoks, sf_ntoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 12 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5461,13 +5513,21 @@ fn test_parse_struct() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let ev_ntoks: Vec<i32> = vec_new();
+    let sf_ntoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, pp,
+                             ev_ntoks, sf_ntoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 11 { return 1; }
     if vec_get(it, 0) != 1 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
     if vec_get(id2, 0) != 2 { return 4; }
+    if vec_get(id3, 0) != 0 { return 5; }
+    if vec_get(id4, 0) != 2 { return 6; }
+    if vec_len(sf_ntoks) != 2 { return 7; }
+    if vec_get(sf_ntoks, 0) != 3 { return 8; }
+    if vec_get(sf_ntoks, 1) != 7 { return 9; }
     return 0;
 }
 
@@ -5499,13 +5559,21 @@ fn test_parse_enum_mixed() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let ev_ntoks: Vec<i32> = vec_new();
+    let sf_ntoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, pp,
+                             ev_ntoks, sf_ntoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_get(it, 0) != 2 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
     if vec_get(id2, 0) != 2 { return 4; }
+    if vec_get(id3, 0) != 0 { return 5; }
+    if vec_get(id4, 0) != 2 { return 6; }
+    if vec_len(ev_ntoks) != 2 { return 7; }
+    if vec_get(ev_ntoks, 0) != 3 { return 8; }
+    if vec_get(ev_ntoks, 1) != 5 { return 9; }
     return 0;
 }
 
@@ -5537,8 +5605,11 @@ fn test_parse_impl() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let ev_ntoks: Vec<i32> = vec_new();
+    let sf_ntoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, pp,
+                             ev_ntoks, sf_ntoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_len(it) != 2 { return 2; }
@@ -5578,8 +5649,11 @@ fn test_parse_fn_contract() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let ev_ntoks: Vec<i32> = vec_new();
+    let sf_ntoks: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, pp,
+                             ev_ntoks, sf_ntoks,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5619,8 +5693,11 @@ fn test_parse_program() -> i32 {
     let be3: Vec<i32> = vec_new();
     let be4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
+    let ev_ntoks: Vec<i32> = vec_new();
+    let sf_ntoks: Vec<i32> = vec_new();
     let r: i32 = parse_program(tags, starts, ends, source, 0,
                                 it, id1, id2, id3, id4, pp,
+                                ev_ntoks, sf_ntoks,
                                 bet, be1, be2, be3, be4, bsf);
     if r != 12 { return 1; }
     if vec_len(it) != 2 { return 2; }
@@ -5632,6 +5709,8 @@ fn test_parse_program() -> i32 {
 }
 
 fn main() -> i32 {
+    let r0: i32 = test_item_fn_id2_pack_roundtrip();
+    if r0 != 0 { return 2000 + r0; }
     let r1: i32 = test_binop_of();
     if r1 != 0 { return r1; }
     let r2: i32 = test_assign_binop();

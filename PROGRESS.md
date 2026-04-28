@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-27 (America/Los_Angeles; **M3 G2 (T0-8 host I/O) — slice closure:** **`read_file` / `write_file` / `read_dir`** (**`CALL_BUILTIN` 15–17** + C **`sv0_runtime.{h,c}`**). **`lib/main.sv0`** — **`compile_write_text`**, **`driver_tokenize_sketch`** reads source; **`lib/link.sv0`** — **`walk_sv0` / `parse_file` / `link_project_dir`**; **`include_expand.sv0`** — **`expand`**, **`expand_from_file`**; **`diagnostic.sv0`** — **`report_all`** (dual **`println`**; no unit call — sv0-emitted C **`void` temp** limitation). Host I/O tests use **`/tmp/…`** paths so **`bootstrap-build`** (**`sv0vm/`** cwd) matches VM runs. Stage0 + vm-parity goldens refreshed.)
+**Last updated:** 2026-04-27 (America/Los_Angeles; **M3 G3 — parser item arena + program sidecars:** **`parse_program`** fills **`enum_variant_name_toks`** / **`struct_field_name_toks`**; **`ItemFn`** **id2** packs **has_ret**/**contract_count** (helpers **`item_fn_*_packed`**); **`ItemEnum`**/**ItemStruct`** **id3**/**id4** index sidecars; **`resolve_top_item`** stub documents **G4** wiring; **`doc/transliteration-plan.md`** § **M3 G3** + **`lib/LAYOUT.md`**. Prior **M3 G2** closure (**`read_file`**/**`write_file`**/**`read_dir`**, **`lib/main.sv0`** … **`diagnostic.sv0`**) remains in Notes below. Stage0 **`parser.c`** + vm-parity **`parser.sv0b`** refreshed.)
 
 ## Checklist (local source of truth)
 
