@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-28 (America/Los_Angeles; **M3 G4 initial — param name sidecars + ItemFn resolve:** **`parse_program`** appends **`fn_param_name_toks`**; **`ItemFn.id5`** base; **`resolve_program`** / **`resolve_top_item`** — param frame + **`resolve_expr`** on **`id4`**. Docs: **`doc/transliteration-plan.md`** (G4 initial + resolver inventory row), **`lib/LAYOUT.md`**. Remaining **G4** (**M3-S-028…032**): struct/enum **`resolve_ty`**, trait/impl, checker **`check`**, **`initTypes`**, integration. Stage0 **`parser.c`** / **`resolver.c`** + vm-parity goldens refreshed. Prior **M3 G3** / **G2** notes below.)
+**Last updated:** 2026-04-28 (America/Los_Angeles; **M3 G4 — struct/type-alias resolve:** **`parse_program`** threads **`pty_tt`** + **`struct_field_ty_root`**; **`ItemTypeAlias.id2`** stores RHS type root; **`resolve_top_item`** runs **`resolve_ty`** on struct fields and aliases (**enum** payloads + **`ItemFn`** signature types still deferred). Docs: **`doc/transliteration-plan.md`**, **`lib/LAYOUT.md`**. Open **G4**: checker program **`check`** (**M3-S-030**), **`initTypes`** (**M3-S-031**), integration (**M3-S-032**). Stage0/vm goldens refreshed with **`parser`**/**`resolver`**. Prior **M3 G3** / **G2** notes below.)
 
 ## Checklist (local source of truth)
 

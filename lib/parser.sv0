@@ -3145,7 +3145,9 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                      it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                      id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                      pp: Vec<i32>,
-                     struct_field_name_toks: Vec<i32>) -> i32 {
+                     struct_field_name_toks: Vec<i32>,
+                     pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
+                     pty_td3: Vec<i32>, struct_field_ty_root: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 89 { return 0 - 1; }
     if ps_peek(tags, pos + 1) != 5 { return 0 - 1; }
     let name_pos: i32 = pos + 1;
@@ -3164,13 +3166,10 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             if ps_peek(tags, fp) != 5 { return 0 - 1; }
             vec_push(struct_field_name_toks, fp);
             if ps_peek(tags, fp + 1) != 14 { return 0 - 1; }
-            let tt: Vec<i32> = vec_new();
-            let td1v: Vec<i32> = vec_new();
-            let td2v: Vec<i32> = vec_new();
-            let td3v: Vec<i32> = vec_new();
             let pt: i32 = parse_type(tags, starts, ends, source, fp + 2,
-                                      tt, td1v, td2v, td3v, pp);
+                                      pty_tt, pty_td1, pty_td2, pty_td3, pp);
             if pt < 0 { return 0 - 1; }
+            vec_push(struct_field_ty_root, vec_len(pty_tt) - 1);
             field_count = field_count + 1;
             if ps_peek(tags, pt) == 12 {
                 p = pt + 1;
@@ -3292,23 +3291,22 @@ fn parse_type_alias_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                          source: string, pos: i32,
                          it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                          id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
-                         pp: Vec<i32>) -> i32 {
+                         pp: Vec<i32>,
+                         pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
+                         pty_td3: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 92 { return 0 - 1; }
     if ps_peek(tags, pos + 1) != 5 { return 0 - 1; }
     let name_pos: i32 = pos + 1;
     let p1: i32 = ps_skip_generic_params(tags, pos + 2);
     if ps_peek(tags, p1) != 35 { return 0 - 1; }
-    let tt: Vec<i32> = vec_new();
-    let td1: Vec<i32> = vec_new();
-    let td2: Vec<i32> = vec_new();
-    let td3: Vec<i32> = vec_new();
     let pt: i32 = parse_type(tags, starts, ends, source, p1 + 1,
-                              tt, td1, td2, td3, pp);
+                              pty_tt, pty_td1, pty_td2, pty_td3, pp);
     if pt < 0 { return 0 - 1; }
     if ps_peek(tags, pt) != 13 { return 0 - 1; }
+    let alias_ty_root: i32 = vec_len(pty_tt) - 1;
     vec_push(it, 7);
     vec_push(id1, name_pos);
-    vec_push(id2, 0);
+    vec_push(id2, alias_ty_root);
     vec_push(id3, 0);
     vec_push(id4, 0);
     vec_push(id5, 0 - 1);
@@ -3420,6 +3418,8 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
               enum_variant_name_toks: Vec<i32>,
               struct_field_name_toks: Vec<i32>,
               fn_param_name_toks: Vec<i32>,
+              pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
+              pty_td3: Vec<i32>, struct_field_ty_root: Vec<i32>,
               body_et: Vec<i32>, body_ed1: Vec<i32>,
               body_ed2: Vec<i32>, body_ed3: Vec<i32>,
               body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3468,7 +3468,9 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     if t == 89 {
         return parse_struct_item(tags, starts, ends, source, p0,
                                  it, id1, id2, id3, id4, id5, pp,
-                                 struct_field_name_toks);
+                                 struct_field_name_toks,
+                                 pty_tt, pty_td1, pty_td2, pty_td3,
+                                 struct_field_ty_root);
     }
     if t == 62 {
         return parse_enum_item(tags, starts, ends, source, p0,
@@ -3491,7 +3493,8 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     }
     if t == 92 {
         return parse_type_alias_item(tags, starts, ends, source, p0,
-                                     it, id1, id2, id3, id4, id5, pp);
+                                     it, id1, id2, id3, id4, id5, pp,
+                                     pty_tt, pty_td1, pty_td2, pty_td3);
     }
     return 0 - 1;
 }
@@ -3504,6 +3507,8 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                  enum_variant_name_toks: Vec<i32>,
                  struct_field_name_toks: Vec<i32>,
                  fn_param_name_toks: Vec<i32>,
+                 pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
+                 pty_td3: Vec<i32>, struct_field_ty_root: Vec<i32>,
                  body_et: Vec<i32>, body_ed1: Vec<i32>,
                  body_ed2: Vec<i32>, body_ed3: Vec<i32>,
                  body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
@@ -3518,6 +3523,8 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                       enum_variant_name_toks,
                                       struct_field_name_toks,
                                       fn_param_name_toks,
+                                      pty_tt, pty_td1, pty_td2, pty_td3,
+                                      struct_field_ty_root,
                                       body_et, body_ed1, body_ed2,
                                       body_ed3, body_ed4, body_sf);
             if pi < 0 { return 0 - 1; }
@@ -5460,9 +5467,15 @@ fn test_parse_fn_simple() -> i32 {
     let sf_ntoks: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, id5, pp,
                              ev_ntoks, sf_ntoks, fn_ptoks,
+                             pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
                              bet, be1, be2, be3, be4, bsf);
     if r != 6 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5509,9 +5522,15 @@ fn test_parse_fn_ret() -> i32 {
     let sf_ntoks: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, id5, pp,
                              ev_ntoks, sf_ntoks, fn_ptoks,
+                             pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
                              bet, be1, be2, be3, be4, bsf);
     if r != 12 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5558,9 +5577,15 @@ fn test_parse_struct() -> i32 {
     let sf_ntoks: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, id5, pp,
                              ev_ntoks, sf_ntoks, fn_ptoks,
+                             pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
                              bet, be1, be2, be3, be4, bsf);
     if r != 11 { return 1; }
     if vec_get(it, 0) != 1 { return 2; }
@@ -5571,6 +5596,7 @@ fn test_parse_struct() -> i32 {
     if vec_len(sf_ntoks) != 2 { return 7; }
     if vec_get(sf_ntoks, 0) != 3 { return 8; }
     if vec_get(sf_ntoks, 1) != 7 { return 9; }
+    if vec_len(sf_ty_root) != 2 { return 10; }
     return 0;
 }
 
@@ -5606,9 +5632,15 @@ fn test_parse_enum_mixed() -> i32 {
     let sf_ntoks: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, id5, pp,
                              ev_ntoks, sf_ntoks, fn_ptoks,
+                             pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_get(it, 0) != 2 { return 2; }
@@ -5654,9 +5686,15 @@ fn test_parse_impl() -> i32 {
     let sf_ntoks: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, id5, pp,
                              ev_ntoks, sf_ntoks, fn_ptoks,
+                             pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_len(it) != 2 { return 2; }
@@ -5700,9 +5738,15 @@ fn test_parse_fn_contract() -> i32 {
     let sf_ntoks: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
     let r: i32 = parse_item(tags, starts, ends, source, 0,
                              it, id1, id2, id3, id4, id5, pp,
                              ev_ntoks, sf_ntoks, fn_ptoks,
+                             pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
                              bet, be1, be2, be3, be4, bsf);
     if r != 10 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
@@ -5746,9 +5790,15 @@ fn test_parse_program() -> i32 {
     let sf_ntoks: Vec<i32> = vec_new();
     let id5: Vec<i32> = vec_new();
     let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
     let r: i32 = parse_program(tags, starts, ends, source, 0,
                                 it, id1, id2, id3, id4, id5, pp,
                                 ev_ntoks, sf_ntoks, fn_ptoks,
+                                pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
                                 bet, be1, be2, be3, be4, bsf);
     if r != 12 { return 1; }
     if vec_len(it) != 2 { return 2; }

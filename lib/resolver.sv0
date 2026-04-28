@@ -24,10 +24,9 @@
    apply_use_clause/apply_use_clauses (SML applyUseClause — use clause
    alias registration; enum variant aliases deferred — variant names
    local to parser),
-   resolve_top_item / resolve_program (ItemFn body walk + param locals;
-   resolve_ty on struct fields / enum payloads / contracts still deferred).
-   Remaining vs SML: persisted type arenas for resolve_ty on items;
-   contract expr roots merged into shared expr arena for requires and ensures. */
+   resolve_top_item / resolve_program: ItemFn body + params; ItemStruct field
+   types + ItemTypeAlias RHS via program type arena (pty_tt and struct_field_ty_root);
+   enum payload resolve_ty and contract expr roots still deferred. */
 
 /* ── path joining ───────────────────────────────────────────── */
 
@@ -1229,12 +1228,12 @@ fn apply_use_clauses(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
 }
 
 /* ── resolve_top_item (SML resolveTopItem) ────────────────────
-   ItemFn (tag 0): bind param names (fn_param_name_toks slice from id5 for
-   id3 slots; -1 means wildcard) then resolve_expr on id4 (body_root).
-   Contracts, return, and param resolve_ty need persisted type arenas (deferred).
-   ItemTrait / ItemImpl (tags 3 and 4): method ItemFn rows appear earlier in
-   the flat item list and are resolved when visited; parent row is a no-op.
-   ItemStruct, ItemEnum, type-alias: field or variant resolve_ty deferred. */
+   ItemFn (tag 0): bind param names then resolve_expr on body_root.
+   ItemStruct (tag 1): resolve_ty each field type root in struct_field_ty_root
+   (parallel to struct_field_name_toks; base id3, count id2).
+   ItemTypeAlias (tag 7): id2 is type arena root index (program pty_tt).
+   ItemTrait / ItemImpl (tags 3, 4): parent rows no-op (methods are ItemFn rows).
+   ItemEnum (tag 2): variant payload resolve_ty deferred. */
 
 fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                     id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
@@ -1242,6 +1241,8 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                     et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     ed3: Vec<i32>, ed4: Vec<i32>,
                     fn_param_name_toks: Vec<i32>,
+                    pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
+                    pty_td3: Vec<i32>, struct_field_ty_root: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     mod_vals: Vec<i32>, mod_tys: Vec<i32>,
                     fn_arities: Vec<i32>,
@@ -1267,6 +1268,24 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                              source, starts, ends,
                              mod_vals, mod_tys, fn_arities, frames, pp);
     }
+    if tag == 1 {
+        let fc: i32 = vec_get(id2, idx);
+        let sfb: i32 = vec_get(id3, idx);
+        let mut fi: i32 = 0;
+        while fi < fc {
+            let tr: i32 = vec_get(struct_field_ty_root, sfb + fi);
+            let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
+                                      source, starts, ends, mod_tys, pp);
+            if rr != 0 { return rr; }
+            fi = fi + 1;
+        }
+        return 0;
+    }
+    if tag == 7 {
+        let alias_root: i32 = vec_get(id2, idx);
+        return resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, alias_root,
+                           source, starts, ends, mod_tys, pp);
+    }
     return 0;
 }
 
@@ -1286,6 +1305,8 @@ fn resolve_program(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                    id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
                    fn_param_name_toks: Vec<i32>,
+                   pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
+                   pty_td3: Vec<i32>, struct_field_ty_root: Vec<i32>,
                    source: string, starts: Vec<i32>, ends: Vec<i32>,
                    mod_vals: Vec<i32>, mod_tys: Vec<i32>,
                    fn_arities: Vec<i32>,
@@ -1303,6 +1324,8 @@ fn resolve_program(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let r: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, i,
                                        et, ed1, ed2, ed3, ed4,
                                        fn_param_name_toks,
+                                       pty_tt, pty_td1, pty_td2, pty_td3,
+                                       struct_field_ty_root,
                                        source, starts, ends,
                                        mod_vals, mod_tys,
                                        fn_arities, pp);
@@ -2005,6 +2028,59 @@ fn test_path_join_vec_three() -> i32 {
     return 0;
 }
 
+fn test_resolve_top_item_struct_field() -> i32 {
+    let source: string = "i32";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 3);
+    let mt: Vec<i32> = vec_new();
+    vec_push(mt, 99);
+    let mv: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    vec_push(pty_tt, 0);
+    vec_push(pty_td1, 0);
+    vec_push(pty_td2, 1);
+    vec_push(pty_td3, 0);
+    let it: Vec<i32> = vec_new();
+    vec_push(it, 1);
+    let id1: Vec<i32> = vec_new();
+    vec_push(id1, 0);
+    let id2: Vec<i32> = vec_new();
+    vec_push(id2, 1);
+    let id3: Vec<i32> = vec_new();
+    vec_push(id3, 0);
+    let id4: Vec<i32> = vec_new();
+    vec_push(id4, 1);
+    let id5: Vec<i32> = vec_new();
+    vec_push(id5, 0 - 1);
+    let et: Vec<i32> = vec_new();
+    vec_push(et, 0);
+    let ed1: Vec<i32> = vec_new();
+    vec_push(ed1, 0);
+    let ed2: Vec<i32> = vec_new();
+    vec_push(ed2, 0);
+    let ed3: Vec<i32> = vec_new();
+    vec_push(ed3, 0);
+    let ed4: Vec<i32> = vec_new();
+    vec_push(ed4, 0);
+    let fn_ptoks: Vec<i32> = vec_new();
+    let sf_root: Vec<i32> = vec_new();
+    vec_push(sf_root, 0);
+    let r: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, 0,
+                                   et, ed1, ed2, ed3, ed4, fn_ptoks,
+                                   pty_tt, pty_td1, pty_td2, pty_td3, sf_root,
+                                   source, starts, ends, mv, mt, fa, pp);
+    if r != 0 { return 1; }
+    return 0;
+}
+
 fn test_resolve_program() -> i32 {
     let source: string = "main 0";
     let starts: Vec<i32> = vec_new();
@@ -2039,9 +2115,15 @@ fn test_resolve_program() -> i32 {
     vec_push(id4, 0);
     vec_push(id5, 0);
     vec_push(fn_ptoks, 0);
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_tr: Vec<i32> = vec_new();
     let r: i32 = resolve_program(et, ed1, ed2, ed3, ed4,
                                   it, id1, id2, id3, id4, id5,
                                   fn_ptoks,
+                                  pty_tt, pty_td1, pty_td2, pty_td3, sf_tr,
                                   source, starts, ends,
                                   mv, mt, fa, pp);
     if r != 0 { return 1; }
@@ -2126,6 +2208,8 @@ fn main() -> i32 {
     if r36 != 0 { return 156 + r36; }
     let r37: i32 = test_apply_use_clause_unknown();
     if r37 != 0 { return 159 + r37; }
+    let r37b: i32 = test_resolve_top_item_struct_field();
+    if r37b != 0 { return 161 + r37b; }
     let r38: i32 = test_resolve_program();
     if r38 != 0 { return 162 + r38; }
     let r39: i32 = test_path_join_vec_three();
