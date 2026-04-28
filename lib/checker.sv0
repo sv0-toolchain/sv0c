@@ -81,7 +81,8 @@
    2-segment use path → fn_table/sdef/edef lookup → env or alias).
    Batch 61: build_mod_env (SML modEnvFromProg — module env builder:
    register ItemFn names as TY_FN + process all ItemUse entries).
-   Full check loop deferred — needs cross-module parse_block.   */
+   Batch 62: check_program — init_struct + init_enum + register_all_item_fns +
+   build_mod_env + per-ItemFn check_fn_body (explicit body_root_idx).     */
 
 /* ── binop classification ───────────────────────────────────── */
 
@@ -1702,8 +1703,9 @@ fn scan_fn_param_names(tok_tags: Vec<i32>,
      3. Synthesise the body root expression via synth_expr
      4. Compare result type against declared return type
    Returns 0 on success (types match), -1 on type error.
-   The body root is assumed to be the last expression in the
-   body expression arena (vec_len(bet) - 1).                   */
+   body_root_idx is the ItemFn id4 body-root index into the shared
+   program body_et (children-before-parents arena); not always
+   vec_len(bet)-1 when multiple ItemFn bodies share one arena.    */
 
 fn check_fn_body(
     bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>,
@@ -1714,6 +1716,7 @@ fn check_fn_body(
     param_name_pos: Vec<i32>, param_type_tags: Vec<i32>,
     param_muts: Vec<i32>, param_count: i32,
     ret_ty: i32,
+    body_root_idx: i32,
     edef_names: Vec<i32>,
     edef_variant_offsets: Vec<i32>,
     edef_variant_counts: Vec<i32>,
@@ -1739,8 +1742,9 @@ fn check_fn_body(
                    vec_get(param_muts, pi));
         pi = pi + 1;
     }
-    let body_root: i32 = vec_len(bet) - 1;
+    let body_root: i32 = body_root_idx;
     if body_root < 0 { return 0 - 1; }
+    if body_root >= vec_len(bet) { return 0 - 1; }
     let body_ty: i32 = synth_expr(bet, bed1, bed2, bed3, bed4, bpp,
                                    source, starts, ends,
                                    env_n, env_t, env_m,
@@ -1874,6 +1878,132 @@ fn build_mod_env(
                                             aliases, alias_targets);
         }
         i = i + 1;
+    }
+    return 0;
+}
+
+/* ── check_program (SML check — program-level orchestration) ─
+   After init_struct_defs + init_enum_defs + register_all_item_fns +
+   build_mod_env, walks each ItemFn (tag 0) and runs check_fn_body
+   with that item's id4 body root in the shared body_et arena.
+   Returns 0 on success, -1 on setup or any function failure.     */
+
+fn check_program(
+    tok_tags: Vec<i32>,
+    source: string,
+    starts: Vec<i32>, ends: Vec<i32>,
+    pp: Vec<i32>,
+    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
+    body_et: Vec<i32>, body_ed1: Vec<i32>, body_ed2: Vec<i32>,
+    body_ed3: Vec<i32>, body_ed4: Vec<i32>,
+    type_params: Vec<i32>, tp_limit: i32) -> i32 {
+    let struct_names: Vec<i32> = vec_new();
+    let enum_names: Vec<i32> = vec_new();
+    let nitems: i32 = vec_len(it);
+    let mut ni: i32 = 0;
+    while ni < nitems {
+        let tg: i32 = vec_get(it, ni);
+        if tg == 1 {
+            vec_push(struct_names, vec_get(id1, ni));
+        }
+        if tg == 2 {
+            vec_push(enum_names, vec_get(id1, ni));
+        }
+        ni = ni + 1;
+    }
+    let sdef_names: Vec<i32> = vec_new();
+    let sdef_field_offsets: Vec<i32> = vec_new();
+    let sdef_field_counts: Vec<i32> = vec_new();
+    let sdef_fnames_flat: Vec<i32> = vec_new();
+    let sdef_ftypes_flat: Vec<i32> = vec_new();
+    let _sc: i32 = init_struct_defs(tok_tags, source, starts, ends,
+                                     struct_names, enum_names,
+                                     type_params, tp_limit,
+                                     it, id1, id2,
+                                     sdef_names, sdef_field_offsets,
+                                     sdef_field_counts, sdef_fnames_flat,
+                                     sdef_ftypes_flat);
+    let edef_names: Vec<i32> = vec_new();
+    let edef_variant_offsets: Vec<i32> = vec_new();
+    let edef_variant_counts: Vec<i32> = vec_new();
+    let edef_vnames_flat: Vec<i32> = vec_new();
+    let edef_vshapes_flat: Vec<i32> = vec_new();
+    let _ec: i32 = init_enum_defs(tok_tags, it, id1, id2,
+                                   edef_names, edef_variant_offsets,
+                                   edef_variant_counts, edef_vnames_flat,
+                                   edef_vshapes_flat);
+    let fn_names: Vec<i32> = vec_new();
+    let fn_param_counts: Vec<i32> = vec_new();
+    let fn_ret_types: Vec<i32> = vec_new();
+    let fn_param_offsets: Vec<i32> = vec_new();
+    let fn_param_types_flat: Vec<i32> = vec_new();
+    let _fc: i32 = register_all_item_fns(tok_tags, source, starts, ends,
+                                          struct_names, enum_names,
+                                          type_params, tp_limit,
+                                          it, id1, id2, id3,
+                                          fn_names, fn_param_counts,
+                                          fn_ret_types, fn_param_offsets,
+                                          fn_param_types_flat);
+    let mod_env_names: Vec<i32> = vec_new();
+    let mod_env_types: Vec<i32> = vec_new();
+    let mod_env_muts: Vec<i32> = vec_new();
+    let aliases: Vec<i32> = vec_new();
+    let alias_targets: Vec<i32> = vec_new();
+    let br: i32 = build_mod_env(source, starts, ends, pp,
+                                 it, id1, id2, id3, id4,
+                                 fn_names, fn_ret_types,
+                                 sdef_names,
+                                 edef_names, edef_variant_offsets,
+                                 edef_variant_counts, edef_vnames_flat,
+                                 edef_vshapes_flat,
+                                 mod_env_names, mod_env_types,
+                                 mod_env_muts, aliases, alias_targets);
+    if br != 0 { return 0 - 1; }
+    let bpp: Vec<i32> = vec_new();
+    let mut ii: i32 = 0;
+    while ii < nitems {
+        if vec_get(it, ii) == 0 {
+            let name_pos: i32 = vec_get(id1, ii);
+            let param_count: i32 = vec_get(id3, ii);
+            let body_root_idx: i32 = vec_get(id4, ii);
+            let param_types: Vec<i32> = vec_new();
+            let rpt: i32 = scan_fn_param_type_tags(tok_tags, source,
+                                                    starts, ends,
+                                                    struct_names,
+                                                    enum_names,
+                                                    type_params,
+                                                    tp_limit,
+                                                    name_pos,
+                                                    param_count,
+                                                    param_types);
+            if rpt < 0 { return 0 - 1; }
+            let param_name_pos: Vec<i32> = vec_new();
+            let param_muts: Vec<i32> = vec_new();
+            let rpn: i32 = scan_fn_param_names(tok_tags, name_pos,
+                                                param_count,
+                                                param_name_pos,
+                                                param_muts);
+            if rpn < 0 { return 0 - 1; }
+            let fidx: i32 = fn_table_lookup(fn_names, name_pos);
+            if fidx < 0 { return 0 - 1; }
+            let ret_ty: i32 = fn_table_ret_type(fn_ret_types, fidx);
+            let chk: i32 = check_fn_body(body_et, body_ed1, body_ed2,
+                                          body_ed3, body_ed4, bpp,
+                                          source, starts, ends,
+                                          mod_env_names, mod_env_types,
+                                          mod_env_muts,
+                                          param_name_pos, param_types,
+                                          param_muts, param_count,
+                                          ret_ty, body_root_idx,
+                                          edef_names,
+                                          edef_variant_offsets,
+                                          edef_variant_counts,
+                                          edef_vnames_flat,
+                                          edef_vshapes_flat,
+                                          fn_names, fn_ret_types);
+            if chk != 0 { return 0 - 1; }
+        }
+        ii = ii + 1;
     }
     return 0;
 }
@@ -5061,7 +5191,7 @@ fn test_check_fn_body() -> i32 {
                                  source, starts, ends,
                                  men, met, mem,
                                  ppn, ppt, ppm, 0,
-                                 TY_INT(),
+                                 TY_INT(), 0,
                                  edn, edvo, edvc, edvn, edvs,
                                  fnn, fnrt);
     if r1 != 0 { return 1; }
@@ -5069,7 +5199,7 @@ fn test_check_fn_body() -> i32 {
                                  source, starts, ends,
                                  men, met, mem,
                                  ppn, ppt, ppm, 0,
-                                 TY_BOOL(),
+                                 TY_BOOL(), 0,
                                  edn, edvo, edvc, edvn, edvs,
                                  fnn, fnrt);
     if r2 != 0 - 1 { return 2; }
@@ -5077,10 +5207,116 @@ fn test_check_fn_body() -> i32 {
                                  source, starts, ends,
                                  men, met, mem,
                                  ppn, ppt, ppm, 0,
-                                 TY_UNIT(),
+                                 TY_UNIT(), 0,
                                  edn, edvo, edvc, edvn, edvs,
                                  fnn, fnrt);
     if r3 != 0 { return 3; }
+    return 0;
+}
+
+fn test_check_program() -> i32 {
+    /* A: one ItemFn — signature fn foo ( ) -> i32 { }, body literal 42. */
+    let source_a: string = "fn foo ( ) -> i32 { }";
+    let starts_a: Vec<i32> = vec_new();
+    let ends_a: Vec<i32> = vec_new();
+    vec_push(starts_a, 0); vec_push(ends_a, 2);
+    vec_push(starts_a, 3); vec_push(ends_a, 6);
+    vec_push(starts_a, 7); vec_push(ends_a, 8);
+    vec_push(starts_a, 9); vec_push(ends_a, 10);
+    vec_push(starts_a, 11); vec_push(ends_a, 13);
+    vec_push(starts_a, 14); vec_push(ends_a, 17);
+    vec_push(starts_a, 18); vec_push(ends_a, 19);
+    vec_push(starts_a, 20); vec_push(ends_a, 21);
+    let tt_a: Vec<i32> = vec_new();
+    vec_push(tt_a, 65); vec_push(tt_a, 5); vec_push(tt_a, 6);
+    vec_push(tt_a, 7); vec_push(tt_a, 19); vec_push(tt_a, 5);
+    vec_push(tt_a, 8); vec_push(tt_a, 9);
+    let it_a: Vec<i32> = vec_new();
+    let id1_a: Vec<i32> = vec_new();
+    let id2_a: Vec<i32> = vec_new();
+    let id3_a: Vec<i32> = vec_new();
+    let id4_a: Vec<i32> = vec_new();
+    vec_push(it_a, 0);
+    vec_push(id1_a, 1);
+    vec_push(id2_a, 1);
+    vec_push(id3_a, 0);
+    vec_push(id4_a, 0);
+    let body_et_a: Vec<i32> = vec_new();
+    let body_ed1_a: Vec<i32> = vec_new();
+    let body_ed2_a: Vec<i32> = vec_new();
+    let body_ed3_a: Vec<i32> = vec_new();
+    let body_ed4_a: Vec<i32> = vec_new();
+    vec_push(body_et_a, 0); vec_push(body_ed1_a, 0);
+    vec_push(body_ed2_a, 0); vec_push(body_ed3_a, 0);
+    vec_push(body_ed4_a, 0);
+    let pp_a: Vec<i32> = vec_new();
+    let tp_a: Vec<i32> = vec_new();
+    let ra: i32 = check_program(tt_a, source_a, starts_a, ends_a, pp_a,
+                                 it_a, id1_a, id2_a, id3_a, id4_a,
+                                 body_et_a, body_ed1_a, body_ed2_a,
+                                 body_ed3_a, body_ed4_a, tp_a, 0);
+    if ra != 0 { return 1; }
+    /* B: two ItemFns share body_et — roots 0 and 1; literals 42 and 7. */
+    let source_b: string =
+        "fn foo ( ) -> i32 { } fn bar ( ) -> i32 { }";
+    let starts_b: Vec<i32> = vec_new();
+    let ends_b: Vec<i32> = vec_new();
+    vec_push(starts_b, 0); vec_push(ends_b, 2);
+    vec_push(starts_b, 3); vec_push(ends_b, 6);
+    vec_push(starts_b, 7); vec_push(ends_b, 8);
+    vec_push(starts_b, 9); vec_push(ends_b, 10);
+    vec_push(starts_b, 11); vec_push(ends_b, 13);
+    vec_push(starts_b, 14); vec_push(ends_b, 17);
+    vec_push(starts_b, 18); vec_push(ends_b, 19);
+    vec_push(starts_b, 20); vec_push(ends_b, 21);
+    vec_push(starts_b, 22); vec_push(ends_b, 24);
+    vec_push(starts_b, 25); vec_push(ends_b, 28);
+    vec_push(starts_b, 29); vec_push(ends_b, 30);
+    vec_push(starts_b, 31); vec_push(ends_b, 32);
+    vec_push(starts_b, 33); vec_push(ends_b, 35);
+    vec_push(starts_b, 36); vec_push(ends_b, 39);
+    vec_push(starts_b, 40); vec_push(ends_b, 41);
+    vec_push(starts_b, 42); vec_push(ends_b, 43);
+    let tt_b: Vec<i32> = vec_new();
+    vec_push(tt_b, 65); vec_push(tt_b, 5); vec_push(tt_b, 6);
+    vec_push(tt_b, 7); vec_push(tt_b, 19); vec_push(tt_b, 5);
+    vec_push(tt_b, 8); vec_push(tt_b, 9);
+    vec_push(tt_b, 65); vec_push(tt_b, 5); vec_push(tt_b, 6);
+    vec_push(tt_b, 7); vec_push(tt_b, 19); vec_push(tt_b, 5);
+    vec_push(tt_b, 8); vec_push(tt_b, 9);
+    let it_b: Vec<i32> = vec_new();
+    let id1_b: Vec<i32> = vec_new();
+    let id2_b: Vec<i32> = vec_new();
+    let id3_b: Vec<i32> = vec_new();
+    let id4_b: Vec<i32> = vec_new();
+    vec_push(it_b, 0);
+    vec_push(id1_b, 1);
+    vec_push(id2_b, 1);
+    vec_push(id3_b, 0);
+    vec_push(id4_b, 0);
+    vec_push(it_b, 0);
+    vec_push(id1_b, 9);
+    vec_push(id2_b, 1);
+    vec_push(id3_b, 0);
+    vec_push(id4_b, 1);
+    let body_et_b: Vec<i32> = vec_new();
+    let body_ed1_b: Vec<i32> = vec_new();
+    let body_ed2_b: Vec<i32> = vec_new();
+    let body_ed3_b: Vec<i32> = vec_new();
+    let body_ed4_b: Vec<i32> = vec_new();
+    vec_push(body_et_b, 0); vec_push(body_ed1_b, 0);
+    vec_push(body_ed2_b, 0); vec_push(body_ed3_b, 0);
+    vec_push(body_ed4_b, 0);
+    vec_push(body_et_b, 0); vec_push(body_ed1_b, 0);
+    vec_push(body_ed2_b, 0); vec_push(body_ed3_b, 0);
+    vec_push(body_ed4_b, 0);
+    let pp_b: Vec<i32> = vec_new();
+    let tp_b: Vec<i32> = vec_new();
+    let rb: i32 = check_program(tt_b, source_b, starts_b, ends_b, pp_b,
+                                 it_b, id1_b, id2_b, id3_b, id4_b,
+                                 body_et_b, body_ed1_b, body_ed2_b,
+                                 body_ed3_b, body_ed4_b, tp_b, 0);
+    if rb != 0 { return 2; }
     return 0;
 }
 
@@ -5380,7 +5616,9 @@ fn main() -> i32 {
     if r63 != 0 { return 670 + r63; }
     let r64: i32 = test_build_mod_env();
     if r64 != 0 { return 680 + r64; }
-    let r65: i32 = test_named_only_ty_basic();
-    if r65 != 0 { return 690 + r65; }
+    let r65: i32 = test_check_program();
+    if r65 != 0 { return 685 + r65; }
+    let r66: i32 = test_named_only_ty_basic();
+    if r66 != 0 { return 690 + r66; }
     return 0;
 }
