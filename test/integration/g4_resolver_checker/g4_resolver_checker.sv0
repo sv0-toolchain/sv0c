@@ -1,0 +1,28 @@
+struct Boxed {
+ value: i32,
+}
+
+enum Gate {
+ Ok(Boxed),
+ Err(i32),
+}
+
+fn score_box(b: Boxed) -> i32
+ requires(b.value >= 0)
+ ensures(result >= b.value)
+{
+ return b.value + 1;
+}
+
+fn fold_gate(g: Gate) -> i32 {
+ return match g {
+ Gate::Ok(b) => score_box(b),
+ Gate::Err(v) => v,
+ };
+}
+
+fn main() -> i32 {
+ let b: Boxed = Boxed { value: 3 };
+ let g: Gate = Gate::Ok(b);
+ return fold_gate(g) - 4;
+}
