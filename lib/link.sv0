@@ -18,8 +18,10 @@
    **`link_path_pool_prefix_needs_mangle`** + **`link_expr_path_needs_mangle`**
    (ExprPath); **`link_expr_subtree_node_count`** / **`link_expr_root_needs_mangle`**
    (recursive mapExpr predicate — ExprCall/MethodCall arg slicing, block/match
-   root-span traversal, stmt/arm tags 27–33). **`mapPat`** / **`mapItem`**
-   rewrite remains deferred. */
+   root-span traversal, stmt/arm tags 27–33). **`link_pat_subtree_node_count`** /
+   **`link_pat_root_needs_mangle`** — standalone **pat arena** (parser **`pat_tags`**
+   rows 0–6) subtree sizing + path mangle predicate (**`mapPat`** rewrite still
+   deferred). **`mapItem`** rewrite remains deferred. */
 
 /* ── file classification ────────────────────────────────────── */
 
@@ -450,6 +452,164 @@ fn link_expr_path_needs_mangle(expr_tags: Vec<i32>, ed1: Vec<i32>,
     let ps2: i32 = vec_get(ed1, idx);
     let sc2: i32 = vec_get(ed2, idx);
     return link_path_pool_prefix_needs_mangle(pp, tops, ps2, sc2);
+}
+
+/* Parser **pat** arena (parallel pat_tags / pat_data1–3) — see parser.sv0
+   “pat arena tags”. Size + mapPat-style predicate for link-time passes that
+   consume **`parse_pat`** buffers (match arms also embed patterns in the expr
+   arena via ExprMatchArm / ExprPatExtra). Mirrors **`pat_leftmost_subtree_rows`**
+   row counts. */
+
+fn link_pat_subtree_node_count(pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                               pat_d2: Vec<i32>, pat_d3: Vec<i32>,
+                               idx: i32, depth: i32) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    if depth > 96 { return 0 - 1; }
+    let t: i32 = vec_get(pat_tags, idx);
+    if t == 0 { return 1; }
+    if t == 1 { return 1; }
+    if t == 2 { return 1; }
+    if t == 3 {
+        let ef: i32 = vec_get(pat_d1, idx);
+        let ec: i32 = vec_get(pat_d2, idx);
+        let mut cur: i32 = ef;
+        let mut tot: i32 = 0;
+        let mut j: i32 = 0;
+        while j < ec {
+            let part: i32 = link_pat_subtree_node_count(pat_tags, pat_d1,
+                pat_d2, pat_d3, cur, depth + 1);
+            if part <= 0 { return 0 - 1; }
+            tot = tot + part;
+            cur = cur + part;
+            j = j + 1;
+        }
+        return tot + 1;
+    }
+    if t == 4 {
+        let fc: i32 = vec_get(pat_d3, idx);
+        if fc <= 0 { return 1; }
+        let first_f: i32 = idx - fc;
+        let mut cur2: i32 = first_f;
+        let mut tot2: i32 = 0;
+        let mut j2: i32 = 0;
+        while j2 < fc {
+            let part2: i32 = link_pat_subtree_node_count(pat_tags, pat_d1,
+                pat_d2, pat_d3, cur2, depth + 1);
+            if part2 <= 0 { return 0 - 1; }
+            tot2 = tot2 + part2;
+            cur2 = cur2 + part2;
+            j2 = j2 + 1;
+        }
+        return tot2 + 1;
+    }
+    if t == 5 {
+        let ac: i32 = vec_get(pat_d3, idx);
+        if ac <= 0 { return 1; }
+        let first_a: i32 = idx - ac;
+        let mut cur3: i32 = first_a;
+        let mut tot3: i32 = 0;
+        let mut j3: i32 = 0;
+        while j3 < ac {
+            let part3: i32 = link_pat_subtree_node_count(pat_tags, pat_d1,
+                pat_d2, pat_d3, cur3, depth + 1);
+            if part3 <= 0 { return 0 - 1; }
+            tot3 = tot3 + part3;
+            cur3 = cur3 + part3;
+            j3 = j3 + 1;
+        }
+        return tot3 + 1;
+    }
+    if t == 6 {
+        let fo: i32 = vec_get(pat_d1, idx);
+        let span: i32 = idx - fo + 1;
+        return span;
+    }
+    return 0 - 1;
+}
+
+fn link_pat_root_needs_mangle(pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                              pat_d2: Vec<i32>, pat_d3: Vec<i32>,
+                              pp: Vec<i32>, tops: Vec<i32>,
+                              idx: i32, depth: i32) -> bool {
+    if idx < 0 { return false; }
+    if depth > 96 { return false; }
+    let t: i32 = vec_get(pat_tags, idx);
+    if t == 0 { return false; }
+    if t == 1 { return false; }
+    if t == 2 { return false; }
+    if t == 3 {
+        let ef: i32 = vec_get(pat_d1, idx);
+        let ec: i32 = vec_get(pat_d2, idx);
+        let mut cur: i32 = ef;
+        let mut j: i32 = 0;
+        while j < ec {
+            if link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3,
+                    pp, tops, cur, depth + 1) == true {
+                return true;
+            }
+            let sp: i32 = link_pat_subtree_node_count(pat_tags, pat_d1, pat_d2,
+                pat_d3, cur, 0);
+            if sp <= 0 { return false; }
+            cur = cur + sp;
+            j = j + 1;
+        }
+        return false;
+    }
+    if t == 4 {
+        let ps: i32 = vec_get(pat_d1, idx);
+        let sc: i32 = vec_get(pat_d2, idx);
+        if link_path_pool_prefix_needs_mangle(pp, tops, ps, sc) == true {
+            return true;
+        }
+        let fc: i32 = vec_get(pat_d3, idx);
+        let mut fi: i32 = 0;
+        while fi < fc {
+            let fr: i32 = idx - fc + fi;
+            if link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3,
+                    pp, tops, fr, depth + 1) == true {
+                return true;
+            }
+            fi = fi + 1;
+        }
+        return false;
+    }
+    if t == 5 {
+        let ps5: i32 = vec_get(pat_d1, idx);
+        let sc5: i32 = vec_get(pat_d2, idx);
+        if link_path_pool_prefix_needs_mangle(pp, tops, ps5, sc5) == true {
+            return true;
+        }
+        let ac: i32 = vec_get(pat_d3, idx);
+        let mut ai: i32 = 0;
+        while ai < ac {
+            let ar: i32 = idx - ac + ai;
+            if link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3,
+                    pp, tops, ar, depth + 1) == true {
+                return true;
+            }
+            ai = ai + 1;
+        }
+        return false;
+    }
+    if t == 6 {
+        let fo: i32 = vec_get(pat_d1, idx);
+        let cnt: i32 = vec_get(pat_d2, idx);
+        let mut cur: i32 = fo;
+        let mut ai: i32 = 0;
+        while ai < cnt {
+            if link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3,
+                    pp, tops, cur, depth + 1) == true {
+                return true;
+            }
+            let sp: i32 = link_pat_subtree_node_count(pat_tags, pat_d1, pat_d2,
+                pat_d3, cur, 0);
+            if sp <= 0 { return false; }
+            cur = cur + sp;
+            ai = ai + 1;
+        }
+        return false;
+    }
+    return false;
 }
 
 /* Post-order expr subtree size at root idx (parser expr arena — children
@@ -1861,6 +2021,75 @@ fn test_link_expr_match_arm_needs_mangle() -> i32 {
     return 0;
 }
 
+fn test_link_pat_subtree_node_count_wild() -> i32 {
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    vec_push(pt, 0);
+    vec_push(pd1, 0);
+    vec_push(pd2, 0);
+    vec_push(pd3, 0);
+    let c: i32 = link_pat_subtree_node_count(pt, pd1, pd2, pd3, 0, 0);
+    if c != 1 { return 1; }
+    return 0;
+}
+
+fn test_link_pat_subtree_tuple_two_wild() -> i32 {
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    vec_push(pt, 0);
+    vec_push(pd1, 0);
+    vec_push(pd2, 0);
+    vec_push(pd3, 0);
+    vec_push(pt, 0);
+    vec_push(pd1, 0);
+    vec_push(pd2, 0);
+    vec_push(pd3, 0);
+    vec_push(pt, 3);
+    vec_push(pd1, 0);
+    vec_push(pd2, 2);
+    vec_push(pd3, 0);
+    let c: i32 = link_pat_subtree_node_count(pt, pd1, pd2, pd3, 2, 0);
+    if c != 3 { return 1; }
+    return 0;
+}
+
+fn test_link_pat_struct_path_needs_mangle() -> i32 {
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pd3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 77);
+    vec_push(pt, 0);
+    vec_push(pd1, 0);
+    vec_push(pd2, 0);
+    vec_push(pd3, 0);
+    vec_push(pt, 0);
+    vec_push(pd1, 0);
+    vec_push(pd2, 0);
+    vec_push(pd3, 0);
+    vec_push(pt, 4);
+    vec_push(pd1, 0);
+    vec_push(pd2, 1);
+    vec_push(pd3, 2);
+    let tops_hit: Vec<i32> = vec_new();
+    vec_push(tops_hit, 77);
+    if link_pat_root_needs_mangle(pt, pd1, pd2, pd3, pp, tops_hit, 2, 0) !=
+            true {
+        return 1;
+    }
+    let tops_miss: Vec<i32> = vec_new();
+    if link_pat_root_needs_mangle(pt, pd1, pd2, pd3, pp, tops_miss, 2, 0) !=
+            false {
+        return 2;
+    }
+    return 0;
+}
+
 fn test_link_ty_ref_chain_tyname_mangle() -> i32 {
     let tt: Vec<i32> = vec_new();
     let d1: Vec<i32> = vec_new();
@@ -2082,6 +2311,12 @@ fn main() -> i32 {
     if r21c3d != 0 { return 239 + r21c3d; }
     let r21c3e: i32 = test_link_expr_match_arm_needs_mangle();
     if r21c3e != 0 { return 242 + r21c3e; }
+    let r21c3p: i32 = test_link_pat_subtree_node_count_wild();
+    if r21c3p != 0 { return 248 + r21c3p; }
+    let r21c3q: i32 = test_link_pat_subtree_tuple_two_wild();
+    if r21c3q != 0 { return 251 + r21c3q; }
+    let r21c3r: i32 = test_link_pat_struct_path_needs_mangle();
+    if r21c3r != 0 { return 254 + r21c3r; }
     let r21d: i32 = test_link_ty_ref_chain_tyname_mangle();
     if r21d != 0 { return 219 + r21d; }
     let r21e: i32 = test_link_ty_array_tyname_mangle();

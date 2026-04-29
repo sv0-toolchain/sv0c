@@ -49,6 +49,8 @@ static const char* map_path_segs_rewrite_2(int tops, const char* mod_id, int fir
 static int link_path_pool_prefix_needs_mangle(int pp, int tops, int pool_start, int seg_count);
 static int link_ty_tyname_path_needs_mangle(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, int idx);
 static int link_expr_path_needs_mangle(int expr_tags, int ed1, int ed2, int pp, int tops, int idx);
+static int link_pat_subtree_node_count(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int idx, int depth);
+static int link_pat_root_needs_mangle(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int pp, int tops, int idx, int depth);
 static int link_expr_subtree_node_count(int expr_tags, int ed1, int ed2, int ed3, int ed4, int idx, int depth);
 static int link_expr_find_root_covering_min(int expr_tags, int ed1, int ed2, int ed3, int ed4, int lo, int hi_excl);
 static int link_expr_root_needs_mangle(int expr_tags, int ed1, int ed2, int ed3, int ed4, int pp, int ty_tags, int ty_d1, int ty_d2, int ty_d3, int tops, int idx, int depth);
@@ -92,6 +94,9 @@ static int test_link_expr_call_root_needs_mangle_two_args(void);
 static int test_link_expr_if_needs_mangle(void);
 static int test_link_expr_block_stmt_needs_mangle(void);
 static int test_link_expr_match_arm_needs_mangle(void);
+static int test_link_pat_subtree_node_count_wild(void);
+static int test_link_pat_subtree_tuple_two_wild(void);
+static int test_link_pat_struct_path_needs_mangle(void);
 static int test_link_ty_ref_chain_tyname_mangle(void);
 static int test_link_ty_array_tyname_mangle(void);
 static int test_link_ty_tuple_two_tyname_mangle(void);
@@ -721,6 +726,256 @@ static int link_expr_path_needs_mangle(int expr_tags, int ed1, int ed2, int pp, 
   int sc2 = _sv0t2;
   int _sv0t3 = link_path_pool_prefix_needs_mangle(pp, tops, ps2, sc2);
   return _sv0t3;
+}
+
+static int link_pat_subtree_node_count(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int idx, int depth) {
+  if ((idx < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  if ((depth > 96)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(pat_tags, idx);
+  int t = _sv0t2;
+  if ((t == 0)) {
+    return 1;
+  } else {
+  }
+  if ((t == 1)) {
+    return 1;
+  } else {
+  }
+  if ((t == 2)) {
+    return 1;
+  } else {
+  }
+  if ((t == 3)) {
+    int _sv0t3 = sv0_vec_get(pat_d1, idx);
+    int ef = _sv0t3;
+    int _sv0t4 = sv0_vec_get(pat_d2, idx);
+    int ec = _sv0t4;
+    int cur = ef;
+    int tot = 0;
+    int j = 0;
+    while ((j < ec)) {
+      int _sv0t5 = (depth + 1);
+      int _sv0t6 = link_pat_subtree_node_count(pat_tags, pat_d1, pat_d2, pat_d3, cur, _sv0t5);
+      int part = _sv0t6;
+      if ((part <= 0)) {
+        int _sv0t7 = (0 - 1);
+        return _sv0t7;
+      } else {
+      }
+      tot = (tot + part);
+      cur = (cur + part);
+      j = (j + 1);
+    }
+    int _sv0t8 = (tot + 1);
+    return _sv0t8;
+  } else {
+  }
+  if ((t == 4)) {
+    int _sv0t9 = sv0_vec_get(pat_d3, idx);
+    int fc = _sv0t9;
+    if ((fc <= 0)) {
+      return 1;
+    } else {
+    }
+    int first_f = (idx - fc);
+    int cur2 = first_f;
+    int tot2 = 0;
+    int j2 = 0;
+    while ((j2 < fc)) {
+      int _sv0t10 = (depth + 1);
+      int _sv0t11 = link_pat_subtree_node_count(pat_tags, pat_d1, pat_d2, pat_d3, cur2, _sv0t10);
+      int part2 = _sv0t11;
+      if ((part2 <= 0)) {
+        int _sv0t12 = (0 - 1);
+        return _sv0t12;
+      } else {
+      }
+      tot2 = (tot2 + part2);
+      cur2 = (cur2 + part2);
+      j2 = (j2 + 1);
+    }
+    int _sv0t13 = (tot2 + 1);
+    return _sv0t13;
+  } else {
+  }
+  if ((t == 5)) {
+    int _sv0t14 = sv0_vec_get(pat_d3, idx);
+    int ac = _sv0t14;
+    if ((ac <= 0)) {
+      return 1;
+    } else {
+    }
+    int first_a = (idx - ac);
+    int cur3 = first_a;
+    int tot3 = 0;
+    int j3 = 0;
+    while ((j3 < ac)) {
+      int _sv0t15 = (depth + 1);
+      int _sv0t16 = link_pat_subtree_node_count(pat_tags, pat_d1, pat_d2, pat_d3, cur3, _sv0t15);
+      int part3 = _sv0t16;
+      if ((part3 <= 0)) {
+        int _sv0t17 = (0 - 1);
+        return _sv0t17;
+      } else {
+      }
+      tot3 = (tot3 + part3);
+      cur3 = (cur3 + part3);
+      j3 = (j3 + 1);
+    }
+    int _sv0t18 = (tot3 + 1);
+    return _sv0t18;
+  } else {
+  }
+  if ((t == 6)) {
+    int _sv0t19 = sv0_vec_get(pat_d1, idx);
+    int fo = _sv0t19;
+    int _sv0t20 = (idx - fo);
+    int span = (_sv0t20 + 1);
+    return span;
+  } else {
+  }
+  int _sv0t21 = (0 - 1);
+  return _sv0t21;
+}
+
+static int link_pat_root_needs_mangle(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int pp, int tops, int idx, int depth) {
+  if ((idx < 0)) {
+    return 0;
+  } else {
+  }
+  if ((depth > 96)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(pat_tags, idx);
+  int t = _sv0t0;
+  if ((t == 0)) {
+    return 0;
+  } else {
+  }
+  if ((t == 1)) {
+    return 0;
+  } else {
+  }
+  if ((t == 2)) {
+    return 0;
+  } else {
+  }
+  if ((t == 3)) {
+    int _sv0t1 = sv0_vec_get(pat_d1, idx);
+    int ef = _sv0t1;
+    int _sv0t2 = sv0_vec_get(pat_d2, idx);
+    int ec = _sv0t2;
+    int cur = ef;
+    int j = 0;
+    while ((j < ec)) {
+      int _sv0t3 = (depth + 1);
+      int _sv0t4 = link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3, pp, tops, cur, _sv0t3);
+      if ((_sv0t4 == 1)) {
+        return 1;
+      } else {
+      }
+      int _sv0t5 = link_pat_subtree_node_count(pat_tags, pat_d1, pat_d2, pat_d3, cur, 0);
+      int sp = _sv0t5;
+      if ((sp <= 0)) {
+        return 0;
+      } else {
+      }
+      cur = (cur + sp);
+      j = (j + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 4)) {
+    int _sv0t6 = sv0_vec_get(pat_d1, idx);
+    int ps = _sv0t6;
+    int _sv0t7 = sv0_vec_get(pat_d2, idx);
+    int sc = _sv0t7;
+    int _sv0t8 = link_path_pool_prefix_needs_mangle(pp, tops, ps, sc);
+    if ((_sv0t8 == 1)) {
+      return 1;
+    } else {
+    }
+    int _sv0t9 = sv0_vec_get(pat_d3, idx);
+    int fc = _sv0t9;
+    int fi = 0;
+    while ((fi < fc)) {
+      int _sv0t10 = (idx - fc);
+      int fr = (_sv0t10 + fi);
+      int _sv0t11 = (depth + 1);
+      int _sv0t12 = link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3, pp, tops, fr, _sv0t11);
+      if ((_sv0t12 == 1)) {
+        return 1;
+      } else {
+      }
+      fi = (fi + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 5)) {
+    int _sv0t13 = sv0_vec_get(pat_d1, idx);
+    int ps5 = _sv0t13;
+    int _sv0t14 = sv0_vec_get(pat_d2, idx);
+    int sc5 = _sv0t14;
+    int _sv0t15 = link_path_pool_prefix_needs_mangle(pp, tops, ps5, sc5);
+    if ((_sv0t15 == 1)) {
+      return 1;
+    } else {
+    }
+    int _sv0t16 = sv0_vec_get(pat_d3, idx);
+    int ac = _sv0t16;
+    int ai = 0;
+    while ((ai < ac)) {
+      int _sv0t17 = (idx - ac);
+      int ar = (_sv0t17 + ai);
+      int _sv0t18 = (depth + 1);
+      int _sv0t19 = link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3, pp, tops, ar, _sv0t18);
+      if ((_sv0t19 == 1)) {
+        return 1;
+      } else {
+      }
+      ai = (ai + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 6)) {
+    int _sv0t20 = sv0_vec_get(pat_d1, idx);
+    int fo = _sv0t20;
+    int _sv0t21 = sv0_vec_get(pat_d2, idx);
+    int cnt = _sv0t21;
+    int cur = fo;
+    int ai = 0;
+    while ((ai < cnt)) {
+      int _sv0t22 = (depth + 1);
+      int _sv0t23 = link_pat_root_needs_mangle(pat_tags, pat_d1, pat_d2, pat_d3, pp, tops, cur, _sv0t22);
+      if ((_sv0t23 == 1)) {
+        return 1;
+      } else {
+      }
+      int _sv0t24 = link_pat_subtree_node_count(pat_tags, pat_d1, pat_d2, pat_d3, cur, 0);
+      int sp = _sv0t24;
+      if ((sp <= 0)) {
+        return 0;
+      } else {
+      }
+      cur = (cur + sp);
+      ai = (ai + 1);
+    }
+    return 0;
+  } else {
+  }
+  return 0;
 }
 
 static int link_expr_subtree_node_count(int expr_tags, int ed1, int ed2, int ed3, int ed4, int idx, int depth) {
@@ -3375,6 +3630,100 @@ static int test_link_expr_match_arm_needs_mangle(void) {
   return 0;
 }
 
+static int test_link_pat_subtree_node_count_wild(void) {
+  int _sv0t0 = sv0_vec_new();
+  int pt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int pd1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int pd2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pd3 = _sv0t3;
+  sv0_vec_push(pt, 0);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  int _sv0t4 = link_pat_subtree_node_count(pt, pd1, pd2, pd3, 0, 0);
+  int c = _sv0t4;
+  if ((c != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_pat_subtree_tuple_two_wild(void) {
+  int _sv0t0 = sv0_vec_new();
+  int pt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int pd1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int pd2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pd3 = _sv0t3;
+  sv0_vec_push(pt, 0);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  sv0_vec_push(pt, 0);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  sv0_vec_push(pt, 3);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 2);
+  sv0_vec_push(pd3, 0);
+  int _sv0t4 = link_pat_subtree_node_count(pt, pd1, pd2, pd3, 2, 0);
+  int c = _sv0t4;
+  if ((c != 3)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_pat_struct_path_needs_mangle(void) {
+  int _sv0t0 = sv0_vec_new();
+  int pt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int pd1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int pd2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pd3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int pp = _sv0t4;
+  sv0_vec_push(pp, 77);
+  sv0_vec_push(pt, 0);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  sv0_vec_push(pt, 0);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 0);
+  sv0_vec_push(pd3, 0);
+  sv0_vec_push(pt, 4);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 1);
+  sv0_vec_push(pd3, 2);
+  int _sv0t5 = sv0_vec_new();
+  int tops_hit = _sv0t5;
+  sv0_vec_push(tops_hit, 77);
+  int _sv0t6 = link_pat_root_needs_mangle(pt, pd1, pd2, pd3, pp, tops_hit, 2, 0);
+  if ((_sv0t6 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_new();
+  int tops_miss = _sv0t7;
+  int _sv0t8 = link_pat_root_needs_mangle(pt, pd1, pd2, pd3, pp, tops_miss, 2, 0);
+  if ((_sv0t8 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 static int test_link_ty_ref_chain_tyname_mangle(void) {
   int _sv0t0 = sv0_vec_new();
   int tt = _sv0t0;
@@ -3832,39 +4181,60 @@ int main(void) {
     return _sv0t66;
   } else {
   }
-  int _sv0t67 = test_link_ty_ref_chain_tyname_mangle();
-  int r21d = _sv0t67;
-  if ((r21d != 0)) {
-    int _sv0t68 = (219 + r21d);
+  int _sv0t67 = test_link_pat_subtree_node_count_wild();
+  int r21c3p = _sv0t67;
+  if ((r21c3p != 0)) {
+    int _sv0t68 = (248 + r21c3p);
     return _sv0t68;
   } else {
   }
-  int _sv0t69 = test_link_ty_array_tyname_mangle();
-  int r21e = _sv0t69;
-  if ((r21e != 0)) {
-    int _sv0t70 = (222 + r21e);
+  int _sv0t69 = test_link_pat_subtree_tuple_two_wild();
+  int r21c3q = _sv0t69;
+  if ((r21c3q != 0)) {
+    int _sv0t70 = (251 + r21c3q);
     return _sv0t70;
   } else {
   }
-  int _sv0t71 = test_link_ty_tuple_two_tyname_mangle();
-  int r21f = _sv0t71;
-  if ((r21f != 0)) {
-    int _sv0t72 = (226 + r21f);
+  int _sv0t71 = test_link_pat_struct_path_needs_mangle();
+  int r21c3r = _sv0t71;
+  if ((r21c3r != 0)) {
+    int _sv0t72 = (254 + r21c3r);
     return _sv0t72;
   } else {
   }
-  int _sv0t73 = test_link_ty_generic_arg_path_mangle();
-  int r21g = _sv0t73;
-  if ((r21g != 0)) {
-    int _sv0t74 = (230 + r21g);
+  int _sv0t73 = test_link_ty_ref_chain_tyname_mangle();
+  int r21d = _sv0t73;
+  if ((r21d != 0)) {
+    int _sv0t74 = (219 + r21d);
     return _sv0t74;
   } else {
   }
-  int _sv0t75 = test_g2_link_host_io_aliases();
-  int r22 = _sv0t75;
-  if ((r22 != 0)) {
-    int _sv0t76 = (220 + r22);
+  int _sv0t75 = test_link_ty_array_tyname_mangle();
+  int r21e = _sv0t75;
+  if ((r21e != 0)) {
+    int _sv0t76 = (222 + r21e);
     return _sv0t76;
+  } else {
+  }
+  int _sv0t77 = test_link_ty_tuple_two_tyname_mangle();
+  int r21f = _sv0t77;
+  if ((r21f != 0)) {
+    int _sv0t78 = (226 + r21f);
+    return _sv0t78;
+  } else {
+  }
+  int _sv0t79 = test_link_ty_generic_arg_path_mangle();
+  int r21g = _sv0t79;
+  if ((r21g != 0)) {
+    int _sv0t80 = (230 + r21g);
+    return _sv0t80;
+  } else {
+  }
+  int _sv0t81 = test_g2_link_host_io_aliases();
+  int r22 = _sv0t81;
+  if ((r22 != 0)) {
+    int _sv0t82 = (220 + r22);
+    return _sv0t82;
   } else {
   }
   return 0;
