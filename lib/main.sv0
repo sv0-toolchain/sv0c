@@ -7,6 +7,10 @@
    Host text I/O uses read_file / write_file / read_dir (T0-8).
    compile_read_source / compile_write_text are compile-oriented aliases.
    Higher-level compileFile / compileProjectDir remain incremental (G6).
+   G6: join_dir_main_sv0 + project_vm_entry_stem (SML projectVmEntryStem);
+   driver_pipeline_step_name / driver_pipeline_step_for_core_phase expose the
+   full nine-step spine (tokenize…emit-vm); cross-module lexer→emit wiring stays
+   in per-module bootstrap roots until multi-unit sv0 compilation lands.
    M3-S-003: tokenize-phase Result boundary sketch (pre-lexer) keeps
    explicit success/error plumbing; M3-S-018: sketch loads source via
    read_file after path validation. */
@@ -135,6 +139,31 @@ fn PHASE_EMIT_C() -> i32 { return 5; }
 fn PHASE_EMIT_VM() -> i32 { return 6; }
 fn PHASE_COUNT() -> i32 { return 7; }
 
+/* Intended full pipeline length for design docs (G6 / M3-S-041): lexer tokenize +
+   parser parse, then the PHASE_* strip starting at resolve. Matches SML driver
+   ordering at a coarse grain; sv0 driver still wires phases incrementally. */
+fn DRIVER_FULL_PIPELINE_LEN() -> i32 {
+    return 2 + PHASE_COUNT();
+}
+
+/* Linear driver step index 0..DRIVER_FULL_PIPELINE_LEN()-1:
+   0 = tokenize, 1 = parse, then PHASE_RESOLVE..PHASE_EMIT_VM at indices 2..8.
+   Matches SML Main.compileFile{,Vm}: Lexer.tokenize → Parser.parse → compileProgram*. */
+
+fn driver_pipeline_step_name(step: i32) -> string {
+    if step == 0 { return "tokenize"; }
+    if step == 1 { return "parse"; }
+    let ph: i32 = step - 2;
+    if ph >= 0 {
+        if ph < PHASE_COUNT() { return phase_name(ph); }
+    }
+    return "unknown";
+}
+
+fn driver_pipeline_step_for_core_phase(ph: i32) -> i32 {
+    return 2 + ph;
+}
+
 fn phase_name(phase: i32) -> string {
     if phase == 0 { return "resolve"; }
     if phase == 1 { return "check"; }
@@ -188,6 +217,23 @@ fn classify_cli(argc: i32, has_vm: bool, has_project: bool) -> i32 {
         }
     }
     return 4;
+}
+
+/* SML main.sml projectVmEntryStem: "main" if dir/main.sv0 exists,
+   else "program". Uses host read_file — empty/missing → program stem. */
+
+fn join_dir_main_sv0(dir: string) -> string {
+    let s: string = string_concat(dir, "/main.sv0");
+    return s;
+}
+
+fn project_vm_entry_stem(dir: string) -> string {
+    let mp: string = join_dir_main_sv0(dir);
+    let body: string = read_file(mp);
+    if string_len(body) > 0 {
+        return vm_entry_stem_main();
+    }
+    return vm_entry_stem_program();
 }
 
 /* ── error prefix constants ─────────────────────────────────── */
@@ -252,6 +298,7 @@ fn test_phases() -> i32 {
     if PHASE_EMIT_C() != 5 { return 2; }
     if PHASE_EMIT_VM() != 6 { return 3; }
     if PHASE_COUNT() != 7 { return 4; }
+    if DRIVER_FULL_PIPELINE_LEN() != 9 { return 10; }
     if string_eq(phase_name(0), "resolve") != true { return 5; }
     if string_eq(phase_name(5), "emit-c") != true { return 6; }
     if is_backend_phase(4) != false { return 7; }
@@ -269,6 +316,31 @@ fn test_cli() -> i32 {
     if classify_cli(2, false, true) != 2 { return 6; }
     if classify_cli(3, true, true) != 3 { return 7; }
     if classify_cli(0, false, false) != 4 { return 8; }
+    return 0;
+}
+
+fn test_cli_invalid_patterns() -> i32 {
+    if classify_cli(1, true, false) != 4 { return 1; }
+    if classify_cli(1, false, true) != 4 { return 2; }
+    if classify_cli(2, true, true) != 4 { return 3; }
+    if classify_cli(3, true, false) != 4 { return 4; }
+    if classify_cli(3, false, true) != 4 { return 5; }
+    return 0;
+}
+
+fn test_driver_pipeline_step_names() -> i32 {
+    if string_eq(driver_pipeline_step_name(0), "tokenize") != true { return 1; }
+    if string_eq(driver_pipeline_step_name(1), "parse") != true { return 2; }
+    if string_eq(driver_pipeline_step_name(2), "resolve") != true { return 3; }
+    if string_eq(driver_pipeline_step_name(3), "check") != true { return 4; }
+    if string_eq(driver_pipeline_step_name(4), "analyze") != true { return 5; }
+    if string_eq(driver_pipeline_step_name(5), "strip") != true { return 6; }
+    if string_eq(driver_pipeline_step_name(6), "lower") != true { return 7; }
+    if string_eq(driver_pipeline_step_name(7), "emit-c") != true { return 8; }
+    if string_eq(driver_pipeline_step_name(8), "emit-vm") != true { return 9; }
+    if string_eq(driver_pipeline_step_name(9), "unknown") != true { return 10; }
+    if driver_pipeline_step_for_core_phase(PHASE_RESOLVE()) != 2 { return 11; }
+    if driver_pipeline_step_for_core_phase(PHASE_EMIT_VM()) != 8 { return 12; }
     return 0;
 }
 
@@ -304,6 +376,13 @@ fn test_base_name_sv0() -> i32 {
     return 0;
 }
 
+fn test_project_vm_entry_stem() -> i32 {
+    if string_eq(join_dir_main_sv0("pkg"), "pkg/main.sv0") != true { return 1; }
+    if string_eq(vm_entry_stem_main(), "main") != true { return 2; }
+    if string_eq(vm_entry_stem_program(), "program") != true { return 3; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_helpers();
     if r1 != 0 { return r1; }
@@ -313,11 +392,17 @@ fn main() -> i32 {
     if r3 != 0 { return 30 + r3; }
     let r4: i32 = test_cli();
     if r4 != 0 { return 40 + r4; }
+    let r4b: i32 = test_cli_invalid_patterns();
+    if r4b != 0 { return 44 + r4b; }
+    let r4c: i32 = test_driver_pipeline_step_names();
+    if r4c != 0 { return 46 + r4c; }
     let r5: i32 = test_error_prefix();
     if r5 != 0 { return 50 + r5; }
     let r5b: i32 = test_driver_tokenize_sketch();
     if r5b != 0 { return 55 + r5b; }
     let r6: i32 = test_base_name_sv0();
     if r6 != 0 { return 60 + r6; }
+    let r7: i32 = test_project_vm_entry_stem();
+    if r7 != 0 { return 70 + r7; }
     return 0;
 }

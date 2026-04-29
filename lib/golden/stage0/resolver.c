@@ -54,6 +54,7 @@ static int res_lookup_fn_arity_str(int fn_arities, const char* name_str, const c
 static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
 static int resolve_stmt(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
 static int resolve_contract(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int frames, int pp);
+static int resolve_expr_cast_roots_program(int et, int ed2, int pty_tt, int pty_td1, int pty_td2, int pty_td3, const char* source, int starts, int ends, int mod_tys, int pp);
 static int apply_use_clause(int it, int id1, int id2, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
 static int apply_use_clauses(int it, int id1, int id2, int id3, int id4, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
 static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5, int idx, int et, int ed1, int ed2, int ed3, int ed4, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int fn_contract_base_by_item, int fn_contract_root, int enum_variant_payload_ty_root, int enum_variant_payload_base_by_item, int enum_variant_payload_count_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp);
@@ -100,6 +101,7 @@ static int test_resolve_top_item_struct_field(void);
 static int test_resolve_top_item_fn_signature_contracts(void);
 static int test_resolve_top_item_enum_payload_type(void);
 static int test_resolve_program(void);
+static int test_resolve_program_cast_type_roots(void);
 
 static const char* path_join2(const char* a, const char* b) {
   const char* _sv0t0 = sv0_string_concat(a, "::");
@@ -1789,6 +1791,36 @@ static int resolve_contract(int et, int ed1, int ed2, int ed3, int ed4, int idx,
   return _sv0t0;
 }
 
+static int resolve_expr_cast_roots_program(int et, int ed2, int pty_tt, int pty_td1, int pty_td2, int pty_td3, const char* source, int starts, int ends, int mod_tys, int pp) {
+  int i = 0;
+  int _sv0t0 = sv0_vec_len(et);
+  int n = _sv0t0;
+  int _sv0t1 = sv0_vec_len(pty_tt);
+  int tn = _sv0t1;
+  while ((i < n)) {
+    int _sv0t2 = sv0_vec_get(et, i);
+    if ((_sv0t2 == 20)) {
+      int _sv0t3 = sv0_vec_get(ed2, i);
+      int tr = _sv0t3;
+      if ((tr >= 0)) {
+        if ((tr < tn)) {
+          int _sv0t4 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, pp);
+          int rr = _sv0t4;
+          if ((rr != 0)) {
+            return rr;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
 static int apply_use_clause(int it, int id1, int id2, int idx, const char* source, int starts, int ends, int mod_vals, int mod_tys, int fn_arities, int pp) {
   int _sv0t0 = sv0_vec_get(it, idx);
   int tag = _sv0t0;
@@ -1993,12 +2025,18 @@ static int resolve_program(int et, int ed1, int ed2, int ed3, int ed4, int it, i
     return ru;
   } else {
   }
-  int _sv0t2 = sv0_vec_len(it);
-  int len = _sv0t2;
+  int _sv0t2 = resolve_expr_cast_roots_program(et, ed2, pty_tt, pty_td1, pty_td2, pty_td3, source, starts, ends, mod_tys, pp);
+  int rcast = _sv0t2;
+  if ((rcast != 0)) {
+    return rcast;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(it);
+  int len = _sv0t3;
   int i = 0;
   while ((i < len)) {
-    int _sv0t3 = resolve_top_item(it, id1, id2, id3, id4, id5, i, et, ed1, ed2, ed3, ed4, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_ty_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
-    int r = _sv0t3;
+    int _sv0t4 = resolve_top_item(it, id1, id2, id3, id4, id5, i, et, ed1, ed2, ed3, ed4, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_ty_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root, source, starts, ends, mod_vals, mod_tys, fn_arities, pp);
+    int r = _sv0t4;
     if ((r != 0)) {
       return r;
     } else {
@@ -4089,6 +4127,119 @@ static int test_resolve_program(void) {
   return 0;
 }
 
+static int test_resolve_program_cast_type_roots(void) {
+  const char* source;
+  source = "main NoSuch";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 4);
+  sv0_vec_push(starts, 5);
+  sv0_vec_push(ends, 11);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t6 = sv0_vec_new();
+  int et = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int ed1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int ed2 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ed3 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int ed4 = _sv0t10;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 20);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  int _sv0t11 = sv0_vec_new();
+  int it = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int id1 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int id2 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int id3 = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int id4 = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int id5 = _sv0t16;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(id2, 0);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 1);
+  int _sv0t17 = (0 - 1);
+  sv0_vec_push(id5, _sv0t17);
+  int _sv0t18 = sv0_vec_new();
+  int fn_ptoks = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int fn_p_ty_root = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int fn_ret_root = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int fn_contract_base = _sv0t21;
+  int _sv0t22 = sv0_vec_new();
+  int fn_contract_root = _sv0t22;
+  int _sv0t23 = sv0_vec_new();
+  int enum_payload_ty_root = _sv0t23;
+  int _sv0t24 = sv0_vec_new();
+  int enum_payload_base = _sv0t24;
+  int _sv0t25 = sv0_vec_new();
+  int enum_payload_count = _sv0t25;
+  int _sv0t26 = (0 - 1);
+  sv0_vec_push(fn_ret_root, _sv0t26);
+  int _sv0t27 = (0 - 1);
+  sv0_vec_push(fn_contract_base, _sv0t27);
+  int _sv0t28 = (0 - 1);
+  sv0_vec_push(enum_payload_base, _sv0t28);
+  sv0_vec_push(enum_payload_count, 0);
+  int _sv0t29 = sv0_vec_new();
+  int pty_tt = _sv0t29;
+  int _sv0t30 = sv0_vec_new();
+  int pty_td1 = _sv0t30;
+  int _sv0t31 = sv0_vec_new();
+  int pty_td2 = _sv0t31;
+  int _sv0t32 = sv0_vec_new();
+  int pty_td3 = _sv0t32;
+  sv0_vec_push(pty_tt, 0);
+  sv0_vec_push(pty_td1, 1);
+  sv0_vec_push(pty_td2, 1);
+  sv0_vec_push(pty_td3, 0);
+  int _sv0t33 = sv0_vec_new();
+  int sf_tr = _sv0t33;
+  int _sv0t34 = resolve_program(et, ed1, ed2, ed3, ed4, it, id1, id2, id3, id4, id5, fn_ptoks, fn_p_ty_root, fn_ret_root, fn_contract_base, fn_contract_root, enum_payload_ty_root, enum_payload_base, enum_payload_count, pty_tt, pty_td1, pty_td2, pty_td3, sf_tr, source, starts, ends, mv, mt, fa, pp);
+  int r1 = _sv0t34;
+  if ((r1 != 301)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(mt, 1);
+  int _sv0t35 = resolve_program(et, ed1, ed2, ed3, ed4, it, id1, id2, id3, id4, id5, fn_ptoks, fn_p_ty_root, fn_ret_root, fn_contract_base, fn_contract_root, enum_payload_ty_root, enum_payload_base, enum_payload_count, pty_tt, pty_td1, pty_td2, pty_td3, sf_tr, source, starts, ends, mv, mt, fa, pp);
+  int r2 = _sv0t35;
+  if ((r2 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_join();
   int r1 = _sv0t0;
@@ -4376,11 +4527,18 @@ int main(void) {
     return _sv0t80;
   } else {
   }
-  int _sv0t81 = test_path_join_vec_three();
-  int r39 = _sv0t81;
-  if ((r39 != 0)) {
-    int _sv0t82 = (167 + r39);
+  int _sv0t81 = test_resolve_program_cast_type_roots();
+  int r38a = _sv0t81;
+  if ((r38a != 0)) {
+    int _sv0t82 = (166 + r38a);
     return _sv0t82;
+  } else {
+  }
+  int _sv0t83 = test_path_join_vec_three();
+  int r39 = _sv0t83;
+  if ((r39 != 0)) {
+    int _sv0t84 = (167 + r39);
+    return _sv0t84;
   } else {
   }
   return 0;

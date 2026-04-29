@@ -31,6 +31,9 @@ static int PHASE_LOWER(void);
 static int PHASE_EMIT_C(void);
 static int PHASE_EMIT_VM(void);
 static int PHASE_COUNT(void);
+static int DRIVER_FULL_PIPELINE_LEN(void);
+static const char* driver_pipeline_step_name(int step);
+static int driver_pipeline_step_for_core_phase(int ph);
 static const char* phase_name(int phase);
 static int is_backend_phase(int phase);
 static int CLI_FILE(void);
@@ -41,6 +44,8 @@ static int CLI_USAGE(void);
 static int is_target_vm_flag(const char* arg);
 static int is_project_flag(const char* arg);
 static int classify_cli(int argc, int has_vm, int has_project);
+static const char* join_dir_main_sv0(const char* dir);
+static const char* project_vm_entry_stem(const char* dir);
 static const char* error_prefix(void);
 static const char* error_cannot_open(void);
 static MainPhaseResult driver_tokenize_sketch(const char* source_path);
@@ -49,9 +54,12 @@ static int test_path_helpers(void);
 static int test_vm_output(void);
 static int test_phases(void);
 static int test_cli(void);
+static int test_cli_invalid_patterns(void);
+static int test_driver_pipeline_step_names(void);
 static int test_error_prefix(void);
 static int test_driver_tokenize_sketch(void);
 static int test_base_name_sv0(void);
+static int test_project_vm_entry_stem(void);
 
 static int DRIVER_TOKENIZE_ERR_EMPTY(void) {
   return 1;
@@ -277,6 +285,39 @@ static int PHASE_COUNT(void) {
   return 7;
 }
 
+static int DRIVER_FULL_PIPELINE_LEN(void) {
+  int _sv0t0 = PHASE_COUNT();
+  int _sv0t1 = (2 + _sv0t0);
+  return _sv0t1;
+}
+
+static const char* driver_pipeline_step_name(int step) {
+  if ((step == 0)) {
+    return "tokenize";
+  } else {
+  }
+  if ((step == 1)) {
+    return "parse";
+  } else {
+  }
+  int ph = (step - 2);
+  if ((ph >= 0)) {
+    int _sv0t0 = PHASE_COUNT();
+    if ((ph < _sv0t0)) {
+      const char* _sv0t1 = phase_name(ph);
+      return _sv0t1;
+    } else {
+    }
+  } else {
+  }
+  return "unknown";
+}
+
+static int driver_pipeline_step_for_core_phase(int ph) {
+  int _sv0t0 = (2 + ph);
+  return _sv0t0;
+}
+
 static const char* phase_name(int phase) {
   if ((phase == 0)) {
     return "resolve";
@@ -390,6 +431,30 @@ static int classify_cli(int argc, int has_vm, int has_project) {
   } else {
   }
   return 4;
+}
+
+static const char* join_dir_main_sv0(const char* dir) {
+  const char* _sv0t0 = sv0_string_concat(dir, "/main.sv0");
+  const char* s;
+  s = _sv0t0;
+  return s;
+}
+
+static const char* project_vm_entry_stem(const char* dir) {
+  const char* _sv0t0 = join_dir_main_sv0(dir);
+  const char* mp;
+  mp = _sv0t0;
+  const char* _sv0t1 = sv0_read_file(mp);
+  const char* body;
+  body = _sv0t1;
+  int _sv0t2 = sv0_string_len(body);
+  if ((_sv0t2 > 0)) {
+    const char* _sv0t3 = vm_entry_stem_main();
+    return _sv0t3;
+  } else {
+  }
+  const char* _sv0t4 = vm_entry_stem_program();
+  return _sv0t4;
 }
 
 static const char* error_prefix(void) {
@@ -589,30 +654,35 @@ static int test_phases(void) {
     return 4;
   } else {
   }
-  const char* _sv0t4 = phase_name(0);
-  int _sv0t5 = sv0_string_eq(_sv0t4, "resolve");
-  if ((_sv0t5 != 1)) {
+  int _sv0t4 = DRIVER_FULL_PIPELINE_LEN();
+  if ((_sv0t4 != 9)) {
+    return 10;
+  } else {
+  }
+  const char* _sv0t5 = phase_name(0);
+  int _sv0t6 = sv0_string_eq(_sv0t5, "resolve");
+  if ((_sv0t6 != 1)) {
     return 5;
   } else {
   }
-  const char* _sv0t6 = phase_name(5);
-  int _sv0t7 = sv0_string_eq(_sv0t6, "emit-c");
-  if ((_sv0t7 != 1)) {
+  const char* _sv0t7 = phase_name(5);
+  int _sv0t8 = sv0_string_eq(_sv0t7, "emit-c");
+  if ((_sv0t8 != 1)) {
     return 6;
   } else {
   }
-  int _sv0t8 = is_backend_phase(4);
-  if ((_sv0t8 != 0)) {
+  int _sv0t9 = is_backend_phase(4);
+  if ((_sv0t9 != 0)) {
     return 7;
   } else {
   }
-  int _sv0t9 = is_backend_phase(5);
-  if ((_sv0t9 != 1)) {
+  int _sv0t10 = is_backend_phase(5);
+  if ((_sv0t10 != 1)) {
     return 8;
   } else {
   }
-  int _sv0t10 = is_backend_phase(6);
-  if ((_sv0t10 != 1)) {
+  int _sv0t11 = is_backend_phase(6);
+  if ((_sv0t11 != 1)) {
     return 9;
   } else {
   }
@@ -658,6 +728,111 @@ static int test_cli(void) {
   int _sv0t7 = classify_cli(0, 0, 0);
   if ((_sv0t7 != 4)) {
     return 8;
+  } else {
+  }
+  return 0;
+}
+
+static int test_cli_invalid_patterns(void) {
+  int _sv0t0 = classify_cli(1, 1, 0);
+  if ((_sv0t0 != 4)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = classify_cli(1, 0, 1);
+  if ((_sv0t1 != 4)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = classify_cli(2, 1, 1);
+  if ((_sv0t2 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = classify_cli(3, 1, 0);
+  if ((_sv0t3 != 4)) {
+    return 4;
+  } else {
+  }
+  int _sv0t4 = classify_cli(3, 0, 1);
+  if ((_sv0t4 != 4)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_driver_pipeline_step_names(void) {
+  const char* _sv0t0 = driver_pipeline_step_name(0);
+  int _sv0t1 = sv0_string_eq(_sv0t0, "tokenize");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = driver_pipeline_step_name(1);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "parse");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = driver_pipeline_step_name(2);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "resolve");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = driver_pipeline_step_name(3);
+  int _sv0t7 = sv0_string_eq(_sv0t6, "check");
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  const char* _sv0t8 = driver_pipeline_step_name(4);
+  int _sv0t9 = sv0_string_eq(_sv0t8, "analyze");
+  if ((_sv0t9 != 1)) {
+    return 5;
+  } else {
+  }
+  const char* _sv0t10 = driver_pipeline_step_name(5);
+  int _sv0t11 = sv0_string_eq(_sv0t10, "strip");
+  if ((_sv0t11 != 1)) {
+    return 6;
+  } else {
+  }
+  const char* _sv0t12 = driver_pipeline_step_name(6);
+  int _sv0t13 = sv0_string_eq(_sv0t12, "lower");
+  if ((_sv0t13 != 1)) {
+    return 7;
+  } else {
+  }
+  const char* _sv0t14 = driver_pipeline_step_name(7);
+  int _sv0t15 = sv0_string_eq(_sv0t14, "emit-c");
+  if ((_sv0t15 != 1)) {
+    return 8;
+  } else {
+  }
+  const char* _sv0t16 = driver_pipeline_step_name(8);
+  int _sv0t17 = sv0_string_eq(_sv0t16, "emit-vm");
+  if ((_sv0t17 != 1)) {
+    return 9;
+  } else {
+  }
+  const char* _sv0t18 = driver_pipeline_step_name(9);
+  int _sv0t19 = sv0_string_eq(_sv0t18, "unknown");
+  if ((_sv0t19 != 1)) {
+    return 10;
+  } else {
+  }
+  int _sv0t20 = PHASE_RESOLVE();
+  int _sv0t21 = driver_pipeline_step_for_core_phase(_sv0t20);
+  if ((_sv0t21 != 2)) {
+    return 11;
+  } else {
+  }
+  int _sv0t22 = PHASE_EMIT_VM();
+  int _sv0t23 = driver_pipeline_step_for_core_phase(_sv0t22);
+  if ((_sv0t23 != 8)) {
+    return 12;
   } else {
   }
   return 0;
@@ -763,6 +938,28 @@ static int test_base_name_sv0(void) {
   return 0;
 }
 
+static int test_project_vm_entry_stem(void) {
+  const char* _sv0t0 = join_dir_main_sv0("pkg");
+  int _sv0t1 = sv0_string_eq(_sv0t0, "pkg/main.sv0");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = vm_entry_stem_main();
+  int _sv0t3 = sv0_string_eq(_sv0t2, "main");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = vm_entry_stem_program();
+  int _sv0t5 = sv0_string_eq(_sv0t4, "program");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_path_helpers();
   int r1 = _sv0t0;
@@ -791,25 +988,46 @@ int main(void) {
     return _sv0t6;
   } else {
   }
-  int _sv0t7 = test_error_prefix();
-  int r5 = _sv0t7;
-  if ((r5 != 0)) {
-    int _sv0t8 = (50 + r5);
+  int _sv0t7 = test_cli_invalid_patterns();
+  int r4b = _sv0t7;
+  if ((r4b != 0)) {
+    int _sv0t8 = (44 + r4b);
     return _sv0t8;
   } else {
   }
-  int _sv0t9 = test_driver_tokenize_sketch();
-  int r5b = _sv0t9;
-  if ((r5b != 0)) {
-    int _sv0t10 = (55 + r5b);
+  int _sv0t9 = test_driver_pipeline_step_names();
+  int r4c = _sv0t9;
+  if ((r4c != 0)) {
+    int _sv0t10 = (46 + r4c);
     return _sv0t10;
   } else {
   }
-  int _sv0t11 = test_base_name_sv0();
-  int r6 = _sv0t11;
-  if ((r6 != 0)) {
-    int _sv0t12 = (60 + r6);
+  int _sv0t11 = test_error_prefix();
+  int r5 = _sv0t11;
+  if ((r5 != 0)) {
+    int _sv0t12 = (50 + r5);
     return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_driver_tokenize_sketch();
+  int r5b = _sv0t13;
+  if ((r5b != 0)) {
+    int _sv0t14 = (55 + r5b);
+    return _sv0t14;
+  } else {
+  }
+  int _sv0t15 = test_base_name_sv0();
+  int r6 = _sv0t15;
+  if ((r6 != 0)) {
+    int _sv0t16 = (60 + r6);
+    return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = test_project_vm_entry_stem();
+  int r7 = _sv0t17;
+  if ((r7 != 0)) {
+    int _sv0t18 = (70 + r7);
+    return _sv0t18;
   } else {
   }
   return 0;
