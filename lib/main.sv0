@@ -6,11 +6,12 @@
    project flag, usage), error prefix constants.
    Host text I/O uses read_file / write_file / read_dir (T0-8).
    compile_read_source / compile_write_text are compile-oriented aliases.
-   Higher-level compileFile / compileProjectDir remain incremental (G6).
+   Higher-level    compileFile / compileProjectDir remain incremental (G6).
    G6: join_dir_main_sv0 + project_vm_entry_stem (SML projectVmEntryStem);
    driver_pipeline_step_name / driver_pipeline_step_for_core_phase expose the
    full nine-step spine (tokenize…emit-vm); cross-module lexer→emit wiring stays
    in per-module bootstrap roots until multi-unit sv0 compilation lands.
+   M3-S-041 closure criteria: sv0c/doc/driver-pipeline-composition.md.
    M3-S-042: argv classification vs SML Main.main — see sv0c/doc/cli-parity.md.
    M3-S-003: tokenize-phase Result boundary sketch (pre-lexer) keeps
    explicit success/error plumbing; M3-S-018: sketch loads source via

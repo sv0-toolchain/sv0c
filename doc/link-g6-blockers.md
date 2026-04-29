@@ -31,5 +31,6 @@ Requires calling **lexer → parser → resolver → … → emit** inside **one
 ## Related
 
 - **`sv0c/doc/transliteration-plan.md`** — Link row.  
+- **`sv0c/doc/driver-pipeline-composition.md`** — driver single-TU vs composition (**M3-S-041**).  
 - **`sv0c/doc/bootstrap-compiler-workarounds.md`** — synthetic names / arena limits.  
 - **`42-transliteration-complexity-invariant.mdc`**.
