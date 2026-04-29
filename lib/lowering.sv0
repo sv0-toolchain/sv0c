@@ -207,7 +207,8 @@ fn parse_decimal_i32_from_tok(source: string, starts: Vec<i32>, ends: Vec<i32>,
 
    Per-tag helper decomposition (§2 of bootstrap-compiler-workarounds.md):
    Tags 4, 9, 10, 13 extracted into lower_tag_call / lower_tag_block /
-   lower_tag_if / lower_tag_for to keep per-function expression depth low. */
+   lower_tag_if / lower_tag_for to keep per-function expression depth low.
+   forall/exists (SML lowerQuant): guarded handle_to_str + shape match, inlined. */
 
 fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
@@ -228,6 +229,132 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let callee_idx: i32 = vec_get(ed1, idx);
     let args_first: i32 = vec_get(ed2, idx);
     let args_count: i32 = vec_get(ed3, idx);
+    let ct_pre: i32 = vec_get(et, callee_idx);
+    if ct_pre == 1 {
+        let cpps_pre: i32 = vec_get(ed1, callee_idx);
+        let cppc_pre: i32 = vec_get(ed2, callee_idx);
+        if cppc_pre == 1 {
+            let name_h_pre: i32 = vec_get(pp, cpps_pre);
+            if name_h_pre >= 0 && name_h_pre < vec_len(starts)
+                && name_h_pre < vec_len(ends) {
+                let callee_nm_pre: string = handle_to_str(name_h_pre,
+                                                           source, starts, ends);
+                let mut qwant_pre: i32 = 0;
+                if string_eq(callee_nm_pre, "forall") { qwant_pre = 1; }
+                if string_eq(callee_nm_pre, "exists") { qwant_pre = 2; }
+                if qwant_pre >= 1 && args_count == 3 {
+                    let arg_iter_pre: i32 = args_first;
+                    let arg_rng_pre: i32 = args_first + 1;
+                    let arg_body_pre: i32 = args_first + 2;
+                    if vec_get(et, arg_iter_pre) == 1 && vec_get(ed2, arg_iter_pre) == 1 && vec_get(et, arg_rng_pre) == 21 {
+                        let lo_ix_pre: i32 = vec_get(ed1, arg_rng_pre);
+                        let hi_ix_pre: i32 = vec_get(ed2, arg_rng_pre);
+                        let iter_tok_pre: i32 = vec_get(pp, vec_get(ed1, arg_iter_pre));
+                        let hi_t_q: i32 = ctr_fresh(ctr);
+                        let cnt_t_q: i32 = ctr_fresh(ctr);
+                        let acc_t_q: i32 = ctr_fresh(ctr);
+                        let v_hi_q: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                            tok_tags, hi_ix_pre, ctr, out_instrs,
+                                            enum_names, enum_tag_offsets,
+                                            enum_tag_counts, enum_tags_flat,
+                                            fn_ctx, builtin_map, lit_sf_names,
+                                            source, starts, ends, item_tags,
+                                            item_names, item_d2, item_d3, item_d4,
+                                            item_field_counts, enum_vnames_flat,
+                                            item_fn_row, match_env_inherit,
+                                            import_aliases);
+                        let e_hi_q: Expr = value_to_expr(v_hi_q);
+                        let a_hi_q: Instr = Instr::Assign(hi_t_q, box_new(e_hi_q));
+                        vec_push(out_instrs, box_new(a_hi_q));
+                        let v_lo_q: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                            tok_tags, lo_ix_pre, ctr, out_instrs,
+                                            enum_names, enum_tag_offsets,
+                                            enum_tag_counts, enum_tags_flat,
+                                            fn_ctx, builtin_map, lit_sf_names,
+                                            source, starts, ends, item_tags,
+                                            item_names, item_d2, item_d3, item_d4,
+                                            item_field_counts, enum_vnames_flat,
+                                            item_fn_row, match_env_inherit,
+                                            import_aliases);
+                        let e_lo_q: Expr = value_to_expr(v_lo_q);
+                        let a_lo_q: Instr = Instr::Assign(cnt_t_q, box_new(e_lo_q));
+                        vec_push(out_instrs, box_new(a_lo_q));
+                        if qwant_pre == 1 {
+                            let ia_q: Instr = Instr::Assign(acc_t_q,
+                                box_new(Expr::Literal(
+                                    box_new(Value::VBoolTrue))));
+                            vec_push(out_instrs, box_new(ia_q));
+                        } else {
+                            let ia2_q: Instr = Instr::Assign(acc_t_q,
+                                box_new(Expr::Literal(
+                                    box_new(Value::VBoolFalse))));
+                            vec_push(out_instrs, box_new(ia2_q));
+                        }
+                        let cond_e_q: Expr = Expr::Binop(7,
+                            box_new(Value::VVar(cnt_t_q)),
+                            box_new(Value::VVar(hi_t_q)));
+                        let p_t_q: i32 = ctr_fresh(ctr);
+                        let mut inner_q: Vec<i32> = vec_new();
+                        let it_q: Instr = Instr::Assign(iter_tok_pre,
+                            box_new(Expr::Load(cnt_t_q)));
+                        vec_push(inner_q, box_new(it_q));
+                        let ep_q: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
+                            tok_tags, arg_body_pre, ctr, inner_q,
+                            enum_names, enum_tag_offsets,
+                            enum_tag_counts, enum_tags_flat,
+                            fn_ctx, builtin_map, lit_sf_names,
+                            source, starts, ends, item_tags,
+                            item_names, item_d2, item_d3, item_d4,
+                            item_field_counts, enum_vnames_flat,
+                            item_fn_row, match_env_inherit,
+                            import_aliases);
+                        let dv_q: Instr = Instr::DeclVar(p_t_q);
+                        vec_push(inner_q, box_new(dv_q));
+                        let st_q: Instr = Instr::Store(p_t_q, box_new(ep_q));
+                        vec_push(inner_q, box_new(st_q));
+                        let mut else_q: Vec<i32> = vec_new();
+                        if qwant_pre == 1 {
+                            let cond_pf_q: Expr = Expr::Binop(5,
+                                box_new(Value::VVar(p_t_q)),
+                                box_new(Value::VInt(0)));
+                            let mut then_q: Vec<i32> = vec_new();
+                            let stf_q: Instr = Instr::Store(acc_t_q,
+                                box_new(Expr::Literal(
+                                    box_new(Value::VBoolFalse))));
+                            vec_push(then_q, box_new(stf_q));
+                            vec_push(then_q, box_new(Instr::Break));
+                            let if_q: Instr = Instr::IfElse(box_new(cond_pf_q),
+                                then_q, else_q);
+                            vec_push(inner_q, box_new(if_q));
+                        } else {
+                            let cond_pe_q: Expr = Expr::Binop(6,
+                                box_new(Value::VVar(p_t_q)),
+                                box_new(Value::VInt(0)));
+                            let mut then_e: Vec<i32> = vec_new();
+                            let ste_q: Instr = Instr::Store(acc_t_q,
+                                box_new(Expr::Literal(
+                                    box_new(Value::VBoolTrue))));
+                            vec_push(then_e, box_new(ste_q));
+                            vec_push(then_e, box_new(Instr::Break));
+                            let if_e: Instr = Instr::IfElse(box_new(cond_pe_q),
+                                then_e, else_q);
+                            vec_push(inner_q, box_new(if_e));
+                        }
+                        let one_q: Value = Value::VInt(1);
+                        let incr_eq: Expr = Expr::Binop(0,
+                            box_new(Value::VVar(cnt_t_q)),
+                            box_new(one_q));
+                        let incr_iq: Instr = Instr::Store(cnt_t_q, box_new(incr_eq));
+                        vec_push(inner_q, box_new(incr_iq));
+                        let wl_q: Instr = Instr::WhileLoop(box_new(cond_e_q),
+                            inner_q);
+                        vec_push(out_instrs, box_new(wl_q));
+                        return Value::VVar(acc_t_q);
+                    }
+                }
+            }
+        }
+    }
     let mut arg_vals: Vec<i32> = vec_new();
     let mut ai: i32 = 0;
     loop {
@@ -2510,7 +2637,8 @@ fn lower_body(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
 fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
             tok_tags: Vec<i32>,
-            body_idx: i32,
+            body_idx: i32, fn_name_h: i32,
+            req_roots: Vec<i32>, ens_roots: Vec<i32>,
             out_instrs: Vec<i32>,
             enum_names: Vec<i32>,
             enum_tag_offsets: Vec<i32>,
@@ -2525,11 +2653,81 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     let mut ctr: Vec<i32> = vec_new();
     vec_push(ctr, 0);
-    return lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags,
-                      body_idx, ctr, out_instrs,
-                      enum_names, enum_tag_offsets,
-                      enum_tag_counts, enum_tags_flat,
-                      fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+    let req_instrs: Vec<i32> = vec_new();
+    let mut ri: i32 = 0;
+    while ri < vec_len(req_roots) {
+        let r_idx: i32 = vec_get(req_roots, ri);
+        let re: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
+                                              tok_tags, r_idx, ctr, req_instrs,
+                                              enum_names, enum_tag_offsets,
+                                              enum_tag_counts, enum_tags_flat,
+                                              fn_ctx, builtin_map, lit_sf_names,
+                                              source, starts, ends, item_tags,
+                                              item_names, item_d2, item_d3,
+                                              item_d4, item_field_counts,
+                                              enum_vnames_flat, item_fn_row,
+                                              match_env_inherit, import_aliases);
+        vec_push(req_instrs, box_new(Instr::Requires(box_new(re), fn_name_h)));
+        ri = ri + 1;
+    }
+    let body_instrs: Vec<i32> = vec_new();
+    let rc_body: i32 = lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  body_idx, ctr, body_instrs,
+                                  enum_names, enum_tag_offsets,
+                                  enum_tag_counts, enum_tags_flat,
+                                  fn_ctx, builtin_map, lit_sf_names, source,
+                                  starts, ends, item_tags, item_names, item_d2,
+                                  item_d3, item_d4, item_field_counts,
+                                  enum_vnames_flat, item_fn_row,
+                                  match_env_inherit, import_aliases);
+    if rc_body != 0 { return rc_body; }
+    let mut mentions_res: bool = false;
+    let mut ei: i32 = 0;
+    while ei < vec_len(ens_roots) {
+        if mentions_result(et, ed1, ed2, ed3, ed4, vec_get(ens_roots, ei),
+                           source, starts, ends, pp) {
+            mentions_res = true;
+        }
+        ei = ei + 1;
+    }
+    let use_slot: bool = use_ret_slot(false, mentions_res);
+    let mut ret_slot: i32 = 0 - 1;
+    let decl_instrs: Vec<i32> = vec_new();
+    if use_slot {
+        let mut rh: i32 = 0 - 1;
+        let mut rk: i32 = 0;
+        while rk < vec_len(ens_roots) {
+            let c: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                  vec_get(ens_roots, rk),
+                                                  source, starts, ends, pp);
+            if c >= 0 { rh = c; }
+            rk = rk + 1;
+        }
+        if rh >= 0 {
+            ret_slot = rh;
+        } else {
+            ret_slot = ctr_fresh(ctr);
+        }
+        vec_push(decl_instrs, box_new(Instr::DeclVar(ret_slot)));
+    }
+    let ens_instrs: Vec<i32> = vec_new();
+    let mut ej: i32 = 0;
+    while ej < vec_len(ens_roots) {
+        let discard_ens: i32 = lower_ensures_clause(
+            et, ed1, ed2, ed3, ed4, pp, tok_tags, vec_get(ens_roots, ej),
+            use_slot, fn_name_h, ctr, ens_instrs, enum_names,
+            enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx,
+            builtin_map, lit_sf_names, source, starts, ends, item_tags,
+            item_names, item_d2, item_d3, item_d4, item_field_counts,
+            enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        ej = ej + 1;
+    }
+    let body_final: Vec<i32> = inject_ensures_and_ret_slot(
+        body_instrs, ens_instrs, use_slot, ret_slot);
+    let discard_append_decl: i32 = append_instrs(out_instrs, decl_instrs);
+    let discard_append_req: i32 = append_instrs(out_instrs, req_instrs);
+    let discard_append_body: i32 = append_instrs(out_instrs, body_final);
+    return 0;
 }
 
 /* ── build_builtin_map ──────────────────────────────────────────
@@ -2666,7 +2864,8 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
                 if body_root >= 0 {
                     let discard_lf: i32 = lower_fn(body_et, body_ed1, body_ed2,
                                                     body_ed3, body_ed4, body_pp,
-                                                    tok_tags, body_root, instrs,
+                                                    tok_tags, body_root, label_h,
+                                                    vec_new(), vec_new(), instrs,
                                                     out_enum_names,
                                                     out_enum_tag_offsets,
                                                     out_enum_tag_counts,
@@ -3062,6 +3261,112 @@ fn ret_syntax_is_unit(has_ret: bool, ret_ty_name: string) -> bool {
 fn use_ret_slot(is_unit: bool, ens_mentions_result: bool) -> bool {
     if is_unit { return false; }
     return ens_mentions_result;
+}
+
+fn append_instrs(dst: Vec<i32>, src: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(src);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(dst, vec_get(src, i));
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn store_value_to_slot(slot: i32, v: Value, out_instrs: Vec<i32>) -> i32 {
+    let vtag: i32 = ir_value_tag(v);
+    if vtag == 3 {
+        match v {
+            Value::VVar(x) => {
+                if x != slot {
+                    let si0: Instr = Instr::Store(slot, box_new(Expr::Load(x)));
+                    vec_push(out_instrs, box_new(si0));
+                }
+                return 0;
+            },
+            _ => {
+                let si1: Instr = Instr::Store(slot, box_new(Expr::Literal(box_new(v))));
+                vec_push(out_instrs, box_new(si1));
+                return 0;
+            },
+        }
+    }
+    let si2: Instr = Instr::Store(slot, box_new(Expr::Literal(box_new(v))));
+    vec_push(out_instrs, box_new(si2));
+    return 0;
+}
+
+fn lower_ensures_clause(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                        ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                        tok_tags: Vec<i32>, expr_idx: i32,
+                        map_result: bool, fn_name_h: i32,
+                        ctr: Vec<i32>, out_instrs: Vec<i32>,
+                        enum_names: Vec<i32>,
+                        enum_tag_offsets: Vec<i32>,
+                        enum_tag_counts: Vec<i32>,
+                        enum_tags_flat: Vec<i32>,
+                        fn_ctx: Vec<i32>,
+                        builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
+                        source: string, starts: Vec<i32>, ends: Vec<i32>,
+                        item_tags: Vec<i32>, item_names: Vec<i32>,
+                        item_d2: Vec<i32>, item_d3: Vec<i32>,
+                        item_d4: Vec<i32>, item_field_counts: Vec<i32>,
+                        enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                        match_env_inherit: Vec<i32>,
+                        import_aliases: Vec<i32>) -> i32 {
+    /* M3-S-034 follow-up: map `result` references to return-slot when map_result=true. */
+    let ee: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
+                                          tok_tags, expr_idx, ctr,
+                                          out_instrs, enum_names,
+                                          enum_tag_offsets, enum_tag_counts,
+                                          enum_tags_flat, fn_ctx, builtin_map,
+                                          lit_sf_names, source, starts, ends,
+                                          item_tags, item_names, item_d2,
+                                          item_d3, item_d4, item_field_counts,
+                                          enum_vnames_flat, item_fn_row,
+                                          match_env_inherit, import_aliases);
+    if map_result == true {
+        let keep_shape: i32 = 0;
+    }
+    let ei: Instr = Instr::Ensures(box_new(ee), fn_name_h);
+    vec_push(out_instrs, box_new(ei));
+    return 0;
+}
+
+fn inject_ensures_and_ret_slot(is: Vec<i32>, ens_instrs: Vec<i32>,
+                               use_ret_slot_flag: bool,
+                               ret_slot: i32) -> Vec<i32> {
+    if vec_len(ens_instrs) == 0 { return is; }
+    let out: Vec<i32> = vec_new();
+    let n: i32 = vec_len(is);
+    let mut i: i32 = 0;
+    while i < n {
+        let ins: Instr = box_deref(vec_get(is, i));
+        match ins {
+            Instr::ReturnVal(bv) => {
+                let rv: Value = box_deref(bv);
+                if use_ret_slot_flag {
+                    let discard_sv: i32 = store_value_to_slot(ret_slot, rv, out);
+                    let discard_append0: i32 = append_instrs(out, ens_instrs);
+                    let rr: Instr = Instr::ReturnVal(box_new(Value::VVar(ret_slot)));
+                    vec_push(out, box_new(rr));
+                } else {
+                    let discard_append1: i32 = append_instrs(out, ens_instrs);
+                    let rr2: Instr = Instr::ReturnVal(box_new(rv));
+                    vec_push(out, box_new(rr2));
+                }
+            },
+            Instr::ReturnVoid => {
+                let discard_append2: i32 = append_instrs(out, ens_instrs);
+                vec_push(out, box_new(Instr::ReturnVoid));
+            },
+            _ => {
+                vec_push(out, box_new(ins));
+            },
+        }
+        i = i + 1;
+    }
+    return out;
 }
 
 fn lower_lit_supported(lit_tag: i32) -> bool {
@@ -3788,6 +4093,134 @@ fn mentions_result(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return false;
 }
 
+fn first_result_path_handle(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                            ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
+                            source: string, starts: Vec<i32>,
+                            ends: Vec<i32>, pp: Vec<i32>) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 1 {
+        let ppc: i32 = vec_get(ed2, idx);
+        if ppc == 1 {
+            let tok: i32 = vec_get(pp, vec_get(ed1, idx));
+            if string_eq(handle_to_str(tok, source, starts, ends), "result") {
+                return tok;
+            }
+        }
+        return 0 - 1;
+    }
+    if tag == 0 { return 0 - 1; }
+    if tag == 2 {
+        return first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                        vec_get(ed2, idx), source, starts, ends, pp);
+    }
+    if tag == 3 {
+        let r1: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                               vec_get(ed2, idx), source, starts, ends, pp);
+        if r1 >= 0 { return r1; }
+        return first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                        vec_get(ed3, idx), source, starts, ends, pp);
+    }
+    if tag == 4 {
+        let c: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                              vec_get(ed1, idx), source, starts, ends, pp);
+        if c >= 0 { return c; }
+        let af: i32 = vec_get(ed2, idx);
+        let ac: i32 = vec_get(ed3, idx);
+        let mut ai: i32 = 0;
+        while ai < ac {
+            let ra: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                   af + ai, source, starts, ends, pp);
+            if ra >= 0 { return ra; }
+            ai = ai + 1;
+        }
+        return 0 - 1;
+    }
+    if tag == 6 || tag == 14 || tag == 16 || tag == 20 || tag == 22 {
+        return first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                        vec_get(ed1, idx), source, starts, ends, pp);
+    }
+    if tag == 10 {
+        let rc: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                               vec_get(ed1, idx), source, starts, ends, pp);
+        if rc >= 0 { return rc; }
+        let rt: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                               vec_get(ed2, idx), source, starts, ends, pp);
+        if rt >= 0 { return rt; }
+        return first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                        vec_get(ed3, idx), source, starts, ends, pp);
+    }
+    if tag == 11 {
+        let rs: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                               vec_get(ed1, idx), source, starts, ends, pp);
+        if rs >= 0 { return rs; }
+        let af2: i32 = vec_get(ed2, idx);
+        let ac2: i32 = vec_get(ed3, idx);
+        let mut ai2: i32 = 0;
+        while ai2 < ac2 {
+            let aidx: i32 = af2 + ai2;
+            let grd: i32 = vec_get(ed3, aidx);
+            if grd >= 0 {
+                let rg: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                       grd, source, starts, ends, pp);
+                if rg >= 0 { return rg; }
+            }
+            let rb: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                   vec_get(ed4, aidx), source, starts, ends, pp);
+            if rb >= 0 { return rb; }
+            ai2 = ai2 + 1;
+        }
+        return 0 - 1;
+    }
+    if tag == 12 {
+        let rc2: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                vec_get(ed1, idx), source, starts, ends, pp);
+        if rc2 >= 0 { return rc2; }
+        let invf: i32 = vec_get(ed3, idx);
+        let invc: i32 = vec_get(ed4, idx);
+        let mut ii: i32 = 0;
+        while ii < invc {
+            let ri: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                   invf + ii, source, starts, ends, pp);
+            if ri >= 0 { return ri; }
+            ii = ii + 1;
+        }
+        return first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                        vec_get(ed2, idx), source, starts, ends, pp);
+    }
+    if tag == 13 {
+        let ri1: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                vec_get(ed2, idx), source, starts, ends, pp);
+        if ri1 >= 0 { return ri1; }
+        return first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                        vec_get(ed3, idx), source, starts, ends, pp);
+    }
+    if tag == 24 {
+        let sfc: i32 = vec_get(ed3, idx);
+        let mut sfi: i32 = 0;
+        while sfi < sfc {
+            let rr: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                   idx - sfc + sfi, source, starts, ends, pp);
+            if rr >= 0 { return rr; }
+            sfi = sfi + 1;
+        }
+        return 0 - 1;
+    }
+    if tag == 25 {
+        let tf: i32 = vec_get(ed1, idx);
+        let tc: i32 = vec_get(ed2, idx);
+        let mut ti: i32 = 0;
+        while ti < tc {
+            let rr2: i32 = first_result_path_handle(et, ed1, ed2, ed3, ed4,
+                                                    tf + ti, source, starts, ends, pp);
+            if rr2 >= 0 { return rr2; }
+            ti = ti + 1;
+        }
+        return 0 - 1;
+    }
+    return 0 - 1;
+}
+
 /* ── all_old_names_expr (SML allOldNames — collect old(x) handles) */
 
 fn all_old_names_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
@@ -4409,6 +4842,59 @@ fn test_store_value_class() -> i32 {
     return 0;
 }
 
+fn test_store_value_to_slot() -> i32 {
+    let out0: Vec<i32> = vec_new();
+    let rc0: i32 = store_value_to_slot(7, Value::VInt(9), out0);
+    if rc0 != 0 { return 1; }
+    if vec_len(out0) != 1 { return 2; }
+    let out1: Vec<i32> = vec_new();
+    let rc1: i32 = store_value_to_slot(12, Value::VVar(12), out1);
+    if rc1 != 0 { return 3; }
+    if vec_len(out1) != 0 { return 4; }
+    let out2: Vec<i32> = vec_new();
+    let rc2: i32 = store_value_to_slot(12, Value::VVar(13), out2);
+    if rc2 != 0 { return 5; }
+    if vec_len(out2) != 1 { return 6; }
+    return 0;
+}
+
+fn test_inject_ensures_and_ret_slot() -> i32 {
+    let body0: Vec<i32> = vec_new();
+    vec_push(body0, box_new(Instr::ReturnVal(box_new(Value::VInt(5)))));
+    let ens0: Vec<i32> = vec_new();
+    vec_push(ens0, box_new(Instr::Ensures(box_new(Expr::Literal(box_new(Value::VBoolTrue))), 99)));
+    let out0: Vec<i32> = inject_ensures_and_ret_slot(body0, ens0, false, 0 - 1);
+    if vec_len(out0) != 2 { return 1; }
+    let i0: Instr = box_deref(vec_get(out0, 0));
+    if ir_instr_tag(i0) != 13 { return 2; }
+    let i1: Instr = box_deref(vec_get(out0, 1));
+    if ir_instr_tag(i1) != 15 { return 3; }
+    let body1: Vec<i32> = vec_new();
+    vec_push(body1, box_new(Instr::ReturnVal(box_new(Value::VInt(7)))));
+    let ens1: Vec<i32> = vec_new();
+    vec_push(ens1, box_new(Instr::Ensures(box_new(Expr::Literal(box_new(Value::VBoolTrue))), 77)));
+    let out1: Vec<i32> = inject_ensures_and_ret_slot(body1, ens1, true, 42);
+    if vec_len(out1) != 3 { return 4; }
+    let j1: Instr = box_deref(vec_get(out1, 1));
+    if ir_instr_tag(j1) != 13 { return 5; }
+    let j2: Instr = box_deref(vec_get(out1, 2));
+    if ir_instr_tag(j2) != 15 { return 6; }
+    match j2 {
+        Instr::ReturnVal(bv2) => {
+            let rv2: Value = box_deref(bv2);
+            if ir_value_tag(rv2) != 3 { return 7; }
+            match rv2 {
+                Value::VVar(h2) => {
+                    if h2 != 42 { return 8; }
+                },
+                _ => { return 9; },
+            }
+        },
+        _ => { return 10; },
+    }
+    return 0;
+}
+
 fn test_assign_lhs() -> i32 {
     if low_classify_assign_lhs(2) != 0 { return 1; }
     if low_classify_assign_lhs(11) != 1 { return 2; }
@@ -4725,6 +5211,30 @@ fn test_mentions_result() -> i32 {
     vec_push(et3, 1); vec_push(d1c, 0); vec_push(d2c, 1); vec_push(d3c, 0); vec_push(d4c, 0);
     vec_push(et3, 3); vec_push(d1c, 0); vec_push(d2c, 0); vec_push(d3c, 1); vec_push(d4c, 0);
     if mentions_result(et3, d1c, d2c, d3c, d4c, 2, src, st, nd, pp3) != true { return 4; }
+    return 0;
+}
+
+fn test_first_result_path_handle() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let d1: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    let d3: Vec<i32> = vec_new();
+    let d4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let src: string = "result x";
+    let st: Vec<i32> = vec_new();
+    let nd: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(nd, 6);
+    vec_push(st, 7); vec_push(nd, 8);
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    vec_push(et, 1); vec_push(d1, 0); vec_push(d2, 1); vec_push(d3, 0); vec_push(d4, 0);
+    vec_push(et, 1); vec_push(d1, 1); vec_push(d2, 1); vec_push(d3, 0); vec_push(d4, 0);
+    vec_push(et, 3); vec_push(d1, 0); vec_push(d2, 0); vec_push(d3, 1); vec_push(d4, 0);
+    let h: i32 = first_result_path_handle(et, d1, d2, d3, d4, 2, src, st, nd, pp);
+    if h != 0 { return 1; }
+    let h2: i32 = first_result_path_handle(et, d1, d2, d3, d4, 1, src, st, nd, pp);
+    if h2 != 0 - 1 { return 2; }
     return 0;
 }
 
@@ -5818,10 +6328,60 @@ fn test_lower_fn_fn() -> i32 {
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_fn(et, ed1, ed2, ed3, ed4, pp, tok_tags,
-                            2, out, en_n, en_to, en_tc, en_tf,
+                            2, 99, vec_new(), vec_new(), out, en_n, en_to, en_tc, en_tf,
                             fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) < 3 { return 2; }
+    return 0;
+}
+
+fn test_lower_fn_contract_glue() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let tok_tags: Vec<i32> = vec_new();
+    /* body literal */
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    /* requires literal */
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    /* ensures path `result` to trigger ret-slot flow */
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 0); vec_push(ed4, 0);
+    let source: string = "result";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 6);
+    vec_push(pp, 0);
+    let req_roots: Vec<i32> = vec_new();
+    vec_push(req_roots, 1);
+    let ens_roots: Vec<i32> = vec_new();
+    vec_push(ens_roots, 2);
+    let out: Vec<i32> = vec_new();
+    let rc: i32 = lower_fn(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                           0, 55, req_roots, ens_roots, out,
+                           vec_new(), vec_new(), vec_new(), vec_new(),
+                           vec_new(), vec_new(), vec_new(),
+                           source, starts, ends,
+                           vec_new(), vec_new(), vec_new(), vec_new(), vec_new(),
+                           vec_new(), vec_new(), 0 - 1, vec_new(), vec_new());
+    if rc != 0 { return 1; }
+    if vec_len(out) < 5 { return 2; }
+    let i0: Instr = box_deref(vec_get(out, 0));
+    if ir_instr_tag(i0) != 1 { return 3; }
+    let i1: Instr = box_deref(vec_get(out, 1));
+    if ir_instr_tag(i1) != 12 { return 4; }
+    let mut has_ens: bool = false;
+    let mut i: i32 = 2;
+    while i < vec_len(out) {
+        let ii: Instr = box_deref(vec_get(out, i));
+        if ir_instr_tag(ii) == 13 { has_ens = true; }
+        i = i + 1;
+    }
+    if has_ens != true { return 5; }
+    let ilast: Instr = box_deref(vec_get(out, vec_len(out) - 1));
+    if ir_instr_tag(ilast) != 15 { return 6; }
     return 0;
 }
 
@@ -6979,6 +7539,10 @@ fn main() -> i32 {
     if r7 != 0 { return 90 + r7; }
     let r8: i32 = test_store_value_class();
     if r8 != 0 { return 100 + r8; }
+    let r8a: i32 = test_store_value_to_slot();
+    if r8a != 0 { return 105 + r8a; }
+    let r8b: i32 = test_inject_ensures_and_ret_slot();
+    if r8b != 0 { return 108 + r8b; }
     let r9: i32 = test_assign_lhs();
     if r9 != 0 { return 110 + r9; }
     let r10: i32 = test_enum_tag();
@@ -7037,6 +7601,8 @@ fn main() -> i32 {
     if r36 != 0 { return 380 + r36; }
     let r37: i32 = test_mentions_result();
     if r37 != 0 { return 390 + r37; }
+    let r37a: i32 = test_first_result_path_handle();
+    if r37a != 0 { return 395 + r37a; }
     let r38: i32 = test_all_old_names();
     if r38 != 0 { return 400 + r38; }
     let r39: i32 = test_expr_init_cty();
@@ -7101,6 +7667,8 @@ fn main() -> i32 {
     if r65 != 0 { return 840 + r65; }
     let r66: i32 = test_lower_fn_fn();
     if r66 != 0 { return 860 + r66; }
+    let r66a: i32 = test_lower_fn_contract_glue();
+    if r66a != 0 { return 865 + r66a; }
     let r67: i32 = test_lower_program_fn();
     if r67 != 0 { return 880 + r67; }
     let r68: i32 = test_lower_for_loop();

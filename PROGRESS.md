@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-28 (America/Los_Angeles; **M3 G4 closure:** parser sidecars for function signature/contract + enum payload roots (**`fn_param_ty_root`**, **`fn_ret_ty_root_by_item`**, **`fn_contract_root`**/**base**, **`enum_variant_payload_ty_root`**/**base/count**), resolver wiring in **`resolve_top_item`** / **`resolve_program`** (formal+return **`resolve_ty`**, contract **`resolve_contract`**, enum payload **`resolve_ty`**), and prelude-aware **`resolve_ty`** type lookup. Added integration fixture **`test/integration/g4_resolver_checker/g4_resolver_checker.sv0`** and harness/README wiring. G4 slices **M3-S-027 … M3-S-032** now **Done** in the owning milestone task. Stage0/vm goldens refreshed for parser/resolver.)
+**Last updated:** 2026-04-29 (America/Los_Angeles; **M3 G6:** **`lib/link.sv0`** — **`link_project_listing_from_entry`** / **`link_project_concat_sources_from_entry`** (SML **`linkDirectory`** shape), **`doc/transliteration-plan.md`** Link row; **Partial:** **`mapExpr`** rewrite (**M3-S-039**), merged program AST (**M3-S-040**).)
 
 ## Checklist (local source of truth)
 

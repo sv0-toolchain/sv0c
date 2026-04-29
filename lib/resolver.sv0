@@ -18,7 +18,8 @@
    res_lookup_in_frames_str, res_full_value_exists,
    res_lookup_fn_arity_str),
    resolve_expr (SML resolveExpr — 27 expr tag cases with scope/binding/
-   arity checking; ExprCast type validation deferred — type arena local),
+   arity checking; ExprCast roots are validated via program type arena
+   in resolve_program),
    resolve_stmt (SML resolveStmt — LetStmt/SemiStmt),
    resolve_contract (SML resolveContract — thin wrapper),
    apply_use_clause/apply_use_clauses (SML applyUseClause — use clause
@@ -715,7 +716,7 @@ fn res_lookup_fn_arity_str(fn_arities: Vec<i32>, name_str: string,
 /* ── resolve_expr (SML resolveExpr) ───────────────────────────
    Walks the expr arena and validates names, scoping, and arity.
    Returns 0 on success, error code on failure.
-   Type arena is local to parser — ExprCast type validation deferred.
+   ExprCast type roots are validated in resolve_program using pty_*.
    Pattern arena is local to parser — ExprFor/ExprMatch patterns
    use inlined tag/d1 from expr arena. */
 
@@ -1168,6 +1169,32 @@ fn resolve_contract(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                          mod_vals, mod_tys, fn_arities, frames, pp);
 }
 
+fn resolve_expr_cast_roots_program(et: Vec<i32>, ed2: Vec<i32>,
+                                   pty_tt: Vec<i32>, pty_td1: Vec<i32>,
+                                   pty_td2: Vec<i32>, pty_td3: Vec<i32>,
+                                   source: string, starts: Vec<i32>,
+                                   ends: Vec<i32>,
+                                   mod_tys: Vec<i32>,
+                                   pp: Vec<i32>) -> i32 {
+    let mut i: i32 = 0;
+    let n: i32 = vec_len(et);
+    let tn: i32 = vec_len(pty_tt);
+    while i < n {
+        if vec_get(et, i) == 20 {
+            let tr: i32 = vec_get(ed2, i);
+            if tr >= 0 {
+                if tr < tn {
+                    let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
+                                             source, starts, ends, mod_tys, pp);
+                    if rr != 0 { return rr; }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
 /* ── apply_use_clause (SML applyUseClause) ───────────────────
    Processes a single ItemUse. Constructs the mangled target name
    (module__item), checks if it exists as a function or type,
@@ -1373,6 +1400,12 @@ fn resolve_program(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                      mod_vals, mod_tys,
                                      fn_arities, pp);
     if ru != 0 { return ru; }
+    let rcast: i32 = resolve_expr_cast_roots_program(et, ed2,
+                                                     pty_tt, pty_td1,
+                                                     pty_td2, pty_td3,
+                                                     source, starts, ends,
+                                                     mod_tys, pp);
+    if rcast != 0 { return rcast; }
     let len: i32 = vec_len(it);
     let mut i: i32 = 0;
     while i < len {
@@ -2359,6 +2392,89 @@ fn test_resolve_program() -> i32 {
     return 0;
 }
 
+fn test_resolve_program_cast_type_roots() -> i32 {
+    let source: string = "main NoSuch";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 4);
+    vec_push(starts, 5); vec_push(ends, 11);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    /* body expr: literal then cast */
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 20); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    vec_push(id1, 0);
+    vec_push(id2, 0);
+    vec_push(id3, 0);
+    vec_push(id4, 1);
+    vec_push(id5, 0 - 1);
+    let fn_ptoks: Vec<i32> = vec_new();
+    let fn_p_ty_root: Vec<i32> = vec_new();
+    let fn_ret_root: Vec<i32> = vec_new();
+    let fn_contract_base: Vec<i32> = vec_new();
+    let fn_contract_root: Vec<i32> = vec_new();
+    let enum_payload_ty_root: Vec<i32> = vec_new();
+    let enum_payload_base: Vec<i32> = vec_new();
+    let enum_payload_count: Vec<i32> = vec_new();
+    vec_push(fn_ret_root, 0 - 1);
+    vec_push(fn_contract_base, 0 - 1);
+    vec_push(enum_payload_base, 0 - 1);
+    vec_push(enum_payload_count, 0);
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    /* cast target = TyName(NoSuch) */
+    vec_push(pty_tt, 0); vec_push(pty_td1, 1); vec_push(pty_td2, 1); vec_push(pty_td3, 0);
+    let sf_tr: Vec<i32> = vec_new();
+    let r1: i32 = resolve_program(et, ed1, ed2, ed3, ed4,
+                                  it, id1, id2, id3, id4, id5,
+                                  fn_ptoks,
+                                  fn_p_ty_root,
+                                  fn_ret_root,
+                                  fn_contract_base,
+                                  fn_contract_root,
+                                  enum_payload_ty_root,
+                                  enum_payload_base,
+                                  enum_payload_count,
+                                  pty_tt, pty_td1, pty_td2, pty_td3, sf_tr,
+                                  source, starts, ends,
+                                  mv, mt, fa, pp);
+    if r1 != 301 { return 1; }
+    vec_push(mt, 1);
+    let r2: i32 = resolve_program(et, ed1, ed2, ed3, ed4,
+                                  it, id1, id2, id3, id4, id5,
+                                  fn_ptoks,
+                                  fn_p_ty_root,
+                                  fn_ret_root,
+                                  fn_contract_base,
+                                  fn_contract_root,
+                                  enum_payload_ty_root,
+                                  enum_payload_base,
+                                  enum_payload_count,
+                                  pty_tt, pty_td1, pty_td2, pty_td3, sf_tr,
+                                  source, starts, ends,
+                                  mv, mt, fa, pp);
+    if r2 != 0 { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_path_join();
     if r1 != 0 { return r1; }
@@ -2442,6 +2558,8 @@ fn main() -> i32 {
     if r37d != 0 { return 163 + r37d; }
     let r38: i32 = test_resolve_program();
     if r38 != 0 { return 164 + r38; }
+    let r38a: i32 = test_resolve_program_cast_type_roots();
+    if r38a != 0 { return 166 + r38a; }
     let r39: i32 = test_path_join_vec_three();
     if r39 != 0 { return 167 + r39; }
     return 0;
