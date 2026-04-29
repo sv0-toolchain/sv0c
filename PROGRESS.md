@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-29 (America/Los_Angeles; **M3 G6:** **`lib/link.sv0`** — **`link_pat_subtree_node_count`**/**`link_pat_root_needs_mangle`** (parser **`pat_tags`** predicates toward **`mapPat`**); prior entry bridges + **`doc/transliteration-plan.md`** Link row; **Partial:** concrete **`mapExpr`/`mapPat`/`mapItem`** rewrites (**M3-S-039**), merged program AST (**M3-S-040**).)
+**Last updated:** 2026-04-29 (America/Los_Angeles; **M3 G6:** **`doc/cli-parity.md`** — **M3-S-042** closure (bootstrap **`Main.main`** argv vs **`lib/main.sv0`** **`classify_cli`**); prior **`link.sv0`** pat predicates + **`doc/transliteration-plan.md`**; **Partial:** **`mapExpr`/`mapPat`/`mapItem`** rewrites (**M3-S-039**), merged program AST (**M3-S-040**), single-TU pipeline (**M3-S-041**).)
 
 ## Checklist (local source of truth)
 

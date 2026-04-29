@@ -11,6 +11,7 @@
    driver_pipeline_step_name / driver_pipeline_step_for_core_phase expose the
    full nine-step spine (tokenize…emit-vm); cross-module lexer→emit wiring stays
    in per-module bootstrap roots until multi-unit sv0 compilation lands.
+   M3-S-042: argv classification vs SML Main.main — see sv0c/doc/cli-parity.md.
    M3-S-003: tokenize-phase Result boundary sketch (pre-lexer) keeps
    explicit success/error plumbing; M3-S-018: sketch loads source via
    read_file after path validation. */
