@@ -21,7 +21,9 @@
    root-span traversal, stmt/arm tags 27–33). **`link_pat_subtree_node_count`** /
    **`link_pat_root_needs_mangle`** — standalone **pat arena** (parser **`pat_tags`**
    rows 0–6) subtree sizing + path mangle predicate (**`mapPat`** rewrite still
-   deferred). **`mapItem`** rewrite remains deferred. */
+   deferred). **`link_ty_tyname_first_seg_preview`** — dry-run **`TyName`** first-segment
+   text after **`map_path_segs_rewrite_*`** (no arena mutation — **`doc/link-g6-blockers.md`**).
+   **`mapItem`** rewrite remains deferred. */
 
 /* ── file classification ────────────────────────────────────── */
 
@@ -440,6 +442,42 @@ fn link_ty_tyname_path_needs_mangle(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
     let ps: i32 = vec_get(ty_d1, idx);
     let sc: i32 = vec_get(ty_d2, idx);
     return link_path_pool_prefix_needs_mangle(pp, tops, ps, sc);
+}
+
+/* Lexer token slice — mirrors parser **`ps_tok_text`** for **`pos`** handle. */
+
+fn link_tok_text(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                 pos: i32) -> string {
+    let st: i32 = vec_get(starts, pos);
+    let en: i32 = vec_get(ends, pos);
+    let len: i32 = en - st;
+    return string_substr(source, st, len);
+}
+
+/* Dry-run **`mapPathSegs`** on **`TyName`** first segment: returned text is what a
+   mutating **`mapTy`** would spell after rewrite. Does not write arenas — full
+   rewrite needs synthetic token handles; see **`doc/link-g6-blockers.md`**. */
+
+fn link_ty_tyname_first_seg_preview(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                                    ty_d2: Vec<i32>, pp: Vec<i32>,
+                                    tops: Vec<i32>, mod_id: string,
+                                    starts: Vec<i32>, ends: Vec<i32>,
+                                    source: string, idx: i32) -> string {
+    if idx < 0 { return ""; }
+    if vec_get(ty_tags, idx) != 0 { return ""; }
+    let ps: i32 = vec_get(ty_d1, idx);
+    let sc: i32 = vec_get(ty_d2, idx);
+    if sc == 1 {
+        let h1: i32 = vec_get(pp, ps);
+        let t1: string = link_tok_text(source, starts, ends, h1);
+        return map_path_segs_rewrite_1(tops, mod_id, h1, t1);
+    }
+    if sc == 2 {
+        let hf: i32 = vec_get(pp, ps);
+        let tf: string = link_tok_text(source, starts, ends, hf);
+        return map_path_segs_rewrite_2(tops, mod_id, hf, tf);
+    }
+    return "";
 }
 
 /* ExprPath (parser expr tag 1): same pp_start / pp_count as mapExpr ExprPath. */
@@ -2221,6 +2259,53 @@ fn test_link_ty_generic_arg_path_mangle() -> i32 {
     return 0;
 }
 
+fn test_link_ty_tyname_first_seg_preview() -> i32 {
+    let tt: Vec<i32> = vec_new();
+    let d1: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(tt, 0);
+    vec_push(d1, 0);
+    vec_push(d2, 1);
+    vec_push(pp, 0);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 3);
+    let tops_hit: Vec<i32> = vec_new();
+    vec_push(tops_hit, 0);
+    let s1: string = link_ty_tyname_first_seg_preview(tt, d1, d2, pp, tops_hit,
+        "mod", starts, ends, "Foo", 0);
+    if string_eq(s1, "mod__Foo") != true { return 1; }
+    let tops_miss: Vec<i32> = vec_new();
+    vec_push(tops_miss, 99);
+    let s2: string = link_ty_tyname_first_seg_preview(tt, d1, d2, pp, tops_miss,
+        "mod", starts, ends, "Foo", 0);
+    if string_eq(s2, "Foo") != true { return 2; }
+    let tt2: Vec<i32> = vec_new();
+    let d1b: Vec<i32> = vec_new();
+    let d2b: Vec<i32> = vec_new();
+    let ppb: Vec<i32> = vec_new();
+    vec_push(tt2, 0);
+    vec_push(d1b, 0);
+    vec_push(d2b, 2);
+    vec_push(ppb, 0);
+    vec_push(ppb, 1);
+    let st2: Vec<i32> = vec_new();
+    let en2: Vec<i32> = vec_new();
+    vec_push(st2, 0);
+    vec_push(en2, 3);
+    vec_push(st2, 5);
+    vec_push(en2, 8);
+    let src2: string = "Foo::Bar";
+    let tops2: Vec<i32> = vec_new();
+    vec_push(tops2, 0);
+    let s3: string = link_ty_tyname_first_seg_preview(tt2, d1b, d2b, ppb, tops2,
+        "m", st2, en2, src2, 0);
+    if string_eq(s3, "m__Foo") != true { return 3; }
+    return 0;
+}
+
 fn test_split_module_name() -> i32 {
     let it: Vec<i32> = vec_new();
     let id1: Vec<i32> = vec_new();
@@ -2325,6 +2410,8 @@ fn main() -> i32 {
     if r21f != 0 { return 226 + r21f; }
     let r21g: i32 = test_link_ty_generic_arg_path_mangle();
     if r21g != 0 { return 230 + r21g; }
+    let r21pv: i32 = test_link_ty_tyname_first_seg_preview();
+    if r21pv != 0 { return 260 + r21pv; }
     let r22: i32 = test_g2_link_host_io_aliases();
     if r22 != 0 { return 220 + r22; }
     return 0;

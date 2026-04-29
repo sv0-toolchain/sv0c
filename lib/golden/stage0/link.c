@@ -48,6 +48,8 @@ static const char* map_path_segs_rewrite_1(int tops, const char* mod_id, int seg
 static const char* map_path_segs_rewrite_2(int tops, const char* mod_id, int first_handle, const char* first_str);
 static int link_path_pool_prefix_needs_mangle(int pp, int tops, int pool_start, int seg_count);
 static int link_ty_tyname_path_needs_mangle(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, int idx);
+static const char* link_tok_text(const char* source, int starts, int ends, int pos);
+static const char* link_ty_tyname_first_seg_preview(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx);
 static int link_expr_path_needs_mangle(int expr_tags, int ed1, int ed2, int pp, int tops, int idx);
 static int link_pat_subtree_node_count(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int idx, int depth);
 static int link_pat_root_needs_mangle(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int pp, int tops, int idx, int depth);
@@ -101,6 +103,7 @@ static int test_link_ty_ref_chain_tyname_mangle(void);
 static int test_link_ty_array_tyname_mangle(void);
 static int test_link_ty_tuple_two_tyname_mangle(void);
 static int test_link_ty_generic_arg_path_mangle(void);
+static int test_link_ty_tyname_first_seg_preview(void);
 static int test_split_module_name(void);
 
 static int is_sv0(const char* name) {
@@ -708,6 +711,53 @@ static int link_ty_tyname_path_needs_mangle(int ty_tags, int ty_d1, int ty_d2, i
   int sc = _sv0t2;
   int _sv0t3 = link_path_pool_prefix_needs_mangle(pp, tops, ps, sc);
   return _sv0t3;
+}
+
+static const char* link_tok_text(const char* source, int starts, int ends, int pos) {
+  int _sv0t0 = sv0_vec_get(starts, pos);
+  int st = _sv0t0;
+  int _sv0t1 = sv0_vec_get(ends, pos);
+  int en = _sv0t1;
+  int len = (en - st);
+  const char* _sv0t2 = sv0_string_substr(source, st, len);
+  return _sv0t2;
+}
+
+static const char* link_ty_tyname_first_seg_preview(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(ty_tags, idx);
+  if ((_sv0t0 != 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(ty_d1, idx);
+  int ps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(ty_d2, idx);
+  int sc = _sv0t2;
+  if ((sc == 1)) {
+    int _sv0t3 = sv0_vec_get(pp, ps);
+    int h1 = _sv0t3;
+    const char* _sv0t4 = link_tok_text(source, starts, ends, h1);
+    const char* t1;
+    t1 = _sv0t4;
+    const char* _sv0t5 = map_path_segs_rewrite_1(tops, mod_id, h1, t1);
+    return _sv0t5;
+  } else {
+  }
+  if ((sc == 2)) {
+    int _sv0t6 = sv0_vec_get(pp, ps);
+    int hf = _sv0t6;
+    const char* _sv0t7 = link_tok_text(source, starts, ends, hf);
+    const char* tf;
+    tf = _sv0t7;
+    const char* _sv0t8 = map_path_segs_rewrite_2(tops, mod_id, hf, tf);
+    return _sv0t8;
+  } else {
+  }
+  return "";
 }
 
 static int link_expr_path_needs_mangle(int expr_tags, int ed1, int ed2, int pp, int tops, int idx) {
@@ -3892,6 +3942,84 @@ static int test_link_ty_generic_arg_path_mangle(void) {
   return 0;
 }
 
+static int test_link_ty_tyname_first_seg_preview(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int d1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int d2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(d1, 0);
+  sv0_vec_push(d2, 1);
+  sv0_vec_push(pp, 0);
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  int _sv0t6 = sv0_vec_new();
+  int tops_hit = _sv0t6;
+  sv0_vec_push(tops_hit, 0);
+  const char* _sv0t7 = link_ty_tyname_first_seg_preview(tt, d1, d2, pp, tops_hit, "mod", starts, ends, "Foo", 0);
+  const char* s1;
+  s1 = _sv0t7;
+  int _sv0t8 = sv0_string_eq(s1, "mod__Foo");
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int tops_miss = _sv0t9;
+  sv0_vec_push(tops_miss, 99);
+  const char* _sv0t10 = link_ty_tyname_first_seg_preview(tt, d1, d2, pp, tops_miss, "mod", starts, ends, "Foo", 0);
+  const char* s2;
+  s2 = _sv0t10;
+  int _sv0t11 = sv0_string_eq(s2, "Foo");
+  if ((_sv0t11 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int tt2 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int d1b = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int d2b = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int ppb = _sv0t15;
+  sv0_vec_push(tt2, 0);
+  sv0_vec_push(d1b, 0);
+  sv0_vec_push(d2b, 2);
+  sv0_vec_push(ppb, 0);
+  sv0_vec_push(ppb, 1);
+  int _sv0t16 = sv0_vec_new();
+  int st2 = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int en2 = _sv0t17;
+  sv0_vec_push(st2, 0);
+  sv0_vec_push(en2, 3);
+  sv0_vec_push(st2, 5);
+  sv0_vec_push(en2, 8);
+  const char* src2;
+  src2 = "Foo::Bar";
+  int _sv0t18 = sv0_vec_new();
+  int tops2 = _sv0t18;
+  sv0_vec_push(tops2, 0);
+  const char* _sv0t19 = link_ty_tyname_first_seg_preview(tt2, d1b, d2b, ppb, tops2, "m", st2, en2, src2, 0);
+  const char* s3;
+  s3 = _sv0t19;
+  int _sv0t20 = sv0_string_eq(s3, "m__Foo");
+  if ((_sv0t20 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 static int test_split_module_name(void) {
   int _sv0t0 = sv0_vec_new();
   int it = _sv0t0;
@@ -4230,11 +4358,18 @@ int main(void) {
     return _sv0t80;
   } else {
   }
-  int _sv0t81 = test_g2_link_host_io_aliases();
-  int r22 = _sv0t81;
-  if ((r22 != 0)) {
-    int _sv0t82 = (220 + r22);
+  int _sv0t81 = test_link_ty_tyname_first_seg_preview();
+  int r21pv = _sv0t81;
+  if ((r21pv != 0)) {
+    int _sv0t82 = (260 + r21pv);
     return _sv0t82;
+  } else {
+  }
+  int _sv0t83 = test_g2_link_host_io_aliases();
+  int r22 = _sv0t83;
+  if ((r22 != 0)) {
+    int _sv0t84 = (220 + r22);
+    return _sv0t84;
   } else {
   }
   return 0;
