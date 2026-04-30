@@ -21,10 +21,10 @@
    root-span traversal, stmt/arm tags 27–33). **`link_pat_subtree_node_count`** /
    **`link_pat_root_needs_mangle`** — standalone **pat arena** (parser **`pat_tags`**
    rows 0–6) subtree sizing + path mangle predicate (**`mapPat`** rewrite still
-   deferred).    **`link_ty_tyname_first_seg_preview`** / **`link_ty_tyname_second_seg_preview`** —
-   dry-run **`TyName`** path segment text (**`map_path_segs_rewrite_*`** vs unchanged
-   second seg when **`sc==2`**) — no arena mutation — **`doc/link-g6-blockers.md`**.
-   **`mapItem`** rewrite remains deferred. */
+   deferred).    **`link_ty_tyname_first_seg_preview`** / **`link_ty_tyname_second_seg_preview`**;
+   **`link_expr_path_first_seg_preview`** / **`link_expr_path_second_seg_preview`** —
+   same dry-run for **`ExprPath`** (expr tag 1; **`ed1`/`ed2`** = **`pp`** start/count).
+   No arena mutation — **`doc/link-g6-blockers.md`**. **`mapItem`** rewrite remains deferred. */
 
 /* ── file classification ────────────────────────────────────── */
 
@@ -509,6 +509,46 @@ fn link_expr_path_needs_mangle(expr_tags: Vec<i32>, ed1: Vec<i32>,
     let ps2: i32 = vec_get(ed1, idx);
     let sc2: i32 = vec_get(ed2, idx);
     return link_path_pool_prefix_needs_mangle(pp, tops, ps2, sc2);
+}
+
+/* Dry-run **`mapPathSegs`** on **`ExprPath`** first segment — logic matches
+   **`link_ty_tyname_first_seg_preview`** but reads **`expr_tags`/`ed1`/`ed2`**. */
+
+fn link_expr_path_first_seg_preview(expr_tags: Vec<i32>, ed1: Vec<i32>,
+                                    ed2: Vec<i32>, pp: Vec<i32>,
+                                    tops: Vec<i32>, mod_id: string,
+                                    starts: Vec<i32>, ends: Vec<i32>,
+                                    source: string, idx: i32) -> string {
+    if idx < 0 { return ""; }
+    if vec_get(expr_tags, idx) != 1 { return ""; }
+    let ps: i32 = vec_get(ed1, idx);
+    let sc: i32 = vec_get(ed2, idx);
+    if sc == 1 {
+        let h1: i32 = vec_get(pp, ps);
+        let t1: string = link_tok_text(source, starts, ends, h1);
+        return map_path_segs_rewrite_1(tops, mod_id, h1, t1);
+    }
+    if sc == 2 {
+        let hf: i32 = vec_get(pp, ps);
+        let tf: string = link_tok_text(source, starts, ends, hf);
+        return map_path_segs_rewrite_2(tops, mod_id, hf, tf);
+    }
+    return "";
+}
+
+/* Second **`ExprPath`** segment text when **`sc==2`**. */
+
+fn link_expr_path_second_seg_preview(expr_tags: Vec<i32>, ed1: Vec<i32>,
+                                     ed2: Vec<i32>, pp: Vec<i32>,
+                                     starts: Vec<i32>, ends: Vec<i32>,
+                                     source: string, idx: i32) -> string {
+    if idx < 0 { return ""; }
+    if vec_get(expr_tags, idx) != 1 { return ""; }
+    let ps: i32 = vec_get(ed1, idx);
+    let sc: i32 = vec_get(ed2, idx);
+    if sc != 2 { return ""; }
+    let h2: i32 = vec_get(pp, ps + 1);
+    return link_tok_text(source, starts, ends, h2);
 }
 
 /* Parser **pat** arena (parallel pat_tags / pat_data1–3) — see parser.sv0
@@ -2363,6 +2403,91 @@ fn test_link_ty_tyname_second_seg_preview() -> i32 {
     return 0;
 }
 
+fn test_link_expr_path_first_seg_preview() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(et, 1);
+    vec_push(e1, 0);
+    vec_push(e2, 1);
+    vec_push(pp, 0);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 3);
+    let tops_hit: Vec<i32> = vec_new();
+    vec_push(tops_hit, 0);
+    let s1: string = link_expr_path_first_seg_preview(et, e1, e2, pp, tops_hit,
+        "mod", starts, ends, "Foo", 0);
+    if string_eq(s1, "mod__Foo") != true { return 1; }
+    let tops_miss: Vec<i32> = vec_new();
+    vec_push(tops_miss, 99);
+    let s2: string = link_expr_path_first_seg_preview(et, e1, e2, pp, tops_miss,
+        "mod", starts, ends, "Foo", 0);
+    if string_eq(s2, "Foo") != true { return 2; }
+    let et2: Vec<i32> = vec_new();
+    let e1b: Vec<i32> = vec_new();
+    let e2b: Vec<i32> = vec_new();
+    let ppb: Vec<i32> = vec_new();
+    vec_push(et2, 1);
+    vec_push(e1b, 0);
+    vec_push(e2b, 2);
+    vec_push(ppb, 0);
+    vec_push(ppb, 1);
+    let st2: Vec<i32> = vec_new();
+    let en2: Vec<i32> = vec_new();
+    vec_push(st2, 0);
+    vec_push(en2, 3);
+    vec_push(st2, 5);
+    vec_push(en2, 8);
+    let src2: string = "Foo::Bar";
+    let tops2: Vec<i32> = vec_new();
+    vec_push(tops2, 0);
+    let s3: string = link_expr_path_first_seg_preview(et2, e1b, e2b, ppb, tops2,
+        "m", st2, en2, src2, 0);
+    if string_eq(s3, "m__Foo") != true { return 3; }
+    return 0;
+}
+
+fn test_link_expr_path_second_seg_preview() -> i32 {
+    let et2: Vec<i32> = vec_new();
+    let e1b: Vec<i32> = vec_new();
+    let e2b: Vec<i32> = vec_new();
+    let ppb: Vec<i32> = vec_new();
+    vec_push(et2, 1);
+    vec_push(e1b, 0);
+    vec_push(e2b, 2);
+    vec_push(ppb, 0);
+    vec_push(ppb, 1);
+    let st2: Vec<i32> = vec_new();
+    let en2: Vec<i32> = vec_new();
+    vec_push(st2, 0);
+    vec_push(en2, 3);
+    vec_push(st2, 5);
+    vec_push(en2, 8);
+    let src2: string = "Foo::Bar";
+    let sec: string = link_expr_path_second_seg_preview(et2, e1b, e2b, ppb,
+        st2, en2, src2, 0);
+    if string_eq(sec, "Bar") != true { return 1; }
+    let et1: Vec<i32> = vec_new();
+    let e1a: Vec<i32> = vec_new();
+    let e2a: Vec<i32> = vec_new();
+    let ppa: Vec<i32> = vec_new();
+    vec_push(et1, 1);
+    vec_push(e1a, 0);
+    vec_push(e2a, 1);
+    vec_push(ppa, 0);
+    let sta: Vec<i32> = vec_new();
+    let ena: Vec<i32> = vec_new();
+    vec_push(sta, 0);
+    vec_push(ena, 3);
+    let empty: string = link_expr_path_second_seg_preview(et1, e1a, e2a, ppa,
+        sta, ena, "Foo", 0);
+    if string_eq(empty, "") != true { return 2; }
+    return 0;
+}
+
 fn test_split_module_name() -> i32 {
     let it: Vec<i32> = vec_new();
     let id1: Vec<i32> = vec_new();
@@ -2471,6 +2596,10 @@ fn main() -> i32 {
     if r21pv != 0 { return 260 + r21pv; }
     let r21pv2: i32 = test_link_ty_tyname_second_seg_preview();
     if r21pv2 != 0 { return 261 + r21pv2; }
+    let r21pv3: i32 = test_link_expr_path_first_seg_preview();
+    if r21pv3 != 0 { return 262 + r21pv3; }
+    let r21pv4: i32 = test_link_expr_path_second_seg_preview();
+    if r21pv4 != 0 { return 266 + r21pv4; }
     let r22: i32 = test_g2_link_host_io_aliases();
     if r22 != 0 { return 220 + r22; }
     return 0;
