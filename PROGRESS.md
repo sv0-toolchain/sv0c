@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-29 (America/Los_Angeles; **M3 G6:** **`doc/driver-pipeline-composition.md`** (**M3-S-041** closure criteria — still Partial); **`lib/link.sv0`** preview + **`doc/link-g6-blockers.md`**; **`doc/cli-parity.md`** (**M3-S-042** done); **`doc/transliteration-plan.md`**; **Partial:** mutating **`map*`** (**M3-S-039**), merged AST (**M3-S-040**), driver TU wiring (**M3-S-041**).)
+**Last updated:** 2026-04-29 (America/Los_Angeles; **M3 G6:** **`lib/link.sv0`** **`link_ty_tyname_second_seg_preview`** (two-seg **`TyName`** dry-run vs SML **`mapPathSegs`**); **`doc/driver-pipeline-composition.md`** (**M3-S-041** Partial); **`doc/link-g6-blockers.md`**; **`doc/cli-parity.md`** (**M3-S-042** done); **`doc/transliteration-plan.md`**; **Partial:** mutating **`map*`** (**M3-S-039**), merged AST (**M3-S-040**), driver TU (**M3-S-041**).)
 
 ## Checklist (local source of truth)
 
