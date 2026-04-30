@@ -50,6 +50,7 @@ static int link_path_pool_prefix_needs_mangle(int pp, int tops, int pool_start, 
 static int link_ty_tyname_path_needs_mangle(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, int idx);
 static const char* link_tok_text(const char* source, int starts, int ends, int pos);
 static const char* link_ty_tyname_first_seg_preview(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx);
+static const char* link_ty_tyname_second_seg_preview(int ty_tags, int ty_d1, int ty_d2, int pp, int starts, int ends, const char* source, int idx);
 static int link_expr_path_needs_mangle(int expr_tags, int ed1, int ed2, int pp, int tops, int idx);
 static int link_pat_subtree_node_count(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int idx, int depth);
 static int link_pat_root_needs_mangle(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int pp, int tops, int idx, int depth);
@@ -104,6 +105,7 @@ static int test_link_ty_array_tyname_mangle(void);
 static int test_link_ty_tuple_two_tyname_mangle(void);
 static int test_link_ty_generic_arg_path_mangle(void);
 static int test_link_ty_tyname_first_seg_preview(void);
+static int test_link_ty_tyname_second_seg_preview(void);
 static int test_split_module_name(void);
 
 static int is_sv0(const char* name) {
@@ -758,6 +760,31 @@ static const char* link_ty_tyname_first_seg_preview(int ty_tags, int ty_d1, int 
   } else {
   }
   return "";
+}
+
+static const char* link_ty_tyname_second_seg_preview(int ty_tags, int ty_d1, int ty_d2, int pp, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(ty_tags, idx);
+  if ((_sv0t0 != 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(ty_d1, idx);
+  int ps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(ty_d2, idx);
+  int sc = _sv0t2;
+  if ((sc != 2)) {
+    return "";
+  } else {
+  }
+  int _sv0t3 = (ps + 1);
+  int _sv0t4 = sv0_vec_get(pp, _sv0t3);
+  int h2 = _sv0t4;
+  const char* _sv0t5 = link_tok_text(source, starts, ends, h2);
+  return _sv0t5;
 }
 
 static int link_expr_path_needs_mangle(int expr_tags, int ed1, int ed2, int pp, int tops, int idx) {
@@ -4020,6 +4047,67 @@ static int test_link_ty_tyname_first_seg_preview(void) {
   return 0;
 }
 
+static int test_link_ty_tyname_second_seg_preview(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt2 = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int d1b = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int d2b = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ppb = _sv0t3;
+  sv0_vec_push(tt2, 0);
+  sv0_vec_push(d1b, 0);
+  sv0_vec_push(d2b, 2);
+  sv0_vec_push(ppb, 0);
+  sv0_vec_push(ppb, 1);
+  int _sv0t4 = sv0_vec_new();
+  int st2 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int en2 = _sv0t5;
+  sv0_vec_push(st2, 0);
+  sv0_vec_push(en2, 3);
+  sv0_vec_push(st2, 5);
+  sv0_vec_push(en2, 8);
+  const char* src2;
+  src2 = "Foo::Bar";
+  const char* _sv0t6 = link_ty_tyname_second_seg_preview(tt2, d1b, d2b, ppb, st2, en2, src2, 0);
+  const char* sec;
+  sec = _sv0t6;
+  int _sv0t7 = sv0_string_eq(sec, "Bar");
+  if ((_sv0t7 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int tt1 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int d1a = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int d2a = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int ppa = _sv0t11;
+  sv0_vec_push(tt1, 0);
+  sv0_vec_push(d1a, 0);
+  sv0_vec_push(d2a, 1);
+  sv0_vec_push(ppa, 0);
+  int _sv0t12 = sv0_vec_new();
+  int sta = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int ena = _sv0t13;
+  sv0_vec_push(sta, 0);
+  sv0_vec_push(ena, 3);
+  const char* _sv0t14 = link_ty_tyname_second_seg_preview(tt1, d1a, d2a, ppa, sta, ena, "Foo", 0);
+  const char* empty;
+  empty = _sv0t14;
+  int _sv0t15 = sv0_string_eq(empty, "");
+  if ((_sv0t15 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 static int test_split_module_name(void) {
   int _sv0t0 = sv0_vec_new();
   int it = _sv0t0;
@@ -4365,11 +4453,18 @@ int main(void) {
     return _sv0t82;
   } else {
   }
-  int _sv0t83 = test_g2_link_host_io_aliases();
-  int r22 = _sv0t83;
-  if ((r22 != 0)) {
-    int _sv0t84 = (220 + r22);
+  int _sv0t83 = test_link_ty_tyname_second_seg_preview();
+  int r21pv2 = _sv0t83;
+  if ((r21pv2 != 0)) {
+    int _sv0t84 = (261 + r21pv2);
     return _sv0t84;
+  } else {
+  }
+  int _sv0t85 = test_g2_link_host_io_aliases();
+  int r22 = _sv0t85;
+  if ((r22 != 0)) {
+    int _sv0t86 = (220 + r22);
+    return _sv0t86;
   } else {
   }
   return 0;

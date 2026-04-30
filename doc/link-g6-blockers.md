@@ -14,7 +14,7 @@ This note explains why **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## M
 **Shipped toward closure**
 
 - Predicate stack (`link_*_needs_mangle`, subtree counts) — verification-only.  
-- **String preview (no mutation):** **`link_ty_tyname_first_seg_preview`** applies `map_path_segs_rewrite_1` / `_2` to the **text** of the first path segment for **`TyName`** rows — documents **what** the rewriter would emit before handles exist.
+- **String preview (no mutation):** **`link_ty_tyname_first_seg_preview`** applies `map_path_segs_rewrite_1` / `_2` to the **text** of the first path segment for **`TyName`** rows; **`link_ty_tyname_second_seg_preview`** surfaces the **second** segment text when `sc==2` (unchanged by SML **`mapPathSegs`** except via the first segment) — documents **what** the rewriter would emit before handles exist.
 
 **Gate:** introduce **`parser`-level** (or link-local) **synthetic ident tokens** + mutation policy for `pp` / item arenas; until then **M3-S-039** stays **Partial**.
 
