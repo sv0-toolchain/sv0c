@@ -65,6 +65,8 @@ From the **sv0-toolchain** repo root:
 
 ## Related
 
+- **`doc/native-self-host-compiler-recipe.md`** — **M3-S-047**: canonical **`build/sv0-self-host-compiler`** wrapper and **`SV0_SELF_HOST_COMPILER`** setup (bootstrap delegate vs future native binary).
+- **`doc/sml-retirement-cutover-checklist.md`**, **`doc/cold-bootstrap-recovery.md`** — **M3 G9** retirement prep / recovery (**human-gated** cutover).
 - **`task/sv0-toolchain-milestone-3-self-host.Rmd`** — definition of done for milestone 3 (full parity + SML retirement remain open).
 - **`sv0c/lib/LAYOUT.md`** — transliteration order and bootstrap lists.
 - **`./scripts/sv0 emit-c`**, **`self-host-capture-stage0`**, **`self-host-compare`** — C snapshot workflow.

@@ -1,0 +1,4 @@
+/* M3-S-044 diagnostics corpus — intentional type error (SML baseline). */
+fn main() -> i32 {
+    return true;
+}

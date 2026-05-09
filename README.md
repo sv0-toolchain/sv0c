@@ -67,6 +67,8 @@ requires SML/NJ (tested with 110.99.9).
 ```bash
 make build         # compile all modules via CM
 make check         # CM compile only (fast smoke; no test_runner)
+make legacy-bootstrap-check   # explicit alias for check (M3-S-052 retirement prep — same as check)
+make legacy-bootstrap-heap    # explicit alias for heap (M3-S-052 retirement prep — same as heap)
 make test          # run test suite (see test_runner for current count)
 make e2e           # emit C, compile with cc, run binary (exit code 42)
 make integration   # Rmd-style scenarios under test/integration/ (needs heap)
@@ -90,6 +92,14 @@ or interactively:
 ```bash
 echo 'CM.make "sources.cm"; Main.compile "input.sv0";' | sml
 ```
+
+## SML retirement (milestone 3 — human-gated)
+
+Cutover procedure (**tag `bootstrap-sml-final`**, **`sml/` → `sml-legacy/`**, default sv0-only build outline): **[doc/sml-retirement-cutover-checklist.md](doc/sml-retirement-cutover-checklist.md)**.
+
+Cold bootstrap if self-host breaks after retirement: **[doc/cold-bootstrap-recovery.md](doc/cold-bootstrap-recovery.md)**.
+
+Do **not** run the checklist until **`task/sv0-toolchain-milestone-3-self-host.Rmd`** L0 criteria and stakeholder sign-off — see **`.cursor/rules/28-sml-retirement-and-self-host-bar.mdc`**.
 
 ## specification
 

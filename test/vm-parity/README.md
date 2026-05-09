@@ -28,3 +28,11 @@ Then commit updated **`golden/sml/*.sv0b`** in **sv0c** together with any compil
 Parent **`./scripts/sv0 test`** runs **`bootstrap-build`** (SML → **`.sv0b`** + VM run), then **`cmp`**s each **`build/vm/<stem>.sv0b`** against **`test/vm-parity/golden/sml/<stem>.sv0b`** for every entry in **`manifest.txt`**. Mismatch fails the build (same pattern as **stage0** C goldens).
 
 When the **sv0** compiler emits VM bytecode, add a second tier (e.g. **`golden/sv0/`** or a dedicated compare step) without dropping the SML reference tier.
+
+## Tier 2 (M3-S-045) — policy subset + optional emitter compare
+
+- **`tier2-manifest.txt`** lists a **subset** of **`manifest.txt`** paths. **`scripts/verify_vm_parity_tier2_policy.py`** ( **`./scripts/sv0 test-guards`** ) asserts each path is in **`manifest.txt`** and that **`golden/sml/<stem>.sv0b`** exists for each stem.
+- **`SV0_VM_BYTECODE_EMITTER`** — optional. When set to an **executable** path, **`./scripts/sv0 test`** (after tier-1 parity) invokes it once per **`tier2-manifest.txt`** line with a single argument: the **`.sv0`** path **relative to `sv0c/`** (e.g. **`lib/span.sv0`**). The emitter must write **`sv0c/build/vm/<stem>.sv0b`**. The harness **`cmp`**s that file to **`test/vm-parity/golden/sml/<stem>.sv0b`**. **`SV0TOOLCHAIN_ROOT`** and **`SV0C_ROOT`** are exported for wrappers.
+- **`scripts/sv0-vm-tier2-emit-bootstrap.sh`** — bootstrap **surrogate**: same SML heap **`--target=vm`** emit as tier-1 (for validating the harness). Example: **`SV0_VM_BYTECODE_EMITTER="$PWD/scripts/sv0-vm-tier2-emit-bootstrap.sh"`** then **`./scripts/sv0 test`**. CI leaves the variable **unset** so this step is skipped.
+- When a **native** compiler built from sv0 sources implements the same emit contract, point **`SV0_VM_BYTECODE_EMITTER`** at it (or a wrapper) and grow **`tier2-manifest.txt`** toward full **`manifest.txt`**.
+- Optional meta workflow **`.github/workflows/vm-parity-tier2.yml`** runs the tier-2 **policy** script alone (**`workflow_dispatch`**) without SML.

@@ -148,6 +148,15 @@ fn DRIVER_FULL_PIPELINE_LEN() -> i32 {
     return 2 + PHASE_COUNT();
 }
 
+fn driver_pipeline_last_step() -> i32 {
+    return DRIVER_FULL_PIPELINE_LEN() - 1;
+}
+
+fn driver_pipeline_step_is_valid(step: i32) -> bool {
+    if step < 0 { return false; }
+    return step < DRIVER_FULL_PIPELINE_LEN();
+}
+
 /* Linear driver step index 0..DRIVER_FULL_PIPELINE_LEN()-1:
    0 = tokenize, 1 = parse, then PHASE_RESOLVE..PHASE_EMIT_VM at indices 2..8.
    Matches SML Main.compileFile{,Vm}: Lexer.tokenize → Parser.parse → compileProgram*. */
@@ -155,6 +164,7 @@ fn DRIVER_FULL_PIPELINE_LEN() -> i32 {
 fn driver_pipeline_step_name(step: i32) -> string {
     if step == 0 { return "tokenize"; }
     if step == 1 { return "parse"; }
+    if driver_pipeline_step_is_valid(step) != true { return "unknown"; }
     let ph: i32 = step - 2;
     if ph >= 0 {
         if ph < PHASE_COUNT() { return phase_name(ph); }
@@ -163,7 +173,21 @@ fn driver_pipeline_step_name(step: i32) -> string {
 }
 
 fn driver_pipeline_step_for_core_phase(ph: i32) -> i32 {
+    if ph < 0 { return 0 - 1; }
+    if ph >= PHASE_COUNT() { return 0 - 1; }
     return 2 + ph;
+}
+
+fn driver_core_phase_for_step(step: i32) -> i32 {
+    if driver_pipeline_step_is_valid(step) != true { return 0 - 1; }
+    if step < 2 { return 0 - 1; }
+    return step - 2;
+}
+
+fn driver_pipeline_step_is_backend(step: i32) -> bool {
+    let ph: i32 = driver_core_phase_for_step(step);
+    if ph < 0 { return false; }
+    return is_backend_phase(ph);
 }
 
 fn phase_name(phase: i32) -> string {
@@ -343,6 +367,23 @@ fn test_driver_pipeline_step_names() -> i32 {
     if string_eq(driver_pipeline_step_name(9), "unknown") != true { return 10; }
     if driver_pipeline_step_for_core_phase(PHASE_RESOLVE()) != 2 { return 11; }
     if driver_pipeline_step_for_core_phase(PHASE_EMIT_VM()) != 8 { return 12; }
+    if driver_pipeline_step_for_core_phase(0 - 1) != 0 - 1 { return 13; }
+    if driver_pipeline_step_for_core_phase(PHASE_COUNT()) != 0 - 1 { return 14; }
+    if driver_pipeline_last_step() != 8 { return 13; }
+    if driver_pipeline_step_is_valid(0) != true { return 15; }
+    if driver_pipeline_step_is_valid(8) != true { return 16; }
+    if driver_pipeline_step_is_valid(9) != false { return 17; }
+    if driver_pipeline_step_is_valid(0 - 1) != false { return 18; }
+    if driver_core_phase_for_step(0) != 0 - 1 { return 19; }
+    if driver_core_phase_for_step(1) != 0 - 1 { return 20; }
+    if driver_core_phase_for_step(2) != PHASE_RESOLVE() { return 21; }
+    if driver_core_phase_for_step(8) != PHASE_EMIT_VM() { return 22; }
+    if driver_core_phase_for_step(9) != 0 - 1 { return 23; }
+    if driver_pipeline_step_is_backend(0) != false { return 24; }
+    if driver_pipeline_step_is_backend(1) != false { return 25; }
+    if driver_pipeline_step_is_backend(7) != true { return 26; }
+    if driver_pipeline_step_is_backend(8) != true { return 27; }
+    if driver_pipeline_step_is_backend(9) != false { return 28; }
     return 0;
 }
 

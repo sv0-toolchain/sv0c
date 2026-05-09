@@ -32,8 +32,12 @@ static int PHASE_EMIT_C(void);
 static int PHASE_EMIT_VM(void);
 static int PHASE_COUNT(void);
 static int DRIVER_FULL_PIPELINE_LEN(void);
+static int driver_pipeline_last_step(void);
+static int driver_pipeline_step_is_valid(int step);
 static const char* driver_pipeline_step_name(int step);
 static int driver_pipeline_step_for_core_phase(int ph);
+static int driver_core_phase_for_step(int step);
+static int driver_pipeline_step_is_backend(int step);
 static const char* phase_name(int phase);
 static int is_backend_phase(int phase);
 static int CLI_FILE(void);
@@ -291,6 +295,22 @@ static int DRIVER_FULL_PIPELINE_LEN(void) {
   return _sv0t1;
 }
 
+static int driver_pipeline_last_step(void) {
+  int _sv0t0 = DRIVER_FULL_PIPELINE_LEN();
+  int _sv0t1 = (_sv0t0 - 1);
+  return _sv0t1;
+}
+
+static int driver_pipeline_step_is_valid(int step) {
+  if ((step < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = DRIVER_FULL_PIPELINE_LEN();
+  int _sv0t1 = (step < _sv0t0);
+  return _sv0t1;
+}
+
 static const char* driver_pipeline_step_name(int step) {
   if ((step == 0)) {
     return "tokenize";
@@ -300,12 +320,17 @@ static const char* driver_pipeline_step_name(int step) {
     return "parse";
   } else {
   }
+  int _sv0t0 = driver_pipeline_step_is_valid(step);
+  if ((_sv0t0 != 1)) {
+    return "unknown";
+  } else {
+  }
   int ph = (step - 2);
   if ((ph >= 0)) {
-    int _sv0t0 = PHASE_COUNT();
-    if ((ph < _sv0t0)) {
-      const char* _sv0t1 = phase_name(ph);
-      return _sv0t1;
+    int _sv0t1 = PHASE_COUNT();
+    if ((ph < _sv0t1)) {
+      const char* _sv0t2 = phase_name(ph);
+      return _sv0t2;
     } else {
     }
   } else {
@@ -314,8 +339,46 @@ static const char* driver_pipeline_step_name(int step) {
 }
 
 static int driver_pipeline_step_for_core_phase(int ph) {
-  int _sv0t0 = (2 + ph);
-  return _sv0t0;
+  if ((ph < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = PHASE_COUNT();
+  if ((ph >= _sv0t1)) {
+    int _sv0t2 = (0 - 1);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = (2 + ph);
+  return _sv0t3;
+}
+
+static int driver_core_phase_for_step(int step) {
+  int _sv0t0 = driver_pipeline_step_is_valid(step);
+  if ((_sv0t0 != 1)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  if ((step < 2)) {
+    int _sv0t2 = (0 - 1);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = (step - 2);
+  return _sv0t3;
+}
+
+static int driver_pipeline_step_is_backend(int step) {
+  int _sv0t0 = driver_core_phase_for_step(step);
+  int ph = _sv0t0;
+  if ((ph < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = is_backend_phase(ph);
+  return _sv0t1;
 }
 
 static const char* phase_name(int phase) {
@@ -833,6 +896,101 @@ static int test_driver_pipeline_step_names(void) {
   int _sv0t23 = driver_pipeline_step_for_core_phase(_sv0t22);
   if ((_sv0t23 != 8)) {
     return 12;
+  } else {
+  }
+  int _sv0t24 = (0 - 1);
+  int _sv0t25 = driver_pipeline_step_for_core_phase(_sv0t24);
+  int _sv0t26 = (0 - 1);
+  if ((_sv0t25 != _sv0t26)) {
+    return 13;
+  } else {
+  }
+  int _sv0t27 = PHASE_COUNT();
+  int _sv0t28 = driver_pipeline_step_for_core_phase(_sv0t27);
+  int _sv0t29 = (0 - 1);
+  if ((_sv0t28 != _sv0t29)) {
+    return 14;
+  } else {
+  }
+  int _sv0t30 = driver_pipeline_last_step();
+  if ((_sv0t30 != 8)) {
+    return 13;
+  } else {
+  }
+  int _sv0t31 = driver_pipeline_step_is_valid(0);
+  if ((_sv0t31 != 1)) {
+    return 15;
+  } else {
+  }
+  int _sv0t32 = driver_pipeline_step_is_valid(8);
+  if ((_sv0t32 != 1)) {
+    return 16;
+  } else {
+  }
+  int _sv0t33 = driver_pipeline_step_is_valid(9);
+  if ((_sv0t33 != 0)) {
+    return 17;
+  } else {
+  }
+  int _sv0t34 = (0 - 1);
+  int _sv0t35 = driver_pipeline_step_is_valid(_sv0t34);
+  if ((_sv0t35 != 0)) {
+    return 18;
+  } else {
+  }
+  int _sv0t36 = driver_core_phase_for_step(0);
+  int _sv0t37 = (0 - 1);
+  if ((_sv0t36 != _sv0t37)) {
+    return 19;
+  } else {
+  }
+  int _sv0t38 = driver_core_phase_for_step(1);
+  int _sv0t39 = (0 - 1);
+  if ((_sv0t38 != _sv0t39)) {
+    return 20;
+  } else {
+  }
+  int _sv0t40 = driver_core_phase_for_step(2);
+  int _sv0t41 = PHASE_RESOLVE();
+  if ((_sv0t40 != _sv0t41)) {
+    return 21;
+  } else {
+  }
+  int _sv0t42 = driver_core_phase_for_step(8);
+  int _sv0t43 = PHASE_EMIT_VM();
+  if ((_sv0t42 != _sv0t43)) {
+    return 22;
+  } else {
+  }
+  int _sv0t44 = driver_core_phase_for_step(9);
+  int _sv0t45 = (0 - 1);
+  if ((_sv0t44 != _sv0t45)) {
+    return 23;
+  } else {
+  }
+  int _sv0t46 = driver_pipeline_step_is_backend(0);
+  if ((_sv0t46 != 0)) {
+    return 24;
+  } else {
+  }
+  int _sv0t47 = driver_pipeline_step_is_backend(1);
+  if ((_sv0t47 != 0)) {
+    return 25;
+  } else {
+  }
+  int _sv0t48 = driver_pipeline_step_is_backend(7);
+  if ((_sv0t48 != 1)) {
+    return 26;
+  } else {
+  }
+  int _sv0t49 = driver_pipeline_step_is_backend(8);
+  if ((_sv0t49 != 1)) {
+    return 27;
+  } else {
+  }
+  int _sv0t50 = driver_pipeline_step_is_backend(9);
+  if ((_sv0t50 != 0)) {
+    return 28;
   } else {
   }
   return 0;

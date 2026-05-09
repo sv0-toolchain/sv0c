@@ -146,7 +146,7 @@ fn LINK_ERR_NO_SV0_IN_DIR() -> i32 {
 }
 
 fn link_listing_nonempty(listing: string) -> bool {
-    return string_len(listing) > 0;
+    return listing_count_nonempty_paths(listing) > 0;
 }
 
 fn link_project_guard_nonempty(dir: string) -> i32 {
@@ -549,6 +549,447 @@ fn link_expr_path_second_seg_preview(expr_tags: Vec<i32>, ed1: Vec<i32>,
     if sc != 2 { return ""; }
     let h2: i32 = vec_get(pp, ps + 1);
     return link_tok_text(source, starts, ends, h2);
+}
+
+/* Synthetic token append helper for mapPathSegs rewrites.
+   Appends text to source, records [start,end) token spans, and returns
+   the updated source buffer. */
+
+fn link_append_synth_ident(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                           text: string) -> string {
+    let mut out: string = source;
+    let mut st: i32 = string_len(source);
+    if st > 0 {
+        out = string_concat(out, "\n");
+        st = st + 1;
+    }
+    out = string_concat(out, text);
+    vec_push(starts, st);
+    vec_push(ends, st + string_len(text));
+    return out;
+}
+
+fn link_last_tok_handle(starts: Vec<i32>) -> i32 {
+    return vec_len(starts) - 1;
+}
+
+/* M3-S-039 forward step: mutate first path segment token handle for TyName
+   rows (tag 0) using synthetic token append. */
+
+fn link_ty_tyname_rewrite_first_seg_handle(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                                           ty_d2: Vec<i32>, pp: Vec<i32>,
+                                           tops: Vec<i32>, mod_id: string,
+                                           starts: Vec<i32>, ends: Vec<i32>,
+                                           source: string, idx: i32) -> string {
+    if idx < 0 { return source; }
+    if vec_get(ty_tags, idx) != 0 { return source; }
+    let ps: i32 = vec_get(ty_d1, idx);
+    let sc: i32 = vec_get(ty_d2, idx);
+    if sc != 1 {
+        if sc != 2 { return source; }
+    }
+    let h0: i32 = vec_get(pp, ps);
+    if in_tops(tops, h0) != true { return source; }
+    let t0: string = link_tok_text(source, starts, ends, h0);
+    let mangled: string = mangle(mod_id, t0);
+    let out: string = link_append_synth_ident(source, starts, ends, mangled);
+    let nh: i32 = link_last_tok_handle(starts);
+    vec_set(pp, ps, nh);
+    return out;
+}
+
+/* M3-S-039 forward step: mutate first path segment token handle for ExprPath
+   rows (expr tag 1) using synthetic token append. */
+
+fn link_expr_path_rewrite_first_seg_handle(expr_tags: Vec<i32>, ed1: Vec<i32>,
+                                           ed2: Vec<i32>, pp: Vec<i32>,
+                                           tops: Vec<i32>, mod_id: string,
+                                           starts: Vec<i32>, ends: Vec<i32>,
+                                           source: string, idx: i32) -> string {
+    if idx < 0 { return source; }
+    if vec_get(expr_tags, idx) != 1 { return source; }
+    let ps: i32 = vec_get(ed1, idx);
+    let sc: i32 = vec_get(ed2, idx);
+    if sc != 1 {
+        if sc != 2 { return source; }
+    }
+    let h0: i32 = vec_get(pp, ps);
+    if in_tops(tops, h0) != true { return source; }
+    let t0: string = link_tok_text(source, starts, ends, h0);
+    let mangled: string = mangle(mod_id, t0);
+    let out: string = link_append_synth_ident(source, starts, ends, mangled);
+    let nh: i32 = link_last_tok_handle(starts);
+    vec_set(pp, ps, nh);
+    return out;
+}
+
+fn link_ty_arena_rewrite_all_first_seg(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                                       ty_d2: Vec<i32>, pp: Vec<i32>,
+                                       tops: Vec<i32>, mod_id: string,
+                                       starts: Vec<i32>, ends: Vec<i32>,
+                                       source: string) -> string {
+    let mut out: string = source;
+    let n: i32 = vec_len(ty_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        out = link_ty_tyname_rewrite_first_seg_handle(ty_tags, ty_d1, ty_d2, pp,
+            tops, mod_id, starts, ends, out, i);
+        i = i + 1;
+    }
+    return out;
+}
+
+fn link_expr_arena_rewrite_all_first_seg(expr_tags: Vec<i32>, ed1: Vec<i32>,
+                                         ed2: Vec<i32>, pp: Vec<i32>,
+                                         tops: Vec<i32>, mod_id: string,
+                                         starts: Vec<i32>, ends: Vec<i32>,
+                                         source: string) -> string {
+    let mut out: string = source;
+    let n: i32 = vec_len(expr_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        out = link_expr_path_rewrite_first_seg_handle(expr_tags, ed1, ed2, pp,
+            tops, mod_id, starts, ends, out, i);
+        i = i + 1;
+    }
+    return out;
+}
+
+/* mapPat path helpers (PatStruct=4, PatEnum=5): previews + first-segment
+   synthetic-token rewrite to mirror TyName/ExprPath rewrites. */
+
+fn link_pat_path_first_seg_preview(pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                                   pat_d2: Vec<i32>, pp: Vec<i32>,
+                                   tops: Vec<i32>, mod_id: string,
+                                   starts: Vec<i32>, ends: Vec<i32>,
+                                   source: string, idx: i32) -> string {
+    if idx < 0 { return ""; }
+    let tag: i32 = vec_get(pat_tags, idx);
+    if tag != 4 {
+        if tag != 5 { return ""; }
+    }
+    let ps: i32 = vec_get(pat_d1, idx);
+    let sc: i32 = vec_get(pat_d2, idx);
+    if sc == 1 {
+        let h1: i32 = vec_get(pp, ps);
+        let t1: string = link_tok_text(source, starts, ends, h1);
+        return map_path_segs_rewrite_1(tops, mod_id, h1, t1);
+    }
+    if sc == 2 {
+        let hf: i32 = vec_get(pp, ps);
+        let tf: string = link_tok_text(source, starts, ends, hf);
+        return map_path_segs_rewrite_2(tops, mod_id, hf, tf);
+    }
+    return "";
+}
+
+fn link_pat_path_second_seg_preview(pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                                    pat_d2: Vec<i32>, pp: Vec<i32>,
+                                    starts: Vec<i32>, ends: Vec<i32>,
+                                    source: string, idx: i32) -> string {
+    if idx < 0 { return ""; }
+    let tag: i32 = vec_get(pat_tags, idx);
+    if tag != 4 {
+        if tag != 5 { return ""; }
+    }
+    let ps: i32 = vec_get(pat_d1, idx);
+    let sc: i32 = vec_get(pat_d2, idx);
+    if sc != 2 { return ""; }
+    let h2: i32 = vec_get(pp, ps + 1);
+    return link_tok_text(source, starts, ends, h2);
+}
+
+fn link_pat_path_rewrite_first_seg_handle(pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                                          pat_d2: Vec<i32>, pp: Vec<i32>,
+                                          tops: Vec<i32>, mod_id: string,
+                                          starts: Vec<i32>, ends: Vec<i32>,
+                                          source: string, idx: i32) -> string {
+    if idx < 0 { return source; }
+    let tag: i32 = vec_get(pat_tags, idx);
+    if tag != 4 {
+        if tag != 5 { return source; }
+    }
+    let ps: i32 = vec_get(pat_d1, idx);
+    let sc: i32 = vec_get(pat_d2, idx);
+    if sc != 1 {
+        if sc != 2 { return source; }
+    }
+    let h0: i32 = vec_get(pp, ps);
+    if in_tops(tops, h0) != true { return source; }
+    let t0: string = link_tok_text(source, starts, ends, h0);
+    let mangled: string = mangle(mod_id, t0);
+    let out: string = link_append_synth_ident(source, starts, ends, mangled);
+    let nh: i32 = link_last_tok_handle(starts);
+    vec_set(pp, ps, nh);
+    return out;
+}
+
+fn link_pat_arena_rewrite_all_first_seg(pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                                        pat_d2: Vec<i32>, pp: Vec<i32>,
+                                        tops: Vec<i32>, mod_id: string,
+                                        starts: Vec<i32>, ends: Vec<i32>,
+                                        source: string) -> string {
+    let mut out: string = source;
+    let n: i32 = vec_len(pat_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        out = link_pat_path_rewrite_first_seg_handle(pat_tags, pat_d1, pat_d2,
+            pp, tops, mod_id, starts, ends, out, i);
+        i = i + 1;
+    }
+    return out;
+}
+
+/* M3-S-039: one-call mapPathSegs for path-bearing rows (TyName, ExprPath,
+   PatStruct/PatEnum) — SML order is mapTy/mapExpr/mapPat; same flat-arena
+   coverage as per-arena drivers. Item ident mangling (mapItem) is separate. */
+
+fn link_apply_map_path_segs_program_source(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                                           ty_d2: Vec<i32>, expr_tags: Vec<i32>,
+                                           ed1: Vec<i32>, ed2: Vec<i32>,
+                                           pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                                           pat_d2: Vec<i32>, pp: Vec<i32>,
+                                           tops: Vec<i32>, mod_id: string,
+                                           starts: Vec<i32>, ends: Vec<i32>,
+                                           source: string) -> string {
+    let mut out: string = source;
+    out = link_ty_arena_rewrite_all_first_seg(ty_tags, ty_d1, ty_d2, pp, tops,
+        mod_id, starts, ends, out);
+    out = link_expr_arena_rewrite_all_first_seg(expr_tags, ed1, ed2, pp, tops,
+        mod_id, starts, ends, out);
+    out = link_pat_arena_rewrite_all_first_seg(pat_tags, pat_d1, pat_d2, pp,
+        tops, mod_id, starts, ends, out);
+    return out;
+}
+
+/* ── mapItem defining identifiers (SML mapFn / mapStruct / mapEnum /
+   mapTrait / ItemTypeAlias) ──────────────────────────────────────────
+   Parser stores each top item's declared name as a lexer token index in
+   item_names (parallel item_tags). Synthetic append + vec_set on that row
+   mirrors other map* handle rewrites. **`fn main`** stays unmangled via
+   **`fn_name_for_link`**.
+
+   **`link_apply_map_link_pass_program_source`** runs **`mapPathSegs`** bulk
+   passes first (same **`tops`** as **`collect_top_names`**), then defining
+   item names. If the same source span index appeared in both a path pool row
+   and **`item_names`**, both passes could append duplicate mangled lines —
+   normal sources use distinct lexer indices for distinct occurrences; avoid
+   overlapping synthetic tests. */
+
+fn link_item_def_mangled_text(item_tag: i32, mod_id: string,
+                              raw_name: string) -> string {
+    if item_tag == 0 {
+        return fn_name_for_link(mod_id, raw_name);
+    }
+    return mangle(mod_id, raw_name);
+}
+
+fn link_item_row_rewrite_defining_name(item_tags: Vec<i32>,
+                                       item_names: Vec<i32>,
+                                       mod_id: string,
+                                       starts: Vec<i32>, ends: Vec<i32>,
+                                       source: string, idx: i32) -> string {
+    if idx < 0 { return source; }
+    let tag: i32 = vec_get(item_tags, idx);
+    if is_top_defining(tag) != true { return source; }
+    let name_pos: i32 = vec_get(item_names, idx);
+    let raw: string = link_tok_text(source, starts, ends, name_pos);
+    let mangled: string = link_item_def_mangled_text(tag, mod_id, raw);
+    if string_eq(mangled, raw) == true { return source; }
+    let out: string = link_append_synth_ident(source, starts, ends, mangled);
+    let nh: i32 = link_last_tok_handle(starts);
+    vec_set(item_names, idx, nh);
+    return out;
+}
+
+fn link_item_arena_rewrite_defining_names(item_tags: Vec<i32>,
+                                          item_names: Vec<i32>,
+                                          mod_id: string,
+                                          starts: Vec<i32>, ends: Vec<i32>,
+                                          source: string) -> string {
+    let mut out: string = source;
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        out = link_item_row_rewrite_defining_name(item_tags, item_names,
+            mod_id, starts, ends, out, i);
+        i = i + 1;
+    }
+    return out;
+}
+
+fn link_apply_map_link_pass_program_source(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
+                                           ty_d2: Vec<i32>,
+                                           expr_tags: Vec<i32>, ed1: Vec<i32>,
+                                           ed2: Vec<i32>,
+                                           pat_tags: Vec<i32>, pat_d1: Vec<i32>,
+                                           pat_d2: Vec<i32>, pp: Vec<i32>,
+                                           item_tags: Vec<i32>,
+                                           item_names: Vec<i32>,
+                                           tops: Vec<i32>, mod_id: string,
+                                           starts: Vec<i32>, ends: Vec<i32>,
+                                           source: string) -> string {
+    let mut out: string = source;
+    out = link_apply_map_path_segs_program_source(ty_tags, ty_d1, ty_d2,
+        expr_tags, ed1, ed2, pat_tags, pat_d1, pat_d2, pp, tops, mod_id,
+        starts, ends, out);
+    out = link_item_arena_rewrite_defining_names(item_tags, item_names,
+        mod_id, starts, ends, out);
+    return out;
+}
+
+/* ── M3-S-040 merge primitives (per-file lex → merged token stream) ───
+   **`link_project_concat_sources_*`** joins files with **`\\n`**. For token
+   spans from file B (indices relative to **`source_b`** alone), relocate by
+   **`string_len(source_a) + 1`** before merging parallel **`tags`/`starts`/`ends`**
+   Vecs. **`parse_program`** arena relocation (expr/ty item indices) is still a
+   separate orchestration step — these helpers only wire **byte-aligned** lexer
+   output like SML **`parseFile` → concat** token bookkeeping. */
+
+fn link_merge_sources_two(first: string, second: string) -> string {
+    let mut out: string = first;
+    out = string_concat(out, "\n");
+    out = string_concat(out, second);
+    return out;
+}
+
+fn link_second_file_byte_offset_after_concat(first: string) -> i32 {
+    return string_len(first) + 1;
+}
+
+/* C backend: avoid chaining multiple `-> ()` calls in one block — use one loop or
+   inline at call sites (see **`test_link_reloc_i32_vec_inplace`**). */
+fn link_reloc_i32_vec_inplace(v: Vec<i32>, delta: i32) -> () {
+    let n: i32 = vec_len(v);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_set(v, i, vec_get(v, i) + delta);
+        i = i + 1;
+    }
+}
+
+fn link_merge_parallel_token_streams_reloc_b(tags_a: Vec<i32>,
+                                             starts_a: Vec<i32>, ends_a: Vec<i32>,
+                                             tags_b: Vec<i32>,
+                                             starts_b: Vec<i32>, ends_b: Vec<i32>,
+                                             delta_b: i32,
+                                             out_tags: Vec<i32>,
+                                             out_starts: Vec<i32>,
+                                             out_ends: Vec<i32>) -> i32 {
+    let na: i32 = vec_len(tags_a);
+    let mut ia: i32 = 0;
+    while ia < na {
+        vec_push(out_tags, vec_get(tags_a, ia));
+        vec_push(out_starts, vec_get(starts_a, ia));
+        vec_push(out_ends, vec_get(ends_a, ia));
+        ia = ia + 1;
+    }
+    let nb: i32 = vec_len(tags_b);
+    let mut j: i32 = 0;
+    while j < nb {
+        vec_push(out_tags, vec_get(tags_b, j));
+        vec_push(out_starts, vec_get(starts_b, j) + delta_b);
+        vec_push(out_ends, vec_get(ends_b, j) + delta_b);
+        j = j + 1;
+    }
+    return vec_len(out_tags);
+}
+
+/* Append parallel **item** arena rows (`it`, **`id1`**–**`id5`**) from a second
+   parsed unit onto **`_*_dst`** Vecs (same layout as **`parse_program`**).
+   **`id4`** body roots / cross-arena indices are **not** relocated — caller must
+   offset **`expr`/`ty`** arenas first when merging two standalone parses
+   (**`M3-S-040`** full **`linkProjectDir`** parity). */
+
+fn link_program_item_vecs_append(it_dst: Vec<i32>,
+                                 id1_dst: Vec<i32>, id2_dst: Vec<i32>,
+                                 id3_dst: Vec<i32>, id4_dst: Vec<i32>,
+                                 id5_dst: Vec<i32>,
+                                 it_src: Vec<i32>,
+                                 id1_src: Vec<i32>, id2_src: Vec<i32>,
+                                 id3_src: Vec<i32>, id4_src: Vec<i32>,
+                                 id5_src: Vec<i32>) -> () {
+    let n: i32 = vec_len(it_src);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(it_dst, vec_get(it_src, i));
+        vec_push(id1_dst, vec_get(id1_src, i));
+        vec_push(id2_dst, vec_get(id2_src, i));
+        vec_push(id3_dst, vec_get(id3_src, i));
+        vec_push(id4_dst, vec_get(id4_src, i));
+        vec_push(id5_dst, vec_get(id5_src, i));
+        i = i + 1;
+    }
+}
+
+fn link_listing_path_at_index(listing: string, idx: i32) -> string {
+    if idx < 0 { return ""; }
+    let len: i32 = string_len(listing);
+    let mut p: i32 = 0;
+    let mut k: i32 = 0;
+    while p < len {
+        let nl: i32 = listing_find_newline(listing, p);
+        let lsz: i32 = nl - p;
+        if lsz > 0 {
+            if k == idx { return string_substr(listing, p, lsz); }
+            k = k + 1;
+        }
+        p = nl + 1;
+    }
+    return "";
+}
+
+fn link_listing_module_id_at_index(listing: string, idx: i32) -> string {
+    let path: string = link_listing_path_at_index(listing, idx);
+    if string_len(path) == 0 { return ""; }
+    return file_stem(path);
+}
+
+fn link_project_concat_sources_offsets_from_listing(listing: string,
+                                                    starts_out: Vec<i32>,
+                                                    lens_out: Vec<i32>) -> string {
+    let len: i32 = string_len(listing);
+    let mut p: i32 = 0;
+    let mut out: string = "";
+    let mut first: bool = true;
+    while p < len {
+        let nl: i32 = listing_find_newline(listing, p);
+        let lsz: i32 = nl - p;
+        if lsz > 0 {
+            let path: string = string_substr(listing, p, lsz);
+            let src: string = parse_file(path);
+            let mut start: i32 = string_len(out);
+            if first {
+                out = src;
+                first = false;
+                start = 0;
+            } else {
+                out = string_concat(out, "\n");
+                out = string_concat(out, src);
+                start = start + 1;
+            }
+            vec_push(starts_out, start);
+            vec_push(lens_out, string_len(src));
+        }
+        p = nl + 1;
+    }
+    return out;
+}
+
+fn link_project_concat_sources_offsets_from_dir(dir: string,
+                                                starts_out: Vec<i32>,
+                                                lens_out: Vec<i32>) -> string {
+    let listing: string = link_project_dir(dir);
+    return link_project_concat_sources_offsets_from_listing(listing,
+        starts_out, lens_out);
+}
+
+fn link_project_concat_sources_offsets_from_entry(entry_path: string,
+                                                  starts_out: Vec<i32>,
+                                                  lens_out: Vec<i32>) -> string {
+    let dir: string = link_dir_from_entry(entry_path);
+    return link_project_concat_sources_offsets_from_dir(dir,
+        starts_out, lens_out);
 }
 
 /* Parser **pat** arena (parallel pat_tags / pat_data1–3) — see parser.sv0
@@ -1835,8 +2276,9 @@ fn test_g2_link_host_io_aliases() -> i32 {
 
 fn test_link_g6_empty_listing() -> i32 {
     if link_listing_nonempty("") != false { return 1; }
-    if link_listing_nonempty("a.sv0\n") != true { return 2; }
-    if LINK_ERR_NO_SV0_IN_DIR() != 321 { return 3; }
+    if link_listing_nonempty("\n\n") != false { return 2; }
+    if link_listing_nonempty("a.sv0\n") != true { return 3; }
+    if LINK_ERR_NO_SV0_IN_DIR() != 321 { return 4; }
     return 0;
 }
 
@@ -2488,6 +2930,399 @@ fn test_link_expr_path_second_seg_preview() -> i32 {
     return 0;
 }
 
+fn test_link_ty_tyname_rewrite_first_seg_handle() -> i32 {
+    let tt: Vec<i32> = vec_new();
+    let d1: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(tt, 0);
+    vec_push(d1, 0);
+    vec_push(d2, 1);
+    vec_push(pp, 0);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 3);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0);
+    let out: string = link_ty_tyname_rewrite_first_seg_handle(tt, d1, d2, pp,
+        tops, "mod", starts, ends, "Foo", 0);
+    if string_eq(out, "Foo\nmod__Foo") != true { return 1; }
+    if vec_get(pp, 0) != 1 { return 2; }
+    let ttok: string = link_tok_text(out, starts, ends, vec_get(pp, 0));
+    if string_eq(ttok, "mod__Foo") != true { return 3; }
+    return 0;
+}
+
+fn test_link_expr_path_rewrite_first_seg_handle() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(et, 1);
+    vec_push(e1, 0);
+    vec_push(e2, 1);
+    vec_push(pp, 0);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 3);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0);
+    let out: string = link_expr_path_rewrite_first_seg_handle(et, e1, e2, pp,
+        tops, "pkg", starts, ends, "Bar", 0);
+    if string_eq(out, "Bar\npkg__Bar") != true { return 1; }
+    if vec_get(pp, 0) != 1 { return 2; }
+    let etok: string = link_tok_text(out, starts, ends, vec_get(pp, 0));
+    if string_eq(etok, "pkg__Bar") != true { return 3; }
+    return 0;
+}
+
+fn test_link_ty_arena_rewrite_all_first_seg() -> i32 {
+    let tt: Vec<i32> = vec_new();
+    let d1: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(tt, 0); vec_push(d1, 0); vec_push(d2, 1); vec_push(pp, 0);
+    vec_push(tt, 6); vec_push(d1, 0); vec_push(d2, 0); vec_push(pp, 1);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0);
+    let out: string = link_ty_arena_rewrite_all_first_seg(tt, d1, d2, pp, tops,
+        "m", starts, ends, "Foo\nBar");
+    if string_eq(out, "Foo\nBar\nm__Foo") != true { return 1; }
+    if vec_get(pp, 0) != 2 { return 2; }
+    if vec_get(pp, 1) != 1 { return 3; }
+    return 0;
+}
+
+fn test_link_expr_arena_rewrite_all_first_seg() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(e1, 0); vec_push(e2, 1); vec_push(pp, 0);
+    vec_push(et, 0); vec_push(e1, 0); vec_push(e2, 0); vec_push(pp, 1);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0);
+    let out: string = link_expr_arena_rewrite_all_first_seg(et, e1, e2, pp,
+        tops, "p", starts, ends, "Foo\nBar");
+    if string_eq(out, "Foo\nBar\np__Foo") != true { return 1; }
+    if vec_get(pp, 0) != 2 { return 2; }
+    if vec_get(pp, 1) != 1 { return 3; }
+    return 0;
+}
+
+fn test_link_pat_path_previews_and_rewrite() -> i32 {
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pt, 4); vec_push(pd1, 0); vec_push(pd2, 2);
+    vec_push(pp, 0); vec_push(pp, 1);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 5); vec_push(ends, 8);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0);
+    let f: string = link_pat_path_first_seg_preview(pt, pd1, pd2, pp, tops,
+        "mod", starts, ends, "Foo::Bar", 0);
+    if string_eq(f, "mod__Foo") != true { return 1; }
+    let s: string = link_pat_path_second_seg_preview(pt, pd1, pd2, pp, starts,
+        ends, "Foo::Bar", 0);
+    if string_eq(s, "Bar") != true { return 2; }
+    let out: string = link_pat_path_rewrite_first_seg_handle(pt, pd1, pd2, pp,
+        tops, "mod", starts, ends, "Foo::Bar", 0);
+    if string_eq(out, "Foo::Bar\nmod__Foo") != true { return 3; }
+    if vec_get(pp, 0) != 2 { return 4; }
+    return 0;
+}
+
+fn test_link_pat_arena_rewrite_all_first_seg() -> i32 {
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pt, 4); vec_push(pd1, 0); vec_push(pd2, 1); vec_push(pp, 0);
+    vec_push(pt, 5); vec_push(pd1, 1); vec_push(pd2, 1); vec_push(pp, 1);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0);
+    vec_push(tops, 1);
+    let out: string = link_pat_arena_rewrite_all_first_seg(pt, pd1, pd2, pp,
+        tops, "m", starts, ends, "Foo\nBar");
+    if string_eq(out, "Foo\nBar\nm__Foo\nm__Bar") != true { return 1; }
+    if vec_get(pp, 0) != 2 { return 2; }
+    if vec_get(pp, 1) != 3 { return 3; }
+    return 0;
+}
+
+fn test_link_apply_map_path_segs_program_source() -> i32 {
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    vec_push(tt, 0); vec_push(td1, 0); vec_push(td2, 1);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(ed1, 1); vec_push(ed2, 1);
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    vec_push(pt, 4); vec_push(pd1, 2); vec_push(pd2, 1);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0); vec_push(pp, 1); vec_push(pp, 2);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    vec_push(starts, 8); vec_push(ends, 11);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0); vec_push(tops, 1); vec_push(tops, 2);
+    let src: string = "Foo\nBar\nBaz";
+    let out: string = link_apply_map_path_segs_program_source(tt, td1, td2,
+        et, ed1, ed2, pt, pd1, pd2, pp, tops, "p", starts, ends, src);
+    if string_eq(out, "Foo\nBar\nBaz\np__Foo\np__Bar\np__Baz") != true {
+        return 1;
+    }
+    if vec_get(pp, 0) != 3 { return 2; }
+    if vec_get(pp, 1) != 4 { return 3; }
+    if vec_get(pp, 2) != 5 { return 4; }
+    return 0;
+}
+
+fn test_link_item_row_rewrite_struct_name() -> i32 {
+    let it: Vec<i32> = vec_new();
+    let nm: Vec<i32> = vec_new();
+    vec_push(it, 1);
+    vec_push(nm, 0);
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0);
+    vec_push(en, 3);
+    let src: string = "Bar";
+    let out: string = link_item_row_rewrite_defining_name(it, nm, "pkg", st,
+        en, src, 0);
+    if string_eq(out, "Bar\npkg__Bar") != true { return 1; }
+    if vec_get(nm, 0) != 1 { return 2; }
+    let tx: string = link_tok_text(out, st, en, vec_get(nm, 0));
+    if string_eq(tx, "pkg__Bar") != true { return 3; }
+    return 0;
+}
+
+fn test_link_item_row_rewrite_fn_main_unchanged() -> i32 {
+    let it: Vec<i32> = vec_new();
+    let nm: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    vec_push(nm, 0);
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0);
+    vec_push(en, 4);
+    let src: string = "main";
+    let out: string = link_item_row_rewrite_defining_name(it, nm, "pkg", st,
+        en, src, 0);
+    if string_eq(out, "main") != true { return 1; }
+    if vec_get(nm, 0) != 0 { return 2; }
+    return 0;
+}
+
+fn test_link_item_arena_rewrite_two() -> i32 {
+    let it: Vec<i32> = vec_new();
+    let nm: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    vec_push(nm, 0);
+    vec_push(it, 1);
+    vec_push(nm, 1);
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0);
+    vec_push(en, 3);
+    vec_push(st, 4);
+    vec_push(en, 7);
+    let src: string = "Foo\nBar";
+    let out: string = link_item_arena_rewrite_defining_names(it, nm, "m", st,
+        en, src);
+    if string_eq(out, "Foo\nBar\nm__Foo\nm__Bar") != true { return 1; }
+    if vec_get(nm, 0) != 2 { return 2; }
+    if vec_get(nm, 1) != 3 { return 3; }
+    return 0;
+}
+
+fn test_link_apply_map_link_pass_program_source() -> i32 {
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    let pd1: Vec<i32> = vec_new();
+    let pd2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let it: Vec<i32> = vec_new();
+    let inm: Vec<i32> = vec_new();
+    vec_push(it, 1);
+    vec_push(inm, 0);
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0);
+    vec_push(en, 3);
+    let tops: Vec<i32> = vec_new();
+    let src: string = "Bar";
+    let out: string = link_apply_map_link_pass_program_source(tt, td1, td2,
+        et, ed1, ed2, pt, pd1, pd2, pp, it, inm, tops, "x", st, en, src);
+    if string_eq(out, "Bar\nx__Bar") != true { return 1; }
+    if vec_get(inm, 0) != 1 { return 2; }
+    return 0;
+}
+
+fn test_link_second_file_byte_offset_after_concat() -> i32 {
+    if link_second_file_byte_offset_after_concat("fn") != 3 { return 1; }
+    return 0;
+}
+
+fn test_link_merge_sources_two() -> i32 {
+    let m: string = link_merge_sources_two("fn", "foo");
+    if string_eq(m, "fn\nfoo") != true { return 1; }
+    return 0;
+}
+
+fn test_link_reloc_i32_vec_inplace() -> i32 {
+    let v: Vec<i32> = vec_new();
+    vec_push(v, 1);
+    vec_push(v, 5);
+    let nr: i32 = vec_len(v);
+    let mut ir: i32 = 0;
+    while ir < nr {
+        vec_set(v, ir, vec_get(v, ir) + 10);
+        ir = ir + 1;
+    }
+    if vec_get(v, 0) != 11 { return 1; }
+    if vec_get(v, 1) != 15 { return 2; }
+    return 0;
+}
+
+fn test_link_merge_parallel_token_streams_reloc_b() -> i32 {
+    let ta: Vec<i32> = vec_new();
+    let sa: Vec<i32> = vec_new();
+    let ea: Vec<i32> = vec_new();
+    vec_push(ta, 65);
+    vec_push(sa, 0);
+    vec_push(ea, 2);
+    let tb: Vec<i32> = vec_new();
+    let sb: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    vec_push(tb, 5);
+    vec_push(sb, 0);
+    vec_push(eb, 3);
+    let ot: Vec<i32> = vec_new();
+    let os: Vec<i32> = vec_new();
+    let oe: Vec<i32> = vec_new();
+    let delta: i32 = link_second_file_byte_offset_after_concat("fn");
+    if delta != 3 { return 10; }
+    let n: i32 = link_merge_parallel_token_streams_reloc_b(ta, sa, ea,
+        tb, sb, eb, delta, ot, os, oe);
+    if n != 2 { return 1; }
+    if vec_get(os, 0) != 0 { return 2; }
+    if vec_get(oe, 0) != 2 { return 3; }
+    if vec_get(os, 1) != 3 { return 4; }
+    if vec_get(oe, 1) != 6 { return 5; }
+    return 0;
+}
+
+fn test_link_program_item_vecs_append() -> i32 {
+    let it_a: Vec<i32> = vec_new();
+    let id1_a: Vec<i32> = vec_new();
+    let id2_a: Vec<i32> = vec_new();
+    let id3_a: Vec<i32> = vec_new();
+    let id4_a: Vec<i32> = vec_new();
+    let id5_a: Vec<i32> = vec_new();
+    vec_push(it_a, 0);
+    vec_push(id1_a, 1);
+    vec_push(id2_a, 2);
+    vec_push(id3_a, 3);
+    vec_push(id4_a, 4);
+    vec_push(id5_a, 5);
+    let it_b: Vec<i32> = vec_new();
+    let id1_b: Vec<i32> = vec_new();
+    let id2_b: Vec<i32> = vec_new();
+    let id3_b: Vec<i32> = vec_new();
+    let id4_b: Vec<i32> = vec_new();
+    let id5_b: Vec<i32> = vec_new();
+    vec_push(it_b, 10);
+    vec_push(id1_b, 11);
+    vec_push(id2_b, 12);
+    vec_push(id3_b, 13);
+    vec_push(id4_b, 14);
+    vec_push(id5_b, 15);
+    let napp: i32 = vec_len(it_b);
+    let mut japp: i32 = 0;
+    while japp < napp {
+        vec_push(it_a, vec_get(it_b, japp));
+        vec_push(id1_a, vec_get(id1_b, japp));
+        vec_push(id2_a, vec_get(id2_b, japp));
+        vec_push(id3_a, vec_get(id3_b, japp));
+        vec_push(id4_a, vec_get(id4_b, japp));
+        vec_push(id5_a, vec_get(id5_b, japp));
+        japp = japp + 1;
+    }
+    if vec_len(it_a) != 2 { return 1; }
+    if vec_get(it_a, 0) != 0 { return 2; }
+    if vec_get(it_a, 1) != 10 { return 3; }
+    if vec_get(id4_a, 1) != 14 { return 4; }
+    return 0;
+}
+
+fn test_link_listing_index_helpers() -> i32 {
+    let listing: string = "a/one.sv0\n\nb/two.sv0\n";
+    let p0: string = link_listing_path_at_index(listing, 0);
+    if string_eq(p0, "a/one.sv0") != true { return 1; }
+    let p1: string = link_listing_path_at_index(listing, 1);
+    if string_eq(p1, "b/two.sv0") != true { return 2; }
+    let p2: string = link_listing_path_at_index(listing, 2);
+    if string_eq(p2, "") != true { return 3; }
+    let m0: string = link_listing_module_id_at_index(listing, 0);
+    if string_eq(m0, "one") != true { return 4; }
+    let m1: string = link_listing_module_id_at_index(listing, 1);
+    if string_eq(m1, "two") != true { return 5; }
+    return 0;
+}
+
+fn test_link_project_concat_sources_offsets_from_listing() -> i32 {
+    let p1: string = "/tmp/sv0_link_offsets_a.sv0";
+    let p2: string = "/tmp/sv0_link_offsets_b.sv0";
+    write_file(p1, "A");
+    write_file(p2, "B");
+    let mut listing: string = p1;
+    listing = string_concat(listing, "\n");
+    listing = string_concat(listing, p2);
+    listing = string_concat(listing, "\n");
+    let starts: Vec<i32> = vec_new();
+    let lens: Vec<i32> = vec_new();
+    let out: string = link_project_concat_sources_offsets_from_listing(listing,
+        starts, lens);
+    if string_eq(out, "A\nB") != true { return 1; }
+    if vec_len(starts) != 2 { return 2; }
+    if vec_len(lens) != 2 { return 3; }
+    if vec_get(starts, 0) != 0 { return 4; }
+    if vec_get(starts, 1) != 2 { return 5; }
+    if vec_get(lens, 0) != 1 { return 6; }
+    if vec_get(lens, 1) != 1 { return 7; }
+    return 0;
+}
+
 fn test_split_module_name() -> i32 {
     let it: Vec<i32> = vec_new();
     let id1: Vec<i32> = vec_new();
@@ -2600,6 +3435,42 @@ fn main() -> i32 {
     if r21pv3 != 0 { return 262 + r21pv3; }
     let r21pv4: i32 = test_link_expr_path_second_seg_preview();
     if r21pv4 != 0 { return 266 + r21pv4; }
+    let r21mv1: i32 = test_link_ty_tyname_rewrite_first_seg_handle();
+    if r21mv1 != 0 { return 268 + r21mv1; }
+    let r21mv2: i32 = test_link_expr_path_rewrite_first_seg_handle();
+    if r21mv2 != 0 { return 272 + r21mv2; }
+    let r21mv3: i32 = test_link_ty_arena_rewrite_all_first_seg();
+    if r21mv3 != 0 { return 276 + r21mv3; }
+    let r21mv4: i32 = test_link_expr_arena_rewrite_all_first_seg();
+    if r21mv4 != 0 { return 280 + r21mv4; }
+    let r21mv5: i32 = test_link_pat_path_previews_and_rewrite();
+    if r21mv5 != 0 { return 284 + r21mv5; }
+    let r21mv5b: i32 = test_link_pat_arena_rewrite_all_first_seg();
+    if r21mv5b != 0 { return 286 + r21mv5b; }
+    let r21mv5c: i32 = test_link_apply_map_path_segs_program_source();
+    if r21mv5c != 0 { return 294 + r21mv5c; }
+    let r21mv5d: i32 = test_link_item_row_rewrite_struct_name();
+    if r21mv5d != 0 { return 305 + r21mv5d; }
+    let r21mv5e: i32 = test_link_item_row_rewrite_fn_main_unchanged();
+    if r21mv5e != 0 { return 310 + r21mv5e; }
+    let r21mv5f: i32 = test_link_item_arena_rewrite_two();
+    if r21mv5f != 0 { return 315 + r21mv5f; }
+    let r21mv5g: i32 = test_link_apply_map_link_pass_program_source();
+    if r21mv5g != 0 { return 320 + r21mv5g; }
+    let r21mv5h: i32 = test_link_second_file_byte_offset_after_concat();
+    if r21mv5h != 0 { return 325 + r21mv5h; }
+    let r21mv5i: i32 = test_link_merge_sources_two();
+    if r21mv5i != 0 { return 328 + r21mv5i; }
+    let r21mv5j: i32 = test_link_reloc_i32_vec_inplace();
+    if r21mv5j != 0 { return 331 + r21mv5j; }
+    let r21mv5k: i32 = test_link_merge_parallel_token_streams_reloc_b();
+    if r21mv5k != 0 { return 334 + r21mv5k; }
+    let r21mv5m: i32 = test_link_program_item_vecs_append();
+    if r21mv5m != 0 { return 335 + r21mv5m; }
+    let r21mv6: i32 = test_link_listing_index_helpers();
+    if r21mv6 != 0 { return 288 + r21mv6; }
+    let r21mv7: i32 = test_link_project_concat_sources_offsets_from_listing();
+    if r21mv7 != 0 { return 292 + r21mv7; }
     let r22: i32 = test_g2_link_host_io_aliases();
     if r22 != 0 { return 220 + r22; }
     return 0;
