@@ -5,7 +5,7 @@ CC       ?= cc
 
 .PHONY: build test check heap clean e2e test-contract-runtime integration integration-vm legacy-bootstrap-check legacy-bootstrap-heap
 
-# M3-S-052: default `check` = heap + SV0_SELF_HOST_COMPILER smoke (meta-repo scripts/sv0-smoke-self-host-compiler.sh).
+# M3-S-052: default `check` = heap + one-file emit smoke (scripts/smoke-self-host-compiler.sh — works standalone + as submodule).
 # Full CM.make compile of sml-legacy is legacy-bootstrap-check (CI keeps both).
 legacy-bootstrap-heap: heap
 
@@ -17,7 +17,7 @@ test:
 	echo 'CM.make "sources.cm"; use "test/test_runner.sml"; OS.Process.exit OS.Process.success;' | $(SML)
 
 check: heap
-	bash "$(CURDIR)/../scripts/sv0-smoke-self-host-compiler.sh"
+	bash "$(CURDIR)/scripts/smoke-self-host-compiler.sh"
 
 legacy-bootstrap-check:
 	@tmp=$$(mktemp); echo 'CM.make "sources.cm"; OS.Process.exit OS.Process.success;' | $(SML) >$$tmp 2>&1; \

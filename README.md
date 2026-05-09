@@ -66,7 +66,7 @@ requires SML/NJ (tested with 110.99.9).
 
 ```bash
 make build         # compile all modules via CM
-make check         # heap + SV0_SELF_HOST_COMPILER smoke (M3-S-052 — scripts/sv0-smoke-self-host-compiler.sh)
+make check         # heap + one-file emit smoke (M3-S-052 — scripts/smoke-self-host-compiler.sh)
 make legacy-bootstrap-check   # full CM.make compile (sml-legacy sources.cm)
 make legacy-bootstrap-heap    # alias for heap (explicit bootstrap naming)
 make test          # run test suite (see test_runner for current count)
