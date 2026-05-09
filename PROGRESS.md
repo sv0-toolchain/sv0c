@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-04-29 (America/Los_Angeles; **M3 G6:** **`lib/link.sv0`** **`link_expr_path_*_seg_preview`** (dry-run **`ExprPath`** vs SML **`mapPathSegs`**, same encoding as TyName previews); **`doc/driver-pipeline-composition.md`** (**M3-S-041** Partial); **`doc/link-g6-blockers.md`**; **`doc/cli-parity.md`** (**M3-S-042** done); **`doc/transliteration-plan.md`**; **Partial:** mutating **`map*`** (**M3-S-039**), merged AST (**M3-S-040**), driver TU (**M3-S-041**).)
+**Last updated:** 2026-05-09 (America/Los_Angeles; **M3 G9 prep:** **`doc/sml-retirement-cutover-checklist.md`**, **`doc/cold-bootstrap-recovery.md`**, **`README.md`** retirement §; **051**/**052** execution **human-gated** — parent **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## M3 G9 slice status**. **M3 G8** recipe unchanged.)
 
 ## Checklist (local source of truth)
 
@@ -26,6 +26,28 @@
 ## Notes
 
 Point to the active vertical slice (SML module, harness name, or milestone sub-step). Link `task/sv0-toolchain-milestone-3-checklist.Rmd` for row-level transliteration inventory.
+
+**2026-05-09 (America/Los_Angeles, night):** **M3 G9 follow-on** — **`Makefile`** **`legacy-bootstrap-check`**/**`heap`** aliases; **`sml_retirement_preflight_scan.py`** / **`./scripts/sv0 sml-retirement-preflight`**. **051**/**052** execution still stakeholder-owned.
+
+**2026-05-09 (America/Los_Angeles, evening):** **M3 G9 prep** — retirement checklist + cold recovery docs; meta **`verify_m3_g9_retirement_docs_layout.py`**. **C-6** unchanged (retirement **not** claimed).
+
+**2026-05-09 (America/Los_Angeles, later):** **M3 G8** — **`native-self-host-compiler-recipe.md`**, **`build/sv0-self-host-compiler`** wrapper script; meta **`verify_m3_g8_native_recipe_paths.py`**, **`self-host-native.yml`** workflow; milestone **## M3 G8** complete.
+
+**2026-05-09 (America/Los_Angeles):** **M3 G7** — tier-2 optional **`cmp`** via **`SV0_VM_BYTECODE_EMITTER`**, bootstrap surrogate script, **4** stems in **`tier2-manifest.txt`**; milestone marks **M3-S-045** **Done**, **M3-S-046** **N/A**.
+
+**2026-05-08 (America/Los_Angeles, night):** **M3 G7 (meta + sv0c)** — **`test/diagnostics/`** behavioral corpus (**`E0400`** seed), **`test/vm-parity/tier2-manifest.txt`** policy subset; see parent milestone **## M3 G7 slice status** (**M3-S-046** stage-1 **Deferred** until **`stage1/`** goldens exist).
+
+**2026-05-08 (America/Los_Angeles, late):** **M3 G6 bootstrap staging closure** — see parent **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## M3 G6 slice status** + refinement log; **`lib/link.sv0`** item-row append helper; meta staging-driver verifier; expected stage0/vm-parity **`link`** refresh on integration.
+
+**2026-05-07 (America/Los_Angeles):** **M3 G6 continuation (`M3-S-039`/`M3-S-040`/`M3-S-041`)** — `lib/link.sv0` gained synthetic-token append/mutation helpers for first-segment `mapPathSegs` rewrites on `TyName` and `ExprPath` arenas, with targeted unit coverage (`test_link_ty_tyname_rewrite_first_seg_handle`, `test_link_expr_path_rewrite_first_seg_handle`). `link_listing_nonempty` now uses `listing_count_nonempty_paths` (blank-line listings no longer count as non-empty). `lib/main.sv0` gained explicit driver pipeline boundary helpers and tests (`driver_pipeline_last_step`, `driver_pipeline_step_is_valid`) to tighten G6 pipeline-shape invariants without claiming single-TU closure.
+
+**2026-05-07 (America/Los_Angeles, later):** **M3 G6 continuation (`M3-S-039`/`M3-S-040`/`M3-S-041`)** — `lib/link.sv0` now mirrors the TyName/ExprPath preview→mutate pattern for mapPat paths (`link_pat_path_first_seg_preview`, `link_pat_path_second_seg_preview`, `link_pat_path_rewrite_first_seg_handle`), and adds arena-wide first-segment rewrite drivers (`link_ty_arena_rewrite_all_first_seg`, `link_expr_arena_rewrite_all_first_seg`). For M3-S-040 prep, added indexed listing helpers (`link_listing_path_at_index`, `link_listing_module_id_at_index`) and per-file source offset sidecars (`link_project_concat_sources_offsets_from_listing`). `lib/main.sv0` adds `driver_core_phase_for_step` plus invalid-phase guards in `driver_pipeline_step_for_core_phase` tests. G6 remains Partial.
+
+**2026-05-08 (America/Los_Angeles):** **M3 G6 continuation (`M3-S-039`/`M3-S-040`/`M3-S-041`)** — `lib/link.sv0` adds `link_pat_arena_rewrite_all_first_seg` (mapPat whole-arena first-segment rewrite driver) and `link_project_concat_sources_offsets_from_dir` / `link_project_concat_sources_offsets_from_entry` wrappers over listing-based sidecar offset generation. `lib/main.sv0` adds `driver_pipeline_step_is_backend` to classify driver step indices against backend phases through `driver_core_phase_for_step`. G6 remains Partial.
+
+**2026-05-08 (America/Los_Angeles, night):** **`link_item_row_rewrite_defining_name`**, **`link_item_arena_rewrite_defining_names`**, **`link_apply_map_link_pass_program_source`** + tests; **`doc/link-g6-blockers.md`**, **`doc/transliteration-plan.md`**; milestone **## M3 G6**; stage0 **`link.c`** + vm-parity **`link.sv0b`**. M3-S-039 remains **Partial** (nested **`StmtItem`** audit).
+
+**2026-05-08 (America/Los_Angeles, later):** **`link_apply_map_path_segs_program_source`** + **`test_link_apply_map_path_segs_program_source`**; **`scripts/verify_m3_g6_pipeline_contract.py`** in meta **`scripts/sv0`** **`run_python_guards`**; **`doc/link-g6-blockers.md`**, **`doc/driver-pipeline-composition.md`**, **`doc/transliteration-plan.md`**; stage0 **`link.c`**/**`main.c`** + vm-parity **`link.sv0b`**/**`main.sv0b`**. **`SV0_SKIP_SELF_HOST_COMPILER_DIFF=1 ./scripts/sv0 test`** exit **0**. G6 slices still **Partial** per owning milestone backlog (item mangling, AST merge, single-TU driver).
 
 **2026-04-18:** `doc/tooling-formatter-linter.md` — expanded **style profile** (formatter phases) and **`L####`** lint rule catalog (tiers A/B/C); design only until a task schedules implementation. **Later same day:** stakeholder **C** — layout defaults **project-configurable** via checked-in profile; numeric defaults (columns, indent width) deferred to the first formatter PR. **`test/vm-parity/README.md`** + checklist **C-3** prose: vm-parity corpus size **101→97** (manifest + goldens) per parent **`task/sv0-toolchain-roadmap-full.Rmd`** hygiene pass.
 

@@ -54,6 +54,31 @@ static const char* link_ty_tyname_second_seg_preview(int ty_tags, int ty_d1, int
 static int link_expr_path_needs_mangle(int expr_tags, int ed1, int ed2, int pp, int tops, int idx);
 static const char* link_expr_path_first_seg_preview(int expr_tags, int ed1, int ed2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx);
 static const char* link_expr_path_second_seg_preview(int expr_tags, int ed1, int ed2, int pp, int starts, int ends, const char* source, int idx);
+static const char* link_append_synth_ident(const char* source, int starts, int ends, const char* text);
+static int link_last_tok_handle(int starts);
+static const char* link_ty_tyname_rewrite_first_seg_handle(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx);
+static const char* link_expr_path_rewrite_first_seg_handle(int expr_tags, int ed1, int ed2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx);
+static const char* link_ty_arena_rewrite_all_first_seg(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source);
+static const char* link_expr_arena_rewrite_all_first_seg(int expr_tags, int ed1, int ed2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source);
+static const char* link_pat_path_first_seg_preview(int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx);
+static const char* link_pat_path_second_seg_preview(int pat_tags, int pat_d1, int pat_d2, int pp, int starts, int ends, const char* source, int idx);
+static const char* link_pat_path_rewrite_first_seg_handle(int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx);
+static const char* link_pat_arena_rewrite_all_first_seg(int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source);
+static const char* link_apply_map_path_segs_program_source(int ty_tags, int ty_d1, int ty_d2, int expr_tags, int ed1, int ed2, int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source);
+static const char* link_item_def_mangled_text(int item_tag, const char* mod_id, const char* raw_name);
+static const char* link_item_row_rewrite_defining_name(int item_tags, int item_names, const char* mod_id, int starts, int ends, const char* source, int idx);
+static const char* link_item_arena_rewrite_defining_names(int item_tags, int item_names, const char* mod_id, int starts, int ends, const char* source);
+static const char* link_apply_map_link_pass_program_source(int ty_tags, int ty_d1, int ty_d2, int expr_tags, int ed1, int ed2, int pat_tags, int pat_d1, int pat_d2, int pp, int item_tags, int item_names, int tops, const char* mod_id, int starts, int ends, const char* source);
+static const char* link_merge_sources_two(const char* first, const char* second);
+static int link_second_file_byte_offset_after_concat(const char* first);
+static void link_reloc_i32_vec_inplace(int v, int delta);
+static int link_merge_parallel_token_streams_reloc_b(int tags_a, int starts_a, int ends_a, int tags_b, int starts_b, int ends_b, int delta_b, int out_tags, int out_starts, int out_ends);
+static void link_program_item_vecs_append(int it_dst, int id1_dst, int id2_dst, int id3_dst, int id4_dst, int id5_dst, int it_src, int id1_src, int id2_src, int id3_src, int id4_src, int id5_src);
+static const char* link_listing_path_at_index(const char* listing, int idx);
+static const char* link_listing_module_id_at_index(const char* listing, int idx);
+static const char* link_project_concat_sources_offsets_from_listing(const char* listing, int starts_out, int lens_out);
+static const char* link_project_concat_sources_offsets_from_dir(const char* dir, int starts_out, int lens_out);
+static const char* link_project_concat_sources_offsets_from_entry(const char* entry_path, int starts_out, int lens_out);
 static int link_pat_subtree_node_count(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int idx, int depth);
 static int link_pat_root_needs_mangle(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int pp, int tops, int idx, int depth);
 static int link_expr_subtree_node_count(int expr_tags, int ed1, int ed2, int ed3, int ed4, int idx, int depth);
@@ -110,6 +135,24 @@ static int test_link_ty_tyname_first_seg_preview(void);
 static int test_link_ty_tyname_second_seg_preview(void);
 static int test_link_expr_path_first_seg_preview(void);
 static int test_link_expr_path_second_seg_preview(void);
+static int test_link_ty_tyname_rewrite_first_seg_handle(void);
+static int test_link_expr_path_rewrite_first_seg_handle(void);
+static int test_link_ty_arena_rewrite_all_first_seg(void);
+static int test_link_expr_arena_rewrite_all_first_seg(void);
+static int test_link_pat_path_previews_and_rewrite(void);
+static int test_link_pat_arena_rewrite_all_first_seg(void);
+static int test_link_apply_map_path_segs_program_source(void);
+static int test_link_item_row_rewrite_struct_name(void);
+static int test_link_item_row_rewrite_fn_main_unchanged(void);
+static int test_link_item_arena_rewrite_two(void);
+static int test_link_apply_map_link_pass_program_source(void);
+static int test_link_second_file_byte_offset_after_concat(void);
+static int test_link_merge_sources_two(void);
+static int test_link_reloc_i32_vec_inplace(void);
+static int test_link_merge_parallel_token_streams_reloc_b(void);
+static int test_link_program_item_vecs_append(void);
+static int test_link_listing_index_helpers(void);
+static int test_link_project_concat_sources_offsets_from_listing(void);
 static int test_split_module_name(void);
 
 static int is_sv0(const char* name) {
@@ -266,7 +309,7 @@ static int LINK_ERR_NO_SV0_IN_DIR(void) {
 }
 
 static int link_listing_nonempty(const char* listing) {
-  int _sv0t0 = sv0_string_len(listing);
+  int _sv0t0 = listing_count_nonempty_paths(listing);
   int _sv0t1 = (_sv0t0 > 0);
   return _sv0t1;
 }
@@ -869,6 +912,536 @@ static const char* link_expr_path_second_seg_preview(int expr_tags, int ed1, int
   int h2 = _sv0t4;
   const char* _sv0t5 = link_tok_text(source, starts, ends, h2);
   return _sv0t5;
+}
+
+static const char* link_append_synth_ident(const char* source, int starts, int ends, const char* text) {
+  const char* out;
+  out = source;
+  int _sv0t0 = sv0_string_len(source);
+  int st = _sv0t0;
+  if ((st > 0)) {
+    const char* _sv0t1 = sv0_string_concat(out, "\n");
+    out = _sv0t1;
+    st = (st + 1);
+  } else {
+  }
+  const char* _sv0t2 = sv0_string_concat(out, text);
+  out = _sv0t2;
+  sv0_vec_push(starts, st);
+  int _sv0t3 = sv0_string_len(text);
+  int _sv0t4 = (st + _sv0t3);
+  sv0_vec_push(ends, _sv0t4);
+  return out;
+}
+
+static int link_last_tok_handle(int starts) {
+  int _sv0t0 = sv0_vec_len(starts);
+  int _sv0t1 = (_sv0t0 - 1);
+  return _sv0t1;
+}
+
+static const char* link_ty_tyname_rewrite_first_seg_handle(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return source;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(ty_tags, idx);
+  if ((_sv0t0 != 0)) {
+    return source;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(ty_d1, idx);
+  int ps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(ty_d2, idx);
+  int sc = _sv0t2;
+  if ((sc != 1)) {
+    if ((sc != 2)) {
+      return source;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(pp, ps);
+  int h0 = _sv0t3;
+  int _sv0t4 = in_tops(tops, h0);
+  if ((_sv0t4 != 1)) {
+    return source;
+  } else {
+  }
+  const char* _sv0t5 = link_tok_text(source, starts, ends, h0);
+  const char* t0;
+  t0 = _sv0t5;
+  const char* _sv0t6 = mangle(mod_id, t0);
+  const char* mangled;
+  mangled = _sv0t6;
+  const char* _sv0t7 = link_append_synth_ident(source, starts, ends, mangled);
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = link_last_tok_handle(starts);
+  int nh = _sv0t8;
+  sv0_vec_set(pp, ps, nh);
+  return out;
+}
+
+static const char* link_expr_path_rewrite_first_seg_handle(int expr_tags, int ed1, int ed2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return source;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(expr_tags, idx);
+  if ((_sv0t0 != 1)) {
+    return source;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(ed1, idx);
+  int ps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(ed2, idx);
+  int sc = _sv0t2;
+  if ((sc != 1)) {
+    if ((sc != 2)) {
+      return source;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(pp, ps);
+  int h0 = _sv0t3;
+  int _sv0t4 = in_tops(tops, h0);
+  if ((_sv0t4 != 1)) {
+    return source;
+  } else {
+  }
+  const char* _sv0t5 = link_tok_text(source, starts, ends, h0);
+  const char* t0;
+  t0 = _sv0t5;
+  const char* _sv0t6 = mangle(mod_id, t0);
+  const char* mangled;
+  mangled = _sv0t6;
+  const char* _sv0t7 = link_append_synth_ident(source, starts, ends, mangled);
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = link_last_tok_handle(starts);
+  int nh = _sv0t8;
+  sv0_vec_set(pp, ps, nh);
+  return out;
+}
+
+static const char* link_ty_arena_rewrite_all_first_seg(int ty_tags, int ty_d1, int ty_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source) {
+  const char* out;
+  out = source;
+  int _sv0t0 = sv0_vec_len(ty_tags);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    const char* _sv0t1 = link_ty_tyname_rewrite_first_seg_handle(ty_tags, ty_d1, ty_d2, pp, tops, mod_id, starts, ends, out, i);
+    out = _sv0t1;
+    i = (i + 1);
+  }
+  return out;
+}
+
+static const char* link_expr_arena_rewrite_all_first_seg(int expr_tags, int ed1, int ed2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source) {
+  const char* out;
+  out = source;
+  int _sv0t0 = sv0_vec_len(expr_tags);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    const char* _sv0t1 = link_expr_path_rewrite_first_seg_handle(expr_tags, ed1, ed2, pp, tops, mod_id, starts, ends, out, i);
+    out = _sv0t1;
+    i = (i + 1);
+  }
+  return out;
+}
+
+static const char* link_pat_path_first_seg_preview(int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(pat_tags, idx);
+  int tag = _sv0t0;
+  if ((tag != 4)) {
+    if ((tag != 5)) {
+      return "";
+    } else {
+    }
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(pat_d1, idx);
+  int ps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(pat_d2, idx);
+  int sc = _sv0t2;
+  if ((sc == 1)) {
+    int _sv0t3 = sv0_vec_get(pp, ps);
+    int h1 = _sv0t3;
+    const char* _sv0t4 = link_tok_text(source, starts, ends, h1);
+    const char* t1;
+    t1 = _sv0t4;
+    const char* _sv0t5 = map_path_segs_rewrite_1(tops, mod_id, h1, t1);
+    return _sv0t5;
+  } else {
+  }
+  if ((sc == 2)) {
+    int _sv0t6 = sv0_vec_get(pp, ps);
+    int hf = _sv0t6;
+    const char* _sv0t7 = link_tok_text(source, starts, ends, hf);
+    const char* tf;
+    tf = _sv0t7;
+    const char* _sv0t8 = map_path_segs_rewrite_2(tops, mod_id, hf, tf);
+    return _sv0t8;
+  } else {
+  }
+  return "";
+}
+
+static const char* link_pat_path_second_seg_preview(int pat_tags, int pat_d1, int pat_d2, int pp, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(pat_tags, idx);
+  int tag = _sv0t0;
+  if ((tag != 4)) {
+    if ((tag != 5)) {
+      return "";
+    } else {
+    }
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(pat_d1, idx);
+  int ps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(pat_d2, idx);
+  int sc = _sv0t2;
+  if ((sc != 2)) {
+    return "";
+  } else {
+  }
+  int _sv0t3 = (ps + 1);
+  int _sv0t4 = sv0_vec_get(pp, _sv0t3);
+  int h2 = _sv0t4;
+  const char* _sv0t5 = link_tok_text(source, starts, ends, h2);
+  return _sv0t5;
+}
+
+static const char* link_pat_path_rewrite_first_seg_handle(int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return source;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(pat_tags, idx);
+  int tag = _sv0t0;
+  if ((tag != 4)) {
+    if ((tag != 5)) {
+      return source;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(pat_d1, idx);
+  int ps = _sv0t1;
+  int _sv0t2 = sv0_vec_get(pat_d2, idx);
+  int sc = _sv0t2;
+  if ((sc != 1)) {
+    if ((sc != 2)) {
+      return source;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(pp, ps);
+  int h0 = _sv0t3;
+  int _sv0t4 = in_tops(tops, h0);
+  if ((_sv0t4 != 1)) {
+    return source;
+  } else {
+  }
+  const char* _sv0t5 = link_tok_text(source, starts, ends, h0);
+  const char* t0;
+  t0 = _sv0t5;
+  const char* _sv0t6 = mangle(mod_id, t0);
+  const char* mangled;
+  mangled = _sv0t6;
+  const char* _sv0t7 = link_append_synth_ident(source, starts, ends, mangled);
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = link_last_tok_handle(starts);
+  int nh = _sv0t8;
+  sv0_vec_set(pp, ps, nh);
+  return out;
+}
+
+static const char* link_pat_arena_rewrite_all_first_seg(int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source) {
+  const char* out;
+  out = source;
+  int _sv0t0 = sv0_vec_len(pat_tags);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    const char* _sv0t1 = link_pat_path_rewrite_first_seg_handle(pat_tags, pat_d1, pat_d2, pp, tops, mod_id, starts, ends, out, i);
+    out = _sv0t1;
+    i = (i + 1);
+  }
+  return out;
+}
+
+static const char* link_apply_map_path_segs_program_source(int ty_tags, int ty_d1, int ty_d2, int expr_tags, int ed1, int ed2, int pat_tags, int pat_d1, int pat_d2, int pp, int tops, const char* mod_id, int starts, int ends, const char* source) {
+  const char* out;
+  out = source;
+  const char* _sv0t0 = link_ty_arena_rewrite_all_first_seg(ty_tags, ty_d1, ty_d2, pp, tops, mod_id, starts, ends, out);
+  out = _sv0t0;
+  const char* _sv0t1 = link_expr_arena_rewrite_all_first_seg(expr_tags, ed1, ed2, pp, tops, mod_id, starts, ends, out);
+  out = _sv0t1;
+  const char* _sv0t2 = link_pat_arena_rewrite_all_first_seg(pat_tags, pat_d1, pat_d2, pp, tops, mod_id, starts, ends, out);
+  out = _sv0t2;
+  return out;
+}
+
+static const char* link_item_def_mangled_text(int item_tag, const char* mod_id, const char* raw_name) {
+  if ((item_tag == 0)) {
+    const char* _sv0t0 = fn_name_for_link(mod_id, raw_name);
+    return _sv0t0;
+  } else {
+  }
+  const char* _sv0t1 = mangle(mod_id, raw_name);
+  return _sv0t1;
+}
+
+static const char* link_item_row_rewrite_defining_name(int item_tags, int item_names, const char* mod_id, int starts, int ends, const char* source, int idx) {
+  if ((idx < 0)) {
+    return source;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(item_tags, idx);
+  int tag = _sv0t0;
+  int _sv0t1 = is_top_defining(tag);
+  if ((_sv0t1 != 1)) {
+    return source;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(item_names, idx);
+  int name_pos = _sv0t2;
+  const char* _sv0t3 = link_tok_text(source, starts, ends, name_pos);
+  const char* raw;
+  raw = _sv0t3;
+  const char* _sv0t4 = link_item_def_mangled_text(tag, mod_id, raw);
+  const char* mangled;
+  mangled = _sv0t4;
+  int _sv0t5 = sv0_string_eq(mangled, raw);
+  if ((_sv0t5 == 1)) {
+    return source;
+  } else {
+  }
+  const char* _sv0t6 = link_append_synth_ident(source, starts, ends, mangled);
+  const char* out;
+  out = _sv0t6;
+  int _sv0t7 = link_last_tok_handle(starts);
+  int nh = _sv0t7;
+  sv0_vec_set(item_names, idx, nh);
+  return out;
+}
+
+static const char* link_item_arena_rewrite_defining_names(int item_tags, int item_names, const char* mod_id, int starts, int ends, const char* source) {
+  const char* out;
+  out = source;
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    const char* _sv0t1 = link_item_row_rewrite_defining_name(item_tags, item_names, mod_id, starts, ends, out, i);
+    out = _sv0t1;
+    i = (i + 1);
+  }
+  return out;
+}
+
+static const char* link_apply_map_link_pass_program_source(int ty_tags, int ty_d1, int ty_d2, int expr_tags, int ed1, int ed2, int pat_tags, int pat_d1, int pat_d2, int pp, int item_tags, int item_names, int tops, const char* mod_id, int starts, int ends, const char* source) {
+  const char* out;
+  out = source;
+  const char* _sv0t0 = link_apply_map_path_segs_program_source(ty_tags, ty_d1, ty_d2, expr_tags, ed1, ed2, pat_tags, pat_d1, pat_d2, pp, tops, mod_id, starts, ends, out);
+  out = _sv0t0;
+  const char* _sv0t1 = link_item_arena_rewrite_defining_names(item_tags, item_names, mod_id, starts, ends, out);
+  out = _sv0t1;
+  return out;
+}
+
+static const char* link_merge_sources_two(const char* first, const char* second) {
+  const char* out;
+  out = first;
+  const char* _sv0t0 = sv0_string_concat(out, "\n");
+  out = _sv0t0;
+  const char* _sv0t1 = sv0_string_concat(out, second);
+  out = _sv0t1;
+  return out;
+}
+
+static int link_second_file_byte_offset_after_concat(const char* first) {
+  int _sv0t0 = sv0_string_len(first);
+  int _sv0t1 = (_sv0t0 + 1);
+  return _sv0t1;
+}
+
+static void link_reloc_i32_vec_inplace(int v, int delta) {
+  int _sv0t0 = sv0_vec_len(v);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(v, i);
+    int _sv0t2 = (_sv0t1 + delta);
+    sv0_vec_set(v, i, _sv0t2);
+    i = (i + 1);
+  }
+  return;
+}
+
+static int link_merge_parallel_token_streams_reloc_b(int tags_a, int starts_a, int ends_a, int tags_b, int starts_b, int ends_b, int delta_b, int out_tags, int out_starts, int out_ends) {
+  int _sv0t0 = sv0_vec_len(tags_a);
+  int na = _sv0t0;
+  int ia = 0;
+  while ((ia < na)) {
+    int _sv0t1 = sv0_vec_get(tags_a, ia);
+    sv0_vec_push(out_tags, _sv0t1);
+    int _sv0t2 = sv0_vec_get(starts_a, ia);
+    sv0_vec_push(out_starts, _sv0t2);
+    int _sv0t3 = sv0_vec_get(ends_a, ia);
+    sv0_vec_push(out_ends, _sv0t3);
+    ia = (ia + 1);
+  }
+  int _sv0t4 = sv0_vec_len(tags_b);
+  int nb = _sv0t4;
+  int j = 0;
+  while ((j < nb)) {
+    int _sv0t5 = sv0_vec_get(tags_b, j);
+    sv0_vec_push(out_tags, _sv0t5);
+    int _sv0t6 = sv0_vec_get(starts_b, j);
+    int _sv0t7 = (_sv0t6 + delta_b);
+    sv0_vec_push(out_starts, _sv0t7);
+    int _sv0t8 = sv0_vec_get(ends_b, j);
+    int _sv0t9 = (_sv0t8 + delta_b);
+    sv0_vec_push(out_ends, _sv0t9);
+    j = (j + 1);
+  }
+  int _sv0t10 = sv0_vec_len(out_tags);
+  return _sv0t10;
+}
+
+static void link_program_item_vecs_append(int it_dst, int id1_dst, int id2_dst, int id3_dst, int id4_dst, int id5_dst, int it_src, int id1_src, int id2_src, int id3_src, int id4_src, int id5_src) {
+  int _sv0t0 = sv0_vec_len(it_src);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(it_src, i);
+    sv0_vec_push(it_dst, _sv0t1);
+    int _sv0t2 = sv0_vec_get(id1_src, i);
+    sv0_vec_push(id1_dst, _sv0t2);
+    int _sv0t3 = sv0_vec_get(id2_src, i);
+    sv0_vec_push(id2_dst, _sv0t3);
+    int _sv0t4 = sv0_vec_get(id3_src, i);
+    sv0_vec_push(id3_dst, _sv0t4);
+    int _sv0t5 = sv0_vec_get(id4_src, i);
+    sv0_vec_push(id4_dst, _sv0t5);
+    int _sv0t6 = sv0_vec_get(id5_src, i);
+    sv0_vec_push(id5_dst, _sv0t6);
+    i = (i + 1);
+  }
+  return;
+}
+
+static const char* link_listing_path_at_index(const char* listing, int idx) {
+  if ((idx < 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t0 = sv0_string_len(listing);
+  int len = _sv0t0;
+  int p = 0;
+  int k = 0;
+  while ((p < len)) {
+    int _sv0t1 = listing_find_newline(listing, p);
+    int nl = _sv0t1;
+    int lsz = (nl - p);
+    if ((lsz > 0)) {
+      if ((k == idx)) {
+        const char* _sv0t2 = sv0_string_substr(listing, p, lsz);
+        return _sv0t2;
+      } else {
+      }
+      k = (k + 1);
+    } else {
+    }
+    p = (nl + 1);
+  }
+  return "";
+}
+
+static const char* link_listing_module_id_at_index(const char* listing, int idx) {
+  const char* _sv0t0 = link_listing_path_at_index(listing, idx);
+  const char* path;
+  path = _sv0t0;
+  int _sv0t1 = sv0_string_len(path);
+  if ((_sv0t1 == 0)) {
+    return "";
+  } else {
+  }
+  const char* _sv0t2 = file_stem(path);
+  return _sv0t2;
+}
+
+static const char* link_project_concat_sources_offsets_from_listing(const char* listing, int starts_out, int lens_out) {
+  int _sv0t0 = sv0_string_len(listing);
+  int len = _sv0t0;
+  int p = 0;
+  const char* out;
+  out = "";
+  int first = 1;
+  while ((p < len)) {
+    int _sv0t1 = listing_find_newline(listing, p);
+    int nl = _sv0t1;
+    int lsz = (nl - p);
+    if ((lsz > 0)) {
+      const char* _sv0t2 = sv0_string_substr(listing, p, lsz);
+      const char* path;
+      path = _sv0t2;
+      const char* _sv0t3 = parse_file(path);
+      const char* src;
+      src = _sv0t3;
+      int _sv0t4 = sv0_string_len(out);
+      int start = _sv0t4;
+      if (first) {
+        out = src;
+        first = 0;
+        start = 0;
+      } else {
+        const char* _sv0t5 = sv0_string_concat(out, "\n");
+        out = _sv0t5;
+        const char* _sv0t6 = sv0_string_concat(out, src);
+        out = _sv0t6;
+        start = (start + 1);
+      }
+      sv0_vec_push(starts_out, start);
+      int _sv0t7 = sv0_string_len(src);
+      sv0_vec_push(lens_out, _sv0t7);
+    } else {
+    }
+    p = (nl + 1);
+  }
+  return out;
+}
+
+static const char* link_project_concat_sources_offsets_from_dir(const char* dir, int starts_out, int lens_out) {
+  const char* _sv0t0 = link_project_dir(dir);
+  const char* listing;
+  listing = _sv0t0;
+  const char* _sv0t1 = link_project_concat_sources_offsets_from_listing(listing, starts_out, lens_out);
+  return _sv0t1;
+}
+
+static const char* link_project_concat_sources_offsets_from_entry(const char* entry_path, int starts_out, int lens_out) {
+  const char* _sv0t0 = link_dir_from_entry(entry_path);
+  const char* dir;
+  dir = _sv0t0;
+  const char* _sv0t1 = link_project_concat_sources_offsets_from_dir(dir, starts_out, lens_out);
+  return _sv0t1;
 }
 
 static int link_pat_subtree_node_count(int pat_tags, int pat_d1, int pat_d2, int pat_d3, int idx, int depth) {
@@ -3342,14 +3915,19 @@ static int test_link_g6_empty_listing(void) {
     return 1;
   } else {
   }
-  int _sv0t1 = link_listing_nonempty("a.sv0\n");
-  if ((_sv0t1 != 1)) {
+  int _sv0t1 = link_listing_nonempty("\n\n");
+  if ((_sv0t1 != 0)) {
     return 2;
   } else {
   }
-  int _sv0t2 = LINK_ERR_NO_SV0_IN_DIR();
-  if ((_sv0t2 != 321)) {
+  int _sv0t2 = link_listing_nonempty("a.sv0\n");
+  if ((_sv0t2 != 1)) {
     return 3;
+  } else {
+  }
+  int _sv0t3 = LINK_ERR_NO_SV0_IN_DIR();
+  if ((_sv0t3 != 321)) {
+    return 4;
   } else {
   }
   return 0;
@@ -4313,6 +4891,837 @@ static int test_link_expr_path_second_seg_preview(void) {
   return 0;
 }
 
+static int test_link_ty_tyname_rewrite_first_seg_handle(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int d1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int d2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(d1, 0);
+  sv0_vec_push(d2, 1);
+  sv0_vec_push(pp, 0);
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  int _sv0t6 = sv0_vec_new();
+  int tops = _sv0t6;
+  sv0_vec_push(tops, 0);
+  const char* _sv0t7 = link_ty_tyname_rewrite_first_seg_handle(tt, d1, d2, pp, tops, "mod", starts, ends, "Foo", 0);
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = sv0_string_eq(out, "Foo\nmod__Foo");
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(pp, 0);
+  if ((_sv0t9 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(pp, 0);
+  const char* _sv0t11 = link_tok_text(out, starts, ends, _sv0t10);
+  const char* ttok;
+  ttok = _sv0t11;
+  int _sv0t12 = sv0_string_eq(ttok, "mod__Foo");
+  if ((_sv0t12 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_expr_path_rewrite_first_seg_handle(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int e1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int e2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(et, 1);
+  sv0_vec_push(e1, 0);
+  sv0_vec_push(e2, 1);
+  sv0_vec_push(pp, 0);
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  int _sv0t6 = sv0_vec_new();
+  int tops = _sv0t6;
+  sv0_vec_push(tops, 0);
+  const char* _sv0t7 = link_expr_path_rewrite_first_seg_handle(et, e1, e2, pp, tops, "pkg", starts, ends, "Bar", 0);
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = sv0_string_eq(out, "Bar\npkg__Bar");
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(pp, 0);
+  if ((_sv0t9 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(pp, 0);
+  const char* _sv0t11 = link_tok_text(out, starts, ends, _sv0t10);
+  const char* etok;
+  etok = _sv0t11;
+  int _sv0t12 = sv0_string_eq(etok, "pkg__Bar");
+  if ((_sv0t12 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_ty_arena_rewrite_all_first_seg(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int d1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int d2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(d1, 0);
+  sv0_vec_push(d2, 1);
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(d1, 0);
+  sv0_vec_push(d2, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 4);
+  sv0_vec_push(ends, 7);
+  int _sv0t6 = sv0_vec_new();
+  int tops = _sv0t6;
+  sv0_vec_push(tops, 0);
+  const char* _sv0t7 = link_ty_arena_rewrite_all_first_seg(tt, d1, d2, pp, tops, "m", starts, ends, "Foo\nBar");
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = sv0_string_eq(out, "Foo\nBar\nm__Foo");
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(pp, 0);
+  if ((_sv0t9 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(pp, 1);
+  if ((_sv0t10 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_expr_arena_rewrite_all_first_seg(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int e1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int e2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(et, 1);
+  sv0_vec_push(e1, 0);
+  sv0_vec_push(e2, 1);
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(et, 0);
+  sv0_vec_push(e1, 0);
+  sv0_vec_push(e2, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 4);
+  sv0_vec_push(ends, 7);
+  int _sv0t6 = sv0_vec_new();
+  int tops = _sv0t6;
+  sv0_vec_push(tops, 0);
+  const char* _sv0t7 = link_expr_arena_rewrite_all_first_seg(et, e1, e2, pp, tops, "p", starts, ends, "Foo\nBar");
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = sv0_string_eq(out, "Foo\nBar\np__Foo");
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(pp, 0);
+  if ((_sv0t9 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(pp, 1);
+  if ((_sv0t10 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_pat_path_previews_and_rewrite(void) {
+  int _sv0t0 = sv0_vec_new();
+  int pt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int pd1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int pd2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(pt, 4);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 2);
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 5);
+  sv0_vec_push(ends, 8);
+  int _sv0t6 = sv0_vec_new();
+  int tops = _sv0t6;
+  sv0_vec_push(tops, 0);
+  const char* _sv0t7 = link_pat_path_first_seg_preview(pt, pd1, pd2, pp, tops, "mod", starts, ends, "Foo::Bar", 0);
+  const char* f;
+  f = _sv0t7;
+  int _sv0t8 = sv0_string_eq(f, "mod__Foo");
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t9 = link_pat_path_second_seg_preview(pt, pd1, pd2, pp, starts, ends, "Foo::Bar", 0);
+  const char* s;
+  s = _sv0t9;
+  int _sv0t10 = sv0_string_eq(s, "Bar");
+  if ((_sv0t10 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t11 = link_pat_path_rewrite_first_seg_handle(pt, pd1, pd2, pp, tops, "mod", starts, ends, "Foo::Bar", 0);
+  const char* out;
+  out = _sv0t11;
+  int _sv0t12 = sv0_string_eq(out, "Foo::Bar\nmod__Foo");
+  if ((_sv0t12 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(pp, 0);
+  if ((_sv0t13 != 2)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_pat_arena_rewrite_all_first_seg(void) {
+  int _sv0t0 = sv0_vec_new();
+  int pt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int pd1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int pd2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int pp = _sv0t3;
+  sv0_vec_push(pt, 4);
+  sv0_vec_push(pd1, 0);
+  sv0_vec_push(pd2, 1);
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pt, 5);
+  sv0_vec_push(pd1, 1);
+  sv0_vec_push(pd2, 1);
+  sv0_vec_push(pp, 1);
+  int _sv0t4 = sv0_vec_new();
+  int starts = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ends = _sv0t5;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 4);
+  sv0_vec_push(ends, 7);
+  int _sv0t6 = sv0_vec_new();
+  int tops = _sv0t6;
+  sv0_vec_push(tops, 0);
+  sv0_vec_push(tops, 1);
+  const char* _sv0t7 = link_pat_arena_rewrite_all_first_seg(pt, pd1, pd2, pp, tops, "m", starts, ends, "Foo\nBar");
+  const char* out;
+  out = _sv0t7;
+  int _sv0t8 = sv0_string_eq(out, "Foo\nBar\nm__Foo\nm__Bar");
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(pp, 0);
+  if ((_sv0t9 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(pp, 1);
+  if ((_sv0t10 != 3)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_apply_map_path_segs_program_source(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int td1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int td2 = _sv0t2;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 1);
+  int _sv0t3 = sv0_vec_new();
+  int et = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ed2 = _sv0t5;
+  sv0_vec_push(et, 1);
+  sv0_vec_push(ed1, 1);
+  sv0_vec_push(ed2, 1);
+  int _sv0t6 = sv0_vec_new();
+  int pt = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int pd1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int pd2 = _sv0t8;
+  sv0_vec_push(pt, 4);
+  sv0_vec_push(pd1, 2);
+  sv0_vec_push(pd2, 1);
+  int _sv0t9 = sv0_vec_new();
+  int pp = _sv0t9;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 1);
+  sv0_vec_push(pp, 2);
+  int _sv0t10 = sv0_vec_new();
+  int starts = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int ends = _sv0t11;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  sv0_vec_push(starts, 4);
+  sv0_vec_push(ends, 7);
+  sv0_vec_push(starts, 8);
+  sv0_vec_push(ends, 11);
+  int _sv0t12 = sv0_vec_new();
+  int tops = _sv0t12;
+  sv0_vec_push(tops, 0);
+  sv0_vec_push(tops, 1);
+  sv0_vec_push(tops, 2);
+  const char* src;
+  src = "Foo\nBar\nBaz";
+  const char* _sv0t13 = link_apply_map_path_segs_program_source(tt, td1, td2, et, ed1, ed2, pt, pd1, pd2, pp, tops, "p", starts, ends, src);
+  const char* out;
+  out = _sv0t13;
+  int _sv0t14 = sv0_string_eq(out, "Foo\nBar\nBaz\np__Foo\np__Bar\np__Baz");
+  if ((_sv0t14 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_get(pp, 0);
+  if ((_sv0t15 != 3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_get(pp, 1);
+  if ((_sv0t16 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_get(pp, 2);
+  if ((_sv0t17 != 5)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_item_row_rewrite_struct_name(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int nm = _sv0t1;
+  sv0_vec_push(it, 1);
+  sv0_vec_push(nm, 0);
+  int _sv0t2 = sv0_vec_new();
+  int st = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int en = _sv0t3;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 3);
+  const char* src;
+  src = "Bar";
+  const char* _sv0t4 = link_item_row_rewrite_defining_name(it, nm, "pkg", st, en, src, 0);
+  const char* out;
+  out = _sv0t4;
+  int _sv0t5 = sv0_string_eq(out, "Bar\npkg__Bar");
+  if ((_sv0t5 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(nm, 0);
+  if ((_sv0t6 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(nm, 0);
+  const char* _sv0t8 = link_tok_text(out, st, en, _sv0t7);
+  const char* tx;
+  tx = _sv0t8;
+  int _sv0t9 = sv0_string_eq(tx, "pkg__Bar");
+  if ((_sv0t9 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_item_row_rewrite_fn_main_unchanged(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int nm = _sv0t1;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(nm, 0);
+  int _sv0t2 = sv0_vec_new();
+  int st = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int en = _sv0t3;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 4);
+  const char* src;
+  src = "main";
+  const char* _sv0t4 = link_item_row_rewrite_defining_name(it, nm, "pkg", st, en, src, 0);
+  const char* out;
+  out = _sv0t4;
+  int _sv0t5 = sv0_string_eq(out, "main");
+  if ((_sv0t5 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(nm, 0);
+  if ((_sv0t6 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_item_arena_rewrite_two(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int nm = _sv0t1;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(nm, 0);
+  sv0_vec_push(it, 1);
+  sv0_vec_push(nm, 1);
+  int _sv0t2 = sv0_vec_new();
+  int st = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int en = _sv0t3;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 3);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 7);
+  const char* src;
+  src = "Foo\nBar";
+  const char* _sv0t4 = link_item_arena_rewrite_defining_names(it, nm, "m", st, en, src);
+  const char* out;
+  out = _sv0t4;
+  int _sv0t5 = sv0_string_eq(out, "Foo\nBar\nm__Foo\nm__Bar");
+  if ((_sv0t5 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(nm, 0);
+  if ((_sv0t6 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(nm, 1);
+  if ((_sv0t7 != 3)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_apply_map_link_pass_program_source(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int td1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int td2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int et = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ed2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int pt = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int pd1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int pd2 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int pp = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int it = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int inm = _sv0t11;
+  sv0_vec_push(it, 1);
+  sv0_vec_push(inm, 0);
+  int _sv0t12 = sv0_vec_new();
+  int st = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int en = _sv0t13;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 3);
+  int _sv0t14 = sv0_vec_new();
+  int tops = _sv0t14;
+  const char* src;
+  src = "Bar";
+  const char* _sv0t15 = link_apply_map_link_pass_program_source(tt, td1, td2, et, ed1, ed2, pt, pd1, pd2, pp, it, inm, tops, "x", st, en, src);
+  const char* out;
+  out = _sv0t15;
+  int _sv0t16 = sv0_string_eq(out, "Bar\nx__Bar");
+  if ((_sv0t16 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_get(inm, 0);
+  if ((_sv0t17 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_second_file_byte_offset_after_concat(void) {
+  int _sv0t0 = link_second_file_byte_offset_after_concat("fn");
+  if ((_sv0t0 != 3)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_merge_sources_two(void) {
+  const char* _sv0t0 = link_merge_sources_two("fn", "foo");
+  const char* m;
+  m = _sv0t0;
+  int _sv0t1 = sv0_string_eq(m, "fn\nfoo");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_reloc_i32_vec_inplace(void) {
+  int _sv0t0 = sv0_vec_new();
+  int v = _sv0t0;
+  sv0_vec_push(v, 1);
+  sv0_vec_push(v, 5);
+  int _sv0t1 = sv0_vec_len(v);
+  int nr = _sv0t1;
+  int ir = 0;
+  while ((ir < nr)) {
+    int _sv0t2 = sv0_vec_get(v, ir);
+    int _sv0t3 = (_sv0t2 + 10);
+    sv0_vec_set(v, ir, _sv0t3);
+    ir = (ir + 1);
+  }
+  int _sv0t4 = sv0_vec_get(v, 0);
+  if ((_sv0t4 != 11)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(v, 1);
+  if ((_sv0t5 != 15)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_merge_parallel_token_streams_reloc_b(void) {
+  int _sv0t0 = sv0_vec_new();
+  int ta = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int sa = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ea = _sv0t2;
+  sv0_vec_push(ta, 65);
+  sv0_vec_push(sa, 0);
+  sv0_vec_push(ea, 2);
+  int _sv0t3 = sv0_vec_new();
+  int tb = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int sb = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int eb = _sv0t5;
+  sv0_vec_push(tb, 5);
+  sv0_vec_push(sb, 0);
+  sv0_vec_push(eb, 3);
+  int _sv0t6 = sv0_vec_new();
+  int ot = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int os = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int oe = _sv0t8;
+  int _sv0t9 = link_second_file_byte_offset_after_concat("fn");
+  int delta = _sv0t9;
+  if ((delta != 3)) {
+    return 10;
+  } else {
+  }
+  int _sv0t10 = link_merge_parallel_token_streams_reloc_b(ta, sa, ea, tb, sb, eb, delta, ot, os, oe);
+  int n = _sv0t10;
+  if ((n != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(os, 0);
+  if ((_sv0t11 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(oe, 0);
+  if ((_sv0t12 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(os, 1);
+  if ((_sv0t13 != 3)) {
+    return 4;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_get(oe, 1);
+  if ((_sv0t14 != 6)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_program_item_vecs_append(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it_a = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int id1_a = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int id2_a = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int id3_a = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int id4_a = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int id5_a = _sv0t5;
+  sv0_vec_push(it_a, 0);
+  sv0_vec_push(id1_a, 1);
+  sv0_vec_push(id2_a, 2);
+  sv0_vec_push(id3_a, 3);
+  sv0_vec_push(id4_a, 4);
+  sv0_vec_push(id5_a, 5);
+  int _sv0t6 = sv0_vec_new();
+  int it_b = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id1_b = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id2_b = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int id3_b = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int id4_b = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int id5_b = _sv0t11;
+  sv0_vec_push(it_b, 10);
+  sv0_vec_push(id1_b, 11);
+  sv0_vec_push(id2_b, 12);
+  sv0_vec_push(id3_b, 13);
+  sv0_vec_push(id4_b, 14);
+  sv0_vec_push(id5_b, 15);
+  int _sv0t12 = sv0_vec_len(it_b);
+  int napp = _sv0t12;
+  int japp = 0;
+  while ((japp < napp)) {
+    int _sv0t13 = sv0_vec_get(it_b, japp);
+    sv0_vec_push(it_a, _sv0t13);
+    int _sv0t14 = sv0_vec_get(id1_b, japp);
+    sv0_vec_push(id1_a, _sv0t14);
+    int _sv0t15 = sv0_vec_get(id2_b, japp);
+    sv0_vec_push(id2_a, _sv0t15);
+    int _sv0t16 = sv0_vec_get(id3_b, japp);
+    sv0_vec_push(id3_a, _sv0t16);
+    int _sv0t17 = sv0_vec_get(id4_b, japp);
+    sv0_vec_push(id4_a, _sv0t17);
+    int _sv0t18 = sv0_vec_get(id5_b, japp);
+    sv0_vec_push(id5_a, _sv0t18);
+    japp = (japp + 1);
+  }
+  int _sv0t19 = sv0_vec_len(it_a);
+  if ((_sv0t19 != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t20 = sv0_vec_get(it_a, 0);
+  if ((_sv0t20 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t21 = sv0_vec_get(it_a, 1);
+  if ((_sv0t21 != 10)) {
+    return 3;
+  } else {
+  }
+  int _sv0t22 = sv0_vec_get(id4_a, 1);
+  if ((_sv0t22 != 14)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_listing_index_helpers(void) {
+  const char* listing;
+  listing = "a/one.sv0\n\nb/two.sv0\n";
+  const char* _sv0t0 = link_listing_path_at_index(listing, 0);
+  const char* p0;
+  p0 = _sv0t0;
+  int _sv0t1 = sv0_string_eq(p0, "a/one.sv0");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = link_listing_path_at_index(listing, 1);
+  const char* p1;
+  p1 = _sv0t2;
+  int _sv0t3 = sv0_string_eq(p1, "b/two.sv0");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = link_listing_path_at_index(listing, 2);
+  const char* p2;
+  p2 = _sv0t4;
+  int _sv0t5 = sv0_string_eq(p2, "");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t6 = link_listing_module_id_at_index(listing, 0);
+  const char* m0;
+  m0 = _sv0t6;
+  int _sv0t7 = sv0_string_eq(m0, "one");
+  if ((_sv0t7 != 1)) {
+    return 4;
+  } else {
+  }
+  const char* _sv0t8 = link_listing_module_id_at_index(listing, 1);
+  const char* m1;
+  m1 = _sv0t8;
+  int _sv0t9 = sv0_string_eq(m1, "two");
+  if ((_sv0t9 != 1)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_link_project_concat_sources_offsets_from_listing(void) {
+  const char* p1;
+  p1 = "/tmp/sv0_link_offsets_a.sv0";
+  const char* p2;
+  p2 = "/tmp/sv0_link_offsets_b.sv0";
+  sv0_write_file(p1, "A");
+  sv0_write_file(p2, "B");
+  const char* listing;
+  listing = p1;
+  const char* _sv0t0 = sv0_string_concat(listing, "\n");
+  listing = _sv0t0;
+  const char* _sv0t1 = sv0_string_concat(listing, p2);
+  listing = _sv0t1;
+  const char* _sv0t2 = sv0_string_concat(listing, "\n");
+  listing = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int starts = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int lens = _sv0t4;
+  const char* _sv0t5 = link_project_concat_sources_offsets_from_listing(listing, starts, lens);
+  const char* out;
+  out = _sv0t5;
+  int _sv0t6 = sv0_string_eq(out, "A\nB");
+  if ((_sv0t6 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(starts);
+  if ((_sv0t7 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_len(lens);
+  if ((_sv0t8 != 2)) {
+    return 3;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(starts, 0);
+  if ((_sv0t9 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(starts, 1);
+  if ((_sv0t10 != 2)) {
+    return 5;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(lens, 0);
+  if ((_sv0t11 != 1)) {
+    return 6;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(lens, 1);
+  if ((_sv0t12 != 1)) {
+    return 7;
+  } else {
+  }
+  return 0;
+}
+
 static int test_split_module_name(void) {
   int _sv0t0 = sv0_vec_new();
   int it = _sv0t0;
@@ -4679,11 +6088,137 @@ int main(void) {
     return _sv0t88;
   } else {
   }
-  int _sv0t89 = test_g2_link_host_io_aliases();
-  int r22 = _sv0t89;
-  if ((r22 != 0)) {
-    int _sv0t90 = (220 + r22);
+  int _sv0t89 = test_link_ty_tyname_rewrite_first_seg_handle();
+  int r21mv1 = _sv0t89;
+  if ((r21mv1 != 0)) {
+    int _sv0t90 = (268 + r21mv1);
     return _sv0t90;
+  } else {
+  }
+  int _sv0t91 = test_link_expr_path_rewrite_first_seg_handle();
+  int r21mv2 = _sv0t91;
+  if ((r21mv2 != 0)) {
+    int _sv0t92 = (272 + r21mv2);
+    return _sv0t92;
+  } else {
+  }
+  int _sv0t93 = test_link_ty_arena_rewrite_all_first_seg();
+  int r21mv3 = _sv0t93;
+  if ((r21mv3 != 0)) {
+    int _sv0t94 = (276 + r21mv3);
+    return _sv0t94;
+  } else {
+  }
+  int _sv0t95 = test_link_expr_arena_rewrite_all_first_seg();
+  int r21mv4 = _sv0t95;
+  if ((r21mv4 != 0)) {
+    int _sv0t96 = (280 + r21mv4);
+    return _sv0t96;
+  } else {
+  }
+  int _sv0t97 = test_link_pat_path_previews_and_rewrite();
+  int r21mv5 = _sv0t97;
+  if ((r21mv5 != 0)) {
+    int _sv0t98 = (284 + r21mv5);
+    return _sv0t98;
+  } else {
+  }
+  int _sv0t99 = test_link_pat_arena_rewrite_all_first_seg();
+  int r21mv5b = _sv0t99;
+  if ((r21mv5b != 0)) {
+    int _sv0t100 = (286 + r21mv5b);
+    return _sv0t100;
+  } else {
+  }
+  int _sv0t101 = test_link_apply_map_path_segs_program_source();
+  int r21mv5c = _sv0t101;
+  if ((r21mv5c != 0)) {
+    int _sv0t102 = (294 + r21mv5c);
+    return _sv0t102;
+  } else {
+  }
+  int _sv0t103 = test_link_item_row_rewrite_struct_name();
+  int r21mv5d = _sv0t103;
+  if ((r21mv5d != 0)) {
+    int _sv0t104 = (305 + r21mv5d);
+    return _sv0t104;
+  } else {
+  }
+  int _sv0t105 = test_link_item_row_rewrite_fn_main_unchanged();
+  int r21mv5e = _sv0t105;
+  if ((r21mv5e != 0)) {
+    int _sv0t106 = (310 + r21mv5e);
+    return _sv0t106;
+  } else {
+  }
+  int _sv0t107 = test_link_item_arena_rewrite_two();
+  int r21mv5f = _sv0t107;
+  if ((r21mv5f != 0)) {
+    int _sv0t108 = (315 + r21mv5f);
+    return _sv0t108;
+  } else {
+  }
+  int _sv0t109 = test_link_apply_map_link_pass_program_source();
+  int r21mv5g = _sv0t109;
+  if ((r21mv5g != 0)) {
+    int _sv0t110 = (320 + r21mv5g);
+    return _sv0t110;
+  } else {
+  }
+  int _sv0t111 = test_link_second_file_byte_offset_after_concat();
+  int r21mv5h = _sv0t111;
+  if ((r21mv5h != 0)) {
+    int _sv0t112 = (325 + r21mv5h);
+    return _sv0t112;
+  } else {
+  }
+  int _sv0t113 = test_link_merge_sources_two();
+  int r21mv5i = _sv0t113;
+  if ((r21mv5i != 0)) {
+    int _sv0t114 = (328 + r21mv5i);
+    return _sv0t114;
+  } else {
+  }
+  int _sv0t115 = test_link_reloc_i32_vec_inplace();
+  int r21mv5j = _sv0t115;
+  if ((r21mv5j != 0)) {
+    int _sv0t116 = (331 + r21mv5j);
+    return _sv0t116;
+  } else {
+  }
+  int _sv0t117 = test_link_merge_parallel_token_streams_reloc_b();
+  int r21mv5k = _sv0t117;
+  if ((r21mv5k != 0)) {
+    int _sv0t118 = (334 + r21mv5k);
+    return _sv0t118;
+  } else {
+  }
+  int _sv0t119 = test_link_program_item_vecs_append();
+  int r21mv5m = _sv0t119;
+  if ((r21mv5m != 0)) {
+    int _sv0t120 = (335 + r21mv5m);
+    return _sv0t120;
+  } else {
+  }
+  int _sv0t121 = test_link_listing_index_helpers();
+  int r21mv6 = _sv0t121;
+  if ((r21mv6 != 0)) {
+    int _sv0t122 = (288 + r21mv6);
+    return _sv0t122;
+  } else {
+  }
+  int _sv0t123 = test_link_project_concat_sources_offsets_from_listing();
+  int r21mv7 = _sv0t123;
+  if ((r21mv7 != 0)) {
+    int _sv0t124 = (292 + r21mv7);
+    return _sv0t124;
+  } else {
+  }
+  int _sv0t125 = test_g2_link_host_io_aliases();
+  int r22 = _sv0t125;
+  if ((r22 != 0)) {
+    int _sv0t126 = (220 + r22);
+    return _sv0t126;
   } else {
   }
   return 0;

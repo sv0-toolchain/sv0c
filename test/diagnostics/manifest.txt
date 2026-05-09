@@ -1,0 +1,3 @@
+# Behavioral diagnostics corpus (M3-S-044): paths relative to sv0c/.
+# Each non-comment line:  rel_path | substring that must appear in combined sml stdout+stderr
+test/diagnostics/cases/type_mismatch.sv0|E0400

@@ -3,7 +3,11 @@ ML_BUILD := ml-build
 HEAP     := sv0c
 CC       ?= cc
 
-.PHONY: build test check heap clean e2e test-contract-runtime integration integration-vm
+.PHONY: build test check heap clean e2e test-contract-runtime integration integration-vm legacy-bootstrap-check legacy-bootstrap-heap
+
+# M3-S-052 prep: explicit names for the SML bootstrap path (default targets unchanged until L0 cutover).
+legacy-bootstrap-check: check
+legacy-bootstrap-heap: heap
 
 build:
 	echo 'CM.make "sources.cm"; OS.Process.exit OS.Process.success;' | $(SML)
