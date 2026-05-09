@@ -12,26 +12,26 @@ sv0c reads `.sv0` source files and compiles them to C source code, which is then
 sv0 source (.sv0)
      |
      v
-  Lexer         sml/lexer/
+  Lexer         sml-legacy/lexer/
      |
      v
-  Parser        sml/parser/ + sml/ast/
+  Parser        sml-legacy/parser/ + sml-legacy/ast/
      |
      v
-  Name Resolver sml/name_resolution/
+  Name Resolver sml-legacy/name_resolution/
      |
      v
-  Type Checker  sml/type_checker/
+  Type Checker  sml-legacy/type_checker/
      |
      v
-  Contract      sml/contract_analyzer/
+  Contract      sml-legacy/contract_analyzer/
   Analyzer
      |
      v
-  IR Lowering   sml/ir/
+  IR Lowering   sml-legacy/ir/
      |
      v
-  C Backend     sml/backend/c/
+  C Backend     sml-legacy/backend/c/
      |
      v
   C source -> cc -> native binary
@@ -41,19 +41,19 @@ sv0 source (.sv0)
 
 | directory | description |
 |---|---|
-| `sml/` | **Bootstrap compiler** (SML/NJ) — lexer through backends (`sources.cm`) |
-| `sml/lexer/` | tokenizer -- keywords, identifiers, literals, operators |
-| `sml/parser/` | recursive descent parser producing AST |
-| `sml/ast/` | AST type definitions (SML datatypes) |
-| `sml/name_resolution/` | scope resolution, import handling, module graph |
-| `sml/type_checker/` | type inference, trait resolution, overload resolution |
-| `sml/contract_analyzer/` | contract validation, runtime check insertion |
-| `sml/ir/` | sv0-IR definition and AST-to-IR lowering |
-| `sml/backend/c/` | sv0-IR to C99 code generation |
-| `sml/backend/vm/` | sv0-IR to bytecode |
-| `sml/error/` | error reporting with source spans |
+| `sml-legacy/` | **Bootstrap compiler** (SML/NJ) — lexer through backends (`sources.cm`) |
+| `sml-legacy/lexer/` | tokenizer -- keywords, identifiers, literals, operators |
+| `sml-legacy/parser/` | recursive descent parser producing AST |
+| `sml-legacy/ast/` | AST type definitions (SML datatypes) |
+| `sml-legacy/name_resolution/` | scope resolution, import handling, module graph |
+| `sml-legacy/type_checker/` | type inference, trait resolution, overload resolution |
+| `sml-legacy/contract_analyzer/` | contract validation, runtime check insertion |
+| `sml-legacy/ir/` | sv0-IR definition and AST-to-IR lowering |
+| `sml-legacy/backend/c/` | sv0-IR to C99 code generation |
+| `sml-legacy/backend/vm/` | sv0-IR to bytecode |
+| `sml-legacy/error/` | error reporting with source spans |
 | `lib/` | **Compiler in sv0** — transliteration seeds, `bootstrap-sources.list`, `golden/stage0/` |
-| `lexer/` | future sv0 lexer sources (parallel to `sml/lexer/`) |
+| `lexer/` | future sv0 lexer sources (parallel to `sml-legacy/lexer/`) |
 | `test/` | test suite |
 | `doc/` | pass-by-pass notes ([compiler-passes.md](doc/compiler-passes.md)) — includes structs, enums, and `match` (Milestone 1 Phase 5) |
 | `examples/learn/` | small **`.sv0`** tutorials + [README](examples/learn/README.md) for **`vm-compile`**, **`emit-c`**, **`repl`** from the toolchain root |
@@ -95,7 +95,7 @@ echo 'CM.make "sources.cm"; Main.compile "input.sv0";' | sml
 
 ## SML retirement (milestone 3 — human-gated)
 
-Cutover procedure (**tag `bootstrap-sml-final`**, **`sml/` → `sml-legacy/`**, default sv0-only build outline): **[doc/sml-retirement-cutover-checklist.md](doc/sml-retirement-cutover-checklist.md)**.
+Cutover procedure (**tag `bootstrap-sml-final`**, **`sml-legacy/` → `sml-legacy/`**, default sv0-only build outline): **[doc/sml-retirement-cutover-checklist.md](doc/sml-retirement-cutover-checklist.md)**.
 
 Cold bootstrap if self-host breaks after retirement: **[doc/cold-bootstrap-recovery.md](doc/cold-bootstrap-recovery.md)**.
 

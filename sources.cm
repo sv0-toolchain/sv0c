@@ -3,60 +3,60 @@ Group is
   $/smlnj-lib.cm
 
   (* error reporting *)
-  sml/error/span.sig
-  sml/error/span.sml
-  sml/error/diagnostic.sig
-  sml/error/diagnostic.sml
+  sml-legacy/error/span.sig
+  sml-legacy/error/span.sml
+  sml-legacy/error/diagnostic.sig
+  sml-legacy/error/diagnostic.sml
 
   (* lexer *)
-  sml/lexer/token.sml
-  sml/lexer/lexer.sig
-  sml/lexer/lexer.sml
+  sml-legacy/lexer/token.sml
+  sml-legacy/lexer/lexer.sig
+  sml-legacy/lexer/lexer.sml
 
   (* AST *)
-  sml/ast/ast.sml
+  sml-legacy/ast/ast.sml
 
   (* parser *)
-  sml/parser/parser.sig
-  sml/parser/parser.sml
+  sml-legacy/parser/parser.sig
+  sml-legacy/parser/parser.sml
 
   (* name resolution *)
-  sml/name_resolution/env.sig
-  sml/name_resolution/env.sml
-  sml/name_resolution/resolver.sig
-  sml/name_resolution/resolver.sml
+  sml-legacy/name_resolution/env.sig
+  sml-legacy/name_resolution/env.sml
+  sml-legacy/name_resolution/resolver.sig
+  sml-legacy/name_resolution/resolver.sml
 
   (* type checker *)
-  sml/type_checker/types.sml
-  sml/type_checker/unify.sig
-  sml/type_checker/unify.sml
-  sml/type_checker/checker.sig
-  sml/type_checker/checker.sml
+  sml-legacy/type_checker/types.sml
+  sml-legacy/type_checker/unify.sig
+  sml-legacy/type_checker/unify.sml
+  sml-legacy/type_checker/checker.sig
+  sml-legacy/type_checker/checker.sml
 
   (* contract analyzer *)
-  sml/contract_analyzer/analyzer.sig
-  sml/contract_analyzer/analyzer.sml
+  sml-legacy/contract_analyzer/analyzer.sig
+  sml-legacy/contract_analyzer/analyzer.sml
 
   (* IR *)
-  sml/ir/ir.sml
-  sml/ir/lowering.sig
-  sml/ir/lowering.sml
+  sml-legacy/ir/ir.sml
+  sml-legacy/ir/lowering.sig
+  sml-legacy/ir/lowering.sml
 
   (* C backend *)
-  sml/backend/c/codegen.sig
-  sml/backend/c/codegen.sml
+  sml-legacy/backend/c/codegen.sig
+  sml-legacy/backend/c/codegen.sml
 
   (* VM backend *)
-  sml/backend/vm/bytecode.sml
-  sml/backend/vm/vm_codegen.sig
-  sml/backend/vm/vm_codegen.sml
+  sml-legacy/backend/vm/bytecode.sml
+  sml-legacy/backend/vm/vm_codegen.sig
+  sml-legacy/backend/vm/vm_codegen.sml
 
   (* multi-file link / name mangling *)
-  sml/link/link.sig
-  sml/link/link.sml
+  sml-legacy/link/link.sig
+  sml-legacy/link/link.sml
 
   (* transliteration: textual include before lex *)
-  sml/include_expand.sml
+  sml-legacy/include_expand.sml
 
   (* entry point *)
-  sml/main.sml
+  sml-legacy/main.sml

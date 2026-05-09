@@ -1,8 +1,8 @@
 # Bootstrap compiler in sv0 (`lib/`)
 
-This tree holds **sv0 source** that mirrors slices of the SML bootstrap compiler (`sml/**/*.sml`) for the self-hosting roadmap (`task/sv0-toolchain-milestone-3-self-host.Rmd`).
+This tree holds **sv0 source** that mirrors slices of the SML bootstrap compiler (`sml-legacy/**/*.sml`) for the self-hosting roadmap (`task/sv0-toolchain-milestone-3-self-host.Rmd`).
 
-Sibling directories at the `sv0c/` root (**`lexer/`**, **`parser/`**, …) hold additional transliterated modules as the surface grows. **`sml/`** is the bootstrap implementation; **`lib/`** + those dirs are the sv0 track.
+Sibling directories at the `sv0c/` root (**`lexer/`**, **`parser/`**, …) hold additional transliterated modules as the surface grows. **`sml-legacy/`** is the bootstrap implementation; **`lib/`** + those dirs are the sv0 track.
 
 ## Build
 
@@ -39,11 +39,11 @@ echo 'CM.make "sources.cm"; Main.main ((), ["--target=vm", "lib/span_core.sv0"])
 
 ## `span_core.sv0`
 
-Transliterated subset of `sml/error/span.sml` / `span.sig`. `main` uses a simple `return` so the bootstrap IR/VM path emits an entry function.
+Transliterated subset of `sml-legacy/error/span.sml` / `span.sig`. `main` uses a simple `return` so the bootstrap IR/VM path emits an entry function.
 
 ## `diagnostic_core.sv0`
 
-Transliterated subset of `sml/error/diagnostic.sig` + `diagnostic.sml`: enum `Severity`, proxy `Diagnostic` (i32 fields for code/message/span/related/help shapes), and a **byte-length** model of `format` (header, `-->` line, optional gutter+snippet, related/help block sizes, final newline). Helpers use scalar `i32` parameters; see [`LAYOUT.md`](./LAYOUT.md) for transliteration order.
+Transliterated subset of `sml-legacy/error/diagnostic.sig` + `diagnostic.sml`: enum `Severity`, proxy `Diagnostic` (i32 fields for code/message/span/related/help shapes), and a **byte-length** model of `format` (header, `-->` line, optional gutter+snippet, related/help block sizes, final newline). Helpers use scalar `i32` parameters; see [`LAYOUT.md`](./LAYOUT.md) for transliteration order.
 
 ## `diagnostic_batch_core.sv0`
 
@@ -51,11 +51,11 @@ Transliterated subset of `sml/error/diagnostic.sig` + `diagnostic.sml`: enum `Se
 
 ## `env_core.sv0`
 
-Bounded slice of `sml/name_resolution/env.*`: two-slot module value list (numeric ids), `env_register` / `env_lookup`, `env_empty`. Exercises **multi-slot struct** arguments and returns on the VM.
+Bounded slice of `sml-legacy/name_resolution/env.*`: two-slot module value list (numeric ids), `env_register` / `env_lookup`, `env_empty`. Exercises **multi-slot struct** arguments and returns on the VM.
 
 ## `lib/resolver_value_core.sv0`
 
-Bounded three-slot module-value list with `lookup_value` / `resolve_path_ok` — tiny slice of `ExprPath` resolution (`sml/name_resolution/resolver.sml` + `Env.lookupValue`).
+Bounded three-slot module-value list with `lookup_value` / `resolve_path_ok` — tiny slice of `ExprPath` resolution (`sml-legacy/name_resolution/resolver.sml` + `Env.lookupValue`).
 
 ## `lib/resolver_arity_core.sv0`
 
@@ -63,7 +63,7 @@ Two-slot function arity table (`FnArity2`), `lookup_fn_arity` (−1 = absent), a
 
 ## `lib/env_scope_core.sv0`
 
-`scope_enter` / `scope_bind` / `scope_exit` / `scope_lookup` on a bounded two-frame, two-local-per-frame model (`sml/name_resolution/env.sml` frames).
+`scope_enter` / `scope_bind` / `scope_exit` / `scope_lookup` on a bounded two-frame, two-local-per-frame model (`sml-legacy/name_resolution/env.sml` frames).
 
 ## `lib/lookup_value_core.sv0`
 
@@ -79,7 +79,7 @@ Prelude type tags (`i32`/`bool`/`unit`/`str` as numeric ids), two-slot module ty
 
 ## `lexer/token_keyword_core.sv0`
 
-Keyword discriminants as `i32` tags in band **1–5** (`fn`, `let`, `if`, `break`, `continue`) plus **`is_keyword_tag`** — anchor for `sml/lexer/token.sml`. **`tag_kw_break`** / **`tag_kw_continue`** wire **`parser/stmt_entry_core.sv0`**. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
+Keyword discriminants as `i32` tags in band **1–5** (`fn`, `let`, `if`, `break`, `continue`) plus **`is_keyword_tag`** — anchor for `sml-legacy/lexer/token.sml`. **`tag_kw_break`** / **`tag_kw_continue`** wire **`parser/stmt_entry_core.sv0`**. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
 
 ## `lexer/token_delim_core.sv0`
 

@@ -59,7 +59,7 @@ From the **sv0-toolchain** repo root:
 |-------|----------------------|
 | Completion criteria before **`bootstrap-sml-final`** / **`sml-legacy/`** | **`task/sv0-toolchain-milestone-3-self-host.Rmd`** |
 | Pilot loop ≠ retirement | **`.cursor/rules/28-sml-retirement-and-self-host-bar.mdc`**, this file (**§ Pilot vs native**), **`README.md`** (bootstrap tag table at meta-repo root) |
-| Anti-patterns (no early tag, no **`sml/`** rename from pilot growth alone) | **`./scripts/sv0 milestone-orient show M3`** |
+| Anti-patterns (no early tag, no **`sml-legacy/`** rename from pilot growth alone) | **`./scripts/sv0 milestone-orient show M3`** |
 
 **Actual retirement** (git tag on **sv0c**, directory rename, default build switch) stays a **human-owned** cutover only after the M3 task says the bar is met — not an automated checklist flip in **`PROGRESS.md`**.
 

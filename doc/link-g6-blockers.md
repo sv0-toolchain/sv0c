@@ -4,7 +4,7 @@ This note tracks **bootstrap-transliteration closure** vs **full SML parity** fo
 
 ## M3-S-039 — `mapTy` / `mapExpr` / `mapPat` / `mapItem` arena rewrites
 
-**SML** (`sv0c/sml/link/link.sml`) builds recursive **`Ast.*`** trees; `mapPathSegs` returns **new** path lists with **fresh** identifiers after `mangle`.
+**SML** (`sv0c/sml-legacy/link/link.sml`) builds recursive **`Ast.*`** trees; `mapPathSegs` returns **new** path lists with **fresh** identifiers after `mangle`.
 
 **sv0 bootstrap** stores paths as **indices into the lexer token stream** (`pp` pool + `starts`/`ends` into **`source`**). A **semantic** rewrite must either:
 
@@ -38,7 +38,7 @@ This note tracks **bootstrap-transliteration closure** vs **full SML parity** fo
 
 ## M3-S-041 — single bootstrap TU driver (staging **Done**)
 
-**Bootstrap / transliteration closure:** stage-0 **composition** is the **SML/NJ `sources.cm` heap** (`sml/main.sml` entry). Each **`lib/*.sv0`** file is **VM-compiled independently** — **`lib/main.sv0`** cannot call **`parse_program`** from **`lib/parser.sv0`** without a linker or mega-module. **M3-S-041** is **Done** in **## M3 G6** when **`driver-pipeline-composition.md`** documents this model and **`scripts/verify_m3_g6_pipeline_contract.py`** + **`scripts/verify_m3_g6_staging_driver_contract.py`** pass (**`test-guards`** / **`test`**).
+**Bootstrap / transliteration closure:** stage-0 **composition** is the **SML/NJ `sources.cm` heap** (`sml-legacy/main.sml` entry). Each **`lib/*.sv0`** file is **VM-compiled independently** — **`lib/main.sv0`** cannot call **`parse_program`** from **`lib/parser.sv0`** without a linker or mega-module. **M3-S-041** is **Done** in **## M3 G6** when **`driver-pipeline-composition.md`** documents this model and **`scripts/verify_m3_g6_pipeline_contract.py`** + **`scripts/verify_m3_g6_staging_driver_contract.py`** pass (**`test-guards`** / **`test`**).
 
 **Deferred:** one sv0 TU (or native sv0 link) that runs **lexer → parser → … → emit** — not required to clear **G6** in the staging sense above.
 

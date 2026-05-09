@@ -21,11 +21,11 @@ git checkout bootstrap-sml-final
 
 Then follow **`README.md`** **`make heap`** and meta-repo **`./scripts/sv0 check`**.
 
-If that tag reflects **`sml/`** (not yet renamed), **`sources.cm`** matches **`sml/...`** — no **`sml-legacy/`** edits needed.
+If that tag reflects **`sml-legacy/`** (not yet renamed), **`sources.cm`** matches **`sml-legacy/...`** — no **`sml-legacy/`** edits needed.
 
 ## Recovery path B — **`sml-legacy/`** tree on **main**
 
-If **`main`** already renamed **`sml/`** → **`sml-legacy/`** and **`sources.cm`** was updated:
+If **`main`** already renamed **`sml-legacy/`** → **`sml-legacy/`** and **`sources.cm`** was updated:
 
 ```bash
 cd sv0c
