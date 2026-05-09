@@ -29,6 +29,19 @@ The **linear step indices** **`0..DRIVER_FULL_PIPELINE_LEN()-1`** exposed from *
 
 **`doc/link-g6-blockers.md`** explains why **M3-S-039** (token-handle rewrites) and **M3-S-040** (per-file parse + merged program) affect link-time and project-wide orchestration. A **single** bootstrap driver that faithfully mirrors **SML** **`compileProjectDir`** may need those facilities before it is honest to mark **M3-S-041** **Done**.
 
+## Native closure — both (A) and (B) as sequential milestones (not dual architecture)
+
+**Stakeholder confusion:** **§ Closure criteria** asks for **one** agreed composition model **(A) xor (B)** for the **native** sv0 driver — you do **not** ship two competing drivers in production.
+
+**Cleanest path toward M3 closure (engineering recommendation):**
+
+1. **Prefer (B) multi-unit linking** for the **maintainable** native compiler: mirrors **`lib/LAYOUT.md`** module boundaries, matches how **`sources.cm`** composes the **SML** driver today (many compilation units → one heap image). Native closure = **`cc`** link of sv0-emitted **`.c`** objects + runtime (**or** agreed package layout).
+2. **Use (A) mega-TU only as an optional spike** if the team needs the **fastest first** proof that **`SV0_SELF_HOST_COMPILER`** can **`diff`** SML on **`lib/self-host-sv0-loop.list`** — e.g. generated single TU or trimmed harness — then **refactor toward (B)** so M3 does not freeze a monolith.
+
+**What “complete both” means for planning:** track **(A)** *spike complete* and **(B)** *linker + roots complete* as **separate milestones** on the way to **one** shipped model (**B)** unless the project explicitly chooses to stay **(A)** (discouraged for long-term sv0 maintenance).
+
+**Already complete today (bootstrap / SML layer):** **multi-unit composition** via **`sources.cm`** + **`sml-legacy/main.sml`** — this is the **authoritative integrated driver** until native **(B)** lands (**§ Bootstrap staging closure**).
+
 ## Closure criteria (Working definition)
 
 Promote **M3-S-041** from **Partial** to **Done** when **all** of the following hold:
@@ -53,6 +66,7 @@ For **bootstrap / transliteration milestone tracking**, promote **M3-S-041** fro
 
 ## Related
 
+- **`sv0c/doc/l0-closure-roadmap.md`** — **L0** sequencing toward native **(A)/(B)** closure vs this document’s deferred engineering.
 - **`sv0c/doc/cli-parity.md`** — argv / **`classify_cli`** vs **SML** **`Main.main`** (**M3-S-042**).
 - **`sv0c/doc/link-g6-blockers.md`** — link-time and merge gates (**M3-S-039**, **M3-S-040**).
 - **`sv0c/lib/LAYOUT.md`** — bootstrap directory roles and transliteration spine.
