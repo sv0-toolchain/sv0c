@@ -28,4 +28,4 @@ Bold markdown that places a slash between closing and opening stars (for example
 
 ## Reference
 
-Implementation: **sml/include_expand.sml**, invoked from **sml/main.sml** (single-file compile) and **sml/link/link.sml** (`parseFile` for `--project`).
+Implementation: **sml-legacy/include_expand.sml**, invoked from **sml-legacy/main.sml** (single-file compile) and **sml-legacy/link/link.sml** (`parseFile` for `--project`).

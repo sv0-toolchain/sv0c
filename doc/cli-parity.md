@@ -1,6 +1,6 @@
 # Bootstrap compiler CLI parity (`sv0c` / M3-S-042)
 
-This document closes **M3-S-042** for the **compiler binary argv surface**: exact modes implemented by **`sv0c/sml/main.sml`** `Main.main`, how **`lib/main.sv0`** classifies the same shapes, and what stays **out of scope** (meta-repo orchestration).
+This document closes **M3-S-042** for the **compiler binary argv surface**: exact modes implemented by **`sv0c/sml-legacy/main.sml`** `Main.main`, how **`lib/main.sv0`** classifies the same shapes, and what stays **out of scope** (meta-repo orchestration).
 
 ## SML reference (`Main.main`)
 
@@ -37,7 +37,7 @@ There are **no** short flags, `--help`, or additional modes in `main.sml` today.
 
 ## When this doc must change
 
-- **`sv0c/sml/main.sml`** gains or removes an argv branch.
+- **`sv0c/sml-legacy/main.sml`** gains or removes an argv branch.
 - **`classify_cli`** semantics change (supported triples).
 - **`scripts/sv0`** `usage()` bootstrap section is edited — keep the **four-mode** summary consistent with this matrix.
 

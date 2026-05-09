@@ -6,7 +6,7 @@ Normative language semantics remain in **`sv0doc/`**. This file is compiler-boot
 
 ## SML reference ordering
 
-The stage-0 compiler’s file driver (**`sv0c/sml/main.sml`**) follows roughly:
+The stage-0 compiler’s file driver (**`sv0c/sml-legacy/main.sml`**) follows roughly:
 
 1. Read source (**`TextIO.inputAll`**).
 2. **`Lexer.tokenize`** → parallel `(tag, start, end)` streams + **`source`** string.
@@ -34,7 +34,7 @@ The **linear step indices** **`0..DRIVER_FULL_PIPELINE_LEN()-1`** exposed from *
 Promote **M3-S-041** from **Partial** to **Done** when **all** of the following hold:
 
 1. **One agreed composition model** is documented and implemented: either  
-   - (A) **one** `.sv0` translation unit whose **`main`** drives **lexer → parse → resolve → check → … → emit** with the same observable phase order as **`sml/main.sml`** on fixed fixtures, or  
+   - (A) **one** `.sv0` translation unit whose **`main`** drives **lexer → parse → resolve → check → … → emit** with the same observable phase order as **`sml-legacy/main.sml`** on fixed fixtures, or  
    - (B) explicit **multi-unit** sv0 linking plus a thin **`main`** root that calls the composed pipeline (with tests proving order).
 2. **Automated checks**: extend **`./scripts/sv0 test`** (or a documented subset) so regressions in phase order or wiring fail CI — not only naming tests in **`lib/main.sv0`**. **Partial guard (landed):** **`scripts/verify_m3_g6_pipeline_contract.py`** (via **`./scripts/sv0 test-guards`** / **`test`**) asserts **`PHASE_COUNT`**, **`DRIVER_FULL_PIPELINE_LEN` = 2 + `PHASE_COUNT()`**, and presence of coarse step-name strings — this protects the **documented spine** but **does not** execute lexer→emit inside sv0.
 3. **Cross-reference**: update **`doc/transliteration-plan.md`** Pipeline/driver row and **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## M3 G6 slice status** when (1)–(2) land.
@@ -45,7 +45,7 @@ Until then, **`lib/main.sv0`** remains the **staging module** for driver-facing 
 
 For **bootstrap / transliteration milestone tracking**, promote **M3-S-041** from **Partial** to **Done** when **all** of the following hold (this is **not** a substitute for a future single-TU sv0 driver):
 
-1. **`sv0c/sources.cm`** lists **`sml/main.sml`** — the SML/NJ heap is the **integrated** stage-0 compiler driver (lexer→…→emit live here).
+1. **`sv0c/sources.cm`** lists **`sml-legacy/main.sml`** — the SML/NJ heap is the **integrated** stage-0 compiler driver (lexer→…→emit live here).
 2. **`lib/main.sv0`** keeps the **nine-step** coarse spine (**`DRIVER_FULL_PIPELINE_LEN`** / **`driver_pipeline_step_name`**) and **`driver_tokenize_sketch`**, and does **not** embed **`parse_program`** (each **`lib/*.sv0`** root is **standalone** under **`bootstrap-build`**).
 3. **Automated guards:** **`scripts/verify_m3_g6_pipeline_contract.py`** + **`scripts/verify_m3_g6_staging_driver_contract.py`** pass via **`./scripts/sv0 test-guards`** / **`test`**.
 
