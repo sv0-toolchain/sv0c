@@ -4,6 +4,8 @@ This document is a **roadmap** for moving the authoritative implementation from 
 
 **Normative language rules** remain in **`sv0doc/`**. This file is **implementation planning** only.
 
+**GX — deferred bootstrap policy:** generics lowering monomorphization (**T0-2d** / **M3-S-054**), closures / **`impl`** / optional VM loop micro-opts (**M3-S-055**) are pinned in **`sv0doc/compiler/bootstrap-generics-policy.md`** and **`sv0doc/compiler/bootstrap-deferred-surface.md`** — do not infer extra obligations from this roadmap alone.
+
 ## Keeping this plan current (**`PROGRESS.md` C-4**)
 
 This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for milestone 3. **`PROGRESS.md`** checklist **C-4** is satisfied when both stay aligned with the tree as seeds land.
