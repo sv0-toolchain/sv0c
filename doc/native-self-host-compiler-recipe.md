@@ -32,7 +32,12 @@ SV0_SELF_HOST_COMPILER="$PWD/build/sv0-self-host-compiler" ./scripts/sv0 test
 
 Replace **`build/sv0-self-host-compiler`** with a **native binary** built from sv0-emitted C (or an agreed link step), honoring the same argv/stdout contract. **`scripts/sv0-self-host-emit-c.sh`** remains the reference behavior until **`diff`** against that binary is green on **`lib/self-host-sv0-loop.list`**.
 
+## L0 prerequisite chain (orientation)
+
+A **native** **`SV0_SELF_HOST_COMPILER`** that can compile real compiler sources implies an **integrated emit entrypoint** (lexer → … → C on stdout) in **native** code. Today **`lib/main.sv0`** is a **staging** module — full composition is **deferred** per **`doc/driver-pipeline-composition.md`** (**Deferred engineering**: single mega-TU **or** multi-unit sv0 linking). Until **(A)** or **(B)** lands, keeping **`build/sv0-self-host-compiler`** as a **bootstrap delegate** is **correct**; **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## L0 closure (blocking prerequisites)** tracks stakeholder **L0** vs slice backlog **Done**.
+
 ## Related
 
+- **`doc/l0-closure-roadmap.md`** — phased **L0** engineering path (merge orchestration → native composition → parity → evidence).
 - **`doc/self-host-sv0-loop.md`** — pilot loop, **`SV0_SKIP_SELF_HOST_COMPILER_DIFF`**, retirement guardrails.
 - **`scripts/sv0`** **`build-self-host-compiler`** — alias that runs **`scripts/build-sv0-self-host-compiler.sh`**.

@@ -1260,9 +1260,11 @@ fn apply_use_clauses(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
    ItemFn (tag 0): bind param names then resolve_expr on body_root.
    ItemStruct (tag 1): resolve_ty each field type root in struct_field_ty_root
    (parallel to struct_field_name_toks; base id3, count id2).
+   ItemEnum (tag 2): resolve_ty each variant payload root (enum_variant_payload_ty_root
+   slice; base/count per item).
    ItemTypeAlias (tag 7): id2 is type arena root index (program pty_tt).
-   ItemTrait / ItemImpl (tags 3, 4): parent rows no-op (methods are ItemFn rows).
-   ItemEnum (tag 2): variant payload resolve_ty deferred. */
+   ItemTrait / ItemImpl (tags 3, 4): parent rows no-op at top level (methods are ItemFn rows).
+   ItemModule / ItemUse (tags 5, 6): no-op here (registration/use elsewhere). */
 
 fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                     id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,

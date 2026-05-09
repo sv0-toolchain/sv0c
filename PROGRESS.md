@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-05-09 (America/Los_Angeles; **`M3-S-052`:** default **`make check`** / **`SV0_SELF_HOST_COMPILER`** smoke + **`legacy-bootstrap-check`** split — **`doc/sml-retirement-cutover-checklist.md`**, **`README.md`**, **`Makefile`**.)
+**Last updated:** 2026-05-08 (America/Los_Angeles; **`doc/l0-closure-roadmap.md`** — phased **L0** engineering path toward native **`SV0_SELF_HOST_COMPILER`** + composed driver; **`M3-S-052`** / retirement docs unchanged.)
 
 ## Checklist (local source of truth)
 
@@ -26,6 +26,8 @@
 ## Notes
 
 Point to the active vertical slice (SML module, harness name, or milestone sub-step). Link `task/sv0-toolchain-milestone-3-checklist.Rmd` for row-level transliteration inventory.
+
+**2026-05-08 (America/Los_Angeles, evening):** **`doc/l0-closure-roadmap.md`** — dependency-ordered phases toward **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **L0** (not a completion claim). Pair with **`doc/transliteration-plan.md`** / **`lib/LAYOUT.md`** when choosing the next implementation slice.
 
 **2026-05-09 (America/Los_Angeles, night):** **`M3-S-052`** — **`make check`** = **`heap` + emit smoke (**`scripts/smoke-self-host-compiler.sh`** — standalone CI safe); **`legacy-bootstrap-check`** = full **`CM.make`**; docs updated.
 
