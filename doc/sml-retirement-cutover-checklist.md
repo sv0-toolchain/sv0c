@@ -53,17 +53,13 @@ git push origin bootstrap-sml-final
 4. Run **`./scripts/sv0 check`** and **`./scripts/sv0 test`** from meta-repo root.
 5. Bump meta-repo **`sv0c`** submodule pointer after **`sv0c`** push.
 
-## M3-S-052 — Default build sv0-only (after native compiler)
+## M3-S-052 — Default build sv0-only (`SV0_SELF_HOST_COMPILER`)
 
-**Blocked** until a **native** sv0 compiler binary can replace SML on default **`make`** / **`./scripts/sv0`** paths without losing **`./scripts/sv0 test`** coverage.
+**Landed:** default **C emit** and **`check`** smoke go through **`SV0_SELF_HOST_COMPILER`** (**`build/sv0-self-host-compiler`** wrapper — **M3-S-047** recipe). **`scripts/sv0-smoke-self-host-compiler.sh`** implements **`make check`** / **`./scripts/sv0 check`** (**`heap`** + one-file emit). **`emit-c`**, stage0 golden capture, and deterministic emits use the same contract.
 
-**Prep landed (names only — default unchanged):** in **`sv0c/Makefile`**, **`legacy-bootstrap-check`** (alias **`check`**) and **`legacy-bootstrap-heap`** (alias **`heap`**) document the SML bootstrap entrypoints for post-cutover docs / CI splits.
+**Still SML-backed today:** the wrapper delegates to **`scripts/sv0-self-host-emit-c.sh`** (**`sml @SMLload=build/sv0c`**). **`make heap`**, **`bootstrap-build`**, VM **`Main.main`** paths, **`sv0vm`** loads, and **`legacy-bootstrap-check`** (**full **`CM.make "sources.cm"`**) remain on **SML/NJ** — CI installs SML and runs **`legacy-bootstrap-check`** after **`./scripts/sv0 check`**.
 
-Outline (not executed today):
-
-1. Keep explicit **`legacy-bootstrap-*`** targets as the supported SML **`sources.cm`** / heap path after defaults switch.
-2. Change **default** **`scripts/sv0`** stages to invoke **`SV0_SELF_HOST_COMPILER`** (or agreed wrapper) instead of **`sml`** where applicable.
-3. CI matrix: default job **without** SML install once native artifact is reproducible; optional scheduled job keeps **`sml-legacy`** path alive.
+**Makefile:** **`check`** = **`heap`** + smoke script; **`legacy-bootstrap-check`** = full **`CM.make`**; **`legacy-bootstrap-heap`** aliases **`heap`**.
 
 ## Post-cutover validation (minimum)
 

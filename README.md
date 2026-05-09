@@ -66,9 +66,9 @@ requires SML/NJ (tested with 110.99.9).
 
 ```bash
 make build         # compile all modules via CM
-make check         # CM compile only (fast smoke; no test_runner)
-make legacy-bootstrap-check   # explicit alias for check (M3-S-052 retirement prep — same as check)
-make legacy-bootstrap-heap    # explicit alias for heap (M3-S-052 retirement prep — same as heap)
+make check         # heap + SV0_SELF_HOST_COMPILER smoke (M3-S-052 — scripts/sv0-smoke-self-host-compiler.sh)
+make legacy-bootstrap-check   # full CM.make compile (sml-legacy sources.cm)
+make legacy-bootstrap-heap    # alias for heap (explicit bootstrap naming)
 make test          # run test suite (see test_runner for current count)
 make e2e           # emit C, compile with cc, run binary (exit code 42)
 make integration   # Rmd-style scenarios under test/integration/ (needs heap)
