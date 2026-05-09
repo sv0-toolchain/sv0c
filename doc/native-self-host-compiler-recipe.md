@@ -8,7 +8,7 @@ Tools invoke **`SV0_SELF_HOST_COMPILER`** with **one argument**: an **absolute**
 
 There is not yet a **single native executable** compiled entirely from sv0 that implements the full SML driver CLI. Until that lands (see **`doc/driver-pipeline-composition.md`**), the supported workflow is:
 
-**M3-S-052:** **`./scripts/sv0 check`** / **`make -C sv0c check`** ensure **`build/sv0-self-host-compiler`** exists and **`export SV0_SELF_HOST_COMPILER`** defaults to that path for **`emit-c`**, stage0 goldens, and related **`scripts/sv0`** stages.
+**M3-S-052:** **`make -C sv0c check`** runs **`scripts/smoke-self-host-compiler.sh`** (**heap** + one-file emit). **`./scripts/sv0 check`** (meta-repo) **`exec`**s that script. **`emit-c`**, stage0 goldens, and related **`scripts/sv0`** stages use **`SV0_SELF_HOST_COMPILER`** (**`build/sv0-self-host-compiler`** after **`build-sv0-self-host-compiler.sh`**).
 
 1. **`./scripts/build-sv0-self-host-compiler.sh`** — writes **`build/sv0-self-host-compiler`**, a thin **`exec`** wrapper around **`scripts/sv0-self-host-emit-c.sh`** (SML heap image **`build/sv0c`**).
 

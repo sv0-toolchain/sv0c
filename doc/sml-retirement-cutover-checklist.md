@@ -55,7 +55,7 @@ git push origin bootstrap-sml-final
 
 ## M3-S-052 — Default build sv0-only (`SV0_SELF_HOST_COMPILER`)
 
-**Landed:** default **C emit** and **`check`** smoke go through **`SV0_SELF_HOST_COMPILER`** (**`build/sv0-self-host-compiler`** wrapper — **M3-S-047** recipe). **`scripts/sv0-smoke-self-host-compiler.sh`** implements **`make check`** / **`./scripts/sv0 check`** (**`heap`** + one-file emit). **`emit-c`**, stage0 golden capture, and deterministic emits use the same contract.
+**Landed:** **`make check`** / **`./scripts/sv0 check`** smoke uses **`sv0c/scripts/smoke-self-host-compiler.sh`** (**`heap`** + one-file **`sml @SMLload`** emit — standalone-safe). Default **C emit** for **`emit-c`**, stage0 goldens, and **`scripts/sv0`** stages goes through **`SV0_SELF_HOST_COMPILER`** (**`build/sv0-self-host-compiler`** wrapper — **M3-S-047** recipe) where applicable.
 
 **Still SML-backed today:** the wrapper delegates to **`scripts/sv0-self-host-emit-c.sh`** (**`sml @SMLload=build/sv0c`**). **`make heap`**, **`bootstrap-build`**, VM **`Main.main`** paths, **`sv0vm`** loads, and **`legacy-bootstrap-check`** (**full **`CM.make "sources.cm"`**) remain on **SML/NJ** — CI installs SML and runs **`legacy-bootstrap-check`** after **`./scripts/sv0 check`**.
 

@@ -27,7 +27,7 @@
 
 Point to the active vertical slice (SML module, harness name, or milestone sub-step). Link `task/sv0-toolchain-milestone-3-checklist.Rmd` for row-level transliteration inventory.
 
-**2026-05-09 (America/Los_Angeles, night):** **`M3-S-052`** — **`make check`** = **`heap` + `SV0_SELF_HOST_COMPILER`** smoke (**`../scripts/sv0-smoke-self-host-compiler.sh`**); **`legacy-bootstrap-check`** = full **`CM.make`**; docs updated.
+**2026-05-09 (America/Los_Angeles, night):** **`M3-S-052`** — **`make check`** = **`heap` + emit smoke (**`scripts/smoke-self-host-compiler.sh`** — standalone CI safe); **`legacy-bootstrap-check`** = full **`CM.make`**; docs updated.
 
 **2026-05-09 (America/Los_Angeles, night):** **M3 G9 follow-on** — **`Makefile`** **`legacy-bootstrap-check`**/**`heap`** aliases; **`sml_retirement_preflight_scan.py`** / **`./scripts/sv0 sml-retirement-preflight`**. **051**/**052** execution still stakeholder-owned.
 
