@@ -2,7 +2,7 @@
 
 **Meta-repo rollup:** when this tree is the `sv0c/` submodule of **sv0-toolchain**, the parent copies this file’s **`%`** into `task/sv0-toolchain-progress.md`. **Standalone clone:** keep this file authoritative here; reconcile on the next meta-repo integration.
 
-**Last updated:** 2026-05-09 (America/Los_Angeles; **M3 G9 prep:** **`doc/sml-retirement-cutover-checklist.md`**, **`doc/cold-bootstrap-recovery.md`**, **`README.md`** retirement §; **051**/**052** execution **human-gated** — parent **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## M3 G9 slice status**. **M3 G8** recipe unchanged.)
+**Last updated:** 2026-05-09 (America/Los_Angeles; **`M3-S-052`:** default **`make check`** / **`SV0_SELF_HOST_COMPILER`** smoke + **`legacy-bootstrap-check`** split — **`doc/sml-retirement-cutover-checklist.md`**, **`README.md`**, **`Makefile`**.)
 
 ## Checklist (local source of truth)
 
@@ -26,6 +26,8 @@
 ## Notes
 
 Point to the active vertical slice (SML module, harness name, or milestone sub-step). Link `task/sv0-toolchain-milestone-3-checklist.Rmd` for row-level transliteration inventory.
+
+**2026-05-09 (America/Los_Angeles, night):** **`M3-S-052`** — **`make check`** = **`heap` + `SV0_SELF_HOST_COMPILER`** smoke (**`../scripts/sv0-smoke-self-host-compiler.sh`**); **`legacy-bootstrap-check`** = full **`CM.make`**; docs updated.
 
 **2026-05-09 (America/Los_Angeles, night):** **M3 G9 follow-on** — **`Makefile`** **`legacy-bootstrap-check`**/**`heap`** aliases; **`sml_retirement_preflight_scan.py`** / **`./scripts/sv0 sml-retirement-preflight`**. **051**/**052** execution still stakeholder-owned.
 

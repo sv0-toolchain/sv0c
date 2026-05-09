@@ -5,8 +5,8 @@ CC       ?= cc
 
 .PHONY: build test check heap clean e2e test-contract-runtime integration integration-vm legacy-bootstrap-check legacy-bootstrap-heap
 
-# M3-S-052 prep: explicit names for the SML bootstrap path (default targets unchanged until L0 cutover).
-legacy-bootstrap-check: check
+# M3-S-052: default `check` = heap + SV0_SELF_HOST_COMPILER smoke (meta-repo scripts/sv0-smoke-self-host-compiler.sh).
+# Full CM.make compile of sml-legacy is legacy-bootstrap-check (CI keeps both).
 legacy-bootstrap-heap: heap
 
 build:
@@ -16,7 +16,10 @@ test:
 	mkdir -p build
 	echo 'CM.make "sources.cm"; use "test/test_runner.sml"; OS.Process.exit OS.Process.success;' | $(SML)
 
-check:
+check: heap
+	bash "$(CURDIR)/../scripts/sv0-smoke-self-host-compiler.sh"
+
+legacy-bootstrap-check:
 	@tmp=$$(mktemp); echo 'CM.make "sources.cm"; OS.Process.exit OS.Process.success;' | $(SML) >$$tmp 2>&1; \
 	  if grep -q 'Error:' $$tmp; then tail -40 $$tmp; rm -f $$tmp; exit 1; fi; \
 	  rm -f $$tmp
