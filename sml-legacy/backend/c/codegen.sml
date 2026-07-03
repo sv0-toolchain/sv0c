@@ -90,7 +90,9 @@ structure Codegen :> CODEGEN = struct
     | Ir.Break => indent ^ "break;\n"
     | Ir.Continue => indent ^ "continue;\n"
     | Ir.Call (SOME d, f, vs, rty) =>
-        indent ^ rty ^ " " ^ d ^ " = " ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
+        if rty = "void"
+        then indent ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
+        else indent ^ rty ^ " " ^ d ^ " = " ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
     | Ir.Call (NONE, f, vs, _) =>
         indent ^ f ^ "(" ^ emitCallArgs vs ^ ");\n"
     | Ir.Requires (e, fnName) =>
