@@ -4,13 +4,25 @@
 
 Tools invoke **`SV0_SELF_HOST_COMPILER`** with **one argument**: an **absolute** path to a **`.sv0`** file under **`sv0c/`**. The program must print **C source** for that compilation unit on **stdout** (same contract as **`./scripts/sv0 emit-c <rel>`** / SML **`Main.main`** default mode).
 
-## Bootstrap path (today)
+## P2 state (2026-07-03)
 
-There is not yet a **single native executable** compiled entirely from sv0 that implements the full SML driver CLI. Until that lands (see **`doc/driver-pipeline-composition.md`**), the supported workflow is:
+**`build-sv0-self-host-compiler.sh`** now produces **three** artifacts:
+
+| Path | What | Used by |
+|------|------|---------|
+| `build/sv0-self-host-compiler` | SML-heap wrapper (bootstrap delegate) | CI default, `SV0_SELF_HOST_COMPILER` |
+| `build/sv0-driver-native` | Native binary from `lib/driver.sv0` via SML→C→cc | Manual testing, P2 validation |
+| `build/sv0-self-host-compiler-native` | Thin wrapper around `sv0-driver-native` | `self-host-native.yml` P2 step |
+
+The native binary reads its input path from **`/tmp/.sv0_drv_path`** (written by the native wrapper before each invocation). An empty file → test mode (49 self-host tests, exit 0). The build script initialises the file as empty.
+
+**Parity gap (P3 prerequisite):** The native binary's C emitter uses inline expressions rather than SML's temporary-variable IR, so `diff` vs SML is non-trivial. The `self-host-native.yml` native step runs with `SV0_SKIP_SELF_HOST_COMPILER_DIFF=1` until P3 parity work lands. The SML-backed default continues to pass a clean diff in CI.
+
+## Bootstrap path (today)
 
 **M3-S-052:** **`make -C sv0c check`** runs **`scripts/smoke-self-host-compiler.sh`** (**heap** + one-file emit). **`./scripts/sv0 check`** (meta-repo) **`exec`**s that script. **`emit-c`**, stage0 goldens, and related **`scripts/sv0`** stages use **`SV0_SELF_HOST_COMPILER`** (**`build/sv0-self-host-compiler`** after **`build-sv0-self-host-compiler.sh`**).
 
-1. **`./scripts/build-sv0-self-host-compiler.sh`** — writes **`build/sv0-self-host-compiler`**, a thin **`exec`** wrapper around **`scripts/sv0-self-host-emit-c.sh`** (SML heap image **`build/sv0c`**).
+1. **`./scripts/build-sv0-self-host-compiler.sh`** — writes **`build/sv0-self-host-compiler`** (SML-heap wrapper) **and** **`build/sv0-driver-native`** (native binary from `lib/driver.sv0`). Previously only wrote the SML wrapper.
 
 2. Point **`SV0_SELF_HOST_COMPILER`** at that path and run the pilot loop or full test:
 
