@@ -194,6 +194,7 @@ fn DRV_TY_I32()    -> i32 { return 200; }  /* i32 type */
 fn DRV_TY_BOOL()   -> i32 { return 201; }  /* bool type */
 fn DRV_TY_UNIT()   -> i32 { return 202; }  /* () type  */
 fn DRV_TY_STRING() -> i32 { return 203; }  /* string type */
+fn DRV_TY_VEC()    -> i32 { return 204; }  /* Vec<T> type — emits as int (handle) in C */
 fn DRV_TY_UNKNOWN() -> i32 { return 299; } /* unresolved / error */
 
 /* ── Sentinel values ──────────────────────────────────────────────────────── */
@@ -245,6 +246,7 @@ fn test_drv_token_tags() -> i32 {
     if DRV_TY_I32()        != 200 { return 33; }
     if DRV_TY_BOOL()       != 201 { return 34; }
     if DRV_TY_UNIT()       != 202 { return 35; }
+    if DRV_TY_VEC()        != 204 { return 37; }
     if DRV_NONE()          != 0 - 1 { return 36; }
     return 0;
 }
@@ -1622,6 +1624,28 @@ fn drv_parse_type(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
         if string_eq(spell, "i32")    { return DRV_TY_I32(); }
         if string_eq(spell, "bool")   { return DRV_TY_BOOL(); }
         if string_eq(spell, "string") { return DRV_TY_STRING(); }
+        if string_eq(spell, "Vec") {
+            /* Vec<T>: consume `<`, inner type, `>` and return DRV_TY_VEC() */
+            let p2: i32 = vec_get(pos_vec, 0);
+            if p2 < tok_count {
+                if vec_get(tok_tags, p2) == DRV_TK_LT() {
+                    drv_advance(pos_vec);
+                    /* skip the inner type token(s) — consume until matching > */
+                    let mut depth: i32 = 1;
+                    while depth > 0 {
+                        let p3: i32 = vec_get(pos_vec, 0);
+                        if p3 >= tok_count { depth = 0; }
+                        else {
+                            let t3: i32 = vec_get(tok_tags, p3);
+                            drv_advance(pos_vec);
+                            if t3 == DRV_TK_LT() { depth = depth + 1; }
+                            if t3 == DRV_TK_GT() { depth = depth - 1; }
+                        }
+                    }
+                }
+            }
+            return DRV_TY_VEC();
+        }
         /* Unknown type: record error but keep going */
         vec_set(err_flag, 0, 1);
         return DRV_TY_UNKNOWN();
@@ -2809,9 +2833,11 @@ fn test_drv_check_basic() -> i32 {
 
 /* Map DRV_TY_* to C type string. */
 fn drv_ty_to_c(ty: i32) -> string {
-    if ty == DRV_TY_I32()  { return "int"; }
-    if ty == DRV_TY_BOOL() { return "int"; }    /* bool → int in C */
-    if ty == DRV_TY_UNIT() { return "void"; }
+    if ty == DRV_TY_I32()    { return "int"; }
+    if ty == DRV_TY_BOOL()   { return "int"; }    /* bool → int in C */
+    if ty == DRV_TY_UNIT()   { return "void"; }
+    if ty == DRV_TY_VEC()    { return "int"; }    /* Vec handle → int in C ABI */
+    if ty == DRV_TY_STRING() { return "const char*"; }
     return "int";   /* fallback */
 }
 
@@ -3367,6 +3393,23 @@ fn test_drv_vm_while_break() -> i32 {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 fn main() -> i32 {
+    /* CLI mode: if /tmp/.sv0_drv_path contains a non-empty path, compile it.
+       The build/sv0-self-host-compiler wrapper writes the input path here before
+       invoking this binary; build-sv0-self-host-compiler.sh creates it empty so
+       that test-mode invocations (which do NOT use the wrapper) fall through. */
+    let cli: string = read_file("/tmp/.sv0_drv_path");
+    if string_len(cli) > 0 {
+        let n: i32 = string_len(cli);
+        let path: string = if string_char_at(cli, n - 1) == 10 {
+            string_substr(cli, 0, n - 1)
+        } else {
+            cli
+        };
+        return drv_compile_file(path, "/dev/stdout");
+    }
+
+    /* Test mode: run all 49 self-host tests */
+
     /* Section 1: Token tag constants */
     let r1: i32 = test_drv_token_tags();
     if r1 != 0 { return 100 + r1; }
