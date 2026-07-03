@@ -879,8 +879,7 @@ fn drv_tokenize(source: string,
                 /* Unknown character: skip it (lenient mode for spike) */
                 pos = pos + 1;
             }
-            }}}}}}}}}}}}}}}}}}}}}}}
-        }
+            }}}}}}}}}}}}}}}}}}}}}
         }
         }
         }
