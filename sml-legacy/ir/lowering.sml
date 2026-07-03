@@ -120,14 +120,20 @@ structure Lowering :> LOWERING = struct
   fun calleeRetCty (name : string) : string =
     let val name0 = resolveFnCallee name
     in
-      case
-        List.find
-          (fn it =>
-             case it of Ast.ItemFn r => #name r = name0 | _ => false) (!theProg)
-      of
-        SOME (Ast.ItemFn r) =>
-          (case #ret r of SOME at => astTyToCString at | NONE => "int")
-      | _ => "int"
+      case name0 of
+        "string_concat" => "const char*"
+      | "string_substr" => "const char*"
+      | "read_file"     => "const char*"
+      | "read_dir"      => "const char*"
+      | _ =>
+          (case
+            List.find
+              (fn it =>
+                 case it of Ast.ItemFn r => #name r = name0 | _ => false) (!theProg)
+          of
+            SOME (Ast.ItemFn r) =>
+              (case #ret r of SOME at => astTyToCString at | NONE => "int")
+          | _ => "int")
     end
 
   fun exprInitCty (e : Ast.expr) : string =
@@ -140,6 +146,9 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprTuple ([e1], _) => exprInitCty e1
     | Ast.ExprLit (Ast.BoolLit _, _) => "int"
     | Ast.ExprLit (Ast.IntLit _, _) => "int"
+    | Ast.ExprLit (Ast.StringLit _, _) => "const char*"
+    | Ast.ExprBlock (_, SOME e2, _) => exprInitCty e2
+    | Ast.ExprIf (_, th, _, _) => exprInitCty th
     | _ => "int"
 
   fun matchScrutCty (e : Ast.expr) : string =
@@ -785,11 +794,14 @@ structure Lowering :> LOWERING = struct
         let
           val t = freshTmp ()
           val u = freshTmp ()
+          val cty = exprInitCty th
           val (ic, ec) = lowerExprWithInstrs c
           val thSt = lowerIntoVarInstrs th u
           val elSt = lowerIntoVarInstrs el u
+          val declU = if cty = "int" then Ir.DeclVar u else Ir.DeclNamed (cty, u)
+          val declT = if cty = "int" then Ir.DeclVar t else Ir.DeclNamed (cty, t)
         in
-          ( ic @ [Ir.DeclVar t, Ir.DeclVar u, Ir.IfElse (ec, thSt, elSt),
+          ( ic @ [declT, declU, Ir.IfElse (ec, thSt, elSt),
                   Ir.Store (t, Ir.Load u)]
           , Ir.VVar t)
         end
@@ -904,11 +916,13 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprIf (c, th, SOME el, _) =>
         let
           val u = freshTmp ()
+          val cty = exprInitCty th
           val (ic, ec) = lowerExprWithInstrs c
           val thSt = lowerIntoVarInstrs th u
           val elSt = lowerIntoVarInstrs el u
+          val declU = if cty = "int" then Ir.DeclVar u else Ir.DeclNamed (cty, u)
         in
-          ic @ [Ir.DeclVar u, Ir.IfElse (ec, thSt, elSt), Ir.Store (t, Ir.Load u)]
+          ic @ [declU, Ir.IfElse (ec, thSt, elSt), Ir.Store (t, Ir.Load u)]
         end
     | Ast.ExprIf (c, th, NONE, _) =>
         let val (ic, ec) = lowerExprWithInstrs c
@@ -943,7 +957,23 @@ structure Lowering :> LOWERING = struct
                 in pre @ [Ir.Requires (ie, !currentFnName)] end) invs)
           val bi = lowerExprForEffect body
         in
-          ic @ [Ir.While (ec, invInstrs @ bi)]
+          if null ic
+          (* Simple condition (variable/constant/binop): emit as while(cond). *)
+          then [Ir.While (ec, invInstrs @ bi)]
+          (* Complex condition (requires instructions to compute): re-evaluate
+             each iteration by putting ic inside the loop with a break-on-false.
+             ec = Ir.Load x (the freshTmp storing the call result); negate it. *)
+          else
+            let
+              (* Store condition result in a temp so we can negate it safely
+                 regardless of what IR expression ec is (Binop, Load, etc.). *)
+              val ct = freshTmp ()
+            in
+              [Ir.While (Ir.Literal (Ir.VBool true),
+                 ic @ [Ir.Assign (ct, ec),
+                       Ir.IfElse (Ir.Unop ("!", Ir.VVar ct), [Ir.Break], [])]
+                 @ invInstrs @ bi)]
+            end
         end
     | Ast.ExprFor (Ast.PatBind (x, _), Ast.ExprRange (SOME lo, SOME hi, _), body, _) =>
         let

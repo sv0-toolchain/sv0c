@@ -2313,23 +2313,31 @@ fn drv_register_fns(it: Vec<i32>, iname: Vec<i32>,
     }
 }
 
-/* Check if tok_idx is in fn_names. */
-fn drv_is_fn_name(fn_names: Vec<i32>, tok_idx: i32) -> bool {
-    let n: i32 = vec_len(fn_names);
+/* Check if tok_idx names the same identifier as any entry in names.
+   Compares token TEXT (via tok_starts/tok_ends/source) so that two different
+   token positions with the same spelling match correctly. */
+fn drv_is_fn_name(names: Vec<i32>, tok_idx: i32,
+                  tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                  source: string) -> bool {
+    let n: i32 = vec_len(names);
+    let needle: string = drv_tok_spell(tok_starts, tok_ends, source, tok_idx);
     let mut i: i32 = 0;
     while i < n {
-        if vec_get(fn_names, i) == tok_idx { return true; }
+        let hay: string = drv_tok_spell(tok_starts, tok_ends, source, vec_get(names, i));
+        if string_eq(hay, needle) { return true; }
         i = i + 1;
     }
     return false;
 }
 
-/* Resolve all expressions in a fn body — just counts undeclared references. */
+/* Resolve all expressions in a fn body — counts undeclared identifier refs. */
 fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
                     ss: Vec<i32>, as_: Vec<i32>,
                     expr_idx: i32,
                     env_names: Vec<i32>, fn_names: Vec<i32>,
-                    err_count: Vec<i32>) -> () {
+                    err_count: Vec<i32>,
+                    tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                    source: string) -> () {
     if expr_idx == DRV_NONE() { return; }
     let tag: i32 = vec_get(et, expr_idx);
 
@@ -2340,10 +2348,9 @@ fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
 
     if tag == DRV_EXPR_PATH() {
         let tok_idx: i32 = vec_get(e1, expr_idx);
-        /* Check env_names */
-        let found: bool = drv_is_fn_name(env_names, tok_idx);
+        let found: bool = drv_is_fn_name(env_names, tok_idx, tok_starts, tok_ends, source);
         if found != true {
-            let found2: bool = drv_is_fn_name(fn_names, tok_idx);
+            let found2: bool = drv_is_fn_name(fn_names, tok_idx, tok_starts, tok_ends, source);
             if found2 != true {
                 vec_set(err_count, 0, vec_get(err_count, 0) + 1);
             }
@@ -2352,30 +2359,30 @@ fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
     }
 
     if tag == DRV_EXPR_BINOP() {
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e3, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e3, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
         return;
     }
 
     if tag == DRV_EXPR_UNOP() {
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
         return;
     }
 
     if tag == DRV_EXPR_RETURN() {
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
         return;
     }
 
     if tag == DRV_EXPR_LET() {
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
         /* Declare name into scope */
         vec_push(env_names, vec_get(e1, expr_idx));
         return;
     }
 
     if tag == DRV_EXPR_ASSIGN() {
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
         return;
     }
 
@@ -2385,7 +2392,7 @@ fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
         let mut i: i32 = 0;
         while i < arg_count {
             let arg_idx: i32 = vec_get(as_, arg_base + i);
-            drv_resolve_expr(et, e1, e2, e3, ss, as_, arg_idx, env_names, fn_names, err_count);
+            drv_resolve_expr(et, e1, e2, e3, ss, as_, arg_idx, env_names, fn_names, err_count, tok_starts, tok_ends, source);
             i = i + 1;
         }
         return;
@@ -2401,23 +2408,23 @@ fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
         let mut i: i32 = 0;
         while i < stmt_count {
             let stmt_idx: i32 = vec_get(ss, stmt_base + i);
-            drv_resolve_expr(et, e1, e2, e3, ss, as_, stmt_idx, env_names, fn_names, err_count);
+            drv_resolve_expr(et, e1, e2, e3, ss, as_, stmt_idx, env_names, fn_names, err_count, tok_starts, tok_ends, source);
             i = i + 1;
         }
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, tail, env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, tail, env_names, fn_names, err_count, tok_starts, tok_ends, source);
         return;
     }
 
     if tag == DRV_EXPR_IF() {
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count);
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e3, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e3, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
         return;
     }
 
     if tag == DRV_EXPR_WHILE() {
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count);
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count, tok_starts, tok_ends, source);
         return;
     }
 }
@@ -2426,7 +2433,8 @@ fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
 fn drv_resolve(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i32>,
                ibody: Vec<i32>, pn: Vec<i32>,
                et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
-               ss: Vec<i32>, as_: Vec<i32>) -> i32 {
+               ss: Vec<i32>, as_: Vec<i32>,
+               tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string) -> i32 {
     let fn_names: Vec<i32> = vec_new();
     drv_register_fns(it, iname, fn_names);
 
@@ -2448,7 +2456,7 @@ fn drv_resolve(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i32>
             j = j + 1;
         }
 
-        drv_resolve_expr(et, e1, e2, e3, ss, as_, body, env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, body, env_names, fn_names, err_count, tok_starts, tok_ends, source);
         i = i + 1;
     }
 
@@ -2487,7 +2495,8 @@ fn drv_resolve_src(source: string) -> i32 {
               it, iname, iarity, ipbase, iret, ibody, pn, pt,
               et, e1, e2, e3, ss, as_);
     return drv_resolve(it, iname, iarity, ipbase, ibody, pn,
-                       et, e1, e2, e3, ss, as_);
+                       et, e1, e2, e3, ss, as_,
+                       tok_starts, tok_ends, source);
 }
 
 fn test_drv_resolve_basic() -> i32 {
@@ -3274,7 +3283,8 @@ fn drv_compile_file(in_path: string, out_path: string) -> i32 {
 
     /* Phase 3: Resolve */
     let resolve_result: i32 = drv_resolve(it, iname, iarity, ipbase, ibody, pn,
-                                           et, e1, e2, e3, ss, as_);
+                                           et, e1, e2, e3, ss, as_,
+                                           tok_starts, tok_ends, source);
     /* Resolve errors are soft for the spike */
 
     /* Phase 4: Check (type inference, soft errors) */
