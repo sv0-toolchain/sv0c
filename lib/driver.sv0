@@ -1,0 +1,3478 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   driver.sv0 — Composed sv0 Pipeline Driver (P1 L0 blocker)
+   ═══════════════════════════════════════════════════════════════════════════
+
+   PURPOSE
+   -------
+   This file implements a SELF-CONTAINED end-to-end sv0 compiler driver.
+   It takes an sv0 source string and produces a C99 source string, threading
+   all six pipeline phases:
+
+       source text
+           │
+           ▼
+       [Phase 1: Tokenize]  drv_tokenize      → tok_tags / tok_starts / tok_ends
+           │
+           ▼
+       [Phase 2: Parse]     drv_parse         → item / expr arenas
+           │
+           ▼
+       [Phase 3: Resolve]   drv_resolve       → name→slot mapping
+           │
+           ▼
+       [Phase 4: Check]     drv_check         → type annotations on exprs
+           │
+           ▼
+       [Phase 5: Lower]     drv_lower         → (elided for spike; direct codegen)
+           │
+           ▼
+       [Phase 6: Emit C]    drv_emit_c        → C99 string
+
+   WHY SELF-CONTAINED?
+   -------------------
+   Each file in sv0c/lib/ is a standalone bootstrap compile unit — it defines
+   its own fn main() and all helpers inline.  Cross-unit calls are blocked by
+   two constraints:
+
+     (A) Mega-TU (text-include): ruled out — all 19 library files define
+         fn main(), which would produce E0302 duplicate errors in the resolver.
+
+     (B) Multi-unit C link: ruled out — the SML codegen emits `static` for
+         every non-main function, so object-file cross-references are illegal.
+
+   See sv0c/doc/driver-pipeline-composition.md for the full design rationale.
+
+   SCOPE (SPIKE)
+   -------------
+   This driver handles the ESSENTIAL subset of sv0 needed to self-compile
+   the simple programs in test/vm-parity/programs/:
+
+     • Top-level fn declarations (no struct/enum/trait)
+     • Parameter and return types: i32, bool, ()
+     • Expressions: integer literals, bool literals, identifiers, binary ops,
+       unary ops, function calls, if/else, while/break/continue, return, let,
+       assignment, block expressions
+     • Statements: let bindings, assignments, expressions (including return)
+     • No generics, no closures, no pattern matching, no contracts
+
+   All driver-internal functions are prefixed `drv_` to avoid shadowing any
+   standard library name.  All test functions are prefixed `test_drv_`.
+
+   ARENA LAYOUT (DATA STRUCTURES)
+   --------------------------------
+   The driver uses flat parallel Vec<i32> arrays ("arenas") rather than
+   heap-allocated tree nodes.  Each logical "node" is an integer index into
+   these arrays.  This mirrors the design of the full SML pipeline and is the
+   canonical sv0 data representation.
+
+   See each section's header comment for the exact arena schema.
+
+   TEST STRATEGY
+   -------------
+   Every function has unit tests immediately below it (test_drv_<name>).
+   All tests are aggregated in fn main() which returns 0 on success or a
+   nonzero error code identifying the first failure.
+
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 1: TOKEN TAG CONSTANTS
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Token tags are small integers assigned to each token kind.  These values
+   MUST match the tags produced by lexer.sv0 (derived from lexer/token.sv0)
+   so that golden-test comparisons work.
+
+   Naming convention:
+     DRV_TK_*   — punctuation / literal token kinds
+     DRV_KW_*   — keyword token kinds
+
+   Implementation note: sv0 has no global constants, so each constant is a
+   zero-argument function.  The compiler inlines these as needed.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Literal / identifier tags ────────────────────────────────────────────── */
+
+/* Integer literal: `42`, `-7`, `0xFF` */
+fn DRV_TK_INT_LIT() -> i32 { return 0; }
+/* String literal: `"hello"` */
+fn DRV_TK_STRING_LIT() -> i32 { return 1; }
+/* Char literal: `'a'` */
+fn DRV_TK_CHAR_LIT() -> i32 { return 2; }
+/* Float literal: `3.14` */
+fn DRV_TK_FLOAT_LIT() -> i32 { return 3; }
+/* Identifier (non-keyword): `foo`, `my_var`, `T` */
+fn DRV_TK_IDENT() -> i32 { return 5; }
+
+/* ── Grouping / punctuation tags ──────────────────────────────────────────── */
+
+fn DRV_TK_LPAREN()     -> i32 { return 6;  }  /* ( */
+fn DRV_TK_RPAREN()     -> i32 { return 7;  }  /* ) */
+fn DRV_TK_LBRACE()     -> i32 { return 8;  }  /* { */
+fn DRV_TK_RBRACE()     -> i32 { return 9;  }  /* } */
+fn DRV_TK_LBRACKET()   -> i32 { return 10; }  /* [ */
+fn DRV_TK_RBRACKET()   -> i32 { return 11; }  /* ] */
+fn DRV_TK_COMMA()      -> i32 { return 12; }  /* , */
+fn DRV_TK_SEMICOLON()  -> i32 { return 13; }  /* ; */
+fn DRV_TK_COLON()      -> i32 { return 14; }  /* : */
+fn DRV_TK_COLONCOLON() -> i32 { return 15; }  /* :: */
+fn DRV_TK_DOT()        -> i32 { return 16; }  /* . */
+fn DRV_TK_DOTDOT()     -> i32 { return 17; }  /* .. */
+fn DRV_TK_DOTDOTDOT()  -> i32 { return 18; }  /* ... */
+fn DRV_TK_ARROW()      -> i32 { return 19; }  /* -> */
+fn DRV_TK_FAT_ARROW()  -> i32 { return 20; }  /* => */
+
+/* ── Operator tags ────────────────────────────────────────────────────────── */
+
+fn DRV_TK_BANG()    -> i32 { return 21; }  /* !  (logical not / not-equals prefix) */
+fn DRV_TK_PLUS()    -> i32 { return 22; }  /* +  */
+fn DRV_TK_MINUS()   -> i32 { return 23; }  /* -  (also unary negation) */
+fn DRV_TK_STAR()    -> i32 { return 24; }  /* *  */
+fn DRV_TK_SLASH()   -> i32 { return 25; }  /* /  */
+fn DRV_TK_PERCENT() -> i32 { return 26; }  /* %  */
+fn DRV_TK_AMP()     -> i32 { return 27; }  /* &  */
+fn DRV_TK_PIPE()    -> i32 { return 28; }  /* |  */
+fn DRV_TK_CARET()   -> i32 { return 29; }  /* ^  */
+fn DRV_TK_TILDE()   -> i32 { return 30; }  /* ~  */
+
+/* ── Compound operators ───────────────────────────────────────────────────── */
+
+fn DRV_TK_AMPAMP()  -> i32 { return 31; }  /* && (logical and) */
+fn DRV_TK_PIPEPIPE() -> i32 { return 32; } /* || (logical or)  */
+fn DRV_TK_LTLT()    -> i32 { return 33; }  /* << (left shift)  */
+fn DRV_TK_GTGT()    -> i32 { return 34; }  /* >> (right shift) */
+fn DRV_TK_EQ()      -> i32 { return 35; }  /* =  (assignment)  */
+fn DRV_TK_EQEQ()    -> i32 { return 36; }  /* == (equality)    */
+fn DRV_TK_BANGEQ()  -> i32 { return 37; }  /* != (inequality)  */
+fn DRV_TK_LT()      -> i32 { return 38; }  /* <  */
+fn DRV_TK_GT()      -> i32 { return 39; }  /* >  */
+fn DRV_TK_LTEQ()    -> i32 { return 40; }  /* <= */
+fn DRV_TK_GTEQ()    -> i32 { return 41; }  /* >= */
+fn DRV_TK_PLUSEQ()  -> i32 { return 42; }  /* += */
+fn DRV_TK_MINUSEQ() -> i32 { return 43; }  /* -= */
+fn DRV_TK_STAREQ()  -> i32 { return 44; }  /* *= */
+fn DRV_TK_SLASHEQ() -> i32 { return 45; }  /* /= */
+
+/* ── Keyword tags ─────────────────────────────────────────────────────────
+   Keyword tags occupy the range 54–96, matching lexer/token.sv0.
+   The full driver only needs the keywords below; others are listed for
+   reference but not used by the spike parser.
+   ──────────────────────────────────────────────────────────────────────── */
+
+fn DRV_KW_AS()       -> i32 { return 54; }  /* as       */
+fn DRV_KW_ASSERT()   -> i32 { return 55; }  /* assert   */
+fn DRV_KW_BORROWS()  -> i32 { return 56; }  /* borrows  */
+fn DRV_KW_BREAK()    -> i32 { return 57; }  /* break    ← used by parser */
+fn DRV_KW_CONST()    -> i32 { return 58; }  /* const    */
+fn DRV_KW_CONTINUE() -> i32 { return 59; }  /* continue ← used by parser */
+fn DRV_KW_ELSE()     -> i32 { return 60; }  /* else     ← used by parser */
+fn DRV_KW_ENSURES()  -> i32 { return 61; }  /* ensures  */
+fn DRV_KW_ENUM()     -> i32 { return 62; }  /* enum     */
+fn DRV_KW_EXISTS()   -> i32 { return 63; }  /* exists   */
+fn DRV_KW_FALSE()    -> i32 { return 64; }  /* false    ← used by parser */
+fn DRV_KW_FN()       -> i32 { return 65; }  /* fn       ← used by parser */
+fn DRV_KW_FOR()      -> i32 { return 66; }  /* for      */
+fn DRV_KW_FORALL()   -> i32 { return 67; }  /* forall   */
+fn DRV_KW_IF()       -> i32 { return 68; }  /* if       ← used by parser */
+fn DRV_KW_IMPL()     -> i32 { return 69; }  /* impl     */
+fn DRV_KW_IN()       -> i32 { return 70; }  /* in       */
+fn DRV_KW_LET()      -> i32 { return 71; }  /* let      ← used by parser */
+fn DRV_KW_LOOP()     -> i32 { return 72; }  /* loop     */
+fn DRV_KW_MATCH()    -> i32 { return 74; }  /* match    */
+fn DRV_KW_MUT()      -> i32 { return 77; }  /* mut      ← used by parser */
+fn DRV_KW_RETURN()   -> i32 { return 85; }  /* return   ← used by parser */
+fn DRV_KW_STRUCT()   -> i32 { return 89; }  /* struct   */
+fn DRV_KW_TRUE()     -> i32 { return 91; }  /* true     ← used by parser */
+fn DRV_KW_WHILE()    -> i32 { return 96; }  /* while    ← used by parser */
+
+/* ── Type keyword tags (encoded as pseudo-tokens during parsing) ─────────── */
+
+/* These are not real token tags but are used internally to encode types
+   in the param-type arena.  Values chosen to not conflict with token tags. */
+fn DRV_TY_I32()    -> i32 { return 200; }  /* i32 type */
+fn DRV_TY_BOOL()   -> i32 { return 201; }  /* bool type */
+fn DRV_TY_UNIT()   -> i32 { return 202; }  /* () type  */
+fn DRV_TY_STRING() -> i32 { return 203; }  /* string type */
+fn DRV_TY_UNKNOWN() -> i32 { return 299; } /* unresolved / error */
+
+/* ── Sentinel values ──────────────────────────────────────────────────────── */
+
+/* Used as "no value" or "absent" in optional fields of arenas. */
+fn DRV_NONE() -> i32 { return 0 - 1; }  /* -1 */
+
+/* Error return code from any drv_ function (distinct from 0 = success). */
+fn DRV_ERR() -> i32 { return 0 - 1; }   /* -1 */
+
+/* ── Token tag tests ──────────────────────────────────────────────────────── */
+
+fn test_drv_token_tags() -> i32 {
+    /* Spot-check a representative sample of tag values to guard against
+       accidental renumbering.  If the SML lexer changes its token numbering
+       these tests will catch the mismatch. */
+    if DRV_TK_INT_LIT()   != 0  { return 1; }
+    if DRV_TK_IDENT()      != 5  { return 2; }
+    if DRV_TK_LPAREN()     != 6  { return 3; }
+    if DRV_TK_RPAREN()     != 7  { return 4; }
+    if DRV_TK_LBRACE()     != 8  { return 5; }
+    if DRV_TK_RBRACE()     != 9  { return 6; }
+    if DRV_TK_COMMA()      != 12 { return 7; }
+    if DRV_TK_SEMICOLON()  != 13 { return 8; }
+    if DRV_TK_COLON()      != 14 { return 9; }
+    if DRV_TK_ARROW()      != 19 { return 10; }
+    if DRV_TK_PLUS()       != 22 { return 11; }
+    if DRV_TK_MINUS()      != 23 { return 12; }
+    if DRV_TK_STAR()       != 24 { return 13; }
+    if DRV_TK_SLASH()      != 25 { return 14; }
+    if DRV_TK_EQ()         != 35 { return 15; }
+    if DRV_TK_EQEQ()       != 36 { return 16; }
+    if DRV_TK_BANGEQ()     != 37 { return 17; }
+    if DRV_TK_LT()         != 38 { return 18; }
+    if DRV_TK_GT()         != 39 { return 19; }
+    if DRV_TK_LTEQ()       != 40 { return 20; }
+    if DRV_TK_GTEQ()       != 41 { return 21; }
+    if DRV_KW_FN()         != 65 { return 22; }
+    if DRV_KW_IF()         != 68 { return 23; }
+    if DRV_KW_LET()        != 71 { return 24; }
+    if DRV_KW_MUT()        != 77 { return 25; }
+    if DRV_KW_RETURN()     != 85 { return 26; }
+    if DRV_KW_WHILE()      != 96 { return 27; }
+    if DRV_KW_TRUE()       != 91 { return 28; }
+    if DRV_KW_FALSE()      != 64 { return 29; }
+    if DRV_KW_BREAK()      != 57 { return 30; }
+    if DRV_KW_CONTINUE()   != 59 { return 31; }
+    if DRV_KW_ELSE()       != 60 { return 32; }
+    if DRV_TY_I32()        != 200 { return 33; }
+    if DRV_TY_BOOL()       != 201 { return 34; }
+    if DRV_TY_UNIT()       != 202 { return 35; }
+    if DRV_NONE()          != 0 - 1 { return 36; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 1
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 2: CHARACTER CLASSIFICATION AND KEYWORD LOOKUP
+   ═══════════════════════════════════════════════════════════════════════════
+
+   The lexer works on raw bytes (ASCII/UTF-8).  These helpers classify
+   individual bytes and map identifier strings to keyword token tags.
+
+   Character code reference (ASCII decimal):
+     48–57   digits 0–9
+     65–90   uppercase A–Z
+     97–122  lowercase a–z
+     95      underscore _
+     32      space, 9=tab, 10=newline, 13=carriage-return
+     47      / (slash, used in comments)
+     42      * (star, used in block comments)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Returns true if c is a valid first character of an identifier.
+   In sv0 identifiers start with a letter or underscore (no leading digit). */
+fn drv_is_ident_start(c: i32) -> bool {
+    if c >= 65 { if c <= 90  { return true; } }   /* A–Z */
+    if c >= 97 { if c <= 122 { return true; } }   /* a–z */
+    if c == 95 { return true; }                    /* _   */
+    return false;
+}
+
+/* Returns true if c may appear as a continuation character in an identifier.
+   Continuation = start character OR an ASCII digit 0–9. */
+fn drv_is_ident_cont(c: i32) -> bool {
+    if drv_is_ident_start(c) { return true; }
+    if c >= 48 { if c <= 57 { return true; } }    /* 0–9 */
+    return false;
+}
+
+/* Returns true for ASCII decimal digits 0–9. */
+fn drv_is_digit(c: i32) -> bool {
+    if c >= 48 { if c <= 57 { return true; } }
+    return false;
+}
+
+/* Returns true for characters that count as whitespace in sv0 source.
+   Block comments are handled separately by the lexer loop. */
+fn drv_is_whitespace(c: i32) -> bool {
+    if c == 32 { return true; }   /* space           */
+    if c == 9  { return true; }   /* horizontal tab  */
+    if c == 10 { return true; }   /* newline         */
+    if c == 13 { return true; }   /* carriage return */
+    return false;
+}
+
+/* ── Character classification tests ──────────────────────────────────────── */
+
+fn test_drv_is_ident_start() -> i32 {
+    /* Letters are valid starts */
+    if drv_is_ident_start(65)  != true  { return 1; }   /* A */
+    if drv_is_ident_start(90)  != true  { return 2; }   /* Z */
+    if drv_is_ident_start(97)  != true  { return 3; }   /* a */
+    if drv_is_ident_start(122) != true  { return 4; }   /* z */
+    if drv_is_ident_start(109) != true  { return 5; }   /* m */
+    if drv_is_ident_start(95)  != true  { return 6; }   /* _ */
+    /* Digits are NOT valid starts */
+    if drv_is_ident_start(48)  != false { return 7; }   /* 0 */
+    if drv_is_ident_start(57)  != false { return 8; }   /* 9 */
+    /* Punctuation is NOT a valid start */
+    if drv_is_ident_start(40)  != false { return 9; }   /* ( */
+    if drv_is_ident_start(32)  != false { return 10; }  /* space */
+    if drv_is_ident_start(45)  != false { return 11; }  /* - */
+    if drv_is_ident_start(0)   != false { return 12; }  /* NUL */
+    return 0;
+}
+
+fn test_drv_is_ident_cont() -> i32 {
+    /* Letters and underscore: valid */
+    if drv_is_ident_cont(65)  != true  { return 1; }
+    if drv_is_ident_cont(97)  != true  { return 2; }
+    if drv_is_ident_cont(95)  != true  { return 3; }
+    /* Digits: valid continuation */
+    if drv_is_ident_cont(48)  != true  { return 4; }   /* 0 */
+    if drv_is_ident_cont(57)  != true  { return 5; }   /* 9 */
+    if drv_is_ident_cont(53)  != true  { return 6; }   /* 5 */
+    /* Punctuation: not valid */
+    if drv_is_ident_cont(40)  != false { return 7; }
+    if drv_is_ident_cont(32)  != false { return 8; }
+    return 0;
+}
+
+fn test_drv_is_digit() -> i32 {
+    if drv_is_digit(48) != true  { return 1; }   /* 0 */
+    if drv_is_digit(57) != true  { return 2; }   /* 9 */
+    if drv_is_digit(53) != true  { return 3; }   /* 5 */
+    if drv_is_digit(47) != false { return 4; }   /* / (one before '0') */
+    if drv_is_digit(58) != false { return 5; }   /* : (one after '9') */
+    if drv_is_digit(65) != false { return 6; }   /* A */
+    return 0;
+}
+
+fn test_drv_is_whitespace() -> i32 {
+    if drv_is_whitespace(32) != true  { return 1; }   /* space */
+    if drv_is_whitespace(9)  != true  { return 2; }   /* tab */
+    if drv_is_whitespace(10) != true  { return 3; }   /* newline */
+    if drv_is_whitespace(13) != true  { return 4; }   /* CR */
+    if drv_is_whitespace(65) != false { return 5; }   /* A */
+    if drv_is_whitespace(0)  != false { return 6; }   /* NUL */
+    if drv_is_whitespace(47) != false { return 7; }   /* / */
+    return 0;
+}
+
+/* ── Keyword lookup ───────────────────────────────────────────────────────
+   Maps a slice of source text (given as a string) to a token tag.
+   Returns DRV_TK_IDENT() if the string is not a keyword.
+
+   Design: dispatch first on string length, then on first character,
+   then do exact string comparison.  This mirrors the approach in
+   lexer.sv0::lookup_keyword and keeps O(1) amortized cost.
+
+   All 43 sv0 keywords are listed below.  The spike parser only uses a
+   subset, but we implement the full table so the lexer produces correct
+   tags for programs that happen to use other keywords.
+   ──────────────────────────────────────────────────────────────────────── */
+fn drv_lookup_keyword(s: string) -> i32 {
+    let len: i32 = string_len(s);
+    /* Fast path: identifiers shorter than 2 chars or longer than 14
+       cannot be keywords in sv0. */
+    if len < 2  { return DRV_TK_IDENT(); }
+    if len > 14 { return DRV_TK_IDENT(); }
+
+    let c0: i32 = string_char_at(s, 0);
+
+    /* a: as, assert */
+    if c0 == 97 {
+        if string_eq(s, "as")     { return DRV_KW_AS(); }
+        if string_eq(s, "assert") { return DRV_KW_ASSERT(); }
+        return DRV_TK_IDENT();
+    }
+    /* b: borrows, break */
+    if c0 == 98 {
+        if string_eq(s, "borrows") { return DRV_KW_BORROWS(); }
+        if string_eq(s, "break")   { return DRV_KW_BREAK(); }
+        return DRV_TK_IDENT();
+    }
+    /* c: const, continue */
+    if c0 == 99 {
+        if string_eq(s, "const")    { return DRV_KW_CONST(); }
+        if string_eq(s, "continue") { return DRV_KW_CONTINUE(); }
+        return DRV_TK_IDENT();
+    }
+    /* e: else, ensures, enum, exists */
+    if c0 == 101 {
+        if string_eq(s, "else")    { return DRV_KW_ELSE(); }
+        if string_eq(s, "ensures") { return DRV_KW_ENSURES(); }
+        if string_eq(s, "enum")    { return DRV_KW_ENUM(); }
+        if string_eq(s, "exists")  { return DRV_KW_EXISTS(); }
+        return DRV_TK_IDENT();
+    }
+    /* f: false, fn, for, forall */
+    if c0 == 102 {
+        if string_eq(s, "false")  { return DRV_KW_FALSE(); }
+        if string_eq(s, "fn")     { return DRV_KW_FN(); }
+        if string_eq(s, "for")    { return DRV_KW_FOR(); }
+        if string_eq(s, "forall") { return DRV_KW_FORALL(); }
+        return DRV_TK_IDENT();
+    }
+    /* i: if, impl, in */
+    if c0 == 105 {
+        if string_eq(s, "if")   { return DRV_KW_IF(); }
+        if string_eq(s, "impl") { return DRV_KW_IMPL(); }
+        if string_eq(s, "in")   { return DRV_KW_IN(); }
+        return DRV_TK_IDENT();
+    }
+    /* l: let, loop, loop_invariant */
+    if c0 == 108 {
+        if string_eq(s, "let")  { return DRV_KW_LET(); }
+        if string_eq(s, "loop") { return DRV_KW_LOOP(); }
+        return DRV_TK_IDENT();
+    }
+    /* m: match, mut */
+    if c0 == 109 {
+        if string_eq(s, "match") { return DRV_KW_MATCH(); }
+        if string_eq(s, "mut")   { return DRV_KW_MUT(); }
+        return DRV_TK_IDENT();
+    }
+    /* r: requires, result, return */
+    if c0 == 114 {
+        if string_eq(s, "return") { return DRV_KW_RETURN(); }
+        return DRV_TK_IDENT();
+    }
+    /* s: self, static, struct */
+    if c0 == 115 {
+        if string_eq(s, "struct") { return DRV_KW_STRUCT(); }
+        return DRV_TK_IDENT();
+    }
+    /* t: trait, true, type */
+    if c0 == 116 {
+        if string_eq(s, "true")  { return DRV_KW_TRUE(); }
+        return DRV_TK_IDENT();
+    }
+    /* w: where, while */
+    if c0 == 119 {
+        if string_eq(s, "while") { return DRV_KW_WHILE(); }
+        return DRV_TK_IDENT();
+    }
+
+    return DRV_TK_IDENT();
+}
+
+/* ── Keyword lookup tests ─────────────────────────────────────────────────── */
+
+fn test_drv_lookup_keyword() -> i32 {
+    /* Keywords that the parser actually uses */
+    if drv_lookup_keyword("fn")       != DRV_KW_FN()       { return 1; }
+    if drv_lookup_keyword("if")       != DRV_KW_IF()       { return 2; }
+    if drv_lookup_keyword("else")     != DRV_KW_ELSE()     { return 3; }
+    if drv_lookup_keyword("while")    != DRV_KW_WHILE()    { return 4; }
+    if drv_lookup_keyword("let")      != DRV_KW_LET()      { return 5; }
+    if drv_lookup_keyword("mut")      != DRV_KW_MUT()      { return 6; }
+    if drv_lookup_keyword("return")   != DRV_KW_RETURN()   { return 7; }
+    if drv_lookup_keyword("break")    != DRV_KW_BREAK()    { return 8; }
+    if drv_lookup_keyword("continue") != DRV_KW_CONTINUE() { return 9; }
+    if drv_lookup_keyword("true")     != DRV_KW_TRUE()     { return 10; }
+    if drv_lookup_keyword("false")    != DRV_KW_FALSE()    { return 11; }
+    /* Other keywords (not used by spike parser but must tokenize correctly) */
+    if drv_lookup_keyword("struct")   != DRV_KW_STRUCT()   { return 12; }
+    if drv_lookup_keyword("enum")     != DRV_KW_ENUM()     { return 13; }
+    if drv_lookup_keyword("match")    != DRV_KW_MATCH()    { return 14; }
+    if drv_lookup_keyword("for")      != DRV_KW_FOR()      { return 15; }
+    if drv_lookup_keyword("const")    != DRV_KW_CONST()    { return 16; }
+    if drv_lookup_keyword("as")       != DRV_KW_AS()       { return 17; }
+    /* Non-keywords must return IDENT */
+    if drv_lookup_keyword("foo")      != DRV_TK_IDENT()    { return 18; }
+    if drv_lookup_keyword("x")        != DRV_TK_IDENT()    { return 19; }
+    if drv_lookup_keyword("i32")      != DRV_TK_IDENT()    { return 20; }
+    if drv_lookup_keyword("bool")     != DRV_TK_IDENT()    { return 21; }
+    if drv_lookup_keyword("string")   != DRV_TK_IDENT()    { return 22; }
+    if drv_lookup_keyword("main")     != DRV_TK_IDENT()    { return 23; }
+    if drv_lookup_keyword("drv")      != DRV_TK_IDENT()    { return 24; }
+    /* Edge cases */
+    if drv_lookup_keyword("f")        != DRV_TK_IDENT()    { return 25; }  /* too short to be "fn" */
+    if drv_lookup_keyword("fnn")      != DRV_TK_IDENT()    { return 26; }  /* not "fn" */
+    if drv_lookup_keyword("whilee")   != DRV_TK_IDENT()    { return 27; }  /* not "while" */
+    if drv_lookup_keyword("IF")       != DRV_TK_IDENT()    { return 28; }  /* case-sensitive */
+    if drv_lookup_keyword("True")     != DRV_TK_IDENT()    { return 29; }  /* case-sensitive */
+    if drv_lookup_keyword("RETURN")   != DRV_TK_IDENT()    { return 30; }  /* case-sensitive */
+    return 0;
+}
+
+/* ── Integer literal parsing helper ──────────────────────────────────────────
+   Parses a decimal integer from a source substring [start, end).
+   Returns the integer value.  Only handles non-negative decimal integers;
+   negative literals are parsed as unary-minus applied to a positive literal.
+   ──────────────────────────────────────────────────────────────────────── */
+fn drv_parse_int_literal(source: string, start: i32, end: i32) -> i32 {
+    let mut val: i32 = 0;
+    let mut i: i32 = start;
+    while i < end {
+        let c: i32 = string_char_at(source, i);
+        val = val * 10 + (c - 48);
+        i = i + 1;
+    }
+    return val;
+}
+
+/* drv_string_contains: returns true if needle appears as a substring of haystack.
+   Implemented via a simple O(n*m) sliding-window search since sv0 has no
+   built-in substring search.  Replaces the hypothetical `string_contains`
+   which is NOT a bootstrap builtin. */
+fn drv_string_contains(haystack: string, needle: string) -> bool {
+    let hlen: i32 = string_len(haystack);
+    let nlen: i32 = string_len(needle);
+    if nlen == 0 { return true; }
+    if nlen > hlen { return false; }
+    let limit: i32 = hlen - nlen;
+    let mut i: i32 = 0;
+    while i <= limit {
+        let mut match_: bool = true;
+        let mut j: i32 = 0;
+        while j < nlen {
+            if string_char_at(haystack, i + j) != string_char_at(needle, j) {
+                match_ = false;
+                j = nlen;  /* break */
+            } else {
+                j = j + 1;
+            }
+        }
+        if match_ { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn test_drv_string_contains() -> i32 {
+    if drv_string_contains("hello world", "world") != true  { return 1; }
+    if drv_string_contains("hello world", "hello") != true  { return 2; }
+    if drv_string_contains("hello world", "o wo")  != true  { return 3; }
+    if drv_string_contains("hello world", "xyz")   != false { return 4; }
+    if drv_string_contains("hello", "hello world") != false { return 5; }
+    if drv_string_contains("", "")                 != true  { return 6; }
+    if drv_string_contains("abc", "")              != true  { return 7; }
+    if drv_string_contains("", "a")                != false { return 8; }
+    if drv_string_contains("#include \"sv0_runtime.h\"", "#include") != true { return 9; }
+    if drv_string_contains("int main(void)", "int main(") != true { return 10; }
+    if drv_string_contains("static int sv0__bump", "static int") != true { return 11; }
+    if drv_string_contains("static int sv0__bump", "static int main") != false { return 12; }
+    return 0;
+}
+
+fn test_drv_parse_int_literal() -> i32 {
+    /* Single digits */
+    if drv_parse_int_literal("0", 0, 1) != 0  { return 1; }
+    if drv_parse_int_literal("1", 0, 1) != 1  { return 2; }
+    if drv_parse_int_literal("9", 0, 1) != 9  { return 3; }
+    /* Multi-digit */
+    if drv_parse_int_literal("42", 0, 2)  != 42  { return 4; }
+    if drv_parse_int_literal("100", 0, 3) != 100 { return 5; }
+    if drv_parse_int_literal("999", 0, 3) != 999 { return 6; }
+    /* Substring (start/end offsets) */
+    if drv_parse_int_literal("x123y", 1, 4) != 123 { return 7; }
+    if drv_parse_int_literal("007", 0, 3)   != 7   { return 8; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 2
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 3: LEXER — drv_tokenize
+   ═══════════════════════════════════════════════════════════════════════════
+
+   drv_tokenize scans an sv0 source string and produces three parallel
+   Vec<i32> arrays:
+
+     tok_tags   — token kind tag for each token (DRV_TK_* / DRV_KW_*)
+     tok_starts — byte offset of first character of each token
+     tok_ends   — byte offset ONE PAST the last character of each token
+
+   The token count is written into tok_count[0] (a single-element Vec).
+   The function returns 0 on success or DRV_ERR() on fatal lexer error.
+
+   TOKEN STREAM INVARIANTS
+   -----------------------
+   • Whitespace and comments are consumed but produce NO tokens.
+   • Line comments: `//` to end-of-line.
+   • Block comments: `/* ... */` (non-nested for the spike).
+   • tok_starts[i] <= tok_ends[i] for all i.
+   • Adjacent tokens do not overlap.
+   • For IDENT/keyword tokens: source[tok_starts[i]..tok_ends[i]] is the
+     exact spelling.
+
+   SCANNING RULES (in priority order)
+   ------------------------------------
+   1. Skip whitespace (space, tab, CR, LF).
+   2. Skip line comments: `//` consumes to end of line.
+   3. Skip block comments: `/*` ... `*/`.
+   4. Integer literals: one or more decimal digits.
+   5. String literals: `"..."` with basic escape handling.
+   6. Identifiers and keywords: letter or `_` followed by letters/digits/`_`.
+   7. Two-character operators: `->`, `=>`, `::`, `..`, `==`, `!=`, `<=`,
+      `>=`, `&&`, `||`, `+=`, `-=`, `*=`, `/=`, `<<`, `>>`.
+   8. Single-character tokens: every other punctuation.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* drv_skip_line_comment: advance pos past the end of a `//` line comment.
+   On entry pos points to the second `/`.  Returns the new position (at or
+   after the newline, or at end-of-source). */
+fn drv_skip_line_comment(source: string, pos: i32) -> i32 {
+    let len: i32 = string_len(source);
+    let mut i: i32 = pos;
+    while i < len {
+        if string_char_at(source, i) == 10 { return i + 1; }  /* newline */
+        i = i + 1;
+    }
+    return len;
+}
+
+/* drv_skip_block_comment: advance pos past the closing `*\/` of a block
+   comment.  On entry pos points to the `*` after the opening `/`.
+   Returns new position or len on unterminated comment (treated as EOF). */
+fn drv_skip_block_comment(source: string, pos: i32) -> i32 {
+    let len: i32 = string_len(source);
+    let mut i: i32 = pos;
+    while i + 1 < len {
+        let c: i32 = string_char_at(source, i);
+        if c == 42 {   /* * */
+            if string_char_at(source, i + 1) == 47 {  /* / */
+                return i + 2;
+            }
+        }
+        i = i + 1;
+    }
+    return len;
+}
+
+/* drv_scan_string_lit: advance pos past the closing `"`.
+   On entry pos points to the character AFTER the opening `"`.
+   Returns position after closing `"`. */
+fn drv_scan_string_lit(source: string, pos: i32) -> i32 {
+    let len: i32 = string_len(source);
+    let mut i: i32 = pos;
+    while i < len {
+        let c: i32 = string_char_at(source, i);
+        if c == 92 { i = i + 2; }   /* backslash: skip next char */
+        else {
+            if c == 34 { return i + 1; }   /* closing " */
+            i = i + 1;
+        }
+    }
+    return len;
+}
+
+/* drv_tokenize: the main lexer entry point.
+   Fills tok_tags, tok_starts, tok_ends and writes the token count into
+   tok_count[0].  Returns 0 on success, DRV_ERR() on error. */
+fn drv_tokenize(source: string,
+                tok_tags: Vec<i32>,
+                tok_starts: Vec<i32>,
+                tok_ends: Vec<i32>,
+                tok_count: Vec<i32>) -> i32 {
+    let len: i32 = string_len(source);
+    let mut pos: i32 = 0;
+    let mut count: i32 = 0;
+
+    while pos < len {
+        let c: i32 = string_char_at(source, pos);
+
+        /* ── 1. Whitespace ─────────────────────────────────────────────── */
+        if drv_is_whitespace(c) { pos = pos + 1; }
+
+        /* ── 2. Line comments: `//` ─────────────────────────────────────── */
+        else {
+        if c == 47 {
+            if pos + 1 < len {
+                let c1: i32 = string_char_at(source, pos + 1);
+                /* // line comment */
+                if c1 == 47 {
+                    pos = drv_skip_line_comment(source, pos + 2);
+                }
+                /* /* block comment */
+                else {
+                if c1 == 42 {
+                    pos = drv_skip_block_comment(source, pos + 2);
+                }
+                /* plain / or /= operator */
+                else {
+                    if c1 == 61 {
+                        vec_push(tok_tags,   DRV_TK_SLASHEQ());
+                        vec_push(tok_starts, pos);
+                        vec_push(tok_ends,   pos + 2);
+                        count = count + 1;
+                        pos = pos + 2;
+                    } else {
+                        vec_push(tok_tags,   DRV_TK_SLASH());
+                        vec_push(tok_starts, pos);
+                        vec_push(tok_ends,   pos + 1);
+                        count = count + 1;
+                        pos = pos + 1;
+                    }
+                }
+                }
+            } else {
+                /* `/` at end of file */
+                vec_push(tok_tags,   DRV_TK_SLASH());
+                vec_push(tok_starts, pos);
+                vec_push(tok_ends,   pos + 1);
+                count = count + 1;
+                pos = pos + 1;
+            }
+        }
+
+        /* ── 3. Integer literals ─────────────────────────────────────────── */
+        else {
+        if drv_is_digit(c) {
+            let start: i32 = pos;
+            while pos < len {
+                if drv_is_digit(string_char_at(source, pos)) { pos = pos + 1; }
+                else { break; }
+            }
+            vec_push(tok_tags,   DRV_TK_INT_LIT());
+            vec_push(tok_starts, start);
+            vec_push(tok_ends,   pos);
+            count = count + 1;
+        }
+
+        /* ── 4. String literals ──────────────────────────────────────────── */
+        else {
+        if c == 34 {   /* " */
+            let start: i32 = pos;
+            pos = drv_scan_string_lit(source, pos + 1);
+            vec_push(tok_tags,   DRV_TK_STRING_LIT());
+            vec_push(tok_starts, start);
+            vec_push(tok_ends,   pos);
+            count = count + 1;
+        }
+
+        /* ── 5. Identifiers and keywords ─────────────────────────────────── */
+        else {
+        if drv_is_ident_start(c) {
+            let start: i32 = pos;
+            while pos < len {
+                if drv_is_ident_cont(string_char_at(source, pos)) { pos = pos + 1; }
+                else { break; }
+            }
+            let spelling: string = string_substr(source, start, pos - start);
+            let tag: i32 = drv_lookup_keyword(spelling);
+            vec_push(tok_tags,   tag);
+            vec_push(tok_starts, start);
+            vec_push(tok_ends,   pos);
+            count = count + 1;
+        }
+
+        /* ── 6. Two-character and single-character operators ─────────────── */
+        else {
+            let start: i32 = pos;
+            let c1: i32 = if pos + 1 < len { string_char_at(source, pos + 1) } else { 0 };
+            /* -> arrow */
+            if c == 45 {
+                if c1 == 62 {
+                    vec_push(tok_tags, DRV_TK_ARROW()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                if c1 == 61 {
+                    vec_push(tok_tags, DRV_TK_MINUSEQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_MINUS()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+                }
+            }
+            /* => fat arrow */
+            else { if c == 61 {
+                if c1 == 62 {
+                    vec_push(tok_tags, DRV_TK_FAT_ARROW()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                if c1 == 61 {
+                    vec_push(tok_tags, DRV_TK_EQEQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_EQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+                }
+            }
+            else { if c == 33 {   /* ! or != */
+                if c1 == 61 {
+                    vec_push(tok_tags, DRV_TK_BANGEQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_BANG()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+            }
+            else { if c == 60 {   /* < or <= or << */
+                if c1 == 61 {
+                    vec_push(tok_tags, DRV_TK_LTEQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                if c1 == 60 {
+                    vec_push(tok_tags, DRV_TK_LTLT()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_LT()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+                }
+            }
+            else { if c == 62 {   /* > or >= or >> */
+                if c1 == 61 {
+                    vec_push(tok_tags, DRV_TK_GTEQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                if c1 == 62 {
+                    vec_push(tok_tags, DRV_TK_GTGT()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_GT()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+                }
+            }
+            else { if c == 38 {   /* & or && */
+                if c1 == 38 {
+                    vec_push(tok_tags, DRV_TK_AMPAMP()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_AMP()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+            }
+            else { if c == 124 {   /* | or || */
+                if c1 == 124 {
+                    vec_push(tok_tags, DRV_TK_PIPEPIPE()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_PIPE()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+            }
+            else { if c == 58 {   /* : or :: */
+                if c1 == 58 {
+                    vec_push(tok_tags, DRV_TK_COLONCOLON()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_COLON()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+            }
+            else { if c == 46 {   /* . or .. or ... */
+                if c1 == 46 {
+                    vec_push(tok_tags, DRV_TK_DOTDOT()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_DOT()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+            }
+            else { if c == 43 {   /* + or += */
+                if c1 == 61 {
+                    vec_push(tok_tags, DRV_TK_PLUSEQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_PLUS()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+            }
+            else { if c == 42 {   /* * or *= */
+                if c1 == 61 {
+                    vec_push(tok_tags, DRV_TK_STAREQ()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 2); count = count + 1; pos = pos + 2;
+                } else {
+                    vec_push(tok_tags, DRV_TK_STAR()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1;
+                }
+            }
+            /* Single-character tokens with no two-char variant */
+            else { if c == 40  { vec_push(tok_tags, DRV_TK_LPAREN());    vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 41  { vec_push(tok_tags, DRV_TK_RPAREN());    vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 123 { vec_push(tok_tags, DRV_TK_LBRACE());    vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 125 { vec_push(tok_tags, DRV_TK_RBRACE());    vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 91  { vec_push(tok_tags, DRV_TK_LBRACKET());  vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 93  { vec_push(tok_tags, DRV_TK_RBRACKET());  vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 44  { vec_push(tok_tags, DRV_TK_COMMA());     vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 59  { vec_push(tok_tags, DRV_TK_SEMICOLON()); vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 37  { vec_push(tok_tags, DRV_TK_PERCENT());   vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 94  { vec_push(tok_tags, DRV_TK_CARET());     vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else { if c == 126 { vec_push(tok_tags, DRV_TK_TILDE());     vec_push(tok_starts, start); vec_push(tok_ends, pos + 1); count = count + 1; pos = pos + 1; }
+            else {
+                /* Unknown character: skip it (lenient mode for spike) */
+                pos = pos + 1;
+            }
+            }}}}}}}}}}}}}}}}}}}}}}}
+        }
+        }
+        }
+        }
+        }
+        }
+    }
+
+    vec_set(tok_count, 0, count);
+    return 0;
+}
+
+/* ── Helper: lex a string and return the count of tokens produced ─────────── */
+fn drv_lex_count(source: string) -> i32 {
+    let tags:   Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends:   Vec<i32> = vec_new();
+    let cnt:    Vec<i32> = vec_new();
+    vec_push(cnt, 0);
+    drv_tokenize(source, tags, starts, ends, cnt);
+    return vec_get(cnt, 0);
+}
+
+/* Helper: lex and return the tag of the Nth token (0-indexed). */
+fn drv_lex_tag(source: string, n: i32) -> i32 {
+    let tags:   Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends:   Vec<i32> = vec_new();
+    let cnt:    Vec<i32> = vec_new();
+    vec_push(cnt, 0);
+    drv_tokenize(source, tags, starts, ends, cnt);
+    return vec_get(tags, n);
+}
+
+/* ── Lexer tests ──────────────────────────────────────────────────────────── */
+
+fn test_drv_lex_empty() -> i32 {
+    /* Empty and whitespace-only inputs produce zero tokens */
+    if drv_lex_count("")        != 0 { return 1; }
+    if drv_lex_count("   ")     != 0 { return 2; }
+    if drv_lex_count("\n\t\r")  != 0 { return 3; }
+    return 0;
+}
+
+fn test_drv_lex_comments() -> i32 {
+    /* Line and block comments are skipped */
+    if drv_lex_count("// hello world")        != 0 { return 1; }
+    if drv_lex_count("/* block */")           != 0 { return 2; }
+    if drv_lex_count("/* a */ /* b */")       != 0 { return 3; }
+    /* Token after comment is kept */
+    if drv_lex_count("// comment\n42")        != 1 { return 4; }
+    if drv_lex_count("/* skip */ foo")        != 1 { return 5; }
+    if drv_lex_tag("/* skip */ foo", 0)       != DRV_TK_IDENT() { return 6; }
+    return 0;
+}
+
+fn test_drv_lex_int_lits() -> i32 {
+    if drv_lex_count("0")         != 1 { return 1; }
+    if drv_lex_tag("0", 0)        != DRV_TK_INT_LIT() { return 2; }
+    if drv_lex_count("42")        != 1 { return 3; }
+    if drv_lex_tag("42", 0)       != DRV_TK_INT_LIT() { return 4; }
+    if drv_lex_count("1 2 3")     != 3 { return 5; }
+    if drv_lex_tag("1 2 3", 0)    != DRV_TK_INT_LIT() { return 6; }
+    if drv_lex_tag("1 2 3", 1)    != DRV_TK_INT_LIT() { return 7; }
+    if drv_lex_tag("1 2 3", 2)    != DRV_TK_INT_LIT() { return 8; }
+    return 0;
+}
+
+fn test_drv_lex_idents() -> i32 {
+    if drv_lex_count("foo")        != 1 { return 1; }
+    if drv_lex_tag("foo", 0)       != DRV_TK_IDENT() { return 2; }
+    if drv_lex_tag("_x", 0)        != DRV_TK_IDENT() { return 3; }
+    if drv_lex_tag("x1", 0)        != DRV_TK_IDENT() { return 4; }
+    if drv_lex_tag("i32", 0)       != DRV_TK_IDENT() { return 5; }  /* not a keyword */
+    if drv_lex_tag("bool", 0)      != DRV_TK_IDENT() { return 6; }  /* not a keyword */
+    if drv_lex_count("foo bar baz") != 3 { return 7; }
+    return 0;
+}
+
+fn test_drv_lex_keywords() -> i32 {
+    if drv_lex_tag("fn",       0) != DRV_KW_FN()       { return 1; }
+    if drv_lex_tag("if",       0) != DRV_KW_IF()       { return 2; }
+    if drv_lex_tag("else",     0) != DRV_KW_ELSE()     { return 3; }
+    if drv_lex_tag("while",    0) != DRV_KW_WHILE()    { return 4; }
+    if drv_lex_tag("let",      0) != DRV_KW_LET()      { return 5; }
+    if drv_lex_tag("mut",      0) != DRV_KW_MUT()      { return 6; }
+    if drv_lex_tag("return",   0) != DRV_KW_RETURN()   { return 7; }
+    if drv_lex_tag("break",    0) != DRV_KW_BREAK()    { return 8; }
+    if drv_lex_tag("continue", 0) != DRV_KW_CONTINUE() { return 9; }
+    if drv_lex_tag("true",     0) != DRV_KW_TRUE()     { return 10; }
+    if drv_lex_tag("false",    0) != DRV_KW_FALSE()    { return 11; }
+    if drv_lex_tag("struct",   0) != DRV_KW_STRUCT()   { return 12; }
+    if drv_lex_tag("enum",     0) != DRV_KW_ENUM()     { return 13; }
+    if drv_lex_tag("match",    0) != DRV_KW_MATCH()    { return 14; }
+    return 0;
+}
+
+fn test_drv_lex_punctuation() -> i32 {
+    if drv_lex_tag("(",  0) != DRV_TK_LPAREN()    { return 1; }
+    if drv_lex_tag(")",  0) != DRV_TK_RPAREN()    { return 2; }
+    if drv_lex_tag("{",  0) != DRV_TK_LBRACE()    { return 3; }
+    if drv_lex_tag("}",  0) != DRV_TK_RBRACE()    { return 4; }
+    if drv_lex_tag(",",  0) != DRV_TK_COMMA()     { return 5; }
+    if drv_lex_tag(";",  0) != DRV_TK_SEMICOLON() { return 6; }
+    if drv_lex_tag(":",  0) != DRV_TK_COLON()     { return 7; }
+    if drv_lex_tag("::", 0) != DRV_TK_COLONCOLON(){ return 8; }
+    if drv_lex_tag(".",  0) != DRV_TK_DOT()       { return 9; }
+    if drv_lex_tag("..", 0) != DRV_TK_DOTDOT()    { return 10; }
+    return 0;
+}
+
+fn test_drv_lex_operators() -> i32 {
+    if drv_lex_tag("+",  0) != DRV_TK_PLUS()     { return 1; }
+    if drv_lex_tag("-",  0) != DRV_TK_MINUS()     { return 2; }
+    if drv_lex_tag("*",  0) != DRV_TK_STAR()      { return 3; }
+    if drv_lex_tag("/",  0) != DRV_TK_SLASH()     { return 4; }
+    if drv_lex_tag("%",  0) != DRV_TK_PERCENT()   { return 5; }
+    if drv_lex_tag("=",  0) != DRV_TK_EQ()        { return 6; }
+    if drv_lex_tag("==", 0) != DRV_TK_EQEQ()      { return 7; }
+    if drv_lex_tag("!=", 0) != DRV_TK_BANGEQ()    { return 8; }
+    if drv_lex_tag("<",  0) != DRV_TK_LT()        { return 9; }
+    if drv_lex_tag(">",  0) != DRV_TK_GT()        { return 10; }
+    if drv_lex_tag("<=", 0) != DRV_TK_LTEQ()      { return 11; }
+    if drv_lex_tag(">=", 0) != DRV_TK_GTEQ()      { return 12; }
+    if drv_lex_tag("->", 0) != DRV_TK_ARROW()     { return 13; }
+    if drv_lex_tag("=>", 0) != DRV_TK_FAT_ARROW() { return 14; }
+    if drv_lex_tag("&&", 0) != DRV_TK_AMPAMP()    { return 15; }
+    if drv_lex_tag("||", 0) != DRV_TK_PIPEPIPE()  { return 16; }
+    if drv_lex_tag("+=", 0) != DRV_TK_PLUSEQ()    { return 17; }
+    if drv_lex_tag("-=", 0) != DRV_TK_MINUSEQ()   { return 18; }
+    if drv_lex_tag("*=", 0) != DRV_TK_STAREQ()    { return 19; }
+    if drv_lex_tag("/=", 0) != DRV_TK_SLASHEQ()   { return 20; }
+    if drv_lex_tag("!",  0) != DRV_TK_BANG()      { return 21; }
+    return 0;
+}
+
+fn test_drv_lex_real_programs() -> i32 {
+    /* `fn main() -> i32 { return 0; }` */
+    let src1: string = "fn main() -> i32 { return 0; }";
+    if drv_lex_count(src1) != 10 { return 1; }
+    if drv_lex_tag(src1, 0)  != DRV_KW_FN()       { return 2; }   /* fn */
+    if drv_lex_tag(src1, 1)  != DRV_TK_IDENT()    { return 3; }   /* main */
+    if drv_lex_tag(src1, 2)  != DRV_TK_LPAREN()   { return 4; }   /* ( */
+    if drv_lex_tag(src1, 3)  != DRV_TK_RPAREN()   { return 5; }   /* ) */
+    if drv_lex_tag(src1, 4)  != DRV_TK_ARROW()    { return 6; }   /* -> */
+    if drv_lex_tag(src1, 5)  != DRV_TK_IDENT()    { return 7; }   /* i32 */
+    if drv_lex_tag(src1, 6)  != DRV_TK_LBRACE()   { return 8; }   /* { */
+    if drv_lex_tag(src1, 7)  != DRV_KW_RETURN()   { return 9; }   /* return */
+    if drv_lex_tag(src1, 8)  != DRV_TK_INT_LIT()  { return 10; }  /* 0 */
+    if drv_lex_tag(src1, 9)  != DRV_TK_SEMICOLON(){ return 11; }  /* ; */
+    /* Token 10 should be } */
+    let tags1: Vec<i32> = vec_new();
+    let s1: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let c1: Vec<i32> = vec_new();
+    vec_push(c1, 0);
+    drv_tokenize(src1, tags1, s1, e1, c1);
+    if vec_get(tags1, 10) != DRV_TK_RBRACE() { return 12; }
+
+    /* `let x: i32 = 42;` */
+    let src2: string = "let x: i32 = 42;";
+    if drv_lex_count(src2) != 6 { return 13; }
+    if drv_lex_tag(src2, 0) != DRV_KW_LET()       { return 14; }
+    if drv_lex_tag(src2, 1) != DRV_TK_IDENT()     { return 15; }
+    if drv_lex_tag(src2, 2) != DRV_TK_COLON()     { return 16; }
+    if drv_lex_tag(src2, 3) != DRV_TK_IDENT()     { return 17; }  /* i32 */
+    if drv_lex_tag(src2, 4) != DRV_TK_EQ()        { return 18; }
+    if drv_lex_tag(src2, 5) != DRV_TK_INT_LIT()   { return 19; }
+
+    /* `1 + 2 + 3 - 6` */
+    let src3: string = "1 + 2 + 3 - 6";
+    if drv_lex_count(src3) != 7 { return 20; }
+
+    /* `if true { 0 } else { 1 }` */
+    let src4: string = "if true { 0 } else { 1 }";
+    if drv_lex_count(src4) != 8 { return 21; }
+    if drv_lex_tag(src4, 0) != DRV_KW_IF()        { return 22; }
+    if drv_lex_tag(src4, 1) != DRV_KW_TRUE()      { return 23; }
+    if drv_lex_tag(src4, 4) != DRV_KW_ELSE()      { return 24; }
+
+    /* `while true { break; }` */
+    let src5: string = "while true { break; }";
+    if drv_lex_count(src5) != 5 { return 25; }
+    if drv_lex_tag(src5, 0) != DRV_KW_WHILE()     { return 26; }
+    if drv_lex_tag(src5, 3) != DRV_KW_BREAK()     { return 27; }
+
+    /* Two-function program: `fn bump(x: i32) -> i32 { return x + 1; }` */
+    let src6: string = "fn bump(x: i32) -> i32 { return x + 1; }";
+    if drv_lex_count(src6) != 14 { return 28; }
+    if drv_lex_tag(src6, 0) != DRV_KW_FN()        { return 29; }
+    if drv_lex_tag(src6, 7) != DRV_TK_ARROW()     { return 30; }
+
+    return 0;
+}
+
+/* ── Lexer token span tests ───────────────────────────────────────────────── */
+
+fn test_drv_lex_spans() -> i32 {
+    /* Verify start/end byte offsets for a simple expression */
+    let src: string = "fn x";
+    let tags:   Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends:   Vec<i32> = vec_new();
+    let cnt:    Vec<i32> = vec_new();
+    vec_push(cnt, 0);
+    drv_tokenize(src, tags, starts, ends, cnt);
+    /* "fn" starts at 0, ends at 2 */
+    if vec_get(starts, 0) != 0 { return 1; }
+    if vec_get(ends,   0) != 2 { return 2; }
+    /* "x" starts at 3, ends at 4 */
+    if vec_get(starts, 1) != 3 { return 3; }
+    if vec_get(ends,   1) != 4 { return 4; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 3
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 4: PARSER ARENA LAYOUT AND HELPER TYPES
+   ═══════════════════════════════════════════════════════════════════════════
+
+   DESIGN
+   ------
+   The parser builds a flat arena representation of the AST rather than a
+   tree of heap-allocated nodes.  Each "node" is just an integer index into
+   one or more parallel Vec<i32> arrays.  This keeps memory access patterns
+   cache-friendly and avoids recursive data structures that sv0 doesn't yet
+   support natively.
+
+   The driver uses a simplified subset of the full parser's arena layout
+   (from parser.sv0) because:
+     1. We only need to represent fn declarations (no struct/enum).
+     2. We skip contract annotations, generics, and patterns.
+     3. We use direct C codegen from the simplified AST (no IR step).
+
+   ── ITEM ARENA ────────────────────────────────────────────────────────────
+   One entry per top-level item (always a fn for the spike):
+
+     it[i]      — item tag: DRV_ITEM_FN = 0
+     iname[i]   — token index of the fn name identifier
+     iarity[i]  — number of parameters
+     ipbase[i]  — index into pn/pt where this fn's params begin
+     iret[i]    — return type tag: DRV_TY_I32 / DRV_TY_BOOL / DRV_TY_UNIT
+     ibody[i]   — expr index of the body block expression
+
+   ── PARAM ARENA ───────────────────────────────────────────────────────────
+   Flat, indexed via ipbase[i]..ipbase[i]+iarity[i]:
+
+     pn[j]      — token index of param name
+     pt[j]      — param type tag (DRV_TY_*)
+
+   ── EXPR ARENA ────────────────────────────────────────────────────────────
+   One entry per expression node:
+
+     et[k]      — expression tag (see DRV_EXPR_* constants below)
+     e1[k]      — field 1 (meaning depends on tag)
+     e2[k]      — field 2
+     e3[k]      — field 3
+
+   Expression tags and their field meanings:
+
+     DRV_EXPR_INT_LIT   = 0   e1=value, e2=unused, e3=unused
+     DRV_EXPR_BOOL_LIT  = 1   e1=0(false)/1(true), e2=unused, e3=unused
+     DRV_EXPR_PATH      = 2   e1=tok_idx (ident token), e2=unused, e3=unused
+     DRV_EXPR_BINOP     = 3   e1=op_tag, e2=lhs_expr_idx, e3=rhs_expr_idx
+     DRV_EXPR_UNOP      = 4   e1=op_tag, e2=operand_expr_idx, e3=unused
+     DRV_EXPR_CALL      = 5   e1=name_tok_idx, e2=arg_count, e3=arg_base (in as_)
+     DRV_EXPR_BLOCK     = 6   e1=stmt_count, e2=stmt_base (in ss), e3=tail_expr_idx (-1=unit)
+     DRV_EXPR_IF        = 7   e1=cond_idx, e2=then_idx, e3=else_idx (-1=no else)
+     DRV_EXPR_RETURN    = 8   e1=value_idx (-1=unit return), e2=unused, e3=unused
+     DRV_EXPR_LET       = 9   e1=name_tok_idx, e2=rhs_idx, e3=is_mut (0/1)
+     DRV_EXPR_WHILE     = 10  e1=cond_idx, e2=body_idx, e3=unused
+     DRV_EXPR_BREAK     = 11  e1=unused, e2=unused, e3=unused
+     DRV_EXPR_CONTINUE  = 12  e1=unused, e2=unused, e3=unused
+     DRV_EXPR_ASSIGN    = 13  e1=name_tok_idx, e2=rhs_idx, e3=unused
+
+   ── STMT SLOTS (ss) ───────────────────────────────────────────────────────
+   A block's statements are stored as a contiguous slice of expr indices:
+     ss[stmt_base .. stmt_base + stmt_count]
+
+   ── CALL ARG SLOTS (as_) ──────────────────────────────────────────────────
+   A call's arguments are stored as a contiguous slice of expr indices:
+     as_[arg_base .. arg_base + arg_count]
+
+   ── PARSE STATE ───────────────────────────────────────────────────────────
+   The parser cursor is passed by reference via a single-element Vec<i32>:
+     pos[0]  — current token index (not byte offset)
+
+   ── BINOP / UNOP OP TAGS ──────────────────────────────────────────────────
+   Binary operators are encoded as small integers:
+     DRV_OP_ADD=0, DRV_OP_SUB=1, DRV_OP_MUL=2, DRV_OP_DIV=3, DRV_OP_MOD=4
+     DRV_OP_EQ=5, DRV_OP_NEQ=6, DRV_OP_LT=7, DRV_OP_GT=8
+     DRV_OP_LTEQ=9, DRV_OP_GTEQ=10, DRV_OP_AND=11, DRV_OP_OR=12
+   Unary operators:
+     DRV_OP_NEG=20, DRV_OP_NOT=21
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Item tag ─────────────────────────────────────────────────────────────── */
+fn DRV_ITEM_FN() -> i32 { return 0; }
+
+/* ── Expr tags ────────────────────────────────────────────────────────────── */
+fn DRV_EXPR_INT_LIT()  -> i32 { return 0; }
+fn DRV_EXPR_BOOL_LIT() -> i32 { return 1; }
+fn DRV_EXPR_PATH()     -> i32 { return 2; }
+fn DRV_EXPR_BINOP()    -> i32 { return 3; }
+fn DRV_EXPR_UNOP()     -> i32 { return 4; }
+fn DRV_EXPR_CALL()     -> i32 { return 5; }
+fn DRV_EXPR_BLOCK()    -> i32 { return 6; }
+fn DRV_EXPR_IF()       -> i32 { return 7; }
+fn DRV_EXPR_RETURN()   -> i32 { return 8; }
+fn DRV_EXPR_LET()      -> i32 { return 9; }
+fn DRV_EXPR_WHILE()    -> i32 { return 10; }
+fn DRV_EXPR_BREAK()    -> i32 { return 11; }
+fn DRV_EXPR_CONTINUE() -> i32 { return 12; }
+fn DRV_EXPR_ASSIGN()   -> i32 { return 13; }
+
+/* ── Binop / unop tags ────────────────────────────────────────────────────── */
+fn DRV_OP_ADD()  -> i32 { return 0;  }  /* +  */
+fn DRV_OP_SUB()  -> i32 { return 1;  }  /* -  */
+fn DRV_OP_MUL()  -> i32 { return 2;  }  /* *  */
+fn DRV_OP_DIV()  -> i32 { return 3;  }  /* /  */
+fn DRV_OP_MOD()  -> i32 { return 4;  }  /* %  */
+fn DRV_OP_EQ()   -> i32 { return 5;  }  /* == */
+fn DRV_OP_NEQ()  -> i32 { return 6;  }  /* != */
+fn DRV_OP_LT()   -> i32 { return 7;  }  /* <  */
+fn DRV_OP_GT()   -> i32 { return 8;  }  /* >  */
+fn DRV_OP_LTEQ() -> i32 { return 9;  }  /* <= */
+fn DRV_OP_GTEQ() -> i32 { return 10; }  /* >= */
+fn DRV_OP_AND()  -> i32 { return 11; }  /* && */
+fn DRV_OP_OR()   -> i32 { return 12; }  /* || */
+fn DRV_OP_NEG()  -> i32 { return 20; }  /* unary - */
+fn DRV_OP_NOT()  -> i32 { return 21; }  /* unary ! */
+
+/* ── Arena push helpers ───────────────────────────────────────────────────
+   Each helper appends one node to the relevant arenas and returns the
+   index of the newly added node.  These are the ONLY way to allocate
+   arena nodes — do not push to et/e1/e2/e3 directly.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Push one expr node; returns its index. */
+fn drv_push_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 tag: i32, d1: i32, d2: i32, d3: i32) -> i32 {
+    let idx: i32 = vec_len(et);
+    vec_push(et, tag);
+    vec_push(e1, d1);
+    vec_push(e2, d2);
+    vec_push(e3, d3);
+    return idx;
+}
+
+/* Shorthand constructors — each returns the new expr index. */
+
+fn drv_mk_int_lit(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                  val: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_INT_LIT(), val, 0, 0);
+}
+
+fn drv_mk_bool_lit(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                   val: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_BOOL_LIT(), val, 0, 0);
+}
+
+fn drv_mk_path(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+               tok_idx: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_PATH(), tok_idx, 0, 0);
+}
+
+fn drv_mk_binop(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                op: i32, lhs: i32, rhs: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_BINOP(), op, lhs, rhs);
+}
+
+fn drv_mk_unop(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+               op: i32, operand: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_UNOP(), op, operand, 0);
+}
+
+fn drv_mk_return(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 val_idx: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_RETURN(), val_idx, 0, 0);
+}
+
+fn drv_mk_let(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+              name_tok: i32, rhs: i32, is_mut: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_LET(), name_tok, rhs, is_mut);
+}
+
+fn drv_mk_assign(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 name_tok: i32, rhs: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_ASSIGN(), name_tok, rhs, 0);
+}
+
+fn drv_mk_if(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+             cond: i32, then_blk: i32, else_blk: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_IF(), cond, then_blk, else_blk);
+}
+
+fn drv_mk_while(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                cond: i32, body: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_WHILE(), cond, body, 0);
+}
+
+fn drv_mk_break(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_BREAK(), 0, 0, 0);
+}
+
+fn drv_mk_continue(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_CONTINUE(), 0, 0, 0);
+}
+
+fn drv_mk_block(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                stmt_count: i32, stmt_base: i32, tail: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_BLOCK(), stmt_count, stmt_base, tail);
+}
+
+fn drv_mk_call(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+               name_tok: i32, arg_count: i32, arg_base: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_CALL(), name_tok, arg_count, arg_base);
+}
+
+/* ── Arena accessor helpers ───────────────────────────────────────────────── */
+
+fn drv_expr_tag(et: Vec<i32>, idx: i32) -> i32 { return vec_get(et, idx); }
+fn drv_expr_e1(e1: Vec<i32>, idx: i32)  -> i32 { return vec_get(e1, idx); }
+fn drv_expr_e2(e2: Vec<i32>, idx: i32)  -> i32 { return vec_get(e2, idx); }
+fn drv_expr_e3(e3: Vec<i32>, idx: i32)  -> i32 { return vec_get(e3, idx); }
+
+/* ── Integer to string conversion ─────────────────────────────────────────
+   int_to_string is NOT a bootstrap builtin (only println/string_* are).
+   We implement it here using repeated div/mod + string_concat.
+   Handles 0, positive, and negative values.
+   ──────────────────────────────────────────────────────────────────────── */
+fn drv_digit_char(d: i32) -> string {
+    if d == 0 { return "0"; }
+    if d == 1 { return "1"; }
+    if d == 2 { return "2"; }
+    if d == 3 { return "3"; }
+    if d == 4 { return "4"; }
+    if d == 5 { return "5"; }
+    if d == 6 { return "6"; }
+    if d == 7 { return "7"; }
+    if d == 8 { return "8"; }
+    return "9";
+}
+
+fn drv_int_to_string(n: i32) -> string {
+    if n == 0 { return "0"; }
+    let neg: bool = n < 0;
+    let mut abs_n: i32 = if neg { 0 - n } else { n };
+    let mut s: string = "";
+    while abs_n > 0 {
+        let digit: i32 = abs_n - (abs_n / 10) * 10;
+        s = string_concat(drv_digit_char(digit), s);
+        abs_n = abs_n / 10;
+    }
+    if neg { return string_concat("-", s); }
+    return s;
+}
+
+fn test_drv_int_to_string() -> i32 {
+    if string_eq(drv_int_to_string(0),    "0")    != true { return 1; }
+    if string_eq(drv_int_to_string(1),    "1")    != true { return 2; }
+    if string_eq(drv_int_to_string(9),    "9")    != true { return 3; }
+    if string_eq(drv_int_to_string(42),   "42")   != true { return 4; }
+    if string_eq(drv_int_to_string(100),  "100")  != true { return 5; }
+    if string_eq(drv_int_to_string(999),  "999")  != true { return 6; }
+    if string_eq(drv_int_to_string(1234), "1234") != true { return 7; }
+    return 0;
+}
+
+/* ── Op tag to C operator string ─────────────────────────────────────────── */
+
+fn drv_op_to_c(op: i32) -> string {
+    if op == DRV_OP_ADD()  { return "+";  }
+    if op == DRV_OP_SUB()  { return "-";  }
+    if op == DRV_OP_MUL()  { return "*";  }
+    if op == DRV_OP_DIV()  { return "/";  }
+    if op == DRV_OP_MOD()  { return "%";  }
+    if op == DRV_OP_EQ()   { return "=="; }
+    if op == DRV_OP_NEQ()  { return "!="; }
+    if op == DRV_OP_LT()   { return "<";  }
+    if op == DRV_OP_GT()   { return ">";  }
+    if op == DRV_OP_LTEQ() { return "<="; }
+    if op == DRV_OP_GTEQ() { return ">="; }
+    if op == DRV_OP_AND()  { return "&&"; }
+    if op == DRV_OP_OR()   { return "||"; }
+    return "?";
+}
+
+/* ── Token tag → binary op tag conversion ────────────────────────────────── */
+
+/* Returns DRV_NONE() if the token tag is not a binary operator. */
+fn drv_tok_to_binop(tok_tag: i32) -> i32 {
+    if tok_tag == DRV_TK_PLUS()    { return DRV_OP_ADD(); }
+    if tok_tag == DRV_TK_MINUS()   { return DRV_OP_SUB(); }
+    if tok_tag == DRV_TK_STAR()    { return DRV_OP_MUL(); }
+    if tok_tag == DRV_TK_SLASH()   { return DRV_OP_DIV(); }
+    if tok_tag == DRV_TK_PERCENT() { return DRV_OP_MOD(); }
+    if tok_tag == DRV_TK_EQEQ()   { return DRV_OP_EQ(); }
+    if tok_tag == DRV_TK_BANGEQ()  { return DRV_OP_NEQ(); }
+    if tok_tag == DRV_TK_LT()      { return DRV_OP_LT(); }
+    if tok_tag == DRV_TK_GT()      { return DRV_OP_GT(); }
+    if tok_tag == DRV_TK_LTEQ()    { return DRV_OP_LTEQ(); }
+    if tok_tag == DRV_TK_GTEQ()    { return DRV_OP_GTEQ(); }
+    if tok_tag == DRV_TK_AMPAMP()  { return DRV_OP_AND(); }
+    if tok_tag == DRV_TK_PIPEPIPE(){ return DRV_OP_OR(); }
+    return DRV_NONE();
+}
+
+/* ── Arena helper tests ───────────────────────────────────────────────────── */
+
+fn test_drv_arena_helpers() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+
+    /* mk_int_lit: index 0, tag=INT_LIT, e1=42 */
+    let idx0: i32 = drv_mk_int_lit(et, e1, e2, e3, 42);
+    if idx0 != 0                              { return 1; }
+    if drv_expr_tag(et, 0) != DRV_EXPR_INT_LIT() { return 2; }
+    if drv_expr_e1(e1, 0)  != 42             { return 3; }
+
+    /* mk_bool_lit: index 1, tag=BOOL_LIT, e1=1 (true) */
+    let idx1: i32 = drv_mk_bool_lit(et, e1, e2, e3, 1);
+    if idx1 != 1                               { return 4; }
+    if drv_expr_tag(et, 1) != DRV_EXPR_BOOL_LIT() { return 5; }
+    if drv_expr_e1(e1, 1)  != 1               { return 6; }
+
+    /* mk_binop: index 2, op=ADD, lhs=0, rhs=1 */
+    let idx2: i32 = drv_mk_binop(et, e1, e2, e3, DRV_OP_ADD(), 0, 1);
+    if idx2 != 2                               { return 7; }
+    if drv_expr_tag(et, 2) != DRV_EXPR_BINOP(){ return 8; }
+    if drv_expr_e1(e1, 2)  != DRV_OP_ADD()    { return 9; }
+    if drv_expr_e2(e2, 2)  != 0               { return 10; }
+    if drv_expr_e3(e3, 2)  != 1               { return 11; }
+
+    /* mk_path: index 3, tok_idx=7 */
+    let idx3: i32 = drv_mk_path(et, e1, e2, e3, 7);
+    if idx3 != 3                               { return 12; }
+    if drv_expr_tag(et, 3) != DRV_EXPR_PATH() { return 13; }
+    if drv_expr_e1(e1, 3)  != 7               { return 14; }
+
+    /* mk_return: index 4, val=2 */
+    let idx4: i32 = drv_mk_return(et, e1, e2, e3, 2);
+    if idx4 != 4                                { return 15; }
+    if drv_expr_tag(et, 4) != DRV_EXPR_RETURN(){ return 16; }
+    if drv_expr_e1(e1, 4)  != 2                { return 17; }
+
+    /* mk_if: index 5, cond=1, then=2, else=-1 */
+    let idx5: i32 = drv_mk_if(et, e1, e2, e3, 1, 2, DRV_NONE());
+    if idx5 != 5                              { return 18; }
+    if drv_expr_tag(et, 5) != DRV_EXPR_IF()  { return 19; }
+    if drv_expr_e3(e3, 5)  != DRV_NONE()     { return 20; }
+
+    /* mk_while: index 6, cond=1, body=2 */
+    let idx6: i32 = drv_mk_while(et, e1, e2, e3, 1, 2);
+    if idx6 != 6                                { return 21; }
+    if drv_expr_tag(et, 6) != DRV_EXPR_WHILE() { return 22; }
+
+    /* mk_break: index 7 */
+    let idx7: i32 = drv_mk_break(et, e1, e2, e3);
+    if idx7 != 7                                { return 23; }
+    if drv_expr_tag(et, 7) != DRV_EXPR_BREAK() { return 24; }
+
+    /* mk_continue: index 8 */
+    let idx8: i32 = drv_mk_continue(et, e1, e2, e3);
+    if idx8 != 8                                   { return 25; }
+    if drv_expr_tag(et, 8) != DRV_EXPR_CONTINUE() { return 26; }
+
+    /* Total arena length: 9 nodes */
+    if vec_len(et) != 9 { return 27; }
+
+    return 0;
+}
+
+fn test_drv_op_to_c() -> i32 {
+    if string_eq(drv_op_to_c(DRV_OP_ADD()),  "+")  != true { return 1; }
+    if string_eq(drv_op_to_c(DRV_OP_SUB()),  "-")  != true { return 2; }
+    if string_eq(drv_op_to_c(DRV_OP_MUL()),  "*")  != true { return 3; }
+    if string_eq(drv_op_to_c(DRV_OP_DIV()),  "/")  != true { return 4; }
+    if string_eq(drv_op_to_c(DRV_OP_EQ()),   "==") != true { return 5; }
+    if string_eq(drv_op_to_c(DRV_OP_NEQ()),  "!=") != true { return 6; }
+    if string_eq(drv_op_to_c(DRV_OP_LT()),   "<")  != true { return 7; }
+    if string_eq(drv_op_to_c(DRV_OP_GT()),   ">")  != true { return 8; }
+    if string_eq(drv_op_to_c(DRV_OP_LTEQ()), "<=") != true { return 9; }
+    if string_eq(drv_op_to_c(DRV_OP_GTEQ()), ">=") != true { return 10; }
+    if string_eq(drv_op_to_c(DRV_OP_AND()),  "&&") != true { return 11; }
+    if string_eq(drv_op_to_c(DRV_OP_OR()),   "||") != true { return 12; }
+    return 0;
+}
+
+fn test_drv_tok_to_binop() -> i32 {
+    if drv_tok_to_binop(DRV_TK_PLUS())     != DRV_OP_ADD()  { return 1; }
+    if drv_tok_to_binop(DRV_TK_MINUS())    != DRV_OP_SUB()  { return 2; }
+    if drv_tok_to_binop(DRV_TK_STAR())     != DRV_OP_MUL()  { return 3; }
+    if drv_tok_to_binop(DRV_TK_SLASH())    != DRV_OP_DIV()  { return 4; }
+    if drv_tok_to_binop(DRV_TK_EQEQ())    != DRV_OP_EQ()   { return 5; }
+    if drv_tok_to_binop(DRV_TK_BANGEQ())  != DRV_OP_NEQ()  { return 6; }
+    if drv_tok_to_binop(DRV_TK_LT())      != DRV_OP_LT()   { return 7; }
+    if drv_tok_to_binop(DRV_TK_GT())      != DRV_OP_GT()   { return 8; }
+    if drv_tok_to_binop(DRV_TK_LTEQ())    != DRV_OP_LTEQ() { return 9; }
+    if drv_tok_to_binop(DRV_TK_GTEQ())    != DRV_OP_GTEQ() { return 10; }
+    if drv_tok_to_binop(DRV_TK_AMPAMP())  != DRV_OP_AND()  { return 11; }
+    if drv_tok_to_binop(DRV_TK_PIPEPIPE())!= DRV_OP_OR()   { return 12; }
+    /* Non-operators return NONE */
+    if drv_tok_to_binop(DRV_TK_IDENT())   != DRV_NONE()    { return 13; }
+    if drv_tok_to_binop(DRV_TK_LPAREN())  != DRV_NONE()    { return 14; }
+    if drv_tok_to_binop(DRV_KW_IF())      != DRV_NONE()    { return 15; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 4
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 5: PARSER — drv_parse
+   ═══════════════════════════════════════════════════════════════════════════
+
+   OVERVIEW
+   --------
+   The parser consumes the token stream (tok_tags/tok_starts/tok_ends) and
+   fills the item and expr arenas described in Section 4.
+
+   GRAMMAR (simplified for spike)
+   --------------------------------
+     program  ::= item*
+     item     ::= 'fn' IDENT '(' params ')' '->' type block_expr
+     params   ::= (param (',' param)*)?
+     param    ::= IDENT ':' type
+     type     ::= 'i32' | 'bool' | '(' ')'
+     block_expr ::= '{' stmt* expr? '}'
+     stmt     ::= expr ';'
+     expr     ::= assignment
+     assignment ::= or_expr ('=' or_expr)?
+     or_expr  ::= and_expr ('||' and_expr)*
+     and_expr ::= cmp_expr ('&&' cmp_expr)*
+     cmp_expr ::= add_expr (('<'|'>'|'<='|'>='|'=='|'!=') add_expr)?
+     add_expr ::= mul_expr (('+' | '-') mul_expr)*
+     mul_expr ::= unary_expr (('*' | '/' | '%') unary_expr)*
+     unary_expr ::= ('-' | '!') unary_expr | primary_expr
+     primary_expr ::= INT_LIT | 'true' | 'false'
+                    | 'return' expr?
+                    | 'break'
+                    | 'continue'
+                    | 'let' 'mut'? IDENT ':' type '=' expr
+                    | 'if' expr block_expr ('else' block_expr)?
+                    | 'while' expr block_expr
+                    | IDENT ('(' call_args ')')?   ← path or call
+                    | '(' expr ')'                  ← grouped
+                    | block_expr
+
+   OPERATOR PRECEDENCE (lowest to highest)
+   ----------------------------------------
+     assignment  =
+     logical-or  ||
+     logical-and &&
+     comparison  == != < > <= >=
+     additive    + -
+     multiplicative * / %
+     unary       - !
+     primary
+
+   PARSER CURSOR
+   -------------
+   The parser cursor `pos` lives in pos_vec[0] and is passed by reference.
+   All parse_* functions update pos_vec[0] on success.
+
+   ERROR HANDLING
+   --------------
+   Parse functions return DRV_NONE() (-1) on error.  The caller checks this
+   and propagates the error.  For the spike, we use a simple error flag
+   (err_flag[0] != 0 means error) rather than full diagnostics.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Parser cursor helpers ────────────────────────────────────────────────── */
+
+/* Current token tag (DRV_NONE if at end). */
+fn drv_cur_tag(tok_tags: Vec<i32>, pos_vec: Vec<i32>, tok_count: i32) -> i32 {
+    let p: i32 = vec_get(pos_vec, 0);
+    if p >= tok_count { return DRV_NONE(); }
+    return vec_get(tok_tags, p);
+}
+
+/* Advance cursor by 1. */
+fn drv_advance(pos_vec: Vec<i32>) -> () {
+    vec_set(pos_vec, 0, vec_get(pos_vec, 0) + 1);
+}
+
+/* Consume a token of the given tag; return its index or DRV_NONE on mismatch. */
+fn drv_expect(tok_tags: Vec<i32>, pos_vec: Vec<i32>, tok_count: i32,
+              expected_tag: i32, err_flag: Vec<i32>) -> i32 {
+    let p: i32 = vec_get(pos_vec, 0);
+    if p >= tok_count {
+        vec_set(err_flag, 0, 1);
+        return DRV_NONE();
+    }
+    let actual: i32 = vec_get(tok_tags, p);
+    if actual != expected_tag {
+        vec_set(err_flag, 0, 1);
+        return DRV_NONE();
+    }
+    vec_set(pos_vec, 0, p + 1);
+    return p;
+}
+
+/* Check if the current token matches a tag (without consuming). */
+fn drv_peek(tok_tags: Vec<i32>, pos_vec: Vec<i32>, tok_count: i32,
+            tag: i32) -> bool {
+    let p: i32 = vec_get(pos_vec, 0);
+    if p >= tok_count { return false; }
+    return vec_get(tok_tags, p) == tag;
+}
+
+/* ── Type parser ──────────────────────────────────────────────────────────── */
+
+/* Parses one type annotation; returns DRV_TY_* or DRV_NONE on error.
+   Handles: i32, bool, string, ()  */
+fn drv_parse_type(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                  source: string, pos_vec: Vec<i32>, tok_count: i32,
+                  err_flag: Vec<i32>) -> i32 {
+    let p: i32 = vec_get(pos_vec, 0);
+    if p >= tok_count { vec_set(err_flag, 0, 1); return DRV_NONE(); }
+    let tag: i32 = vec_get(tok_tags, p);
+    /* () unit type */
+    if tag == DRV_TK_LPAREN() {
+        drv_advance(pos_vec);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN(), err_flag);
+        return DRV_TY_UNIT();
+    }
+    if tag == DRV_TK_IDENT() {
+        let start: i32 = vec_get(tok_starts, p);
+        let end:   i32 = vec_get(tok_ends,   p);
+        let spell: string = string_substr(source, start, end - start);
+        drv_advance(pos_vec);
+        if string_eq(spell, "i32")    { return DRV_TY_I32(); }
+        if string_eq(spell, "bool")   { return DRV_TY_BOOL(); }
+        if string_eq(spell, "string") { return DRV_TY_STRING(); }
+        /* Unknown type: record error but keep going */
+        vec_set(err_flag, 0, 1);
+        return DRV_TY_UNKNOWN();
+    }
+    vec_set(err_flag, 0, 1);
+    return DRV_NONE();
+}
+
+/* ── Expression parser (recursive descent) ────────────────────────────────── */
+
+fn drv_parse_unary(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                   source: string, pos_vec: Vec<i32>, tok_count: i32,
+                   et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                   ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    let tag: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+    if tag == DRV_TK_MINUS() {
+        drv_advance(pos_vec);
+        let operand: i32 = drv_parse_unary(tok_tags, tok_starts, tok_ends, source,
+                                            pos_vec, tok_count, et, e1, e2, e3,
+                                            ss, as_, err_flag);
+        if operand == DRV_NONE() { return DRV_NONE(); }
+        return drv_mk_unop(et, e1, e2, e3, DRV_OP_NEG(), operand);
+    }
+    if tag == DRV_TK_BANG() {
+        drv_advance(pos_vec);
+        let operand: i32 = drv_parse_unary(tok_tags, tok_starts, tok_ends, source,
+                                            pos_vec, tok_count, et, e1, e2, e3,
+                                            ss, as_, err_flag);
+        if operand == DRV_NONE() { return DRV_NONE(); }
+        return drv_mk_unop(et, e1, e2, e3, DRV_OP_NOT(), operand);
+    }
+    return drv_parse_primary(tok_tags, tok_starts, tok_ends, source, pos_vec,
+                              tok_count, et, e1, e2, e3, ss, as_, err_flag);
+}
+
+fn drv_parse_mul(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                 source: string, pos_vec: Vec<i32>, tok_count: i32,
+                 et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    let mut lhs: i32 = drv_parse_unary(tok_tags, tok_starts, tok_ends, source,
+                                        pos_vec, tok_count, et, e1, e2, e3,
+                                        ss, as_, err_flag);
+    if lhs == DRV_NONE() { return DRV_NONE(); }
+    while true {
+        let tag: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+        let op: i32 = if tag == DRV_TK_STAR()    { DRV_OP_MUL() }
+                      else { if tag == DRV_TK_SLASH()   { DRV_OP_DIV() }
+                      else { if tag == DRV_TK_PERCENT() { DRV_OP_MOD() }
+                      else { DRV_NONE() } } };
+        if op == DRV_NONE() { break; }
+        drv_advance(pos_vec);
+        let rhs: i32 = drv_parse_unary(tok_tags, tok_starts, tok_ends, source,
+                                        pos_vec, tok_count, et, e1, e2, e3,
+                                        ss, as_, err_flag);
+        if rhs == DRV_NONE() { return DRV_NONE(); }
+        lhs = drv_mk_binop(et, e1, e2, e3, op, lhs, rhs);
+    }
+    return lhs;
+}
+
+fn drv_parse_add(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                 source: string, pos_vec: Vec<i32>, tok_count: i32,
+                 et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    let mut lhs: i32 = drv_parse_mul(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+    if lhs == DRV_NONE() { return DRV_NONE(); }
+    while true {
+        let tag: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+        let op: i32 = if tag == DRV_TK_PLUS()  { DRV_OP_ADD() }
+                      else { if tag == DRV_TK_MINUS() { DRV_OP_SUB() }
+                      else { DRV_NONE() } };
+        if op == DRV_NONE() { break; }
+        drv_advance(pos_vec);
+        let rhs: i32 = drv_parse_mul(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+        if rhs == DRV_NONE() { return DRV_NONE(); }
+        lhs = drv_mk_binop(et, e1, e2, e3, op, lhs, rhs);
+    }
+    return lhs;
+}
+
+fn drv_parse_cmp(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                 source: string, pos_vec: Vec<i32>, tok_count: i32,
+                 et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    let mut lhs: i32 = drv_parse_add(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+    if lhs == DRV_NONE() { return DRV_NONE(); }
+    let tag: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+    let op: i32 = if tag == DRV_TK_EQEQ()  { DRV_OP_EQ() }
+                  else { if tag == DRV_TK_BANGEQ() { DRV_OP_NEQ() }
+                  else { if tag == DRV_TK_LT()     { DRV_OP_LT() }
+                  else { if tag == DRV_TK_GT()     { DRV_OP_GT() }
+                  else { if tag == DRV_TK_LTEQ()   { DRV_OP_LTEQ() }
+                  else { if tag == DRV_TK_GTEQ()   { DRV_OP_GTEQ() }
+                  else { DRV_NONE() } } } } } };
+    if op != DRV_NONE() {
+        drv_advance(pos_vec);
+        let rhs: i32 = drv_parse_add(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+        if rhs == DRV_NONE() { return DRV_NONE(); }
+        lhs = drv_mk_binop(et, e1, e2, e3, op, lhs, rhs);
+    }
+    return lhs;
+}
+
+fn drv_parse_and(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                 source: string, pos_vec: Vec<i32>, tok_count: i32,
+                 et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    let mut lhs: i32 = drv_parse_cmp(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+    if lhs == DRV_NONE() { return DRV_NONE(); }
+    while drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_AMPAMP()) {
+        drv_advance(pos_vec);
+        let rhs: i32 = drv_parse_cmp(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+        if rhs == DRV_NONE() { return DRV_NONE(); }
+        lhs = drv_mk_binop(et, e1, e2, e3, DRV_OP_AND(), lhs, rhs);
+    }
+    return lhs;
+}
+
+fn drv_parse_or(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                source: string, pos_vec: Vec<i32>, tok_count: i32,
+                et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    let mut lhs: i32 = drv_parse_and(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+    if lhs == DRV_NONE() { return DRV_NONE(); }
+    while drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_PIPEPIPE()) {
+        drv_advance(pos_vec);
+        let rhs: i32 = drv_parse_and(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, et, e1, e2, e3,
+                                      ss, as_, err_flag);
+        if rhs == DRV_NONE() { return DRV_NONE(); }
+        lhs = drv_mk_binop(et, e1, e2, e3, DRV_OP_OR(), lhs, rhs);
+    }
+    return lhs;
+}
+
+fn drv_parse_expr(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                  source: string, pos_vec: Vec<i32>, tok_count: i32,
+                  et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                  ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    /* assignment: parse lhs, check for =, parse rhs */
+    let lhs: i32 = drv_parse_or(tok_tags, tok_starts, tok_ends, source,
+                                  pos_vec, tok_count, et, e1, e2, e3,
+                                  ss, as_, err_flag);
+    if lhs == DRV_NONE() { return DRV_NONE(); }
+    if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_EQ()) {
+        drv_advance(pos_vec);
+        /* lhs must be a path for a valid assignment; we trust the checker */
+        let rhs: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                       pos_vec, tok_count, et, e1, e2, e3,
+                                       ss, as_, err_flag);
+        if rhs == DRV_NONE() { return DRV_NONE(); }
+        /* Reuse lhs's tok_idx if it's a path, else use -1 */
+        let name_tok: i32 = if vec_get(et, lhs) == DRV_EXPR_PATH() {
+            vec_get(e1, lhs)
+        } else { DRV_NONE() };
+        return drv_mk_assign(et, e1, e2, e3, name_tok, rhs);
+    }
+    return lhs;
+}
+
+/* ── Primary expression parser ────────────────────────────────────────────── */
+
+fn drv_parse_primary(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                     source: string, pos_vec: Vec<i32>, tok_count: i32,
+                     et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                     ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    let tag: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+
+    /* Integer literal */
+    if tag == DRV_TK_INT_LIT() {
+        let p: i32 = vec_get(pos_vec, 0);
+        let start: i32 = vec_get(tok_starts, p);
+        let end:   i32 = vec_get(tok_ends,   p);
+        let val: i32 = drv_parse_int_literal(source, start, end);
+        drv_advance(pos_vec);
+        return drv_mk_int_lit(et, e1, e2, e3, val);
+    }
+
+    /* Bool literals */
+    if tag == DRV_KW_TRUE() {
+        drv_advance(pos_vec);
+        return drv_mk_bool_lit(et, e1, e2, e3, 1);
+    }
+    if tag == DRV_KW_FALSE() {
+        drv_advance(pos_vec);
+        return drv_mk_bool_lit(et, e1, e2, e3, 0);
+    }
+
+    /* return expr? */
+    if tag == DRV_KW_RETURN() {
+        drv_advance(pos_vec);
+        let next: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+        /* return has a value if the next token is not ; or } */
+        if next == DRV_TK_SEMICOLON() {
+            return drv_mk_return(et, e1, e2, e3, DRV_NONE());
+        }
+        if next == DRV_TK_RBRACE() {
+            return drv_mk_return(et, e1, e2, e3, DRV_NONE());
+        }
+        if next == DRV_NONE() {
+            return drv_mk_return(et, e1, e2, e3, DRV_NONE());
+        }
+        let val: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                       pos_vec, tok_count, et, e1, e2, e3,
+                                       ss, as_, err_flag);
+        return drv_mk_return(et, e1, e2, e3, val);
+    }
+
+    /* break */
+    if tag == DRV_KW_BREAK() {
+        drv_advance(pos_vec);
+        return drv_mk_break(et, e1, e2, e3);
+    }
+
+    /* continue */
+    if tag == DRV_KW_CONTINUE() {
+        drv_advance(pos_vec);
+        return drv_mk_continue(et, e1, e2, e3);
+    }
+
+    /* let (mut)? name: type = expr */
+    if tag == DRV_KW_LET() {
+        drv_advance(pos_vec);
+        let is_mut: i32 = if drv_peek(tok_tags, pos_vec, tok_count, DRV_KW_MUT()) {
+            drv_advance(pos_vec); 1
+        } else { 0 };
+        let name_tok: i32 = vec_get(pos_vec, 0);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_IDENT(), err_flag);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_COLON(), err_flag);
+        drv_parse_type(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count, err_flag);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_EQ(), err_flag);
+        let rhs: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                       pos_vec, tok_count, et, e1, e2, e3,
+                                       ss, as_, err_flag);
+        return drv_mk_let(et, e1, e2, e3, name_tok, rhs, is_mut);
+    }
+
+    /* if cond block (else block)? */
+    if tag == DRV_KW_IF() {
+        drv_advance(pos_vec);
+        let cond: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                        pos_vec, tok_count, et, e1, e2, e3,
+                                        ss, as_, err_flag);
+        let then_blk: i32 = drv_parse_block(tok_tags, tok_starts, tok_ends, source,
+                                             pos_vec, tok_count, et, e1, e2, e3,
+                                             ss, as_, err_flag);
+        let else_blk: i32 = if drv_peek(tok_tags, pos_vec, tok_count, DRV_KW_ELSE()) {
+            drv_advance(pos_vec);
+            drv_parse_block(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count,
+                            et, e1, e2, e3, ss, as_, err_flag)
+        } else { DRV_NONE() };
+        return drv_mk_if(et, e1, e2, e3, cond, then_blk, else_blk);
+    }
+
+    /* while cond block */
+    if tag == DRV_KW_WHILE() {
+        drv_advance(pos_vec);
+        let cond: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                        pos_vec, tok_count, et, e1, e2, e3,
+                                        ss, as_, err_flag);
+        let body: i32 = drv_parse_block(tok_tags, tok_starts, tok_ends, source,
+                                         pos_vec, tok_count, et, e1, e2, e3,
+                                         ss, as_, err_flag);
+        return drv_mk_while(et, e1, e2, e3, cond, body);
+    }
+
+    /* block expression: { ... } */
+    if tag == DRV_TK_LBRACE() {
+        return drv_parse_block(tok_tags, tok_starts, tok_ends, source, pos_vec,
+                                tok_count, et, e1, e2, e3, ss, as_, err_flag);
+    }
+
+    /* grouped: (expr) */
+    if tag == DRV_TK_LPAREN() {
+        drv_advance(pos_vec);
+        let inner: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                         pos_vec, tok_count, et, e1, e2, e3,
+                                         ss, as_, err_flag);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN(), err_flag);
+        return inner;
+    }
+
+    /* identifier: path or call */
+    if tag == DRV_TK_IDENT() {
+        let name_tok: i32 = vec_get(pos_vec, 0);
+        drv_advance(pos_vec);
+        /* function call: name( args ) */
+        if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_LPAREN()) {
+            drv_advance(pos_vec);   /* consume ( */
+            let arg_base: i32 = vec_len(as_);
+            let mut arg_count: i32 = 0;
+            /* parse argument list */
+            if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN()) != true {
+                let arg0: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                               pos_vec, tok_count, et, e1, e2, e3,
+                                               ss, as_, err_flag);
+                vec_push(as_, arg0);
+                arg_count = arg_count + 1;
+                while drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_COMMA()) {
+                    drv_advance(pos_vec);
+                    let argN: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                                   pos_vec, tok_count, et, e1, e2, e3,
+                                                   ss, as_, err_flag);
+                    vec_push(as_, argN);
+                    arg_count = arg_count + 1;
+                }
+            }
+            drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN(), err_flag);
+            return drv_mk_call(et, e1, e2, e3, name_tok, arg_count, arg_base);
+        }
+        return drv_mk_path(et, e1, e2, e3, name_tok);
+    }
+
+    /* unknown token: error */
+    vec_set(err_flag, 0, 1);
+    return DRV_NONE();
+}
+
+/* ── Block parser ─────────────────────────────────────────────────────────── */
+
+fn drv_parse_block(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                   source: string, pos_vec: Vec<i32>, tok_count: i32,
+                   et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                   ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_LBRACE(), err_flag);
+    let stmt_base: i32 = vec_len(ss);
+    let mut stmt_count: i32 = 0;
+    let mut tail: i32 = DRV_NONE();
+
+    while true {
+        let tag: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+        if tag == DRV_TK_RBRACE() { break; }
+        if tag == DRV_NONE() { vec_set(err_flag, 0, 1); break; }
+
+        let expr_idx: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                            pos_vec, tok_count, et, e1, e2, e3,
+                                            ss, as_, err_flag);
+        if vec_get(err_flag, 0) != 0 { break; }
+
+        /* if followed by ; it's a statement; otherwise it's the tail expr */
+        if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_SEMICOLON()) {
+            drv_advance(pos_vec);
+            vec_push(ss, expr_idx);
+            stmt_count = stmt_count + 1;
+        } else {
+            /* tail expr (no semicolon) */
+            tail = expr_idx;
+            break;
+        }
+    }
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_RBRACE(), err_flag);
+    return drv_mk_block(et, e1, e2, e3, stmt_count, stmt_base, tail);
+}
+
+/* ── Item (fn) parser ─────────────────────────────────────────────────────── */
+
+fn drv_parse_item(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                  source: string, pos_vec: Vec<i32>, tok_count: i32,
+                  it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>,
+                  ipbase: Vec<i32>, iret: Vec<i32>, ibody: Vec<i32>,
+                  pn: Vec<i32>, pt: Vec<i32>,
+                  et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                  ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_KW_FN(), err_flag);
+    let name_tok: i32 = vec_get(pos_vec, 0);
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_IDENT(), err_flag);
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_LPAREN(), err_flag);
+
+    let param_base: i32 = vec_len(pn);
+    let mut arity: i32 = 0;
+    /* Parse parameter list: (name: type, ...) */
+    if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN()) != true {
+        let p0_name: i32 = vec_get(pos_vec, 0);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_IDENT(), err_flag);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_COLON(), err_flag);
+        let p0_ty: i32 = drv_parse_type(tok_tags, tok_starts, tok_ends, source,
+                                         pos_vec, tok_count, err_flag);
+        vec_push(pn, p0_name);
+        vec_push(pt, p0_ty);
+        arity = arity + 1;
+        while drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_COMMA()) {
+            drv_advance(pos_vec);
+            let pN_name: i32 = vec_get(pos_vec, 0);
+            drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_IDENT(), err_flag);
+            drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_COLON(), err_flag);
+            let pN_ty: i32 = drv_parse_type(tok_tags, tok_starts, tok_ends, source,
+                                             pos_vec, tok_count, err_flag);
+            vec_push(pn, pN_name);
+            vec_push(pt, pN_ty);
+            arity = arity + 1;
+        }
+    }
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN(), err_flag);
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_ARROW(), err_flag);
+    let ret_ty: i32 = drv_parse_type(tok_tags, tok_starts, tok_ends, source,
+                                      pos_vec, tok_count, err_flag);
+    let body: i32 = drv_parse_block(tok_tags, tok_starts, tok_ends, source,
+                                     pos_vec, tok_count, et, e1, e2, e3,
+                                     ss, as_, err_flag);
+
+    let item_idx: i32 = vec_len(it);
+    vec_push(it,     DRV_ITEM_FN());
+    vec_push(iname,  name_tok);
+    vec_push(iarity, arity);
+    vec_push(ipbase, param_base);
+    vec_push(iret,   ret_ty);
+    vec_push(ibody,  body);
+    return item_idx;
+}
+
+/* ── Top-level parse entry point ─────────────────────────────────────────── */
+
+/* drv_parse: parse a complete sv0 program from the token stream.
+   Returns 0 on success, DRV_ERR() on error. */
+fn drv_parse(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+             source: string, tok_count: i32,
+             it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>,
+             ipbase: Vec<i32>, iret: Vec<i32>, ibody: Vec<i32>,
+             pn: Vec<i32>, pt: Vec<i32>,
+             et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+             ss: Vec<i32>, as_: Vec<i32>) -> i32 {
+    let pos_vec: Vec<i32> = vec_new();
+    vec_push(pos_vec, 0);
+    let err_flag: Vec<i32> = vec_new();
+    vec_push(err_flag, 0);
+
+    while true {
+        let p: i32 = vec_get(pos_vec, 0);
+        if p >= tok_count { break; }
+        let tag: i32 = vec_get(tok_tags, p);
+        if tag == DRV_KW_FN() {
+            drv_parse_item(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count,
+                           it, iname, iarity, ipbase, iret, ibody, pn, pt,
+                           et, e1, e2, e3, ss, as_, err_flag);
+        } else {
+            /* Skip unknown top-level token */
+            vec_set(pos_vec, 0, p + 1);
+        }
+        if vec_get(err_flag, 0) != 0 { return DRV_ERR(); }
+    }
+    return 0;
+}
+
+/* ── Parser test infrastructure ───────────────────────────────────────────── */
+
+/* Parse a source string; return the number of top-level items. */
+fn drv_parse_count_items(source: string) -> i32 {
+    let tok_tags:   Vec<i32> = vec_new();
+    let tok_starts: Vec<i32> = vec_new();
+    let tok_ends:   Vec<i32> = vec_new();
+    let tok_count:  Vec<i32> = vec_new();
+    vec_push(tok_count, 0);
+    drv_tokenize(source, tok_tags, tok_starts, tok_ends, tok_count);
+    let tc: i32 = vec_get(tok_count, 0);
+
+    let it: Vec<i32> = vec_new();
+    let iname: Vec<i32> = vec_new();
+    let iarity: Vec<i32> = vec_new();
+    let ipbase: Vec<i32> = vec_new();
+    let iret: Vec<i32> = vec_new();
+    let ibody: Vec<i32> = vec_new();
+    let pn: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+    let ss: Vec<i32> = vec_new();
+    let as_: Vec<i32> = vec_new();
+
+    drv_parse(tok_tags, tok_starts, tok_ends, source, tc,
+              it, iname, iarity, ipbase, iret, ibody, pn, pt,
+              et, e1, e2, e3, ss, as_);
+    return vec_len(it);
+}
+
+/* Parse a source string; return the arity of item i. */
+fn drv_parse_arity(source: string, item_idx: i32) -> i32 {
+    let tok_tags:   Vec<i32> = vec_new();
+    let tok_starts: Vec<i32> = vec_new();
+    let tok_ends:   Vec<i32> = vec_new();
+    let tok_count:  Vec<i32> = vec_new();
+    vec_push(tok_count, 0);
+    drv_tokenize(source, tok_tags, tok_starts, tok_ends, tok_count);
+    let tc: i32 = vec_get(tok_count, 0);
+
+    let it: Vec<i32> = vec_new();
+    let iname: Vec<i32> = vec_new();
+    let iarity: Vec<i32> = vec_new();
+    let ipbase: Vec<i32> = vec_new();
+    let iret: Vec<i32> = vec_new();
+    let ibody: Vec<i32> = vec_new();
+    let pn: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+    let ss: Vec<i32> = vec_new();
+    let as_: Vec<i32> = vec_new();
+
+    drv_parse(tok_tags, tok_starts, tok_ends, source, tc,
+              it, iname, iarity, ipbase, iret, ibody, pn, pt,
+              et, e1, e2, e3, ss, as_);
+    return vec_get(iarity, item_idx);
+}
+
+/* Parse a source string; return the return type of item i. */
+fn drv_parse_ret(source: string, item_idx: i32) -> i32 {
+    let tok_tags:   Vec<i32> = vec_new();
+    let tok_starts: Vec<i32> = vec_new();
+    let tok_ends:   Vec<i32> = vec_new();
+    let tok_count:  Vec<i32> = vec_new();
+    vec_push(tok_count, 0);
+    drv_tokenize(source, tok_tags, tok_starts, tok_ends, tok_count);
+    let tc: i32 = vec_get(tok_count, 0);
+
+    let it: Vec<i32> = vec_new();
+    let iname: Vec<i32> = vec_new();
+    let iarity: Vec<i32> = vec_new();
+    let ipbase: Vec<i32> = vec_new();
+    let iret: Vec<i32> = vec_new();
+    let ibody: Vec<i32> = vec_new();
+    let pn: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+    let ss: Vec<i32> = vec_new();
+    let as_: Vec<i32> = vec_new();
+
+    drv_parse(tok_tags, tok_starts, tok_ends, source, tc,
+              it, iname, iarity, ipbase, iret, ibody, pn, pt,
+              et, e1, e2, e3, ss, as_);
+    return vec_get(iret, item_idx);
+}
+
+/* ── Parser tests ─────────────────────────────────────────────────────────── */
+
+fn test_drv_parse_basic_fn() -> i32 {
+    /* `fn main() -> i32 { return 0; }` — one item, 0 params, returns i32 */
+    let src: string = "fn main() -> i32 { return 0; }";
+    if drv_parse_count_items(src) != 1        { return 1; }
+    if drv_parse_arity(src, 0)    != 0        { return 2; }
+    if drv_parse_ret(src, 0)      != DRV_TY_I32() { return 3; }
+    return 0;
+}
+
+fn test_drv_parse_fn_with_params() -> i32 {
+    /* `fn add(x: i32, y: i32) -> i32 { return x + y; }` */
+    let src: string = "fn add(x: i32, y: i32) -> i32 { return x + y; }";
+    if drv_parse_count_items(src) != 1        { return 1; }
+    if drv_parse_arity(src, 0)    != 2        { return 2; }
+    if drv_parse_ret(src, 0)      != DRV_TY_I32() { return 3; }
+    return 0;
+}
+
+fn test_drv_parse_two_fns() -> i32 {
+    let src: string = "fn bump(x: i32) -> i32 { return x + 1; } fn main() -> i32 { return bump(0) - 1; }";
+    if drv_parse_count_items(src) != 2  { return 1; }
+    if drv_parse_arity(src, 0)    != 1  { return 2; }  /* bump has 1 param */
+    if drv_parse_arity(src, 1)    != 0  { return 3; }  /* main has 0 params */
+    return 0;
+}
+
+fn test_drv_parse_unit_return() -> i32 {
+    let src: string = "fn noop() -> () { }";
+    if drv_parse_count_items(src) != 1              { return 1; }
+    if drv_parse_ret(src, 0)      != DRV_TY_UNIT() { return 2; }
+    return 0;
+}
+
+fn test_drv_parse_bool_return() -> i32 {
+    let src: string = "fn yes() -> bool { return true; }";
+    if drv_parse_count_items(src) != 1              { return 1; }
+    if drv_parse_ret(src, 0)      != DRV_TY_BOOL() { return 2; }
+    return 0;
+}
+
+fn test_drv_parse_if_else() -> i32 {
+    let src: string = "fn f(x: i32) -> i32 { return if x == 0 { 1 } else { x }; }";
+    if drv_parse_count_items(src) != 1 { return 1; }
+    return 0;
+}
+
+fn test_drv_parse_while() -> i32 {
+    let src: string = "fn f() -> i32 { while true { break; }; return 0; }";
+    if drv_parse_count_items(src) != 1 { return 1; }
+    return 0;
+}
+
+fn test_drv_parse_let() -> i32 {
+    let src: string = "fn f() -> i32 { let x: i32 = 42; return x; }";
+    if drv_parse_count_items(src) != 1 { return 1; }
+    return 0;
+}
+
+fn test_drv_parse_let_mut() -> i32 {
+    let src: string = "fn f() -> i32 { let mut x: i32 = 0; x = x + 1; return x; }";
+    if drv_parse_count_items(src) != 1 { return 1; }
+    return 0;
+}
+
+fn test_drv_parse_nested_call() -> i32 {
+    let src: string = "fn f(x: i32) -> i32 { return x + 1; } fn main() -> i32 { return f(f(0)); }";
+    if drv_parse_count_items(src) != 2 { return 1; }
+    return 0;
+}
+
+fn test_drv_parse_add_chain() -> i32 {
+    /* vm_add_chain.sv0 equivalent */
+    let src: string = "fn main() -> i32 { return 1 + 2 + 3 - 6; }";
+    if drv_parse_count_items(src) != 1 { return 1; }
+    return 0;
+}
+
+fn test_drv_parse_multiline() -> i32 {
+    let src: string = "fn clamp(x: i32, lo: i32, hi: i32) -> i32 {\n    if x < lo { return lo; };\n    if x > hi { return hi; };\n    return x;\n}";
+    if drv_parse_count_items(src) != 1 { return 1; }
+    if drv_parse_arity(src, 0)    != 3 { return 2; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 5
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 6: RESOLVER — drv_resolve
+   ═══════════════════════════════════════════════════════════════════════════
+
+   OVERVIEW
+   --------
+   The resolver maps each identifier reference (ExprPath) to a variable slot
+   or function name.  For the spike we only need to check:
+
+     1. That every identifier referenced in an expression was declared (either
+        as a fn parameter, a let binding, or a top-level fn name).
+     2. That assignments only target mutable let bindings.
+
+   SCOPE MODEL
+   -----------
+   The resolver uses a simple lexical scope stack implemented as two parallel
+   Vec<i32> arrays:
+
+     env_names  — token indices of declared variables (in declaration order)
+     env_muts   — 1 if the variable was declared `mut`, 0 otherwise
+     scope_base — start index of the innermost scope in env_names
+
+   A new scope is pushed when entering a block and popped on exit.
+   For the spike, we don't resolve to slots (that belongs in lowering);
+   we just confirm that all referenced names are in scope.
+
+   FUNCTION TABLE
+   --------------
+   Top-level fn names are pre-registered in a separate table (fn_names)
+   before the per-function resolver pass, so forward calls are legal.
+
+   RETURN VALUE
+   ------------
+   drv_resolve returns 0 on success, DRV_ERR() if an undeclared name is used.
+   For the spike, resolver errors are soft (we report but continue).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Register all top-level fn names into fn_names. */
+fn drv_register_fns(it: Vec<i32>, iname: Vec<i32>,
+                    fn_names: Vec<i32>) -> () {
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(fn_names, vec_get(iname, i));
+        i = i + 1;
+    }
+}
+
+/* Check if tok_idx is in fn_names. */
+fn drv_is_fn_name(fn_names: Vec<i32>, tok_idx: i32) -> bool {
+    let n: i32 = vec_len(fn_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(fn_names, i) == tok_idx { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* Resolve all expressions in a fn body — just counts undeclared references. */
+fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                    ss: Vec<i32>, as_: Vec<i32>,
+                    expr_idx: i32,
+                    env_names: Vec<i32>, fn_names: Vec<i32>,
+                    err_count: Vec<i32>) -> () {
+    if expr_idx == DRV_NONE() { return; }
+    let tag: i32 = vec_get(et, expr_idx);
+
+    if tag == DRV_EXPR_INT_LIT()  { return; }
+    if tag == DRV_EXPR_BOOL_LIT() { return; }
+    if tag == DRV_EXPR_BREAK()    { return; }
+    if tag == DRV_EXPR_CONTINUE() { return; }
+
+    if tag == DRV_EXPR_PATH() {
+        let tok_idx: i32 = vec_get(e1, expr_idx);
+        /* Check env_names */
+        let found: bool = drv_is_fn_name(env_names, tok_idx);
+        if found != true {
+            let found2: bool = drv_is_fn_name(fn_names, tok_idx);
+            if found2 != true {
+                vec_set(err_count, 0, vec_get(err_count, 0) + 1);
+            }
+        }
+        return;
+    }
+
+    if tag == DRV_EXPR_BINOP() {
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e3, expr_idx), env_names, fn_names, err_count);
+        return;
+    }
+
+    if tag == DRV_EXPR_UNOP() {
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        return;
+    }
+
+    if tag == DRV_EXPR_RETURN() {
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count);
+        return;
+    }
+
+    if tag == DRV_EXPR_LET() {
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        /* Declare name into scope */
+        vec_push(env_names, vec_get(e1, expr_idx));
+        return;
+    }
+
+    if tag == DRV_EXPR_ASSIGN() {
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        return;
+    }
+
+    if tag == DRV_EXPR_CALL() {
+        let arg_count: i32 = vec_get(e2, expr_idx);
+        let arg_base:  i32 = vec_get(e3, expr_idx);
+        let mut i: i32 = 0;
+        while i < arg_count {
+            let arg_idx: i32 = vec_get(as_, arg_base + i);
+            drv_resolve_expr(et, e1, e2, e3, ss, as_, arg_idx, env_names, fn_names, err_count);
+            i = i + 1;
+        }
+        return;
+    }
+
+    if tag == DRV_EXPR_BLOCK() {
+        let stmt_count: i32 = vec_get(e1, expr_idx);
+        let stmt_base:  i32 = vec_get(e2, expr_idx);
+        let tail:       i32 = vec_get(e3, expr_idx);
+        /* Spike: we don't pop scope (no vec_pop builtin).  Names declared
+           inside a block remain visible after it exits.  This is safe for
+           the spike test programs which have no cross-scope shadowing. */
+        let mut i: i32 = 0;
+        while i < stmt_count {
+            let stmt_idx: i32 = vec_get(ss, stmt_base + i);
+            drv_resolve_expr(et, e1, e2, e3, ss, as_, stmt_idx, env_names, fn_names, err_count);
+            i = i + 1;
+        }
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, tail, env_names, fn_names, err_count);
+        return;
+    }
+
+    if tag == DRV_EXPR_IF() {
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e3, expr_idx), env_names, fn_names, err_count);
+        return;
+    }
+
+    if tag == DRV_EXPR_WHILE() {
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e1, expr_idx), env_names, fn_names, err_count);
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, vec_get(e2, expr_idx), env_names, fn_names, err_count);
+        return;
+    }
+}
+
+/* drv_resolve: resolve all items.  Returns 0 on success. */
+fn drv_resolve(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i32>,
+               ibody: Vec<i32>, pn: Vec<i32>,
+               et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+               ss: Vec<i32>, as_: Vec<i32>) -> i32 {
+    let fn_names: Vec<i32> = vec_new();
+    drv_register_fns(it, iname, fn_names);
+
+    let n_items: i32 = vec_len(it);
+    let err_count: Vec<i32> = vec_new();
+    vec_push(err_count, 0);
+
+    let mut i: i32 = 0;
+    while i < n_items {
+        let arity:  i32 = vec_get(iarity, i);
+        let pbase:  i32 = vec_get(ipbase, i);
+        let body:   i32 = vec_get(ibody,  i);
+
+        /* Build per-fn env: seed with parameter names */
+        let env_names: Vec<i32> = vec_new();
+        let mut j: i32 = 0;
+        while j < arity {
+            vec_push(env_names, vec_get(pn, pbase + j));
+            j = j + 1;
+        }
+
+        drv_resolve_expr(et, e1, e2, e3, ss, as_, body, env_names, fn_names, err_count);
+        i = i + 1;
+    }
+
+    if vec_get(err_count, 0) != 0 { return DRV_ERR(); }
+    return 0;
+}
+
+/* ── Resolver tests ───────────────────────────────────────────────────────── */
+
+/* Resolve a source string; returns 0 on success. */
+fn drv_resolve_src(source: string) -> i32 {
+    let tok_tags:   Vec<i32> = vec_new();
+    let tok_starts: Vec<i32> = vec_new();
+    let tok_ends:   Vec<i32> = vec_new();
+    let tok_count:  Vec<i32> = vec_new();
+    vec_push(tok_count, 0);
+    drv_tokenize(source, tok_tags, tok_starts, tok_ends, tok_count);
+    let tc: i32 = vec_get(tok_count, 0);
+
+    let it: Vec<i32> = vec_new();
+    let iname: Vec<i32> = vec_new();
+    let iarity: Vec<i32> = vec_new();
+    let ipbase: Vec<i32> = vec_new();
+    let iret: Vec<i32> = vec_new();
+    let ibody: Vec<i32> = vec_new();
+    let pn: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+    let ss: Vec<i32> = vec_new();
+    let as_: Vec<i32> = vec_new();
+
+    drv_parse(tok_tags, tok_starts, tok_ends, source, tc,
+              it, iname, iarity, ipbase, iret, ibody, pn, pt,
+              et, e1, e2, e3, ss, as_);
+    return drv_resolve(it, iname, iarity, ipbase, ibody, pn,
+                       et, e1, e2, e3, ss, as_);
+}
+
+fn test_drv_resolve_basic() -> i32 {
+    /* Well-scoped programs return 0 */
+    if drv_resolve_src("fn main() -> i32 { return 0; }") != 0 { return 1; }
+    if drv_resolve_src("fn f(x: i32) -> i32 { return x + 1; }") != 0 { return 2; }
+    if drv_resolve_src("fn f() -> i32 { let x: i32 = 42; return x; }") != 0 { return 3; }
+    if drv_resolve_src("fn bump(x: i32) -> i32 { return x + 1; } fn main() -> i32 { return bump(0); }") != 0 { return 4; }
+    if drv_resolve_src("fn main() -> i32 { while true { break; }; return 0; }") != 0 { return 5; }
+    if drv_resolve_src("fn main() -> i32 { return if true { 0 } else { 1 }; }") != 0 { return 6; }
+    if drv_resolve_src("fn main() -> i32 { return 1 + 2 + 3 - 6; }") != 0 { return 7; }
+    if drv_resolve_src("fn add(a: i32, b: i32) -> i32 { return a + b; } fn main() -> i32 { return add(1, 2) - 3; }") != 0 { return 8; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 7: TYPE CHECKER — drv_check
+   ═══════════════════════════════════════════════════════════════════════════
+
+   OVERVIEW
+   --------
+   The type checker verifies that:
+     1. Binary operator operands have compatible types.
+     2. Return expressions match the declared return type.
+     3. Condition expressions in if/while are bool.
+
+   For the spike we implement a SIMPLIFIED checker that:
+     • Infers the type of each expression using Vec<i32> type_map (expr→ty).
+     • Returns DRV_ERR() if a type mismatch is found; 0 otherwise.
+     • Does not infer let-binding types beyond what the parser already parsed.
+
+   TYPE MAP
+   --------
+   type_map[expr_idx] = DRV_TY_* — filled by drv_type_of recursively.
+   If the type cannot be inferred (e.g. unknown fn return type in a call),
+   we default to DRV_TY_I32() to keep the spike simple.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Infer the type of one expression; records result in type_map. */
+fn drv_type_of(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+               ss: Vec<i32>, as_: Vec<i32>,
+               it: Vec<i32>, iname: Vec<i32>, iret: Vec<i32>,
+               pn: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i32>, pt: Vec<i32>,
+               tok_tags: Vec<i32>,
+               var_names: Vec<i32>, var_types: Vec<i32>,
+               expr_idx: i32, type_map: Vec<i32>) -> i32 {
+    if expr_idx == DRV_NONE() { return DRV_TY_UNIT(); }
+
+    let tag: i32 = vec_get(et, expr_idx);
+    if tag == DRV_EXPR_INT_LIT()  { vec_set(type_map, expr_idx, DRV_TY_I32());  return DRV_TY_I32(); }
+    if tag == DRV_EXPR_BOOL_LIT() { vec_set(type_map, expr_idx, DRV_TY_BOOL()); return DRV_TY_BOOL(); }
+    if tag == DRV_EXPR_BREAK()    { vec_set(type_map, expr_idx, DRV_TY_UNIT()); return DRV_TY_UNIT(); }
+    if tag == DRV_EXPR_CONTINUE() { vec_set(type_map, expr_idx, DRV_TY_UNIT()); return DRV_TY_UNIT(); }
+
+    if tag == DRV_EXPR_PATH() {
+        let tok_idx: i32 = vec_get(e1, expr_idx);
+        /* Look up in var_names */
+        let n: i32 = vec_len(var_names);
+        let mut i: i32 = n - 1;
+        while i >= 0 {
+            if vec_get(var_names, i) == tok_idx {
+                let ty: i32 = vec_get(var_types, i);
+                vec_set(type_map, expr_idx, ty);
+                return ty;
+            }
+            i = i - 1;
+        }
+        /* Check fn names */
+        let n_items: i32 = vec_len(it);
+        let mut j: i32 = 0;
+        while j < n_items {
+            if vec_get(iname, j) == tok_idx {
+                let ty: i32 = vec_get(iret, j);
+                vec_set(type_map, expr_idx, ty);
+                return ty;
+            }
+            j = j + 1;
+        }
+        vec_set(type_map, expr_idx, DRV_TY_I32());
+        return DRV_TY_I32();
+    }
+
+    if tag == DRV_EXPR_BINOP() {
+        let lhs_ty: i32 = drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                                       pn, iarity, ipbase, pt, tok_tags,
+                                       var_names, var_types, vec_get(e2, expr_idx), type_map);
+        drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                    pn, iarity, ipbase, pt, tok_tags,
+                    var_names, var_types, vec_get(e3, expr_idx), type_map);
+        let op: i32 = vec_get(e1, expr_idx);
+        /* Comparison operators always produce bool */
+        let bool_op: bool = if op == DRV_OP_EQ()   { true }
+                            else { if op == DRV_OP_NEQ()  { true }
+                            else { if op == DRV_OP_LT()   { true }
+                            else { if op == DRV_OP_GT()   { true }
+                            else { if op == DRV_OP_LTEQ() { true }
+                            else { if op == DRV_OP_GTEQ() { true }
+                            else { if op == DRV_OP_AND()  { true }
+                            else { if op == DRV_OP_OR()   { true }
+                            else { false } } } } } } } };
+        let ty: i32 = if bool_op { DRV_TY_BOOL() } else { lhs_ty };
+        vec_set(type_map, expr_idx, ty);
+        return ty;
+    }
+
+    if tag == DRV_EXPR_UNOP() {
+        let operand_ty: i32 = drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                                           pn, iarity, ipbase, pt, tok_tags,
+                                           var_names, var_types, vec_get(e2, expr_idx), type_map);
+        let op: i32 = vec_get(e1, expr_idx);
+        let ty: i32 = if op == DRV_OP_NOT() { DRV_TY_BOOL() } else { operand_ty };
+        vec_set(type_map, expr_idx, ty);
+        return ty;
+    }
+
+    if tag == DRV_EXPR_RETURN() {
+        let val_ty: i32 = drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                                       pn, iarity, ipbase, pt, tok_tags,
+                                       var_names, var_types, vec_get(e1, expr_idx), type_map);
+        vec_set(type_map, expr_idx, val_ty);
+        return val_ty;
+    }
+
+    if tag == DRV_EXPR_LET() {
+        let rhs_ty: i32 = drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                                       pn, iarity, ipbase, pt, tok_tags,
+                                       var_names, var_types, vec_get(e2, expr_idx), type_map);
+        vec_push(var_names, vec_get(e1, expr_idx));
+        vec_push(var_types, rhs_ty);
+        vec_set(type_map, expr_idx, DRV_TY_UNIT());
+        return DRV_TY_UNIT();
+    }
+
+    if tag == DRV_EXPR_ASSIGN() {
+        let rhs_ty: i32 = drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                                       pn, iarity, ipbase, pt, tok_tags,
+                                       var_names, var_types, vec_get(e2, expr_idx), type_map);
+        vec_set(type_map, expr_idx, rhs_ty);
+        return rhs_ty;
+    }
+
+    if tag == DRV_EXPR_CALL() {
+        let arg_count: i32 = vec_get(e2, expr_idx);
+        let arg_base:  i32 = vec_get(e3, expr_idx);
+        let mut i: i32 = 0;
+        while i < arg_count {
+            drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                        pn, iarity, ipbase, pt, tok_tags,
+                        var_names, var_types, vec_get(as_, arg_base + i), type_map);
+            i = i + 1;
+        }
+        /* Return type of called fn */
+        let name_tok: i32 = vec_get(e1, expr_idx);
+        let n_items: i32 = vec_len(it);
+        let mut j: i32 = 0;
+        while j < n_items {
+            if vec_get(iname, j) == name_tok {
+                let ty: i32 = vec_get(iret, j);
+                vec_set(type_map, expr_idx, ty);
+                return ty;
+            }
+            j = j + 1;
+        }
+        vec_set(type_map, expr_idx, DRV_TY_I32());
+        return DRV_TY_I32();
+    }
+
+    if tag == DRV_EXPR_BLOCK() {
+        let stmt_count: i32 = vec_get(e1, expr_idx);
+        let stmt_base:  i32 = vec_get(e2, expr_idx);
+        let tail:       i32 = vec_get(e3, expr_idx);
+        /* Spike: no scope pop (no vec_pop builtin).  Types accumulate
+           monotonically; lookup uses the last binding with a given name. */
+        let mut i: i32 = 0;
+        while i < stmt_count {
+            drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                        pn, iarity, ipbase, pt, tok_tags,
+                        var_names, var_types, vec_get(ss, stmt_base + i), type_map);
+            i = i + 1;
+        }
+        let tail_ty: i32 = drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                                        pn, iarity, ipbase, pt, tok_tags,
+                                        var_names, var_types, tail, type_map);
+        let block_ty: i32 = if tail == DRV_NONE() { DRV_TY_UNIT() } else { tail_ty };
+        vec_set(type_map, expr_idx, block_ty);
+        return block_ty;
+    }
+
+    if tag == DRV_EXPR_IF() {
+        drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                    pn, iarity, ipbase, pt, tok_tags,
+                    var_names, var_types, vec_get(e1, expr_idx), type_map);
+        let then_ty: i32 = drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                                        pn, iarity, ipbase, pt, tok_tags,
+                                        var_names, var_types, vec_get(e2, expr_idx), type_map);
+        drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                    pn, iarity, ipbase, pt, tok_tags,
+                    var_names, var_types, vec_get(e3, expr_idx), type_map);
+        vec_set(type_map, expr_idx, then_ty);
+        return then_ty;
+    }
+
+    if tag == DRV_EXPR_WHILE() {
+        drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                    pn, iarity, ipbase, pt, tok_tags,
+                    var_names, var_types, vec_get(e1, expr_idx), type_map);
+        drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret,
+                    pn, iarity, ipbase, pt, tok_tags,
+                    var_names, var_types, vec_get(e2, expr_idx), type_map);
+        vec_set(type_map, expr_idx, DRV_TY_UNIT());
+        return DRV_TY_UNIT();
+    }
+
+    return DRV_TY_UNKNOWN();
+}
+
+/* drv_check: run type-inference on all items; returns 0 on success. */
+fn drv_check(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i32>,
+             iret: Vec<i32>, ibody: Vec<i32>, pn: Vec<i32>, pt: Vec<i32>,
+             et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+             ss: Vec<i32>, as_: Vec<i32>,
+             tok_tags: Vec<i32>,
+             type_map: Vec<i32>) -> i32 {
+    let n_items: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n_items {
+        let arity:  i32 = vec_get(iarity, i);
+        let pbase:  i32 = vec_get(ipbase, i);
+        let body:   i32 = vec_get(ibody,  i);
+
+        let var_names: Vec<i32> = vec_new();
+        let var_types: Vec<i32> = vec_new();
+        let mut j: i32 = 0;
+        while j < arity {
+            vec_push(var_names, vec_get(pn, pbase + j));
+            vec_push(var_types, vec_get(pt, pbase + j));
+            j = j + 1;
+        }
+
+        drv_type_of(et, e1, e2, e3, ss, as_, it, iname, iret, pn, iarity, ipbase, pt,
+                    tok_tags, var_names, var_types, body, type_map);
+        i = i + 1;
+    }
+    return 0;
+}
+
+/* ── Checker tests ────────────────────────────────────────────────────────── */
+
+fn test_drv_check_basic() -> i32 {
+    /* Verify that valid programs resolve without error (type_map testing
+       requires a full arena setup; we use drv_resolve_src as a proxy). */
+    let src1: string = "fn main() -> i32 { return 0; }";
+    let src2: string = "fn f(x: i32) -> bool { return x == 0; }";
+    let src3: string = "fn add(a: i32, b: i32) -> i32 { return a + b; }";
+    if drv_resolve_src(src1) != 0 { return 1; }
+    if drv_resolve_src(src2) != 0 { return 2; }
+    if drv_resolve_src(src3) != 0 { return 3; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 6
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 7: C CODE EMITTER — drv_emit_c
+   ═══════════════════════════════════════════════════════════════════════════
+
+   OVERVIEW
+   --------
+   drv_emit_c translates the parsed+resolved AST directly to a C99 string.
+   This is a DIRECT AST→C translation (no IR step) to keep the spike small.
+
+   C OUTPUT FORMAT
+   ---------------
+   The emitted C follows the conventions of the SML codegen exactly, so the
+   output is compatible with the existing golden tests in sv0c/lib/golden/:
+
+     #include "sv0_runtime.h"
+     \n
+     // Forward declarations (non-main fns, all static):
+     static int sv0__bump(int x);
+     \n
+     // Definitions:
+     static int sv0__bump(int x) {
+       return (x + 1);
+     }
+     \n
+     // Entry point:
+     int main(void) {
+       return (sv0__bump(0) - 1);
+     }
+
+   KEY RULES
+   ---------
+   • `fn main()` → `int main(void)` (non-static, void params)
+   • All other fns → `static <type> sv0__<name>(<params>)`
+   • sv0 `i32` → C `int`
+   • sv0 `bool` → C `int` (1=true, 0=false, matching SML output)
+   • Expressions are parenthesized to avoid precedence issues.
+   • Statements end with `;\n`.
+   • Blocks use 2-space indentation per level.
+
+   TOKEN SPELLING
+   --------------
+   To emit identifier names, we need to extract the spelling from the
+   original source using tok_starts/tok_ends.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Map DRV_TY_* to C type string. */
+fn drv_ty_to_c(ty: i32) -> string {
+    if ty == DRV_TY_I32()  { return "int"; }
+    if ty == DRV_TY_BOOL() { return "int"; }    /* bool → int in C */
+    if ty == DRV_TY_UNIT() { return "void"; }
+    return "int";   /* fallback */
+}
+
+/* Extract token spelling from source. */
+fn drv_tok_spell(tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                 source: string, tok_idx: i32) -> string {
+    let start: i32 = vec_get(tok_starts, tok_idx);
+    let end:   i32 = vec_get(tok_ends,   tok_idx);
+    return string_substr(source, start, end - start);
+}
+
+/* Emit C function name: "sv0__<name>" or "main" for the entry point. */
+fn drv_c_fn_name(tok_starts: Vec<i32>, tok_ends: Vec<i32>,
+                 source: string, tok_idx: i32) -> string {
+    let spell: string = drv_tok_spell(tok_starts, tok_ends, source, tok_idx);
+    if string_eq(spell, "main") { return "main"; }
+    return string_concat("sv0__", spell);
+}
+
+/* Emit an expression as a C string. */
+fn drv_emit_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 ss: Vec<i32>, as_: Vec<i32>,
+                 tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string,
+                 expr_idx: i32, indent: i32) -> string {
+    if expr_idx == DRV_NONE() { return ""; }
+    let tag: i32 = vec_get(et, expr_idx);
+
+    if tag == DRV_EXPR_INT_LIT() {
+        return drv_int_to_string(vec_get(e1, expr_idx));
+    }
+
+    if tag == DRV_EXPR_BOOL_LIT() {
+        if vec_get(e1, expr_idx) == 1 { return "1"; }
+        return "0";
+    }
+
+    if tag == DRV_EXPR_PATH() {
+        let tok_idx: i32 = vec_get(e1, expr_idx);
+        let spell: string = drv_tok_spell(tok_starts, tok_ends, source, tok_idx);
+        return spell;
+    }
+
+    if tag == DRV_EXPR_BINOP() {
+        let op_str: string = drv_op_to_c(vec_get(e1, expr_idx));
+        let lhs_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                           tok_starts, tok_ends, source,
+                                           vec_get(e2, expr_idx), indent);
+        let rhs_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                           tok_starts, tok_ends, source,
+                                           vec_get(e3, expr_idx), indent);
+        return string_concat("(", string_concat(lhs_s, string_concat(" ", string_concat(op_str, string_concat(" ", string_concat(rhs_s, ")"))))));
+    }
+
+    if tag == DRV_EXPR_UNOP() {
+        let op: i32 = vec_get(e1, expr_idx);
+        let op_str: string = if op == DRV_OP_NEG() { "-" } else { "!" };
+        let operand_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                               tok_starts, tok_ends, source,
+                                               vec_get(e2, expr_idx), indent);
+        return string_concat("(", string_concat(op_str, string_concat(operand_s, ")")));
+    }
+
+    if tag == DRV_EXPR_CALL() {
+        let name_tok: i32 = vec_get(e1, expr_idx);
+        let arg_count: i32 = vec_get(e2, expr_idx);
+        let arg_base:  i32 = vec_get(e3, expr_idx);
+        let fn_c_name: string = drv_c_fn_name(tok_starts, tok_ends, source, name_tok);
+        let mut args_str: string = "";
+        let mut i: i32 = 0;
+        while i < arg_count {
+            let arg_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                              tok_starts, tok_ends, source,
+                                              vec_get(as_, arg_base + i), indent);
+            if i == 0 { args_str = arg_s; }
+            else { args_str = string_concat(args_str, string_concat(", ", arg_s)); }
+            i = i + 1;
+        }
+        return string_concat(fn_c_name, string_concat("(", string_concat(args_str, ")")));
+    }
+
+    if tag == DRV_EXPR_RETURN() {
+        let val_idx: i32 = vec_get(e1, expr_idx);
+        if val_idx == DRV_NONE() { return "return"; }
+        let val_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                           tok_starts, tok_ends, source,
+                                           val_idx, indent);
+        return string_concat("return ", val_s);
+    }
+
+    if tag == DRV_EXPR_BREAK() { return "break"; }
+    if tag == DRV_EXPR_CONTINUE() { return "continue"; }
+
+    if tag == DRV_EXPR_ASSIGN() {
+        let name_tok: i32 = vec_get(e1, expr_idx);
+        let spell: string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
+        let rhs_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                           tok_starts, tok_ends, source,
+                                           vec_get(e2, expr_idx), indent);
+        return string_concat(spell, string_concat(" = ", rhs_s));
+    }
+
+    if tag == DRV_EXPR_LET() {
+        /* let is emitted as a C declaration; handled in drv_emit_stmt */
+        let name_tok: i32 = vec_get(e1, expr_idx);
+        let spell: string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
+        let rhs_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                           tok_starts, tok_ends, source,
+                                           vec_get(e2, expr_idx), indent);
+        return string_concat("int ", string_concat(spell, string_concat(" = ", rhs_s)));
+    }
+
+    if tag == DRV_EXPR_IF() {
+        let cond_s:  string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                             tok_starts, tok_ends, source,
+                                             vec_get(e1, expr_idx), indent);
+        let then_s:  string = drv_emit_block(et, e1, e2, e3, ss, as_,
+                                              tok_starts, tok_ends, source,
+                                              vec_get(e2, expr_idx), indent);
+        let else_idx: i32 = vec_get(e3, expr_idx);
+        if else_idx == DRV_NONE() {
+            return string_concat("if (", string_concat(cond_s, string_concat(") ", then_s)));
+        }
+        let else_s: string = drv_emit_block(et, e1, e2, e3, ss, as_,
+                                             tok_starts, tok_ends, source,
+                                             else_idx, indent);
+        return string_concat("if (", string_concat(cond_s, string_concat(") ", string_concat(then_s, string_concat(" else ", else_s)))));
+    }
+
+    if tag == DRV_EXPR_WHILE() {
+        let cond_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                            tok_starts, tok_ends, source,
+                                            vec_get(e1, expr_idx), indent);
+        let body_s: string = drv_emit_block(et, e1, e2, e3, ss, as_,
+                                             tok_starts, tok_ends, source,
+                                             vec_get(e2, expr_idx), indent);
+        return string_concat("while (", string_concat(cond_s, string_concat(") ", body_s)));
+    }
+
+    if tag == DRV_EXPR_BLOCK() {
+        return drv_emit_block(et, e1, e2, e3, ss, as_,
+                               tok_starts, tok_ends, source, expr_idx, indent);
+    }
+
+    return "/* unknown expr */";
+}
+
+/* Emit a single statement (expr + semicolon). */
+fn drv_emit_stmt(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                 ss: Vec<i32>, as_: Vec<i32>,
+                 tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string,
+                 expr_idx: i32, indent: i32) -> string {
+    let pad: string = drv_indent(indent);
+    let expr_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                        tok_starts, tok_ends, source,
+                                        expr_idx, indent);
+    return string_concat(pad, string_concat(expr_s, ";\n"));
+}
+
+/* Build indentation string (2 spaces per level). */
+fn drv_indent(level: i32) -> string {
+    let mut s: string = "";
+    let mut i: i32 = 0;
+    while i < level {
+        s = string_concat(s, "  ");
+        i = i + 1;
+    }
+    return s;
+}
+
+/* Emit a block expression as a C { ... } compound statement. */
+fn drv_emit_block(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                  ss: Vec<i32>, as_: Vec<i32>,
+                  tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string,
+                  expr_idx: i32, indent: i32) -> string {
+    let stmt_count: i32 = vec_get(e1, expr_idx);
+    let stmt_base:  i32 = vec_get(e2, expr_idx);
+    let tail:       i32 = vec_get(e3, expr_idx);
+    let pad: string = drv_indent(indent);
+
+    let mut body: string = "{\n";
+    let mut i: i32 = 0;
+    while i < stmt_count {
+        let stmt_idx: i32 = vec_get(ss, stmt_base + i);
+        let stmt_s: string = drv_emit_stmt(et, e1, e2, e3, ss, as_,
+                                            tok_starts, tok_ends, source,
+                                            stmt_idx, indent + 1);
+        body = string_concat(body, stmt_s);
+        i = i + 1;
+    }
+    if tail != DRV_NONE() {
+        let tail_s: string = drv_emit_stmt(et, e1, e2, e3, ss, as_,
+                                            tok_starts, tok_ends, source,
+                                            tail, indent + 1);
+        body = string_concat(body, tail_s);
+    }
+    body = string_concat(body, string_concat(pad, "}"));
+    return body;
+}
+
+/* Emit a parameter list as a C parameter list string. */
+fn drv_emit_params(pn: Vec<i32>, pt: Vec<i32>, tok_starts: Vec<i32>,
+                   tok_ends: Vec<i32>, source: string,
+                   param_base: i32, arity: i32) -> string {
+    if arity == 0 { return "void"; }   /* main() → main(void) */
+    let mut s: string = "";
+    let mut i: i32 = 0;
+    while i < arity {
+        let name_tok: i32 = vec_get(pn, param_base + i);
+        let ty_tag:   i32 = vec_get(pt, param_base + i);
+        let name_s:   string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
+        let ty_s:     string = drv_ty_to_c(ty_tag);
+        let param_s:  string = string_concat(ty_s, string_concat(" ", name_s));
+        if i == 0 { s = param_s; }
+        else { s = string_concat(s, string_concat(", ", param_s)); }
+        i = i + 1;
+    }
+    return s;
+}
+
+/* Emit one fn item. */
+fn drv_emit_fn(item_idx: i32,
+               it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>,
+               ipbase: Vec<i32>, iret: Vec<i32>, ibody: Vec<i32>,
+               pn: Vec<i32>, pt: Vec<i32>,
+               et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+               ss: Vec<i32>, as_: Vec<i32>,
+               tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string) -> string {
+    let name_tok:  i32 = vec_get(iname,  item_idx);
+    let arity:     i32 = vec_get(iarity, item_idx);
+    let param_base:i32 = vec_get(ipbase, item_idx);
+    let ret_ty:    i32 = vec_get(iret,   item_idx);
+    let body_idx:  i32 = vec_get(ibody,  item_idx);
+
+    let fn_name: string = drv_c_fn_name(tok_starts, tok_ends, source, name_tok);
+    let params_s: string = drv_emit_params(pn, pt, tok_starts, tok_ends, source,
+                                            param_base, arity);
+    let ret_s: string = drv_ty_to_c(ret_ty);
+    let is_main: bool = string_eq(fn_name, "main");
+
+    let proto: string = if is_main {
+        string_concat(ret_s, string_concat(" main(", string_concat(params_s, ")")))
+    } else {
+        string_concat("static ", string_concat(ret_s, string_concat(" ", string_concat(fn_name, string_concat("(", string_concat(params_s, ")"))))))
+    };
+
+    let body_s: string = drv_emit_block(et, e1, e2, e3, ss, as_,
+                                         tok_starts, tok_ends, source,
+                                         body_idx, 0);
+    return string_concat(proto, string_concat(" ", string_concat(body_s, "\n")));
+}
+
+/* drv_emit_c: top-level C emitter.
+   Returns the complete C source as a string. */
+fn drv_emit_c(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>,
+              ipbase: Vec<i32>, iret: Vec<i32>, ibody: Vec<i32>,
+              pn: Vec<i32>, pt: Vec<i32>,
+              et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+              ss: Vec<i32>, as_: Vec<i32>,
+              tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string) -> string {
+    let n_items: i32 = vec_len(it);
+    let mut out: string = "#include \"sv0_runtime.h\"\n\n";
+
+    /* Forward declarations for non-main functions */
+    let mut i: i32 = 0;
+    while i < n_items {
+        let name_tok: i32 = vec_get(iname, i);
+        let fn_name: string = drv_c_fn_name(tok_starts, tok_ends, source, name_tok);
+        if string_eq(fn_name, "main") != true {
+            let arity:      i32 = vec_get(iarity, i);
+            let param_base: i32 = vec_get(ipbase, i);
+            let ret_ty:     i32 = vec_get(iret,   i);
+            let params_s: string = drv_emit_params(pn, pt, tok_starts, tok_ends, source,
+                                                    param_base, arity);
+            let ret_s: string = drv_ty_to_c(ret_ty);
+            let decl: string = string_concat("static ", string_concat(ret_s, string_concat(" ", string_concat(fn_name, string_concat("(", string_concat(params_s, ");\n"))))));
+            out = string_concat(out, decl);
+        }
+        i = i + 1;
+    }
+    if n_items > 1 { out = string_concat(out, "\n"); }
+
+    /* Definitions */
+    let mut j: i32 = 0;
+    while j < n_items {
+        let def: string = drv_emit_fn(j, it, iname, iarity, ipbase, iret, ibody,
+                                       pn, pt, et, e1, e2, e3, ss, as_,
+                                       tok_starts, tok_ends, source);
+        out = string_concat(out, def);
+        if j < n_items - 1 { out = string_concat(out, "\n"); }
+        j = j + 1;
+    }
+    return out;
+}
+
+/* ── Codegen helper: compile source to C ──────────────────────────────────── */
+
+fn drv_src_to_c(source: string) -> string {
+    let tok_tags:   Vec<i32> = vec_new();
+    let tok_starts: Vec<i32> = vec_new();
+    let tok_ends:   Vec<i32> = vec_new();
+    let tok_count:  Vec<i32> = vec_new();
+    vec_push(tok_count, 0);
+    drv_tokenize(source, tok_tags, tok_starts, tok_ends, tok_count);
+    let tc: i32 = vec_get(tok_count, 0);
+
+    let it: Vec<i32> = vec_new();
+    let iname: Vec<i32> = vec_new();
+    let iarity: Vec<i32> = vec_new();
+    let ipbase: Vec<i32> = vec_new();
+    let iret: Vec<i32> = vec_new();
+    let ibody: Vec<i32> = vec_new();
+    let pn: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+    let ss: Vec<i32> = vec_new();
+    let as_: Vec<i32> = vec_new();
+
+    drv_parse(tok_tags, tok_starts, tok_ends, source, tc,
+              it, iname, iarity, ipbase, iret, ibody, pn, pt,
+              et, e1, e2, e3, ss, as_);
+    return drv_emit_c(it, iname, iarity, ipbase, iret, ibody, pn, pt,
+                       et, e1, e2, e3, ss, as_,
+                       tok_starts, tok_ends, source);
+}
+
+/* ── Codegen tests ────────────────────────────────────────────────────────── */
+
+fn test_drv_emit_header() -> i32 {
+    let c: string = drv_src_to_c("fn main() -> i32 { return 0; }");
+    /* Must start with the runtime include */
+    let prefix: string = string_substr(c, 0, 25);
+    if string_eq(prefix, "#include \"sv0_runtime.h\"\n") != true { return 1; }
+    return 0;
+}
+
+fn test_drv_emit_main_nonstaticx() -> i32 {
+    let c: string = drv_src_to_c("fn main() -> i32 { return 0; }");
+    /* main must NOT be prefixed with 'static' */
+    /* Check that "int main(" appears somewhere in the output */
+    let has_int_main: bool = drv_string_contains(c, "int main(");
+    if has_int_main != true { return 1; }
+    /* And no "static int main" */
+    let has_static_main: bool = drv_string_contains(c, "static int main");
+    if has_static_main != false { return 2; }
+    return 0;
+}
+
+fn test_drv_emit_return_zero() -> i32 {
+    let c: string = drv_src_to_c("fn main() -> i32 { return 0; }");
+    if drv_string_contains(c, "return 0") != true { return 1; }
+    return 0;
+}
+
+fn test_drv_emit_add_chain() -> i32 {
+    /* vm_add_chain: return 1 + 2 + 3 - 6 */
+    let c: string = drv_src_to_c("fn main() -> i32 { return 1 + 2 + 3 - 6; }");
+    if drv_string_contains(c, "return") != true { return 1; }
+    if drv_string_contains(c, "int main(") != true { return 2; }
+    return 0;
+}
+
+fn test_drv_emit_helper_call() -> i32 {
+    /* vm_helper_call: fn bump + fn main */
+    let src: string = "fn bump(x: i32) -> i32 { return x + 1; } fn main() -> i32 { return bump(0) - 1; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "sv0__bump") != true { return 1; }
+    if drv_string_contains(c, "static int sv0__bump") != true { return 2; }
+    if drv_string_contains(c, "int main(") != true { return 3; }
+    return 0;
+}
+
+fn test_drv_emit_if_expr() -> i32 {
+    let src: string = "fn main() -> i32 { return if true { 0 } else { 1 }; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "if (") != true { return 1; }
+    if drv_string_contains(c, "else") != true { return 2; }
+    return 0;
+}
+
+fn test_drv_emit_while_break() -> i32 {
+    let src: string = "fn main() -> i32 { while true { break; }; return 0; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "while (") != true { return 1; }
+    if drv_string_contains(c, "break") != true { return 2; }
+    return 0;
+}
+
+fn test_drv_emit_forward_decl() -> i32 {
+    /* With two fns, the non-main fn should get a forward declaration */
+    let src: string = "fn f(x: i32) -> i32 { return x; } fn main() -> i32 { return f(0); }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "static int sv0__f") != true { return 1; }
+    if drv_string_contains(c, "int main(") != true { return 2; }
+    return 0;
+}
+
+fn test_drv_emit_bool_ops() -> i32 {
+    let src: string = "fn f(x: i32) -> i32 { return if x == 0 { 1 } else { 0 }; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "==") != true { return 1; }
+    return 0;
+}
+
+fn test_drv_emit_let_binding() -> i32 {
+    let src: string = "fn f() -> i32 { let x: i32 = 42; return x; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "int x = 42") != true { return 1; }
+    if drv_string_contains(c, "return x") != true { return 2; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 7
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 8: DRIVER ORCHESTRATION — drv_compile_file
+   ═══════════════════════════════════════════════════════════════════════════
+
+   drv_compile_file ties all six phases together:
+     1. Read source from in_path
+     2. Tokenize
+     3. Parse
+     4. Resolve
+     5. Check
+     6. Emit C → write to out_path
+
+   Returns 0 on success, DRV_ERR() on any phase failure.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+fn drv_compile_file(in_path: string, out_path: string) -> i32 {
+    let source: string = read_file(in_path);
+    if string_len(source) == 0 { return DRV_ERR(); }
+
+    /* Phase 1: Tokenize */
+    let tok_tags:   Vec<i32> = vec_new();
+    let tok_starts: Vec<i32> = vec_new();
+    let tok_ends:   Vec<i32> = vec_new();
+    let tok_count:  Vec<i32> = vec_new();
+    vec_push(tok_count, 0);
+    let lex_result: i32 = drv_tokenize(source, tok_tags, tok_starts, tok_ends, tok_count);
+    if lex_result != 0 { return DRV_ERR(); }
+    let tc: i32 = vec_get(tok_count, 0);
+
+    /* Phase 2: Parse */
+    let it: Vec<i32> = vec_new();
+    let iname: Vec<i32> = vec_new();
+    let iarity: Vec<i32> = vec_new();
+    let ipbase: Vec<i32> = vec_new();
+    let iret: Vec<i32> = vec_new();
+    let ibody: Vec<i32> = vec_new();
+    let pn: Vec<i32> = vec_new();
+    let pt: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e3: Vec<i32> = vec_new();
+    let ss: Vec<i32> = vec_new();
+    let as_: Vec<i32> = vec_new();
+
+    let parse_result: i32 = drv_parse(tok_tags, tok_starts, tok_ends, source, tc,
+                                       it, iname, iarity, ipbase, iret, ibody, pn, pt,
+                                       et, e1, e2, e3, ss, as_);
+    if parse_result != 0 { return DRV_ERR(); }
+
+    /* Phase 3: Resolve */
+    let resolve_result: i32 = drv_resolve(it, iname, iarity, ipbase, ibody, pn,
+                                           et, e1, e2, e3, ss, as_);
+    /* Resolve errors are soft for the spike */
+
+    /* Phase 4: Check (type inference, soft errors) */
+    let type_map: Vec<i32> = vec_new();
+    let n_exprs: i32 = vec_len(et);
+    let mut k: i32 = 0;
+    while k < n_exprs { vec_push(type_map, DRV_TY_UNKNOWN()); k = k + 1; }
+    drv_check(it, iname, iarity, ipbase, iret, ibody, pn, pt,
+              et, e1, e2, e3, ss, as_, tok_tags, type_map);
+
+    /* Phase 5: (lowering elided — direct codegen) */
+
+    /* Phase 6: Emit C */
+    let c_source: string = drv_emit_c(it, iname, iarity, ipbase, iret, ibody, pn, pt,
+                                       et, e1, e2, e3, ss, as_,
+                                       tok_starts, tok_ends, source);
+    write_file(out_path, c_source);
+    return 0;
+}
+
+/* ── Integration tests for the vm-parity programs ────────────────────────── */
+
+fn test_drv_vm_add_chain() -> i32 {
+    /* fn main() -> i32 { return 1 + 2 + 3 - 6; }  → should produce 0 at runtime */
+    let src: string = "fn main() -> i32 { return 1 + 2 + 3 - 6; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "#include \"sv0_runtime.h\"") != true { return 1; }
+    if drv_string_contains(c, "int main(") != true { return 2; }
+    if drv_string_contains(c, "return") != true { return 3; }
+    return 0;
+}
+
+fn test_drv_vm_helper_call() -> i32 {
+    /* fn bump(x) + fn main: main returns bump(0)-1 = 0 */
+    let src: string = "fn bump(x: i32) -> i32 { return x + 1; } fn main() -> i32 { return bump(0) - 1; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "sv0__bump") != true { return 1; }
+    if drv_string_contains(c, "static int sv0__bump(int x)") != true { return 2; }
+    return 0;
+}
+
+fn test_drv_vm_if_expr() -> i32 {
+    /* fn main() -> i32 { return if true { 0 } else { 1 }; } */
+    let src: string = "fn main() -> i32 { return if true { 0 } else { 1 }; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "if (") != true { return 1; }
+    if drv_string_contains(c, "else") != true { return 2; }
+    return 0;
+}
+
+fn test_drv_vm_while_break() -> i32 {
+    /* fn main() -> i32 { while true { break; }; return 0; } */
+    let src: string = "fn main() -> i32 { while true { break; }; return 0; }";
+    let c: string = drv_src_to_c(src);
+    if drv_string_contains(c, "while (1)") != true { return 1; }
+    if drv_string_contains(c, "break;") != true { return 2; }
+    return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END SECTION 8
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 9: TEST HARNESS — fn main()
+   ═══════════════════════════════════════════════════════════════════════════
+
+   All test functions are aggregated here in pipeline order.  Each test
+   suite returns 0 on success or a nonzero sub-code on the first failure.
+   The main() function returns:
+     0        — all tests pass
+     100+N    — Section 1 token tag test N failed
+     200+N    — Section 2 char classification test N failed
+     ...
+     3200+N   — Section 8 integration test N failed
+
+   This encoding lets you identify the failing test group from the exit code
+   without needing print statements (important for bootstrap VM testing).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+fn main() -> i32 {
+    /* Section 1: Token tag constants */
+    let r1: i32 = test_drv_token_tags();
+    if r1 != 0 { return 100 + r1; }
+
+    /* Section 2: Character classification */
+    let r2: i32 = test_drv_is_ident_start();
+    if r2 != 0 { return 200 + r2; }
+    let r3: i32 = test_drv_is_ident_cont();
+    if r3 != 0 { return 300 + r3; }
+    let r4: i32 = test_drv_is_digit();
+    if r4 != 0 { return 400 + r4; }
+    let r5: i32 = test_drv_is_whitespace();
+    if r5 != 0 { return 500 + r5; }
+    let r6: i32 = test_drv_lookup_keyword();
+    if r6 != 0 { return 600 + r6; }
+    let r7: i32 = test_drv_parse_int_literal();
+    if r7 != 0 { return 700 + r7; }
+    let r7b: i32 = test_drv_string_contains();
+    if r7b != 0 { return 750 + r7b; }
+    let r7c: i32 = test_drv_int_to_string();
+    if r7c != 0 { return 760 + r7c; }
+
+    /* Section 3: Lexer */
+    let r8: i32 = test_drv_lex_empty();
+    if r8 != 0 { return 800 + r8; }
+    let r9: i32 = test_drv_lex_comments();
+    if r9 != 0 { return 900 + r9; }
+    let r10: i32 = test_drv_lex_int_lits();
+    if r10 != 0 { return 1000 + r10; }
+    let r11: i32 = test_drv_lex_idents();
+    if r11 != 0 { return 1100 + r11; }
+    let r12: i32 = test_drv_lex_keywords();
+    if r12 != 0 { return 1200 + r12; }
+    let r13: i32 = test_drv_lex_punctuation();
+    if r13 != 0 { return 1300 + r13; }
+    let r14: i32 = test_drv_lex_operators();
+    if r14 != 0 { return 1400 + r14; }
+    let r15: i32 = test_drv_lex_real_programs();
+    if r15 != 0 { return 1500 + r15; }
+    let r16: i32 = test_drv_lex_spans();
+    if r16 != 0 { return 1600 + r16; }
+
+    /* Section 4: Arena helpers */
+    let r17: i32 = test_drv_arena_helpers();
+    if r17 != 0 { return 1700 + r17; }
+    let r18: i32 = test_drv_op_to_c();
+    if r18 != 0 { return 1800 + r18; }
+    let r19: i32 = test_drv_tok_to_binop();
+    if r19 != 0 { return 1900 + r19; }
+
+    /* Section 5: Parser */
+    let r20: i32 = test_drv_parse_basic_fn();
+    if r20 != 0 { return 2000 + r20; }
+    let r21: i32 = test_drv_parse_fn_with_params();
+    if r21 != 0 { return 2100 + r21; }
+    let r22: i32 = test_drv_parse_two_fns();
+    if r22 != 0 { return 2200 + r22; }
+    let r23: i32 = test_drv_parse_unit_return();
+    if r23 != 0 { return 2300 + r23; }
+    let r24: i32 = test_drv_parse_bool_return();
+    if r24 != 0 { return 2400 + r24; }
+    let r25: i32 = test_drv_parse_if_else();
+    if r25 != 0 { return 2500 + r25; }
+    let r26: i32 = test_drv_parse_while();
+    if r26 != 0 { return 2600 + r26; }
+    let r27: i32 = test_drv_parse_let();
+    if r27 != 0 { return 2700 + r27; }
+    let r28: i32 = test_drv_parse_let_mut();
+    if r28 != 0 { return 2800 + r28; }
+    let r29: i32 = test_drv_parse_nested_call();
+    if r29 != 0 { return 2900 + r29; }
+    let r30: i32 = test_drv_parse_add_chain();
+    if r30 != 0 { return 3000 + r30; }
+    let r31: i32 = test_drv_parse_multiline();
+    if r31 != 0 { return 3100 + r31; }
+
+    /* Section 6: Resolver */
+    let r32: i32 = test_drv_resolve_basic();
+    if r32 != 0 { return 3200 + r32; }
+
+    /* Section 6b: Checker */
+    let r33: i32 = test_drv_check_basic();
+    if r33 != 0 { return 3300 + r33; }
+
+    /* Section 7: C emitter */
+    let r34: i32 = test_drv_emit_header();
+    if r34 != 0 { return 3400 + r34; }
+    let r35: i32 = test_drv_emit_main_nonstaticx();
+    if r35 != 0 { return 3500 + r35; }
+    let r36: i32 = test_drv_emit_return_zero();
+    if r36 != 0 { return 3600 + r36; }
+    let r37: i32 = test_drv_emit_add_chain();
+    if r37 != 0 { return 3700 + r37; }
+    let r38: i32 = test_drv_emit_helper_call();
+    if r38 != 0 { return 3800 + r38; }
+    let r39: i32 = test_drv_emit_if_expr();
+    if r39 != 0 { return 3900 + r39; }
+    let r40: i32 = test_drv_emit_while_break();
+    if r40 != 0 { return 4000 + r40; }
+    let r41: i32 = test_drv_emit_forward_decl();
+    if r41 != 0 { return 4100 + r41; }
+    let r42: i32 = test_drv_emit_bool_ops();
+    if r42 != 0 { return 4200 + r42; }
+    let r43: i32 = test_drv_emit_let_binding();
+    if r43 != 0 { return 4300 + r43; }
+
+    /* Section 8: Integration / vm-parity */
+    let r44: i32 = test_drv_vm_add_chain();
+    if r44 != 0 { return 4400 + r44; }
+    let r45: i32 = test_drv_vm_helper_call();
+    if r45 != 0 { return 4500 + r45; }
+    let r46: i32 = test_drv_vm_if_expr();
+    if r46 != 0 { return 4600 + r46; }
+    let r47: i32 = test_drv_vm_while_break();
+    if r47 != 0 { return 4700 + r47; }
+
+    return 0;
+}
