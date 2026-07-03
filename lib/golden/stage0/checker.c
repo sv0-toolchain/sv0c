@@ -1908,8 +1908,13 @@ static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
       } else {
       }
       int ni = 0;
-      int _sv0t14 = sv0_vec_len(struct_names);
-      while ((ni < _sv0t14)) {
+      while (1) {
+        int _sv0t14 = sv0_vec_len(struct_names);
+        int _sv0t17 = (ni < _sv0t14);
+        if ((!_sv0t17)) {
+          break;
+        } else {
+        }
         int _sv0t15 = sv0_vec_get(struct_names, ni);
         if ((_sv0t15 == tok)) {
           int _sv0t16 = TY_STRUCT();
@@ -1919,33 +1924,38 @@ static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
         ni = (ni + 1);
       }
       int ei = 0;
-      int _sv0t17 = sv0_vec_len(enum_names);
-      while ((ei < _sv0t17)) {
-        int _sv0t18 = sv0_vec_get(enum_names, ei);
-        if ((_sv0t18 == tok)) {
-          int _sv0t19 = TY_ENUM();
-          return _sv0t19;
+      while (1) {
+        int _sv0t18 = sv0_vec_len(enum_names);
+        int _sv0t21 = (ei < _sv0t18);
+        if ((!_sv0t21)) {
+          break;
+        } else {
+        }
+        int _sv0t19 = sv0_vec_get(enum_names, ei);
+        if ((_sv0t19 == tok)) {
+          int _sv0t20 = TY_ENUM();
+          return _sv0t20;
         } else {
         }
         ei = (ei + 1);
       }
-      int _sv0t20 = type_param_lookup(type_params, tp_limit, tok);
-      int tp = _sv0t20;
+      int _sv0t22 = type_param_lookup(type_params, tp_limit, tok);
+      int tp = _sv0t22;
       if ((tp >= 0)) {
-        int _sv0t21 = TY_VAR();
-        return _sv0t21;
+        int _sv0t23 = TY_VAR();
+        return _sv0t23;
       } else {
       }
-      int _sv0t22 = (0 - 1);
-      return _sv0t22;
+      int _sv0t24 = (0 - 1);
+      return _sv0t24;
     } else {
     }
-    int _sv0t23 = (0 - 1);
-    return _sv0t23;
+    int _sv0t25 = (0 - 1);
+    return _sv0t25;
   } else {
   }
-  int _sv0t24 = (0 - 1);
-  return _sv0t24;
+  int _sv0t26 = (0 - 1);
+  return _sv0t26;
 }
 
 static int ast_ty_to_ty_payload(int ty_tags, int ty_d1, int ty_d2, int ty_d3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int idx, int out_payload) {
@@ -2005,8 +2015,13 @@ static int ast_ty_to_ty_payload(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
       } else {
       }
       int ni = 0;
-      int _sv0t15 = sv0_vec_len(struct_names);
-      while ((ni < _sv0t15)) {
+      while (1) {
+        int _sv0t15 = sv0_vec_len(struct_names);
+        int _sv0t18 = (ni < _sv0t15);
+        if ((!_sv0t18)) {
+          break;
+        } else {
+        }
         int _sv0t16 = sv0_vec_get(struct_names, ni);
         if ((_sv0t16 == tok)) {
           sv0_vec_push(out_payload, tok);
@@ -2017,35 +2032,40 @@ static int ast_ty_to_ty_payload(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
         ni = (ni + 1);
       }
       int ei = 0;
-      int _sv0t18 = sv0_vec_len(enum_names);
-      while ((ei < _sv0t18)) {
-        int _sv0t19 = sv0_vec_get(enum_names, ei);
-        if ((_sv0t19 == tok)) {
+      while (1) {
+        int _sv0t19 = sv0_vec_len(enum_names);
+        int _sv0t22 = (ei < _sv0t19);
+        if ((!_sv0t22)) {
+          break;
+        } else {
+        }
+        int _sv0t20 = sv0_vec_get(enum_names, ei);
+        if ((_sv0t20 == tok)) {
           sv0_vec_push(out_payload, tok);
-          int _sv0t20 = TY_ENUM();
-          return _sv0t20;
+          int _sv0t21 = TY_ENUM();
+          return _sv0t21;
         } else {
         }
         ei = (ei + 1);
       }
-      int _sv0t21 = type_param_lookup(type_params, tp_limit, tok);
-      int tp = _sv0t21;
+      int _sv0t23 = type_param_lookup(type_params, tp_limit, tok);
+      int tp = _sv0t23;
       if ((tp >= 0)) {
         sv0_vec_push(out_payload, tp);
-        int _sv0t22 = TY_VAR();
-        return _sv0t22;
+        int _sv0t24 = TY_VAR();
+        return _sv0t24;
       } else {
       }
-      int _sv0t23 = (0 - 1);
-      return _sv0t23;
+      int _sv0t25 = (0 - 1);
+      return _sv0t25;
     } else {
     }
-    int _sv0t24 = (0 - 1);
-    return _sv0t24;
+    int _sv0t26 = (0 - 1);
+    return _sv0t26;
   } else {
   }
-  int _sv0t25 = (0 - 1);
-  return _sv0t25;
+  int _sv0t27 = (0 - 1);
+  return _sv0t27;
 }
 
 static int enum_ctor_count(int variant_enum_ids, int enum_name) {
@@ -2076,8 +2096,13 @@ static int item_fn_ret_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, int 
 
 static int scan_struct_field_names(int tok_tags, int name_tok_pos, int field_count, int out_field_names) {
   int p = (name_tok_pos + 1);
-  int _sv0t0 = sv0_vec_get(tok_tags, p);
-  while ((_sv0t0 != 8)) {
+  while (1) {
+    int _sv0t0 = sv0_vec_get(tok_tags, p);
+    int _sv0t3 = (_sv0t0 != 8);
+    if ((!_sv0t3)) {
+      break;
+    } else {
+    }
     p = (p + 1);
     int _sv0t1 = sv0_vec_len(tok_tags);
     if ((p >= _sv0t1)) {
@@ -2089,32 +2114,32 @@ static int scan_struct_field_names(int tok_tags, int name_tok_pos, int field_cou
   p = (p + 1);
   int found = 0;
   while ((found < field_count)) {
-    int _sv0t3 = sv0_vec_get(tok_tags, p);
-    if ((_sv0t3 == 87)) {
+    int _sv0t4 = sv0_vec_get(tok_tags, p);
+    if ((_sv0t4 == 87)) {
       p = (p + 1);
     } else {
     }
-    int _sv0t4 = sv0_vec_get(tok_tags, p);
-    if ((_sv0t4 != 5)) {
-      int _sv0t5 = (0 - 1);
-      return _sv0t5;
+    int _sv0t5 = sv0_vec_get(tok_tags, p);
+    if ((_sv0t5 != 5)) {
+      int _sv0t6 = (0 - 1);
+      return _sv0t6;
     } else {
     }
     sv0_vec_push(out_field_names, p);
     found = (found + 1);
     p = (p + 1);
-    int _sv0t6 = sv0_vec_get(tok_tags, p);
-    if ((_sv0t6 != 14)) {
-      int _sv0t7 = (0 - 1);
-      return _sv0t7;
+    int _sv0t7 = sv0_vec_get(tok_tags, p);
+    if ((_sv0t7 != 14)) {
+      int _sv0t8 = (0 - 1);
+      return _sv0t8;
     } else {
     }
     p = (p + 1);
     int depth = 0;
     int scanning_type = 1;
     while (scanning_type) {
-      int _sv0t8 = sv0_vec_get(tok_tags, p);
-      int t = _sv0t8;
+      int _sv0t9 = sv0_vec_get(tok_tags, p);
+      int t = _sv0t9;
       if ((t == 8)) {
         depth = (depth + 1);
         p = (p + 1);
@@ -2160,8 +2185,13 @@ static int scan_struct_field_names(int tok_tags, int name_tok_pos, int field_cou
 
 static int scan_enum_variant_names(int tok_tags, int name_tok_pos, int variant_count, int out_variant_names) {
   int p = (name_tok_pos + 1);
-  int _sv0t0 = sv0_vec_get(tok_tags, p);
-  while ((_sv0t0 != 8)) {
+  while (1) {
+    int _sv0t0 = sv0_vec_get(tok_tags, p);
+    int _sv0t3 = (_sv0t0 != 8);
+    if ((!_sv0t3)) {
+      break;
+    } else {
+    }
     p = (p + 1);
     int _sv0t1 = sv0_vec_len(tok_tags);
     if ((p >= _sv0t1)) {
@@ -2173,23 +2203,23 @@ static int scan_enum_variant_names(int tok_tags, int name_tok_pos, int variant_c
   p = (p + 1);
   int found = 0;
   while ((found < variant_count)) {
-    int _sv0t3 = sv0_vec_get(tok_tags, p);
-    if ((_sv0t3 != 5)) {
-      int _sv0t4 = (0 - 1);
-      return _sv0t4;
+    int _sv0t4 = sv0_vec_get(tok_tags, p);
+    if ((_sv0t4 != 5)) {
+      int _sv0t5 = (0 - 1);
+      return _sv0t5;
     } else {
     }
     sv0_vec_push(out_variant_names, p);
     found = (found + 1);
     p = (p + 1);
-    int _sv0t5 = sv0_vec_get(tok_tags, p);
-    int t = _sv0t5;
+    int _sv0t6 = sv0_vec_get(tok_tags, p);
+    int t = _sv0t6;
     if ((t == 6)) {
       int depth = 1;
       p = (p + 1);
       while ((depth > 0)) {
-        int _sv0t6 = sv0_vec_get(tok_tags, p);
-        int u = _sv0t6;
+        int _sv0t7 = sv0_vec_get(tok_tags, p);
+        int u = _sv0t7;
         if ((u == 6)) {
           depth = (depth + 1);
         } else {
@@ -2206,8 +2236,8 @@ static int scan_enum_variant_names(int tok_tags, int name_tok_pos, int variant_c
       int depth = 1;
       p = (p + 1);
       while ((depth > 0)) {
-        int _sv0t7 = sv0_vec_get(tok_tags, p);
-        int u = _sv0t7;
+        int _sv0t8 = sv0_vec_get(tok_tags, p);
+        int u = _sv0t8;
         if ((u == 10)) {
           depth = (depth + 1);
         } else {
@@ -2224,8 +2254,8 @@ static int scan_enum_variant_names(int tok_tags, int name_tok_pos, int variant_c
       int depth = 1;
       p = (p + 1);
       while ((depth > 0)) {
-        int _sv0t8 = sv0_vec_get(tok_tags, p);
-        int u = _sv0t8;
+        int _sv0t9 = sv0_vec_get(tok_tags, p);
+        int u = _sv0t9;
         if ((u == 8)) {
           depth = (depth + 1);
         } else {
@@ -2238,8 +2268,8 @@ static int scan_enum_variant_names(int tok_tags, int name_tok_pos, int variant_c
       }
     } else {
     }
-    int _sv0t9 = sv0_vec_get(tok_tags, p);
-    if ((_sv0t9 == 12)) {
+    int _sv0t10 = sv0_vec_get(tok_tags, p);
+    if ((_sv0t10 == 12)) {
       p = (p + 1);
     } else {
     }
@@ -2316,8 +2346,13 @@ static int scan_type_tag_at(int tok_tags, const char* source, int starts, int en
     } else {
     }
     int ni = 0;
-    int _sv0t10 = sv0_vec_len(struct_names);
-    while ((ni < _sv0t10)) {
+    while (1) {
+      int _sv0t10 = sv0_vec_len(struct_names);
+      int _sv0t18 = (ni < _sv0t10);
+      if ((!_sv0t18)) {
+        break;
+      } else {
+      }
       int _sv0t11 = sv0_vec_get(struct_names, ni);
       int sn = _sv0t11;
       int _sv0t12 = sv0_vec_get(starts, sn);
@@ -2338,55 +2373,60 @@ static int scan_type_tag_at(int tok_tags, const char* source, int starts, int en
       ni = (ni + 1);
     }
     int ei = 0;
-    int _sv0t18 = sv0_vec_len(enum_names);
-    while ((ei < _sv0t18)) {
-      int _sv0t19 = sv0_vec_get(enum_names, ei);
-      int en_pos = _sv0t19;
-      int _sv0t20 = sv0_vec_get(starts, en_pos);
-      int es = _sv0t20;
-      int _sv0t21 = sv0_vec_get(ends, en_pos);
-      int ee = _sv0t21;
-      int _sv0t22 = (ee - es);
-      const char* _sv0t23 = sv0_string_substr(source, es, _sv0t22);
+    while (1) {
+      int _sv0t19 = sv0_vec_len(enum_names);
+      int _sv0t27 = (ei < _sv0t19);
+      if ((!_sv0t27)) {
+        break;
+      } else {
+      }
+      int _sv0t20 = sv0_vec_get(enum_names, ei);
+      int en_pos = _sv0t20;
+      int _sv0t21 = sv0_vec_get(starts, en_pos);
+      int es = _sv0t21;
+      int _sv0t22 = sv0_vec_get(ends, en_pos);
+      int ee = _sv0t22;
+      int _sv0t23 = (ee - es);
+      const char* _sv0t24 = sv0_string_substr(source, es, _sv0t23);
       const char* ename;
-      ename = _sv0t23;
-      int _sv0t24 = sv0_string_eq(name, ename);
-      if (_sv0t24) {
+      ename = _sv0t24;
+      int _sv0t25 = sv0_string_eq(name, ename);
+      if (_sv0t25) {
         sv0_vec_push(out_tag, 7);
-        int _sv0t25 = (pos + 1);
-        return _sv0t25;
+        int _sv0t26 = (pos + 1);
+        return _sv0t26;
       } else {
       }
       ei = (ei + 1);
     }
-    int _sv0t26 = type_param_lookup_str(type_params, tp_limit, source, starts, ends, name);
-    int tp = _sv0t26;
+    int _sv0t28 = type_param_lookup_str(type_params, tp_limit, source, starts, ends, name);
+    int tp = _sv0t28;
     if ((tp >= 0)) {
       sv0_vec_push(out_tag, 16);
-      int _sv0t27 = (pos + 1);
-      return _sv0t27;
+      int _sv0t29 = (pos + 1);
+      return _sv0t29;
     } else {
     }
-    int _sv0t28 = (0 - 1);
-    sv0_vec_push(out_tag, _sv0t28);
-    int _sv0t29 = (pos + 1);
-    return _sv0t29;
+    int _sv0t30 = (0 - 1);
+    sv0_vec_push(out_tag, _sv0t30);
+    int _sv0t31 = (pos + 1);
+    return _sv0t31;
   } else {
   }
   if ((t == 6)) {
-    int _sv0t30 = (pos + 1);
-    int _sv0t31 = sv0_vec_get(tok_tags, _sv0t30);
-    if ((_sv0t31 == 7)) {
+    int _sv0t32 = (pos + 1);
+    int _sv0t33 = sv0_vec_get(tok_tags, _sv0t32);
+    if ((_sv0t33 == 7)) {
       sv0_vec_push(out_tag, 2);
-      int _sv0t32 = (pos + 2);
-      return _sv0t32;
+      int _sv0t34 = (pos + 2);
+      return _sv0t34;
     } else {
     }
     int depth = 1;
     int p = (pos + 1);
     while ((depth > 0)) {
-      int _sv0t33 = sv0_vec_get(tok_tags, p);
-      int u = _sv0t33;
+      int _sv0t35 = sv0_vec_get(tok_tags, p);
+      int u = _sv0t35;
       if ((u == 6)) {
         depth = (depth + 1);
       } else {
@@ -2402,31 +2442,31 @@ static int scan_type_tag_at(int tok_tags, const char* source, int starts, int en
   } else {
   }
   if ((t == 27)) {
-    int _sv0t34 = (pos + 1);
-    int _sv0t35 = sv0_vec_get(tok_tags, _sv0t34);
-    if ((_sv0t35 == 77)) {
-      int _sv0t36 = sv0_vec_new();
-      int inner_out = _sv0t36;
-      int _sv0t37 = (pos + 2);
-      int _sv0t38 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t37, inner_out);
-      int p = _sv0t38;
+    int _sv0t36 = (pos + 1);
+    int _sv0t37 = sv0_vec_get(tok_tags, _sv0t36);
+    if ((_sv0t37 == 77)) {
+      int _sv0t38 = sv0_vec_new();
+      int inner_out = _sv0t38;
+      int _sv0t39 = (pos + 2);
+      int _sv0t40 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t39, inner_out);
+      int p = _sv0t40;
       sv0_vec_push(out_tag, 13);
       return p;
     } else {
     }
-    int _sv0t39 = sv0_vec_new();
-    int inner_out = _sv0t39;
-    int _sv0t40 = (pos + 1);
-    int _sv0t41 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t40, inner_out);
-    int p = _sv0t41;
+    int _sv0t41 = sv0_vec_new();
+    int inner_out = _sv0t41;
+    int _sv0t42 = (pos + 1);
+    int _sv0t43 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t42, inner_out);
+    int p = _sv0t43;
     sv0_vec_push(out_tag, 12);
     return p;
   } else {
   }
-  int _sv0t42 = (0 - 1);
-  sv0_vec_push(out_tag, _sv0t42);
-  int _sv0t43 = (pos + 1);
-  return _sv0t43;
+  int _sv0t44 = (0 - 1);
+  sv0_vec_push(out_tag, _sv0t44);
+  int _sv0t45 = (pos + 1);
+  return _sv0t45;
 }
 
 static int scan_struct_field_type_tags(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int field_name_positions, int out_field_types) {

@@ -131,8 +131,13 @@ static int path_ok(const char* rel) {
   } else {
   }
   int i = 0;
-  int _sv0t2 = (len - 1);
-  while ((i < _sv0t2)) {
+  while (1) {
+    int _sv0t2 = (len - 1);
+    int _sv0t6 = (i < _sv0t2);
+    if ((!_sv0t6)) {
+      break;
+    } else {
+    }
     int _sv0t3 = sv0_string_char_at(rel, i);
     int c0 = _sv0t3;
     int _sv0t4 = (i + 1);

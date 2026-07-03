@@ -2841,8 +2841,13 @@ static int test_encode_decode_roundtrip(void) {
   } else {
   }
   int i = 0;
-  int _sv0t12 = sv0_vec_len(instrs);
-  while ((i < _sv0t12)) {
+  while (1) {
+    int _sv0t12 = sv0_vec_len(instrs);
+    int _sv0t16 = (i < _sv0t12);
+    if ((!_sv0t16)) {
+      break;
+    } else {
+    }
     int _sv0t13 = sv0_vec_get(instrs, i);
     int _sv0t14 = sv0_vec_get(decoded, i);
     if ((_sv0t13 != _sv0t14)) {
