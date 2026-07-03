@@ -15,11 +15,12 @@ The stage-0 compiler’s file driver (**`sv0c/sml-legacy/main.sml`**) follows ro
 
 The **linear step indices** **`0..DRIVER_FULL_PIPELINE_LEN()-1`** exposed from **`lib/main.sv0`** (**`driver_pipeline_step_name`**) mirror this at **coarse** granularity: **tokenize**, **parse**, then **`PHASE_RESOLVE` … `PHASE_EMIT_VM`** (see **`DRIVER_FULL_PIPELINE_LEN`**, **`driver_pipeline_step_for_core_phase`**).
 
-## Current sv0 bootstrap shape
+## Current sv0 bootstrap shape (updated 2026-07-03)
 
-- **`lib/main.sv0`** implements **path / CLI / phase naming / VM output paths**, **`driver_tokenize_sketch`** (read file → tokenize boundary sketch), and tests (**`test_driver_pipeline_step_names`**, **`test_phases`**, …). It does **not** call **`resolve_program`**, **`check_program`**, **`lower`**, or **`emit`** — those live in other **`lib/*.sv0`** roots compiled independently by the **SML** **`CM.make`** heap loader.
-- Full lexer + parser live in **`lib/lexer.sv0`**, **`lib/parser.sv0`** (see **`lib/LAYOUT.md`** § transliteration order).
-- **Cross-unit linking for sv0** (multiple **`lib/*.sv0`** compilation units merged into one executable) is **not** the same as `#include` text concatenation; until an agreed multi-unit or single-TU policy lands, “one driver TU” is **documentation + naming parity**, not an end-to-end **`main`** that runs the whole compiler.
+- **`lib/driver.sv0`** now implements a **complete, tested pipeline** — tokenize → parse → resolve → check → emit — in a single translation unit, with **49 self-host tests passing** (exit 0 natively). Key `drv_*` functions: `drv_tokenize`, `drv_parse`, `drv_resolve`, `drv_check`, `drv_emit`, and test helpers. This is the canonical single-TU pipeline implementation for P1/P2.
+- **`lib/main.sv0`** implements **path / CLI / phase naming / VM output paths**, **`driver_tokenize_sketch`** (read file → tokenize boundary sketch), and tests (**`test_driver_pipeline_step_names`**, **`test_phases`**, …). It does **not** yet call the `drv_*` pipeline — that wiring (Phase A3 in the plan) is the P1 next step.
+- Full lexer + parser live in **`lib/lexer.sv0`**, **`lib/parser.sv0`** (see **`lib/LAYOUT.md`** § transliteration order). `lib/driver.sv0` re-implements a self-contained subset of these for its pipeline.
+- **Cross-unit linking for sv0** (multiple **`lib/*.sv0`** compilation units merged into one executable) is **not** the same as `#include` text concatenation; until an agreed multi-unit or single-TU policy lands, “one driver TU” is **documentation + naming parity**, not an end-to-end **`main`** that runs the whole compiler. `driver.sv0` is the working single-TU proof-of-concept.
 
 ### Bootstrap VM-compile unit model (why **M3-S-041** is hard)
 
