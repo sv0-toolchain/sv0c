@@ -691,7 +691,7 @@ fn drv_tokenize(source: string,
                 if c1 == 47 {
                     pos = drv_skip_line_comment(source, pos + 2);
                 }
-                /* /* block comment */
+                /* block comment (slash-star) */
                 else {
                 if c1 == 42 {
                     pos = drv_skip_block_comment(source, pos + 2);
