@@ -1018,7 +1018,7 @@ fn test_drv_lex_operators() -> i32 {
 fn test_drv_lex_real_programs() -> i32 {
     /* `fn main() -> i32 { return 0; }` */
     let src1: string = "fn main() -> i32 { return 0; }";
-    if drv_lex_count(src1) != 10 { return 1; }
+    if drv_lex_count(src1) != 11 { return 1; }
     if drv_lex_tag(src1, 0)  != DRV_KW_FN()       { return 2; }   /* fn */
     if drv_lex_tag(src1, 1)  != DRV_TK_IDENT()    { return 3; }   /* main */
     if drv_lex_tag(src1, 2)  != DRV_TK_LPAREN()   { return 4; }   /* ( */
@@ -1040,7 +1040,7 @@ fn test_drv_lex_real_programs() -> i32 {
 
     /* `let x: i32 = 42;` */
     let src2: string = "let x: i32 = 42;";
-    if drv_lex_count(src2) != 6 { return 13; }
+    if drv_lex_count(src2) != 7 { return 13; }
     if drv_lex_tag(src2, 0) != DRV_KW_LET()       { return 14; }
     if drv_lex_tag(src2, 1) != DRV_TK_IDENT()     { return 15; }
     if drv_lex_tag(src2, 2) != DRV_TK_COLON()     { return 16; }
@@ -1054,20 +1054,20 @@ fn test_drv_lex_real_programs() -> i32 {
 
     /* `if true { 0 } else { 1 }` */
     let src4: string = "if true { 0 } else { 1 }";
-    if drv_lex_count(src4) != 8 { return 21; }
+    if drv_lex_count(src4) != 9 { return 21; }
     if drv_lex_tag(src4, 0) != DRV_KW_IF()        { return 22; }
     if drv_lex_tag(src4, 1) != DRV_KW_TRUE()      { return 23; }
-    if drv_lex_tag(src4, 4) != DRV_KW_ELSE()      { return 24; }
+    if drv_lex_tag(src4, 5) != DRV_KW_ELSE()      { return 24; }
 
     /* `while true { break; }` */
     let src5: string = "while true { break; }";
-    if drv_lex_count(src5) != 5 { return 25; }
+    if drv_lex_count(src5) != 6 { return 25; }
     if drv_lex_tag(src5, 0) != DRV_KW_WHILE()     { return 26; }
     if drv_lex_tag(src5, 3) != DRV_KW_BREAK()     { return 27; }
 
     /* Two-function program: `fn bump(x: i32) -> i32 { return x + 1; }` */
     let src6: string = "fn bump(x: i32) -> i32 { return x + 1; }";
-    if drv_lex_count(src6) != 14 { return 28; }
+    if drv_lex_count(src6) != 16 { return 28; }
     if drv_lex_tag(src6, 0) != DRV_KW_FN()        { return 29; }
     if drv_lex_tag(src6, 7) != DRV_TK_ARROW()     { return 30; }
 
