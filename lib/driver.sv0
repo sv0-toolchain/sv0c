@@ -597,7 +597,7 @@ fn test_drv_parse_int_literal() -> i32 {
    -----------------------
    • Whitespace and comments are consumed but produce NO tokens.
    • Line comments: `//` to end-of-line.
-   • Block comments: `/* ... */` (non-nested for the spike).
+   • Block comments: slash-star ... star-slash (non-nested for the spike).
    • tok_starts[i] <= tok_ends[i] for all i.
    • Adjacent tokens do not overlap.
    • For IDENT/keyword tokens: source[tok_starts[i]..tok_ends[i]] is the
@@ -607,7 +607,7 @@ fn test_drv_parse_int_literal() -> i32 {
    ------------------------------------
    1. Skip whitespace (space, tab, CR, LF).
    2. Skip line comments: `//` consumes to end of line.
-   3. Skip block comments: `/*` ... `*/`.
+   3. Skip block comments: slash-star ... star-slash.
    4. Integer literals: one or more decimal digits.
    5. String literals: `"..."` with basic escape handling.
    6. Identifiers and keywords: letter or `_` followed by letters/digits/`_`.
