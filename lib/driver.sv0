@@ -1159,6 +1159,7 @@ fn test_drv_lex_spans() -> i32 {
      DRV_EXPR_BREAK     = 11  e1=unused, e2=unused, e3=unused
      DRV_EXPR_CONTINUE  = 12  e1=unused, e2=unused, e3=unused
      DRV_EXPR_ASSIGN    = 13  e1=name_tok_idx, e2=rhs_idx, e3=unused
+     DRV_EXPR_STRING_LIT= 14  e1=tok_idx (string-literal token), e2=unused, e3=unused
 
    ── STMT SLOTS (ss) ───────────────────────────────────────────────────────
    A block's statements are stored as a contiguous slice of expr indices:
@@ -1198,7 +1199,9 @@ fn DRV_EXPR_LET()      -> i32 { return 9; }
 fn DRV_EXPR_WHILE()    -> i32 { return 10; }
 fn DRV_EXPR_BREAK()    -> i32 { return 11; }
 fn DRV_EXPR_CONTINUE() -> i32 { return 12; }
-fn DRV_EXPR_ASSIGN()   -> i32 { return 13; }
+fn DRV_EXPR_ASSIGN()     -> i32 { return 13; }
+fn DRV_EXPR_STRING_LIT() -> i32 { return 14; }
+fn DRV_EXPR_FOR()        -> i32 { return 15; }
 
 /* ── Binop / unop tags ────────────────────────────────────────────────────── */
 fn DRV_OP_ADD()  -> i32 { return 0;  }  /* +  */
@@ -1214,8 +1217,13 @@ fn DRV_OP_LTEQ() -> i32 { return 9;  }  /* <= */
 fn DRV_OP_GTEQ() -> i32 { return 10; }  /* >= */
 fn DRV_OP_AND()  -> i32 { return 11; }  /* && */
 fn DRV_OP_OR()   -> i32 { return 12; }  /* || */
-fn DRV_OP_NEG()  -> i32 { return 20; }  /* unary - */
-fn DRV_OP_NOT()  -> i32 { return 21; }  /* unary ! */
+fn DRV_OP_NEG()    -> i32 { return 20; }  /* unary - */
+fn DRV_OP_NOT()    -> i32 { return 21; }  /* unary ! */
+fn DRV_OP_SHL()    -> i32 { return 13; }  /* << */
+fn DRV_OP_SHR()    -> i32 { return 14; }  /* >> */
+fn DRV_OP_BITAND() -> i32 { return 15; }  /* &  */
+fn DRV_OP_BITOR()  -> i32 { return 16; }  /* |  */
+fn DRV_OP_BITXOR() -> i32 { return 17; }  /* ^  */
 
 /* ── Arena push helpers ───────────────────────────────────────────────────
    Each helper appends one node to the relevant arenas and returns the
@@ -1304,6 +1312,11 @@ fn drv_mk_call(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
     return drv_push_expr(et, e1, e2, e3, DRV_EXPR_CALL(), name_tok, arg_count, arg_base);
 }
 
+fn drv_mk_string_lit(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                     tok_idx: i32) -> i32 {
+    return drv_push_expr(et, e1, e2, e3, DRV_EXPR_STRING_LIT(), tok_idx, 0, 0);
+}
+
 /* ── Arena accessor helpers ───────────────────────────────────────────────── */
 
 fn drv_expr_tag(et: Vec<i32>, idx: i32) -> i32 { return vec_get(et, idx); }
@@ -1368,8 +1381,13 @@ fn drv_op_to_c(op: i32) -> string {
     if op == DRV_OP_GT()   { return ">";  }
     if op == DRV_OP_LTEQ() { return "<="; }
     if op == DRV_OP_GTEQ() { return ">="; }
-    if op == DRV_OP_AND()  { return "&&"; }
-    if op == DRV_OP_OR()   { return "||"; }
+    if op == DRV_OP_AND()    { return "&&"; }
+    if op == DRV_OP_OR()     { return "||"; }
+    if op == DRV_OP_SHL()    { return "<<"; }
+    if op == DRV_OP_SHR()    { return ">>"; }
+    if op == DRV_OP_BITAND() { return "&"; }
+    if op == DRV_OP_BITOR()  { return "|"; }
+    if op == DRV_OP_BITXOR() { return "^"; }
     return "?";
 }
 
@@ -1646,8 +1664,7 @@ fn drv_parse_type(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
             }
             return DRV_TY_VEC();
         }
-        /* Unknown type: record error but keep going */
-        vec_set(err_flag, 0, 1);
+        /* Unknown type: skip silently, emit as int */
         return DRV_TY_UNKNOWN();
     }
     vec_set(err_flag, 0, 1);
@@ -1695,13 +1712,20 @@ fn drv_parse_mul(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
                       else { if tag == DRV_TK_SLASH()   { DRV_OP_DIV() }
                       else { if tag == DRV_TK_PERCENT() { DRV_OP_MOD() }
                       else { DRV_NONE() } } };
-        if op == DRV_NONE() { break; }
-        drv_advance(pos_vec);
-        let rhs: i32 = drv_parse_unary(tok_tags, tok_starts, tok_ends, source,
-                                        pos_vec, tok_count, et, e1, e2, e3,
-                                        ss, as_, err_flag);
-        if rhs == DRV_NONE() { return DRV_NONE(); }
-        lhs = drv_mk_binop(et, e1, e2, e3, op, lhs, rhs);
+        if op == DRV_NONE() {
+            /* as type-cast: consume the keyword and the type, keep lhs unchanged */
+            if tag == DRV_KW_AS() {
+                drv_advance(pos_vec);
+                drv_parse_type(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count, err_flag);
+            } else { break; }
+        } else {
+            drv_advance(pos_vec);
+            let rhs: i32 = drv_parse_unary(tok_tags, tok_starts, tok_ends, source,
+                                            pos_vec, tok_count, et, e1, e2, e3,
+                                            ss, as_, err_flag);
+            if rhs == DRV_NONE() { return DRV_NONE(); }
+            lhs = drv_mk_binop(et, e1, e2, e3, op, lhs, rhs);
+        }
     }
     return lhs;
 }
@@ -1716,9 +1740,14 @@ fn drv_parse_add(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
     if lhs == DRV_NONE() { return DRV_NONE(); }
     while true {
         let tag: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
-        let op: i32 = if tag == DRV_TK_PLUS()  { DRV_OP_ADD() }
-                      else { if tag == DRV_TK_MINUS() { DRV_OP_SUB() }
-                      else { DRV_NONE() } };
+        let op: i32 = if tag == DRV_TK_PLUS()   { DRV_OP_ADD() }
+                      else { if tag == DRV_TK_MINUS()  { DRV_OP_SUB() }
+                      else { if tag == DRV_TK_LTLT()   { DRV_OP_SHL() }
+                      else { if tag == DRV_TK_GTGT()   { DRV_OP_SHR() }
+                      else { if tag == DRV_TK_AMP()    { DRV_OP_BITAND() }
+                      else { if tag == DRV_TK_PIPE()   { DRV_OP_BITOR() }
+                      else { if tag == DRV_TK_CARET()  { DRV_OP_BITXOR() }
+                      else { DRV_NONE() } } } } } } };
         if op == DRV_NONE() { break; }
         drv_advance(pos_vec);
         let rhs: i32 = drv_parse_mul(tok_tags, tok_starts, tok_ends, source,
@@ -1888,13 +1917,17 @@ fn drv_parse_primary(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32
         } else { 0 };
         let name_tok: i32 = vec_get(pos_vec, 0);
         drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_IDENT(), err_flag);
-        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_COLON(), err_flag);
-        drv_parse_type(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count, err_flag);
+        /* Optional type annotation: `: type` */
+        let ann_ty: i32 = if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_COLON()) {
+            drv_advance(pos_vec);
+            drv_parse_type(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count, err_flag)
+        } else { DRV_TY_UNKNOWN() };
         drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_EQ(), err_flag);
         let rhs: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
                                        pos_vec, tok_count, et, e1, e2, e3,
                                        ss, as_, err_flag);
-        return drv_mk_let(et, e1, e2, e3, name_tok, rhs, is_mut);
+        /* Store annotated type in e3 (replaces is_mut; not needed for C emission) */
+        return drv_mk_let(et, e1, e2, e3, name_tok, rhs, ann_ty);
     }
 
     /* if cond block (else block)? */
@@ -1908,8 +1941,14 @@ fn drv_parse_primary(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32
                                              ss, as_, err_flag);
         let else_blk: i32 = if drv_peek(tok_tags, pos_vec, tok_count, DRV_KW_ELSE()) {
             drv_advance(pos_vec);
-            drv_parse_block(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count,
-                            et, e1, e2, e3, ss, as_, err_flag)
+            /* else if → parse as expression (not block) so else-if chains work */
+            if drv_peek(tok_tags, pos_vec, tok_count, DRV_KW_IF()) {
+                drv_parse_expr(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count,
+                               et, e1, e2, e3, ss, as_, err_flag)
+            } else {
+                drv_parse_block(tok_tags, tok_starts, tok_ends, source, pos_vec, tok_count,
+                                et, e1, e2, e3, ss, as_, err_flag)
+            }
         } else { DRV_NONE() };
         return drv_mk_if(et, e1, e2, e3, cond, then_blk, else_blk);
     }
@@ -1946,31 +1985,66 @@ fn drv_parse_primary(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32
     if tag == DRV_TK_IDENT() {
         let name_tok: i32 = vec_get(pos_vec, 0);
         drv_advance(pos_vec);
-        /* function call: name( args ) */
+        /* function call: name( args ) — collect args locally then flush to as_
+           so that nested call arg pushes don't corrupt outer call's arg_base. */
         if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_LPAREN()) {
             drv_advance(pos_vec);   /* consume ( */
-            let arg_base: i32 = vec_len(as_);
+            let arg_collect: Vec<i32> = vec_new();
             let mut arg_count: i32 = 0;
             /* parse argument list */
             if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN()) != true {
                 let arg0: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
                                                pos_vec, tok_count, et, e1, e2, e3,
                                                ss, as_, err_flag);
-                vec_push(as_, arg0);
+                vec_push(arg_collect, arg0);
                 arg_count = arg_count + 1;
                 while drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_COMMA()) {
                     drv_advance(pos_vec);
                     let argN: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
                                                    pos_vec, tok_count, et, e1, e2, e3,
                                                    ss, as_, err_flag);
-                    vec_push(as_, argN);
+                    vec_push(arg_collect, argN);
                     arg_count = arg_count + 1;
                 }
             }
             drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_RPAREN(), err_flag);
+            let arg_base: i32 = vec_len(as_);
+            let mut ak: i32 = 0;
+            while ak < arg_count { vec_push(as_, vec_get(arg_collect, ak)); ak = ak + 1; }
             return drv_mk_call(et, e1, e2, e3, name_tok, arg_count, arg_base);
         }
         return drv_mk_path(et, e1, e2, e3, name_tok);
+    }
+
+    /* string literal */
+    if tag == DRV_TK_STRING_LIT() {
+        let p: i32 = vec_get(pos_vec, 0);
+        drv_advance(pos_vec);
+        return drv_mk_string_lit(et, e1, e2, e3, p);
+    }
+
+    /* for iter in lo..hi { body } — stored as DRV_EXPR_FOR; emitted as C native
+       for-loop so `continue` correctly jumps to the loop increment. */
+    if tag == DRV_KW_FOR() {
+        drv_advance(pos_vec);
+        let iter_tok: i32 = vec_get(pos_vec, 0);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_IDENT(), err_flag);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_KW_IN(), err_flag);
+        let lo_expr: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                           pos_vec, tok_count, et, e1, e2, e3,
+                                           ss, as_, err_flag);
+        drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_DOTDOT(), err_flag);
+        let hi_expr: i32 = drv_parse_expr(tok_tags, tok_starts, tok_ends, source,
+                                           pos_vec, tok_count, et, e1, e2, e3,
+                                           ss, as_, err_flag);
+        let body_idx: i32 = drv_parse_block(tok_tags, tok_starts, tok_ends, source,
+                                             pos_vec, tok_count, et, e1, e2, e3,
+                                             ss, as_, err_flag);
+        /* Pack hi_expr + body_idx into a synthetic node so we have only 3 fields.
+           DRV_EXPR_FOR: e1=iter_tok, e2=lo_expr, e3=for_rest_idx
+           for_rest (reuses BLOCK tag): e1=0 (unused), e2=hi_expr, e3=body_idx */
+        let for_rest: i32 = drv_push_expr(et, e1, e2, e3, DRV_EXPR_BLOCK(), 0, hi_expr, body_idx);
+        return drv_push_expr(et, e1, e2, e3, DRV_EXPR_FOR(), iter_tok, lo_expr, for_rest);
     }
 
     /* unknown token: error */
@@ -1985,7 +2059,10 @@ fn drv_parse_block(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
                    et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
                    ss: Vec<i32>, as_: Vec<i32>, err_flag: Vec<i32>) -> i32 {
     drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_LBRACE(), err_flag);
-    let stmt_base: i32 = vec_len(ss);
+    /* Collect stmt expr indices locally; take stmt_base AFTER all sub-exprs
+       are parsed so that internal ss pushes (e.g. for-loop lowering) don't
+       corrupt the parent block's stmt_base. */
+    let collected: Vec<i32> = vec_new();
     let mut stmt_count: i32 = 0;
     let mut tail: i32 = DRV_NONE();
 
@@ -1999,19 +2076,62 @@ fn drv_parse_block(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
                                             ss, as_, err_flag);
         if vec_get(err_flag, 0) != 0 { break; }
 
-        /* if followed by ; it's a statement; otherwise it's the tail expr */
+        /* if followed by ; it's a statement; otherwise check if block-like */
         if drv_peek(tok_tags, pos_vec, tok_count, DRV_TK_SEMICOLON()) {
             drv_advance(pos_vec);
-            vec_push(ss, expr_idx);
+            vec_push(collected, expr_idx);
             stmt_count = stmt_count + 1;
         } else {
-            /* tail expr (no semicolon) */
-            tail = expr_idx;
-            break;
+            /* Block-like exprs (if/while/for/block) don't need ; as statements */
+            let xtag: i32 = vec_get(et, expr_idx);
+            let is_block_like: bool =
+                xtag == DRV_EXPR_BLOCK() ||
+                xtag == DRV_EXPR_IF()    ||
+                xtag == DRV_EXPR_WHILE() ||
+                xtag == DRV_EXPR_FOR();
+            if is_block_like {
+                /* Check next token: if } then it's the tail, else it's a stmt */
+                let nxt: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+                if nxt == DRV_TK_RBRACE() {
+                    tail = expr_idx;
+                    break;
+                } else {
+                    vec_push(collected, expr_idx);
+                    stmt_count = stmt_count + 1;
+                }
+            } else {
+                /* tail expr (no semicolon) */
+                tail = expr_idx;
+                break;
+            }
         }
     }
     drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_RBRACE(), err_flag);
+    /* Flush collected stmts to ss now that all sub-exprs are done */
+    let stmt_base: i32 = vec_len(ss);
+    let mut k: i32 = 0;
+    while k < stmt_count {
+        vec_push(ss, vec_get(collected, k));
+        k = k + 1;
+    }
     return drv_mk_block(et, e1, e2, e3, stmt_count, stmt_base, tail);
+}
+
+/* Skip a balanced parenthesis group starting at the current position. */
+fn drv_skip_paren_group(tok_tags: Vec<i32>, pos_vec: Vec<i32>, tok_count: i32,
+                        err_flag: Vec<i32>) -> () {
+    drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_LPAREN(), err_flag);
+    let mut depth: i32 = 1;
+    while depth > 0 {
+        let p: i32 = vec_get(pos_vec, 0);
+        if p >= tok_count { vec_set(err_flag, 0, 1); depth = 0; }
+        else {
+            let t: i32 = vec_get(tok_tags, p);
+            drv_advance(pos_vec);
+            if t == DRV_TK_LPAREN() { depth = depth + 1; }
+            if t == DRV_TK_RPAREN() { depth = depth - 1; }
+        }
+    }
 }
 
 /* ── Item (fn) parser ─────────────────────────────────────────────────────── */
@@ -2056,6 +2176,23 @@ fn drv_parse_item(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
     drv_expect(tok_tags, pos_vec, tok_count, DRV_TK_ARROW(), err_flag);
     let ret_ty: i32 = drv_parse_type(tok_tags, tok_starts, tok_ends, source,
                                       pos_vec, tok_count, err_flag);
+    /* Skip optional requires(...) / ensures(...) contract clauses. */
+    while true {
+        let ct: i32 = drv_cur_tag(tok_tags, pos_vec, tok_count);
+        if ct == DRV_KW_ENSURES() {
+            drv_advance(pos_vec);
+            drv_skip_paren_group(tok_tags, pos_vec, tok_count, err_flag);
+        } else {
+            if ct == DRV_TK_IDENT() {
+                let cp: i32 = vec_get(pos_vec, 0);
+                let cspell: string = drv_tok_spell(tok_starts, tok_ends, source, cp);
+                if string_eq(cspell, "requires") {
+                    drv_advance(pos_vec);
+                    drv_skip_paren_group(tok_tags, pos_vec, tok_count, err_flag);
+                } else { break; }
+            } else { break; }
+        }
+    }
     let body: i32 = drv_parse_block(tok_tags, tok_starts, tok_ends, source,
                                      pos_vec, tok_count, et, e1, e2, e3,
                                      ss, as_, err_flag);
@@ -2095,8 +2232,34 @@ fn drv_parse(tok_tags: Vec<i32>, tok_starts: Vec<i32>, tok_ends: Vec<i32>,
                            it, iname, iarity, ipbase, iret, ibody, pn, pt,
                            et, e1, e2, e3, ss, as_, err_flag);
         } else {
-            /* Skip unknown top-level token */
+            /* Skip non-fn top-level construct: advance past token, then skip
+               any brace-matched block (enum/struct/impl bodies).
+               Stop scanning at fn or ; to avoid consuming the next item. */
             vec_set(pos_vec, 0, p + 1);
+            while true {
+                let sp: i32 = vec_get(pos_vec, 0);
+                if sp >= tok_count { break; }
+                let st: i32 = vec_get(tok_tags, sp);
+                if st == DRV_KW_FN() { break; }
+                if st == DRV_TK_SEMICOLON() { vec_set(pos_vec, 0, sp + 1); break; }
+                if st == DRV_TK_LBRACE() {
+                    /* skip balanced brace block */
+                    vec_set(pos_vec, 0, sp + 1);
+                    let mut bd: i32 = 1;
+                    while bd > 0 {
+                        let bp: i32 = vec_get(pos_vec, 0);
+                        if bp >= tok_count { bd = 0; }
+                        else {
+                            let bt: i32 = vec_get(tok_tags, bp);
+                            vec_set(pos_vec, 0, bp + 1);
+                            if bt == DRV_TK_LBRACE() { bd = bd + 1; }
+                            if bt == DRV_TK_RBRACE() { bd = bd - 1; }
+                        }
+                    }
+                    break;
+                }
+                vec_set(pos_vec, 0, sp + 1);
+            }
         }
         if vec_get(err_flag, 0) != 0 { return DRV_ERR(); }
     }
@@ -2365,10 +2528,11 @@ fn drv_resolve_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
     if expr_idx == DRV_NONE() { return; }
     let tag: i32 = vec_get(et, expr_idx);
 
-    if tag == DRV_EXPR_INT_LIT()  { return; }
-    if tag == DRV_EXPR_BOOL_LIT() { return; }
-    if tag == DRV_EXPR_BREAK()    { return; }
-    if tag == DRV_EXPR_CONTINUE() { return; }
+    if tag == DRV_EXPR_INT_LIT()    { return; }
+    if tag == DRV_EXPR_BOOL_LIT()   { return; }
+    if tag == DRV_EXPR_BREAK()      { return; }
+    if tag == DRV_EXPR_CONTINUE()   { return; }
+    if tag == DRV_EXPR_STRING_LIT() { return; }
 
     if tag == DRV_EXPR_PATH() {
         let tok_idx: i32 = vec_get(e1, expr_idx);
@@ -2849,12 +3013,81 @@ fn drv_tok_spell(tok_starts: Vec<i32>, tok_ends: Vec<i32>,
     return string_substr(source, start, end - start);
 }
 
-/* Emit C function name: "sv0__<name>" or "main" for the entry point. */
+/* Returns true if name is a runtime builtin (emitted as sv0_<name>, not sv0__<name>). */
+fn drv_is_builtin_fn(spell: string) -> bool {
+    if string_eq(spell, "println")         { return true; }
+    if string_eq(spell, "string_len")      { return true; }
+    if string_eq(spell, "string_eq")       { return true; }
+    if string_eq(spell, "string_concat")   { return true; }
+    if string_eq(spell, "string_char_at")  { return true; }
+    if string_eq(spell, "string_substr")   { return true; }
+    if string_eq(spell, "vec_new")         { return true; }
+    if string_eq(spell, "vec_push")        { return true; }
+    if string_eq(spell, "vec_len")         { return true; }
+    if string_eq(spell, "vec_get")         { return true; }
+    if string_eq(spell, "vec_set")         { return true; }
+    if string_eq(spell, "box_new")         { return true; }
+    if string_eq(spell, "box_deref")       { return true; }
+    if string_eq(spell, "read_file")       { return true; }
+    if string_eq(spell, "write_file")      { return true; }
+    if string_eq(spell, "read_dir")        { return true; }
+    return false;
+}
+
+/* Emit C function name: "main" for entry point, "sv0_<name>" for builtins,
+   "sv0__<name>" for user-defined functions. */
 fn drv_c_fn_name(tok_starts: Vec<i32>, tok_ends: Vec<i32>,
                  source: string, tok_idx: i32) -> string {
     let spell: string = drv_tok_spell(tok_starts, tok_ends, source, tok_idx);
     if string_eq(spell, "main") { return "main"; }
+    if drv_is_builtin_fn(spell) { return string_concat("sv0_", spell); }
     return string_concat("sv0__", spell);
+}
+
+/* Returns true if expr at expr_idx can appear as a ternary value (not a statement-only form). */
+fn drv_expr_ternary_ok(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                        expr_idx: i32) -> bool {
+    let tag: i32 = vec_get(et, expr_idx);
+    if tag == DRV_EXPR_WHILE() { return false; }
+    if tag == DRV_EXPR_FOR()   { return false; }
+    if tag == DRV_EXPR_BLOCK() { return false; }
+    if tag == DRV_EXPR_IF() {
+        return vec_get(e3, expr_idx) != DRV_NONE();
+    }
+    return true;
+}
+
+/* Returns true if the else-branch (else_idx with tag else_tag) is ternary-compatible. */
+fn drv_else_branch_ternary_ok(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                               else_idx: i32, else_tag: i32) -> bool {
+    if else_tag == DRV_EXPR_IF() {
+        return vec_get(e3, else_idx) != DRV_NONE();
+    }
+    if else_tag == DRV_EXPR_BLOCK() {
+        if vec_get(e1, else_idx) == 0 {
+            let etail: i32 = vec_get(e3, else_idx);
+            if etail != DRV_NONE() {
+                return drv_expr_ternary_ok(et, e1, e2, e3, etail);
+            }
+        }
+    }
+    return false;
+}
+
+/* Returns true if then_tail can appear as the ternary value (not statement-only). */
+fn drv_then_tail_ternary_ok(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
+                              then_tail: i32) -> bool {
+    let tag: i32 = vec_get(et, then_tail);
+    if tag == DRV_EXPR_WHILE() { return false; }
+    if tag == DRV_EXPR_FOR()   { return false; }
+    if tag == DRV_EXPR_BLOCK() { return false; }
+    if tag == DRV_EXPR_IF() {
+        let tt_else: i32 = vec_get(e3, then_tail);
+        if tt_else == DRV_NONE() { return false; }
+        let tt_then_blk: i32 = vec_get(e2, then_tail);
+        return vec_get(e1, tt_then_blk) == 0;
+    }
+    return true;
 }
 
 /* Emit an expression as a C string. */
@@ -2940,29 +3173,71 @@ fn drv_emit_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
     }
 
     if tag == DRV_EXPR_LET() {
-        /* let is emitted as a C declaration; handled in drv_emit_stmt */
+        /* let is emitted as a C declaration; e3 holds the annotated type */
         let name_tok: i32 = vec_get(e1, expr_idx);
         let spell: string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
         let rhs_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
                                            tok_starts, tok_ends, source,
                                            vec_get(e2, expr_idx), indent);
-        return string_concat("int ", string_concat(spell, string_concat(" = ", rhs_s)));
+        let ann_ty: i32 = vec_get(e3, expr_idx);
+        let ty_s: string = drv_ty_to_c(ann_ty);
+        return string_concat(ty_s, string_concat(" ", string_concat(spell, string_concat(" = ", rhs_s))));
     }
 
     if tag == DRV_EXPR_IF() {
-        let cond_s:  string = drv_emit_expr(et, e1, e2, e3, ss, as_,
-                                             tok_starts, tok_ends, source,
-                                             vec_get(e1, expr_idx), indent);
-        let then_s:  string = drv_emit_block(et, e1, e2, e3, ss, as_,
+        let cond_s:   string = drv_emit_expr(et, e1, e2, e3, ss, as_,
                                               tok_starts, tok_ends, source,
-                                              vec_get(e2, expr_idx), indent);
+                                              vec_get(e1, expr_idx), indent);
+        let then_idx: i32 = vec_get(e2, expr_idx);
         let else_idx: i32 = vec_get(e3, expr_idx);
+        /* Emit as ternary when then-branch is a trivial BLOCK (0 stmts, has tail).
+           Else can be a trivial BLOCK or an IF (else-if chain emitted recursively). */
+        if else_idx != DRV_NONE() {
+            if vec_get(et, then_idx) == DRV_EXPR_BLOCK() {
+                if vec_get(e1, then_idx) == 0 {
+                    let then_tail: i32 = vec_get(e3, then_idx);
+                    if then_tail != DRV_NONE() {
+                        let else_tag2: i32 = vec_get(et, else_idx);
+                        /* Check ternary-ability without computing ev first. */
+                        let else_ternary_ok: bool =
+                            drv_else_branch_ternary_ok(et, e1, e2, e3, else_idx, else_tag2);
+                        if else_ternary_ok {
+                            /* Check then-tail is also scalar (not a statement-only expr). */
+                            let tt_ok: bool =
+                                drv_then_tail_ternary_ok(et, e1, e2, e3, then_tail);
+                            if tt_ok {
+                                /* Both sides ternary-able: emit as (cond ? tv : ev) */
+                                let tv: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                                                tok_starts, tok_ends, source,
+                                                                then_tail, indent);
+                                let etail2: i32 = vec_get(e3, else_idx);
+                                let ev_raw: string = if else_tag2 == DRV_EXPR_IF() {
+                                    drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                                  tok_starts, tok_ends, source, else_idx, indent)
+                                } else {
+                                    drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                                  tok_starts, tok_ends, source, etail2, indent)
+                                };
+                                return string_concat("(", string_concat(cond_s, string_concat(" ? ", string_concat(tv, string_concat(" : ", string_concat(ev_raw, ")"))))));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let then_s: string = drv_emit_block(et, e1, e2, e3, ss, as_,
+                                             tok_starts, tok_ends, source,
+                                             then_idx, indent);
         if else_idx == DRV_NONE() {
             return string_concat("if (", string_concat(cond_s, string_concat(") ", then_s)));
         }
-        let else_s: string = drv_emit_block(et, e1, e2, e3, ss, as_,
-                                             tok_starts, tok_ends, source,
-                                             else_idx, indent);
+        /* else branch may be a BLOCK or an IF (else-if chain) */
+        let else_tag: i32 = vec_get(et, else_idx);
+        let else_s: string = if else_tag == DRV_EXPR_IF() {
+            drv_emit_expr(et, e1, e2, e3, ss, as_, tok_starts, tok_ends, source, else_idx, indent)
+        } else {
+            drv_emit_block(et, e1, e2, e3, ss, as_, tok_starts, tok_ends, source, else_idx, indent)
+        };
         return string_concat("if (", string_concat(cond_s, string_concat(") ", string_concat(then_s, string_concat(" else ", else_s)))));
     }
 
@@ -2981,15 +3256,102 @@ fn drv_emit_expr(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
                                tok_starts, tok_ends, source, expr_idx, indent);
     }
 
+    if tag == DRV_EXPR_STRING_LIT() {
+        let tok_idx: i32 = vec_get(e1, expr_idx);
+        let start: i32 = vec_get(tok_starts, tok_idx);
+        let end:   i32 = vec_get(tok_ends,   tok_idx);
+        return string_substr(source, start, end - start);
+    }
+
+    /* for iter in lo..hi { body } → C native for loop (continue works correctly) */
+    if tag == DRV_EXPR_FOR() {
+        let iter_tok:  i32 = vec_get(e1, expr_idx);
+        let lo_idx:    i32 = vec_get(e2, expr_idx);
+        let rest_idx:  i32 = vec_get(e3, expr_idx);
+        let hi_idx:    i32 = vec_get(e2, rest_idx);
+        let body_idx:  i32 = vec_get(e3, rest_idx);
+        let iter_s:    string = drv_tok_spell(tok_starts, tok_ends, source, iter_tok);
+        let lo_s:      string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                               tok_starts, tok_ends, source, lo_idx, indent);
+        let hi_s:      string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                               tok_starts, tok_ends, source, hi_idx, indent);
+        let body_s:    string = drv_emit_block(et, e1, e2, e3, ss, as_,
+                                                tok_starts, tok_ends, source, body_idx, indent);
+        let hdr: string = string_concat("for (int ", string_concat(iter_s,
+                          string_concat(" = ", string_concat(lo_s,
+                          string_concat("; ", string_concat(iter_s,
+                          string_concat(" < ", string_concat(hi_s,
+                          string_concat("; ", string_concat(iter_s, "++)"))))))))));
+        return string_concat(hdr, string_concat(" ", body_s));
+    }
+
     return "/* unknown expr */";
 }
 
-/* Emit a single statement (expr + semicolon). */
+/* Emit a single statement (expr + semicolon).
+   Special case: let name = if cond { stmts; val } else { default }
+   — split into `type name = default; if (cond) { stmts; name = val; }`
+   to avoid emitting `int name = if (...)` which is invalid C. */
 fn drv_emit_stmt(et: Vec<i32>, e1: Vec<i32>, e2: Vec<i32>, e3: Vec<i32>,
                  ss: Vec<i32>, as_: Vec<i32>,
                  tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string,
                  expr_idx: i32, indent: i32) -> string {
     let pad: string = drv_indent(indent);
+    /* Detect let-with-if-rhs that can't be a ternary (then-block has stmts) */
+    if vec_get(et, expr_idx) == DRV_EXPR_LET() {
+        let rhs_idx: i32 = vec_get(e2, expr_idx);
+        if vec_get(et, rhs_idx) == DRV_EXPR_IF() {
+            let if_then_idx: i32 = vec_get(e2, rhs_idx);
+            let if_then_stmts: i32 = vec_get(e1, if_then_idx);
+            if if_then_stmts > 0 {
+                let name_tok: i32 = vec_get(e1, expr_idx);
+                let spell: string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
+                let ann_ty: i32 = vec_get(e3, expr_idx);
+                let ty_s: string = drv_ty_to_c(ann_ty);
+                let if_cond_idx: i32 = vec_get(e1, rhs_idx);
+                let if_else_idx: i32 = vec_get(e3, rhs_idx);
+                let cond_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                                    tok_starts, tok_ends, source,
+                                                    if_cond_idx, indent);
+                /* Compute default (else value): extract else-block tail first, then emit. */
+                let default_else_blk: i32 = if if_else_idx != DRV_NONE() {
+                    if vec_get(et, if_else_idx) == DRV_EXPR_BLOCK() {
+                        vec_get(e3, if_else_idx)
+                    } else { DRV_NONE() }
+                } else { DRV_NONE() };
+                let default_s: string = if default_else_blk != DRV_NONE() {
+                    drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                  tok_starts, tok_ends, source, default_else_blk, indent)
+                } else { "0" };
+                let decl: string = string_concat(pad, string_concat(ty_s,
+                                   string_concat(" ", string_concat(spell,
+                                   string_concat(" = ", string_concat(default_s, ";\n"))))));
+                /* Emit then-block stmts + `spell = tail;` */
+                let then_pad: string = drv_indent(indent + 1);
+                let then_stmts_base: i32 = vec_get(e2, if_then_idx);
+                let then_tail: i32 = vec_get(e3, if_then_idx);
+                let mut then_body: string = "{\n";
+                let mut ki: i32 = 0;
+                while ki < if_then_stmts {
+                    let si: i32 = vec_get(ss, then_stmts_base + ki);
+                    then_body = string_concat(then_body, drv_emit_stmt(et, e1, e2, e3, ss, as_,
+                                              tok_starts, tok_ends, source, si, indent + 1));
+                    ki = ki + 1;
+                }
+                if then_tail != DRV_NONE() {
+                    let tv: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
+                                                    tok_starts, tok_ends, source, then_tail, indent + 1);
+                    then_body = string_concat(then_body, string_concat(then_pad,
+                                string_concat(spell, string_concat(" = ", string_concat(tv, ";\n")))));
+                }
+                then_body = string_concat(then_body, string_concat(pad, "}"));
+                let if_stmt: string = string_concat(pad,
+                             string_concat("if (", string_concat(cond_s,
+                             string_concat(") ", string_concat(then_body, "\n")))));
+                return string_concat(decl, if_stmt);
+            }
+        }
+    }
     let expr_s: string = drv_emit_expr(et, e1, e2, e3, ss, as_,
                                         tok_starts, tok_ends, source,
                                         expr_idx, indent);
@@ -3215,8 +3577,12 @@ fn test_drv_emit_helper_call() -> i32 {
 fn test_drv_emit_if_expr() -> i32 {
     let src: string = "fn main() -> i32 { return if true { 0 } else { 1 }; }";
     let c: string = drv_src_to_c(src);
-    if drv_string_contains(c, "if (") != true { return 1; }
-    if drv_string_contains(c, "else") != true { return 2; }
+    /* trivial if/else → ternary (cond ? then : else) */
+    let has_ternary: bool = drv_string_contains(c, "?");
+    let has_if: bool = drv_string_contains(c, "if (");
+    if has_ternary != true {
+        if has_if != true { return 1; }
+    }
     return 0;
 }
 
@@ -3356,8 +3722,12 @@ fn test_drv_vm_if_expr() -> i32 {
     /* fn main() -> i32 { return if true { 0 } else { 1 }; } */
     let src: string = "fn main() -> i32 { return if true { 0 } else { 1 }; }";
     let c: string = drv_src_to_c(src);
-    if drv_string_contains(c, "if (") != true { return 1; }
-    if drv_string_contains(c, "else") != true { return 2; }
+    /* trivial if/else → ternary; non-trivial → if/else */
+    let has_ternary: bool = drv_string_contains(c, "?");
+    let has_if: bool = drv_string_contains(c, "if (");
+    if has_ternary != true {
+        if has_if != true { return 1; }
+    }
     return 0;
 }
 

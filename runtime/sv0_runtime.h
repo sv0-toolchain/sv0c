@@ -75,7 +75,7 @@ static inline const char *sv0_string_substr(const char *s, int start, int len) {
  * Each vec_new() returns an int handle into a global table.
  * Elements are stored as intptr_t (word-sized); works for i32, bool, pointers.
  */
-#define SV0_VEC_MAX 4096
+#define SV0_VEC_MAX 65536
 
 static struct {
   intptr_t *data;
