@@ -75,7 +75,7 @@ static inline const char *sv0_string_substr(const char *s, int start, int len) {
  * Each vec_new() returns an int handle into a global table.
  * Elements are stored as intptr_t (word-sized); works for i32, bool, pointers.
  */
-#define SV0_VEC_MAX 65536
+#define SV0_VEC_MAX 262144
 
 static struct {
   intptr_t *data;
@@ -142,6 +142,22 @@ static inline void sv0_box_store(int32_t h, int32_t off, intptr_t val) {
 static inline intptr_t sv0_box_load(int32_t h, int32_t off) {
   return sv0_box_pool[h + off];
 }
+
+/* sv0__box_new_raw / sv0__box_deref_raw: generic box<T> helpers.
+ * box_new(val) stores val's bytes in the pool, returns handle (int).
+ * box_deref(h, T) reads bytes back as type T.
+ * Uses GCC/Clang __typeof__ + statement expressions to handle rvalue args. */
+static inline int32_t sv0__box_new_raw_impl(const void* data, int nbytes) {
+  int nwords = (nbytes + (int)sizeof(intptr_t) - 1) / (int)sizeof(intptr_t);
+  int32_t h = sv0_box_alloc(nwords);
+  memcpy(&sv0_box_pool[h], data, (size_t)nbytes);
+  return h;
+}
+#define sv0__box_new_raw(val) __extension__({ \
+  __typeof__(val) _sv0_box_tmp = (val); \
+  sv0__box_new_raw_impl(&_sv0_box_tmp, (int)sizeof(_sv0_box_tmp)); \
+})
+#define sv0__box_deref_raw(h, T) (*(T *)(void *)&sv0_box_pool[(h)])
 
 /* Host filesystem (T0-8 / M3 G2): see sv0doc/compiler/bootstrap-host-io.md */
 const char *sv0_read_file(const char *path);
