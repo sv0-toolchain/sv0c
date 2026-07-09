@@ -3918,6 +3918,7 @@ fn drv_emit_return_match(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase
     let sc_s3: string = drv_emit_expr(it, iname, iarity, ipbase, pn, pt, et, e1, e2, e3, ss, as_,
                                        tok_starts, tok_ends, source, sc_idx2, indent);
     let mut out_s: string = "";
+    let mut has_wildcard: bool = false;
     let mut mk: i32 = 0;
     while mk < arm_count3 {
         let ab3: i32 = arm_base3 + mk * 5;
@@ -3926,16 +3927,25 @@ fn drv_emit_return_match(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase
         let m3_bind_base: i32 = vec_get(as_, ab3 + 2);
         let m3_bind_count: i32 = vec_get(as_, ab3 + 3);
         let m3_body: i32 = vec_get(as_, ab3 + 4);
+        /* Emit as an if / else if / else CHAIN so exactly one arm runs. Independent
+           `if` blocks would double-execute for effect-matches (arms that don't
+           return); the chain is correct for both return- and effect-matches. */
         let mut arm_s: string = "";
         if m3_enum_tok == DRV_NONE() {
-            /* wildcard _ arm: unconditional else block */
-            arm_s = string_concat(pad, "{\n");
+            /* wildcard _ arm: `else` — makes the match exhaustive */
+            has_wildcard = true;
+            if mk == 0 { arm_s = string_concat(pad, "{\n"); }
+            else { arm_s = string_concat(pad, "} else {\n"); }
         } else {
             let m3_tag: i32 = drv_find_variant_tag(it, iname, iarity, ipbase, pn,
                                                     tok_starts, tok_ends, source,
                                                     m3_enum_tok, m3_var_tok);
             let cond3: string = string_concat(sc_s3, string_concat("._tag == ", drv_int_to_string(m3_tag)));
-            arm_s = string_concat(pad, string_concat("if (", string_concat(cond3, ") {\n")));
+            if mk == 0 {
+                arm_s = string_concat(pad, string_concat("if (", string_concat(cond3, ") {\n")));
+            } else {
+                arm_s = string_concat(pad, string_concat("} else if (", string_concat(cond3, ") {\n")));
+            }
         };
         /* declare bindings (skip wildcard '_' to avoid redefinition) */
         let mut bi3: i32 = 0;
@@ -3985,11 +3995,20 @@ fn drv_emit_return_match(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase
                                                  tok_starts, tok_ends, source, m3_body, indent + 1);
             arm_s = string_concat(arm_s, string_concat(ipad, string_concat("return ", string_concat(body3_s, ";\n"))));
         }
-        arm_s = string_concat(arm_s, string_concat(pad, "}\n"));
         out_s = string_concat(out_s, arm_s);
         mk = mk + 1;
     }
-    out_s = string_concat(out_s, string_concat(pad, "return 0;\n"));
+    /* Close the final arm of the chain. */
+    if arm_count3 > 0 {
+        out_s = string_concat(out_s, string_concat(pad, "}\n"));
+    }
+    /* Trailing fallback only when the match is not exhaustive. A wildcard `_`
+       arm makes the chain end in `else`, so this is unreachable — and would be
+       type-invalid when the function returns a struct/enum (e.g.
+       `value_to_expr -> Expr`). Only emit it for a non-exhaustive return-match. */
+    if has_wildcard != true {
+        out_s = string_concat(out_s, string_concat(pad, "return 0;\n"));
+    }
     return out_s;
 }
 
@@ -4030,7 +4049,7 @@ fn drv_emit_stmt(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i3
                 let name_tok: i32 = vec_get(e1, expr_idx);
                 let spell: string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
                 let ann_ty: i32 = vec_get(e3, expr_idx);
-                let ty_s: string = drv_ty_to_c(ann_ty);
+                let ty_s: string = drv_ty_to_c_tok(ann_ty, tok_starts, tok_ends, source);
                 let if_cond_idx: i32 = vec_get(e1, rhs_idx);
                 let if_else_idx: i32 = vec_get(e3, rhs_idx);
                 let cond_s: string = drv_emit_expr(it, iname, iarity, ipbase, pn, pt,
@@ -4142,7 +4161,7 @@ fn drv_emit_params(pn: Vec<i32>, pt: Vec<i32>, tok_starts: Vec<i32>,
         let name_tok: i32 = vec_get(pn, param_base + i);
         let ty_tag:   i32 = vec_get(pt, param_base + i);
         let name_s:   string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
-        let ty_s:     string = drv_ty_to_c(ty_tag);
+        let ty_s:     string = drv_ty_to_c_tok(ty_tag, tok_starts, tok_ends, source);
         let param_s:  string = string_concat(ty_s, string_concat(" ", name_s));
         if i == 0 { s = param_s; }
         else { s = string_concat(s, string_concat(", ", param_s)); }
@@ -4168,7 +4187,7 @@ fn drv_emit_fn(item_idx: i32,
     let fn_name: string = drv_c_fn_name(tok_starts, tok_ends, source, name_tok);
     let params_s: string = drv_emit_params(pn, pt, tok_starts, tok_ends, source,
                                             param_base, arity);
-    let ret_s: string = drv_ty_to_c(ret_ty);
+    let ret_s: string = drv_ty_to_c_tok(ret_ty, tok_starts, tok_ends, source);
     let is_main: bool = string_eq(fn_name, "main");
 
     let proto: string = if is_main {
@@ -4186,6 +4205,87 @@ fn drv_emit_fn(item_idx: i32,
 
 /* drv_emit_c: top-level C emitter.
    Returns the complete C source as a string. */
+/* Emit a struct typedef:  typedef struct { <cty> sv0__<field>; ... } sv0__<Name>;
+   Fields are named sv0__<field> to match drv_emit_expr's struct-lit / field emit. */
+fn drv_emit_struct_def(item_idx: i32, iname: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i32>,
+                       pn: Vec<i32>, pt: Vec<i32>,
+                       tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string) -> string {
+    let name_tok: i32 = vec_get(iname,  item_idx);
+    let fcount:   i32 = vec_get(iarity, item_idx);
+    let fbase:    i32 = vec_get(ipbase, item_idx);
+    let sname: string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
+    let mut s: string = "typedef struct {\n";
+    let mut k: i32 = 0;
+    while k < fcount {
+        let fname_tok: i32 = vec_get(pn, fbase + k);
+        let fty:       i32 = vec_get(pt, fbase + k);
+        let fname: string = drv_tok_spell(tok_starts, tok_ends, source, fname_tok);
+        let cty:   string = drv_ty_to_c_tok(fty, tok_starts, tok_ends, source);
+        s = string_concat(s, string_concat("  ", string_concat(cty,
+              string_concat(" sv0__", string_concat(fname, ";\n")))));
+        k = k + 1;
+    }
+    return string_concat(s, string_concat("} sv0__", string_concat(sname, ";\n")));
+}
+
+/* Emit an enum typedef plus one constructor per variant.
+     typedef struct { int _tag; int _0; ... int _{maxp-1}; } sv0__<Name>;
+     static sv0__<Name> sv0__<Name>__<Var>(int _0, ...) { ...; _tag = k; ...; return; }
+   Layout matches drv_emit_expr's enum-ctor call and match (._tag / ._k) emit. */
+fn drv_emit_enum_def(item_idx: i32, iname: Vec<i32>, iarity: Vec<i32>, ipbase: Vec<i32>,
+                     pn: Vec<i32>, pt: Vec<i32>,
+                     tok_starts: Vec<i32>, tok_ends: Vec<i32>, source: string) -> string {
+    let name_tok: i32 = vec_get(iname,  item_idx);
+    let vcount:   i32 = vec_get(iarity, item_idx);
+    let vbase:    i32 = vec_get(ipbase, item_idx);
+    let ename: string = drv_tok_spell(tok_starts, tok_ends, source, name_tok);
+    /* widest payload across variants (pt[vbase+k] holds the payload arity) */
+    let mut maxp: i32 = 0;
+    let mut k: i32 = 0;
+    while k < vcount {
+        let pcount: i32 = vec_get(pt, vbase + k);
+        if pcount > maxp { maxp = pcount; }
+        k = k + 1;
+    }
+    let mut s: string = "typedef struct {\n  int _tag;\n";
+    let mut pi: i32 = 0;
+    while pi < maxp {
+        s = string_concat(s, string_concat("  int _", string_concat(drv_int_to_string(pi), ";\n")));
+        pi = pi + 1;
+    }
+    s = string_concat(s, string_concat("} sv0__", string_concat(ename, ";\n")));
+    /* constructors */
+    let mut vk: i32 = 0;
+    while vk < vcount {
+        let vname_tok: i32 = vec_get(pn, vbase + vk);
+        let pcount:    i32 = vec_get(pt, vbase + vk);
+        let vname: string = drv_tok_spell(tok_starts, tok_ends, source, vname_tok);
+        let mut params: string = "void";
+        let mut a: i32 = 0;
+        while a < pcount {
+            let p1: string = string_concat("int _", drv_int_to_string(a));
+            if a == 0 { params = p1; }
+            else { params = string_concat(params, string_concat(", ", p1)); }
+            a = a + 1;
+        }
+        s = string_concat(s, string_concat("static sv0__", string_concat(ename,
+              string_concat(" sv0__", string_concat(ename, string_concat("__", string_concat(vname,
+              string_concat("(", string_concat(params, ") {\n")))))))));
+        s = string_concat(s, string_concat("  sv0__", string_concat(ename, " sv0__r;\n")));
+        s = string_concat(s, string_concat("  sv0__r._tag = ", string_concat(drv_int_to_string(vk), ";\n")));
+        let mut a2: i32 = 0;
+        while a2 < pcount {
+            let ai: string = drv_int_to_string(a2);
+            s = string_concat(s, string_concat("  sv0__r._", string_concat(ai,
+                  string_concat(" = _", string_concat(ai, ";\n")))));
+            a2 = a2 + 1;
+        }
+        s = string_concat(s, "  return sv0__r;\n}\n");
+        vk = vk + 1;
+    }
+    return s;
+}
+
 fn drv_emit_c(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>,
               ipbase: Vec<i32>, iret: Vec<i32>, ibody: Vec<i32>,
               pn: Vec<i32>, pt: Vec<i32>,
@@ -4195,33 +4295,57 @@ fn drv_emit_c(it: Vec<i32>, iname: Vec<i32>, iarity: Vec<i32>,
     let n_items: i32 = vec_len(it);
     let mut out: string = "#include \"sv0_runtime.h\"\n\n";
 
-    /* Forward declarations for non-main functions */
+    /* Type definitions: struct/enum typedefs + enum constructors (before fns,
+       which reference the types). */
+    let mut ti: i32 = 0;
+    let mut any_ty: i32 = 0;
+    while ti < n_items {
+        let ttag: i32 = vec_get(it, ti);
+        if ttag == DRV_ITEM_STRUCT() {
+            out = string_concat(out, drv_emit_struct_def(ti, iname, iarity, ipbase,
+                                        pn, pt, tok_starts, tok_ends, source));
+            any_ty = 1;
+        }
+        if ttag == DRV_ITEM_ENUM() {
+            out = string_concat(out, drv_emit_enum_def(ti, iname, iarity, ipbase,
+                                        pn, pt, tok_starts, tok_ends, source));
+            any_ty = 1;
+        }
+        ti = ti + 1;
+    }
+    if any_ty == 1 { out = string_concat(out, "\n"); }
+
+    /* Forward declarations for non-main functions (fn items only) */
     let mut i: i32 = 0;
     while i < n_items {
-        let name_tok: i32 = vec_get(iname, i);
-        let fn_name: string = drv_c_fn_name(tok_starts, tok_ends, source, name_tok);
-        if string_eq(fn_name, "main") != true {
-            let arity:      i32 = vec_get(iarity, i);
-            let param_base: i32 = vec_get(ipbase, i);
-            let ret_ty:     i32 = vec_get(iret,   i);
-            let params_s: string = drv_emit_params(pn, pt, tok_starts, tok_ends, source,
-                                                    param_base, arity);
-            let ret_s: string = drv_ty_to_c(ret_ty);
-            let decl: string = string_concat("static ", string_concat(ret_s, string_concat(" ", string_concat(fn_name, string_concat("(", string_concat(params_s, ");\n"))))));
-            out = string_concat(out, decl);
+        if vec_get(it, i) == DRV_ITEM_FN() {
+            let name_tok: i32 = vec_get(iname, i);
+            let fn_name: string = drv_c_fn_name(tok_starts, tok_ends, source, name_tok);
+            if string_eq(fn_name, "main") != true {
+                let arity:      i32 = vec_get(iarity, i);
+                let param_base: i32 = vec_get(ipbase, i);
+                let ret_ty:     i32 = vec_get(iret,   i);
+                let params_s: string = drv_emit_params(pn, pt, tok_starts, tok_ends, source,
+                                                        param_base, arity);
+                let ret_s: string = drv_ty_to_c_tok(ret_ty, tok_starts, tok_ends, source);
+                let decl: string = string_concat("static ", string_concat(ret_s, string_concat(" ", string_concat(fn_name, string_concat("(", string_concat(params_s, ");\n"))))));
+                out = string_concat(out, decl);
+            }
         }
         i = i + 1;
     }
     if n_items > 1 { out = string_concat(out, "\n"); }
 
-    /* Definitions */
+    /* Definitions (fn items only) */
     let mut j: i32 = 0;
     while j < n_items {
-        let def: string = drv_emit_fn(j, it, iname, iarity, ipbase, iret, ibody,
-                                       pn, pt, et, e1, e2, e3, ss, as_,
-                                       tok_starts, tok_ends, source);
-        out = string_concat(out, def);
-        if j < n_items - 1 { out = string_concat(out, "\n"); }
+        if vec_get(it, j) == DRV_ITEM_FN() {
+            let def: string = drv_emit_fn(j, it, iname, iarity, ipbase, iret, ibody,
+                                           pn, pt, et, e1, e2, e3, ss, as_,
+                                           tok_starts, tok_ends, source);
+            out = string_concat(out, def);
+            if j < n_items - 1 { out = string_concat(out, "\n"); }
+        }
         j = j + 1;
     }
     return out;
