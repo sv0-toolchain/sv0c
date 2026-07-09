@@ -4,7 +4,7 @@ Normative **“M3 done”** criteria live in **`task/sv0-toolchain-milestone-3-s
 
 > **Absorbs the former root `sv0-g6-to-g9-plan.md`.** That standalone plan has been folded into this doc so the L0 engineering sequence lives in one place under `sv0c/doc/`. Phase labels **A–E** below are the detailed execution steps; the four **L0 prerequisites** table is the criteria summary.
 
-**Status snapshot (2026-07-05):** All slice gates **G1–GX Done**; SML retired to **`sml-legacy/`**; **`bootstrap-sml-final`** tag exists. **`lib/driver.sv0`** is a self-contained lex→parse→resolve→check→emit unit: **49 self-host unit tests pass** and **`./scripts/sv0 self-host-sv0-loop` is 98/98** (every `lib/*.sv0` seed emits C, compiles, runs, and matches the SML heap). A **native** binary **`build/sv0-driver-native`** is built from `driver.sv0` (SML→C→cc, CLI mode via `/tmp/.sv0_drv_path`). **Still open:** `lib/main.sv0` is a **staging** boundary (no phase calls — enforced by `verify_m3_g6_staging_driver_contract.py`); the default `build/sv0-self-host-compiler` is still the SML **bootstrap delegate**; multi-module `linkProjectDir` and VM tier-2 native emission are not done.
+**Status snapshot (2026-07-09):** All slice gates **G1–GX Done**; SML retired to **`sml-legacy/`**; **`bootstrap-sml-final`** tag exists. **`lib/driver.sv0`** is a self-contained lex→parse→resolve→check→emit unit: **49 self-host unit tests pass** and **`./scripts/sv0 self-host-sv0-loop` is 98/98** in SML-emit mode. A **native** binary **`build/sv0-driver-native`** is built from `driver.sv0` (SML→C→cc, CLI mode via `/tmp/.sv0_drv_path`) and now reaches **98/98 native↔SML behavioral parity** (`./scripts/sv0 self-host-native-parity`: emit C with both compilers, cc+run both, identical stdout+exit). Parity is **behavioral, not byte-identical** — the native driver inlines expr trees (`return ((1+2)+3)`) while SML uses IR temporaries (`_sv0t0 = (1+2); …`); the two compilers emit different C by design. **Still open:** `lib/main.sv0` is a **staging** boundary (no phase calls — enforced by `verify_m3_g6_staging_driver_contract.py`); the default `build/sv0-self-host-compiler` is still the SML **bootstrap delegate**; multi-module `linkProjectDir` and VM tier-2 native emission are not done.
 
 ## Why L0 is still open after G6/G7/G8/G9/GX
 
@@ -125,7 +125,8 @@ Narrow → wide (see **`.cursor/rules/40-validation-and-proof.mdc`**):
 1. **`./scripts/sv0 test-guards`**
 2. Targeted **`./scripts/sv0 vm-compile`** / **`compile-run`** / **`emit-c`** for touched **`.sv0`**
 3. **`./scripts/sv0 self-host-sv0-loop`** with **`SV0_SELF_HOST_COMPILER`** pointed at the artifact under test
-4. **`./scripts/sv0 test`** before claiming integration closure
+4. **`./scripts/sv0 self-host-native-parity`** — native driver ↔ SML **behavioral** parity (emit+cc+run, identical stdout+exit) on the whole seed list; the principled native third-leg check
+5. **`./scripts/sv0 test`** before claiming integration closure
 
 ## Related
 
