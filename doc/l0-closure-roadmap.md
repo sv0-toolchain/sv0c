@@ -80,7 +80,24 @@ Each item closes a gap between the sv0 pipeline and SML `compileProjectDir`. For
 
 ### Phase D — VM parity tier-2 native (P4)
 
-After a working native compiler (B): run it on all tier-2 programs (`scripts/sv0-vm-tier2-emit-bootstrap.sh`), `cmp` each `.sv0b` against `sv0c/test/vm-parity/golden/sml/`, fix mismatches (usual suspects: string encode byte order, pool index off-by-one, function-table entry format), then **replace the surrogate** SML-heap invocation in the tier-2 script with the native binary and update CI to run it without skip flags.
+**Goal:** a **native** sv0-built VM emitter that, given a `.sv0` path, writes `build/vm/<stem>.sv0b` **byte-identical** to the SML golden (`sv0c/test/vm-parity/golden/sml/<stem>.sv0b`). It replaces the surrogate `scripts/sv0-vm-tier2-emit-bootstrap.sh` (which shells out to the SML heap `--target=vm`) as the `SV0_VM_BYTECODE_EMITTER`.
+
+**The bar is stricter than P3.** P3's C third leg accepts **behavioral** parity (native and SML emit different C that runs the same — see `self-host-native-parity`). P4 must be **byte-exact**: the harness does `cmp -s built golden` (`run_vm_parity_tier2_emit_compare` in `scripts/sv0`), because `.sv0b` is a binary format the VM loads verbatim (magic `SV0B`, `bytecode.sv0` `magic_byte_0..3` = 83/86/48/66). There is no "behaviorally equivalent bytecode" fallback — the emitter must reproduce SML's exact byte layout: opcode encoding and instruction sizes (`bytecode.sv0 insn_encoded_size` / `opcode_has_{i32,u32}_payload`), constant/string pool **ordering and index assignment**, function-table entry format, and integer endianness/padding. Spec: `sv0doc/bytecode/format.md` + `instructions.md`; reference: `sv0vm/src/bytecode/bytecode.sml` and `sml-legacy/backend/vm/vm_codegen.sml`.
+
+**Assets that already exist:** `lib/vm_codegen.sv0` (~3050 lines) and `lib/bytecode.sv0` (~1370 lines) are transliterations of the VM backend + encoder, and both pass C behavioral parity in the self-host loop. **But passing the loop only proves their C-compiled *self-tests* run — not that, wired as the compiler's VM backend, they emit byte-identical `.sv0b` on real programs.** That is the open P4 work.
+
+**Dependency:** P4 needs the lower→`vm_codegen`→`bytecode`-encode path runnable natively. Two routes: **(i)** ride **P1/Phase B** — once the composed driver exists, add `--target=vm` to it; or **(ii)** a dedicated self-contained `vm_driver.sv0` (mirroring today's `driver.sv0` C-emit unit) that composes lower + `vm_codegen` + encode and writes `.sv0b` in CLI mode. **(i)** is preferred (one driver, no second self-contained reimplementation to maintain); **(ii)** is a fallback spike if P1 slips.
+
+**Ordered steps:**
+
+- **D0. Byte-diff instrumentation.** Add a `.sv0b` hex-diff helper (offset → field) so mismatches read as "pool[3] index" / "insn @ 0x1A opcode" rather than raw byte deltas. Emit SML golden and native side-by-side for `tier2-manifest.txt` (start: `span`, `token`, `ast`, `bytecode` — 4 programs; goldens exist for all 97).
+- **D1. Native VM emit path.** Land route (i) or (ii): a native binary that writes `build/vm/<stem>.sv0b`. Reuse the `/tmp/.sv0_drv_path` CLI convention and the emitter contract (`SV0_VM_BYTECODE_EMITTER <rel>` → `build/vm/<stem>.sv0b`, `SV0C_ROOT`/`SV0TOOLCHAIN_ROOT` in env).
+- **D2. Byte-exact convergence on the 4-program tier-2 manifest.** Iterate against `cmp -s` vs golden. Expected mismatch classes: pool ordering/index assignment, string encode byte order, function-table entry layout, opcode payload width, trailing padding. Fix in `lib/bytecode.sv0` / `lib/vm_codegen.sv0` (keep C behavioral parity green — `self-host-native-parity` must not regress).
+- **D3. Widen** the tier-2 manifest toward the full 97 goldens as programs go `cmp`-clean; `verify_vm_parity_tier2_policy.py` keeps `tier2-manifest ⊆ manifest` and golden presence enforced.
+- **D4. Replace the surrogate.** Point `SV0_VM_BYTECODE_EMITTER` at the native binary by default; update `scripts/sv0-vm-tier2-emit-bootstrap.sh` (or retire it) and run `run_vm_parity_tier2_emit_compare` in CI **without** the SML-heap surrogate.
+- **D5. CI + evidence.** Add a native-VM-parity step to `self-host-native.yml` (alongside the P3 `self-host-native-parity` step) and record it in the Phase E "VM parity v1" evidence row.
+
+**Acceptance:** `SV0_VM_BYTECODE_EMITTER=<native> ./scripts/sv0 test` passes the tier-2 `cmp` for every manifest entry with **no** SML-heap fallback; `tier2-manifest.txt` covers the intended program set; policy guard green.
 
 ### Phase E — M3 completion declaration (evidence)
 
