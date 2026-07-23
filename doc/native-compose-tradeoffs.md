@@ -49,11 +49,25 @@ the real functions (now all visible in the one TU). Compile that TU SML→C→`c
 the native `SV0_SELF_HOST_COMPILER`.
 
 **Work required.** (1) Build-time assembler: concatenate modules, strip the 18 test
-`main`s + `test_*`, resolve the ~14 logic collisions (rename backend `emit_*`,
-dedup shared accessors). Deterministic, scriptable. (2) Write the compose `main`
-threading the real phase signatures (e.g. `parse_program`'s 36 arenas) — the core
-new logic, but it is exactly what `driver.sv0`'s `drv_compile_file` does, using the
-*real* modules instead of the `drv_` subset. (3) No language or codegen changes.
+`main`s + `test_*`, resolve the collisions. Deterministic, scriptable —
+`scripts/assemble-sv0-megaTU.py` (`./scripts/sv0 assemble-megatu`). (2) Write the
+compose `main` threading the real phase signatures (e.g. `parse_program`'s 36
+arenas) — the core new logic, but it is exactly what `driver.sv0`'s
+`drv_compile_file` does, using the *real* modules instead of the `drv_` subset.
+(3) No language or codegen changes.
+
+**Collision surface — bigger than the `fn` count (found while building A1).** Beyond
+the ~14 logic-`fn` collisions, the core **types** collide and are **not identical**:
+`Value` has two shapes (`ir`/`vm_codegen` use `VBool(bool)`+`VFloat`; `lowering`/
+`codegen` use `VBoolTrue`/`VBoolFalse`, no `VFloat`), and `Expr` (5 modules),
+`Instr` (4), `Ty` (3) similarly diverge. So the back-end cannot dedup types — it
+needs **per-module type namespacing** (rename the type + every constructor
+`T::V`, match pattern, `Box<T>`, and annotation within that module). That is a
+deep, pervasive transform, materially larger than the fn renames. **A1 is therefore
+incremental:** the **front-end** set (`span, diagnostic, lexer, ast, parser, env,
+resolver`) has **no** collisions once mains/tests are stripped and assembles +
+compiles today (11k lines C, `assemble-megatu --check`); the back-end modules land
+behind per-module `RENAME_TYPES` maps in later increments.
 
 **Pros.** Sidesteps the missing cross-unit mechanism entirely; reuses the
 **proven** self-contained-TU model (`driver.sv0` at 98/98); assembly is a
