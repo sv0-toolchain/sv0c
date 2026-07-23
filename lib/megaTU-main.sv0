@@ -59,5 +59,25 @@ fn main() -> i32 {
 
     /* One top-level item (`fn main`) must have parsed. */
     if vec_len(it) != 1 { return 2; }
+
+    /* Phase 3: resolve (real resolver.sv0). mv/mt/fa are the module value/type/
+       arity env the resolver populates; pp is threaded through. 0 = ok. */
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let rr: i32 = resolve_program(bet, bed1, bed2, bed3, bed4,
+        it, id1, id2, id3, id4, id5,
+        fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc,
+        ptt, ptd1, ptd2, ptd3, sft,
+        source, starts, ends, mv, mt, fa, pp);
+    if rr != 0 { return 3; }
+
+    /* NEXT A2 boundary — type check: `check_program(tags, source, starts, ends,
+       pp, it, id1..id4, bet, bed1..bed4, tp, 0)` returns -1 here even on this
+       valid program (and independently of resolve). The real parser + checker
+       were transliterated and unit-tested STANDALONE, never composed, so their
+       arena interface has drifted (checker's test hand-builds arenas rather than
+       parsing). Reconciling that parser->checker arena contract is the next
+       increment; lower + emit follow. */
     return 0;
 }

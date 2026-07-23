@@ -70,13 +70,21 @@ compiles (SML→C ~34k lines → cc, binary runs)** — `./scripts/sv0 assemble-
 --check`. The divergent types coexist (`Value` + `lowering_Value` +
 `codegen_Value` + `vm_codegen_Value`; five `Expr`s), proving (A)'s assembly step is
 done. **A2 (in progress):** the assembler appends `sv0c/lib/megaTU-main.sv0` as the
-compose `main`; it drives the **real** lexer + parser (`tokenize` → `parse_program`)
-in the composed TU and asserts a program parses — `assemble-megatu --check`
-compiles **and runs** it. The phase **boundaries are arena-based** (`lower(...)` and
-`emit_program(typedefs, blocks: Vec<i32>)` take/produce `Vec<i32>`), so the compose
-main threads arenas and the per-module namespaced IR types stay internal. Next A2
-increments thread `resolve → check → lower → emit_program` so the mega-TU emits C,
-validated by native-vs-SML behavioral parity.
+compose `main`; `assemble-megatu --check` compiles **and runs** it. It now threads
+**three real phases — `tokenize → parse_program → resolve_program`** — all
+returning success on a valid program in the composed TU. The phase **boundaries are
+arena-based** (`lower(...)` and `emit_program(typedefs, blocks: Vec<i32>)`
+take/produce `Vec<i32>`), so the compose main threads arenas and the per-module
+namespaced IR types stay internal.
+
+**Key A2 finding — arena-interface drift.** `check_program` returns `-1` on the real
+parser's output for a valid program (independently of resolve). The pipeline
+modules were transliterated and unit-tested **standalone, never actually composed**
+(checker's own test hand-builds arenas instead of parsing), so producer/consumer
+arena contracts have **drifted** between phases. The remaining A2 work is therefore
+not just wiring but **reconciling each phase-boundary arena contract**
+(parser→checker first, then lower, then `emit_program`), validated by native-vs-SML
+behavioral parity once emit lands.
 
 **Pros.** Sidesteps the missing cross-unit mechanism entirely; reuses the
 **proven** self-contained-TU model (`driver.sv0` at 98/98); assembly is a
