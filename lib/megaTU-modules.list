@@ -2,11 +2,14 @@
 # sv0c/doc/native-compose-tradeoffs.md. Paths relative to sv0c/, in pipeline order.
 # Assembled by scripts/assemble-sv0-megaTU.py (./scripts/sv0 assemble-megatu).
 #
-# A1 status: FRONT-END only (lex -> parse -> resolve). These modules concatenate
-# without collisions once test mains/tests are stripped. Back-end modules
-# (checker, ir, lowering, codegen, bytecode, vm_codegen, link, include_expand)
-# redefine core types (Expr/Value/Instr/Ty) DIFFERENTLY, so they need per-module
-# type namespacing (RENAME_TYPES in the assembler) before they can be added.
+# A1 status: FULL pipeline — all 18 modules assemble into one TU that compiles
+# (SML -> C ~34k lines -> cc, binary runs). The assembler AUTO-NAMESPACES any name
+# a module defines that an earlier module already claimed (the back-end's divergent
+# core types Expr/Value/Instr/Ty become e.g. lowering_Value / codegen_Value /
+# vm_codegen_Value, each with its uses rewritten self-consistently). Remaining for
+# a working native compiler: A2 — replace the placeholder main with a compose main
+# that threads the real phases (tokenize -> parse -> resolve -> check -> lower ->
+# emit) over the shared arenas.
 
 lib/span.sv0
 lib/diagnostic.sv0
@@ -15,3 +18,14 @@ lib/ast.sv0
 lib/parser.sv0
 lib/env.sv0
 lib/resolver.sv0
+lib/types.sv0
+lib/unify.sv0
+lib/checker.sv0
+lib/contract_analyzer.sv0
+lib/ir.sv0
+lib/lowering.sv0
+lib/codegen.sv0
+lib/bytecode.sv0
+lib/vm_codegen.sv0
+lib/link.sv0
+lib/include_expand.sv0
