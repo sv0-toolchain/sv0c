@@ -6,10 +6,13 @@
 # (SML -> C ~34k lines -> cc, binary runs). The assembler AUTO-NAMESPACES any name
 # a module defines that an earlier module already claimed (the back-end's divergent
 # core types Expr/Value/Instr/Ty become e.g. lowering_Value / codegen_Value /
-# vm_codegen_Value, each with its uses rewritten self-consistently). Remaining for
-# a working native compiler: A2 — replace the placeholder main with a compose main
-# that threads the real phases (tokenize -> parse -> resolve -> check -> lower ->
-# emit) over the shared arenas.
+# vm_codegen_Value, each with its uses rewritten self-consistently).
+#
+# A2 (in progress): the assembler appends sv0c/lib/megaTU-main.sv0 as the compose
+# main. It currently drives the REAL lexer (tokenize) + parser (parse_program) and
+# asserts a program parses; `assemble-megatu --check` compiles AND runs it. Next:
+# thread resolve -> check -> lower -> emit_program over the shared arenas so the
+# mega-TU emits C, validated by native-vs-SML behavioral parity.
 
 lib/span.sv0
 lib/diagnostic.sv0

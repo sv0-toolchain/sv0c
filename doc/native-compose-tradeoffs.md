@@ -69,7 +69,14 @@ and self-contained. **Result: all 18 pipeline modules assemble into one TU that
 compiles (SML→C ~34k lines → cc, binary runs)** — `./scripts/sv0 assemble-megatu
 --check`. The divergent types coexist (`Value` + `lowering_Value` +
 `codegen_Value` + `vm_codegen_Value`; five `Expr`s), proving (A)'s assembly step is
-done. **Remaining for a working native compiler: A2** — the compose `main` (below).
+done. **A2 (in progress):** the assembler appends `sv0c/lib/megaTU-main.sv0` as the
+compose `main`; it drives the **real** lexer + parser (`tokenize` → `parse_program`)
+in the composed TU and asserts a program parses — `assemble-megatu --check`
+compiles **and runs** it. The phase **boundaries are arena-based** (`lower(...)` and
+`emit_program(typedefs, blocks: Vec<i32>)` take/produce `Vec<i32>`), so the compose
+main threads arenas and the per-module namespaced IR types stay internal. Next A2
+increments thread `resolve → check → lower → emit_program` so the mega-TU emits C,
+validated by native-vs-SML behavioral parity.
 
 **Pros.** Sidesteps the missing cross-unit mechanism entirely; reuses the
 **proven** self-contained-TU model (`driver.sv0` at 98/98); assembly is a
