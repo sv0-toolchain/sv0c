@@ -55,6 +55,12 @@ Promote **M3-S-041** from **Partial** to **Done** when **all** of the following 
 
 Until then, **`lib/main.sv0`** remains the **staging module** for driver-facing helpers; **M3-S-042** (**`doc/cli-parity.md`**) can be **Done** independently.
 
+### Resolution — model chosen: (A) self-contained single TU = `lib/driver.sv0` (2026-07-09)
+
+Per **`l0-closure-roadmap.md`** the composition model is **(A)**, realized as the **self-contained single translation unit** **`lib/driver.sv0`** — **not** a text-`include` mega-TU of the 19 real modules (that is ruled out: every module defines `fn main()` → **E0302**, and the codegen emits `static` for non-main fns → **(B)** object linking is illegal too; see the `driver.sv0` header "WHY SELF-CONTAINED"). `driver.sv0`'s `main` (CLI mode via `/tmp/.sv0_drv_path`) drives **`drv_tokenize` → `drv_parse` → `drv_resolve`/`drv_check` → `drv_emit_c`** in the documented order. **`lib/main.sv0`** stays the naming/CLI **staging module** by design — it does not (and per **`verify_m3_g6_staging_driver_contract.py`** must not) call `parse_program`.
+
+**Criterion (1)** — model documented + implemented: `driver.sv0` (49 self-host unit tests; the *essential subset* per its header). **Criterion (2)** — phase-order/wiring regressions fail CI via **two** checks beyond the numeric spine: (a) **`verify_m3_g6_pipeline_contract.py`** now statically asserts `drv_compile_file` calls `drv_tokenize` before `drv_parse` before `drv_emit_c`; (b) **`./scripts/sv0 self-host-native-parity`** *executes* the composed pipeline end-to-end natively on all 98 seeds (emit+cc+run, 98/98 vs SML) — the "lexer→emit runs inside sv0" proof this section previously lacked. **Scope caveat:** this closes the *composition* gate on the essential-subset driver; full-language **feature parity** (multi-module `linkProjectDir`, resolver/lowering tails) remains the separate **Phase C** work, and the composed *full* compiler + native `--target=vm` remain **Phase B/D**.
+
 ## Bootstrap staging closure (**M3-S-041** stage-0 **Done**)
 
 For **bootstrap / transliteration milestone tracking**, promote **M3-S-041** from **Partial** to **Done** when **all** of the following hold (this is **not** a substitute for a future single-TU sv0 driver):
