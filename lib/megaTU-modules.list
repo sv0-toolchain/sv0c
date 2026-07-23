@@ -1,0 +1,17 @@
+# Mega-TU module manifest for native-compose option (A) — see
+# sv0c/doc/native-compose-tradeoffs.md. Paths relative to sv0c/, in pipeline order.
+# Assembled by scripts/assemble-sv0-megaTU.py (./scripts/sv0 assemble-megatu).
+#
+# A1 status: FRONT-END only (lex -> parse -> resolve). These modules concatenate
+# without collisions once test mains/tests are stripped. Back-end modules
+# (checker, ir, lowering, codegen, bytecode, vm_codegen, link, include_expand)
+# redefine core types (Expr/Value/Instr/Ty) DIFFERENTLY, so they need per-module
+# type namespacing (RENAME_TYPES in the assembler) before they can be added.
+
+lib/span.sv0
+lib/diagnostic.sv0
+lib/lexer.sv0
+lib/ast.sv0
+lib/parser.sv0
+lib/env.sv0
+lib/resolver.sv0
