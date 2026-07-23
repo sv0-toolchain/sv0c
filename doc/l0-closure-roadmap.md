@@ -62,7 +62,9 @@ Inter-phase data (all already defined in their modules): lexer → `source: stri
 
 ### Phase B — Native binary, full compiler (P2)
 
-**B1.** `driver.sv0` → `build/sv0-driver-native` is done (per-file). The remaining P2 work is a **`scripts/build-sv0-self-host-compiler.sh`** (or successor) that composes the **full** multi-module compiler natively (via the A1 model) and **must not** call `sv0-self-host-emit-c.sh` (the SML delegate). If it touches the SML heap at all, it is not a native build.
+**Native full-compose is the critical path** (unblocks Phase C validation + P2 + P4). See **`native-compose-tradeoffs.md`** (2026-07-23) for the concrete (A)-vs-(B) analysis: **recommend (A) mega-TU** — assemble the real modules into one TU by a build script (concat + strip the 18 test `main`s / 8 `test_*` / rename ~14 logic collisions) + a compose `main` threading the real phases; (B) multi-unit link is gated on a new `extern` language feature the compiler lacks. Evidence: 1651 fns / only 21 collisions; a 2-module concat compiles; `driver.sv0` proves the self-contained-TU shape at 98/98.
+
+**B1.** `driver.sv0` → `build/sv0-driver-native` is done (per-file). The remaining P2 work is a **`scripts/build-sv0-self-host-compiler.sh`** (or successor) that composes the **full** multi-module compiler natively (via the (A) mega-TU model) and **must not** call `sv0-self-host-emit-c.sh` (the SML delegate). If it touches the SML heap at all, it is not a native build.
 
 **B2. Third-leg parity** — with `SV0_SELF_HOST_COMPILER` pointed at that binary, `./scripts/sv0 self-host-sv0-loop` must report **byte-identical** C vs the SML heap on `lib/self-host-sv0-loop.list` (**already achieved for the `driver.sv0`-native binary at 98/98**; the bar is to keep it clean for the composed full compiler). Diffs mean either a driver phase diverges from SML (→ Phase C) or a binary bug.
 
@@ -154,6 +156,7 @@ Narrow → wide (see **`.cursor/rules/40-validation-and-proof.mdc`**):
 ## Related
 
 - **`doc/native-self-host-compiler-recipe.md`** — interface contract + bootstrap vs forward path
+- **`doc/native-compose-tradeoffs.md`** — (A) mega-TU vs (B) multi-unit link, evidence + recommendation (2026-07-23)
 - **`doc/driver-pipeline-composition.md`** — (A)/(B), staging vs native
 - **`doc/self-host-sv0-loop.md`** — pilot loop semantics
 - **`task/sv0-toolchain-milestone-3-self-host.Rmd`** — **L0** prerequisites table + ordered execution steps

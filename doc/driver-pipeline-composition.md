@@ -32,6 +32,8 @@ The **linear step indices** **`0..DRIVER_FULL_PIPELINE_LEN()-1`** exposed from *
 
 ## Native closure — both (A) and (B) as sequential milestones (not dual architecture)
 
+> **Evidence-based recommendation (2026-07-23): pursue (A) mega-TU first.** A concrete trade-off analysis with collision counts, feasibility tests, and the finding that **(B) requires a new `extern`/import-symbol language feature** the bootstrap compiler lacks is in **`native-compose-tradeoffs.md`**. It updates the "(B) for maintainability" lean below: (B) is the cleaner *destination* but is gated on a language feature we do not have; (A) is proven-viable now (`driver.sv0` at 98/98; 2-module concat compiles; only ~14 real name collisions). Read that doc before starting compose work.
+
 **Stakeholder confusion:** **§ Closure criteria** asks for **one** agreed composition model **(A) xor (B)** for the **native** sv0 driver — you do **not** ship two competing drivers in production.
 
 **Cleanest path toward M3 closure (engineering recommendation):**
