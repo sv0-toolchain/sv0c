@@ -1,0 +1,63 @@
+/* Compose main for the native mega-TU — native-compose option (A), step A2.
+
+   NOT a standalone bootstrap unit: it references cross-module entry points
+   (`tokenize`, `parse_program`, …) that exist only in the assembled
+   `build/megaTU.sv0`. The assembler (scripts/assemble-sv0-megaTU.py) appends this
+   file verbatim after the (main-stripped, auto-namespaced) pipeline modules, so
+   these bare names resolve to the first-definer real entry points. Do not add it
+   to bootstrap-sources.list / self-host-sv0-loop.list.
+
+   A2 status: smoke stage — drives the REAL lexer + parser (composed in the TU) on
+   a fixed program and asserts one item parses. Later A2 increments thread
+   resolve → check → lower → emit_program over the shared arenas. */
+
+fn main() -> i32 {
+    let source: string = "fn main() -> i32 { return 0; }";
+
+    /* Phase 1: tokenize (real lexer.sv0) */
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    let tc: i32 = tokenize(source, tags, starts, ends);
+    if vec_len(tags) == 0 { return 1; }
+
+    /* Phase 2: parse_program (real parser.sv0) — full arena set */
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let evn: Vec<i32> = vec_new();
+    let sfn: Vec<i32> = vec_new();
+    let fpn: Vec<i32> = vec_new();
+    let fpt: Vec<i32> = vec_new();
+    let frt: Vec<i32> = vec_new();
+    let fcb: Vec<i32> = vec_new();
+    let fcr: Vec<i32> = vec_new();
+    let evpt: Vec<i32> = vec_new();
+    let evpb: Vec<i32> = vec_new();
+    let evpc: Vec<i32> = vec_new();
+    let ptt: Vec<i32> = vec_new();
+    let ptd1: Vec<i32> = vec_new();
+    let ptd2: Vec<i32> = vec_new();
+    let ptd3: Vec<i32> = vec_new();
+    let sft: Vec<i32> = vec_new();
+    let bet: Vec<i32> = vec_new();
+    let bed1: Vec<i32> = vec_new();
+    let bed2: Vec<i32> = vec_new();
+    let bed3: Vec<i32> = vec_new();
+    let bed4: Vec<i32> = vec_new();
+    let bsf: Vec<i32> = vec_new();
+
+    let pr: i32 = parse_program(tags, starts, ends, source, 0,
+        it, id1, id2, id3, id4, id5, pp,
+        evn, sfn, fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc,
+        ptt, ptd1, ptd2, ptd3, sft,
+        bet, bed1, bed2, bed3, bed4, bsf);
+
+    /* One top-level item (`fn main`) must have parsed. */
+    if vec_len(it) != 1 { return 2; }
+    return 0;
+}
