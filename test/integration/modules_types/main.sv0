@@ -1,0 +1,12 @@
+use lib::sum_point;
+use lib::color_code;
+
+fn main() -> i32 {
+  if sum_point() != 7 {
+    return 1;
+  }
+  if color_code() != 7 {
+    return 2;
+  }
+  return sum_point() + color_code() + 28;
+}

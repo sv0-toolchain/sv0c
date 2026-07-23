@@ -1,0 +1,28 @@
+module lib;
+
+/* Struct and enum defined AND used within this module; the cross-module
+   surface exposes them via i32-returning fns. Exercises linkProjectDir name
+   mangling (lib__Point / lib__Color / lib__*) plus intra-module struct
+   construction + field access and enum construction + match. */
+struct Point {
+  x: i32,
+  y: i32,
+}
+
+enum Color {
+  Red(),
+  Blue(),
+}
+
+fn sum_point() -> i32 {
+  let p: Point = Point { x: 3, y: 4, };
+  return p.x + p.y;
+}
+
+fn color_code() -> i32 {
+  let c: Color = Color::Blue();
+  return match c {
+    Color::Red() => 100,
+    Color::Blue() => 7,
+  };
+}
