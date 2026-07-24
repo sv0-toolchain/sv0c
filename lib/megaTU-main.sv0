@@ -81,7 +81,51 @@ fn main() -> i32 {
         bet, bed1, bed2, bed3, bed4, tp, 0);
     if cr != 0 { return 4; }
 
-    /* NEXT A2 boundary: lower (lowering.sv0) then emit_program (codegen.sv0),
-       then validate emitted C by native-vs-SML behavioral parity. */
+    /* Phase 5: lower (real lowering.sv0) — parse arenas -> IR out_blocks; returns
+       the typedefs string. item_field_counts/item_vmax are parallel to `it`
+       (fn items: 0/0). Struct/enum sidecars are empty for this fn-only program. */
+    let ifc: Vec<i32> = vec_new();
+    let ivm: Vec<i32> = vec_new();
+    let mut ii: i32 = 0;
+    while ii < vec_len(it) {
+        vec_push(ifc, 0);
+        vec_push(ivm, 0);
+        ii = ii + 1;
+    }
+    let sf_names: Vec<i32> = vec_new();
+    let sf_types: Vec<i32> = vec_new();
+    let ob: Vec<i32> = vec_new();
+    let osn: Vec<i32> = vec_new();
+    let oso: Vec<i32> = vec_new();
+    let osc: Vec<i32> = vec_new();
+    let osf: Vec<i32> = vec_new();
+    let oen: Vec<i32> = vec_new();
+    let oeto: Vec<i32> = vec_new();
+    let oetc: Vec<i32> = vec_new();
+    let oetf: Vec<i32> = vec_new();
+    let oem: Vec<i32> = vec_new();
+    let out_blocks: Vec<i32> = vec_new();
+    let imp: Vec<i32> = vec_new();
+    let td: string = lower(it, id1, id2, id3, id4, ifc, ivm,
+        sfn, evn, sf_names, sf_types,
+        source, starts, ends,
+        ob, osn, oso, osc, osf,
+        oen, oeto, oetc, oetf, oem,
+        bet, bed1, bed2, bed3, bed4, bsf,
+        pp, tags, out_blocks, imp);
+
+    /* Phase 6: emit C (real codegen.sv0). out_blocks is exactly emit_program's
+       `blocks` (4 ints/block: label, ret, params-vec, instrs-vec). */
+    let c: string = emit_program(td, out_blocks);
+    if string_len(c) == 0 { return 5; }
+
+    /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
+       lower -> emit_program) compose and RUN in the native mega-TU, producing C.
+       NOT YET CORRECT: the parse->lower arena mapping mislowers the fn body — it
+       emits a stray block (label `x`, empty body) so codegen falls back to a
+       default `int main(void){return 0;}` instead of lowering `fn main`'s body.
+       Reconciling that block-label/body mapping at the parse->lower boundary is
+       the next increment; correctness will be validated by native-vs-SML
+       behavioral parity once it lands. */
     return 0;
 }
