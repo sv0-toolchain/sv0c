@@ -114,9 +114,14 @@ fn main() -> i32 {
         bet, bed1, bed2, bed3, bed4, bsf,
         pp, tags, out_blocks, imp);
 
-    /* Phase 6: emit C (real codegen.sv0). out_blocks is exactly emit_program's
-       `blocks` (4 ints/block: label, ret, params-vec, instrs-vec). */
-    let c: string = emit_program(td, out_blocks);
+    /* Phase 6: emit C. codegen's emit_program uses a hardcoded test stub for
+       names (name_of: token-index -> fabricated names, and `label_h == 11` to
+       detect main). Bridge it here: resolve real fn names via lowering's
+       handle_to_str(source) and detect main by name. Reuses codegen's
+       emit_instrs/emit_param_list/emit_block_defn for the body (fine while the
+       body has no identifiers). This is the native-compose (A) de-stub, done in
+       the compose main so codegen.sv0 stays standalone-compilable. */
+    let c: string = megatu_emit_program(td, out_blocks, source, starts, ends);
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
@@ -128,4 +133,57 @@ fn main() -> i32 {
        the next increment; correctness will be validated by native-vs-SML
        behavioral parity once it lands. */
     return 0;
+}
+
+/* Source-aware C emit (native-compose A de-stub). Same shape as codegen.sv0's
+   emit_program, but resolves each block's fn name via lowering's handle_to_str
+   (real source names) instead of the stub name_of, and detects main by name.
+   Lives in the compose main so it can see BOTH modules; codegen.sv0 stays a
+   standalone unit. Body names (vars/calls) still route through codegen's
+   name_of — the next de-stub layer. */
+fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
+                       source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let num_blocks: i32 = vec_len(blocks) / 4;
+    if num_blocks == 0 {
+        return "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
+    }
+    let prelude: string = "#include \"sv0_runtime.h\"\n\n";
+    let mut td_part: string = "";
+    if string_eq(typedefs, "") != true {
+        td_part = string_concat(typedefs, "\n");
+    }
+    let mut fwd_decls: string = "";
+    let mut statics: string = "";
+    let mut main_part: string = "";
+    let mut idx: i32 = 0;
+    while idx < num_blocks {
+        let label_h: i32 = vec_get(blocks, idx * 4);
+        let ret_h: i32 = vec_get(blocks, idx * 4 + 1);
+        let params: Vec<i32> = vec_get(blocks, idx * 4 + 2);
+        let instrs: Vec<i32> = vec_get(blocks, idx * 4 + 3);
+        let ret_name: string = name_of(ret_h);
+        let fn_name: string = handle_to_str(label_h, source, starts, ends);
+        let pstr: string = emit_param_list(params);
+        let sig: string = string_concat(fn_name,
+            string_concat("(", string_concat(pstr, ")")));
+        let body: string = emit_instrs(instrs, "  ", ret_name);
+        if string_eq(fn_name, "main") {
+            let proto: string = string_concat(ret_name, string_concat(" ", sig));
+            main_part = emit_block_defn(proto, body);
+        } else {
+            let proto: string = string_concat("static ",
+                string_concat(ret_name, string_concat(" ", sig)));
+            fwd_decls = string_concat(fwd_decls, string_concat(proto, ";\n"));
+            statics = string_concat(statics, emit_block_defn(proto, body));
+        }
+        idx = idx + 1;
+    }
+    if string_eq(main_part, "") {
+        main_part = "int main(void) { return 0; }\n";
+    }
+    let mut out: string = string_concat(prelude, td_part);
+    out = string_concat(out, fwd_decls);
+    out = string_concat(out, "\n");
+    out = string_concat(out, statics);
+    return string_concat(out, main_part);
 }
