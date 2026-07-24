@@ -1207,8 +1207,18 @@ static int struct_has_field(int field_names, int name) {
 }
 
 static int expect(int got_tag, int want_tag) {
-  int _sv0t0 = (got_tag == want_tag);
-  return _sv0t0;
+  int _sv0t0 = TY_VAR();
+  if ((got_tag == _sv0t0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = TY_VAR();
+  if ((want_tag == _sv0t1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = (got_tag == want_tag);
+  return _sv0t2;
 }
 
 static int fields_of_struct(int struct_names, int struct_stride, int target_name) {
@@ -4673,32 +4683,38 @@ static int synth_expr(int et, int ed1, int ed2, int ed3, int ed4, int pp, const 
       return _sv0t162;
     } else {
     }
-    int _sv0t163 = TY_UNIT();
-    return _sv0t163;
-  } else {
-  }
-  if ((tag == 30)) {
-    int _sv0t164 = TY_UNIT();
-    return _sv0t164;
-  } else {
-  }
-  if ((tag == 31)) {
+    int _sv0t163 = last_stmt_returns_arena(et, ed1, stmts_first, stmts_count);
+    if (_sv0t163) {
+      int _sv0t164 = TY_VAR();
+      return _sv0t164;
+    } else {
+    }
     int _sv0t165 = TY_UNIT();
     return _sv0t165;
   } else {
   }
-  if ((tag == 32)) {
+  if ((tag == 30)) {
     int _sv0t166 = TY_UNIT();
     return _sv0t166;
   } else {
   }
-  if ((tag == 33)) {
+  if ((tag == 31)) {
     int _sv0t167 = TY_UNIT();
     return _sv0t167;
   } else {
   }
-  int _sv0t168 = (0 - 1);
-  return _sv0t168;
+  if ((tag == 32)) {
+    int _sv0t168 = TY_UNIT();
+    return _sv0t168;
+  } else {
+  }
+  if ((tag == 33)) {
+    int _sv0t169 = TY_UNIT();
+    return _sv0t169;
+  } else {
+  }
+  int _sv0t170 = (0 - 1);
+  return _sv0t170;
 }
 
 static int test_binop_class(void) {

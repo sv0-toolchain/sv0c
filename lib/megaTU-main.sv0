@@ -72,12 +72,16 @@ fn main() -> i32 {
         source, starts, ends, mv, mt, fa, pp);
     if rr != 0 { return 3; }
 
-    /* NEXT A2 boundary — type check: `check_program(tags, source, starts, ends,
-       pp, it, id1..id4, bet, bed1..bed4, tp, 0)` returns -1 here even on this
-       valid program (and independently of resolve). The real parser + checker
-       were transliterated and unit-tested STANDALONE, never composed, so their
-       arena interface has drifted (checker's test hand-builds arenas rather than
-       parsing). Reconciling that parser->checker arena contract is the next
-       increment; lower + emit follow. */
+    /* Phase 4: type check (real checker.sv0). tp = type params (none). 0 = ok.
+       (Reconciled: a tailless block whose last stmt is `return` now types as
+       TY_VAR and unifies with the declared return type — see checker.sv0.) */
+    let tp: Vec<i32> = vec_new();
+    let cr: i32 = check_program(tags, source, starts, ends, pp,
+        it, id1, id2, id3, id4,
+        bet, bed1, bed2, bed3, bed4, tp, 0);
+    if cr != 0 { return 4; }
+
+    /* NEXT A2 boundary: lower (lowering.sv0) then emit_program (codegen.sv0),
+       then validate emitted C by native-vs-SML behavioral parity. */
     return 0;
 }
