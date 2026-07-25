@@ -141,8 +141,14 @@ fn ir_instr_tag(ins: Instr) -> i32 {
    tok_tags needed to distinguish true (91) vs false (64). */
 
 fn lower_lit_to_ir_value(lit_tag: i32, tok_pos: i32,
-                          tok_tags: Vec<i32>) -> Value {
-    if lit_tag == 0 { return Value::VInt(tok_pos); }
+                          tok_tags: Vec<i32>,
+                          source: string, starts: Vec<i32>, ends: Vec<i32>) -> Value {
+    /* Integer literal: parse the actual value from the token text (SML IR VInt
+       holds the value). Previously stored tok_pos, so codegen emitted the token
+       index instead of the number. */
+    if lit_tag == 0 {
+        return Value::VInt(parse_decimal_i32_from_tok(source, starts, ends, tok_pos));
+    }
     if lit_tag == 5 {
         let tt: i32 = vec_get(tok_tags, tok_pos);
         if tt == 91 { return Value::VBoolTrue; }
@@ -768,7 +774,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if tag == 0 {
         let lit_tag: i32 = vec_get(ed1, idx);
         let tok_pos: i32 = vec_get(ed2, idx);
-        return lower_lit_to_ir_value(lit_tag, tok_pos, tok_tags);
+        return lower_lit_to_ir_value(lit_tag, tok_pos, tok_tags, source, starts, ends);
     }
     if tag == 1 {
         let pps: i32 = vec_get(ed1, idx);
@@ -1531,8 +1537,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             if is_neg2 == 1 {
                                 cexp = Expr::Literal(box_new(Value::VBoolTrue));
                             } else {
-                                let rv0: Value = lower_lit_to_ir_value(0, tp2,
-                                                                        tok_tags);
+                                let rv0: Value = lower_lit_to_ir_value(0, tp2, tok_tags, source, starts, ends);
                                 cexp = Expr::Binop(4, box_new(lv2),
                                                     box_new(rv0));
                             }
@@ -1571,13 +1576,13 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         } else {
                             if is_neg2 == 1 {
                                 let rv_n: Value = lower_lit_to_ir_value(
-                                    lt2, tp2, tok_tags);
+                                    lt2, tp2, tok_tags, source, starts, ends);
                                 let lv_n: Value = Value::VVar(scrut_var);
                                 cexp = Expr::Binop(5, box_new(lv_n),
                                                     box_new(rv_n));
                             } else {
                                 let rv3: Value = lower_lit_to_ir_value(
-                                    lt2, tp2, tok_tags);
+                                    lt2, tp2, tok_tags, source, starts, ends);
                                 let lv3: Value = Value::VVar(scrut_var);
                                 cexp = Expr::Binop(4, box_new(lv3),
                                                     box_new(rv3));
@@ -5817,15 +5822,18 @@ fn test_lower_lit_val() -> i32 {
     vec_push(tok_tags, 91);
     vec_push(tok_tags, 64);
     vec_push(tok_tags, 0);
-    let v1: Value = lower_lit_to_ir_value(0, 2, tok_tags);
+    let lit_src: string = "";
+    let lit_st: Vec<i32> = vec_new();
+    let lit_en: Vec<i32> = vec_new();
+    let v1: Value = lower_lit_to_ir_value(0, 2, tok_tags, lit_src, lit_st, lit_en);
     if ir_value_tag(v1) != 0 { return 1; }
-    let v2: Value = lower_lit_to_ir_value(5, 0, tok_tags);
+    let v2: Value = lower_lit_to_ir_value(5, 0, tok_tags, lit_src, lit_st, lit_en);
     if ir_value_tag(v2) != 1 { return 2; }
-    let v3: Value = lower_lit_to_ir_value(5, 1, tok_tags);
+    let v3: Value = lower_lit_to_ir_value(5, 1, tok_tags, lit_src, lit_st, lit_en);
     if ir_value_tag(v3) != 2 { return 3; }
-    let v4: Value = lower_lit_to_ir_value(3, 2, tok_tags);
+    let v4: Value = lower_lit_to_ir_value(3, 2, tok_tags, lit_src, lit_st, lit_en);
     if ir_value_tag(v4) != 5 { return 4; }
-    let v5: Value = lower_lit_to_ir_value(99, 0, tok_tags);
+    let v5: Value = lower_lit_to_ir_value(99, 0, tok_tags, lit_src, lit_st, lit_en);
     if ir_value_tag(v5) != 4 { return 5; }
     return 0;
 }

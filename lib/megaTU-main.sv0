@@ -125,15 +125,16 @@ fn main() -> i32 {
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
-       lower -> emit_program) compose and RUN in the native mega-TU, and the fn
-       body now lowers. For `fn main() -> i32 { return 0; }` the native pipeline
-       emits `int main(void) { return 8; }` — structurally correct (real name,
-       return statement present). Fixes so far: return-statement lowering
-       (lower_stmt), the box/vec convention (box_deref above), and source-aware fn
-       names (megatu_emit_program). REMAINING before it matches SML: integer
-       literals emit their token position (8) not the parsed value (0) — another
-       handle that needs source resolution. Then validate by native-vs-SML
-       behavioral parity. */
+       lower -> emit_program) compose and RUN in the native mega-TU, and for
+       `fn main() -> i32 { return 0; }` the native pipeline now emits the
+       byte-correct `int main(void) { return 0; }`. Fixes that got here:
+       return-statement lowering (lower_stmt routes ExprReturn -> lower_return),
+       the box/vec convention (box_deref above), source-aware fn names
+       (megatu_emit_program via handle_to_str), and integer-literal values
+       (lower_lit_to_ir_value parses the token text via parse_decimal_i32_from_tok
+       instead of storing the token position). NEXT: body-level names (vars/calls)
+       still route through codegen's name_of stub — the next de-stub layer — then
+       native-vs-SML behavioral parity over the self-host-sv0-loop corpus. */
     return 0;
 }
 
