@@ -114,27 +114,32 @@ fn main() -> i32 {
         bet, bed1, bed2, bed3, bed4, bsf,
         pp, tags, out_blocks, imp);
 
-    /* Phase 6: emit C. codegen's emit_program uses a hardcoded test stub for
-       names (name_of: token-index -> fabricated names, and `label_h == 11` to
-       detect main). Bridge it here: resolve real fn names via lowering's
-       handle_to_str(source) and detect main by name. Reuses codegen's
-       emit_instrs/emit_param_list/emit_block_defn for the body (fine while the
-       body has no identifiers). This is the native-compose (A) de-stub, done in
-       the compose main so codegen.sv0 stays standalone-compilable. */
+    /* Phase 6: emit C. codegen's emit_program AND its body emit (emit_instrs)
+       use hardcoded test stubs — name_of (token-index -> fabricated names,
+       `label_h == 11` for main) and op_of (ad-hoc 1-8 operator table). Bridge the
+       whole emit here: megatu_emit_program resolves fn names via lowering's
+       handle_to_str + detects main by name, and megatu_emit_instrs (below)
+       resolves body var/temp names and AST binop/unop operators against the real
+       source. This is the native-compose (A) de-stub, done in the compose main so
+       codegen.sv0 stays standalone-compilable. */
     let c: string = megatu_emit_program(td, out_blocks, source, starts, ends);
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
-       lower -> emit_program) compose and RUN in the native mega-TU, and for
-       `fn main() -> i32 { return 0; }` the native pipeline now emits the
-       byte-correct `int main(void) { return 0; }`. Fixes that got here:
-       return-statement lowering (lower_stmt routes ExprReturn -> lower_return),
-       the box/vec convention (box_deref above), source-aware fn names
-       (megatu_emit_program via handle_to_str), and integer-literal values
-       (lower_lit_to_ir_value parses the token text via parse_decimal_i32_from_tok
-       instead of storing the token position). NEXT: body-level names (vars/calls)
-       still route through codegen's name_of stub — the next de-stub layer — then
-       native-vs-SML behavioral parity over the self-host-sv0-loop corpus. */
+       lower -> emit_program) compose and RUN in the native mega-TU, and the emit
+       is fully de-stubbed for the expression surface. Native-vs-SML behavioral
+       parity holds: `return 0` -> exit 0, `return 1 + 2` ->
+       `int _sv0t0 = (1 + 2); return _sv0t0;` -> exit 3, `return 1 + 2 * 3` ->
+       exit 7 (nested temps, correct precedence). Fixes that got here:
+       return-statement lowering (lower_stmt -> lower_return), the box/vec
+       convention (box_deref), source-aware fn names (handle_to_str),
+       integer-literal values (parse_decimal_i32_from_tok), and the body de-stub —
+       temps offset above the token range (lower_temp_base) so the emitter tells a
+       synthetic temp ("_sv0t<n>") from a source var (handle_to_str), plus real
+       AST binop/unop -> C operator tables. NEXT: let-bound locals fail the checker
+       (composed-pipeline gap, same class as the earlier parser->checker fix);
+       then calls/params; then the full self-host-sv0-loop corpus, then A3
+       (--target=vm) and P4. */
     return 0;
 }
 
@@ -172,7 +177,11 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
         let pstr: string = emit_param_list(params);
         let sig: string = string_concat(fn_name,
             string_concat("(", string_concat(pstr, ")")));
-        let body: string = emit_instrs(instrs, "  ", ret_name);
+        /* Body via the source-aware emitter (not codegen's emit_instrs, whose
+           name_of/op_of are test stubs): resolves var/temp names and operators
+           against the real source. This is the body-level de-stub. */
+        let body: string = megatu_emit_instrs(instrs, "  ", ret_name,
+                                              source, starts, ends);
         if string_eq(fn_name, "main") {
             let proto: string = string_concat(ret_name, string_concat(" ", sig));
             main_part = emit_block_defn(proto, body);
@@ -192,4 +201,300 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
     out = string_concat(out, "\n");
     out = string_concat(out, statics);
     return string_concat(out, main_part);
+}
+
+/* ── Body-level de-stub (native-compose A) ──────────────────────────────────
+   codegen.sv0's emit_instrs resolves body names via name_of (a hardcoded test
+   stub: 1->x, 12->foo, …) and operators via op_of (an ad-hoc 1-8 table). The
+   real pipeline carries source-token handles for names and AST binop/unop tags
+   for operators, so codegen's stubs emit `?`. These megatu_* mirrors reproduce
+   codegen's emit tree exactly but resolve:
+     - variable/temp names  via megatu_val_name (temps >= lower_temp_base ->
+       "_sv0t<n>", tuple fields 500..599 -> "f<n>", else handle_to_str),
+     - type names           via megatu_ty_name (name_of for int/void, else source),
+     - operators            via the real AST binop/unop -> C tables.
+   The SML reference (ir.sml) carries these as strings pre-resolved at lowering
+   time; the flat i32 IR defers resolution to emit, which is what happens here.
+   Lives in the compose main so codegen.sv0 stays a standalone-compilable unit. */
+
+fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    if h >= lower_temp_base() {
+        return string_concat("_sv0t", int_to_string(h - lower_temp_base()));
+    }
+    if h >= 500 {
+        if h < 600 {
+            return string_concat("f", int_to_string(h - 500));
+        }
+    }
+    return handle_to_str(h, source, starts, ends);
+}
+
+fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let n: string = name_of(h);
+    if !string_eq(n, "?") { return n; }
+    return handle_to_str(h, source, starts, ends);
+}
+
+/* AST binop tag (ast.sml: Add=0 … Shr=17) -> C operator (astBinopToC). */
+fn megatu_binop_c(t: i32) -> string {
+    if t == 0 { return "+"; }
+    if t == 1 { return "-"; }
+    if t == 2 { return "*"; }
+    if t == 3 { return "/"; }
+    if t == 4 { return "%"; }
+    if t == 5 { return "=="; }
+    if t == 6 { return "!="; }
+    if t == 7 { return "<"; }
+    if t == 8 { return ">"; }
+    if t == 9 { return "<="; }
+    if t == 10 { return ">="; }
+    if t == 11 { return "&&"; }
+    if t == 12 { return "||"; }
+    if t == 13 { return "&"; }
+    if t == 14 { return "|"; }
+    if t == 15 { return "^"; }
+    if t == 16 { return "<<"; }
+    if t == 17 { return ">>"; }
+    return "?";
+}
+
+/* AST unop tag (ast.sml: Neg=0, Not=1, BitNot=2, Deref=3, Borrow=4, BorrowMut=5)
+   -> C operator (unopToC). 99 is the synthetic cast tag lowering emits for
+   ExprCast; for the i32-only surface it is an identity, so emit no operator. */
+fn megatu_unop_c(t: i32) -> string {
+    if t == 0 { return "-"; }
+    if t == 1 { return "!"; }
+    if t == 2 { return "~"; }
+    if t == 3 { return "*"; }
+    if t == 4 { return "&"; }
+    if t == 5 { return "&"; }
+    if t == 99 { return ""; }
+    return "?";
+}
+
+fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    match v {
+        codegen_Value::VInt(i) => { return int_to_string(i); },
+        codegen_Value::VBoolTrue => { return "1"; },
+        codegen_Value::VBoolFalse => { return "0"; },
+        codegen_Value::VVar(h) => { return megatu_val_name(h, source, starts, ends); },
+        codegen_Value::VUnit => { return "0"; },
+        codegen_Value::VString(h) => {
+            let raw: string = megatu_val_name(h, source, starts, ends);
+            let escaped: string = c_escape_string(raw);
+            let a: string = string_concat("\"", escaped);
+            return string_concat(a, "\"");
+        },
+        codegen_Value::VMember(bv, fh) => {
+            let inner: codegen_Value = box_deref(bv);
+            let field: string = megatu_val_name(fh, source, starts, ends);
+            let tag: i32 = codegen_value_tag(inner);
+            if tag == 3 {
+                let prefix: string = megatu_emit_value(inner, source, starts, ends);
+                return string_concat(string_concat(prefix, "."), field);
+            }
+            let prefix: string = string_concat("(", megatu_emit_value(inner, source, starts, ends));
+            return string_concat(string_concat(prefix, ")."), field);
+        },
+        codegen_Value::VAddrOf(h) => {
+            return string_concat(string_concat("(&", megatu_val_name(h, source, starts, ends)), ")");
+        },
+    }
+    return "";
+}
+
+fn megatu_emit_expr(e: codegen_Expr, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    match e {
+        codegen_Expr::Literal(bv) => {
+            let v: codegen_Value = box_deref(bv);
+            return megatu_emit_value(v, source, starts, ends);
+        },
+        codegen_Expr::Load(h) => {
+            return megatu_val_name(h, source, starts, ends);
+        },
+        codegen_Expr::Binop(op_h, bv1, bv2) => {
+            let v1: codegen_Value = box_deref(bv1);
+            let v2: codegen_Value = box_deref(bv2);
+            let s1: string = megatu_emit_value(v1, source, starts, ends);
+            let s2: string = megatu_emit_value(v2, source, starts, ends);
+            let op: string = megatu_binop_c(op_h);
+            let a: string = string_concat("(", s1);
+            let b: string = string_concat(a, " ");
+            let c: string = string_concat(b, op);
+            let d: string = string_concat(c, " ");
+            let f: string = string_concat(d, s2);
+            return string_concat(f, ")");
+        },
+        codegen_Expr::Unop(op_h, bv) => {
+            let v: codegen_Value = box_deref(bv);
+            let op: string = megatu_unop_c(op_h);
+            let inner: string = megatu_emit_value(v, source, starts, ends);
+            let a: string = string_concat("(", op);
+            return string_concat(a, string_concat(inner, ")"));
+        },
+        codegen_Expr::FieldAccess(bv, fh) => {
+            let v: codegen_Value = box_deref(bv);
+            let a: string = string_concat("(", megatu_emit_value(v, source, starts, ends));
+            return string_concat(string_concat(a, ")."), megatu_val_name(fh, source, starts, ends));
+        },
+    }
+    return "";
+}
+
+fn megatu_emit_call_args(args: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let count: i32 = vec_len(args);
+    if count == 0 { return ""; }
+    let mut out: string = "";
+    let mut idx: i32 = 0;
+    while idx < count {
+        if idx > 0 {
+            out = string_concat(out, ", ");
+        }
+        let bv: Box<codegen_Value> = vec_get(args, idx);
+        let v: codegen_Value = box_deref(bv);
+        out = string_concat(out, megatu_emit_value(v, source, starts, ends));
+        idx = idx + 1;
+    }
+    return out;
+}
+
+fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
+                     source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    match ins {
+        codegen_Instr::Nop => { return ""; },
+        codegen_Instr::DeclVar(h) => {
+            let a: string = string_concat(indent, "int ");
+            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends));
+            return string_concat(b, ";\n");
+        },
+        codegen_Instr::DeclNamed(ct, h) => {
+            let a: string = string_concat(indent, megatu_ty_name(ct, source, starts, ends));
+            let b: string = string_concat(a, " ");
+            let c: string = string_concat(b, megatu_val_name(h, source, starts, ends));
+            return string_concat(c, ";\n");
+        },
+        codegen_Instr::Assign(h, be) => {
+            let e: codegen_Expr = box_deref(be);
+            let a: string = string_concat(indent, "int ");
+            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends));
+            let c: string = string_concat(b, " = ");
+            let d: string = string_concat(c, megatu_emit_expr(e, source, starts, ends));
+            return string_concat(d, ";\n");
+        },
+        codegen_Instr::Store(h, be) => {
+            let e: codegen_Expr = box_deref(be);
+            let a: string = string_concat(indent, megatu_val_name(h, source, starts, ends));
+            let b: string = string_concat(a, " = ");
+            let c: string = string_concat(b, megatu_emit_expr(e, source, starts, ends));
+            return string_concat(c, ";\n");
+        },
+        codegen_Instr::StoreField(bh, fh, be) => {
+            let e: codegen_Expr = box_deref(be);
+            let a: string = string_concat(indent, megatu_val_name(bh, source, starts, ends));
+            let b: string = string_concat(a, ".");
+            let c: string = string_concat(b, megatu_val_name(fh, source, starts, ends));
+            let d: string = string_concat(c, " = ");
+            let f: string = string_concat(d, megatu_emit_expr(e, source, starts, ends));
+            return string_concat(f, ";\n");
+        },
+        codegen_Instr::IfElse(be, th, el) => {
+            let e: codegen_Expr = box_deref(be);
+            let deeper: string = string_concat(indent, "  ");
+            let a: string = string_concat(indent, "if (");
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let c: string = string_concat(b, ") {\n");
+            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends));
+            let f: string = string_concat(d, indent);
+            let g: string = string_concat(f, "} else {\n");
+            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends));
+            let j: string = string_concat(h, indent);
+            return string_concat(j, "}\n");
+        },
+        codegen_Instr::WhileLoop(be, body) => {
+            let e: codegen_Expr = box_deref(be);
+            let deeper: string = string_concat(indent, "  ");
+            let a: string = string_concat(indent, "while (");
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let c: string = string_concat(b, ") {\n");
+            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends));
+            let f: string = string_concat(d, indent);
+            return string_concat(f, "}\n");
+        },
+        codegen_Instr::BlockInstr(body) => {
+            let deeper: string = string_concat(indent, "  ");
+            let a: string = string_concat(indent, "{\n");
+            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends));
+            let c: string = string_concat(b, indent);
+            return string_concat(c, "}\n");
+        },
+        codegen_Instr::Break => {
+            return string_concat(indent, "break;\n");
+        },
+        codegen_Instr::Continue => {
+            return string_concat(indent, "continue;\n");
+        },
+        codegen_Instr::Call(dst_h, fn_h, args, rt_h) => {
+            let arg_str: string = megatu_emit_call_args(args, source, starts, ends);
+            let fn_name: string = megatu_val_name(fn_h, source, starts, ends);
+            if dst_h == 0 {
+                let a: string = string_concat(indent, fn_name);
+                let b: string = string_concat(a, "(");
+                let c: string = string_concat(b, arg_str);
+                return string_concat(c, ");\n");
+            }
+            let ret_name: string = megatu_ty_name(rt_h, source, starts, ends);
+            let a: string = string_concat(indent, ret_name);
+            let b: string = string_concat(a, " ");
+            let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends));
+            let d: string = string_concat(c, " = ");
+            let e: string = string_concat(d, fn_name);
+            let f: string = string_concat(e, "(");
+            let g: string = string_concat(f, arg_str);
+            return string_concat(g, ");\n");
+        },
+        codegen_Instr::Requires(be, fh) => {
+            let e: codegen_Expr = box_deref(be);
+            let a: string = string_concat(indent, "sv0_requires(");
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let c: string = string_concat(b, ", \"");
+            let d: string = string_concat(c, megatu_val_name(fh, source, starts, ends));
+            return string_concat(d, "\");\n");
+        },
+        codegen_Instr::Ensures(be, fh) => {
+            let e: codegen_Expr = box_deref(be);
+            let a: string = string_concat(indent, "sv0_ensures(");
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let c: string = string_concat(b, ", \"");
+            let d: string = string_concat(c, megatu_val_name(fh, source, starts, ends));
+            return string_concat(d, "\");\n");
+        },
+        codegen_Instr::ReturnVoid => {
+            return string_concat(indent, "return;\n");
+        },
+        codegen_Instr::ReturnVal(bv) => {
+            if string_eq(ret_ty, "void") {
+                return string_concat(indent, "return;\n");
+            }
+            let v: codegen_Value = box_deref(bv);
+            let a: string = string_concat(indent, "return ");
+            let b: string = string_concat(a, megatu_emit_value(v, source, starts, ends));
+            return string_concat(b, ";\n");
+        },
+    }
+    return "";
+}
+
+fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
+                      source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let count: i32 = vec_len(instrs);
+    if count == 0 { return ""; }
+    let mut out: string = "";
+    let mut idx: i32 = 0;
+    while idx < count {
+        let bh: Box<codegen_Instr> = vec_get(instrs, idx);
+        let ins: codegen_Instr = box_deref(bh);
+        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends));
+        idx = idx + 1;
+    }
+    return out;
 }
