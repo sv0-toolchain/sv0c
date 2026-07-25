@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "fn main() -> i32 { let x: i32 = 5; return x; }";
+    let source: string = "fn add(a: i32, b: i32) -> i32 { return a + b; } fn main() -> i32 { return add(2, 5); }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -57,8 +57,9 @@ fn main() -> i32 {
         ptt, ptd1, ptd2, ptd3, sft,
         bet, bed1, bed2, bed3, bed4, bsf);
 
-    /* One top-level item (`fn main`) must have parsed. */
-    if vec_len(it) != 1 { return 2; }
+    /* At least one top-level item must have parsed (multi-fn programs are now
+       supported — the mega-TU threads all items through lower + emit). */
+    if vec_len(it) < 1 { return 2; }
 
     /* Phase 3: resolve (real resolver.sv0). mv/mt/fa are the module value/type/
        arity env the resolver populates; pp is threaded through. 0 = ok. */
@@ -122,36 +123,83 @@ fn main() -> i32 {
        resolves body var/temp names and AST binop/unop operators against the real
        source. This is the native-compose (A) de-stub, done in the compose main so
        codegen.sv0 stays standalone-compilable. */
-    let c: string = megatu_emit_program(td, out_blocks, source, starts, ends);
+    let c: string = megatu_emit_program(td, out_blocks, source, starts, ends,
+                                        it, id1, id3, id5, fpn);
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
        lower -> emit_program) compose and RUN in the native mega-TU, and the emit
-       is fully de-stubbed for the expression + let-local surface. This smoke
-       program (`let x: i32 = 5; return x;`) now lowers to
-       `int x; x = 5; return x;` and runs to exit 5. Native-vs-SML behavioral
-       parity also holds for `return 0` (0), `return 1 + 2` (3), `return 1+2*3` (7),
-       and `let a=3; let b=4; return a+b` (7). Fixes that got here: return-stmt
-       lowering, box/vec convention, source-aware fn + body names, integer-literal
-       values, the body operator/name de-stub (lower_temp_base disambiguates temps
-       from source vars), the block statement-order sidecar (parser records ordered
-       stmt indices in pp/d4 because statement nodes are non-contiguous; checker/
-       lowering/resolver read it via block_stmt_index — `stmts_first + si` only
-       ever found statement 0), and the checker body path pool (synth_expr now
-       reads the real pp, not a fresh empty one). NEXT: calls/params (lower still
-       pushes empty params, ret_h=9); then the full self-host-sv0-loop corpus for
-       native-vs-SML parity; then A3 (--target=vm) and P4. */
+       is fully de-stubbed for the multi-function call/param surface. This smoke
+       program (`fn add(a,b) { a + b }` + `fn main { add(2, 5) }`) lowers to a
+       forward-declared `static int add(int a, int b)` + a calling `main`, and runs
+       to exit 7. Native-vs-SML behavioral parity holds across: `return 0` (0),
+       `return 1 + 2` (3), `return 1+2*3` (7), `let x=5; return x` (5),
+       `let a=3; let b=4; return a+b` (7), `fn f(a){a}` + `f(3)` (3). Fixes that got
+       here: return-stmt lowering, box/vec convention, source-aware fn + body
+       names, integer-literal values, the body operator/name de-stub
+       (lower_temp_base disambiguates temps from source vars), the block
+       statement-order sidecar (block_stmt_index), the checker body path pool
+       (real pp), and the calls/params de-stub (megatu_param_list rebuilds the C
+       param list from the parse arenas since lower pushes empty params; Call
+       rt_h == 0 resolves to int). NEXT: non-i32 param/return types (all int today);
+       then the full self-host-sv0-loop corpus for native-vs-SML parity; then A3
+       (--target=vm) and P4. */
     return 0;
+}
+
+/* Find the item index of the ItemFn whose name token is label_h (blocks carry the
+   fn name token as their label). Lets the emit recover per-fn param data that
+   lower() does not thread into out_blocks. */
+fn megatu_find_item_by_label(it: Vec<i32>, id1: Vec<i32>, label_h: i32) -> i32 {
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(it, i) == 0 {
+            if vec_get(id1, i) == label_h {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* Build the C parameter list for fn item `item_i`. Param name tokens live in fpn
+   (fn_param_name_toks) at base id5[item_i], param_count in id3[item_i]. Types are
+   `int` for the i32 surface (SML astTyToCString for richer types is future work).
+   lower() currently pushes empty params into out_blocks, so the emit reconstructs
+   them here from the parse arenas — the params de-stub, matching the fn-name and
+   body de-stubs. */
+fn megatu_param_list(item_i: i32, id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
+                     source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    if item_i < 0 { return "void"; }
+    let pc: i32 = vec_get(id3, item_i);
+    if pc == 0 { return "void"; }
+    let base: i32 = vec_get(id5, item_i);
+    let mut out: string = "";
+    let mut k: i32 = 0;
+    while k < pc {
+        if k > 0 {
+            out = string_concat(out, ", ");
+        }
+        let nt: i32 = vec_get(fpn, base + k);
+        let nm: string = handle_to_str(nt, source, starts, ends);
+        out = string_concat(out, string_concat("int ", nm));
+        k = k + 1;
+    }
+    return out;
 }
 
 /* Source-aware C emit (native-compose A de-stub). Same shape as codegen.sv0's
    emit_program, but resolves each block's fn name via lowering's handle_to_str
-   (real source names) instead of the stub name_of, and detects main by name.
-   Lives in the compose main so it can see BOTH modules; codegen.sv0 stays a
-   standalone unit. Body names (vars/calls) still route through codegen's
-   name_of — the next de-stub layer. */
+   (real source names) instead of the stub name_of, detects main by name, builds
+   the parameter list from the parse arenas (megatu_param_list), and emits the body
+   via the source-aware megatu_emit_instrs. Lives in the compose main so it can see
+   BOTH modules; codegen.sv0 stays a standalone unit. */
 fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
-                       source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+                       source: string, starts: Vec<i32>, ends: Vec<i32>,
+                       it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
+                       id5: Vec<i32>, fpn: Vec<i32>) -> string {
     let num_blocks: i32 = vec_len(blocks) / 4;
     if num_blocks == 0 {
         return "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
@@ -168,14 +216,15 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
     while idx < num_blocks {
         let label_h: i32 = vec_get(blocks, idx * 4);
         let ret_h: i32 = vec_get(blocks, idx * 4 + 1);
-        /* lower stores params/instrs as box_new(vec); codegen's emit_program reads
-           them unboxed (its own test only exercises the empty-blocks fallback, so
-           this never surfaced). box_deref to recover the real vecs. */
-        let params: Vec<i32> = box_deref(vec_get(blocks, idx * 4 + 2));
+        /* lower stores params/instrs as box_new(vec); box_deref to recover them.
+           The params box is empty (lower does not fill it yet); the real param
+           list is rebuilt below from the parse arenas via megatu_param_list. */
         let instrs: Vec<i32> = box_deref(vec_get(blocks, idx * 4 + 3));
         let ret_name: string = name_of(ret_h);
         let fn_name: string = handle_to_str(label_h, source, starts, ends);
-        let pstr: string = emit_param_list(params);
+        let item_i: i32 = megatu_find_item_by_label(it, id1, label_h);
+        let pstr: string = megatu_param_list(item_i, id3, id5, fpn,
+                                             source, starts, ends);
         let sig: string = string_concat(fn_name,
             string_concat("(", string_concat(pstr, ")")));
         /* Body via the source-aware emitter (not codegen's emit_instrs, whose
@@ -443,7 +492,13 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                 let c: string = string_concat(b, arg_str);
                 return string_concat(c, ");\n");
             }
-            let ret_name: string = megatu_ty_name(rt_h, source, starts, ends);
+            /* lower emits Instr::Call with rt_h == 0 as the default-int-return
+               placeholder (the i32 surface); resolve that to "int" rather than
+               token 0's text (which would be the `fn` keyword). */
+            let mut ret_name: string = "int";
+            if rt_h != 0 {
+                ret_name = megatu_ty_name(rt_h, source, starts, ends);
+            }
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends));
