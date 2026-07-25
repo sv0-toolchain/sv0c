@@ -2539,6 +2539,20 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     }
     if s_tag == 28 {
         let expr_idx: i32 = vec_get(ed1, s_idx);
+        /* `return e;` as a statement must emit a Return instr (SML lowerStmt
+           StmtSemi(ExprReturn)). lower_for_effect lowers for value + discards,
+           dropping the return. Route the return's value through lower_return. */
+        if vec_get(et, expr_idx) == 15 {
+            let ret_val: i32 = vec_get(ed1, expr_idx);
+            return lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                ret_val, ctr, out_instrs, enum_names,
+                                enum_tag_offsets, enum_tag_counts,
+                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                source, starts, ends, item_tags, item_names,
+                                item_d2, item_d3, item_d4, item_field_counts,
+                                enum_vnames_flat, item_fn_row, match_env_inherit,
+                                import_aliases);
+        }
         let rc: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
                                         tok_tags, expr_idx, ctr,
                                         out_instrs, enum_names,
