@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "fn add(a: i32, b: i32) -> i32 { return a + b; } fn main() -> i32 { return add(2, 5); }";
+    let source: string = "fn wide(a: u8, b: i64) -> i64 { return b; } fn main() -> i32 { return wide(1, 9); }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -124,26 +124,28 @@ fn main() -> i32 {
        source. This is the native-compose (A) de-stub, done in the compose main so
        codegen.sv0 stays standalone-compilable. */
     let c: string = megatu_emit_program(td, out_blocks, source, starts, ends,
-                                        it, id1, id3, id5, fpn);
+                                        it, id1, id2, id3, id5, fpn,
+                                        fpt, frt, ptt, ptd1, ptd2, pp);
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
-       lower -> emit_program) compose and RUN in the native mega-TU, and the emit
-       is fully de-stubbed for the multi-function call/param surface. This smoke
-       program (`fn add(a,b) { a + b }` + `fn main { add(2, 5) }`) lowers to a
-       forward-declared `static int add(int a, int b)` + a calling `main`, and runs
-       to exit 7. Native-vs-SML behavioral parity holds across: `return 0` (0),
-       `return 1 + 2` (3), `return 1+2*3` (7), `let x=5; return x` (5),
-       `let a=3; let b=4; return a+b` (7), `fn f(a){a}` + `f(3)` (3). Fixes that got
-       here: return-stmt lowering, box/vec convention, source-aware fn + body
-       names, integer-literal values, the body operator/name de-stub
-       (lower_temp_base disambiguates temps from source vars), the block
-       statement-order sidecar (block_stmt_index), the checker body path pool
-       (real pp), and the calls/params de-stub (megatu_param_list rebuilds the C
-       param list from the parse arenas since lower pushes empty params; Call
-       rt_h == 0 resolves to int). NEXT: non-i32 param/return types (all int today);
-       then the full self-host-sv0-loop corpus for native-vs-SML parity; then A3
-       (--target=vm) and P4. */
+       lower -> emit_program) compose and RUN in the native mega-TU with a fully
+       de-stubbed emit over the first-order surface with real C types. This smoke
+       program (`fn wide(a: u8, b: i64) -> i64 { b }` + `fn main { wide(1, 9) }`)
+       emits `static int64_t wide(uint8_t a, int64_t b)` and runs to exit 9.
+       Native-vs-SML behavioral parity holds across: `return 0` (0), `1 + 2` (3),
+       `1+2*3` (7), `let x=5; return x` (5), `let a=3; let b=4; a+b` (7),
+       `fn f(a){a}` + `f(3)` (3), `fn pos(a)->bool{a>0}` + `pos(5)` (1), and
+       `fn noop(){return;}` (void). Fixes that got here: return-stmt lowering,
+       box/vec convention, source-aware fn + body names, integer-literal values,
+       the body operator/name de-stub (lower_temp_base), the block statement-order
+       sidecar (block_stmt_index), the checker body path pool (real pp), the
+       calls/params de-stub (megatu_param_list), real C types for params + returns
+       (megatu_cty_of_root over the parse type arena via ast_ty_to_c_string; void
+       returns from has_ret), and bare-`return;` lowering (ReturnVoid). NEXT: user
+       struct/enum param/return types (primitives only today); calls to non-int
+       fns (Call rt_h is 0 = int); then the full self-host-sv0-loop corpus for
+       native-vs-SML parity; then A3 (--target=vm) and P4. */
     return 0;
 }
 
@@ -164,14 +166,42 @@ fn megatu_find_item_by_label(it: Vec<i32>, id1: Vec<i32>, label_h: i32) -> i32 {
     return 0 - 1;
 }
 
+/* Resolve a type-arena root (parser pty_tt/ptd1/ptd2 arena) to its C type string.
+   TyName (tag 0): ptd1 = path start in pp, ptd2 = segment count; the last segment
+   is the type name, mapped via lowering's ast_ty_to_c_string (i32->int, bool->int,
+   i8->int8_t, u8->uint8_t, i64->int64_t, string->const char*, unit->void, ...).
+   root < 0 means no type (unit) -> "void". TyRef and other constructors fall back
+   to "int" (references to primitives are not yet in the composed surface); user
+   struct/enum names also fall back (need the struct/enum tables — future work). */
+fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                      pp: Vec<i32>, source: string, starts: Vec<i32>,
+                      ends: Vec<i32>) -> string {
+    if root < 0 {
+        return "void";
+    }
+    if vec_get(ptt, root) == 0 {
+        let ppstart: i32 = vec_get(ptd1, root);
+        let segc: i32 = vec_get(ptd2, root);
+        if segc <= 0 {
+            return "int";
+        }
+        let name_tok: i32 = vec_get(pp, ppstart + segc - 1);
+        let nm: string = handle_to_str(name_tok, source, starts, ends);
+        return ast_ty_to_c_string(nm);
+    }
+    return "int";
+}
+
 /* Build the C parameter list for fn item `item_i`. Param name tokens live in fpn
-   (fn_param_name_toks) at base id5[item_i], param_count in id3[item_i]. Types are
-   `int` for the i32 surface (SML astTyToCString for richer types is future work).
+   (fn_param_name_toks) at base id5[item_i]; the parallel type roots live in fpt
+   (fn_param_ty_root), resolved via megatu_cty_of_root. param_count in id3[item_i].
    lower() currently pushes empty params into out_blocks, so the emit reconstructs
    them here from the parse arenas — the params de-stub, matching the fn-name and
    body de-stubs. */
 fn megatu_param_list(item_i: i32, id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
-                     source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+                     fpt: Vec<i32>, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                     pp: Vec<i32>, source: string, starts: Vec<i32>,
+                     ends: Vec<i32>) -> string {
     if item_i < 0 { return "void"; }
     let pc: i32 = vec_get(id3, item_i);
     if pc == 0 { return "void"; }
@@ -184,7 +214,10 @@ fn megatu_param_list(item_i: i32, id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
         }
         let nt: i32 = vec_get(fpn, base + k);
         let nm: string = handle_to_str(nt, source, starts, ends);
-        out = string_concat(out, string_concat("int ", nm));
+        let cty: string = megatu_cty_of_root(vec_get(fpt, base + k),
+                                             ptt, ptd1, ptd2, pp,
+                                             source, starts, ends);
+        out = string_concat(out, string_concat(string_concat(cty, " "), nm));
         k = k + 1;
     }
     return out;
@@ -198,8 +231,11 @@ fn megatu_param_list(item_i: i32, id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
    BOTH modules; codegen.sv0 stays a standalone unit. */
 fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                        source: string, starts: Vec<i32>, ends: Vec<i32>,
-                       it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
-                       id5: Vec<i32>, fpn: Vec<i32>) -> string {
+                       it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                       id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
+                       fpt: Vec<i32>, frt: Vec<i32>,
+                       ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                       pp: Vec<i32>) -> string {
     let num_blocks: i32 = vec_len(blocks) / 4;
     if num_blocks == 0 {
         return "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
@@ -220,10 +256,25 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
            The params box is empty (lower does not fill it yet); the real param
            list is rebuilt below from the parse arenas via megatu_param_list. */
         let instrs: Vec<i32> = box_deref(vec_get(blocks, idx * 4 + 3));
-        let ret_name: string = name_of(ret_h);
         let fn_name: string = handle_to_str(label_h, source, starts, ends);
         let item_i: i32 = megatu_find_item_by_label(it, id1, label_h);
+        /* Return type from the item, not the hardcoded ret_h (lower always emits 9
+           = int). has_ret is the low bit of id2 (id2 = has_ret + contract*2); a
+           fn with no `-> T` returns void, else resolve frt (fn_ret_ty_root). */
+        let mut ret_name: string = name_of(ret_h);
+        if item_i >= 0 {
+            let idv: i32 = vec_get(id2, item_i);
+            let has_ret: i32 = idv - (idv / 2) * 2;
+            if has_ret == 0 {
+                ret_name = "void";
+            } else {
+                ret_name = megatu_cty_of_root(vec_get(frt, item_i),
+                                             ptt, ptd1, ptd2, pp,
+                                             source, starts, ends);
+            }
+        }
         let pstr: string = megatu_param_list(item_i, id3, id5, fpn,
+                                             fpt, ptt, ptd1, ptd2, pp,
                                              source, starts, ends);
         let sig: string = string_concat(fn_name,
             string_concat("(", string_concat(pstr, ")")));

@@ -2505,6 +2505,14 @@ fn lower_return(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
+    /* Bare `return;` (ExprReturn d1 = value_idx = -1) has no value to lower —
+       emit ReturnVoid. Without this the -1 index reaches lower_expr_to_value and
+       reads et[-1] out of bounds. */
+    if idx < 0 {
+        let rv: Instr = Instr::ReturnVoid;
+        vec_push(out_instrs, box_new(rv));
+        return 0;
+    }
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                         tok_tags, idx, ctr, out_instrs,
                                         enum_names, enum_tag_offsets,
