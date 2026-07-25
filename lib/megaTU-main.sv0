@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "fn wide(a: u8, b: i64) -> i64 { return b; } fn main() -> i32 { return wide(1, 9); }";
+    let source: string = "struct P { x: i32 } fn getx(p: P) -> i32 { return p.x; } fn main() -> i32 { return 42; }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -83,18 +83,39 @@ fn main() -> i32 {
     if cr != 0 { return 4; }
 
     /* Phase 5: lower (real lowering.sv0) — parse arenas -> IR out_blocks; returns
-       the typedefs string. item_field_counts/item_vmax are parallel to `it`
-       (fn items: 0/0). Struct/enum sidecars are empty for this fn-only program. */
+       the typedefs string. item_field_counts (ifc) is the struct field count /
+       enum variant count for struct (tag 1) / enum (tag 2) items (both carry it in
+       id2), else 0. item_vmax (ivm) is the enum max-payload width (0 here; enum
+       payloads are future work). */
     let ifc: Vec<i32> = vec_new();
     let ivm: Vec<i32> = vec_new();
     let mut ii: i32 = 0;
     while ii < vec_len(it) {
-        vec_push(ifc, 0);
+        let itag: i32 = vec_get(it, ii);
+        if itag == 1 {
+            vec_push(ifc, vec_get(id2, ii));
+        } else {
+            if itag == 2 {
+                vec_push(ifc, vec_get(id2, ii));
+            } else {
+                vec_push(ifc, 0);
+            }
+        }
         vec_push(ivm, 0);
         ii = ii + 1;
     }
-    let sf_names: Vec<i32> = vec_new();
+    /* Struct field name tokens come straight from the parser (sfn). Field types:
+       emit_struct_td wants type-name TOKENS (it handle_to_str's them), but the
+       parser stores type-arena ROOTS in sft, so convert each root to its type-name
+       token (megatu_type_root_name_tok). */
+    let sf_names: Vec<i32> = sfn;
     let sf_types: Vec<i32> = vec_new();
+    let mut fti: i32 = 0;
+    while fti < vec_len(sft) {
+        vec_push(sf_types, megatu_type_root_name_tok(vec_get(sft, fti),
+                                                     ptt, ptd1, ptd2, pp));
+        fti = fti + 1;
+    }
     let ob: Vec<i32> = vec_new();
     let osn: Vec<i32> = vec_new();
     let oso: Vec<i32> = vec_new();
@@ -130,21 +151,25 @@ fn main() -> i32 {
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
        lower -> emit_program) compose and RUN in the native mega-TU with a fully
-       de-stubbed emit over the first-order surface with real C types. This smoke
-       program (`fn wide(a: u8, b: i64) -> i64 { b }` + `fn main { wide(1, 9) }`)
-       emits `static int64_t wide(uint8_t a, int64_t b)` and runs to exit 9.
-       Native-vs-SML behavioral parity holds across: `return 0` (0), `1 + 2` (3),
-       `1+2*3` (7), `let x=5; return x` (5), `let a=3; let b=4; a+b` (7),
-       `fn f(a){a}` + `f(3)` (3), `fn pos(a)->bool{a>0}` + `pos(5)` (1), and
-       `fn noop(){return;}` (void). Fixes that got here: return-stmt lowering,
-       box/vec convention, source-aware fn + body names, integer-literal values,
-       the body operator/name de-stub (lower_temp_base), the block statement-order
-       sidecar (block_stmt_index), the checker body path pool (real pp), the
-       calls/params de-stub (megatu_param_list), real C types for params + returns
-       (megatu_cty_of_root over the parse type arena via ast_ty_to_c_string; void
-       returns from has_ret), and bare-`return;` lowering (ReturnVoid). NEXT: user
-       struct/enum param/return types (primitives only today); calls to non-int
-       fns (Call rt_h is 0 = int); then the full self-host-sv0-loop corpus for
+       de-stubbed emit including user struct types. This smoke program
+       (`struct P { x: i32 }` + `fn getx(p: P) -> i32 { p.x }`) emits a
+       `typedef struct { int x; } P;`, a `static int getx(P p) { return p.x; }`,
+       and runs to exit 42. Native-vs-SML behavioral parity holds across the
+       first-order surface: literals/operators (`1+2*3` -> 7), `let` locals
+       (`let x=5; return x` -> 5), multi-fn calls with params (`add(2,5)` -> 7),
+       non-i32 types (`fn wide(a: u8, b: i64) -> i64` -> int64_t/uint8_t, exit 9;
+       `-> bool` -> int; void), and structs as param/return types with field
+       access (`p.x`) and pass-through (`return p`). Fixes that got here:
+       return-stmt lowering, box/vec convention, source-aware fn + body names,
+       integer-literal values, the body operator/name de-stub (lower_temp_base),
+       the block statement-order sidecar (block_stmt_index), the checker body path
+       pool (real pp), the calls/params de-stub, real C types for params + returns
+       (megatu_cty_of_root, including user struct/enum names via megatu_is_user_type
+       by text), struct typedefs with fields (ifc + sf_names/sf_types threaded from
+       the parser), and bare-`return;` lowering (ReturnVoid). NEXT: struct literal
+       construction (`P { x: 7 }` needs the parser to thread sf_names through
+       parse_expr into body_sf); enum variants/payloads; calls to non-int fns
+       (Call rt_h is 0 = int); then the full self-host-sv0-loop corpus for
        native-vs-SML parity; then A3 (--target=vm) and P4. */
     return 0;
 }
@@ -166,16 +191,57 @@ fn megatu_find_item_by_label(it: Vec<i32>, id1: Vec<i32>, label_h: i32) -> i32 {
     return 0 - 1;
 }
 
+/* Type-name token of a type-arena root: for TyName (tag 0) the last path segment
+   token; -1 otherwise. Used to build the sf_types token array emit_struct_td wants. */
+fn megatu_type_root_name_tok(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>,
+                             ptd2: Vec<i32>, pp: Vec<i32>) -> i32 {
+    if root < 0 {
+        return 0 - 1;
+    }
+    if vec_get(ptt, root) == 0 {
+        let segc: i32 = vec_get(ptd2, root);
+        if segc <= 0 {
+            return 0 - 1;
+        }
+        return vec_get(pp, vec_get(ptd1, root) + segc - 1);
+    }
+    return 0 - 1;
+}
+
+/* True if `nm` names a top-level struct (tag 1) or enum (tag 2) item, by text.
+   Matches on the source text (not token index) — a type reference and the struct/
+   enum definition are different tokens with the same spelling. */
+fn megatu_is_user_type(nm: string, it: Vec<i32>, id1: Vec<i32>,
+                       source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        let tg: i32 = vec_get(it, i);
+        if tg == 1 {
+            if string_eq(handle_to_str(vec_get(id1, i), source, starts, ends), nm) {
+                return true;
+            }
+        }
+        if tg == 2 {
+            if string_eq(handle_to_str(vec_get(id1, i), source, starts, ends), nm) {
+                return true;
+            }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
 /* Resolve a type-arena root (parser pty_tt/ptd1/ptd2 arena) to its C type string.
    TyName (tag 0): ptd1 = path start in pp, ptd2 = segment count; the last segment
    is the type name, mapped via lowering's ast_ty_to_c_string (i32->int, bool->int,
-   i8->int8_t, u8->uint8_t, i64->int64_t, string->const char*, unit->void, ...).
-   root < 0 means no type (unit) -> "void". TyRef and other constructors fall back
-   to "int" (references to primitives are not yet in the composed surface); user
-   struct/enum names also fall back (need the struct/enum tables — future work). */
+   i8->int8_t, u8->uint8_t, i64->int64_t, string->const char*, unit->void, ...). A
+   name that is not a primitive but matches a top-level struct/enum resolves to that
+   typedef name (the emitted C typedef). root < 0 means no type (unit) -> "void".
+   TyRef and other constructors fall back to "int". */
 fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
                       pp: Vec<i32>, source: string, starts: Vec<i32>,
-                      ends: Vec<i32>) -> string {
+                      ends: Vec<i32>, it: Vec<i32>, id1: Vec<i32>) -> string {
     if root < 0 {
         return "void";
     }
@@ -187,7 +253,14 @@ fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
         }
         let name_tok: i32 = vec_get(pp, ppstart + segc - 1);
         let nm: string = handle_to_str(name_tok, source, starts, ends);
-        return ast_ty_to_c_string(nm);
+        let prim: string = ast_ty_to_c_string(nm);
+        if !string_eq(prim, "int") {
+            return prim;
+        }
+        if megatu_is_user_type(nm, it, id1, source, starts, ends) {
+            return nm;
+        }
+        return "int";
     }
     return "int";
 }
@@ -198,7 +271,8 @@ fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
    lower() currently pushes empty params into out_blocks, so the emit reconstructs
    them here from the parse arenas — the params de-stub, matching the fn-name and
    body de-stubs. */
-fn megatu_param_list(item_i: i32, id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
+fn megatu_param_list(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
+                     id5: Vec<i32>, fpn: Vec<i32>,
                      fpt: Vec<i32>, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
                      pp: Vec<i32>, source: string, starts: Vec<i32>,
                      ends: Vec<i32>) -> string {
@@ -216,7 +290,7 @@ fn megatu_param_list(item_i: i32, id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
         let nm: string = handle_to_str(nt, source, starts, ends);
         let cty: string = megatu_cty_of_root(vec_get(fpt, base + k),
                                              ptt, ptd1, ptd2, pp,
-                                             source, starts, ends);
+                                             source, starts, ends, it, id1);
         out = string_concat(out, string_concat(string_concat(cty, " "), nm));
         k = k + 1;
     }
@@ -270,10 +344,10 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
             } else {
                 ret_name = megatu_cty_of_root(vec_get(frt, item_i),
                                              ptt, ptd1, ptd2, pp,
-                                             source, starts, ends);
+                                             source, starts, ends, it, id1);
             }
         }
-        let pstr: string = megatu_param_list(item_i, id3, id5, fpn,
+        let pstr: string = megatu_param_list(item_i, it, id1, id3, id5, fpn,
                                              fpt, ptt, ptd1, ptd2, pp,
                                              source, starts, ends);
         let sig: string = string_concat(fn_name,
