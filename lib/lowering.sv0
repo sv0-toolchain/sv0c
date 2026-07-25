@@ -447,6 +447,17 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return Value::VUnit;
 }
 
+/* Resolve the arena index of block statement `si`. Statement nodes are not
+   contiguous; parse_block records an ordered index list in pp with its offset
+   (+1) in the block's d4 (parser.sv0 block_stmt_sidecar_push). d4 == 0 → no
+   sidecar (hand-built test arenas) → legacy stmts_first + si fallback. */
+fn block_stmt_index(pp: Vec<i32>, stmts_first: i32, sidecar: i32, si: i32) -> i32 {
+    if sidecar > 0 {
+        return vec_get(pp, sidecar - 1 + si);
+    }
+    return stmts_first + si;
+}
+
 fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
                     tok_tags: Vec<i32>,
@@ -466,10 +477,11 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let stmts_first: i32 = vec_get(ed1, idx);
     let stmts_count: i32 = vec_get(ed2, idx);
     let tail_idx: i32 = vec_get(ed3, idx);
+    let sidecar: i32 = vec_get(ed4, idx);
     let mut si: i32 = 0;
     loop {
         if si >= stmts_count { break; }
-        let s_idx: i32 = stmts_first + si;
+        let s_idx: i32 = block_stmt_index(pp, stmts_first, sidecar, si);
         let s_tag: i32 = vec_get(et, s_idx);
         if s_tag == 27 {
             let name_tok: i32 = vec_get(ed1, s_idx);
@@ -2576,6 +2588,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
                tok_tags: Vec<i32>,
                stmts_first: i32, stmts_count: i32, tail_idx: i32,
+               block_sidecar: i32,
                ctr: Vec<i32>,
                out_instrs: Vec<i32>,
                enum_names: Vec<i32>,
@@ -2592,7 +2605,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let mut si: i32 = 0;
     loop {
         if si >= stmts_count { break; }
-        let s_idx: i32 = stmts_first + si;
+        let s_idx: i32 = block_stmt_index(pp, stmts_first, block_sidecar, si);
         let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                   s_idx, ctr, out_instrs, enum_names,
                                   enum_tag_offsets, enum_tag_counts,
@@ -2634,8 +2647,9 @@ fn lower_body(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let sf: i32 = vec_get(ed1, body_idx);
         let sc: i32 = vec_get(ed2, body_idx);
         let ti: i32 = vec_get(ed3, body_idx);
+        let sidecar: i32 = vec_get(ed4, body_idx);
         return lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
-                           sf, sc, ti, ctr, out_instrs,
+                           sf, sc, ti, sidecar, ctr, out_instrs,
                            enum_names, enum_tag_offsets,
                            enum_tag_counts, enum_tags_flat,
                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
@@ -7153,13 +7167,13 @@ fn test_lower_block_fn() -> i32 {
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
-                               1, 1, 0, ctr, out, en_n, en_to, en_tc,
+                               1, 1, 0, 0, ctr, out, en_n, en_to, en_tc,
                                en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) < 3 { return 2; }
     let mut out2: Vec<i32> = vec_new();
     let rc2: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
-                                1, 1, 0 - 1, ctr, out2,
+                                1, 1, 0 - 1, 0, ctr, out2,
                                 en_n, en_to, en_tc, en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
     if rc2 != 0 { return 3; }
     if vec_len(out2) != 2 { return 4; }

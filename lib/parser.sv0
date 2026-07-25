@@ -2459,6 +2459,25 @@ fn try_stmt(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                             et, ed1, ed2, ed3, ed4, pp, sf_names);
 }
 
+/* Block statement-order sidecar. Statement nodes are pushed to the expr arena
+   interleaved with their sub-expressions (each stmt's sub-exprs come first, then
+   the stmt node), so statements are NOT at contiguous indices — `stmts_first + si`
+   only finds statement 0. To recover the ordered list, parse_block collects each
+   statement node's index and stores that list in the shared pp pool (pp is only
+   ever read by stored offset, never iterated wholesale). The ExprBlock node's
+   otherwise-unused d4 holds `offset + 1` (0 = no sidecar → consumers fall back to
+   the legacy stmts_first + si, which is correct for hand-built single-stmt test
+   arenas). Consumers resolve statement si via block_stmt_index below. */
+fn block_stmt_sidecar_push(pp: Vec<i32>, stmt_ids: Vec<i32>) -> i32 {
+    let off: i32 = vec_len(pp);
+    let mut k: i32 = 0;
+    while k < vec_len(stmt_ids) {
+        vec_push(pp, vec_get(stmt_ids, k));
+        k = k + 1;
+    }
+    return off + 1;
+}
+
 fn parse_block(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                source: string, pos: i32,
                et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
@@ -2467,6 +2486,7 @@ fn parse_block(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     if ps_peek(tags, pos) != 8 { return 0 - 1; }
     let mut stmts_first: i32 = 0 - 1;
     let mut stmt_count: i32 = 0;
+    let stmt_ids: Vec<i32> = vec_new();
     let mut p: i32 = pos + 1;
     let mut blk_done: bool = false;
     while blk_done != true {
@@ -2477,7 +2497,7 @@ fn parse_block(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             vec_push(ed1, sf2);
             vec_push(ed2, stmt_count);
             vec_push(ed3, 0 - 1);
-            vec_push(ed4, 0);
+            vec_push(ed4, block_stmt_sidecar_push(pp, stmt_ids));
             return p + 1;
         }
         let s: i32 = try_stmt(tags, starts, ends, source, p,
@@ -2486,6 +2506,7 @@ fn parse_block(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             if stmts_first < 0 {
                 stmts_first = vec_len(et) - 1;
             }
+            vec_push(stmt_ids, vec_len(et) - 1);
             stmt_count = stmt_count + 1;
             p = s;
         } else {
@@ -2500,7 +2521,7 @@ fn parse_block(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 vec_push(ed1, sf2);
                 vec_push(ed2, stmt_count);
                 vec_push(ed3, tail_idx);
-                vec_push(ed4, 0);
+                vec_push(ed4, block_stmt_sidecar_push(pp, stmt_ids));
                 return pe + 1;
             }
             if ps_peek(tags, pe) == 13 {
@@ -2513,6 +2534,7 @@ fn parse_block(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 if stmts_first < 0 {
                     stmts_first = vec_len(et) - 1;
                 }
+                vec_push(stmt_ids, vec_len(et) - 1);
                 stmt_count = stmt_count + 1;
                 p = pe + 1;
             } else {
@@ -2526,6 +2548,7 @@ fn parse_block(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     if stmts_first < 0 {
                         stmts_first = vec_len(et) - 1;
                     }
+                    vec_push(stmt_ids, vec_len(et) - 1);
                     stmt_count = stmt_count + 1;
                     p = pe;
                 } else {
