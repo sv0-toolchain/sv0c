@@ -125,13 +125,15 @@ fn main() -> i32 {
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
-       lower -> emit_program) compose and RUN in the native mega-TU, producing C.
-       NOT YET CORRECT: the parse->lower arena mapping mislowers the fn body — it
-       emits a stray block (label `x`, empty body) so codegen falls back to a
-       default `int main(void){return 0;}` instead of lowering `fn main`'s body.
-       Reconciling that block-label/body mapping at the parse->lower boundary is
-       the next increment; correctness will be validated by native-vs-SML
-       behavioral parity once it lands. */
+       lower -> emit_program) compose and RUN in the native mega-TU, and the fn
+       body now lowers. For `fn main() -> i32 { return 0; }` the native pipeline
+       emits `int main(void) { return 8; }` — structurally correct (real name,
+       return statement present). Fixes so far: return-statement lowering
+       (lower_stmt), the box/vec convention (box_deref above), and source-aware fn
+       names (megatu_emit_program). REMAINING before it matches SML: integer
+       literals emit their token position (8) not the parsed value (0) — another
+       handle that needs source resolution. Then validate by native-vs-SML
+       behavioral parity. */
     return 0;
 }
 
@@ -159,8 +161,11 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
     while idx < num_blocks {
         let label_h: i32 = vec_get(blocks, idx * 4);
         let ret_h: i32 = vec_get(blocks, idx * 4 + 1);
-        let params: Vec<i32> = vec_get(blocks, idx * 4 + 2);
-        let instrs: Vec<i32> = vec_get(blocks, idx * 4 + 3);
+        /* lower stores params/instrs as box_new(vec); codegen's emit_program reads
+           them unboxed (its own test only exercises the empty-blocks fallback, so
+           this never surfaced). box_deref to recover the real vecs. */
+        let params: Vec<i32> = box_deref(vec_get(blocks, idx * 4 + 2));
+        let instrs: Vec<i32> = box_deref(vec_get(blocks, idx * 4 + 3));
         let ret_name: string = name_of(ret_h);
         let fn_name: string = handle_to_str(label_h, source, starts, ends);
         let pstr: string = emit_param_list(params);
