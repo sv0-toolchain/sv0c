@@ -2671,7 +2671,9 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     let mut ctr: Vec<i32> = vec_new();
-    vec_push(ctr, 0);
+    /* Start the temp counter above the token-index range so synthetic temps
+       never collide with source-var handles (see lower_temp_base). */
+    vec_push(ctr, lower_temp_base());
     let req_instrs: Vec<i32> = vec_new();
     let mut ri: i32 = 0;
     while ri < vec_len(req_roots) {
@@ -2912,6 +2914,18 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
 }
 
 /* ── freshTmp ───────────────────────────────────────────────── */
+
+/* Synthetic-temp handle base. In the SML reference (ir.sml) IR values carry
+   STRINGS: freshTmp() = "_sv0t<n>", real vars = their source name. The sv0 IR
+   flattens names to i32 handles resolved at emit time, but real vars carry a
+   token INDEX and freshTmp temps carry a plain counter — the two spaces overlap.
+   Offsetting the production counter (lower_fn) by this base keeps every temp
+   handle disjoint from any token index, so the native emitter can tell a temp
+   (>= base → "_sv0t<h-base>") from a source var (< base → handle_to_str). Chosen
+   far above any realistic token count; also above the 500..599 tuple-field range. */
+fn lower_temp_base() -> i32 {
+    return 1000000;
+}
 
 fn fresh_tmp_name(counter: i32) -> i32 {
     return counter;
