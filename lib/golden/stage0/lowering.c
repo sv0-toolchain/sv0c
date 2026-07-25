@@ -22,7 +22,7 @@ typedef struct {
 static int ir_value_tag(Value v);
 static int ir_expr_tag(Expr e);
 static int ir_instr_tag(Instr ins);
-static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags);
+static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags, const char* source, int starts, int ends);
 static int parse_decimal_i32_from_tok(const char* source, int starts, int ends, int tok_pos);
 static Value lower_tag_call(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int enum_vnames_flat, int item_fn_row, int match_env_inherit, int import_aliases);
 static Value lower_tag_block(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int enum_vnames_flat, int item_fn_row, int match_env_inherit, int import_aliases);
@@ -402,38 +402,39 @@ static int ir_instr_tag(Instr ins) {
   return _sv0t0;
 }
 
-static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags) {
+static Value lower_lit_to_ir_value(int lit_tag, int tok_pos, int tok_tags, const char* source, int starts, int ends) {
   if ((lit_tag == 0)) {
     Value _sv0t0;
+    int _sv0t1 = parse_decimal_i32_from_tok(source, starts, ends, tok_pos);
     _sv0t0.tag = 0;
-    _sv0t0.p0 = tok_pos;
+    _sv0t0.p0 = _sv0t1;
     return _sv0t0;
   } else {
   }
   if ((lit_tag == 5)) {
-    int _sv0t1 = sv0_vec_get(tok_tags, tok_pos);
-    int tt = _sv0t1;
+    int _sv0t2 = sv0_vec_get(tok_tags, tok_pos);
+    int tt = _sv0t2;
     if ((tt == 91)) {
-      Value _sv0t2;
-      _sv0t2.tag = 1;
-      return _sv0t2;
+      Value _sv0t3;
+      _sv0t3.tag = 1;
+      return _sv0t3;
     } else {
     }
-    Value _sv0t3;
-    _sv0t3.tag = 2;
-    return _sv0t3;
-  } else {
-  }
-  if ((lit_tag == 3)) {
     Value _sv0t4;
-    _sv0t4.tag = 5;
-    _sv0t4.p0 = tok_pos;
+    _sv0t4.tag = 2;
     return _sv0t4;
   } else {
   }
-  Value _sv0t5;
-  _sv0t5.tag = 4;
-  return _sv0t5;
+  if ((lit_tag == 3)) {
+    Value _sv0t5;
+    _sv0t5.tag = 5;
+    _sv0t5.p0 = tok_pos;
+    return _sv0t5;
+  } else {
+  }
+  Value _sv0t6;
+  _sv0t6.tag = 4;
+  return _sv0t6;
 }
 
 static int parse_decimal_i32_from_tok(const char* source, int starts, int ends, int tok_pos) {
@@ -1820,7 +1821,7 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
     int lit_tag = _sv0t1;
     int _sv0t2 = sv0_vec_get(ed2, idx);
     int tok_pos = _sv0t2;
-    Value _sv0t3 = lower_lit_to_ir_value(lit_tag, tok_pos, tok_tags);
+    Value _sv0t3 = lower_lit_to_ir_value(lit_tag, tok_pos, tok_tags, source, starts, ends);
     return _sv0t3;
   } else {
   }
@@ -3218,7 +3219,7 @@ static int lower_match_arms(int et, int ed1, int ed2, int ed3, int ed4, int pp, 
                 _sv0t33.p0 = _sv0t35;
                 cexp = _sv0t33;
               } else {
-                Value _sv0t36 = lower_lit_to_ir_value(0, tp2, tok_tags);
+                Value _sv0t36 = lower_lit_to_ir_value(0, tp2, tok_tags, source, starts, ends);
                 Value rv0;
                 rv0 = _sv0t36;
                 Expr _sv0t37;
@@ -3317,7 +3318,7 @@ static int lower_match_arms(int et, int ed1, int ed2, int ed3, int ed4, int pp, 
               }
             } else {
               if ((is_neg2 == 1)) {
-                Value _sv0t51 = lower_lit_to_ir_value(lt2, tp2, tok_tags);
+                Value _sv0t51 = lower_lit_to_ir_value(lt2, tp2, tok_tags, source, starts, ends);
                 Value rv_n;
                 rv_n = _sv0t51;
                 Value lv_n;
@@ -3338,7 +3339,7 @@ static int lower_match_arms(int et, int ed1, int ed2, int ed3, int ed4, int pp, 
                 _sv0t52.p2 = _sv0t54;
                 cexp = _sv0t52;
               } else {
-                Value _sv0t55 = lower_lit_to_ir_value(lt2, tp2, tok_tags);
+                Value _sv0t55 = lower_lit_to_ir_value(lt2, tp2, tok_tags, source, starts, ends);
                 Value rv3;
                 rv3 = _sv0t55;
                 Value lv3;
@@ -10815,43 +10816,49 @@ static int test_lower_lit_val(void) {
   sv0_vec_push(tok_tags, 91);
   sv0_vec_push(tok_tags, 64);
   sv0_vec_push(tok_tags, 0);
-  Value _sv0t1 = lower_lit_to_ir_value(0, 2, tok_tags);
+  const char* lit_src;
+  lit_src = "";
+  int _sv0t1 = sv0_vec_new();
+  int lit_st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int lit_en = _sv0t2;
+  Value _sv0t3 = lower_lit_to_ir_value(0, 2, tok_tags, lit_src, lit_st, lit_en);
   Value v1;
-  v1 = _sv0t1;
-  int _sv0t2 = ir_value_tag(v1);
-  if ((_sv0t2 != 0)) {
+  v1 = _sv0t3;
+  int _sv0t4 = ir_value_tag(v1);
+  if ((_sv0t4 != 0)) {
     return 1;
   } else {
   }
-  Value _sv0t3 = lower_lit_to_ir_value(5, 0, tok_tags);
+  Value _sv0t5 = lower_lit_to_ir_value(5, 0, tok_tags, lit_src, lit_st, lit_en);
   Value v2;
-  v2 = _sv0t3;
-  int _sv0t4 = ir_value_tag(v2);
-  if ((_sv0t4 != 1)) {
+  v2 = _sv0t5;
+  int _sv0t6 = ir_value_tag(v2);
+  if ((_sv0t6 != 1)) {
     return 2;
   } else {
   }
-  Value _sv0t5 = lower_lit_to_ir_value(5, 1, tok_tags);
+  Value _sv0t7 = lower_lit_to_ir_value(5, 1, tok_tags, lit_src, lit_st, lit_en);
   Value v3;
-  v3 = _sv0t5;
-  int _sv0t6 = ir_value_tag(v3);
-  if ((_sv0t6 != 2)) {
+  v3 = _sv0t7;
+  int _sv0t8 = ir_value_tag(v3);
+  if ((_sv0t8 != 2)) {
     return 3;
   } else {
   }
-  Value _sv0t7 = lower_lit_to_ir_value(3, 2, tok_tags);
+  Value _sv0t9 = lower_lit_to_ir_value(3, 2, tok_tags, lit_src, lit_st, lit_en);
   Value v4;
-  v4 = _sv0t7;
-  int _sv0t8 = ir_value_tag(v4);
-  if ((_sv0t8 != 5)) {
+  v4 = _sv0t9;
+  int _sv0t10 = ir_value_tag(v4);
+  if ((_sv0t10 != 5)) {
     return 4;
   } else {
   }
-  Value _sv0t9 = lower_lit_to_ir_value(99, 0, tok_tags);
+  Value _sv0t11 = lower_lit_to_ir_value(99, 0, tok_tags, lit_src, lit_st, lit_en);
   Value v5;
-  v5 = _sv0t9;
-  int _sv0t10 = ir_value_tag(v5);
-  if ((_sv0t10 != 4)) {
+  v5 = _sv0t11;
+  int _sv0t12 = ir_value_tag(v5);
+  if ((_sv0t12 != 4)) {
     return 5;
   } else {
   }
