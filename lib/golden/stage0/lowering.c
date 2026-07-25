@@ -4777,23 +4777,36 @@ static Value lower_tag_match(int et, int ed1, int ed2, int ed3, int ed4, int pp,
 }
 
 static int lower_return(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int enum_vnames_flat, int item_fn_row, int match_env_inherit, int import_aliases) {
-  Value _sv0t0 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+  if ((idx < 0)) {
+    Instr rv;
+    rv.tag = 14;
+    int _sv0t0 = sv0_box_alloc(5);
+    sv0_box_store(_sv0t0, 0, rv.tag);
+    sv0_box_store(_sv0t0, 1, rv.p0);
+    sv0_box_store(_sv0t0, 2, rv.p1);
+    sv0_box_store(_sv0t0, 3, rv.p2);
+    sv0_box_store(_sv0t0, 4, rv.p3);
+    sv0_vec_push(out_instrs, _sv0t0);
+    return 0;
+  } else {
+  }
+  Value _sv0t1 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
   Value v;
-  v = _sv0t0;
+  v = _sv0t1;
   Instr ri;
-  int _sv0t1 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t1, 0, v.tag);
-  sv0_box_store(_sv0t1, 1, v.p0);
-  sv0_box_store(_sv0t1, 2, v.p1);
+  int _sv0t2 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t2, 0, v.tag);
+  sv0_box_store(_sv0t2, 1, v.p0);
+  sv0_box_store(_sv0t2, 2, v.p1);
   ri.tag = 15;
-  ri.p0 = _sv0t1;
-  int _sv0t2 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t2, 0, ri.tag);
-  sv0_box_store(_sv0t2, 1, ri.p0);
-  sv0_box_store(_sv0t2, 2, ri.p1);
-  sv0_box_store(_sv0t2, 3, ri.p2);
-  sv0_box_store(_sv0t2, 4, ri.p3);
-  sv0_vec_push(out_instrs, _sv0t2);
+  ri.p0 = _sv0t2;
+  int _sv0t3 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t3, 0, ri.tag);
+  sv0_box_store(_sv0t3, 1, ri.p0);
+  sv0_box_store(_sv0t3, 2, ri.p1);
+  sv0_box_store(_sv0t3, 3, ri.p2);
+  sv0_box_store(_sv0t3, 4, ri.p3);
+  sv0_vec_push(out_instrs, _sv0t3);
   return 0;
 }
 
