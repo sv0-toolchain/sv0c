@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "fn main() -> i32 { return 0; }";
+    let source: string = "fn main() -> i32 { let x: i32 = 5; return x; }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -127,19 +127,20 @@ fn main() -> i32 {
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
        lower -> emit_program) compose and RUN in the native mega-TU, and the emit
-       is fully de-stubbed for the expression surface. Native-vs-SML behavioral
-       parity holds: `return 0` -> exit 0, `return 1 + 2` ->
-       `int _sv0t0 = (1 + 2); return _sv0t0;` -> exit 3, `return 1 + 2 * 3` ->
-       exit 7 (nested temps, correct precedence). Fixes that got here:
-       return-statement lowering (lower_stmt -> lower_return), the box/vec
-       convention (box_deref), source-aware fn names (handle_to_str),
-       integer-literal values (parse_decimal_i32_from_tok), and the body de-stub —
-       temps offset above the token range (lower_temp_base) so the emitter tells a
-       synthetic temp ("_sv0t<n>") from a source var (handle_to_str), plus real
-       AST binop/unop -> C operator tables. NEXT: let-bound locals fail the checker
-       (composed-pipeline gap, same class as the earlier parser->checker fix);
-       then calls/params; then the full self-host-sv0-loop corpus, then A3
-       (--target=vm) and P4. */
+       is fully de-stubbed for the expression + let-local surface. This smoke
+       program (`let x: i32 = 5; return x;`) now lowers to
+       `int x; x = 5; return x;` and runs to exit 5. Native-vs-SML behavioral
+       parity also holds for `return 0` (0), `return 1 + 2` (3), `return 1+2*3` (7),
+       and `let a=3; let b=4; return a+b` (7). Fixes that got here: return-stmt
+       lowering, box/vec convention, source-aware fn + body names, integer-literal
+       values, the body operator/name de-stub (lower_temp_base disambiguates temps
+       from source vars), the block statement-order sidecar (parser records ordered
+       stmt indices in pp/d4 because statement nodes are non-contiguous; checker/
+       lowering/resolver read it via block_stmt_index — `stmts_first + si` only
+       ever found statement 0), and the checker body path pool (synth_expr now
+       reads the real pp, not a fresh empty one). NEXT: calls/params (lower still
+       pushes empty params, ret_h=9); then the full self-host-sv0-loop corpus for
+       native-vs-SML parity; then A3 (--target=vm) and P4. */
     return 0;
 }
 

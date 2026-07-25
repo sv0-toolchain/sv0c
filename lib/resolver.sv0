@@ -720,6 +720,17 @@ fn res_lookup_fn_arity_str(fn_arities: Vec<i32>, name_str: string,
    Pattern arena is local to parser — ExprFor/ExprMatch patterns
    use inlined tag/d1 from expr arena. */
 
+/* Resolve the arena index of block statement `si`. Statement nodes are not
+   contiguous; parse_block records an ordered index list in pp with its offset
+   (+1) in the block's d4 (parser.sv0 block_stmt_sidecar_push). d4 == 0 → no
+   sidecar (hand-built test arenas) → legacy sf + si fallback. */
+fn block_stmt_index(pp: Vec<i32>, stmts_first: i32, sidecar: i32, si: i32) -> i32 {
+    if sidecar > 0 {
+        return vec_get(pp, sidecar - 1 + si);
+    }
+    return stmts_first + si;
+}
+
 fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 ed3: Vec<i32>, ed4: Vec<i32>, idx: i32,
                 source: string, starts: Vec<i32>, ends: Vec<i32>,
@@ -882,11 +893,12 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let sf: i32 = vec_get(ed1, idx);
         let sc: i32 = vec_get(ed2, idx);
         let tail: i32 = vec_get(ed3, idx);
+        let sidecar: i32 = vec_get(ed4, idx);
         res_enter_scope(frames);
         let mut si: i32 = 0;
         while si < sc {
             let rs: i32 = resolve_stmt(et, ed1, ed2, ed3, ed4,
-                                        sf + si,
+                                        block_stmt_index(pp, sf, sidecar, si),
                                         source, starts, ends,
                                         mod_vals, mod_tys,
                                         fn_arities, frames, pp);
