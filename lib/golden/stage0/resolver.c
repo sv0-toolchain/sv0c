@@ -1538,17 +1538,49 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
         int _sv0t90 = res_bind_local(frames, arm_pat_d1);
       } else {
       }
+      if ((arm_pat_tag == 5)) {
+        int _sv0t91 = sv0_vec_get(ed3, arm_pat_d1);
+        int argc_r = _sv0t91;
+        if ((argc_r > 0)) {
+          int meta_r = (arm_pat_d1 - 1);
+          int _sv0t92 = sv0_vec_get(et, meta_r);
+          if ((_sv0t92 == 33)) {
+            int _sv0t93 = sv0_vec_get(ed1, meta_r);
+            int ac_r = _sv0t93;
+            int _sv0t94 = sv0_vec_get(ed2, meta_r);
+            int first_r = _sv0t94;
+            int ej_r = 0;
+            while ((ej_r < ac_r)) {
+              int eidx_r = (first_r + ej_r);
+              int _sv0t95 = sv0_vec_get(et, eidx_r);
+              if ((_sv0t95 == 31)) {
+                int _sv0t96 = sv0_vec_get(ed4, eidx_r);
+                if ((_sv0t96 == 1)) {
+                  int _sv0t97 = sv0_vec_get(ed1, eidx_r);
+                  int _sv0t98 = res_bind_local(frames, _sv0t97);
+                } else {
+                }
+              } else {
+              }
+              ej_r = (ej_r + 1);
+            }
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
       if ((guard >= 0)) {
-        int _sv0t91 = resolve_expr(et, ed1, ed2, ed3, ed4, guard, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-        int rg = _sv0t91;
+        int _sv0t99 = resolve_expr(et, ed1, ed2, ed3, ed4, guard, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+        int rg = _sv0t99;
         if ((rg != 0)) {
           return rg;
         } else {
         }
       } else {
       }
-      int _sv0t92 = resolve_expr(et, ed1, ed2, ed3, ed4, body, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      int rb = _sv0t92;
+      int _sv0t100 = resolve_expr(et, ed1, ed2, ed3, ed4, body, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      int rb = _sv0t100;
       if ((rb != 0)) {
         return rb;
       } else {
@@ -1559,77 +1591,77 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
   } else {
   }
   if ((tag == 12)) {
-    int _sv0t93 = sv0_vec_get(ed1, idx);
-    int cond = _sv0t93;
-    int _sv0t94 = sv0_vec_get(ed2, idx);
-    int wbody = _sv0t94;
-    int _sv0t95 = sv0_vec_get(ed3, idx);
-    int inv_f = _sv0t95;
-    int _sv0t96 = sv0_vec_get(ed4, idx);
-    int inv_c = _sv0t96;
-    int _sv0t97 = resolve_expr(et, ed1, ed2, ed3, ed4, cond, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    int rwc = _sv0t97;
+    int _sv0t101 = sv0_vec_get(ed1, idx);
+    int cond = _sv0t101;
+    int _sv0t102 = sv0_vec_get(ed2, idx);
+    int wbody = _sv0t102;
+    int _sv0t103 = sv0_vec_get(ed3, idx);
+    int inv_f = _sv0t103;
+    int _sv0t104 = sv0_vec_get(ed4, idx);
+    int inv_c = _sv0t104;
+    int _sv0t105 = resolve_expr(et, ed1, ed2, ed3, ed4, cond, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    int rwc = _sv0t105;
     if ((rwc != 0)) {
       return rwc;
     } else {
     }
     int ii = 0;
     while ((ii < inv_c)) {
-      int _sv0t98 = (inv_f + ii);
-      int _sv0t99 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t98, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      int ri = _sv0t99;
+      int _sv0t106 = (inv_f + ii);
+      int _sv0t107 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t106, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      int ri = _sv0t107;
       if ((ri != 0)) {
         return ri;
       } else {
       }
       ii = (ii + 1);
     }
-    int _sv0t100 = resolve_expr(et, ed1, ed2, ed3, ed4, wbody, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t100;
+    int _sv0t108 = resolve_expr(et, ed1, ed2, ed3, ed4, wbody, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t108;
   } else {
   }
   if ((tag == 13)) {
-    int _sv0t101 = sv0_vec_get(ed1, idx);
-    int pat_tok = _sv0t101;
-    int _sv0t102 = sv0_vec_get(ed2, idx);
-    int iter = _sv0t102;
-    int _sv0t103 = sv0_vec_get(ed3, idx);
-    int fbody = _sv0t103;
-    int _sv0t104 = resolve_expr(et, ed1, ed2, ed3, ed4, iter, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    int rit = _sv0t104;
+    int _sv0t109 = sv0_vec_get(ed1, idx);
+    int pat_tok = _sv0t109;
+    int _sv0t110 = sv0_vec_get(ed2, idx);
+    int iter = _sv0t110;
+    int _sv0t111 = sv0_vec_get(ed3, idx);
+    int fbody = _sv0t111;
+    int _sv0t112 = resolve_expr(et, ed1, ed2, ed3, ed4, iter, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    int rit = _sv0t112;
     if ((rit != 0)) {
       return rit;
     } else {
     }
-    int _sv0t105 = res_enter_scope(frames);
-    int _sv0t106 = res_bind_local(frames, pat_tok);
-    int _sv0t107 = resolve_expr(et, ed1, ed2, ed3, ed4, fbody, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t107;
+    int _sv0t113 = res_enter_scope(frames);
+    int _sv0t114 = res_bind_local(frames, pat_tok);
+    int _sv0t115 = resolve_expr(et, ed1, ed2, ed3, ed4, fbody, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t115;
   } else {
   }
   if ((tag == 14)) {
-    int _sv0t108 = sv0_vec_get(ed1, idx);
-    int _sv0t109 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t108, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t109;
+    int _sv0t116 = sv0_vec_get(ed1, idx);
+    int _sv0t117 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t116, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t117;
   } else {
   }
   if ((tag == 15)) {
-    int _sv0t110 = sv0_vec_get(ed1, idx);
-    int rv = _sv0t110;
+    int _sv0t118 = sv0_vec_get(ed1, idx);
+    int rv = _sv0t118;
     if ((rv >= 0)) {
-      int _sv0t111 = resolve_expr(et, ed1, ed2, ed3, ed4, rv, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      return _sv0t111;
+      int _sv0t119 = resolve_expr(et, ed1, ed2, ed3, ed4, rv, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      return _sv0t119;
     } else {
     }
     return 0;
   } else {
   }
   if ((tag == 16)) {
-    int _sv0t112 = sv0_vec_get(ed1, idx);
-    int bv = _sv0t112;
+    int _sv0t120 = sv0_vec_get(ed1, idx);
+    int bv = _sv0t120;
     if ((bv >= 0)) {
-      int _sv0t113 = resolve_expr(et, ed1, ed2, ed3, ed4, bv, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      return _sv0t113;
+      int _sv0t121 = resolve_expr(et, ed1, ed2, ed3, ed4, bv, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      return _sv0t121;
     } else {
     }
     return 0;
@@ -1640,45 +1672,45 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
   } else {
   }
   if ((tag == 18)) {
-    int _sv0t114 = sv0_vec_get(ed1, idx);
-    int _sv0t115 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t114, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    int ra = _sv0t115;
+    int _sv0t122 = sv0_vec_get(ed1, idx);
+    int _sv0t123 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t122, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    int ra = _sv0t123;
     if ((ra != 0)) {
       return ra;
     } else {
     }
-    int _sv0t116 = sv0_vec_get(ed2, idx);
-    int _sv0t117 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t116, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t117;
+    int _sv0t124 = sv0_vec_get(ed2, idx);
+    int _sv0t125 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t124, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t125;
   } else {
   }
   if ((tag == 19)) {
-    int _sv0t118 = sv0_vec_get(ed2, idx);
-    int _sv0t119 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t118, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    int ra = _sv0t119;
+    int _sv0t126 = sv0_vec_get(ed2, idx);
+    int _sv0t127 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t126, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    int ra = _sv0t127;
     if ((ra != 0)) {
       return ra;
     } else {
     }
-    int _sv0t120 = sv0_vec_get(ed3, idx);
-    int _sv0t121 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t120, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t121;
+    int _sv0t128 = sv0_vec_get(ed3, idx);
+    int _sv0t129 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t128, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t129;
   } else {
   }
   if ((tag == 20)) {
-    int _sv0t122 = sv0_vec_get(ed1, idx);
-    int _sv0t123 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t122, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t123;
+    int _sv0t130 = sv0_vec_get(ed1, idx);
+    int _sv0t131 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t130, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t131;
   } else {
   }
   if ((tag == 21)) {
-    int _sv0t124 = sv0_vec_get(ed1, idx);
-    int lo = _sv0t124;
-    int _sv0t125 = sv0_vec_get(ed2, idx);
-    int hi = _sv0t125;
+    int _sv0t132 = sv0_vec_get(ed1, idx);
+    int lo = _sv0t132;
+    int _sv0t133 = sv0_vec_get(ed2, idx);
+    int hi = _sv0t133;
     if ((lo >= 0)) {
-      int _sv0t126 = resolve_expr(et, ed1, ed2, ed3, ed4, lo, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      int rl = _sv0t126;
+      int _sv0t134 = resolve_expr(et, ed1, ed2, ed3, ed4, lo, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      int rl = _sv0t134;
       if ((rl != 0)) {
         return rl;
       } else {
@@ -1686,55 +1718,55 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
     } else {
     }
     if ((hi >= 0)) {
-      int _sv0t127 = resolve_expr(et, ed1, ed2, ed3, ed4, hi, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      return _sv0t127;
+      int _sv0t135 = resolve_expr(et, ed1, ed2, ed3, ed4, hi, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      return _sv0t135;
     } else {
     }
     return 0;
   } else {
   }
   if ((tag == 22)) {
-    int _sv0t128 = sv0_vec_get(ed1, idx);
-    int _sv0t129 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t128, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t129;
+    int _sv0t136 = sv0_vec_get(ed1, idx);
+    int _sv0t137 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t136, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t137;
   } else {
   }
   if ((tag == 23)) {
-    int _sv0t130 = sv0_vec_get(ed1, idx);
-    int _sv0t131 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t130, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t131;
+    int _sv0t138 = sv0_vec_get(ed1, idx);
+    int _sv0t139 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t138, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t139;
   } else {
   }
   if ((tag == 24)) {
-    int _sv0t132 = sv0_vec_get(ed1, idx);
-    int spps = _sv0t132;
-    int _sv0t133 = sv0_vec_get(ed2, idx);
-    int sppc = _sv0t133;
-    int _sv0t134 = sv0_vec_get(ed3, idx);
-    int sfc = _sv0t134;
-    int _sv0t135 = sv0_vec_new();
-    int spath = _sv0t135;
+    int _sv0t140 = sv0_vec_get(ed1, idx);
+    int spps = _sv0t140;
+    int _sv0t141 = sv0_vec_get(ed2, idx);
+    int sppc = _sv0t141;
+    int _sv0t142 = sv0_vec_get(ed3, idx);
+    int sfc = _sv0t142;
+    int _sv0t143 = sv0_vec_new();
+    int spath = _sv0t143;
     int sk = 0;
     while ((sk < sppc)) {
-      int _sv0t136 = (spps + sk);
-      int _sv0t137 = sv0_vec_get(pp, _sv0t136);
-      sv0_vec_push(spath, _sv0t137);
+      int _sv0t144 = (spps + sk);
+      int _sv0t145 = sv0_vec_get(pp, _sv0t144);
+      sv0_vec_push(spath, _sv0t145);
       sk = (sk + 1);
     }
-    const char* _sv0t138 = path_join_vec(source, starts, ends, spath);
+    const char* _sv0t146 = path_join_vec(source, starts, ends, spath);
     const char* sps;
-    sps = _sv0t138;
-    int _sv0t139 = res_type_exists(mod_tys, sps, source, starts, ends);
-    if ((_sv0t139 != 1)) {
+    sps = _sv0t146;
+    int _sv0t147 = res_type_exists(mod_tys, sps, source, starts, ends);
+    if ((_sv0t147 != 1)) {
       return 301;
     } else {
     }
     int sfi = 0;
     while ((sfi < sfc)) {
-      int _sv0t140 = (idx - sfc);
-      int _sv0t141 = (_sv0t140 + sfi);
-      int _sv0t142 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t141, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      int rfe = _sv0t142;
+      int _sv0t148 = (idx - sfc);
+      int _sv0t149 = (_sv0t148 + sfi);
+      int _sv0t150 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t149, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      int rfe = _sv0t150;
       if ((rfe != 0)) {
         return rfe;
       } else {
@@ -1745,15 +1777,15 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
   } else {
   }
   if ((tag == 25)) {
-    int _sv0t143 = sv0_vec_get(ed1, idx);
-    int tf = _sv0t143;
-    int _sv0t144 = sv0_vec_get(ed2, idx);
-    int tc = _sv0t144;
+    int _sv0t151 = sv0_vec_get(ed1, idx);
+    int tf = _sv0t151;
+    int _sv0t152 = sv0_vec_get(ed2, idx);
+    int tc = _sv0t152;
     int ti = 0;
     while ((ti < tc)) {
-      int _sv0t145 = (tf + ti);
-      int _sv0t146 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t145, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      int rte = _sv0t146;
+      int _sv0t153 = (tf + ti);
+      int _sv0t154 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t153, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      int rte = _sv0t154;
       if ((rte != 0)) {
         return rte;
       } else {
@@ -1764,15 +1796,15 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
   } else {
   }
   if ((tag == 26)) {
-    int _sv0t147 = sv0_vec_get(ed1, idx);
-    int af = _sv0t147;
-    int _sv0t148 = sv0_vec_get(ed2, idx);
-    int ac = _sv0t148;
+    int _sv0t155 = sv0_vec_get(ed1, idx);
+    int af = _sv0t155;
+    int _sv0t156 = sv0_vec_get(ed2, idx);
+    int ac = _sv0t156;
     int ari = 0;
     while ((ari < ac)) {
-      int _sv0t149 = (af + ari);
-      int _sv0t150 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t149, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      int rae = _sv0t150;
+      int _sv0t157 = (af + ari);
+      int _sv0t158 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t157, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      int rae = _sv0t158;
       if ((rae != 0)) {
         return rae;
       } else {

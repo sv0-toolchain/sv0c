@@ -514,6 +514,19 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         let_declared = 1;
                     }
                 }
+                /* Enum payload constructor init (ExprCall `Enum::Variant(args)`):
+                   callee is a 2-seg ExprPath; declare with the enum type. */
+                if vec_get(et, init_idx) == 4 {
+                    let callee_cb: i32 = vec_get(ed1, init_idx);
+                    if vec_get(et, callee_cb) == 1 {
+                        if vec_get(ed2, callee_cb) == 2 {
+                            let ety_cb: i32 = vec_get(pp, vec_get(ed1, callee_cb));
+                            let decl_eb: Instr = Instr::DeclNamed(ety_cb, name_tok);
+                            vec_push(out_instrs, box_new(decl_eb));
+                            let_declared = 1;
+                        }
+                    }
+                }
             }
             if let_declared == 0 {
                 let decl: Instr = Instr::DeclVar(name_tok);
@@ -2606,6 +2619,19 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     let decl_e: Instr = Instr::DeclNamed(ety_tok, name_tok);
                     vec_push(out_instrs, box_new(decl_e));
                     let_declared = 1;
+                }
+            }
+            /* Enum payload constructor init (ExprCall `Enum::Variant(args)`): the
+               callee is a 2-seg ExprPath; declare the let with the enum type. */
+            if vec_get(et, init_idx) == 4 {
+                let callee_ci: i32 = vec_get(ed1, init_idx);
+                if vec_get(et, callee_ci) == 1 {
+                    if vec_get(ed2, callee_ci) == 2 {
+                        let ety_c: i32 = vec_get(pp, vec_get(ed1, callee_ci));
+                        let decl_ec: Instr = Instr::DeclNamed(ety_c, name_tok);
+                        vec_push(out_instrs, box_new(decl_ec));
+                        let_declared = 1;
+                    }
                 }
             }
         }

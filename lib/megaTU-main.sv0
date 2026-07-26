@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "enum Color { Red, Green, Blue } fn main() -> i32 { let c: Color = Color::Green; return match c { Color::Red => 10, Color::Green => 20, Color::Blue => 30 }; }";
+    let source: string = "enum Opt { None, Some(i32) } fn main() -> i32 { let o: Opt = Opt::Some(5); return match o { Opt::None => 0, Opt::Some(x) => x }; }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -101,7 +101,12 @@ fn main() -> i32 {
                 vec_push(ifc, 0);
             }
         }
-        vec_push(ivm, 0);
+        /* item_vmax = number of payload int slots (p0..) the enum typedef needs.
+           evpc is the enum's TOTAL payload count (0 for non-enums); it is an upper
+           bound on the max-per-variant width the SML compiler uses, so it
+           over-allocates slots but is behaviorally correct (exact max would need
+           per-variant counts the parser does not retain — future work for P4). */
+        vec_push(ivm, vec_get(evpc, ii));
         ii = ii + 1;
     }
     /* Struct field name tokens come straight from the parser (sfn). Field types:
@@ -186,11 +191,19 @@ fn main() -> i32 {
        via ExprMatch d4), match patterns parsed into the SHARED pp (so PatEnum path
        tokens survive for lower), and the match comparison ops remapped from the old
        codegen op_of encoding (4 = "==") to the AST encoding the emitter uses
-       (5 = Eq, 6 = Neq). NEXT: payload variants (need item_vmax = max payload width
-       for the `p<i>` typedef slots; `Opt::Some(x)` + payload binds in match arms);
-       calls to non-int fns (Call rt_h is 0 = int); `let` types for non-struct/enum
-       inits (still int); then the self-host-sv0-loop corpus for native-vs-SML
-       parity; then A3 (--target=vm) and P4. */
+       (5 = Eq, 6 = Neq). Payload variants also work: this smoke's
+       `enum Opt { None, Some(i32) }` + `let o = Opt::Some(5); match o { Opt::None
+       => 0, Opt::Some(x) => x }` emits `typedef struct { int tag; int p0; } Opt;`,
+       lowers the ctor to `_sv0t0.tag = 1; _sv0t0.p0 = 5;`, and the match arm to
+       `int x = o.p0; ... = x;`, returning 5. Payloads needed item_vmax = the enum's
+       payload-slot count (from evpc, an upper bound on the per-variant max), the
+       `let`-type for a payload ctor (an ExprCall with a 2-seg callee -> the enum
+       type), and payload PatBind registration in the resolver and checker (walk the
+       ExprPatEnumMeta -> ExprPatFieldEmbed rows; the ctor payload store and match
+       payload bind already existed in lower). NEXT: exact per-variant item_vmax (for
+       P4 byte-exactness); calls to non-int fns (Call rt_h is 0 = int); `let` types
+       for non-struct/enum inits (still int); then the self-host-sv0-loop corpus for
+       native-vs-SML parity; then A3 (--target=vm) and P4. */
     return 0;
 }
 

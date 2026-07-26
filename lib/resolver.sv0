@@ -960,6 +960,30 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if arm_pat_tag == 1 {
                 res_bind_local(frames, arm_pat_d1);
             }
+            /* PatEnum with a tuple payload (`Variant(x, ...)`): bind each payload
+               PatBind so the arm body can reference it. arm_pat_d1 is the
+               ExprPatExtra index; the ExprPatEnumMeta (tag 33) just before it lists
+               the ExprPatFieldEmbed (tag 31) payload rows (d4 == 1 => PatBind). */
+            if arm_pat_tag == 5 {
+                let argc_r: i32 = vec_get(ed3, arm_pat_d1);
+                if argc_r > 0 {
+                    let meta_r: i32 = arm_pat_d1 - 1;
+                    if vec_get(et, meta_r) == 33 {
+                        let ac_r: i32 = vec_get(ed1, meta_r);
+                        let first_r: i32 = vec_get(ed2, meta_r);
+                        let mut ej_r: i32 = 0;
+                        while ej_r < ac_r {
+                            let eidx_r: i32 = first_r + ej_r;
+                            if vec_get(et, eidx_r) == 31 {
+                                if vec_get(ed4, eidx_r) == 1 {
+                                    res_bind_local(frames, vec_get(ed1, eidx_r));
+                                }
+                            }
+                            ej_r = ej_r + 1;
+                        }
+                    }
+                }
+            }
             if guard >= 0 {
                 let rg: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, guard,
                                             source, starts, ends,
