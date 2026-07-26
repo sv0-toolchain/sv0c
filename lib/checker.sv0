@@ -3188,6 +3188,34 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
             let arm_idx: i32 = block_stmt_index(pp, arms_first, arms_sidecar, ai);
             let guard_idx: i32 = vec_get(ed3, arm_idx);
             let body_idx: i32 = vec_get(ed4, arm_idx);
+            /* PatEnum tuple payload (`Variant(x, ...)`): bind each payload PatBind
+               into the env so the arm body/guard can reference it. ed2[arm] is the
+               ExprPatExtra index; the ExprPatEnumMeta (tag 33) before it lists the
+               ExprPatFieldEmbed (tag 31) rows (d4 == 1 => PatBind). Payloads are
+               bound as TY_INT (the i32 payload surface). */
+            let arm_pt: i32 = vec_get(ed1, arm_idx);
+            if arm_pt == 5 {
+                let apx: i32 = vec_get(ed2, arm_idx);
+                let apc: i32 = vec_get(ed3, apx);
+                if apc > 0 {
+                    let apm: i32 = apx - 1;
+                    if vec_get(et, apm) == 33 {
+                        let apac: i32 = vec_get(ed1, apm);
+                        let apfe: i32 = vec_get(ed2, apm);
+                        let mut apj: i32 = 0;
+                        while apj < apac {
+                            let apei: i32 = apfe + apj;
+                            if vec_get(et, apei) == 31 {
+                                if vec_get(ed4, apei) == 1 {
+                                    env_extend(env_names, env_types, env_muts,
+                                               vec_get(ed1, apei), TY_INT(), 0);
+                                }
+                            }
+                            apj = apj + 1;
+                        }
+                    }
+                }
+            }
             if guard_idx >= 0 {
                 let g_ty: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
                                             source, starts, ends,
