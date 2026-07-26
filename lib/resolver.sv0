@@ -128,6 +128,11 @@ fn is_intrinsic(name: string) -> bool {
     if string_eq(name, "vec_set") { return true; }
     if string_eq(name, "box_new") { return true; }
     if string_eq(name, "box_deref") { return true; }
+    /* Host I/O builtins (lowering build_builtin_map IDs 15-17); used by the
+       library modules (link / include_expand) but not in the original 17. */
+    if string_eq(name, "read_file") { return true; }
+    if string_eq(name, "write_file") { return true; }
+    if string_eq(name, "read_dir") { return true; }
     return false;
 }
 
@@ -149,6 +154,9 @@ fn intrinsic_arity(name: string) -> i32 {
     if string_eq(name, "vec_set") { return 3; }
     if string_eq(name, "box_new") { return 1; }
     if string_eq(name, "box_deref") { return 1; }
+    if string_eq(name, "read_file") { return 1; }
+    if string_eq(name, "write_file") { return 2; }
+    if string_eq(name, "read_dir") { return 1; }
     return 0 - 1;
 }
 
@@ -753,6 +761,16 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if res_full_value_exists(mod_vals, frames, ps,
                                   source, starts, ends) {
             return 0;
+        }
+        /* Intrinsic/builtin values (println, string_*, vec_*, box_*, host I/O, …)
+           are not defined in the source and are not registered in the module env,
+           so accept a 1-segment name that is_intrinsic recognises. This also
+           resolves the callee of an intrinsic call, which reaches here via the
+           tag-4 handler's resolve_expr(callee). */
+        if ppc == 1 {
+            if is_intrinsic(ps) {
+                return 0;
+            }
         }
         /* 2-segment enum-variant constructor path (EnumType::Variant). The
            resolver only registers enum type names (not per-variant qualified
