@@ -1348,8 +1348,13 @@ static int infer_lit(int lit_tag) {
     return _sv0t4;
   } else {
   }
-  int _sv0t5 = (0 - 1);
-  return _sv0t5;
+  if ((lit_tag == 5)) {
+    int _sv0t5 = TY_BOOL();
+    return _sv0t5;
+  } else {
+  }
+  int _sv0t6 = (0 - 1);
+  return _sv0t6;
 }
 
 static int dup_variant_names(int names) {

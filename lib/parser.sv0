@@ -2068,7 +2068,9 @@ fn parse_and_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             if pa < 0 { return 0 - 1; }
             let ri: i32 = vec_len(et) - 1;
             vec_push(et, 3);
-            vec_push(ed1, 10);
+            /* AST_AND = 11 (ast.sv0). This dedicated `&&` parser previously pushed
+               10 (AST_GEQ), so lower/emit saw `&&` as `>=`. */
+            vec_push(ed1, 11);
             vec_push(ed2, left);
             vec_push(ed3, ri);
             vec_push(ed4, 0);
@@ -2106,7 +2108,9 @@ fn parse_or_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             if pa < 0 { return 0 - 1; }
             let ri: i32 = vec_len(et) - 1;
             vec_push(et, 3);
-            vec_push(ed1, 11);
+            /* AST_OR = 12 (ast.sv0). This dedicated `||` parser previously pushed
+               11 (AST_AND), so lower/emit saw `||` as `&&`. */
+            vec_push(ed1, 12);
             vec_push(ed2, left);
             vec_push(ed3, ri);
             vec_push(ed4, 0);

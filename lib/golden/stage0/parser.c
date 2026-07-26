@@ -3517,7 +3517,7 @@ static int parse_and_expr(int tags, int starts, int ends, const char* source, in
       int _sv0t7 = sv0_vec_len(et);
       int ri = (_sv0t7 - 1);
       sv0_vec_push(et, 3);
-      sv0_vec_push(ed1, 10);
+      sv0_vec_push(ed1, 11);
       sv0_vec_push(ed2, left);
       sv0_vec_push(ed3, ri);
       sv0_vec_push(ed4, 0);
@@ -3558,7 +3558,7 @@ static int parse_or_expr(int tags, int starts, int ends, const char* source, int
       int _sv0t7 = sv0_vec_len(et);
       int ri = (_sv0t7 - 1);
       sv0_vec_push(et, 3);
-      sv0_vec_push(ed1, 11);
+      sv0_vec_push(ed1, 12);
       sv0_vec_push(ed2, left);
       sv0_vec_push(ed3, ri);
       sv0_vec_push(ed4, 0);
