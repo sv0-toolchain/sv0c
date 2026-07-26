@@ -4549,24 +4549,24 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
   }
   int arms_first = (0 - 1);
   int arm_count = 0;
+  int _sv0t10 = sv0_vec_new();
+  int arm_ids = _sv0t10;
   int p = (p1 + 1);
   int arms_done = 0;
   while ((arms_done != 1)) {
-    int _sv0t10 = ps_peek(tags, p);
-    if ((_sv0t10 == 9)) {
+    int _sv0t11 = ps_peek(tags, p);
+    if ((_sv0t11 == 9)) {
       arms_done = 1;
     } else {
-      int _sv0t11 = sv0_vec_new();
-      int pt = _sv0t11;
       int _sv0t12 = sv0_vec_new();
-      int pd1v = _sv0t12;
+      int pt = _sv0t12;
       int _sv0t13 = sv0_vec_new();
-      int pd2v = _sv0t13;
+      int pd1v = _sv0t13;
       int _sv0t14 = sv0_vec_new();
-      int pd3v = _sv0t14;
+      int pd2v = _sv0t14;
       int _sv0t15 = sv0_vec_new();
-      int pp2 = _sv0t15;
-      int _sv0t16 = parse_pat(tags, starts, ends, source, p, pt, pd1v, pd2v, pd3v, pp2);
+      int pd3v = _sv0t15;
+      int _sv0t16 = parse_pat(tags, starts, ends, source, p, pt, pd1v, pd2v, pd3v, pp);
       int pa = _sv0t16;
       if ((pa < 0)) {
         int _sv0t17 = (0 - 1);
@@ -4744,11 +4744,14 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
           arms_first = (_sv0t65 - 1);
         } else {
         }
+        int _sv0t66 = sv0_vec_len(et);
+        int _sv0t67 = (_sv0t66 - 1);
+        sv0_vec_push(arm_ids, _sv0t67);
         arm_count = (arm_count + 1);
         am = (am + 1);
       }
-      int _sv0t66 = ps_peek(tags, body_pos);
-      if ((_sv0t66 == 12)) {
+      int _sv0t68 = ps_peek(tags, body_pos);
+      if ((_sv0t68 == 12)) {
         p = (body_pos + 1);
       } else {
         p = body_pos;
@@ -4759,9 +4762,10 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
   sv0_vec_push(ed1, scrut_idx);
   sv0_vec_push(ed2, arms_first);
   sv0_vec_push(ed3, arm_count);
-  sv0_vec_push(ed4, 0);
-  int _sv0t67 = (p + 1);
-  return _sv0t67;
+  int _sv0t69 = block_stmt_sidecar_push(pp, arm_ids);
+  sv0_vec_push(ed4, _sv0t69);
+  int _sv0t70 = (p + 1);
+  return _sv0t70;
 }
 
 static int parse_quant(int tags, int starts, int ends, const char* source, int pos, int is_forall, int et, int ed1, int ed2, int ed3, int ed4, int pp) {

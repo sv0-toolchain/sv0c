@@ -2824,6 +2824,12 @@ fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     if ps_peek(tags, p1) != 8 { return 0 - 1; }
     let mut arms_first: i32 = 0 - 1;
     let mut arm_count: i32 = 0;
+    /* Match arm nodes (tag 29) are interleaved with their pattern-payload and body
+       sub-expressions, so they are NOT at contiguous indices — record each arm
+       node index in order and stash the list in pp (offset+1 in ExprMatch d4), the
+       same statement-order sidecar blocks use. Consumers read it via
+       block_stmt_index. */
+    let arm_ids: Vec<i32> = vec_new();
     let mut p: i32 = p1 + 1;
     let mut arms_done: bool = false;
     while arms_done != true {
@@ -2834,9 +2840,12 @@ fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             let pd1v: Vec<i32> = vec_new();
             let pd2v: Vec<i32> = vec_new();
             let pd3v: Vec<i32> = vec_new();
-            let pp2: Vec<i32> = vec_new();
+            /* Parse the pattern path into the SHARED pp: PatEnum/PatStruct record a
+               pp offset (pd1v[pr]) that the ExprPatExtra copies into et, and lower
+               reads the enum/struct/variant name tokens back from pp. A local pool
+               would be discarded, leaving those offsets dangling into pp. */
             let pa: i32 = parse_pat(tags, starts, ends, source, p,
-                                     pt, pd1v, pd2v, pd3v, pp2);
+                                     pt, pd1v, pd2v, pd3v, pp);
             if pa < 0 { return 0 - 1; }
             let pr: i32 = vec_len(pt) - 1;
             if pr < 0 { return 0 - 1; }
@@ -2945,6 +2954,7 @@ fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 vec_push(ed3, guard_idx);
                 vec_push(ed4, body_idx);
                 if arms_first < 0 { arms_first = vec_len(et) - 1; }
+                vec_push(arm_ids, vec_len(et) - 1);
                 arm_count = arm_count + 1;
                 am = am + 1;
             }
@@ -2959,7 +2969,7 @@ fn parse_match_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(ed1, scrut_idx);
     vec_push(ed2, arms_first);
     vec_push(ed3, arm_count);
-    vec_push(ed4, 0);
+    vec_push(ed4, block_stmt_sidecar_push(pp, arm_ids));
     return p + 1;
 }
 

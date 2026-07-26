@@ -944,13 +944,14 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let scrut: i32 = vec_get(ed1, idx);
         let arms_f: i32 = vec_get(ed2, idx);
         let arms_c: i32 = vec_get(ed3, idx);
+        let arms_sidecar: i32 = vec_get(ed4, idx);
         let rsc: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, scrut,
                                      source, starts, ends,
                                      mod_vals, mod_tys, fn_arities, frames, pp);
         if rsc != 0 { return rsc; }
         let mut ami: i32 = 0;
         while ami < arms_c {
-            let arm_idx: i32 = arms_f + ami;
+            let arm_idx: i32 = block_stmt_index(pp, arms_f, arms_sidecar, ami);
             let arm_pat_tag: i32 = vec_get(ed1, arm_idx);
             let arm_pat_d1: i32 = vec_get(ed2, arm_idx);
             let guard: i32 = vec_get(ed3, arm_idx);

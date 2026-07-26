@@ -1510,7 +1510,7 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
 fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
                     tok_tags: Vec<i32>,
-                    arms_first: i32, arm_count: i32,
+                    arms_first: i32, arm_count: i32, arms_sidecar: i32,
                     out_var: i32, scrut_var: i32,
                     scrut_cty: i32,
                     ctr: Vec<i32>,
@@ -1532,7 +1532,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let mut result_instrs: Vec<i32> = vec_new();
     let mut ai: i32 = arm_count - 1;
     while ai >= 0 {
-        let arm_idx: i32 = arms_first + ai;
+        let arm_idx: i32 = block_stmt_index(pp, arms_first, arms_sidecar, ai);
         let arm_tag: i32 = vec_get(et, arm_idx);
         if arm_tag != 29 { return 0 - 1; }
         let pat_tag: i32 = vec_get(ed1, arm_idx);
@@ -1581,7 +1581,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 cexp = Expr::Literal(box_new(Value::VBoolTrue));
                             } else {
                                 let rv0: Value = lower_lit_to_ir_value(0, tp2, tok_tags, source, starts, ends);
-                                cexp = Expr::Binop(4, box_new(lv2),
+                                cexp = Expr::Binop(5, box_new(lv2),
                                                     box_new(rv0));
                             }
                         } else {
@@ -1591,7 +1591,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 vi = 0 - vi;
                             }
                             let rv2: Value = Value::VInt(vi);
-                            cexp = Expr::Binop(4, box_new(lv2), box_new(rv2));
+                            cexp = Expr::Binop(5, box_new(lv2), box_new(rv2));
                         }
                     } else {
                         if lt2 == 5 {
@@ -1610,10 +1610,10 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             let lv_b: Value = Value::VVar(scrut_var);
                             let zv: Value = Value::VInt(0);
                             if nz == 1 {
-                                cexp = Expr::Binop(5, box_new(lv_b),
+                                cexp = Expr::Binop(6, box_new(lv_b),
                                                     box_new(zv));
                             } else {
-                                cexp = Expr::Binop(4, box_new(lv_b),
+                                cexp = Expr::Binop(5, box_new(lv_b),
                                                     box_new(zv));
                             }
                         } else {
@@ -1621,13 +1621,13 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 let rv_n: Value = lower_lit_to_ir_value(
                                     lt2, tp2, tok_tags, source, starts, ends);
                                 let lv_n: Value = Value::VVar(scrut_var);
-                                cexp = Expr::Binop(5, box_new(lv_n),
+                                cexp = Expr::Binop(6, box_new(lv_n),
                                                     box_new(rv_n));
                             } else {
                                 let rv3: Value = lower_lit_to_ir_value(
                                     lt2, tp2, tok_tags, source, starts, ends);
                                 let lv3: Value = Value::VVar(scrut_var);
-                                cexp = Expr::Binop(4, box_new(lv3),
+                                cexp = Expr::Binop(5, box_new(lv3),
                                                     box_new(rv3));
                             }
                         }
@@ -1659,7 +1659,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             let tag_m: Value = Value::VMember(
                                 box_new(Value::VVar(scrut_var)), 0 - 1);
                             let kv_v: Value = Value::VInt(kv);
-                            cexp = Expr::Binop(4, box_new(tag_m),
+                            cexp = Expr::Binop(5, box_new(tag_m),
                                                 box_new(kv_v));
                             let argc5: i32 = vec_get(ed3, paux5);
                             if argc5 > 0 {
@@ -1724,7 +1724,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             let tag_m4: Value = Value::VMember(
                                 box_new(Value::VVar(scrut_var)), 0 - 1);
                             let kv_v4: Value = Value::VInt(kv4);
-                            cexp = Expr::Binop(4, box_new(tag_m4),
+                            cexp = Expr::Binop(5, box_new(tag_m4),
                                                 box_new(kv_v4));
                             let meta_idx: i32 = paux4 - 1;
                             let mtag: i32 = vec_get(et, meta_idx);
@@ -2462,6 +2462,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let scrut_idx: i32 = vec_get(ed1, idx);
     let arms_first: i32 = vec_get(ed2, idx);
     let arm_count: i32 = vec_get(ed3, idx);
+    let arms_sidecar: i32 = vec_get(ed4, idx);
     let match_env: Vec<i32> = lower_match_env_alloc_v0_empty_header();
     let discard_ap: i32 = lower_match_env_append_top_fn_match_tables(
         match_env, item_tags, item_names, item_d2, source, starts, ends,
@@ -2502,6 +2503,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     vec_push(out_instrs, box_new(dv));
     let discard_ma: i32 = lower_match_arms(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, arms_first, arm_count,
+                                            arms_sidecar,
                                             out, scrut_var, sct, ctr,
                                             out_instrs, enum_names,
                                             enum_tag_offsets, enum_tag_counts,
