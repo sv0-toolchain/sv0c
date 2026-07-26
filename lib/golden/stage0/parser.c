@@ -173,7 +173,7 @@ static int parse_type(int tags, int starts, int ends, const char* source, int po
 static int path_pattern_from(int tags, int starts, int ends, const char* source, int pos, int pat_tags, int pat_data1, int pat_data2, int pat_data3, int path_pool, int pp_start, int pp_count);
 static int parse_pat_atom(int tags, int starts, int ends, const char* source, int pos, int pat_tags, int pat_data1, int pat_data2, int pat_data3, int path_pool);
 static int parse_pat(int tags, int starts, int ends, const char* source, int pos, int pat_tags, int pat_data1, int pat_data2, int pat_data3, int path_pool);
-static int parse_arg_list(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp);
+static int parse_arg_list(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
 static int parse_struct_fields(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
 static int parse_primary_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names, int allow_struct);
 static int parse_postfix_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names, int allow_struct);
@@ -190,6 +190,7 @@ static int parse_and_expr(int tags, int starts, int ends, const char* source, in
 static int parse_or_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names, int ty_tags, int ty_d1, int ty_d2, int ty_d3, int allow_struct);
 static int parse_range_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names, int ty_tags, int ty_d1, int ty_d2, int ty_d3, int allow_struct);
 static int parse_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int allow_struct);
+static int parse_expr_sf(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names, int allow_struct);
 static int expr_ends_with_braced_block(int et, int idx);
 static int parse_return_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
 static int parse_let_stmt(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names);
@@ -2334,7 +2335,7 @@ static int parse_pat(int tags, int starts, int ends, const char* source, int pos
   return p;
 }
 
-static int parse_arg_list(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp) {
+static int parse_arg_list(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names) {
   int _sv0t0 = ps_peek(tags, pos);
   if ((_sv0t0 == 7)) {
     return pos;
@@ -2342,7 +2343,7 @@ static int parse_arg_list(int tags, int starts, int ends, const char* source, in
   }
   int _sv0t1 = sv0_vec_len(et);
   int first_idx = _sv0t1;
-  int _sv0t2 = parse_expr(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, 1);
+  int _sv0t2 = parse_expr_sf(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
   int p1 = _sv0t2;
   if ((p1 < 0)) {
     int _sv0t3 = (0 - 1);
@@ -2362,7 +2363,7 @@ static int parse_arg_list(int tags, int starts, int ends, const char* source, in
         done = 1;
       } else {
         p = (p + 1);
-        int _sv0t7 = parse_expr(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, 1);
+        int _sv0t7 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
         int pa = _sv0t7;
         if ((pa < 0)) {
           int _sv0t8 = (0 - 1);
@@ -2406,7 +2407,7 @@ static int parse_struct_fields(int tags, int starts, int ends, const char* sourc
             int _sv0t7 = (p + 1);
             sv0_vec_push(sf_names, _sv0t7);
             int _sv0t8 = (p + 3);
-            int _sv0t9 = parse_expr(tags, starts, ends, source, _sv0t8, et, ed1, ed2, ed3, ed4, pp, 1);
+            int _sv0t9 = parse_expr_sf(tags, starts, ends, source, _sv0t8, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
             int pv = _sv0t9;
             if ((pv < 0)) {
               int _sv0t10 = (0 - 1);
@@ -2430,7 +2431,7 @@ static int parse_struct_fields(int tags, int starts, int ends, const char* sourc
           if ((nt == 14)) {
             sv0_vec_push(sf_names, p);
             int _sv0t15 = (p + 2);
-            int _sv0t16 = parse_expr(tags, starts, ends, source, _sv0t15, et, ed1, ed2, ed3, ed4, pp, 1);
+            int _sv0t16 = parse_expr_sf(tags, starts, ends, source, _sv0t15, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
             int pv = _sv0t16;
             if ((pv < 0)) {
               int _sv0t17 = (0 - 1);
@@ -2549,7 +2550,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
     } else {
     }
     int _sv0t18 = (pos + 1);
-    int _sv0t19 = parse_expr(tags, starts, ends, source, _sv0t18, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t19 = parse_expr_sf(tags, starts, ends, source, _sv0t18, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int p1 = _sv0t19;
     if ((p1 < 0)) {
       int _sv0t20 = (0 - 1);
@@ -2581,7 +2582,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
           return _sv0t26;
         } else {
         }
-        int _sv0t27 = parse_expr(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, 1);
+        int _sv0t27 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
         int pa = _sv0t27;
         if ((pa < 0)) {
           int _sv0t28 = (0 - 1);
@@ -2631,7 +2632,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
     int _sv0t37 = sv0_vec_len(et);
     int first_idx = _sv0t37;
     int _sv0t38 = (pos + 1);
-    int _sv0t39 = parse_expr(tags, starts, ends, source, _sv0t38, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t39 = parse_expr_sf(tags, starts, ends, source, _sv0t38, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int p1 = _sv0t39;
     if ((p1 < 0)) {
       int _sv0t40 = (0 - 1);
@@ -2641,7 +2642,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
     int _sv0t41 = ps_peek(tags, p1);
     if ((_sv0t41 == 13)) {
       int _sv0t42 = (p1 + 1);
-      int _sv0t43 = parse_expr(tags, starts, ends, source, _sv0t42, et, ed1, ed2, ed3, ed4, pp, 1);
+      int _sv0t43 = parse_expr_sf(tags, starts, ends, source, _sv0t42, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
       int p2 = _sv0t43;
       if ((p2 < 0)) {
         int _sv0t44 = (0 - 1);
@@ -2691,7 +2692,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
           return _sv0t52;
         } else {
         }
-        int _sv0t53 = parse_expr(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, 1);
+        int _sv0t53 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
         int pa = _sv0t53;
         if ((pa < 0)) {
           int _sv0t54 = (0 - 1);
@@ -2768,7 +2769,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
   }
   if ((t == 55)) {
     int _sv0t73 = (pos + 1);
-    int _sv0t74 = parse_expr(tags, starts, ends, source, _sv0t73, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t74 = parse_expr_sf(tags, starts, ends, source, _sv0t73, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pa = _sv0t74;
     if ((pa < 0)) {
       int _sv0t75 = (0 - 1);
@@ -2812,7 +2813,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
     int _sv0t84 = sv0_vec_len(et);
     int first_idx = _sv0t84;
     int _sv0t85 = (pos + 2);
-    int _sv0t86 = parse_expr(tags, starts, ends, source, _sv0t85, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t86 = parse_expr_sf(tags, starts, ends, source, _sv0t85, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pe = _sv0t86;
     if ((pe < 0)) {
       int _sv0t87 = (0 - 1);
@@ -2855,7 +2856,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
     int _sv0t96 = sv0_vec_len(et);
     int first_idx = _sv0t96;
     int _sv0t97 = (pos + 2);
-    int _sv0t98 = parse_expr(tags, starts, ends, source, _sv0t97, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t98 = parse_expr_sf(tags, starts, ends, source, _sv0t97, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pa = _sv0t98;
     if ((pa < 0)) {
       int _sv0t99 = (0 - 1);
@@ -2869,7 +2870,7 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
     } else {
     }
     int _sv0t102 = (pa + 1);
-    int _sv0t103 = parse_expr(tags, starts, ends, source, _sv0t102, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t103 = parse_expr_sf(tags, starts, ends, source, _sv0t102, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pb = _sv0t103;
     if ((pb < 0)) {
       int _sv0t104 = (0 - 1);
@@ -2924,7 +2925,7 @@ static int parse_postfix_expr(int tags, int starts, int ends, const char* source
       int _sv0t4 = sv0_vec_len(et);
       int args_before = _sv0t4;
       int _sv0t5 = (p + 1);
-      int _sv0t6 = parse_arg_list(tags, starts, ends, source, _sv0t5, et, ed1, ed2, ed3, ed4, pp);
+      int _sv0t6 = parse_arg_list(tags, starts, ends, source, _sv0t5, et, ed1, ed2, ed3, ed4, pp, sf_names);
       int pa = _sv0t6;
       if ((pa < 0)) {
         int _sv0t7 = (0 - 1);
@@ -2961,7 +2962,7 @@ static int parse_postfix_expr(int tags, int starts, int ends, const char* source
             int _sv0t16 = sv0_vec_len(et);
             int args_before = _sv0t16;
             int _sv0t17 = (p + 3);
-            int _sv0t18 = parse_arg_list(tags, starts, ends, source, _sv0t17, et, ed1, ed2, ed3, ed4, pp);
+            int _sv0t18 = parse_arg_list(tags, starts, ends, source, _sv0t17, et, ed1, ed2, ed3, ed4, pp, sf_names);
             int pa = _sv0t18;
             if ((pa < 0)) {
               int _sv0t19 = (0 - 1);
@@ -3013,7 +3014,7 @@ static int parse_postfix_expr(int tags, int starts, int ends, const char* source
       } else {
         if ((t == 10)) {
           int _sv0t28 = (p + 1);
-          int _sv0t29 = parse_expr(tags, starts, ends, source, _sv0t28, et, ed1, ed2, ed3, ed4, pp, 1);
+          int _sv0t29 = parse_expr_sf(tags, starts, ends, source, _sv0t28, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
           int ix_p = _sv0t29;
           if ((ix_p < 0)) {
             int _sv0t30 = (0 - 1);
@@ -3606,16 +3607,21 @@ static int parse_range_expr(int tags, int starts, int ends, const char* source, 
 static int parse_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int allow_struct) {
   int _sv0t0 = sv0_vec_new();
   int sf = _sv0t0;
+  int _sv0t1 = parse_expr_sf(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf, allow_struct);
+  return _sv0t1;
+}
+
+static int parse_expr_sf(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names, int allow_struct) {
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
   int _sv0t1 = sv0_vec_new();
-  int tt = _sv0t1;
+  int td1 = _sv0t1;
   int _sv0t2 = sv0_vec_new();
-  int td1 = _sv0t2;
+  int td2 = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int td2 = _sv0t3;
-  int _sv0t4 = sv0_vec_new();
-  int td3 = _sv0t4;
-  int _sv0t5 = parse_range_expr(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf, tt, td1, td2, td3, allow_struct);
-  return _sv0t5;
+  int td3 = _sv0t3;
+  int _sv0t4 = parse_range_expr(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf_names, tt, td1, td2, td3, allow_struct);
+  return _sv0t4;
 }
 
 static int expr_ends_with_braced_block(int et, int idx) {
@@ -3753,7 +3759,7 @@ static int parse_let_stmt(int tags, int starts, int ends, const char* source, in
   int _sv0t16 = ps_peek(tags, p4);
   if ((_sv0t16 == 35)) {
     int _sv0t17 = (p4 + 1);
-    int _sv0t18 = parse_expr(tags, starts, ends, source, _sv0t17, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t18 = parse_expr_sf(tags, starts, ends, source, _sv0t17, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pi = _sv0t18;
     if ((pi < 0)) {
       int _sv0t19 = (0 - 1);
@@ -3843,7 +3849,7 @@ static int try_assign_stmt(int tags, int starts, int ends, const char* source, i
       lhs_idx = (_sv0t6 - 1);
     } else {
     }
-    int _sv0t7 = parse_expr(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t7 = parse_expr_sf(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pe = _sv0t7;
     if ((pe < 0)) {
       int _sv0t8 = (0 - 1);
@@ -3898,7 +3904,7 @@ static int try_assign_stmt(int tags, int starts, int ends, const char* source, i
       lhs_idx = (_sv0t18 - 1);
     } else {
     }
-    int _sv0t19 = parse_expr(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t19 = parse_expr_sf(tags, starts, ends, source, rhs_pos, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pe = _sv0t19;
     if ((pe < 0)) {
       int _sv0t20 = (0 - 1);
@@ -3964,7 +3970,7 @@ static int try_stmt(int tags, int starts, int ends, const char* source, int pos,
     } else {
     }
     int _sv0t8 = (pos + 1);
-    int _sv0t9 = parse_expr(tags, starts, ends, source, _sv0t8, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t9 = parse_expr_sf(tags, starts, ends, source, _sv0t8, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pe = _sv0t9;
     if ((pe >= 0)) {
       int _sv0t10 = ps_peek(tags, pe);
@@ -4019,7 +4025,7 @@ static int try_stmt(int tags, int starts, int ends, const char* source, int pos,
   }
   if ((t == 55)) {
     int _sv0t20 = (pos + 1);
-    int _sv0t21 = parse_expr(tags, starts, ends, source, _sv0t20, et, ed1, ed2, ed3, ed4, pp, 1);
+    int _sv0t21 = parse_expr_sf(tags, starts, ends, source, _sv0t20, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     int pe = _sv0t21;
     if ((pe >= 0)) {
       int _sv0t22 = ps_peek(tags, pe);
@@ -4118,7 +4124,7 @@ static int parse_block(int tags, int starts, int ends, const char* source, int p
       stmt_count = (stmt_count + 1);
       p = s;
     } else {
-      int _sv0t12 = parse_expr(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, 1);
+      int _sv0t12 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
       int pe = _sv0t12;
       if ((pe < 0)) {
         int _sv0t13 = (0 - 1);
@@ -4313,7 +4319,7 @@ static int parse_while_expr(int tags, int starts, int ends, const char* source, 
       } else {
       }
       int _sv0t13 = (pi + 2);
-      int _sv0t14 = parse_expr(tags, starts, ends, source, _sv0t13, et, ed1, ed2, ed3, ed4, pp, 1);
+      int _sv0t14 = parse_expr_sf(tags, starts, ends, source, _sv0t13, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
       int pe = _sv0t14;
       if ((pe < 0)) {
         int _sv0t15 = (0 - 1);
@@ -4583,7 +4589,7 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
       int _sv0t22 = ps_peek(tags, p2);
       if ((_sv0t22 == 68)) {
         int _sv0t23 = (p2 + 1);
-        int _sv0t24 = parse_expr(tags, starts, ends, source, _sv0t23, et, ed1, ed2, ed3, ed4, pp, 1);
+        int _sv0t24 = parse_expr_sf(tags, starts, ends, source, _sv0t23, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
         int pg = _sv0t24;
         if ((pg < 0)) {
           int _sv0t25 = (0 - 1);
@@ -4608,7 +4614,7 @@ static int parse_match_expr(int tags, int starts, int ends, const char* source, 
         int _sv0t30 = parse_block(tags, starts, ends, source, p3, et, ed1, ed2, ed3, ed4, pp, sf_names);
         body_pos = _sv0t30;
       } else {
-        int _sv0t31 = parse_expr(tags, starts, ends, source, p3, et, ed1, ed2, ed3, ed4, pp, 1);
+        int _sv0t31 = parse_expr_sf(tags, starts, ends, source, p3, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
         body_pos = _sv0t31;
       }
       if ((body_pos < 0)) {

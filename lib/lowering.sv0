@@ -486,8 +486,29 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if s_tag == 27 {
             let name_tok: i32 = vec_get(ed1, s_idx);
             let init_idx: i32 = vec_get(ed3, s_idx);
-            let decl: Instr = Instr::DeclVar(name_tok);
-            vec_push(out_instrs, box_new(decl));
+            /* A `let` whose init is a struct literal (ExprStruct, tag 24) binds a
+               struct value: declare it with the struct's type (DeclNamed) so the
+               C variable is the struct type, not int. The struct typename is the
+               last path segment of the literal (same as the tag-24 lowering). The
+               let's own type annotation is not retained by the parser, so the init
+               shape is the type source here. */
+            let mut let_declared: i32 = 0;
+            if init_idx >= 0 {
+                if vec_get(et, init_idx) == 24 {
+                    let sppc: i32 = vec_get(ed2, init_idx);
+                    if sppc >= 1 {
+                        let sty_tok: i32 = vec_get(pp,
+                            vec_get(ed1, init_idx) + sppc - 1);
+                        let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
+                        vec_push(out_instrs, box_new(decl_n));
+                        let_declared = 1;
+                    }
+                }
+            }
+            if let_declared == 0 {
+                let decl: Instr = Instr::DeclVar(name_tok);
+                vec_push(out_instrs, box_new(decl));
+            }
             if init_idx >= 0 {
                 let iv: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4,
                                                      pp, tok_tags, init_idx,
@@ -2548,8 +2569,28 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if s_tag == 27 {
         let name_tok: i32 = vec_get(ed1, s_idx);
         let init_idx: i32 = vec_get(ed3, s_idx);
-        let decl: Instr = Instr::DeclVar(name_tok);
-        vec_push(out_instrs, box_new(decl));
+        /* A `let` whose init is a struct literal (ExprStruct, tag 24) binds a
+           struct value: declare it with the struct's type (DeclNamed) so the C
+           variable is the struct type, not int. The typename is the literal's last
+           path segment (as in the tag-24 lowering). The let's own type annotation
+           is not retained by the parser, so the init shape is the type source. */
+        let mut let_declared: i32 = 0;
+        if init_idx >= 0 {
+            if vec_get(et, init_idx) == 24 {
+                let sppc: i32 = vec_get(ed2, init_idx);
+                if sppc >= 1 {
+                    let sty_tok: i32 = vec_get(pp,
+                        vec_get(ed1, init_idx) + sppc - 1);
+                    let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
+                    vec_push(out_instrs, box_new(decl_n));
+                    let_declared = 1;
+                }
+            }
+        }
+        if let_declared == 0 {
+            let decl: Instr = Instr::DeclVar(name_tok);
+            vec_push(out_instrs, box_new(decl));
+        }
         if init_idx >= 0 {
             let e: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                                    tok_tags, init_idx, ctr,

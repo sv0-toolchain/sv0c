@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "struct P { x: i32 } fn getx(p: P) -> i32 { return p.x; } fn main() -> i32 { return 42; }";
+    let source: string = "struct P { x: i32 } fn getx(p: P) -> i32 { return p.x; } fn main() -> i32 { let q: P = P { x: 7 }; return getx(q); }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -166,11 +166,16 @@ fn main() -> i32 {
        pool (real pp), the calls/params de-stub, real C types for params + returns
        (megatu_cty_of_root, including user struct/enum names via megatu_is_user_type
        by text), struct typedefs with fields (ifc + sf_names/sf_types threaded from
-       the parser), and bare-`return;` lowering (ReturnVoid). NEXT: struct literal
-       construction (`P { x: 7 }` needs the parser to thread sf_names through
-       parse_expr into body_sf); enum variants/payloads; calls to non-int fns
-       (Call rt_h is 0 = int); then the full self-host-sv0-loop corpus for
-       native-vs-SML parity; then A3 (--target=vm) and P4. */
+       the parser), bare-`return;` lowering (ReturnVoid), and struct literal
+       construction — this smoke's `let q: P = P { x: 7 }; return getx(q)` lowers to
+       `P q; P _sv0t0; _sv0t0.x = 7; q = _sv0t0;` + a call and runs to exit 7.
+       Construction needed (1) the parser to thread the struct field-name pool
+       through parse_expr (parse_expr_sf) so ExprStruct field names reach body_sf,
+       and (2) lower to declare a struct-literal-initialised `let` with the struct
+       type (DeclNamed) not int. NEXT: enum variants/payloads; calls to non-int fns
+       (Call rt_h is 0 = int); `let` types for non-struct-literal inits (still int);
+       then the full self-host-sv0-loop corpus for native-vs-SML parity; then A3
+       (--target=vm) and P4. */
     return 0;
 }
 
