@@ -14,12 +14,19 @@ out of the way), one commit per task.
 `scripts/sv0-megatu-corpus-parity.sh` runs the composed compiler over all 98 seeds:
 
 ```
-PASS=71  PHASEFAIL=27  PANIC=0  CCFAIL=0  RUNFAIL=0
+PASS=72  PHASEFAIL=24  PANIC=0  CCFAIL=2  RUNFAIL=0   (after Task 1)
 ```
 
-Every failure is a **clean rejection** (the compiler correctly refuses a program whose
-features it doesn't support yet) — never a crash, invalid C, or wrong output. Raising
-the number means teaching the composed pipeline the missing features, one at a time.
+Raising the number means teaching the composed pipeline the missing features, one at
+a time. **Gating:** the harness fails only on PANIC (crash) or RUNFAIL (wrong output);
+PHASEFAIL (clean rejection) and CCFAIL (a feature that resolves/checks but whose emit
+is not complete yet) are expected during bring-up and are reported, not fatal — drive
+them to zero. Note `sv0_panic` exits 1, so exit 1 with no output is counted as PANIC
+(the compose main's own return-1 gate is unreachable for real seeds).
+
+The 2 current CCFAILs are known next tasks: `string_api` (string-typed lets / string
+builtin returns — the string-primitive task) and `lib/env.sv0` (Task 2, call
+arg-count).
 
 The 27 rejections, by the phase + raw error code they hit (see "Diagnostic method"):
 
@@ -95,7 +102,19 @@ Prior increments hit the same handful of transliteration bugs. Expect these:
 
 ## Tasks
 
-### Task 1 — Register builtins in the resolver  *(foundational, highest value)*
+### Task 1 — Register builtins in the resolver  *(DONE — sv0c bump after this doc)*
+
+**Done:** `resolve_expr`'s tag-1 handler now accepts a 1-segment `is_intrinsic`
+name; `read_file`/`write_file`/`read_dir` were added to the registry; the emit maps
+a builtin call's negative sentinel to `sv0_<name>` (`megatu_builtin_name`), and the
+string-literal double-quote bug (`handle_to_str` keeps the source quotes) was fixed.
+Also removed a latent `megatu_val_name` bug that rendered any value handle in
+500..599 as `f<n>` (real token indices reach that range in large modules — it was
+turning `env.sv0`'s calls into `f24(...)`). `println_ok` now PASSES.
+
+**Not in Task 1 (split out):** `string_api` needs string-typed `let`s and
+string-returning builtin call types → folded into the **string-primitive type**
+task (a sibling of "let types for non-struct/enum inits" below). Original notes:
 
 **Gap.** `resolve_program` (resolver.sv0) never wires the intrinsic registry, so
 `println`, `string_len/eq/concat/char_at/substr`, `vec_new/push/len/get/set`,

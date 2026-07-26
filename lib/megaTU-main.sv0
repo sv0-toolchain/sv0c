@@ -429,11 +429,11 @@ fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> 
     if h >= lower_temp_base() {
         return string_concat("_sv0t", int_to_string(h - lower_temp_base()));
     }
-    if h >= 500 {
-        if h < 600 {
-            return string_concat("f", int_to_string(h - 500));
-        }
-    }
+    /* NB: no 500..599 -> f<n> branch here. That range is the tuple-field synthetic
+       handle space and belongs only to megatu_field_name (VMember/StoreField field
+       positions). A *value* handle is a temp (>= lower_temp_base) or a real source
+       token — and in a large module real token indices reach 500+, so treating
+       them as tuple fields renders e.g. a call to token 524 as `f24`. */
     return handle_to_str(h, source, starts, ends);
 }
 
@@ -455,6 +455,32 @@ fn megatu_field_name(fh: i32, source: string, starts: Vec<i32>,
         }
     }
     return handle_to_str(fh, source, starts, ends);
+}
+
+/* Builtin id (lowering build_builtin_map: println=1 … read_dir=17) -> runtime C
+   function name. Builtin calls lower to Call(dst, 0 - id, args, rt), so the emit
+   maps the negated sentinel back here. Value-returning string builtins
+   (string_concat/substr) still get an `int` dest today — non-int call returns are
+   a separate gap — so string_api is not yet fully supported. */
+fn megatu_builtin_name(bid: i32) -> string {
+    if bid == 1 { return "sv0_println"; }
+    if bid == 2 { return "sv0_string_len"; }
+    if bid == 3 { return "sv0_string_eq"; }
+    if bid == 4 { return "sv0_string_concat"; }
+    if bid == 5 { return "sv0_string_char_at"; }
+    if bid == 6 { return "sv0_string_substr"; }
+    if bid == 7 { return "sv0_vec_new"; }
+    if bid == 8 { return "sv0_vec_push"; }
+    if bid == 9 { return "sv0_vec_len"; }
+    if bid == 10 { return "sv0_vec_get"; }
+    if bid == 11 { return "sv0_vec_set"; }
+    if bid == 12 { return "sv0_box_new"; }
+    if bid == 13 { return "sv0_box_deref"; }
+    if bid == 14 { return "sv0_no_alias"; }
+    if bid == 15 { return "sv0_read_file"; }
+    if bid == 16 { return "sv0_write_file"; }
+    if bid == 17 { return "sv0_read_dir"; }
+    return "sv0_unknown_builtin";
 }
 
 fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
@@ -508,8 +534,18 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
         codegen_Value::VVar(h) => { return megatu_val_name(h, source, starts, ends); },
         codegen_Value::VUnit => { return "0"; },
         codegen_Value::VString(h) => {
+            /* A string literal's handle is a source token whose text still includes
+               the surrounding double quotes (e.g. `"golden"`); strip them before
+               re-escaping and re-quoting so the emitted literal is not doubly
+               quoted. name_of's stub returned bare names, hence codegen never hit
+               this. */
             let raw: string = megatu_val_name(h, source, starts, ends);
-            let escaped: string = c_escape_string(raw);
+            let mut inner: string = raw;
+            let rlen: i32 = string_len(raw);
+            if rlen >= 2 {
+                inner = string_substr(raw, 1, rlen - 2);
+            }
+            let escaped: string = c_escape_string(inner);
             let a: string = string_concat("\"", escaped);
             return string_concat(a, "\"");
         },
@@ -663,7 +699,13 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
         },
         codegen_Instr::Call(dst_h, fn_h, args, rt_h) => {
             let arg_str: string = megatu_emit_call_args(args, source, starts, ends);
-            let fn_name: string = megatu_val_name(fn_h, source, starts, ends);
+            /* A builtin call is lowered as Call with a NEGATIVE fn handle: the
+               sentinel is `0 - builtin_id` (lowering build_builtin_map). Map it to
+               the runtime C name `sv0_<builtin>`; a source fn resolves normally. */
+            let mut fn_name: string = megatu_builtin_name(0 - fn_h);
+            if fn_h >= 0 {
+                fn_name = megatu_val_name(fn_h, source, starts, ends);
+            }
             if dst_h == 0 {
                 let a: string = string_concat(indent, fn_name);
                 let b: string = string_concat(a, "(");
