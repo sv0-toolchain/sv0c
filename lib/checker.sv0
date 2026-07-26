@@ -681,6 +681,10 @@ fn infer_lit(lit_tag: i32) -> i32 {
     if lit_tag == 2 { return TY_UNIT(); }
     if lit_tag == 3 { return TY_STRING(); }
     if lit_tag == 4 { return TY_CHAR(); }
+    /* The parser/lowering encode bool literals (true/false) as lit_tag 5
+       (lit_from_tok / lower_lit_to_ir_value); the stale 1 above was never emitted
+       for bool by the real parser. */
+    if lit_tag == 5 { return TY_BOOL(); }
     return 0 - 1;
 }
 
