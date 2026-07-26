@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "struct P { x: i32 } fn getx(p: P) -> i32 { return p.x; } fn main() -> i32 { let q: P = P { x: 7 }; return getx(q); }";
+    let source: string = "enum Color { Red, Green, Blue } fn main() -> i32 { let c: Color = Color::Green; return c.tag; }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -172,10 +172,20 @@ fn main() -> i32 {
        Construction needed (1) the parser to thread the struct field-name pool
        through parse_expr (parse_expr_sf) so ExprStruct field names reach body_sf,
        and (2) lower to declare a struct-literal-initialised `let` with the struct
-       type (DeclNamed) not int. NEXT: enum variants/payloads; calls to non-int fns
-       (Call rt_h is 0 = int); `let` types for non-struct-literal inits (still int);
-       then the full self-host-sv0-loop corpus for native-vs-SML parity; then A3
-       (--target=vm) and P4. */
+       type (DeclNamed) not int, and nullary enum variants — this smoke's
+       `enum Color { Red, Green, Blue }` + `let c: Color = Color::Green; c.tag`
+       emits `typedef struct { int tag; } Color;` and lowers the ctor to
+       `Color c; Color _sv0t0; _sv0t0.tag = 1;`, returning tag 1 (Green). Enums
+       needed the resolver to accept `Enum::Variant` value paths (coarse), a
+       text-based variant-tag lookup (enum_tag_lookup_str; the tables hold
+       definition tokens, ctors carry use tokens), the tag/payload field-name
+       resolver in emit (megatu_field_name: -1 -> "tag", -10-i -> "p<i>"), and the
+       enum-ctor `let`-type inference (DeclNamed with the enum name). NEXT: enum
+       match (checker rejects it today) and payload variants (need item_vmax = max
+       payload width for the `p<i>` typedef slots); calls to non-int fns (Call rt_h
+       is 0 = int); `let` types for non-struct/enum inits (still int); then the
+       self-host-sv0-loop corpus for native-vs-SML parity; then A3 (--target=vm)
+       and P4. */
     return 0;
 }
 
@@ -409,6 +419,26 @@ fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> 
     return handle_to_str(h, source, starts, ends);
 }
 
+/* Resolve a struct/enum field handle to its C field name. Enum layout (see
+   emit_enum_td / the enum-ctor lowering): the tag field is the sentinel -1 ->
+   "tag", and payload i is the sentinel -10 - i -> "p<i>". Tuple projection fields
+   use 500..599 -> "f<n>". Everything else is a struct field name token. */
+fn megatu_field_name(fh: i32, source: string, starts: Vec<i32>,
+                     ends: Vec<i32>) -> string {
+    if fh == 0 - 1 {
+        return "tag";
+    }
+    if fh <= 0 - 10 {
+        return string_concat("p", int_to_string(0 - 10 - fh));
+    }
+    if fh >= 500 {
+        if fh < 600 {
+            return string_concat("f", int_to_string(fh - 500));
+        }
+    }
+    return handle_to_str(fh, source, starts, ends);
+}
+
 fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
     let n: string = name_of(h);
     if !string_eq(n, "?") { return n; }
@@ -467,7 +497,7 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
         },
         codegen_Value::VMember(bv, fh) => {
             let inner: codegen_Value = box_deref(bv);
-            let field: string = megatu_val_name(fh, source, starts, ends);
+            let field: string = megatu_field_name(fh, source, starts, ends);
             let tag: i32 = codegen_value_tag(inner);
             if tag == 3 {
                 let prefix: string = megatu_emit_value(inner, source, starts, ends);
@@ -515,7 +545,7 @@ fn megatu_emit_expr(e: codegen_Expr, source: string, starts: Vec<i32>, ends: Vec
         codegen_Expr::FieldAccess(bv, fh) => {
             let v: codegen_Value = box_deref(bv);
             let a: string = string_concat("(", megatu_emit_value(v, source, starts, ends));
-            return string_concat(string_concat(a, ")."), megatu_val_name(fh, source, starts, ends));
+            return string_concat(string_concat(a, ")."), megatu_field_name(fh, source, starts, ends));
         },
     }
     return "";
@@ -572,7 +602,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let e: codegen_Expr = box_deref(be);
             let a: string = string_concat(indent, megatu_val_name(bh, source, starts, ends));
             let b: string = string_concat(a, ".");
-            let c: string = string_concat(b, megatu_val_name(fh, source, starts, ends));
+            let c: string = string_concat(b, megatu_field_name(fh, source, starts, ends));
             let d: string = string_concat(c, " = ");
             let f: string = string_concat(d, megatu_emit_expr(e, source, starts, ends));
             return string_concat(f, ";\n");

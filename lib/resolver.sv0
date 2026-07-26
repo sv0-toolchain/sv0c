@@ -751,10 +751,21 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         }
         let ps: string = path_join_vec(source, starts, ends, path);
         if res_full_value_exists(mod_vals, frames, ps,
-                                  source, starts, ends) != true {
-            return 300;
+                                  source, starts, ends) {
+            return 0;
         }
-        return 0;
+        /* 2-segment enum-variant constructor path (EnumType::Variant). The
+           resolver only registers enum type names (not per-variant qualified
+           paths), and is a coarse existence pass — the checker validates the
+           variant. Accept when the first segment is a known type. Covers a
+           nullary `Color::Green` and the callee of `Opt::Some(x)`. */
+        if ppc == 2 {
+            let seg0: string = tok_str(source, starts, ends, vec_get(pp, pps));
+            if res_type_exists(mod_tys, seg0, source, starts, ends) {
+                return 0;
+            }
+        }
+        return 300;
     }
     if tag == 2 {
         return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
