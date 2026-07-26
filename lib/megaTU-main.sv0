@@ -12,7 +12,7 @@
    resolve → check → lower → emit_program over the shared arenas. */
 
 fn main() -> i32 {
-    let source: string = "enum Color { Red, Green, Blue } fn main() -> i32 { let c: Color = Color::Green; return c.tag; }";
+    let source: string = "enum Color { Red, Green, Blue } fn main() -> i32 { let c: Color = Color::Green; return match c { Color::Red => 10, Color::Green => 20, Color::Blue => 30 }; }";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -174,18 +174,23 @@ fn main() -> i32 {
        and (2) lower to declare a struct-literal-initialised `let` with the struct
        type (DeclNamed) not int, and nullary enum variants — this smoke's
        `enum Color { Red, Green, Blue }` + `let c: Color = Color::Green; c.tag`
-       emits `typedef struct { int tag; } Color;` and lowers the ctor to
-       `Color c; Color _sv0t0; _sv0t0.tag = 1;`, returning tag 1 (Green). Enums
-       needed the resolver to accept `Enum::Variant` value paths (coarse), a
-       text-based variant-tag lookup (enum_tag_lookup_str; the tables hold
-       definition tokens, ctors carry use tokens), the tag/payload field-name
-       resolver in emit (megatu_field_name: -1 -> "tag", -10-i -> "p<i>"), and the
-       enum-ctor `let`-type inference (DeclNamed with the enum name). NEXT: enum
-       match (checker rejects it today) and payload variants (need item_vmax = max
-       payload width for the `p<i>` typedef slots); calls to non-int fns (Call rt_h
-       is 0 = int); `let` types for non-struct/enum inits (still int); then the
-       self-host-sv0-loop corpus for native-vs-SML parity; then A3 (--target=vm)
-       and P4. */
+       emits `typedef struct { int tag; } Color;`, and matches on it: this smoke's
+       `match c { Color::Red => 10, Color::Green => 20, Color::Blue => 30 }` lowers
+       to an `if ((c.tag == 0)) ... else if ((c.tag == 1)) { 20 } ...` chain and
+       returns 20 (Green). Enums needed the resolver to accept `Enum::Variant` value
+       paths (coarse), a text-based variant-tag lookup (enum_tag_lookup_str; the
+       tables hold definition tokens, ctors/patterns carry use tokens), the
+       tag/payload field-name resolver in emit (megatu_field_name: -1 -> "tag",
+       -10-i -> "p<i>"), enum-ctor `let`-type inference, the match arm-order sidecar
+       (arm nodes are non-contiguous, like block statements — reuse block_stmt_index
+       via ExprMatch d4), match patterns parsed into the SHARED pp (so PatEnum path
+       tokens survive for lower), and the match comparison ops remapped from the old
+       codegen op_of encoding (4 = "==") to the AST encoding the emitter uses
+       (5 = Eq, 6 = Neq). NEXT: payload variants (need item_vmax = max payload width
+       for the `p<i>` typedef slots; `Opt::Some(x)` + payload binds in match arms);
+       calls to non-int fns (Call rt_h is 0 = int); `let` types for non-struct/enum
+       inits (still int); then the self-host-sv0-loop corpus for native-vs-SML
+       parity; then A3 (--target=vm) and P4. */
     return 0;
 }
 

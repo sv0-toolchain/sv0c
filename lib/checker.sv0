@@ -3181,10 +3181,11 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                         ret_ty, loop_depth,
                                         scrut_idx);
         if scrut_ty < 0 { return 0 - 1; }
+        let arms_sidecar: i32 = vec_get(ed4, idx);
         let mut first_body_ty: i32 = TY_INT();
         let mut ai: i32 = 0;
         while ai < arms_count {
-            let arm_idx: i32 = arms_first + ai;
+            let arm_idx: i32 = block_stmt_index(pp, arms_first, arms_sidecar, ai);
             let guard_idx: i32 = vec_get(ed3, arm_idx);
             let body_idx: i32 = vec_get(ed4, arm_idx);
             if guard_idx >= 0 {
