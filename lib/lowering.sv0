@@ -419,10 +419,10 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if cppc == 2 {
             let en_tok: i32 = vec_get(pp, cpps);
             let vn_tok: i32 = vec_get(pp, cpps + 1);
-            let k: i32 = enum_tag_lookup(enum_names, enum_tags_flat,
+            let k: i32 = enum_tag_lookup_str(enum_names, enum_tags_flat,
                                           enum_tag_offsets,
                                           enum_tag_counts,
-                                          en_tok, vn_tok);
+                                          en_tok, vn_tok, source, starts, ends);
             let t: i32 = ctr_fresh(ctr);
             let decl: Instr = Instr::DeclNamed(en_tok, t);
             vec_push(out_instrs, box_new(decl));
@@ -501,6 +501,16 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             vec_get(ed1, init_idx) + sppc - 1);
                         let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
                         vec_push(out_instrs, box_new(decl_n));
+                        let_declared = 1;
+                    }
+                }
+                /* Enum nullary constructor init (ExprPath `Enum::Variant`, 2-seg):
+                   declare the let with the enum type (the first path segment). */
+                if vec_get(et, init_idx) == 1 {
+                    if vec_get(ed2, init_idx) == 2 {
+                        let ety_tok: i32 = vec_get(pp, vec_get(ed1, init_idx));
+                        let decl_e: Instr = Instr::DeclNamed(ety_tok, name_tok);
+                        vec_push(out_instrs, box_new(decl_e));
                         let_declared = 1;
                     }
                 }
@@ -819,9 +829,9 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if ppc == 2 {
             let en_tok: i32 = vec_get(pp, pps);
             let vn_tok: i32 = vec_get(pp, pps + 1);
-            let k: i32 = enum_tag_lookup(enum_names, enum_tags_flat,
+            let k: i32 = enum_tag_lookup_str(enum_names, enum_tags_flat,
                                           enum_tag_offsets, enum_tag_counts,
-                                          en_tok, vn_tok);
+                                          en_tok, vn_tok, source, starts, ends);
             let t: i32 = ctr_fresh(ctr);
             let decl: Instr = Instr::DeclNamed(en_tok, t);
             vec_push(out_instrs, box_new(decl));
@@ -1640,9 +1650,9 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     if pp_c5 >= 2 {
                         let en_h: i32 = vec_get(pp, pp_s5);
                         let vn_h: i32 = vec_get(pp, pp_s5 + 1);
-                        let kv: i32 = enum_tag_lookup(enum_names,
+                        let kv: i32 = enum_tag_lookup_str(enum_names,
                             enum_tags_flat, enum_tag_offsets,
-                            enum_tag_counts, en_h, vn_h);
+                            enum_tag_counts, en_h, vn_h, source, starts, ends);
                         if kv < 0 {
                             cexp = Expr::Literal(box_new(Value::VBoolFalse));
                         } else {
@@ -1705,9 +1715,9 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     if pp_c4 >= 2 {
                         let en_h4: i32 = vec_get(pp, pp_s4);
                         let vn_h4: i32 = vec_get(pp, pp_s4 + 1);
-                        let kv4: i32 = enum_tag_lookup(enum_names,
+                        let kv4: i32 = enum_tag_lookup_str(enum_names,
                             enum_tags_flat, enum_tag_offsets,
-                            enum_tag_counts, en_h4, vn_h4);
+                            enum_tag_counts, en_h4, vn_h4, source, starts, ends);
                         if kv4 < 0 {
                             cexp = Expr::Literal(box_new(Value::VBoolFalse));
                         } else {
@@ -1781,9 +1791,9 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         let pp_s5s: i32 = vec_get(ed1, paux5s);
                         let en_hs: i32 = vec_get(pp, pp_s5s);
                         let vn_hs: i32 = vec_get(pp, pp_s5s + 1);
-                        let kvs: i32 = enum_tag_lookup(enum_names,
+                        let kvs: i32 = enum_tag_lookup_str(enum_names,
                             enum_tags_flat, enum_tag_offsets,
-                            enum_tag_counts, en_hs, vn_hs);
+                            enum_tag_counts, en_hs, vn_hs, source, starts, ends);
                         if kvs >= 0 {
                             let argc5s: i32 = vec_get(ed3, paux5s);
                             if argc5s > 0 {
@@ -1828,9 +1838,9 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         let pp_s4s: i32 = vec_get(ed1, paux4s);
                         let en_h4s: i32 = vec_get(pp, pp_s4s);
                         let vn_h4s: i32 = vec_get(pp, pp_s4s + 1);
-                        let kv4s: i32 = enum_tag_lookup(enum_names,
+                        let kv4s: i32 = enum_tag_lookup_str(enum_names,
                             enum_tags_flat, enum_tag_offsets,
-                            enum_tag_counts, en_h4s, vn_h4s);
+                            enum_tag_counts, en_h4s, vn_h4s, source, starts, ends);
                         if kv4s >= 0 {
                             let meta_idxs: i32 = paux4s - 1;
                             if vec_get(et, meta_idxs) == 32 {
@@ -2583,6 +2593,16 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         vec_get(ed1, init_idx) + sppc - 1);
                     let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
                     vec_push(out_instrs, box_new(decl_n));
+                    let_declared = 1;
+                }
+            }
+            /* Enum nullary constructor init (ExprPath `Enum::Variant`, 2-seg):
+               declare the let with the enum type (the first path segment). */
+            if vec_get(et, init_idx) == 1 {
+                if vec_get(ed2, init_idx) == 2 {
+                    let ety_tok: i32 = vec_get(pp, vec_get(ed1, init_idx));
+                    let decl_e: Instr = Instr::DeclNamed(ety_tok, name_tok);
+                    vec_push(out_instrs, box_new(decl_e));
                     let_declared = 1;
                 }
             }
@@ -3490,6 +3510,42 @@ fn low_classify_assign_lhs(expr_tag: i32) -> i32 {
 }
 
 /* ── enum/struct lookup helpers ──────────────────────────────── */
+
+/* Text-based enum variant tag lookup. The enum tables hold the DEFINITION name
+   tokens while a constructor/pattern carries USE tokens (different token indices,
+   same spelling), so comparison must be by source text, not token index (the
+   index-based enum_tag_lookup only works for hand-built test arenas). Returns the
+   variant's tag index, -1 if the variant is unknown, -2 if the enum is unknown. */
+fn enum_tag_lookup_str(enum_names: Vec<i32>, enum_tags_flat: Vec<i32>,
+                       enum_tag_offsets: Vec<i32>, enum_tag_counts: Vec<i32>,
+                       enum_name: i32, variant_name: i32,
+                       source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let want_e: string = handle_to_str(enum_name, source, starts, ends);
+    let want_v: string = handle_to_str(variant_name, source, starts, ends);
+    let n: i32 = vec_len(enum_names);
+    let mut ei: i32 = 0;
+    while ei < n {
+        let e_nm: string = handle_to_str(vec_get(enum_names, ei),
+                                         source, starts, ends);
+        if string_eq(e_nm, want_e) {
+            let offset: i32 = vec_get(enum_tag_offsets, ei);
+            let count: i32 = vec_get(enum_tag_counts, ei);
+            let mut vi: i32 = 0;
+            while vi < count {
+                let flat_idx: i32 = offset + vi * 2;
+                let v_nm: string = handle_to_str(vec_get(enum_tags_flat, flat_idx),
+                                                 source, starts, ends);
+                if string_eq(v_nm, want_v) {
+                    return vec_get(enum_tags_flat, flat_idx + 1);
+                }
+                vi = vi + 1;
+            }
+            return 0 - 1;
+        }
+        ei = ei + 1;
+    }
+    return 0 - 2;
+}
 
 fn enum_tag_lookup(enum_names: Vec<i32>, enum_tags_flat: Vec<i32>,
                    enum_tag_offsets: Vec<i32>, enum_tag_counts: Vec<i32>,
@@ -7362,9 +7418,17 @@ fn test_lower_enum_ctor() -> i32 {
     let fn_ctx: Vec<i32> = vec_new();
     let builtin_map: Vec<i32> = vec_new();
     let lit_sf_names: Vec<i32> = vec_new();
-    let source: string = "";
+    /* enum_tag_lookup_str compares by source text, so give the enum/variant tokens
+       real spellings: token 0="E", 1="A", 2="B" in "E A B". The ctor is E::A. */
+    let source: string = "E A B";
     let starts: Vec<i32> = vec_new();
     let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 1);
+    vec_push(starts, 2);
+    vec_push(ends, 3);
+    vec_push(starts, 4);
+    vec_push(ends, 5);
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
     let item_d2: Vec<i32> = vec_new();
@@ -7373,15 +7437,15 @@ fn test_lower_enum_ctor() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
-    vec_push(en_n, 100);
+    vec_push(en_n, 0);
     vec_push(en_to, 0);
     vec_push(en_tc, 2);
-    vec_push(en_tf, 200);
-    vec_push(en_tf, 0);
-    vec_push(en_tf, 201);
     vec_push(en_tf, 1);
-    vec_push(pp, 100);
-    vec_push(pp, 200);
+    vec_push(en_tf, 0);
+    vec_push(en_tf, 2);
+    vec_push(en_tf, 1);
+    vec_push(pp, 0);
+    vec_push(pp, 1);
     vec_push(et, 1);
     vec_push(ed1, 0);
     vec_push(ed2, 2);
