@@ -14,11 +14,11 @@ out of the way), one commit per task.
 `scripts/sv0-megatu-corpus-parity.sh` runs the composed compiler over all 98 seeds:
 
 ```
-PASS=78  PHASEFAIL=2  PANIC=0  CCFAIL=17  RUNFAIL=1   (Phase 2: string primitive)
+PASS=79  PHASEFAIL=2  PANIC=0  CCFAIL=17  RUNFAIL=0   (Phase 2: string-escape fix)
 ```
-(The lone RUNFAIL is `lexer.sv0`, which the string fix advanced past its CCFAIL
-into a deeper runtime crash — a new Phase 2 module bug, not a regression: it never
-passed. Triage next.)
+
+The composed compiler again has **zero crashes and zero wrong-output** on the
+corpus; every non-PASS is a clean rejection or an incomplete emit.
 
 The composed compiler now **never crashes and never emits wrong output** on the
 corpus — every non-PASS is a clean rejection (PHASEFAIL) or an incomplete emit
@@ -267,7 +267,14 @@ size: `span`, `diagnostic`, `env`, `types`, `unify`, `ir`, `ast`, `include_expan
   read_dir), declare it with a sentinel ctype (`lower_string_cty`) that the emit maps
   to `const char*` (`megatu_ty_name`), and type a string-returning builtin call's
   result temp via `megatu_builtin_ret_cty`. `string_api` PASSes; PASS 76 → 78. This
-  advanced `lexer.sv0` past its string CCFAIL into a runtime crash (its next bug).
+  advanced `lexer.sv0` past its string CCFAIL into a runtime failure (its next bug).
+- String-escape emission (`lexer.sv0`, was RUNFAIL): a string literal's `VString`
+  handle is a *source* token whose body still holds escape sequences as source
+  characters (`\n` is backslash + `n`), but the emit ran `c_escape_string` over it,
+  doubling the backslash so the C literal got a literal backslash-n instead of a
+  newline — `skip_line_comment` then never found the newline (returned the wrong
+  index). sv0 string escapes already match C, so emit the inner body verbatim
+  (strip only the outer quotes). `lexer.sv0` PASSes; PASS 78 -> 79, RUNFAIL -> 0.
 
 Each remaining becomes its own small task: diagnose the module's *next* error (300/301/307/…),
 identify the one feature it needs (likely another instance of a recurring bug class),
