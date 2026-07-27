@@ -14,7 +14,7 @@ out of the way), one commit per task.
 `scripts/sv0-megatu-corpus-parity.sh` runs the composed compiler over all 98 seeds:
 
 ```
-PASS=75  PHASEFAIL=2  PANIC=6  CCFAIL=14  RUNFAIL=1   (after Task 2)
+PASS=76  PHASEFAIL=2  PANIC=6  CCFAIL=14  RUNFAIL=0   (Phase 2: while-loop fix, env.sv0)
 ```
 
 Raising the PASS number means teaching the composed pipeline the missing features,
@@ -229,7 +229,17 @@ size: `span`, `diagnostic`, `env`, `types`, `unify`, `ir`, `ast`, `include_expan
 `link`, `bytecode`, `lexer`, `contract_analyzer`, `resolver`, `checker`, `vm_codegen`,
 `codegen`, `lowering`, `parser`, `main`, `driver`.
 
-Each becomes its own small task: diagnose the module's *next* error (300/301/307/…),
+**Phase 2 log:**
+- `env.sv0` (was RUNFAIL): the `while` condition was lowered with `lower_expr_to_value`,
+  which hoists the test into a temp `Assign`ed *before* the loop — so `while (_t)`
+  re-checked a frozen value and any loop that iterated ran forever off the end of a
+  Vec. Fixed to mirror SML `lowerExprWithInstrs` (new `lower_cond_expr`): lower the
+  condition's operands to values but keep the top-level Binop/Unop as an Expr, then
+  `while (cond) { body }` for a simple condition (C re-evaluates it) or
+  `while (1) { cond_is; ct = cond; if (!ct) break; body }` for a complex one. General
+  fix (any iterating `while`), not env-specific. RUNFAIL → 0, PASS 75 → 76.
+
+Each remaining becomes its own small task: diagnose the module's *next* error (300/301/307/…),
 identify the one feature it needs (likely another instance of a recurring bug class),
 fix, verify parity, commit. Expect features like: multi-segment/module paths, tuple
 types and tuple returns, array/index expressions, `for` loops over ranges, casts,

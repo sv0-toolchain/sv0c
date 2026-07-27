@@ -812,6 +812,64 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return Value::VVar(out_t);
 }
 
+/* Lower an expression to (instrs, Expr) WITHOUT hoisting the top-level operator
+   into a temp — the operand-computing instructions go into `cond_is`, and the
+   returned Expr is the top-level Binop/Unop referencing the operand values (or,
+   for anything else, value_to_expr of the lowered value). Mirrors SML
+   lowerExprWithInstrs. Used for loop conditions, which must re-evaluate each
+   iteration: lower_expr_to_value would emit `Assign(t, i < len)` once before the
+   loop and leave `while (t)` checking a frozen temp (infinite loop / OOB). */
+fn lower_cond_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                   ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                   tok_tags: Vec<i32>, idx: i32, ctr: Vec<i32>,
+                   cond_is: Vec<i32>,
+                   enum_names: Vec<i32>, enum_tag_offsets: Vec<i32>,
+                   enum_tag_counts: Vec<i32>, enum_tags_flat: Vec<i32>,
+                   fn_ctx: Vec<i32>, builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
+                   source: string, starts: Vec<i32>, ends: Vec<i32>,
+                   item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
+                   item_d3: Vec<i32>, item_d4: Vec<i32>, item_field_counts: Vec<i32>,
+                   enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                   match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Expr {
+    let ctag: i32 = vec_get(et, idx);
+    if ctag == 3 {
+        let op: i32 = vec_get(ed1, idx);
+        let lhs_i: i32 = vec_get(ed2, idx);
+        let rhs_i: i32 = vec_get(ed3, idx);
+        let vl: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+            lhs_i, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
+            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
+            item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
+            enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+            rhs_i, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
+            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
+            item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
+            enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        return Expr::Binop(op, box_new(vl), box_new(vr));
+    }
+    /* Plain unary (! ~ -, tags 0/1/2); borrow/cast (4/5/99) are not loop
+       conditions, so fall through to the general value form for those. */
+    if ctag == 2 {
+        let uop: i32 = vec_get(ed1, idx);
+        if uop < 3 {
+            let operand_i: i32 = vec_get(ed2, idx);
+            let uv: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                operand_i, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
+                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
+                item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
+                enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+            return Expr::Unop(uop, box_new(uv));
+        }
+    }
+    let gv: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+        idx, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
+        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
+        item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
+        enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+    return value_to_expr(gv);
+}
+
 fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
                         tok_tags: Vec<i32>,
@@ -1113,13 +1171,17 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if tag == 12 {
         let cond_idx2: i32 = vec_get(ed1, idx);
         let body_idx2: i32 = vec_get(ed2, idx);
-        let vc2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
-                                              tok_tags, cond_idx2, ctr,
-                                              out_instrs, enum_names,
-                                              enum_tag_offsets,
-                                              enum_tag_counts,
-                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-        let ce2: Expr = Expr::Literal(box_new(vc2));
+        /* Lower the condition to its own instr list + top-level Expr so it can be
+           RE-EVALUATED each iteration (SML lowering.sml ExprWhile). */
+        let mut cond_is: Vec<i32> = vec_new();
+        let ce2: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                        cond_idx2, ctr, cond_is,
+                                        enum_names, enum_tag_offsets, enum_tag_counts,
+                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                        source, starts, ends, item_tags, item_names,
+                                        item_d2, item_d3, item_d4, item_field_counts,
+                                        enum_vnames_flat, item_fn_row, match_env_inherit,
+                                        import_aliases);
         let mut body_is: Vec<i32> = vec_new();
         let discard3: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                                    tok_tags, body_idx2, ctr,
@@ -1127,8 +1189,38 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-        let wl: Instr = Instr::WhileLoop(box_new(ce2), body_is);
-        vec_push(out_instrs, box_new(wl));
+        if vec_len(cond_is) == 0 {
+            /* Simple condition (no sub-instructions): while (cond) { body } — C
+               re-evaluates the condition expression each iteration. */
+            let wl: Instr = Instr::WhileLoop(box_new(ce2), body_is);
+            vec_push(out_instrs, box_new(wl));
+        } else {
+            /* Complex condition: while (1) { cond_is; ct = cond; if (!ct) break;
+               body } so the condition instructions re-run every iteration. */
+            let ct_w: i32 = ctr_fresh(ctr);
+            let loop_body: Vec<i32> = vec_new();
+            let mut ci: i32 = 0;
+            while ci < vec_len(cond_is) {
+                vec_push(loop_body, vec_get(cond_is, ci));
+                ci = ci + 1;
+            }
+            let asg_w: Instr = Instr::Assign(ct_w, box_new(ce2));
+            vec_push(loop_body, box_new(asg_w));
+            let neg_w: Expr = Expr::Unop(1, box_new(Value::VVar(ct_w)));
+            let brk_blk: Vec<i32> = vec_new();
+            vec_push(brk_blk, box_new(Instr::Break));
+            let empty_then: Vec<i32> = vec_new();
+            let if_w: Instr = Instr::IfElse(box_new(neg_w), empty_then, brk_blk);
+            vec_push(loop_body, box_new(if_w));
+            let mut bi: i32 = 0;
+            while bi < vec_len(body_is) {
+                vec_push(loop_body, vec_get(body_is, bi));
+                bi = bi + 1;
+            }
+            let wl: Instr = Instr::WhileLoop(
+                box_new(Expr::Literal(box_new(Value::VBoolTrue))), loop_body);
+            vec_push(out_instrs, box_new(wl));
+        }
         return Value::VUnit;
     }
     if tag == 13 {
