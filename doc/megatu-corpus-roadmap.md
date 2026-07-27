@@ -294,6 +294,26 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   This also cleared the box errors on `ir.sv0`/`unify.sv0`, narrowing each to a
   single remaining class (see parked item below).
 
+- String-returning user functions (`diagnostic.sv0` et al., was CCFAIL): a `let x =
+  user_fn(..)` where `user_fn` returns `string` declared `int x`, and the call's
+  result temp was `int _t = user_fn(..)`, so every string flowing out of a user call
+  hit `-Wint-conversion` against the `const char*` runtime string API. The prior
+  string task only recognised string literals + string-returning *builtins*
+  (`lower_init_is_string`); this adds the *user-function* case. New helper
+  `lower_call_ret_is_string` (lowering.sv0): a 1-seg ExprCall whose callee name (by
+  TEXT) matches a top-level ItemFn with `has_ret` and a return type token of
+  `string` (via `lower_scan_fn_ret_ty_tok`). Wired at both `let` handlers (declare
+  the `const char*` sentinel) and the plain-call `Instr::Call` (set `rt_h` to the
+  string sentinel so the result temp is typed `const char*`). Note `codegen.sv0` is
+  stub-resolved/standalone (not the real generator), so no `-7` handling needed
+  there; the SML golden + mega-TU emit already map the sentinel. PASS 80 → 81,
+  CCFAIL 16 → 13. Refreshed stage0 + vm-parity goldens for lowering.sv0 (lowering.sv0
+  is itself a corpus input the SML bootstrap compiles). Exposed 2 new RUNFAILs
+  (checker.sv0/parser.sv0 now compile but a deeper newly-reached bug fails a unit
+  test — not a regression, they never passed). NEXT string gap: `let x = y` where `y`
+  is a string *local variable* (not a call) — needs a local-variable type environment
+  during lowering (bigger; e.g. diagnostic.sv0 `let underline = gutter`).
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
