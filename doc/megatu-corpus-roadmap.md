@@ -282,6 +282,32 @@ fix, verify parity, commit. Expect features like: multi-segment/module paths, tu
 types and tuple returns, array/index expressions, `for` loops over ranges, casts,
 generics on functions, and `impl`/method calls. Split any that turn out large.
 
+- Box builtins (`ast.sv0`, was CCFAIL): `box_new`/`box_deref` (builtin ids 12/13)
+  lowered to calls to `sv0_box_new`/`sv0_box_deref`, which the runtime does not
+  export (it has `sv0_box_alloc`/`sv0_box_store`/`sv0_box_load` plus the generic
+  `sv0__box_new_raw`/`sv0__box_deref_raw` macros). The golden SML codegen boxes
+  *flat* multi-word struct values (`store .tag`, `.p0`, …), but the composed
+  compiler represents every value as a single-word `int` handle, so boxing is just
+  "box one word". Mapped `box_new` → `sv0__box_new_raw` and `box_deref` →
+  `sv0__box_deref_raw(h, int)` (the macro needs the target C type; always `int`
+  here) in `megatu_builtin_name` + the Call emit. `ast.sv0` PASSes; PASS 79 → 80.
+  This also cleared the box errors on `ir.sv0`/`unify.sv0`, narrowing each to a
+  single remaining class (see parked item below).
+
+**Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
+`unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
+type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
+'Pos'/'Span'`. Root cause: the emit is internally inconsistent about how a user
+struct/enum is represented. Function params and struct fields are declared with real
+struct C types (`Value x`, `Ty t`, typedef'd structs), but every *value* (temp,
+local, argument) is an `int` handle. Passing a handle to a struct-typed param, or
+assigning a struct-returning call's result to an `int` local, therefore type-errors.
+Fixing this is a single coherent but large decision — pick one representation
+end-to-end: either make all values flat structs (like the golden, big emit rework) or
+make all struct/enum params/fields/returns `int` handles (and route field access
+through the handle). This is the dominant remaining CCFAIL cause and should be its own
+planned multi-step task, not squeezed into an incremental fix.
+
 **Stop rule.** A module that needs a genuinely big feature (e.g. full generics or
 trait resolution) should be parked with a note here rather than forced — keep tasks
 bite-sized.
