@@ -2237,13 +2237,15 @@ fn parse_return_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(ed4, 0);
         return pos;
     }
-    let sf: Vec<i32> = vec_new();
     let tt: Vec<i32> = vec_new();
     let td1: Vec<i32> = vec_new();
     let td2: Vec<i32> = vec_new();
     let td3: Vec<i32> = vec_new();
+    /* Thread the real struct-literal field-name pool (sf_names), not a throwaway:
+       a `return P { ... }` records field-name offsets that lowering reads back, so
+       a discarded pool leaves them dangling -> vec OOB in the struct-lit lowering. */
     let p1: i32 = parse_range_expr(tags, starts, ends, source, pos,
-                                    et, ed1, ed2, ed3, ed4, pp, sf,
+                                    et, ed1, ed2, ed3, ed4, pp, sf_names,
                                     tt, td1, td2, td3, 1);
     if p1 < 0 { return 0 - 1; }
     let vi: i32 = vec_len(et) - 1;
