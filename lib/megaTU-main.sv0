@@ -474,8 +474,13 @@ fn megatu_builtin_name(bid: i32) -> string {
     if bid == 9 { return "sv0_vec_len"; }
     if bid == 10 { return "sv0_vec_get"; }
     if bid == 11 { return "sv0_vec_set"; }
-    if bid == 12 { return "sv0_box_new"; }
-    if bid == 13 { return "sv0_box_deref"; }
+    /* box_new/box_deref: every composed value is a single-word int handle
+       (structs/enums are handles, not flat multi-word values), so the golden's
+       multi-word .tag/.p0 box expansion collapses to boxing one word. Map to
+       the runtime's generic single-value macros; box_deref needs a `, int`
+       type argument, appended at the Call emit site. */
+    if bid == 12 { return "sv0__box_new_raw"; }
+    if bid == 13 { return "sv0__box_deref_raw"; }
     if bid == 14 { return "sv0_no_alias"; }
     if bid == 15 { return "sv0_read_file"; }
     if bid == 16 { return "sv0_write_file"; }
@@ -718,7 +723,15 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             return string_concat(indent, "continue;\n");
         },
         codegen_Instr::Call(dst_h, fn_h, args, rt_h) => {
-            let arg_str: string = megatu_emit_call_args(args, source, starts, ends);
+            let mut arg_str: string = megatu_emit_call_args(args, source, starts, ends);
+            /* box_deref lowers to a Call to builtin 13; sv0__box_deref_raw(h, T)
+               takes the target C type as a second argument. Every composed value
+               is an int handle, so the reconstructed type is always `int`. */
+            if fn_h < 0 {
+                if (0 - fn_h) == 13 {
+                    arg_str = string_concat(arg_str, ", int");
+                }
+            }
             /* A builtin call is lowered as Call with a NEGATIVE fn handle: the
                sentinel is `0 - builtin_id` (lowering build_builtin_map). Map it to
                the runtime C name `sv0_<builtin>`; a source fn resolves normally. */
