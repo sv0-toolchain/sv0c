@@ -803,6 +803,8 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let callee: i32 = vec_get(ed1, idx);
         let args_first: i32 = vec_get(ed2, idx);
         let args_count: i32 = vec_get(ed3, idx);
+        /* d4 = pp sidecar of arg-root indices (0 => contiguous fallback). */
+        let args_sidecar: i32 = vec_get(ed4, idx);
         if vec_get(et, callee) == 1 {
             let cpps: i32 = vec_get(ed1, callee);
             let cppc: i32 = vec_get(ed2, callee);
@@ -872,7 +874,7 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let mut ai: i32 = 0;
         while ai < args_count {
             let ra: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
-                                        args_first + ai,
+                                        block_stmt_index(pp, args_first, args_sidecar, ai),
                                         source, starts, ends,
                                         mod_vals, mod_tys, fn_arities, frames, pp);
             if ra != 0 { return ra; }

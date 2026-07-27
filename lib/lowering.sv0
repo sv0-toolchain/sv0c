@@ -235,6 +235,9 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let callee_idx: i32 = vec_get(ed1, idx);
     let args_first: i32 = vec_get(ed2, idx);
     let args_count: i32 = vec_get(ed3, idx);
+    /* d4 = pp sidecar of arg-root indices (args are non-contiguous). 0 => no
+       sidecar (special desugared calls / hand-built tests) => legacy args_first + k. */
+    let args_sidecar: i32 = vec_get(ed4, idx);
     let ct_pre: i32 = vec_get(et, callee_idx);
     if ct_pre == 1 {
         let cpps_pre: i32 = vec_get(ed1, callee_idx);
@@ -365,7 +368,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let mut ai: i32 = 0;
     loop {
         if ai >= args_count { break; }
-        let a_idx: i32 = args_first + ai;
+        let a_idx: i32 = block_stmt_index(pp, args_first, args_sidecar, ai);
         let av: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, a_idx, ctr,
                                              out_instrs, enum_names,

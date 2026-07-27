@@ -1202,16 +1202,22 @@ fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                      tuple args only; d1=arg_count, d2=first ExprPatFieldEmbed index,
                      d3–d4 reserved */
 
+/* Parses a comma-separated argument list, pushing each argument's ROOT node index
+   (its last-pushed node) to `arg_roots` in order. The number of args is
+   vec_len(arg_roots); the roots are non-contiguous (a nested call arg spans many
+   nodes), so callers store them via a pp sidecar (block_stmt_sidecar_push) exactly
+   like block statements — counting `vec_len(et)` deltas over-counts multi-node
+   args (e.g. `f(g(h(0)))` would look like 5 args). */
 fn parse_arg_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                   source: string, pos: i32,
                   et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                   ed3: Vec<i32>, ed4: Vec<i32>,
-                  pp: Vec<i32>, sf_names: Vec<i32>) -> i32 {
+                  pp: Vec<i32>, sf_names: Vec<i32>, arg_roots: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) == 7 { return pos; }
-    let first_idx: i32 = vec_len(et);
     let p1: i32 = parse_expr_sf(tags, starts, ends, source, pos,
                                  et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
     if p1 < 0 { return 0 - 1; }
+    vec_push(arg_roots, vec_len(et) - 1);
     let mut p: i32 = p1;
     let mut done: bool = false;
     while done != true {
@@ -1225,6 +1231,7 @@ fn parse_arg_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 let pa: i32 = parse_expr_sf(tags, starts, ends, source, p,
                                              et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
                 if pa < 0 { return 0 - 1; }
+                vec_push(arg_roots, vec_len(et) - 1);
                 p = pa;
             }
         } else {
@@ -1584,16 +1591,20 @@ fn parse_postfix_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         let t: i32 = ps_peek(tags, p);
         if t == 6 {
             let args_before: i32 = vec_len(et);
+            let arg_roots: Vec<i32> = vec_new();
             let pa: i32 = parse_arg_list(tags, starts, ends, source, p + 1,
-                                          et, ed1, ed2, ed3, ed4, pp, sf_names);
+                                          et, ed1, ed2, ed3, ed4, pp, sf_names,
+                                          arg_roots);
             if pa < 0 { return 0 - 1; }
-            let argc: i32 = vec_len(et) - args_before;
+            /* d3 = real argument count; d4 = pp sidecar of arg-root indices (args
+               are non-contiguous). Consumers read arg k via block_stmt_index. */
+            let argc: i32 = vec_len(arg_roots);
             if ps_peek(tags, pa) != 7 { return 0 - 1; }
             vec_push(et, 4);
             vec_push(ed1, cur);
             vec_push(ed2, args_before);
             vec_push(ed3, argc);
-            vec_push(ed4, 0);
+            vec_push(ed4, block_stmt_sidecar_push(pp, arg_roots));
             cur = vec_len(et) - 1;
             p = pa + 1;
         } else {
@@ -1604,11 +1615,15 @@ fn parse_postfix_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     if n2 == 6 {
                         let method_tok: i32 = p + 1;
                         let args_before: i32 = vec_len(et);
+                        let arg_roots_m: Vec<i32> = vec_new();
                         let pa: i32 = parse_arg_list(tags, starts, ends, source,
                                                       p + 3, et, ed1, ed2, ed3,
-                                                      ed4, pp, sf_names);
+                                                      ed4, pp, sf_names, arg_roots_m);
                         if pa < 0 { return 0 - 1; }
-                        let argc: i32 = vec_len(et) - args_before;
+                        /* Method calls (tag 5) have no free field for an arg
+                           sidecar; store the real arg count (flat method args are
+                           contiguous — nested method args are not yet supported). */
+                        let argc: i32 = vec_len(arg_roots_m);
                         if ps_peek(tags, pa) != 7 { return 0 - 1; }
                         vec_push(et, 5);
                         vec_push(ed1, cur);
