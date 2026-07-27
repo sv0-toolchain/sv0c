@@ -3687,24 +3687,22 @@ static int parse_return_expr(int tags, int starts, int ends, const char* source,
   } else {
   }
   int _sv0t3 = sv0_vec_new();
-  int sf = _sv0t3;
+  int tt = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int tt = _sv0t4;
+  int td1 = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int td1 = _sv0t5;
+  int td2 = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int td2 = _sv0t6;
-  int _sv0t7 = sv0_vec_new();
-  int td3 = _sv0t7;
-  int _sv0t8 = parse_range_expr(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf, tt, td1, td2, td3, 1);
-  int p1 = _sv0t8;
+  int td3 = _sv0t6;
+  int _sv0t7 = parse_range_expr(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf_names, tt, td1, td2, td3, 1);
+  int p1 = _sv0t7;
   if ((p1 < 0)) {
-    int _sv0t9 = (0 - 1);
-    return _sv0t9;
+    int _sv0t8 = (0 - 1);
+    return _sv0t8;
   } else {
   }
-  int _sv0t10 = sv0_vec_len(et);
-  int vi = (_sv0t10 - 1);
+  int _sv0t9 = sv0_vec_len(et);
+  int vi = (_sv0t9 - 1);
   sv0_vec_push(et, 15);
   sv0_vec_push(ed1, vi);
   sv0_vec_push(ed2, 0);

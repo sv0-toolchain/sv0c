@@ -121,8 +121,13 @@ static inline void sv0_vec_set(int32_t h, int32_t idx, intptr_t val) {
 /* Box<T> (T0-6): handle-based heap indirection for recursive types.
  * Each box_alloc(nwords) returns a handle into a flat word pool.
  * Used for recursive enum variants like Box<Expr> in AST definitions.
+ * Boxes are never freed (arena-style), so the pool must fit a whole run. The
+ * native-compose mega-TU compiler box_new's every IR instruction/value while
+ * lowering a module, so compiling a large library module (parser/checker/
+ * lowering, thousands of lines) needs millions of words; sized generously — it
+ * is demand-paged BSS, so unused capacity costs nothing.
  */
-#define SV0_BOX_POOL_SIZE (64 * 1024)
+#define SV0_BOX_POOL_SIZE (16 * 1024 * 1024)
 
 static intptr_t sv0_box_pool[SV0_BOX_POOL_SIZE];
 static int32_t sv0_box_next = 0;

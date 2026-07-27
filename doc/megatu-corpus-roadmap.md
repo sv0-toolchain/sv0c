@@ -14,8 +14,12 @@ out of the way), one commit per task.
 `scripts/sv0-megatu-corpus-parity.sh` runs the composed compiler over all 98 seeds:
 
 ```
-PASS=76  PHASEFAIL=2  PANIC=6  CCFAIL=14  RUNFAIL=0   (Phase 2: while-loop fix, env.sv0)
+PASS=76  PHASEFAIL=2  PANIC=0  CCFAIL=20  RUNFAIL=0   (Phase 2: panics triaged)
 ```
+
+The composed compiler now **never crashes and never emits wrong output** on the
+corpus — every non-PASS is a clean rejection (PHASEFAIL) or an incomplete emit
+(CCFAIL, a feature whose lowering/emit is not finished). PASS is the metric.
 
 Raising the PASS number means teaching the composed pipeline the missing features,
 one at a time. **This harness is a progress monitor, not a CI gate** (the real gate
@@ -238,6 +242,20 @@ size: `span`, `diagnostic`, `env`, `types`, `unify`, `ir`, `ast`, `include_expan
   `while (cond) { body }` for a simple condition (C re-evaluates it) or
   `while (1) { cond_is; ct = cond; if (!ct) break; body }` for a complex one. General
   fix (any iterating `while`), not env-specific. RUNFAIL → 0, PASS 75 → 76.
+
+- Compile-time PANICs (6 modules) triaged to two causes:
+  - `box: pool exhausted` (5 largest modules — vm_codegen/checker/lowering/parser/
+    driver): the runtime box pool was a fixed 64K words, but the mega-TU box_new's
+    every IR node while lowering, so a multi-thousand-line module overflows it.
+    Bumped `SV0_BOX_POOL_SIZE` to 16M words (demand-paged BSS). Those 5 now emit
+    (still CCFAIL on deeper feature gaps, but no longer crash).
+  - `vec: index out of bounds` (`span.sv0`): `return P { ... }` — the struct-literal
+    field-name pool was empty because `parse_return_expr` passed a throwaway `sf`
+    to `parse_range_expr` instead of the real `sf_names` (the same discarded-local
+    pool bug as struct literals in other positions). Threaded `sf_names`.
+  Result: PANIC 6 → 0. (Latent: a few other `parse_range_expr` call sites still
+  pass a local `sf`; those are `allow_struct = 0` condition parsers, so struct
+  literals can't appear there — not currently reachable, worth tidying later.)
 
 Each remaining becomes its own small task: diagnose the module's *next* error (300/301/307/…),
 identify the one feature it needs (likely another instance of a recurring bug class),
