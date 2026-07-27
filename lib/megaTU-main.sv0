@@ -553,18 +553,20 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
         codegen_Value::VUnit => { return "0"; },
         codegen_Value::VString(h) => {
             /* A string literal's handle is a source token whose text still includes
-               the surrounding double quotes (e.g. `"golden"`); strip them before
-               re-escaping and re-quoting so the emitted literal is not doubly
-               quoted. name_of's stub returned bare names, hence codegen never hit
-               this. */
+               the surrounding double quotes (e.g. `"golden"` or `"a\nb"`). Strip the
+               quotes and emit the inner body VERBATIM: sv0 string-escape syntax
+               (\n \t \\ \" …) already matches C, so the source body is a valid C
+               string body. Do NOT re-escape it — c_escape_string would double the
+               backslash of `\n`, turning the newline into a literal backslash-n
+               (broke lexer's skip_line_comment). name_of's stub returned bare names,
+               so codegen never hit this. */
             let raw: string = megatu_val_name(h, source, starts, ends);
             let mut inner: string = raw;
             let rlen: i32 = string_len(raw);
             if rlen >= 2 {
                 inner = string_substr(raw, 1, rlen - 2);
             }
-            let escaped: string = c_escape_string(inner);
-            let a: string = string_concat("\"", escaped);
+            let a: string = string_concat("\"", inner);
             return string_concat(a, "\"");
         },
         codegen_Value::VMember(bv, fh) => {
