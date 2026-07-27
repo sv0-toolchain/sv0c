@@ -483,7 +483,25 @@ fn megatu_builtin_name(bid: i32) -> string {
     return "sv0_unknown_builtin";
 }
 
+/* C return type of a builtin call's result (dst) by builtin id. String-returning
+   builtins (string_concat=4, string_substr=6, read_file=15, read_dir=17) yield
+   const char*; everything else that returns a value (string_len, string_eq,
+   char_at, vec_*, box_*) is int. Used to type the call-result temp. */
+fn megatu_builtin_ret_cty(bid: i32) -> string {
+    if bid == 4 { return "const char*"; }
+    if bid == 6 { return "const char*"; }
+    if bid == 15 { return "const char*"; }
+    if bid == 17 { return "const char*"; }
+    return "int";
+}
+
 fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    /* String-primitive sentinel from lowering (lower_string_cty): a string-typed
+       `let` gets this as its DeclNamed ctype. Must be handled before handle_to_str,
+       which would read a negative token index out of bounds. */
+    if h == lower_string_cty() {
+        return "const char*";
+    }
     let n: string = name_of(h);
     if !string_eq(n, "?") { return n; }
     return handle_to_str(h, source, starts, ends);
@@ -714,10 +732,16 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             }
             /* lower emits Instr::Call with rt_h == 0 as the default-int-return
                placeholder (the i32 surface); resolve that to "int" rather than
-               token 0's text (which would be the `fn` keyword). */
+               token 0's text (which would be the `fn` keyword). A builtin call
+               (negative fn_h) uses the builtin's real return C type so a
+               string-returning builtin's result temp is typed const char*. */
             let mut ret_name: string = "int";
-            if rt_h != 0 {
-                ret_name = megatu_ty_name(rt_h, source, starts, ends);
+            if fn_h < 0 {
+                ret_name = megatu_builtin_ret_cty(0 - fn_h);
+            } else {
+                if rt_h != 0 {
+                    ret_name = megatu_ty_name(rt_h, source, starts, ends);
+                }
             }
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");

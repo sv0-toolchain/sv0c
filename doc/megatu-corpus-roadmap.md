@@ -14,8 +14,11 @@ out of the way), one commit per task.
 `scripts/sv0-megatu-corpus-parity.sh` runs the composed compiler over all 98 seeds:
 
 ```
-PASS=76  PHASEFAIL=2  PANIC=0  CCFAIL=20  RUNFAIL=0   (Phase 2: panics triaged)
+PASS=78  PHASEFAIL=2  PANIC=0  CCFAIL=17  RUNFAIL=1   (Phase 2: string primitive)
 ```
+(The lone RUNFAIL is `lexer.sv0`, which the string fix advanced past its CCFAIL
+into a deeper runtime crash — a new Phase 2 module bug, not a regression: it never
+passed. Triage next.)
 
 The composed compiler now **never crashes and never emits wrong output** on the
 corpus — every non-PASS is a clean rejection (PHASEFAIL) or an incomplete emit
@@ -256,6 +259,15 @@ size: `span`, `diagnostic`, `env`, `types`, `unify`, `ir`, `ast`, `include_expan
   Result: PANIC 6 → 0. (Latent: a few other `parse_range_expr` call sites still
   pass a local `sf`; those are `allow_struct = 0` condition parsers, so struct
   literals can't appear there — not currently reachable, worth tidying later.)
+
+- String primitive type (`string_api`, was CCFAIL): the parser discards the `let`
+  type annotation, so a `let s: string = "hello"` declared `int s` and every string
+  flowed as int. Infer the string type from the init (`lower_init_is_string`: a
+  string literal or a string-returning builtin call — string_concat/substr/read_file/
+  read_dir), declare it with a sentinel ctype (`lower_string_cty`) that the emit maps
+  to `const char*` (`megatu_ty_name`), and type a string-returning builtin call's
+  result temp via `megatu_builtin_ret_cty`. `string_api` PASSes; PASS 76 → 78. This
+  advanced `lexer.sv0` past its string CCFAIL into a runtime crash (its next bug).
 
 Each remaining becomes its own small task: diagnose the module's *next* error (300/301/307/…),
 identify the one feature it needs (likely another instance of a recurring bug class),
