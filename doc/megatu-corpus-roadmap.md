@@ -375,6 +375,20 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   84 (`diagnostic.sv0` enum, `main.sv0` struct `MainPhaseResult`), CCFAIL 11 → 9, no
   regressions. Refreshed stage0 + vm-parity goldens.
 
+- Void-returning user calls in statement position (`driver.sv0`, contributes): a
+  call to a user fn returning unit — `fn f(..) -> ()` or `fn f(..)` (no `-> T`) — in
+  discarded/statement position lowered to a Call with a dst temp, emitting
+  `int _t = f(..)` → C error `initializing 'int' with 'void'` (e.g. driver.sv0
+  `drv_advance(..) -> ()`). New helper `lower_callee_is_void` (mirrors
+  `lower_callee_ret_ty_head`'s bounds-safe item scan): a matched top-level ItemFn is
+  void when `has_ret == 0`, or its `-> ()` return type head is TK_LPAREN(6) +
+  TK_RPAREN(7). Wired at the top of `lower_tag_call`'s `bid == 0` branch: emit
+  `Instr::Call(0, callee_tok, args, 0)` and return `VUnit` (like the builtin void
+  path). Removes the void-init error class; driver.sv0 20 → 18 errors, stays CCFAIL
+  on unrelated issues, PASS holds at 84. (Implemented by a delegated Sonnet subagent
+  to a fixed spec; verified here: compile-run OK, no parity regression, goldens
+  refreshed, full suite green.) Refreshed stage0 + vm-parity goldens.
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
