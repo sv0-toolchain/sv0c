@@ -359,6 +359,22 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   ones — reverted and fixed the 2 sites surgically. NEXT: `diagnostic.sv0` remaining
   6 (another string position or struct); `driver.sv0` still 20.
 
+- User-type (enum/struct) return values (`diagnostic.sv0` + `main.sv0` PASS, were
+  CCFAIL): a `let e = make_error(..)` where `make_error -> Severity` (a nullary enum,
+  emitted as a consistent `typedef struct { .tag } Severity`) declared `int e`, and
+  the call temp was `int _t = make_error(..)`, so `is_error(e)` (param `Severity`) and
+  the assignment mismatched. This is the string-return path generalized to *any* user
+  struct/enum return. New helpers: `lower_callee_ret_ty_head` (shared front-end
+  returning a 1-seg user call's return-type head token), `lower_name_is_user_type`
+  (name matches a top-level ItemStruct tag 1 / ItemEnum tag 2), and
+  `lower_call_ret_user_ty_tok` (the head token when the return type is a user type).
+  Wired at both `let` handlers (DeclNamed with the type-name token) and the plain-call
+  `Instr::Call` rt_h (string sentinel, else the user-type token). NOT the parked
+  param-mismatch trap: here the enum/struct value representation is already consistent
+  in signatures + bodies; only the call temp / let local were mistyped int. PASS 82 →
+  84 (`diagnostic.sv0` enum, `main.sv0` struct `MainPhaseResult`), CCFAIL 11 → 9, no
+  regressions. Refreshed stage0 + vm-parity goldens.
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
