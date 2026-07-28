@@ -332,6 +332,16 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   string *local variable* (needs tracking declared-string locals within a block).
   NEXT deeper bug: the `path_ok` while-loop/char miscompile (include_expand RUNFAIL).
 
+- Explicit unit return type `-> ()` (`driver.sv0`, contributes): a `fn f(..) -> ()`
+  emitted as `int f(..)` while its body used bare `return;` → `-Wreturn-mismatch`
+  hard error (e.g. driver.sv0 `drv_resolve_expr`). `megatu_cty_of_root` mapped only
+  `root < 0` to void and TyName (ptt tag 0) to a name; the explicit unit type is
+  `TyUnit` (ty_tag 6), which fell through to "int". Added a tag-6 → "void" branch
+  (megaTU-main.sv0, emit-only — no lowering/golden change). Removes the whole
+  return-mismatch class; driver.sv0 stays CCFAIL on its remaining string-local
+  aliasing errors, so PASS holds at 81 (5 corpus modules use `-> ()`, now all
+  correctly voided).
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
