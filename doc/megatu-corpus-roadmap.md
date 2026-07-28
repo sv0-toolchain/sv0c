@@ -342,6 +342,23 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   aliasing errors, so PASS holds at 81 (5 corpus modules use `-> ()`, now all
   correctly voided).
 
+- String-local aliasing (`link.sv0` PASSES, was CCFAIL): `let y = x` where `x` is a
+  `string` local declared earlier in the same block declared `int y`. Completes the
+  string-propagation set (literal/builtin, user-call return, param-alias, now
+  local-alias). Threads a per-block `str_locals: Vec<i32>` of string-local name
+  tokens through `lower_block` → `lower_stmt` (new last param); each string-declaring
+  `let` pushes its name token, and a new branch declares `let y = x` string when `x`
+  (by TEXT) is in the set (`lower_ident_in_str_locals`, bounds-safe). Function bodies
+  lower via `lower_body` → `lower_block` → `lower_stmt` (not `lower_tag_block`, which
+  handles nested block-expressions and keeps its own scope — nested blocks don't yet
+  see outer string locals, an accepted limitation). PASS 81 → 82 (`link.sv0`),
+  CCFAIL 12 → 11; `diagnostic.sv0` 20 → 6 errors (closer). Refreshed stage0 +
+  vm-parity goldens. GOTCHA: an over-broad `replace_all` on the shared
+  `..., vec_new(), vec_new())` test-call tail added a third arg to every lowering
+  test call (lower_expr_to_value/lower_body/lower_fn/…), not just the two `lower_stmt`
+  ones — reverted and fixed the 2 sites surgically. NEXT: `diagnostic.sv0` remaining
+  6 (another string position or struct); `driver.sv0` still 20.
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
