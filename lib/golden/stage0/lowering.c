@@ -72,6 +72,7 @@ static int lower_temp_base(void);
 static int lower_string_cty(void);
 static int lower_tok_in_bounds(int h, int starts, int ends);
 static int lower_call_ret_is_string(int et, int ed1, int ed2, int pp, int call_idx, int item_tags, int item_names, int item_d2, int tok_tags, const char* source, int starts, int ends);
+static int lower_init_ident_is_string_param(int et, int ed1, int ed2, int pp, int init_idx, int item_tags, int item_names, int item_d3, int tok_tags, const char* source, int starts, int ends, int item_fn_row);
 static int lower_init_is_string(int et, int ed1, int ed2, int pp, int init_idx, const char* source, int starts, int ends);
 static int fresh_tmp_name(int counter);
 static int next_tmp(int counter);
@@ -1346,70 +1347,90 @@ static Value lower_tag_block(int et, int ed1, int ed2, int ed3, int ed4, int pp,
           }
         } else {
         }
+        if ((let_declared == 0)) {
+          int _sv0t33 = lower_init_ident_is_string_param(et, ed1, ed2, pp, init_idx, item_tags, item_names, item_d3, tok_tags, source, starts, ends, item_fn_row);
+          if (_sv0t33) {
+            Instr decl_spb;
+            int _sv0t34 = lower_string_cty();
+            decl_spb.tag = 2;
+            decl_spb.p0 = _sv0t34;
+            decl_spb.p1 = name_tok;
+            int _sv0t35 = sv0_box_alloc(5);
+            sv0_box_store(_sv0t35, 0, decl_spb.tag);
+            sv0_box_store(_sv0t35, 1, decl_spb.p0);
+            sv0_box_store(_sv0t35, 2, decl_spb.p1);
+            sv0_box_store(_sv0t35, 3, decl_spb.p2);
+            sv0_box_store(_sv0t35, 4, decl_spb.p3);
+            sv0_vec_push(out_instrs, _sv0t35);
+            let_declared = 1;
+          } else {
+          }
+        } else {
+        }
       } else {
       }
       if ((let_declared == 0)) {
         Instr decl;
         decl.tag = 1;
         decl.p0 = name_tok;
-        int _sv0t33 = sv0_box_alloc(5);
-        sv0_box_store(_sv0t33, 0, decl.tag);
-        sv0_box_store(_sv0t33, 1, decl.p0);
-        sv0_box_store(_sv0t33, 2, decl.p1);
-        sv0_box_store(_sv0t33, 3, decl.p2);
-        sv0_box_store(_sv0t33, 4, decl.p3);
-        sv0_vec_push(out_instrs, _sv0t33);
+        int _sv0t36 = sv0_box_alloc(5);
+        sv0_box_store(_sv0t36, 0, decl.tag);
+        sv0_box_store(_sv0t36, 1, decl.p0);
+        sv0_box_store(_sv0t36, 2, decl.p1);
+        sv0_box_store(_sv0t36, 3, decl.p2);
+        sv0_box_store(_sv0t36, 4, decl.p3);
+        sv0_vec_push(out_instrs, _sv0t36);
       } else {
       }
       if ((init_idx >= 0)) {
-        Value _sv0t34 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, init_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        Value _sv0t37 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, init_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
         Value iv;
-        iv = _sv0t34;
+        iv = _sv0t37;
         Expr lit_e;
-        int _sv0t35 = sv0_box_alloc(3);
-        sv0_box_store(_sv0t35, 0, iv.tag);
-        sv0_box_store(_sv0t35, 1, iv.p0);
-        sv0_box_store(_sv0t35, 2, iv.p1);
+        int _sv0t38 = sv0_box_alloc(3);
+        sv0_box_store(_sv0t38, 0, iv.tag);
+        sv0_box_store(_sv0t38, 1, iv.p0);
+        sv0_box_store(_sv0t38, 2, iv.p1);
         lit_e.tag = 0;
-        lit_e.p0 = _sv0t35;
+        lit_e.p0 = _sv0t38;
         Instr asgn;
-        int _sv0t36 = sv0_box_alloc(4);
-        sv0_box_store(_sv0t36, 0, lit_e.tag);
-        sv0_box_store(_sv0t36, 1, lit_e.p0);
-        sv0_box_store(_sv0t36, 2, lit_e.p1);
-        sv0_box_store(_sv0t36, 3, lit_e.p2);
+        int _sv0t39 = sv0_box_alloc(4);
+        sv0_box_store(_sv0t39, 0, lit_e.tag);
+        sv0_box_store(_sv0t39, 1, lit_e.p0);
+        sv0_box_store(_sv0t39, 2, lit_e.p1);
+        sv0_box_store(_sv0t39, 3, lit_e.p2);
         asgn.tag = 4;
         asgn.p0 = name_tok;
-        asgn.p1 = _sv0t36;
-        int _sv0t37 = sv0_box_alloc(5);
-        sv0_box_store(_sv0t37, 0, asgn.tag);
-        sv0_box_store(_sv0t37, 1, asgn.p0);
-        sv0_box_store(_sv0t37, 2, asgn.p1);
-        sv0_box_store(_sv0t37, 3, asgn.p2);
-        sv0_box_store(_sv0t37, 4, asgn.p3);
-        sv0_vec_push(out_instrs, _sv0t37);
+        asgn.p1 = _sv0t39;
+        int _sv0t40 = sv0_box_alloc(5);
+        sv0_box_store(_sv0t40, 0, asgn.tag);
+        sv0_box_store(_sv0t40, 1, asgn.p0);
+        sv0_box_store(_sv0t40, 2, asgn.p1);
+        sv0_box_store(_sv0t40, 3, asgn.p2);
+        sv0_box_store(_sv0t40, 4, asgn.p3);
+        sv0_vec_push(out_instrs, _sv0t40);
       } else {
       }
     } else {
     }
     if ((s_tag == 28)) {
-      int _sv0t38 = sv0_vec_get(ed1, s_idx);
-      int semi_idx = _sv0t38;
-      Value _sv0t39 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, semi_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+      int _sv0t41 = sv0_vec_get(ed1, s_idx);
+      int semi_idx = _sv0t41;
+      Value _sv0t42 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, semi_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
       Value discard1;
-      discard1 = _sv0t39;
+      discard1 = _sv0t42;
     } else {
     }
     si = (si + 1);
   }
   if ((tail_idx >= 0)) {
-    Value _sv0t40 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, tail_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-    return _sv0t40;
+    Value _sv0t43 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, tail_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+    return _sv0t43;
   } else {
   }
-  Value _sv0t41;
-  _sv0t41.tag = 4;
-  return _sv0t41;
+  Value _sv0t44;
+  _sv0t44.tag = 4;
+  return _sv0t44;
 }
 
 static Value lower_tag_if(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int enum_vnames_flat, int item_fn_row, int match_env_inherit, int import_aliases) {
@@ -5246,59 +5267,79 @@ static int lower_stmt(int et, int ed1, int ed2, int ed3, int ed4, int pp, int to
         }
       } else {
       }
+      if ((let_declared == 0)) {
+        int _sv0t28 = lower_init_ident_is_string_param(et, ed1, ed2, pp, init_idx, item_tags, item_names, item_d3, tok_tags, source, starts, ends, item_fn_row);
+        if (_sv0t28) {
+          Instr decl_sp;
+          int _sv0t29 = lower_string_cty();
+          decl_sp.tag = 2;
+          decl_sp.p0 = _sv0t29;
+          decl_sp.p1 = name_tok;
+          int _sv0t30 = sv0_box_alloc(5);
+          sv0_box_store(_sv0t30, 0, decl_sp.tag);
+          sv0_box_store(_sv0t30, 1, decl_sp.p0);
+          sv0_box_store(_sv0t30, 2, decl_sp.p1);
+          sv0_box_store(_sv0t30, 3, decl_sp.p2);
+          sv0_box_store(_sv0t30, 4, decl_sp.p3);
+          sv0_vec_push(out_instrs, _sv0t30);
+          let_declared = 1;
+        } else {
+        }
+      } else {
+      }
     } else {
     }
     if ((let_declared == 0)) {
       Instr decl;
       decl.tag = 1;
       decl.p0 = name_tok;
-      int _sv0t28 = sv0_box_alloc(5);
-      sv0_box_store(_sv0t28, 0, decl.tag);
-      sv0_box_store(_sv0t28, 1, decl.p0);
-      sv0_box_store(_sv0t28, 2, decl.p1);
-      sv0_box_store(_sv0t28, 3, decl.p2);
-      sv0_box_store(_sv0t28, 4, decl.p3);
-      sv0_vec_push(out_instrs, _sv0t28);
+      int _sv0t31 = sv0_box_alloc(5);
+      sv0_box_store(_sv0t31, 0, decl.tag);
+      sv0_box_store(_sv0t31, 1, decl.p0);
+      sv0_box_store(_sv0t31, 2, decl.p1);
+      sv0_box_store(_sv0t31, 3, decl.p2);
+      sv0_box_store(_sv0t31, 4, decl.p3);
+      sv0_vec_push(out_instrs, _sv0t31);
     } else {
     }
     if ((init_idx >= 0)) {
-      Expr _sv0t29 = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, init_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+      Expr _sv0t32 = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, init_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
       Expr e;
-      e = _sv0t29;
+      e = _sv0t32;
       Instr si;
-      int _sv0t30 = sv0_box_alloc(4);
-      sv0_box_store(_sv0t30, 0, e.tag);
-      sv0_box_store(_sv0t30, 1, e.p0);
-      sv0_box_store(_sv0t30, 2, e.p1);
-      sv0_box_store(_sv0t30, 3, e.p2);
+      int _sv0t33 = sv0_box_alloc(4);
+      sv0_box_store(_sv0t33, 0, e.tag);
+      sv0_box_store(_sv0t33, 1, e.p0);
+      sv0_box_store(_sv0t33, 2, e.p1);
+      sv0_box_store(_sv0t33, 3, e.p2);
       si.tag = 4;
       si.p0 = name_tok;
-      si.p1 = _sv0t30;
-      int _sv0t31 = sv0_box_alloc(5);
-      sv0_box_store(_sv0t31, 0, si.tag);
-      sv0_box_store(_sv0t31, 1, si.p0);
-      sv0_box_store(_sv0t31, 2, si.p1);
-      sv0_box_store(_sv0t31, 3, si.p2);
-      sv0_box_store(_sv0t31, 4, si.p3);
-      sv0_vec_push(out_instrs, _sv0t31);
+      si.p1 = _sv0t33;
+      int _sv0t34 = sv0_box_alloc(5);
+      sv0_box_store(_sv0t34, 0, si.tag);
+      sv0_box_store(_sv0t34, 1, si.p0);
+      sv0_box_store(_sv0t34, 2, si.p1);
+      sv0_box_store(_sv0t34, 3, si.p2);
+      sv0_box_store(_sv0t34, 4, si.p3);
+      sv0_vec_push(out_instrs, _sv0t34);
     } else {
     }
     return 0;
   } else {
   }
   if ((s_tag == 28)) {
-    int _sv0t32 = sv0_vec_get(ed1, s_idx);
-    int expr_idx = _sv0t32;
-    int _sv0t33 = sv0_vec_get(et, expr_idx);
-    if ((_sv0t33 == 15)) {
-      int _sv0t34 = sv0_vec_get(ed1, expr_idx);
-      int ret_val = _sv0t34;
-      int _sv0t35 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags, ret_val, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-      return _sv0t35;
+    int _sv0t35 = sv0_vec_get(ed1, s_idx);
+    int expr_idx = _sv0t35;
+    int _sv0t36 = sv0_vec_get(et, expr_idx);
+    if ((_sv0t36 == 15)) {
+      int _sv0t37 = sv0_vec_get(ed1, expr_idx);
+      int ret_val = _sv0t37;
+      int _sv0t38 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags, ret_val, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+      return _sv0t38;
     } else {
     }
-    int _sv0t36 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, expr_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-    int rc = _sv0t36;
+    int _sv0t39 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, expr_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+    int rc = _sv0t39;
     return 0;
   } else {
   }
@@ -5789,6 +5830,140 @@ static int lower_call_ret_is_string(int et, int ed1, int ed2, int pp, int call_i
     } else {
     }
     i = (i + 1);
+  }
+  return 0;
+}
+
+static int lower_init_ident_is_string_param(int et, int ed1, int ed2, int pp, int init_idx, int item_tags, int item_names, int item_d3, int tok_tags, const char* source, int starts, int ends, int item_fn_row) {
+  if ((init_idx < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(et);
+  if ((init_idx >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(et, init_idx);
+  if ((_sv0t1 != 1)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(ed2, init_idx);
+  if ((_sv0t2 != 1)) {
+    return 0;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(ed1, init_idx);
+  int pps = _sv0t3;
+  if ((pps < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_len(pp);
+  if ((pps >= _sv0t4)) {
+    return 0;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(pp, pps);
+  int itok = _sv0t5;
+  int _sv0t6 = lower_tok_in_bounds(itok, starts, ends);
+  if ((_sv0t6 != 1)) {
+    return 0;
+  } else {
+  }
+  if ((item_fn_row < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(item_tags);
+  if ((item_fn_row >= _sv0t7)) {
+    return 0;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_len(item_names);
+  if ((item_fn_row >= _sv0t8)) {
+    return 0;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_len(item_d3);
+  if ((item_fn_row >= _sv0t9)) {
+    return 0;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(item_tags, item_fn_row);
+  if ((_sv0t10 != 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(item_d3, item_fn_row);
+  int pc = _sv0t11;
+  if ((pc <= 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_get(item_names, item_fn_row);
+  int name_tok = _sv0t12;
+  if ((name_tok < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t13 = (name_tok + 1);
+  int _sv0t14 = sv0_vec_len(tok_tags);
+  if ((_sv0t13 >= _sv0t14)) {
+    return 0;
+  } else {
+  }
+  int _sv0t15 = sv0_vec_new();
+  int pnames = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int pty = _sv0t16;
+  int _sv0t17 = lower_scan_item_fn_param_names_ty_toks(tok_tags, name_tok, pc, pnames, pty);
+  int rs = _sv0t17;
+  if ((rs < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t18 = sv0_vec_len(pnames);
+  if ((_sv0t18 != pc)) {
+    return 0;
+  } else {
+  }
+  int _sv0t19 = sv0_vec_len(pty);
+  if ((_sv0t19 != pc)) {
+    return 0;
+  } else {
+  }
+  const char* _sv0t20 = handle_to_str(itok, source, starts, ends);
+  const char* iname;
+  iname = _sv0t20;
+  int j = 0;
+  while ((j < pc)) {
+    int _sv0t21 = sv0_vec_get(pnames, j);
+    int pn = _sv0t21;
+    int _sv0t22 = sv0_vec_get(pty, j);
+    int pt = _sv0t22;
+    int _sv0t23 = lower_tok_in_bounds(pn, starts, ends);
+    if (_sv0t23) {
+      int _sv0t24 = lower_tok_in_bounds(pt, starts, ends);
+      if (_sv0t24) {
+        const char* _sv0t25 = handle_to_str(pn, source, starts, ends);
+        int _sv0t26 = sv0_string_eq(_sv0t25, iname);
+        if (_sv0t26) {
+          const char* _sv0t27 = handle_to_str(pt, source, starts, ends);
+          int _sv0t28 = sv0_string_eq(_sv0t27, "string");
+          if (_sv0t28) {
+            return 1;
+          } else {
+          }
+          return 0;
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    j = (j + 1);
   }
   return 0;
 }

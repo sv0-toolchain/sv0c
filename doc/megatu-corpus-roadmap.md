@@ -314,6 +314,24 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   is a string *local variable* (not a call) — needs a local-variable type environment
   during lowering (bigger; e.g. diagnostic.sv0 `let underline = gutter`).
 
+- String-parameter aliasing (`include_expand.sv0`, was CCFAIL): `let mut out = dir`
+  where `dir` is a `string` parameter declared `int out`, so every subsequent
+  `out = string_concat(..)` / `return out` hit `-Wint-conversion`. New helper
+  `lower_init_ident_is_string_param` (lowering.sv0): a 1-seg ExprPath init whose
+  identifier (by TEXT) matches a `string`-typed parameter of the current function
+  (`item_fn_row`), resolved with the same `lower_scan_item_fn_param_names_ty_toks`
+  scan the match-scrutinee typing uses (`pc = item_d3[item_fn_row]`). Wired at both
+  `let` handlers. Fully bounds-checked and returns false for `item_fn_row < 0` (the
+  case in every lowering unit test), so the non-bounds-safe param scan is never hit
+  on synthetic arenas. `include_expand.sv0` now compiles (CCFAIL 13 → 12) but
+  RUNFAILs (exit 25 = `test_path_ok` code 5): `path_ok("../escape")` returns true —
+  the composed compiler miscompiles `path_ok`'s `while i < len - 1` char loop
+  (`string_char_at`/compound-condition), a deeper newly-reached bug unrelated to the
+  string fix (path_ok has no `let x = param`). PASS stays 81. Refreshed stage0 +
+  vm-parity goldens for lowering.sv0. NEXT string gap: `let x = y` where `y` is a
+  string *local variable* (needs tracking declared-string locals within a block).
+  NEXT deeper bug: the `path_ok` while-loop/char miscompile (include_expand RUNFAIL).
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
