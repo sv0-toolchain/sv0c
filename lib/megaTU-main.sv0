@@ -278,6 +278,12 @@ fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
     if root < 0 {
         return "void";
     }
+    /* TyUnit (ty_tag 6, `-> ()`): an explicit unit return type is void. Without
+       this it falls through to "int", so a `fn f(..) -> ()` with bare `return;`
+       emits as `int f(..)` -> -Wreturn-mismatch (e.g. driver.sv0 drv_resolve_expr). */
+    if vec_get(ptt, root) == 6 {
+        return "void";
+    }
     if vec_get(ptt, root) == 0 {
         let ppstart: i32 = vec_get(ptd1, root);
         let segc: i32 = vec_get(ptd2, root);
