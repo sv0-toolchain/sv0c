@@ -413,19 +413,44 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   { break }`. **PASS 84 → 87, RUNFAIL 3 → 0** (all three RUNFAILs were complex-while
   miscompiles). Refreshed stage0 + vm-parity goldens.
 
-**Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
-`unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
-type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
-'Pos'/'Span'`. Root cause: the emit is internally inconsistent about how a user
-struct/enum is represented. Function params and struct fields are declared with real
-struct C types (`Value x`, `Ty t`, typedef'd structs), but every *value* (temp,
-local, argument) is an `int` handle. Passing a handle to a struct-typed param, or
-assigning a struct-returning call's result to an `int` local, therefore type-errors.
-Fixing this is a single coherent but large decision — pick one representation
-end-to-end: either make all values flat structs (like the golden, big emit rework) or
-make all struct/enum params/fields/returns `int` handles (and route field access
-through the handle). This is the dominant remaining CCFAIL cause and should be its own
-planned multi-step task, not squeezed into an incremental fix.
+## Struct-by-value / recursive-type cluster (the 9 remaining CCFAIL) — plan
+
+All 9 remaining CCFAIL (`codegen`, `ast_types`, `types`, `span`, `ir`, `unify`,
+`vm_codegen`, `lowering`, `driver`) are the same feature: the composed compiler emits
+user structs/enums as flat C structs (`typedef struct {..} Ty;`), and direct values
+work (diagnostic's enum + main's struct PASS), but **struct-typed values in several
+positions are still mistyped `int`**. Chosen representation: **keep the golden's flat
+structs** (structs already flatten correctly; enums are `{int tag; int p0;..}`) and
+fix the positions where a struct value is typed `int`. **Common root:** the composed
+compiler uses token indices as name handles, so shared lowering helpers that compare
+handles by equality (interned-name assumption from the SML pipeline) silently fail —
+fix by comparing by TEXT. Bite-sized pieces, each independently landable:
+
+1. **Nested struct/enum field types (DONE).** `struct CompileError { span: Span }`
+   emitted `int span;` because `is_struct_cty`/`is_enum_cty` compare handles by
+   equality (def-vs-use token mismatch in the composed compiler). Added a text
+   fallback in `emit_struct_td` (`lower_name_in_handle_list`). `span.sv0` 10 → 8 err.
+2. **Struct-literal field/value scramble.** `span_new`'s `Span { file: f, start_line:
+   s.line, .. }` emits misaligned assignments (`_t.file = s.offset`, `_t.start_line =
+   e`) when field values are themselves field accesses (extra instrs) — a non-
+   contiguous field-value alignment bug in the struct-literal lowering (same family as
+   the call-args / match-arm sidecar). Likely the highest-value correctness piece.
+3. **Struct-typed locals / temps.** `let z = struct_expr` (construction, field access
+   `sp.start`, index) still declared `int`. Extend the return-type typing
+   (`lower_call_ret_user_ty_tok`) to struct construction and field-access results.
+4. **Boxed struct deref (recursive types: `types`/`ir`/`unify`).** `let d =
+   box_deref(bt)` emits `int d = sv0__box_deref_raw(bt, int)` but `d` is a `Ty` struct
+   (`ty_tag(d)` wants `Ty`, `d.tag` needs a struct). The runtime macros already box
+   whole structs by `sizeof`; the emit must deref to the box's element type (from the
+   `Box<T>` field type), not hardcode `int`. The recursive-type core.
+5. **`member reference base type 'int' is not a struct`.** A value that should be a
+   struct is `int`, then `.tag`/`.p0`-accessed — a downstream symptom of (3)/(4);
+   should clear once values are typed.
+
+Sequence: (2) is an independent correctness bug (do next); (3) unblocks the most
+`assigning to int from Struct` errors; (4) is the recursive-type piece; (5) follows.
+Each piece: fix in lowering.sv0/megaTU-main.sv0, run `./scripts/sv0 test`, refresh
+stage0+vm-parity goldens (lowering.sv0 edits only), verify no parity regression.
 
 **Stop rule.** A module that needs a genuinely big feature (e.g. full generics or
 trait resolution) should be parked with a note here rather than forced — keep tasks

@@ -150,6 +150,7 @@ static int callee_fn_index_match_env(int env, int aliases, int name_h);
 static int scrut_local_lookup(int scrut_names, int name_h);
 static int param_ty_lookup(int param_names, int name_h);
 static const char* handle_to_str(int h, const char* source, int starts, int ends);
+static int lower_name_in_handle_list(const char* name, int list, const char* source, int starts, int ends);
 static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, int fcount, const char* source, int starts, int ends, int sn, int en);
 static const char* emit_enum_td(int name_h, int max_payload, const char* source, int starts, int ends);
 static int build_struct_order(int item_tags, int item_names, int item_field_counts, int struct_fnames_flat, int out_names, int out_offsets, int out_counts, int out_flat);
@@ -8060,6 +8061,28 @@ static const char* handle_to_str(int h, const char* source, int starts, int ends
   return _sv0t3;
 }
 
+static int lower_name_in_handle_list(const char* name, int list, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_len(list);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(list, i);
+    int h = _sv0t1;
+    int _sv0t2 = lower_tok_in_bounds(h, starts, ends);
+    if (_sv0t2) {
+      const char* _sv0t3 = handle_to_str(h, source, starts, ends);
+      int _sv0t4 = sv0_string_eq(_sv0t3, name);
+      if (_sv0t4) {
+        return 1;
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
 static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, int fcount, const char* source, int starts, int ends, int sn, int en) {
   const char* _sv0t0 = handle_to_str(name_h, source, starts, ends);
   const char* name;
@@ -8077,29 +8100,43 @@ static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, 
     const char* _sv0t4 = ast_ty_to_c_string_with_user(tname, th, sn, en);
     const char* cty;
     cty = _sv0t4;
-    int _sv0t5 = (foff + i);
-    int _sv0t6 = sv0_vec_get(fnames, _sv0t5);
-    const char* _sv0t7 = handle_to_str(_sv0t6, source, starts, ends);
+    int _sv0t5 = sv0_string_eq(cty, "int");
+    if (_sv0t5) {
+      int _sv0t6 = lower_name_in_handle_list(tname, sn, source, starts, ends);
+      if (_sv0t6) {
+        cty = tname;
+      } else {
+        int _sv0t7 = lower_name_in_handle_list(tname, en, source, starts, ends);
+        if (_sv0t7) {
+          cty = tname;
+        } else {
+        }
+      }
+    } else {
+    }
+    int _sv0t8 = (foff + i);
+    int _sv0t9 = sv0_vec_get(fnames, _sv0t8);
+    const char* _sv0t10 = handle_to_str(_sv0t9, source, starts, ends);
     const char* fname;
-    fname = _sv0t7;
-    const char* _sv0t8 = sv0_string_concat(r, "  ");
-    r = _sv0t8;
-    const char* _sv0t9 = sv0_string_concat(r, cty);
-    r = _sv0t9;
-    const char* _sv0t10 = sv0_string_concat(r, " ");
-    r = _sv0t10;
-    const char* _sv0t11 = sv0_string_concat(r, fname);
+    fname = _sv0t10;
+    const char* _sv0t11 = sv0_string_concat(r, "  ");
     r = _sv0t11;
-    const char* _sv0t12 = sv0_string_concat(r, ";\n");
+    const char* _sv0t12 = sv0_string_concat(r, cty);
     r = _sv0t12;
+    const char* _sv0t13 = sv0_string_concat(r, " ");
+    r = _sv0t13;
+    const char* _sv0t14 = sv0_string_concat(r, fname);
+    r = _sv0t14;
+    const char* _sv0t15 = sv0_string_concat(r, ";\n");
+    r = _sv0t15;
     i = (i + 1);
   }
-  const char* _sv0t13 = sv0_string_concat(r, "} ");
-  r = _sv0t13;
-  const char* _sv0t14 = sv0_string_concat(r, name);
-  r = _sv0t14;
-  const char* _sv0t15 = sv0_string_concat(r, ";\n");
-  r = _sv0t15;
+  const char* _sv0t16 = sv0_string_concat(r, "} ");
+  r = _sv0t16;
+  const char* _sv0t17 = sv0_string_concat(r, name);
+  r = _sv0t17;
+  const char* _sv0t18 = sv0_string_concat(r, ";\n");
+  r = _sv0t18;
   return r;
 }
 

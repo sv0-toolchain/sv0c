@@ -4571,6 +4571,27 @@ fn handle_to_str(h: i32, source: string,
 
 /* ── emit_struct_td (SML emitStructTd) ──────────────────────── */
 
+/* True if `name` (by TEXT) matches any handle in `list`. is_struct_cty/is_enum_cty
+   compare by handle equality, which works in the SML pipeline (interned names share
+   a handle) but not in the composed compiler (handles are token indices, so a field-
+   type token — a use — never equals the struct-def token). This text fallback
+   recovers user-struct/enum field types there. Bounds-safe. */
+fn lower_name_in_handle_list(name: string, list: Vec<i32>,
+                             source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    let n: i32 = vec_len(list);
+    let mut i: i32 = 0;
+    while i < n {
+        let h: i32 = vec_get(list, i);
+        if lower_tok_in_bounds(h, starts, ends) {
+            if string_eq(handle_to_str(h, source, starts, ends), name) {
+                return true;
+            }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
 fn emit_struct_td(name_h: i32,
                   fnames: Vec<i32>, ftypes: Vec<i32>,
                   foff: i32, fcount: i32,
@@ -4582,7 +4603,19 @@ fn emit_struct_td(name_h: i32,
     while i < fcount {
         let th: i32 = vec_get(ftypes, foff + i);
         let tname: string = handle_to_str(th, source, starts, ends);
-        let cty: string = ast_ty_to_c_string_with_user(tname, th, sn, en);
+        let mut cty: string = ast_ty_to_c_string_with_user(tname, th, sn, en);
+        /* Composed-compiler fallback: a field whose type is a user struct/enum
+           resolves to int under handle-equality (def-vs-use token mismatch); match
+           by text so `span: Span` emits `Span span;` not `int span;`. */
+        if string_eq(cty, "int") {
+            if lower_name_in_handle_list(tname, sn, source, starts, ends) {
+                cty = tname;
+            } else {
+                if lower_name_in_handle_list(tname, en, source, starts, ends) {
+                    cty = tname;
+                }
+            }
+        }
         let fname: string = handle_to_str(vec_get(fnames, foff + i), source, starts, ends);
         r = string_concat(r, "  ");
         r = string_concat(r, cty);
