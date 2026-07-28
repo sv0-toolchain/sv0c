@@ -2742,7 +2742,7 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
       sv0_box_store(_sv0t136, 4, _sv0t135.p3);
       sv0_vec_push(brk_blk, _sv0t136);
       int _sv0t137 = sv0_vec_new();
-      int empty_then = _sv0t137;
+      int empty_else = _sv0t137;
       Instr if_w;
       int _sv0t138 = sv0_box_alloc(4);
       sv0_box_store(_sv0t138, 0, neg_w.tag);
@@ -2751,8 +2751,8 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
       sv0_box_store(_sv0t138, 3, neg_w.p2);
       if_w.tag = 6;
       if_w.p0 = _sv0t138;
-      if_w.p1 = empty_then;
-      if_w.p2 = brk_blk;
+      if_w.p1 = brk_blk;
+      if_w.p2 = empty_else;
       int _sv0t139 = sv0_box_alloc(5);
       sv0_box_store(_sv0t139, 0, if_w.tag);
       sv0_box_store(_sv0t139, 1, if_w.p0);

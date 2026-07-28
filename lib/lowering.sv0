@@ -1272,8 +1272,12 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let neg_w: Expr = Expr::Unop(1, box_new(Value::VVar(ct_w)));
             let brk_blk: Vec<i32> = vec_new();
             vec_push(brk_blk, box_new(Instr::Break));
-            let empty_then: Vec<i32> = vec_new();
-            let if_w: Instr = Instr::IfElse(box_new(neg_w), empty_then, brk_blk);
+            let empty_else: Vec<i32> = vec_new();
+            /* if (!ct) { break } else {} — break when the condition is FALSE. The
+               break block is the THEN arm; putting it in the else arm inverts the
+               loop (breaks while the condition holds), miscompiling any while whose
+               condition needs sub-instructions, e.g. `while i < len - 1`. */
+            let if_w: Instr = Instr::IfElse(box_new(neg_w), brk_blk, empty_else);
             vec_push(loop_body, box_new(if_w));
             let mut bi: i32 = 0;
             while bi < vec_len(body_is) {
