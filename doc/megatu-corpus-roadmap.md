@@ -400,6 +400,19 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   500..599 in big files). `types.sv0` stays CCFAIL — its remaining errors are the
   parked struct-by-value cluster below (`passing int to parameter of type 'Ty'`).
 
+- Complex-while break inversion (ALL 3 RUNFAILs fixed — `include_expand`, `checker`,
+  `parser`): the complex-condition `while` path (condition needs sub-instructions,
+  e.g. `while i < len - 1` where `len - 1` is a Binop operand) built
+  `Instr::IfElse(!ct, empty_then, break_blk)` → emitted `if (!ct) {} else { break; }`,
+  i.e. it broke while the condition was TRUE — the loop ran zero or wrong iterations.
+  `path_ok("../escape")` returned true (the `..` scan never ran). A transliteration
+  error in lowering.sv0: the SML `lowering.sml` is correct, and the golden/self-host
+  (SML-compiled) never exercised it, so it only surfaced in the composed compiler.
+  The simple-condition path (empty `cond_is`, `while (cond) {..}`) was already correct,
+  so most loops worked. Fix: swap to `IfElse(!ct, break_blk, empty_else)` = `if (!ct)
+  { break }`. **PASS 84 → 87, RUNFAIL 3 → 0** (all three RUNFAILs were complex-while
+  miscompiles). Refreshed stage0 + vm-parity goldens.
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
