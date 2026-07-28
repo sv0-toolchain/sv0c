@@ -2719,7 +2719,8 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
-                    match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
+                    match_env_inherit: Vec<i32>, import_aliases: Vec<i32>,
+                    str_locals: Vec<i32>) -> i32 {
     let s_tag: i32 = vec_get(et, s_idx);
     if s_tag == 27 {
         let name_tok: i32 = vec_get(ed1, s_idx);
@@ -2730,6 +2731,9 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
            path segment (as in the tag-24 lowering). The let's own type annotation
            is not retained by the parser, so the init shape is the type source. */
         let mut let_declared: i32 = 0;
+        /* str_let: this let binds a string; its name joins str_locals so later
+           `let y = x` aliases resolve to const char* too. */
+        let mut str_let: i32 = 0;
         if init_idx >= 0 {
             if vec_get(et, init_idx) == 24 {
                 let sppc: i32 = vec_get(ed2, init_idx);
@@ -2770,6 +2774,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 let decl_str: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
                 vec_push(out_instrs, box_new(decl_str));
                 let_declared = 1;
+                str_let = 1;
             }
             /* String-returning user-function call init: same const char* decl. */
             if let_declared == 0 {
@@ -2779,6 +2784,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     let decl_su: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
                     vec_push(out_instrs, box_new(decl_su));
                     let_declared = 1;
+                    str_let = 1;
                 }
             }
             /* `let x = str_param` aliasing a string-typed parameter. */
@@ -2789,8 +2795,22 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     let decl_sp: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
                     vec_push(out_instrs, box_new(decl_sp));
                     let_declared = 1;
+                    str_let = 1;
                 }
             }
+            /* `let x = str_local` aliasing an earlier string-typed local. */
+            if let_declared == 0 {
+                if lower_ident_in_str_locals(et, ed1, ed2, pp, init_idx,
+                        str_locals, source, starts, ends) {
+                    let decl_sl: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
+                    vec_push(out_instrs, box_new(decl_sl));
+                    let_declared = 1;
+                    str_let = 1;
+                }
+            }
+        }
+        if str_let == 1 {
+            vec_push(str_locals, name_tok);
         }
         if let_declared == 0 {
             let decl: Instr = Instr::DeclVar(name_tok);
@@ -2857,13 +2877,16 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     let mut si: i32 = 0;
+    /* Running set of string-typed local name tokens for this block, so a later
+       `let y = x` aliasing an earlier string local declares const char*. */
+    let str_locals: Vec<i32> = vec_new();
     loop {
         if si >= stmts_count { break; }
         let s_idx: i32 = block_stmt_index(pp, stmts_first, block_sidecar, si);
         let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                   s_idx, ctr, out_instrs, enum_names,
                                   enum_tag_offsets, enum_tag_counts,
-                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, str_locals);
         si = si + 1;
     }
     if tail_idx >= 0 {
@@ -3327,6 +3350,37 @@ fn lower_init_ident_is_string_param(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             }
         }
         j = j + 1;
+    }
+    return false;
+}
+
+/* True when a `let` init is a bare 1-seg identifier naming a `string`-typed local
+   already declared earlier in the same block. str_locals holds the name tokens of
+   such locals (pushed by lower_block/lower_stmt as they declare string lets);
+   compared by TEXT. Handles `let s = spaces(..); let t = s;` chains. Bounds-safe. */
+fn lower_ident_in_str_locals(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>,
+        init_idx: i32, str_locals: Vec<i32>,
+        source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    if init_idx < 0 { return false; }
+    if init_idx >= vec_len(et) { return false; }
+    if vec_get(et, init_idx) != 1 { return false; }
+    if vec_get(ed2, init_idx) != 1 { return false; }
+    let pps: i32 = vec_get(ed1, init_idx);
+    if pps < 0 { return false; }
+    if pps >= vec_len(pp) { return false; }
+    let itok: i32 = vec_get(pp, pps);
+    if lower_tok_in_bounds(itok, starts, ends) != true { return false; }
+    let iname: string = handle_to_str(itok, source, starts, ends);
+    let n: i32 = vec_len(str_locals);
+    let mut i: i32 = 0;
+    while i < n {
+        let s: i32 = vec_get(str_locals, i);
+        if lower_tok_in_bounds(s, starts, ends) {
+            if string_eq(handle_to_str(s, source, starts, ends), iname) {
+                return true;
+            }
+        }
+        i = i + 1;
     }
     return false;
 }
@@ -7564,7 +7618,7 @@ fn test_lower_stmt_fn() -> i32 {
     let enum_vnames_flat: Vec<i32> = vec_new();
     let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                               1, ctr, out, en_n, en_to, en_tc, en_tf,
-                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) != 2 { return 2; }
     let mut out2: Vec<i32> = vec_new();
@@ -7575,7 +7629,7 @@ fn test_lower_stmt_fn() -> i32 {
     vec_push(ed4, 0);
     let rc2: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                2, ctr, out2, en_n, en_to, en_tc, en_tf,
-                               fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                               fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new(), vec_new());
     if rc2 != 0 { return 3; }
     return 0;
 }
