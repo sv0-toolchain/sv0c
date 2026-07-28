@@ -513,8 +513,15 @@ fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> s
     if h == lower_string_cty() {
         return "const char*";
     }
-    let n: string = name_of(h);
-    if !string_eq(n, "?") { return n; }
+    /* name_of maps handles 500..599 to tuple-field names (f<n>) for
+       megatu_field_name; a *type* token that lands in that range is a real source
+       token (large files reach 500+), not a field, so skip name_of there and
+       resolve via handle_to_str — the same collision fixed for megatu_val_name.
+       Below 500, name_of still resolves the int(9)/void(10) sentinels. */
+    if h < 500 {
+        let n: string = name_of(h);
+        if !string_eq(n, "?") { return n; }
+    }
     return handle_to_str(h, source, starts, ends);
 }
 
