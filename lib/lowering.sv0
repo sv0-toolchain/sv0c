@@ -393,6 +393,16 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 }
             }
             if bid == 0 {
+                /* A void-returning user fn (no `-> T`, or explicit `-> ()`) must
+                   lower to a void Call with dst=0, like the builtin void path
+                   below -- never `int _sv0tN = f(...)` (C rejects init from void). */
+                if lower_callee_is_void(et, ed1, ed2, pp, idx,
+                        item_tags, item_names, item_d2, tok_tags,
+                        source, starts, ends) {
+                    let void_call_instr: Instr = Instr::Call(0, callee_tok, arg_vals, 0);
+                    vec_push(out_instrs, box_new(void_call_instr));
+                    return Value::VUnit;
+                }
                 /* Type the result temp by the callee's return type: string ->
                    const char* sentinel; a user struct/enum -> its type name token
                    (else the int temp collides with the typed value downstream). */
@@ -3408,6 +3418,72 @@ fn lower_ident_in_str_locals(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec
         if lower_tok_in_bounds(s, starts, ends) {
             if string_eq(handle_to_str(s, source, starts, ends), iname) {
                 return true;
+            }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* True when a 1-seg ExprCall's callee is a top-level user function that returns
+   unit/void -- either no `-> T` at all, or an explicit `-> ()`. Used so such a
+   call lowers to a void Call(dst=0, ...) instead of `int _sv0tN = f(...)` (which
+   C rejects as init-from-void). Bounds-safe, mirrors lower_callee_ret_ty_head. */
+fn lower_callee_is_void(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>,
+        call_idx: i32, item_tags: Vec<i32>, item_names: Vec<i32>,
+        item_d2: Vec<i32>, tok_tags: Vec<i32>,
+        source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    if call_idx < 0 { return false; }
+    if call_idx >= vec_len(et) { return false; }
+    if vec_get(et, call_idx) != 4 { return false; }
+    let callee: i32 = vec_get(ed1, call_idx);
+    if callee < 0 { return false; }
+    if callee >= vec_len(et) { return false; }
+    if vec_get(et, callee) != 1 { return false; }
+    if vec_get(ed2, callee) != 1 { return false; }
+    let cpps: i32 = vec_get(ed1, callee);
+    if cpps < 0 { return false; }
+    if cpps >= vec_len(pp) { return false; }
+    let ctok: i32 = vec_get(pp, cpps);
+    if lower_tok_in_bounds(ctok, starts, ends) != true { return false; }
+    let cname: string = handle_to_str(ctok, source, starts, ends);
+    let n: i32 = vec_len(item_tags);
+    let nn: i32 = vec_len(item_names);
+    let nd: i32 = vec_len(item_d2);
+    let mut i: i32 = 0;
+    while i < n {
+        if i < nn {
+            if i < nd {
+                if vec_get(item_tags, i) == 0 {
+                    let nm: i32 = vec_get(item_names, i);
+                    if lower_tok_in_bounds(nm, starts, ends) {
+                        if string_eq(handle_to_str(nm, source, starts, ends), cname) {
+                            let packed: i32 = vec_get(item_d2, i);
+                            let has_ret: i32 = packed - (packed / 2) * 2;
+                            if has_ret == 0 {
+                                return true;
+                            }
+                            let p3: i32 = lower_scan_fn_ret_ty_tok(tok_tags,
+                                source, starts, ends, nm);
+                            let mut is_unit: i32 = 0;
+                            if p3 >= 0 {
+                                if p3 < vec_len(tok_tags) {
+                                    if p3 + 1 < vec_len(tok_tags) {
+                                        if vec_get(tok_tags, p3) == 6 {
+                                            if vec_get(tok_tags, p3 + 1) == 7 {
+                                                is_unit = 1;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if is_unit == 1 {
+                                return true;
+                            }
+                            return false;
+                        }
+                    }
+                }
             }
         }
         i = i + 1;
