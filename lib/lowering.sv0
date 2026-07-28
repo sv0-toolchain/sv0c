@@ -393,14 +393,21 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 }
             }
             if bid == 0 {
-                /* A user fn returning `string` must type its result temp as
-                   const char* (rt_h = string sentinel), else the int temp
-                   collides with the const char* the emit expects downstream. */
+                /* Type the result temp by the callee's return type: string ->
+                   const char* sentinel; a user struct/enum -> its type name token
+                   (else the int temp collides with the typed value downstream). */
                 let mut rt_u: i32 = 0;
                 if lower_call_ret_is_string(et, ed1, ed2, pp, idx,
                         item_tags, item_names, item_d2, tok_tags,
                         source, starts, ends) {
                     rt_u = lower_string_cty();
+                } else {
+                    let uty_c: i32 = lower_call_ret_user_ty_tok(et, ed1, ed2, pp,
+                        idx, item_tags, item_names, item_d2, tok_tags,
+                        source, starts, ends);
+                    if uty_c >= 0 {
+                        rt_u = uty_c;
+                    }
                 }
                 let call_instr: Instr = Instr::Call(t, callee_tok, arg_vals, rt_u);
                 vec_push(out_instrs, box_new(call_instr));
@@ -562,6 +569,17 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             source, starts, ends, item_fn_row) {
                         let decl_spb: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
                         vec_push(out_instrs, box_new(decl_spb));
+                        let_declared = 1;
+                    }
+                }
+                /* `let x = f(..)` where f returns a user struct/enum. */
+                if let_declared == 0 {
+                    let uty_lb: i32 = lower_call_ret_user_ty_tok(et, ed1, ed2, pp,
+                        init_idx, item_tags, item_names, item_d2, tok_tags,
+                        source, starts, ends);
+                    if uty_lb >= 0 {
+                        let decl_utb: Instr = Instr::DeclNamed(uty_lb, name_tok);
+                        vec_push(out_instrs, box_new(decl_utb));
                         let_declared = 1;
                     }
                 }
@@ -2808,6 +2826,18 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     str_let = 1;
                 }
             }
+            /* `let x = f(..)` where f returns a user struct/enum: declare x with
+               that type (the call temp is typed likewise via the Call rt_h). */
+            if let_declared == 0 {
+                let uty_ls: i32 = lower_call_ret_user_ty_tok(et, ed1, ed2, pp,
+                    init_idx, item_tags, item_names, item_d2, tok_tags,
+                    source, starts, ends);
+                if uty_ls >= 0 {
+                    let decl_ut: Instr = Instr::DeclNamed(uty_ls, name_tok);
+                    vec_push(out_instrs, box_new(decl_ut));
+                    let_declared = 1;
+                }
+            }
         }
         if str_let == 1 {
             vec_push(str_locals, name_tok);
@@ -3383,6 +3413,102 @@ fn lower_ident_in_str_locals(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec
         i = i + 1;
     }
     return false;
+}
+
+/* Return-type head token of a 1-seg ExprCall to a top-level user function (has a
+   `-> T`), or -1. The shared front-end of the string-return and user-type-return
+   detection. Bounds-safe (runs on synthetic arenas in the lowering unit tests). */
+fn lower_callee_ret_ty_head(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>,
+        call_idx: i32, item_tags: Vec<i32>, item_names: Vec<i32>,
+        item_d2: Vec<i32>, tok_tags: Vec<i32>,
+        source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    if call_idx < 0 { return 0 - 1; }
+    if call_idx >= vec_len(et) { return 0 - 1; }
+    if vec_get(et, call_idx) != 4 { return 0 - 1; }
+    let callee: i32 = vec_get(ed1, call_idx);
+    if callee < 0 { return 0 - 1; }
+    if callee >= vec_len(et) { return 0 - 1; }
+    if vec_get(et, callee) != 1 { return 0 - 1; }
+    if vec_get(ed2, callee) != 1 { return 0 - 1; }
+    let cpps: i32 = vec_get(ed1, callee);
+    if cpps < 0 { return 0 - 1; }
+    if cpps >= vec_len(pp) { return 0 - 1; }
+    let ctok: i32 = vec_get(pp, cpps);
+    if lower_tok_in_bounds(ctok, starts, ends) != true { return 0 - 1; }
+    let cname: string = handle_to_str(ctok, source, starts, ends);
+    let n: i32 = vec_len(item_tags);
+    let nn: i32 = vec_len(item_names);
+    let nd: i32 = vec_len(item_d2);
+    let mut i: i32 = 0;
+    while i < n {
+        if i < nn {
+            if i < nd {
+                if vec_get(item_tags, i) == 0 {
+                    let nm: i32 = vec_get(item_names, i);
+                    if lower_tok_in_bounds(nm, starts, ends) {
+                        if string_eq(handle_to_str(nm, source, starts, ends), cname) {
+                            let packed: i32 = vec_get(item_d2, i);
+                            if packed % 2 == 1 {
+                                let p3: i32 = lower_scan_fn_ret_ty_tok(tok_tags,
+                                    source, starts, ends, nm);
+                                if lower_tok_in_bounds(p3, starts, ends) {
+                                    return p3;
+                                }
+                            }
+                            return 0 - 1;
+                        }
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* True if `name` (by TEXT) is a top-level user struct (ItemStruct tag 1) or enum
+   (ItemEnum tag 2). Used to decide a call-result temp / let local should carry the
+   user type name, not int. */
+fn lower_name_is_user_type(name: string, item_tags: Vec<i32>, item_names: Vec<i32>,
+        source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    let n: i32 = vec_len(item_tags);
+    let nn: i32 = vec_len(item_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if i < nn {
+            let t: i32 = vec_get(item_tags, i);
+            let mut is_ty: i32 = 0;
+            if t == 1 { is_ty = 1; }
+            if t == 2 { is_ty = 1; }
+            if is_ty == 1 {
+                let nm: i32 = vec_get(item_names, i);
+                if lower_tok_in_bounds(nm, starts, ends) {
+                    if string_eq(handle_to_str(nm, source, starts, ends), name) {
+                        return true;
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* Return-type name token of a 1-seg user call whose return type is a user
+   struct/enum (so a `let x = f(..)` / the call temp gets `T`, not int), else -1.
+   The struct/enum-return analog of lower_call_ret_is_string. */
+fn lower_call_ret_user_ty_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>,
+        call_idx: i32, item_tags: Vec<i32>, item_names: Vec<i32>,
+        item_d2: Vec<i32>, tok_tags: Vec<i32>,
+        source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let head: i32 = lower_callee_ret_ty_head(et, ed1, ed2, pp, call_idx,
+        item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+    if head < 0 { return 0 - 1; }
+    let rty: string = handle_to_str(head, source, starts, ends);
+    if lower_name_is_user_type(rty, item_tags, item_names, source, starts, ends) {
+        return head;
+    }
+    return 0 - 1;
 }
 
 /* True if a `let` init evaluates to a `string` (const char*): a string literal
