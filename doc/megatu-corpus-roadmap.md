@@ -389,6 +389,17 @@ generics on functions, and `impl`/method calls. Split any that turn out large.
   to a fixed spec; verified here: compile-run OK, no parity regression, goldens
   refreshed, full suite green.) Refreshed stage0 + vm-parity goldens.
 
+- Type-token / tuple-field name collision (`types.sv0`, contributes): a DeclNamed
+  type token that lands in `name_of`'s 500..599 range (tuple-field names `f<n>`, used
+  by `megatu_field_name`) rendered the type as `f9` instead of its real name (e.g.
+  `f9 us;` for a `Ty` enum local in the large types.sv0). `megatu_ty_name` consulted
+  `name_of` unconditionally — the same collision fixed earlier for `megatu_val_name`.
+  Fix: only consult `name_of` for `h < 500` (keeps the int(9)/void(10) sentinels);
+  resolve `h >= 500` via `handle_to_str`. Emit-only. `us` now declares `Ty`; f9 class
+  gone. This also hardens the user-type-return typing (its type tokens can land in
+  500..599 in big files). `types.sv0` stays CCFAIL — its remaining errors are the
+  parked struct-by-value cluster below (`passing int to parameter of type 'Ty'`).
+
 **Parked (large): struct-by-value representation.** After the box fix, `ir.sv0` and
 `unify.sv0` reduce to one error class — `passing 'int' to parameter of incompatible
 type 'Value'/'Ty'` — and `span.sv0` to `assigning to 'int' from incompatible type
