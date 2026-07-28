@@ -555,6 +555,16 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         let_declared = 1;
                     }
                 }
+                /* `let x = str_param` aliasing a string-typed parameter. */
+                if let_declared == 0 {
+                    if lower_init_ident_is_string_param(et, ed1, ed2, pp, init_idx,
+                            item_tags, item_names, item_d3, tok_tags,
+                            source, starts, ends, item_fn_row) {
+                        let decl_spb: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
+                        vec_push(out_instrs, box_new(decl_spb));
+                        let_declared = 1;
+                    }
+                }
             }
             if let_declared == 0 {
                 let decl: Instr = Instr::DeclVar(name_tok);
@@ -2771,6 +2781,16 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     let_declared = 1;
                 }
             }
+            /* `let x = str_param` aliasing a string-typed parameter. */
+            if let_declared == 0 {
+                if lower_init_ident_is_string_param(et, ed1, ed2, pp, init_idx,
+                        item_tags, item_names, item_d3, tok_tags,
+                        source, starts, ends, item_fn_row) {
+                    let decl_sp: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
+                    vec_push(out_instrs, box_new(decl_sp));
+                    let_declared = 1;
+                }
+            }
         }
         if let_declared == 0 {
             let decl: Instr = Instr::DeclVar(name_tok);
@@ -3249,6 +3269,64 @@ fn lower_call_ret_is_string(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<
             }
         }
         i = i + 1;
+    }
+    return false;
+}
+
+/* True when a `let` init is a bare 1-seg identifier that names a `string`-typed
+   parameter of the current function (item_fn_row). Handles `let x = str_param`
+   aliasing so x is declared const char* not int. Uses the same param name/type
+   token scan the match-scrutinee typing uses. Fully bounds-checked; returns
+   false for item_fn_row < 0 (the case in every lowering unit test), so the
+   non-bounds-safe param scan is never reached on synthetic arenas. */
+fn lower_init_ident_is_string_param(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+        pp: Vec<i32>, init_idx: i32,
+        item_tags: Vec<i32>, item_names: Vec<i32>, item_d3: Vec<i32>,
+        tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>,
+        item_fn_row: i32) -> bool {
+    if init_idx < 0 { return false; }
+    if init_idx >= vec_len(et) { return false; }
+    if vec_get(et, init_idx) != 1 { return false; }
+    if vec_get(ed2, init_idx) != 1 { return false; }
+    let pps: i32 = vec_get(ed1, init_idx);
+    if pps < 0 { return false; }
+    if pps >= vec_len(pp) { return false; }
+    let itok: i32 = vec_get(pp, pps);
+    if lower_tok_in_bounds(itok, starts, ends) != true { return false; }
+    if item_fn_row < 0 { return false; }
+    if item_fn_row >= vec_len(item_tags) { return false; }
+    if item_fn_row >= vec_len(item_names) { return false; }
+    if item_fn_row >= vec_len(item_d3) { return false; }
+    if vec_get(item_tags, item_fn_row) != 0 { return false; }
+    let pc: i32 = vec_get(item_d3, item_fn_row);
+    if pc <= 0 { return false; }
+    let name_tok: i32 = vec_get(item_names, item_fn_row);
+    if name_tok < 0 { return false; }
+    if name_tok + 1 >= vec_len(tok_tags) { return false; }
+    let pnames: Vec<i32> = vec_new();
+    let pty: Vec<i32> = vec_new();
+    let rs: i32 = lower_scan_item_fn_param_names_ty_toks(tok_tags, name_tok,
+        pc, pnames, pty);
+    if rs < 0 { return false; }
+    if vec_len(pnames) != pc { return false; }
+    if vec_len(pty) != pc { return false; }
+    let iname: string = handle_to_str(itok, source, starts, ends);
+    let mut j: i32 = 0;
+    while j < pc {
+        let pn: i32 = vec_get(pnames, j);
+        let pt: i32 = vec_get(pty, j);
+        if lower_tok_in_bounds(pn, starts, ends) {
+            if lower_tok_in_bounds(pt, starts, ends) {
+                if string_eq(handle_to_str(pn, source, starts, ends), iname) {
+                    if string_eq(handle_to_str(pt, source, starts, ends),
+                                 "string") {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+        }
+        j = j + 1;
     }
     return false;
 }
