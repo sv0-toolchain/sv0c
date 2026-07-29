@@ -445,11 +445,22 @@ fix by comparing by TEXT. Bite-sized pieces, each independently landable:
 3. **Struct-typed locals / temps.** `let z = struct_expr` (construction, field access
    `sp.start`, index) still declared `int`. Extend the return-type typing
    (`lower_call_ret_user_ty_tok`) to struct construction and field-access results.
-4. **Boxed struct deref (recursive types: `types`/`ir`/`unify`).** `let d =
-   box_deref(bt)` emits `int d = sv0__box_deref_raw(bt, int)` but `d` is a `Ty` struct
-   (`ty_tag(d)` wants `Ty`, `d.tag` needs a struct). The runtime macros already box
-   whole structs by `sizeof`; the emit must deref to the box's element type (from the
-   `Box<T>` field type), not hardcode `int`. The recursive-type core.
+4. **Boxed struct deref (recursive types: `ir` is 1 error away; `types`/`unify`).**
+   `let inner: Value = box_deref(bv)` emits `int inner`/`int _t = sv0__box_deref_raw(
+   bv, int)` then `inner = _t`, but `inner` is a `Value` struct (`value_tag(inner)`
+   wants `Value`). The runtime macros already box/unbox whole structs by `sizeof` — the
+   fix is to give box_deref the element type. Cleanest source: the discarded `let`
+   annotation. Concrete plan: (a) `parse_let_stmt` (parser.sv0) retains the type head
+   token — replace `type_flag = 0` with `type_flag = p3 + 1` (the token after `:`);
+   LetStmt d2 becomes the type token or -1, and d2 is currently unread by consumers.
+   (b) The let-handlers, when init is a `box_deref(bv)` call and d2 is a user
+   struct/enum, build the box_deref `Instr::Call` with `rt_h` = the type token (and
+   DeclNamed the let with it). (c) The megaTU-main Call emit: for box_deref (bid 13)
+   with `rt_h != 0`, type the result temp via `megatu_ty_name(rt_h)` (not the hardcoded
+   `megatu_builtin_ret_cty` int) and append `, <that type>` instead of `, int`.
+   NOTE: declaring `inner` Value alone just moves the error to `inner = _t` — the temp
+   AND the deref type must change together. Coordinated parser+lowering+emit +
+   parser/lowering golden refresh. This unblocks the recursive-type modules.
 5. **`member reference base type 'int' is not a struct`.** A value that should be a
    struct is `int`, then `.tag`/`.p0`-accessed — a downstream symptom of (3)/(4);
    should clear once values are typed.
