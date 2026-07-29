@@ -4111,9 +4111,14 @@ static int lower_match_arms(int et, int ed1, int ed2, int ed3, int ed4, int pp, 
                         }
                         int _sv0t133 = lower_pat_struct_field_payload_index(tok_tags, source, starts, ends, vn_h4, sfc, fnam_tok);
                         int pi = _sv0t133;
-                        if ((pi >= 0)) {
+                        int pif = pi;
+                        if ((pif < 0)) {
+                          pif = fj;
+                        } else {
+                        }
+                        if ((pif >= 0)) {
                           int _sv0t134 = (0 - 10);
-                          int pay = (_sv0t134 - pi);
+                          int pay = (_sv0t134 - pif);
                           Value rhsv;
                           Value _sv0t135;
                           _sv0t135.tag = 3;

@@ -3222,6 +3222,31 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                     }
                 }
             }
+            /* PatStruct enum struct-variant (`Variant { w, h }`): bind each field
+               shorthand PatBind as TY_INT. Mirrors PatEnum(5) but the meta is
+               ExprPatStructMeta (tag 32) not ExprPatEnumMeta (33). */
+            if arm_pt == 4 {
+                let spx: i32 = vec_get(ed2, arm_idx);
+                let spc: i32 = vec_get(ed3, spx);
+                if spc > 0 {
+                    let spm: i32 = spx - 1;
+                    if vec_get(et, spm) == 32 {
+                        let spac: i32 = vec_get(ed1, spm);
+                        let spfe: i32 = vec_get(ed2, spm);
+                        let mut spj: i32 = 0;
+                        while spj < spac {
+                            let spei: i32 = spfe + spj;
+                            if vec_get(et, spei) == 31 {
+                                if vec_get(ed4, spei) == 1 {
+                                    env_extend(env_names, env_types, env_muts,
+                                               vec_get(ed1, spei), TY_INT(), 0);
+                                }
+                            }
+                            spj = spj + 1;
+                        }
+                    }
+                }
+            }
             if guard_idx >= 0 {
                 let g_ty: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
                                             source, starts, ends,
