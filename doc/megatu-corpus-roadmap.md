@@ -479,6 +479,16 @@ Sequence: (2) is an independent correctness bug (do next); (3) unblocks the most
 Each piece: fix in lowering.sv0/megaTU-main.sv0, run `./scripts/sv0 test`, refresh
 stage0+vm-parity goldens (lowering.sv0 edits only), verify no parity regression.
 
+- Strings in if-expression results (`driver.sv0` PASSES): `let s = if c { emit(..) }
+  else { "!" }` and bare `if c { "a" } else { "b" }` typed the if-expr result temps
+  (and the binding) `int`, then string ops rejected them. New `lower_expr_yields_string`
+  recurses the value positions that carry a string — a block tail (tag 9, ed3) and an
+  if-expr then branch (tag 10, ed2) — and treats string literals, string-returning
+  builtins AND user functions (`lower_call_ret_is_string`) as strings. Wired into
+  `lower_tag_if` (declare the result temps `const char*` when a branch yields a string)
+  and both let-handlers (a let whose init yields a string). driver.sv0 18 → 0, PASSes.
+  **PASS 94 → 95, CCFAIL 2 → 1 (only `lowering.sv0` left).**
+
 **Stop rule.** A module that needs a genuinely big feature (e.g. full generics or
 trait resolution) should be parked with a note here rather than forced — keep tasks
 bite-sized.

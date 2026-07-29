@@ -557,8 +557,9 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         }
                     }
                 }
-                /* String-typed let (string literal / string-returning builtin). */
-                if lower_init_is_string(et, ed1, ed2, pp, init_idx, source, starts, ends) {
+                /* String-typed let (literal / string builtin / block or if-expr
+                   whose value is a string). */
+                if lower_expr_yields_string(et, ed1, ed2, ed3, pp, init_idx, item_tags, item_names, item_d2, tok_tags, source, starts, ends) {
                     let decl_sb: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
                     vec_push(out_instrs, box_new(decl_sb));
                     let_declared = 1;
@@ -695,10 +696,25 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let e_lit: Expr = Expr::Literal(box_new(ve));
         let e_store: Instr = Instr::Store(u, box_new(e_lit));
         vec_push(else_instrs, box_new(e_store));
-        let decl_t: Instr = Instr::DeclVar(t);
-        let decl_u: Instr = Instr::DeclVar(u);
-        vec_push(out_instrs, box_new(decl_t));
-        vec_push(out_instrs, box_new(decl_u));
+        /* Type the result temps: if the branches yield strings, declare them
+           const char* (via the string sentinel) so `if c { "a" } else { "b" }`
+           and any downstream string op typecheck; else plain int. */
+        let mut if_is_str: i32 = 0;
+        if lower_expr_yields_string(et, ed1, ed2, ed3, pp, then_idx,
+                item_tags, item_names, item_d2, tok_tags, source, starts, ends) {
+            if_is_str = 1;
+        }
+        if lower_expr_yields_string(et, ed1, ed2, ed3, pp, else_idx,
+                item_tags, item_names, item_d2, tok_tags, source, starts, ends) {
+            if_is_str = 1;
+        }
+        if if_is_str == 1 {
+            vec_push(out_instrs, box_new(Instr::DeclNamed(lower_string_cty(), t)));
+            vec_push(out_instrs, box_new(Instr::DeclNamed(lower_string_cty(), u)));
+        } else {
+            vec_push(out_instrs, box_new(Instr::DeclVar(t)));
+            vec_push(out_instrs, box_new(Instr::DeclVar(u)));
+        }
         let if_instr: Instr = Instr::IfElse(box_new(cond_expr),
                                               then_instrs, else_instrs);
         vec_push(out_instrs, box_new(if_instr));
@@ -2820,9 +2836,9 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     }
                 }
             }
-            /* String-typed let (string literal or string-returning builtin call):
-               declare `const char*` (lower_string_cty sentinel) not int. */
-            if lower_init_is_string(et, ed1, ed2, pp, init_idx, source, starts, ends) {
+            /* String-typed let (string literal, string-returning builtin call, or a
+               block/if-expr whose value is a string): declare `const char*`. */
+            if lower_expr_yields_string(et, ed1, ed2, ed3, pp, init_idx, item_tags, item_names, item_d2, tok_tags, source, starts, ends) {
                 let decl_str: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
                 vec_push(out_instrs, box_new(decl_str));
                 let_declared = 1;
@@ -3704,6 +3720,38 @@ fn lower_init_is_string(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>
                 if string_eq(nm, "read_dir") { return true; }
             }
         }
+    }
+    return false;
+}
+
+/* True if the expression at `idx` evaluates to a `string`: a string literal, a
+   string-returning builtin OR user function call, or — recursing — a block's tail
+   (tag 9, ed3) or an if-expr's then branch (tag 10, ed2). Used to type a string-
+   valued let and an if-expression result temp as const char* (e.g.
+   `let s: string = if c { emit(..) } else { "!" }` whose branches are user calls). */
+fn lower_expr_yields_string(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+        ed3: Vec<i32>, pp: Vec<i32>, idx: i32,
+        item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
+        tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    if idx < 0 { return false; }
+    if idx >= vec_len(et) { return false; }
+    if lower_init_is_string(et, ed1, ed2, pp, idx, source, starts, ends) {
+        return true;
+    }
+    if lower_call_ret_is_string(et, ed1, ed2, pp, idx, item_tags, item_names,
+            item_d2, tok_tags, source, starts, ends) {
+        return true;
+    }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 9 {
+        return lower_expr_yields_string(et, ed1, ed2, ed3, pp,
+            vec_get(ed3, idx), item_tags, item_names, item_d2, tok_tags,
+            source, starts, ends);
+    }
+    if tag == 10 {
+        return lower_expr_yields_string(et, ed1, ed2, ed3, pp,
+            vec_get(ed2, idx), item_tags, item_names, item_d2, tok_tags,
+            source, starts, ends);
     }
     return false;
 }
