@@ -430,11 +430,18 @@ fix by comparing by TEXT. Bite-sized pieces, each independently landable:
    emitted `int span;` because `is_struct_cty`/`is_enum_cty` compare handles by
    equality (def-vs-use token mismatch in the composed compiler). Added a text
    fallback in `emit_struct_td` (`lower_name_in_handle_list`). `span.sv0` 10 → 8 err.
-2. **Struct-literal field/value scramble.** `span_new`'s `Span { file: f, start_line:
-   s.line, .. }` emits misaligned assignments (`_t.file = s.offset`, `_t.start_line =
-   e`) when field values are themselves field accesses (extra instrs) — a non-
-   contiguous field-value alignment bug in the struct-literal lowering (same family as
-   the call-args / match-arm sidecar). Likely the highest-value correctness piece.
+2. **Struct-literal field/value scramble (DONE — `span.sv0` PASSES).** `span_new`'s
+   `Span { file: f, start_line: s.line, .. }` emitted misaligned assignments
+   (`_t.file = s.offset`) because lowering read field values as `idx - fc + fi`
+   (contiguous), which breaks when values are field accesses (non-contiguous roots).
+   Fix: `sf_names` is now **stride-2** per field (`[name_tok, value_root]`) — the
+   parser (`parse_struct_fields`) records `vec_len(et) - 1` after each field value,
+   `fc = (delta)/2`, and lowering reads name at `sf0 + fi*2`, value root at
+   `sf0 + fi*2 + 1`. `sf_names` has exactly one reader (lowering tag-24), so no new
+   pipeline threading. Updated the two synthetic lowering struct-lit tests to stride-2.
+   `span.sv0` 8 → 0 (PASS); PASS 87 → 88. (Nested struct-lit *values* remain
+   unsupported — they'd pollute the stride-2 interleave — but that was already
+   miscounted by the old `fc` logic; not a corpus case.)
 3. **Struct-typed locals / temps.** `let z = struct_expr` (construction, field access
    `sp.start`, index) still declared `int`. Extend the return-type typing
    (`lower_call_ret_user_ty_tok`) to struct construction and field-access results.
