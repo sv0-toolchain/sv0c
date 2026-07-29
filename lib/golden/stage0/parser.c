@@ -3767,7 +3767,7 @@ static int parse_let_stmt(int tags, int starts, int ends, const char* source, in
       return _sv0t15;
     } else {
     }
-    type_flag = 0;
+    type_flag = (p3 + 1);
     p3 = pt2;
   } else {
   }
@@ -9368,7 +9368,7 @@ static int test_parse_block_let(void) {
   } else {
   }
   int _sv0t13 = sv0_vec_get(ed2v, 1);
-  if ((_sv0t13 != 0)) {
+  if ((_sv0t13 != 4)) {
     return 5;
   } else {
   }

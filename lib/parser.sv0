@@ -1184,7 +1184,7 @@ fn parse_pat(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     26 ExprArray    : d1=first_elem_idx, d2=elem_count
 
    Stmt-like nodes (also in the expr arena, referenced by ExprBlock):
-    27 LetStmt      : d1=name_tok_pos, d2=type_flag(0=present,-1=none), d3=init_idx(-1=none), d4=is_mut(0/1)
+    27 LetStmt      : d1=name_tok_pos, d2=annotation type-head token (-1=none), d3=init_idx(-1=none), d4=is_mut(0/1)
     28 SemiStmt     : d1=expr_idx
 
    Match arm nodes (also in expr arena, referenced by ExprMatch):
@@ -2293,7 +2293,11 @@ fn parse_let_stmt(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         let pt2: i32 = parse_type(tags, starts, ends, source, p3 + 1,
                                    tytt, tyd1, tyd2, tyd3, pp);
         if pt2 < 0 { return 0 - 1; }
-        type_flag = 0;
+        /* Retain the annotation's type-head token (the token right after `:`) in
+           LetStmt d2 (was a bare 0/-1 present flag, unread by consumers) so the
+           lowering can recover the declared type — e.g. `let x: Value = box_deref(..)`
+           needs the element type Value to type the deref. -1 still means no annotation. */
+        type_flag = p3 + 1;
         p3 = pt2;
     }
     let mut init_idx: i32 = 0 - 1;
@@ -5117,7 +5121,9 @@ fn test_parse_block_let() -> i32 {
     if vec_get(et, 0) != 0 { return 2; }
     if vec_get(et, 1) != 27 { return 3; }
     if vec_get(ed1v, 1) != 2 { return 4; }
-    if vec_get(ed2v, 1) != 0 { return 5; }
+    /* LetStmt d2 now holds the annotation type-head token (was a bare 0 flag): for
+       `let x: i32`, the `:` is token 3, so the type head `i32` is token 4. */
+    if vec_get(ed2v, 1) != 4 { return 5; }
     if vec_get(ed3v, 1) != 0 { return 6; }
     if vec_get(ed4v, 1) != 0 { return 7; }
     if vec_get(et, 2) != 1 { return 8; }

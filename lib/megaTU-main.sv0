@@ -738,11 +738,19 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
         codegen_Instr::Call(dst_h, fn_h, args, rt_h) => {
             let mut arg_str: string = megatu_emit_call_args(args, source, starts, ends);
             /* box_deref lowers to a Call to builtin 13; sv0__box_deref_raw(h, T)
-               takes the target C type as a second argument. Every composed value
-               is an int handle, so the reconstructed type is always `int`. */
+               takes the target C type as a second argument. Default `int` (values
+               are int handles), but a typed box_deref (rt_h set — a `let x: T =
+               box_deref(..)` on a user struct/enum) reconstructs the element type T
+               so the whole struct is recovered, not just its first word. */
             if fn_h < 0 {
                 if (0 - fn_h) == 13 {
-                    arg_str = string_concat(arg_str, ", int");
+                    if rt_h != 0 {
+                        arg_str = string_concat(arg_str, ", ");
+                        arg_str = string_concat(arg_str,
+                            megatu_ty_name(rt_h, source, starts, ends));
+                    } else {
+                        arg_str = string_concat(arg_str, ", int");
+                    }
                 }
             }
             /* A builtin call is lowered as Call with a NEGATIVE fn handle: the
@@ -766,6 +774,12 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let mut ret_name: string = "int";
             if fn_h < 0 {
                 ret_name = megatu_builtin_ret_cty(0 - fn_h);
+                /* Typed box_deref: the result temp carries the element type T. */
+                if (0 - fn_h) == 13 {
+                    if rt_h != 0 {
+                        ret_name = megatu_ty_name(rt_h, source, starts, ends);
+                    }
+                }
             } else {
                 if rt_h != 0 {
                     ret_name = megatu_ty_name(rt_h, source, starts, ends);
