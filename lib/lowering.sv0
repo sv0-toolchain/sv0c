@@ -598,8 +598,12 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 /* `let x: T = box_deref(bv)` with T a user struct/enum. */
                 if let_declared == 0 {
                     let bdb: i32 = lower_typed_box_deref_let(et, ed1, ed2, ed3, ed4,
-                        pp, init_idx, name_tok, vec_get(ed2, s_idx), out_instrs,
-                        item_tags, item_names, source, starts, ends);
+                        pp, tok_tags, init_idx, name_tok, vec_get(ed2, s_idx), ctr,
+                        out_instrs, enum_names, enum_tag_offsets, enum_tag_counts,
+                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source,
+                        starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                        item_field_counts, enum_vnames_flat, item_fn_row,
+                        match_env_inherit, import_aliases);
                     if bdb == 1 {
                         let_declared = 1;
                         init_handled = 1;
@@ -2892,8 +2896,12 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                typed box_deref Call (declare + reconstruct element type T). */
             if let_declared == 0 {
                 let bd: i32 = lower_typed_box_deref_let(et, ed1, ed2, ed3, ed4, pp,
-                    init_idx, name_tok, vec_get(ed2, s_idx), out_instrs,
-                    item_tags, item_names, source, starts, ends);
+                    tok_tags, init_idx, name_tok, vec_get(ed2, s_idx), ctr,
+                    out_instrs, enum_names, enum_tag_offsets, enum_tag_counts,
+                    enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source,
+                    starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                    item_field_counts, enum_vnames_flat, item_fn_row,
+                    match_env_inherit, import_aliases);
                 if bd == 1 {
                     let_declared = 1;
                     init_handled = 1;
@@ -3648,10 +3656,16 @@ fn lower_call_ret_user_ty_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Ve
    Ty/Value/Expr struct. Returns 1 if handled, 0 to fall back to generic lowering.
    `ann_tok` is the retained let annotation head token (LetStmt d2), or -1. */
 fn lower_typed_box_deref_let(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
-        ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
-        init_idx: i32, name_tok: i32, ann_tok: i32, out_instrs: Vec<i32>,
-        item_tags: Vec<i32>, item_names: Vec<i32>,
-        source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+        ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>, tok_tags: Vec<i32>,
+        init_idx: i32, name_tok: i32, ann_tok: i32, ctr: Vec<i32>,
+        out_instrs: Vec<i32>,
+        enum_names: Vec<i32>, enum_tag_offsets: Vec<i32>, enum_tag_counts: Vec<i32>,
+        enum_tags_flat: Vec<i32>, fn_ctx: Vec<i32>, builtin_map: Vec<i32>,
+        lit_sf_names: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>,
+        item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
+        item_d3: Vec<i32>, item_d4: Vec<i32>, item_field_counts: Vec<i32>,
+        enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+        match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     if ann_tok < 0 { return 0; }
     if lower_tok_in_bounds(ann_tok, starts, ends) != true { return 0; }
     let ann_name: string = handle_to_str(ann_tok, source, starts, ends);
@@ -3680,14 +3694,13 @@ fn lower_typed_box_deref_let(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let arg_idx: i32 = block_stmt_index(pp, args_first, args_sidecar, 0);
     if arg_idx < 0 { return 0; }
     if arg_idx >= vec_len(et) { return 0; }
-    /* Only a simple variable arg (1-seg ExprPath); complex args fall back. */
-    if vec_get(et, arg_idx) != 1 { return 0; }
-    if vec_get(ed2, arg_idx) != 1 { return 0; }
-    let arg_pps: i32 = vec_get(ed1, arg_idx);
-    if arg_pps < 0 { return 0; }
-    if arg_pps >= vec_len(pp) { return 0; }
-    let arg_tok: i32 = vec_get(pp, arg_pps);
-    let av: Value = Value::VVar(arg_tok);
+    /* Lower the arg (simple var OR complex, e.g. box_deref(vec_get(..))) to a
+       value; its instrs go into out_instrs before the box_deref Call. */
+    let av: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+        arg_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts,
+        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
+        item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
+        enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
     let args: Vec<i32> = vec_new();
     vec_push(args, box_new(av));
     let call: Instr = Instr::Call(name_tok, 0 - 13, args, ann_tok);

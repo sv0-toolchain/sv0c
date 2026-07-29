@@ -78,7 +78,7 @@ static int lower_callee_is_void(int et, int ed1, int ed2, int pp, int call_idx, 
 static int lower_callee_ret_ty_head(int et, int ed1, int ed2, int pp, int call_idx, int item_tags, int item_names, int item_d2, int tok_tags, const char* source, int starts, int ends);
 static int lower_name_is_user_type(const char* name, int item_tags, int item_names, const char* source, int starts, int ends);
 static int lower_call_ret_user_ty_tok(int et, int ed1, int ed2, int pp, int call_idx, int item_tags, int item_names, int item_d2, int tok_tags, const char* source, int starts, int ends);
-static int lower_typed_box_deref_let(int et, int ed1, int ed2, int ed3, int ed4, int pp, int init_idx, int name_tok, int ann_tok, int out_instrs, int item_tags, int item_names, const char* source, int starts, int ends);
+static int lower_typed_box_deref_let(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int init_idx, int name_tok, int ann_tok, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int enum_vnames_flat, int item_fn_row, int match_env_inherit, int import_aliases);
 static int lower_init_is_string(int et, int ed1, int ed2, int pp, int init_idx, const char* source, int starts, int ends);
 static int lower_expr_yields_string(int et, int ed1, int ed2, int ed3, int pp, int idx, int item_tags, int item_names, int item_d2, int tok_tags, const char* source, int starts, int ends);
 static int fresh_tmp_name(int counter);
@@ -1424,7 +1424,7 @@ static Value lower_tag_block(int et, int ed1, int ed2, int ed3, int ed4, int pp,
         }
         if ((let_declared == 0)) {
           int _sv0t38 = sv0_vec_get(ed2, s_idx);
-          int _sv0t39 = lower_typed_box_deref_let(et, ed1, ed2, ed3, ed4, pp, init_idx, name_tok, _sv0t38, out_instrs, item_tags, item_names, source, starts, ends);
+          int _sv0t39 = lower_typed_box_deref_let(et, ed1, ed2, ed3, ed4, pp, tok_tags, init_idx, name_tok, _sv0t38, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
           int bdb = _sv0t39;
           if ((bdb == 1)) {
             let_declared = 1;
@@ -5446,7 +5446,7 @@ static int lower_stmt(int et, int ed1, int ed2, int ed3, int ed4, int pp, int to
       }
       if ((let_declared == 0)) {
         int _sv0t36 = sv0_vec_get(ed2, s_idx);
-        int _sv0t37 = lower_typed_box_deref_let(et, ed1, ed2, ed3, ed4, pp, init_idx, name_tok, _sv0t36, out_instrs, item_tags, item_names, source, starts, ends);
+        int _sv0t37 = lower_typed_box_deref_let(et, ed1, ed2, ed3, ed4, pp, tok_tags, init_idx, name_tok, _sv0t36, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
         int bd = _sv0t37;
         if ((bd == 1)) {
           let_declared = 1;
@@ -6515,7 +6515,7 @@ static int lower_call_ret_user_ty_tok(int et, int ed1, int ed2, int pp, int call
   return _sv0t4;
 }
 
-static int lower_typed_box_deref_let(int et, int ed1, int ed2, int ed3, int ed4, int pp, int init_idx, int name_tok, int ann_tok, int out_instrs, int item_tags, int item_names, const char* source, int starts, int ends) {
+static int lower_typed_box_deref_let(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int init_idx, int name_tok, int ann_tok, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int enum_vnames_flat, int item_fn_row, int match_env_inherit, int import_aliases) {
   if ((ann_tok < 0)) {
     return 0;
   } else {
@@ -6613,53 +6613,30 @@ static int lower_typed_box_deref_let(int et, int ed1, int ed2, int ed3, int ed4,
     return 0;
   } else {
   }
-  int _sv0t20 = sv0_vec_get(et, arg_idx);
-  if ((_sv0t20 != 1)) {
-    return 0;
-  } else {
-  }
-  int _sv0t21 = sv0_vec_get(ed2, arg_idx);
-  if ((_sv0t21 != 1)) {
-    return 0;
-  } else {
-  }
-  int _sv0t22 = sv0_vec_get(ed1, arg_idx);
-  int arg_pps = _sv0t22;
-  if ((arg_pps < 0)) {
-    return 0;
-  } else {
-  }
-  int _sv0t23 = sv0_vec_len(pp);
-  if ((arg_pps >= _sv0t23)) {
-    return 0;
-  } else {
-  }
-  int _sv0t24 = sv0_vec_get(pp, arg_pps);
-  int arg_tok = _sv0t24;
+  Value _sv0t20 = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags, arg_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
   Value av;
-  av.tag = 3;
-  av.p0 = arg_tok;
-  int _sv0t25 = sv0_vec_new();
-  int args = _sv0t25;
-  int _sv0t26 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t26, 0, av.tag);
-  sv0_box_store(_sv0t26, 1, av.p0);
-  sv0_box_store(_sv0t26, 2, av.p1);
-  sv0_vec_push(args, _sv0t26);
+  av = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int args = _sv0t21;
+  int _sv0t22 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t22, 0, av.tag);
+  sv0_box_store(_sv0t22, 1, av.p0);
+  sv0_box_store(_sv0t22, 2, av.p1);
+  sv0_vec_push(args, _sv0t22);
   Instr call;
-  int _sv0t27 = (0 - 13);
+  int _sv0t23 = (0 - 13);
   call.tag = 11;
   call.p0 = name_tok;
-  call.p1 = _sv0t27;
+  call.p1 = _sv0t23;
   call.p2 = args;
   call.p3 = ann_tok;
-  int _sv0t28 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t28, 0, call.tag);
-  sv0_box_store(_sv0t28, 1, call.p0);
-  sv0_box_store(_sv0t28, 2, call.p1);
-  sv0_box_store(_sv0t28, 3, call.p2);
-  sv0_box_store(_sv0t28, 4, call.p3);
-  sv0_vec_push(out_instrs, _sv0t28);
+  int _sv0t24 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t24, 0, call.tag);
+  sv0_box_store(_sv0t24, 1, call.p0);
+  sv0_box_store(_sv0t24, 2, call.p1);
+  sv0_box_store(_sv0t24, 3, call.p2);
+  sv0_box_store(_sv0t24, 4, call.p3);
+  sv0_vec_push(out_instrs, _sv0t24);
   return 1;
 }
 
