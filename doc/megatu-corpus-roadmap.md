@@ -461,6 +461,15 @@ fix by comparing by TEXT. Bite-sized pieces, each independently landable:
    NOTE: declaring `inner` Value alone just moves the error to `inner = _t` — the temp
    AND the deref type must change together. Coordinated parser+lowering+emit +
    parser/lowering golden refresh. This unblocks the recursive-type modules.
+   **DONE — PASS 88 → 94 (+6: `ir`/`types`/`unify`/`codegen`/`ast_types`/`vm_codegen`).**
+   Implemented exactly as planned: (a) `parse_let_stmt` retains the annotation head
+   token in LetStmt d2 (`type_flag = p3 + 1`); (b) new `lower_typed_box_deref_let`
+   helper, wired at both let-handlers behind an `init_handled` skip flag, emits a
+   single `Call(dst=x, box_deref, [bv], T)` (bv restricted to a simple var — corpus
+   case); (c) megaTU-main Call emit types the box_deref result temp and deref arg via
+   `megatu_ty_name(rt_h)` when set. GOTCHA: `test_parse_block_let` asserted the old
+   LetStmt d2 == 0 flag → updated to the type-head token (4 for `let x: i32`); without
+   that, parser.sv0 regressed PASS→RUNFAIL(133).
 5. **`member reference base type 'int' is not a struct`.** A value that should be a
    struct is `int`, then `.tag`/`.p0`-accessed — a downstream symptom of (3)/(4);
    should clear once values are typed.
