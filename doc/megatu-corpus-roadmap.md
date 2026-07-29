@@ -470,9 +470,24 @@ fix by comparing by TEXT. Bite-sized pieces, each independently landable:
    `megatu_ty_name(rt_h)` when set. GOTCHA: `test_parse_block_let` asserted the old
    LetStmt d2 == 0 flag → updated to the type-head token (4 for `let x: i32`); without
    that, parser.sv0 regressed PASS→RUNFAIL(133).
-5. **`member reference base type 'int' is not a struct`.** A value that should be a
-   struct is `int`, then `.tag`/`.p0`-accessed — a downstream symptom of (3)/(4);
-   should clear once values are typed.
+5. **`member reference base type 'int' is not a struct` + untyped struct returns
+   (DONE — `lowering.sv0` PASSES; CCFAIL → 0).** The last module's ~20 errors were all
+   box_deref with a **complex** arg — `let ins: Instr = box_deref(vec_get(..))`,
+   `let na_val: Value = box_deref(vec_get(arg_vals, 0))` — which piece 4 skipped (it
+   only handled a simple-var arg), leaving `int ins` then `ins.tag`/`ins.p0` member-ref
+   on int, and `return na_val` (int) from a Value fn. Fix: `lower_typed_box_deref_let`
+   now lowers the arg via `lower_expr_to_value` (full lowering context added to its
+   signature), handling simple **and** complex args, instead of bailing. `lowering.sv0`
+   0 errors, PASSes. **PASS 95 → 96, CCFAIL 1 → 0.**
+
+## Status: corpus emit is complete (96/98 PASS, 0 CCFAIL/PANIC/RUNFAIL)
+
+Every corpus file the composed compiler accepts now emits, compiles, and runs
+correctly. The only 2 non-PASS are deliberate PHASEFAILs — clean phase rejections of
+features the composed pipeline does not yet accept: `old_ensures.sv0` (exit 2, parse —
+`old()`/contract-expr) and `enum_struct_match.sv0` (exit 3, resolve — struct-variant
+enums). Those are roadmap Tasks 3–4 (contracts, struct-variant enums), separate
+front-end features, not emit gaps.
 
 Sequence: (2) is an independent correctness bug (do next); (3) unblocks the most
 `assigning to int from Struct` errors; (4) is the recursive-type piece; (5) follows.
