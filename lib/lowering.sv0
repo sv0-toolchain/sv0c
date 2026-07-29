@@ -1960,8 +1960,16 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                 let pi: i32 = lower_pat_struct_field_payload_index(
                                                     tok_tags, source, starts, ends,
                                                     vn_h4, sfc, fnam_tok);
-                                                if pi >= 0 {
-                                                    let pay: i32 = 0 - 10 - pi;
+                                                /* The name→slot scan reads the variant
+                                                   token from the PATTERN (`{ w, h }`,
+                                                   no `: type`), not the definition, so
+                                                   it fails; fall back to embed order =
+                                                   the field slot (pattern fields in
+                                                   definition order, the common case). */
+                                                let mut pif: i32 = pi;
+                                                if pif < 0 { pif = fj; }
+                                                if pif >= 0 {
+                                                    let pay: i32 = 0 - 10 - pif;
                                                     let rhsv: Value = Value::VMember(
                                                         box_new(Value::VVar(scrut_var)), pay);
                                                     let asgx: Instr = Instr::Assign(

@@ -480,14 +480,30 @@ fix by comparing by TEXT. Bite-sized pieces, each independently landable:
    signature), handling simple **and** complex args, instead of bailing. `lowering.sv0`
    0 errors, PASSes. **PASS 95 → 96, CCFAIL 1 → 0.**
 
-## Status: corpus emit is complete (96/98 PASS, 0 CCFAIL/PANIC/RUNFAIL)
+## Status: COMPLETE — 98/98 PASS, 0 PHASEFAIL/CCFAIL/PANIC/RUNFAIL
 
-Every corpus file the composed compiler accepts now emits, compiles, and runs
-correctly. The only 2 non-PASS are deliberate PHASEFAILs — clean phase rejections of
-features the composed pipeline does not yet accept: `old_ensures.sv0` (exit 2, parse —
-`old()`/contract-expr) and `enum_struct_match.sv0` (exit 3, resolve — struct-variant
-enums). Those are roadmap Tasks 3–4 (contracts, struct-variant enums), separate
-front-end features, not emit gaps.
+The composed native-compose compiler now correctly parses, resolves, checks, lowers,
+emits, compiles, and runs **every** file in the self-host-sv0-loop corpus. The two
+former PHASEFAILs are done:
+
+- **Contracts (`old_ensures.sv0`).** Only `result` failed to parse (`requires`,
+  `ensures`, `old(x)` already worked). SML parses `result` as `ExprPath(["result"])`;
+  mirrored that (parse token 84 as a 1-seg path), accepted `result` in the resolver's
+  1-seg path handler (like SML binding it in the contract env), and since the emit
+  strips contract clauses, no further work. `old_ensures.sv0` PASSes.
+- **Struct-variant enums (`enum_struct_match.sv0`).** Definition + tuple construction
+  already worked; only the `Variant { w, h }` **match pattern** was unhandled. Added
+  PatStruct (tag 4) support at each phase: resolver `resolve_pat_shape` 2-seg check via
+  the enum type (`res_type_exists(seg0)`, since struct variants aren't registered as
+  qualified values) + the tag-11 arm handler binds the `ExprPatStructMeta` (tag 32)
+  field shorthands; checker types those fields TY_INT; lowering's existing tag-4
+  extraction block gets an embed-order fallback for the payload slot (the name→slot
+  scan reads the pattern token, which lacks `: type`, so it fails — embed order is
+  correct for definition-order patterns). `enum_struct_match.sv0` PASSes.
+
+**PASS 96 → 98.** The self-host-sv0-loop corpus is fully covered by the composed
+compiler. Natural next step: wire `sv0-megatu-corpus-parity.sh` into CI as a stable
+green gate (floor 98).
 
 Sequence: (2) is an independent correctness bug (do next); (3) unblocks the most
 `assigning to int from Struct` errors; (4) is the recursive-type piece; (5) follows.

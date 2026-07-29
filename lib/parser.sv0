@@ -1325,6 +1325,19 @@ fn parse_primary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(ed4, 0);
         return pos + 1;
     }
+    /* `result` (TK_RESULT=84) in an `ensures` clause: the return value. SML parses
+       it as ExprPath(["result"]) (parser.sml); mirror that as a 1-seg path so the
+       contract expression parses. */
+    if t == 84 {
+        let ppr: i32 = vec_len(pp);
+        vec_push(pp, pos);
+        vec_push(et, 1);
+        vec_push(ed1, ppr);
+        vec_push(ed2, 1);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return pos + 1;
+    }
     if t == 5 {
         let pps: i32 = vec_len(pp);
         let p1: i32 = parse_path(tags, pos, pp);

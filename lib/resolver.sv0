@@ -536,8 +536,14 @@ fn resolve_pat_shape(pt: Vec<i32>, pd1: Vec<i32>, pd2: Vec<i32>,
         }
         let ps: string = path_join_vec(source, starts, ends, path);
         if ppc >= 2 {
-            if res_value_exists(mod_vals, ps, source, starts, ends) != true {
-                return 300;
+            /* Enum struct-variant pattern `Enum::Variant { fields }`: struct
+               variants are not registered as qualified values (unlike tuple/nullary
+               variants), so accept when the first segment is a known enum type — the
+               coarse pass; the checker validates the variant + fields. Mirrors the
+               2-seg expr-path handler. */
+            let seg0: string = tok_str(source, starts, ends, vec_get(path, 0));
+            if res_type_exists(mod_tys, seg0, source, starts, ends) != true {
+                return 301;
             }
         } else {
             if res_type_exists(mod_tys, ps, source, starts, ends) != true {
@@ -771,6 +777,11 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if is_intrinsic(ps) {
                 return 0;
             }
+            /* `result` in a requires/ensures clause is the function's return value
+               (SML binds it in the contract env: resolver.sml). Accept it here. */
+            if string_eq(ps, "result") {
+                return 0;
+            }
         }
         /* 2-segment enum-variant constructor path (EnumType::Variant). The
            resolver only registers enum type names (not per-variant qualified
@@ -1000,6 +1011,29 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 }
                             }
                             ej_r = ej_r + 1;
+                        }
+                    }
+                }
+            }
+            /* PatStruct enum struct-variant (`Variant { w, h }`): bind each field
+               shorthand PatBind. Mirrors PatEnum(5) but the meta is ExprPatStructMeta
+               (tag 32) not ExprPatEnumMeta (33). */
+            if arm_pat_tag == 4 {
+                let fc_r: i32 = vec_get(ed3, arm_pat_d1);
+                if fc_r > 0 {
+                    let meta_s: i32 = arm_pat_d1 - 1;
+                    if vec_get(et, meta_s) == 32 {
+                        let mc_s: i32 = vec_get(ed1, meta_s);
+                        let first_s: i32 = vec_get(ed2, meta_s);
+                        let mut ej_s: i32 = 0;
+                        while ej_s < mc_s {
+                            let eidx_s: i32 = first_s + ej_s;
+                            if vec_get(et, eidx_s) == 31 {
+                                if vec_get(ed4, eidx_s) == 1 {
+                                    res_bind_local(frames, vec_get(ed1, eidx_s));
+                                }
+                            }
+                            ej_s = ej_s + 1;
                         }
                     }
                 }
