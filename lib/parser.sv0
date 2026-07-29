@@ -1264,6 +1264,7 @@ fn parse_struct_fields(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                         let pv: i32 = parse_expr_sf(tags, starts, ends, source, p + 3,
                                                   et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
                         if pv < 0 { return 0 - 1; }
+                        vec_push(sf_names, vec_len(et) - 1);
                         p = pv;
                     } else {
                         return 0 - 1;
@@ -1279,6 +1280,7 @@ fn parse_struct_fields(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                         let pv: i32 = parse_expr_sf(tags, starts, ends, source, p + 2,
                                                   et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
                         if pv < 0 { return 0 - 1; }
+                        vec_push(sf_names, vec_len(et) - 1);
                         p = pv;
                     } else {
                         vec_push(sf_names, p);
@@ -1289,6 +1291,7 @@ fn parse_struct_fields(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                         vec_push(ed2, 1);
                         vec_push(ed3, 0);
                         vec_push(ed4, 0);
+                        vec_push(sf_names, vec_len(et) - 1);
                         p = p + 1;
                     }
                 } else {
@@ -1335,7 +1338,11 @@ fn parse_primary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                                    p1 + 1, et, ed1, ed2, ed3,
                                                    ed4, pp, sf_names);
                 if pf < 0 { return 0 - 1; }
-                let fc: i32 = vec_len(sf_names) - fc_before;
+                /* sf_names is stride-2 per field: [name_tok, value_root]. The
+                   value root lets lowering read each field's value expression
+                   directly (they are non-contiguous in the arena when values are
+                   field accesses / calls), instead of guessing contiguity. */
+                let fc: i32 = (vec_len(sf_names) - fc_before) / 2;
                 vec_push(et, 24);
                 vec_push(ed1, pps);
                 vec_push(ed2, ppc);

@@ -1427,9 +1427,13 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let t_s: i32 = ctr_fresh(ctr);
         let decl_s: Instr = Instr::DeclNamed(sty_tok, t_s);
         vec_push(out_instrs, box_new(decl_s));
+        /* lit_sf_names is stride-2 per field: [name_tok, value_root]. sf0 is the
+           stride-2 base (fc_before). Read the value root directly rather than
+           assuming the fc_s value expressions are contiguous before the ExprStruct
+           node — they are not when a field value is itself a field access / call. */
         let mut fi_s: i32 = 0;
         while fi_s < fc_s {
-            let ch_s: i32 = idx - fc_s + fi_s;
+            let ch_s: i32 = vec_get(lit_sf_names, sf0 + fi_s * 2 + 1);
             let fv_s: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                                   tok_tags, ch_s, ctr,
                                                   out_instrs, enum_names,
@@ -1438,7 +1442,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                   enum_tags_flat, fn_ctx,
                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
             let fe_s: Expr = value_to_expr(fv_s);
-            let fnm_s: i32 = vec_get(lit_sf_names, sf0 + fi_s);
+            let fnm_s: i32 = vec_get(lit_sf_names, sf0 + fi_s * 2);
             let stf_s: Instr = Instr::StoreField(t_s, fnm_s, box_new(fe_s));
             vec_push(out_instrs, box_new(stf_s));
             fi_s = fi_s + 1;
@@ -7621,7 +7625,9 @@ fn test_lower_expr_struct() -> i32 {
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     vec_push(lit_sf_names, 201);
+    vec_push(lit_sf_names, 0);
     vec_push(lit_sf_names, 202);
+    vec_push(lit_sf_names, 1);
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
@@ -7678,7 +7684,9 @@ fn test_lower_expr_struct_qualified_path() -> i32 {
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
     vec_push(lit_sf_names, 201);
+    vec_push(lit_sf_names, 0);
     vec_push(lit_sf_names, 202);
+    vec_push(lit_sf_names, 1);
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
