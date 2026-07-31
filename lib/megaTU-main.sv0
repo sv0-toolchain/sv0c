@@ -491,6 +491,7 @@ fn megatu_builtin_name(bid: i32) -> string {
     if bid == 15 { return "sv0_read_file"; }
     if bid == 16 { return "sv0_write_file"; }
     if bid == 17 { return "sv0_read_dir"; }
+    if bid == 18 { return "sv0_write_bytes"; }
     return "sv0_unknown_builtin";
 }
 

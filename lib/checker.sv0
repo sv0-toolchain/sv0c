@@ -2478,6 +2478,7 @@ fn builtin_fn_lookup(name_str: string) -> i32 {
     if string_eq(name_str, "read_file") { return 13; }
     if string_eq(name_str, "write_file") { return 14; }
     if string_eq(name_str, "read_dir") { return 15; }
+    if string_eq(name_str, "write_bytes") { return 16; }
     return 0 - 1;
 }
 
@@ -2498,6 +2499,7 @@ fn builtin_fn_ret_type(bid: i32) -> i32 {
     if bid == 13 { return TY_STRING(); }
     if bid == 14 { return TY_UNIT(); }
     if bid == 15 { return TY_STRING(); }
+    if bid == 16 { return TY_UNIT(); }
     return 0 - 1;
 }
 
@@ -2518,6 +2520,7 @@ fn builtin_fn_param_count(bid: i32) -> i32 {
     if bid == 13 { return 1; }
     if bid == 14 { return 2; }
     if bid == 15 { return 1; }
+    if bid == 16 { return 2; }
     return 0 - 1;
 }
 
@@ -2556,6 +2559,10 @@ fn builtin_fn_param_type(bid: i32, idx: i32) -> i32 {
         return TY_STRING();
     }
     if bid == 15 { return TY_STRING(); }
+    if bid == 16 {
+        if idx == 0 { return TY_STRING(); }
+        return TY_NAMED();
+    }
     return 0 - 1;
 }
 
