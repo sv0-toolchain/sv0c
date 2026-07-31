@@ -169,4 +169,26 @@ const char *sv0_read_file(const char *path);
 void sv0_write_file(const char *path, const char *contents);
 const char *sv0_read_dir(const char *dir);
 
+/* write_bytes: raw binary write of a Vec<i32>'s byte values (low 8 bits each),
+   NUL-safe (writes the vec length, not strlen) — for .sv0b bytecode emission.
+   MUST be static inline in this header (not a .c function): the vec table is
+   `static` (per-TU), so a .c definition would read the runtime.c TU's empty
+   table instead of the emitted program's. Here it compiles into the caller's TU. */
+static inline void sv0_write_bytes(const char *path, int32_t vec) {
+  FILE *f = fopen(path, "wb");
+  if (!f)
+    sv0_panic("write_bytes: fopen failed");
+  int32_t n = sv0_vec_len(vec);
+  int32_t i;
+  for (i = 0; i < n; i++) {
+    unsigned char b = (unsigned char)(sv0_vec_get(vec, i) & 0xFF);
+    if (fwrite(&b, 1u, 1u, f) != 1u) {
+      fclose(f);
+      sv0_panic("write_bytes: fwrite failed");
+    }
+  }
+  if (fclose(f) != 0)
+    sv0_panic("write_bytes: fclose failed");
+}
+
 #endif /* SV0_RUNTIME_H */

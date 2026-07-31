@@ -133,6 +133,7 @@ fn is_intrinsic(name: string) -> bool {
     if string_eq(name, "read_file") { return true; }
     if string_eq(name, "write_file") { return true; }
     if string_eq(name, "read_dir") { return true; }
+    if string_eq(name, "write_bytes") { return true; }
     return false;
 }
 
@@ -157,6 +158,7 @@ fn intrinsic_arity(name: string) -> i32 {
     if string_eq(name, "read_file") { return 1; }
     if string_eq(name, "write_file") { return 2; }
     if string_eq(name, "read_dir") { return 1; }
+    if string_eq(name, "write_bytes") { return 2; }
     return 0 - 1;
 }
 

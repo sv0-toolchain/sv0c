@@ -296,6 +296,11 @@ static int is_intrinsic(const char* name) {
     return 1;
   } else {
   }
+  int _sv0t20 = sv0_string_eq(name, "write_bytes");
+  if (_sv0t20) {
+    return 1;
+  } else {
+  }
   return 0;
 }
 
@@ -400,8 +405,13 @@ static int intrinsic_arity(const char* name) {
     return 1;
   } else {
   }
-  int _sv0t20 = (0 - 1);
-  return _sv0t20;
+  int _sv0t20 = sv0_string_eq(name, "write_bytes");
+  if (_sv0t20) {
+    return 2;
+  } else {
+  }
+  int _sv0t21 = (0 - 1);
+  return _sv0t21;
 }
 
 static int intrinsic_count(void) {

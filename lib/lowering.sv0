@@ -435,6 +435,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if bid == 8 { is_void = 1; }
             if bid == 11 { is_void = 1; }
             if bid == 16 { is_void = 1; }
+            if bid == 18 { is_void = 1; }
             let fn_sentinel: i32 = 0 - bid;
             if is_void == 1 {
                 let vc: Instr = Instr::Call(0, fn_sentinel, arg_vals, 0);
@@ -3178,6 +3179,7 @@ fn build_builtin_map_classify(s: string) -> i32 {
     if string_eq(s, "read_file") { return 15; }
     if string_eq(s, "write_file") { return 16; }
     if string_eq(s, "read_dir") { return 17; }
+    if string_eq(s, "write_bytes") { return 18; }
     return 0;
 }
 

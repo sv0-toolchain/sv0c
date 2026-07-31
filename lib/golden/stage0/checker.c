@@ -3568,8 +3568,13 @@ static int builtin_fn_lookup(const char* name_str) {
     return 15;
   } else {
   }
-  int _sv0t16 = (0 - 1);
-  return _sv0t16;
+  int _sv0t16 = sv0_string_eq(name_str, "write_bytes");
+  if (_sv0t16) {
+    return 16;
+  } else {
+  }
+  int _sv0t17 = (0 - 1);
+  return _sv0t17;
 }
 
 static int builtin_fn_ret_type(int bid) {
@@ -3653,8 +3658,13 @@ static int builtin_fn_ret_type(int bid) {
     return _sv0t15;
   } else {
   }
-  int _sv0t16 = (0 - 1);
-  return _sv0t16;
+  if ((bid == 16)) {
+    int _sv0t16 = TY_UNIT();
+    return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = (0 - 1);
+  return _sv0t17;
 }
 
 static int builtin_fn_param_count(int bid) {
@@ -3720,6 +3730,10 @@ static int builtin_fn_param_count(int bid) {
   }
   if ((bid == 15)) {
     return 1;
+  } else {
+  }
+  if ((bid == 16)) {
+    return 2;
   } else {
   }
   int _sv0t0 = (0 - 1);
@@ -3837,8 +3851,18 @@ static int builtin_fn_param_type(int bid, int idx) {
     return _sv0t21;
   } else {
   }
-  int _sv0t22 = (0 - 1);
-  return _sv0t22;
+  if ((bid == 16)) {
+    if ((idx == 0)) {
+      int _sv0t22 = TY_STRING();
+      return _sv0t22;
+    } else {
+    }
+    int _sv0t23 = TY_NAMED();
+    return _sv0t23;
+  } else {
+  }
+  int _sv0t24 = (0 - 1);
+  return _sv0t24;
 }
 
 static int resolve_fn_call(int fn_names, const char* source, int starts, int ends, const char* name_str, int is_builtin_out) {
