@@ -611,10 +611,13 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     }
                 }
             }
-            if let_declared == 0 {
-                let decl: Instr = Instr::DeclVar(name_tok);
-                vec_push(out_instrs, box_new(decl));
-            }
+            /* SML lowerStmt StmtLet (general case): `instrs @ [Store(x, rhs)]` —
+               the initializer is lowered FIRST, then the let variable is declared.
+               So x's VM slot is allocated AFTER any temps the init spilled (e.g.
+               the result temps of `let y = if c { a } else { b }`), not before.
+               Declaring x up front (as we did) gave it the lower slot and diverged
+               the bytecode. The DeclVar is only skipped when a struct/enum/string
+               special case already emitted a DeclNamed (let_declared == 1). */
             if init_idx >= 0 {
                 if init_handled == 0 {
                     let iv: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4,
@@ -624,9 +627,16 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                          enum_tag_offsets,
                                                          enum_tag_counts,
                                                          enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                    if let_declared == 0 {
+                        vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                    }
                     let lit_e: Expr = Expr::Literal(box_new(iv));
                     let asgn: Instr = Instr::Store(name_tok, box_new(lit_e));
                     vec_push(out_instrs, box_new(asgn));
+                }
+            } else {
+                if let_declared == 0 {
+                    vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
                 }
             }
         }
@@ -2948,10 +2958,11 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if str_let == 1 {
             vec_push(str_locals, name_tok);
         }
-        if let_declared == 0 {
-            let decl: Instr = Instr::DeclVar(name_tok);
-            vec_push(out_instrs, box_new(decl));
-        }
+        /* SML lowerStmt StmtLet: lower the initializer FIRST, then declare the
+           let variable (its VM slot is allocated after any temps the init spilled,
+           e.g. the result temps of `let y = if c { a } else { b }`). Declaring x up
+           front gives it the lower slot and diverges the bytecode. DeclVar is
+           skipped when a struct/enum/string special case already emitted DeclNamed. */
         if init_idx >= 0 {
             if init_handled == 0 {
                 let e: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
@@ -2960,8 +2971,15 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                        enum_tag_offsets,
                                                        enum_tag_counts,
                                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                if let_declared == 0 {
+                    vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                }
                 let si: Instr = Instr::Store(name_tok, box_new(e));
                 vec_push(out_instrs, box_new(si));
+            }
+        } else {
+            if let_declared == 0 {
+                vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
             }
         }
         return 0;
