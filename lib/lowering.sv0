@@ -2878,11 +2878,14 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
            path segment (as in the tag-24 lowering). The let's own type annotation
            is not retained by the parser, so the init shape is the type source. */
         let mut let_declared: i32 = 0;
-        /* A `let x = f(..)` whose init is a struct/enum-returning CALL: record the
-           type here but declare x AFTER the init (SML's general path lowers the
-           call temp first, so x's slot follows it — like the if-as-value reorder).
-           Struct/enum LITERAL inits stay decl-first (SML declares them first). */
-        let mut struct_call_ty: i32 = 0 - 1;
+        /* A `let x = f(..)` whose init is a struct/enum/string-returning USER CALL:
+           record the type here but declare x AFTER the init (SML's general path
+           lowers the call temp first, so x's slot follows it — like the if-as-value
+           reorder). Struct/enum/string LITERAL inits stay decl-first. `deferred_ty`
+           holds the C type token (a struct token >=0, or the string sentinel -7),
+           so a separate flag marks whether a deferral was requested. */
+        let mut deferred_ty: i32 = 0 - 1;
+        let mut has_deferred_decl: i32 = 0;
         /* str_let: this let binds a string; its name joins str_locals so later
            `let y = x` aliases resolve to const char* too. */
         let mut str_let: i32 = 0;
@@ -2926,8 +2929,12 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             /* String-typed let (string literal, string-returning builtin call, or a
                block/if-expr whose value is a string): declare `const char*`. */
             if lower_expr_yields_string(et, ed1, ed2, ed3, pp, init_idx, item_tags, item_names, item_d2, tok_tags, source, starts, ends) {
-                let decl_str: Instr = Instr::DeclNamed(lower_string_cty(), name_tok);
-                vec_push(out_instrs, box_new(decl_str));
+                /* SML's general let path declares a string local AFTER lowering the
+                   init, so any temps the init spilled (a builtin/user call, an
+                   if-block value) get the earlier slots. Defer the DeclNamed to the
+                   init block below; a literal init has no temps so the order is moot. */
+                deferred_ty = lower_string_cty();
+                has_deferred_decl = 1;
                 let_declared = 1;
                 str_let = 1;
             }
@@ -2972,7 +2979,8 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 if uty_ls >= 0 {
                     /* Record the type; emit DeclNamed AFTER the init (below) so the
                        call temp gets the earlier slot, as SML does. */
-                    struct_call_ty = uty_ls;
+                    deferred_ty = uty_ls;
+                    has_deferred_decl = 1;
                 }
             }
             /* `let x: T = box_deref(bv)` with T a user struct/enum: emit a single
@@ -3007,8 +3015,8 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                        enum_tag_offsets,
                                                        enum_tag_counts,
                                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-                if struct_call_ty >= 0 {
-                    vec_push(out_instrs, box_new(Instr::DeclNamed(struct_call_ty, name_tok)));
+                if has_deferred_decl == 1 {
+                    vec_push(out_instrs, box_new(Instr::DeclNamed(deferred_ty, name_tok)));
                 } else {
                     if let_declared == 0 {
                         vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
