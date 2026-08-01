@@ -97,6 +97,10 @@ static int file_header_magic_len(void);
 static int file_header_version_len(void);
 static int string_section_size(int count, int total_bytes);
 static int func_table_size(int count);
+static int bc_string_escape_char(int c);
+static int bc_hex_digit_value(int c);
+static int decode_one_escape(const char* source, int pos, int end, int out);
+static int decode_pool_string(const char* source, int s, int e, int out);
 static int encode_strings(int strings, const char* source, int starts, int ends, int out);
 static int encode_string_literals(int strs, int out);
 static int decode_strings(int buf, int pos, int out_starts, int out_lens);
@@ -895,6 +899,142 @@ static int func_table_size(int count) {
   return _sv0t1;
 }
 
+static int bc_string_escape_char(int c) {
+  if ((c == 110)) {
+    return 10;
+  } else {
+  }
+  if ((c == 116)) {
+    return 9;
+  } else {
+  }
+  if ((c == 114)) {
+    return 13;
+  } else {
+  }
+  if ((c == 92)) {
+    return 92;
+  } else {
+  }
+  if ((c == 34)) {
+    return 34;
+  } else {
+  }
+  if ((c == 39)) {
+    return 39;
+  } else {
+  }
+  if ((c == 48)) {
+    return 0;
+  } else {
+  }
+  return c;
+}
+
+static int bc_hex_digit_value(int c) {
+  if ((c >= 48)) {
+    if ((c <= 57)) {
+      int _sv0t0 = (c - 48);
+      return _sv0t0;
+    } else {
+    }
+  } else {
+  }
+  if ((c >= 65)) {
+    if ((c <= 70)) {
+      int _sv0t1 = (c - 55);
+      return _sv0t1;
+    } else {
+    }
+  } else {
+  }
+  if ((c >= 97)) {
+    if ((c <= 102)) {
+      int _sv0t2 = (c - 87);
+      return _sv0t2;
+    } else {
+    }
+  } else {
+  }
+  return 0;
+}
+
+static int decode_one_escape(const char* source, int pos, int end, int out) {
+  if ((pos >= end)) {
+    sv0_vec_push(out, 92);
+    return pos;
+  } else {
+  }
+  int _sv0t0 = sv0_string_char_at(source, pos);
+  int nc = _sv0t0;
+  if ((nc == 120)) {
+    int d1 = 48;
+    int d2 = 48;
+    int _sv0t1 = (pos + 1);
+    if ((_sv0t1 < end)) {
+      int _sv0t2 = (pos + 1);
+      int _sv0t3 = sv0_string_char_at(source, _sv0t2);
+      d1 = _sv0t3;
+    } else {
+    }
+    int _sv0t4 = (pos + 2);
+    if ((_sv0t4 < end)) {
+      int _sv0t5 = (pos + 2);
+      int _sv0t6 = sv0_string_char_at(source, _sv0t5);
+      d2 = _sv0t6;
+    } else {
+    }
+    int _sv0t7 = bc_hex_digit_value(d1);
+    int _sv0t8 = (_sv0t7 * 16);
+    int _sv0t9 = bc_hex_digit_value(d2);
+    int _sv0t10 = (_sv0t8 + _sv0t9);
+    sv0_vec_push(out, _sv0t10);
+    int _sv0t11 = (pos + 3);
+    return _sv0t11;
+  } else {
+  }
+  int _sv0t12 = bc_string_escape_char(nc);
+  sv0_vec_push(out, _sv0t12);
+  int _sv0t13 = (pos + 1);
+  return _sv0t13;
+}
+
+static int decode_pool_string(const char* source, int s, int e, int out) {
+  if ((e <= s)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_string_char_at(source, s);
+  if ((_sv0t0 != 34)) {
+    int j = s;
+    while ((j < e)) {
+      int _sv0t1 = sv0_string_char_at(source, j);
+      sv0_vec_push(out, _sv0t1);
+      j = (j + 1);
+    }
+    int _sv0t2 = (e - s);
+    return _sv0t2;
+  } else {
+  }
+  int inner_end = (e - 1);
+  int pos = (s + 1);
+  int n = 0;
+  while ((pos < inner_end)) {
+    int _sv0t3 = sv0_string_char_at(source, pos);
+    int c = _sv0t3;
+    if ((c == 92)) {
+      int _sv0t4 = (pos + 1);
+      int _sv0t5 = decode_one_escape(source, _sv0t4, inner_end, out);
+      pos = _sv0t5;
+    } else {
+      sv0_vec_push(out, c);
+      pos = (pos + 1);
+    }
+    n = (n + 1);
+  }
+  return n;
+}
+
 static int encode_strings(int strings, const char* source, int starts, int ends, int out) {
   int _sv0t0 = sv0_vec_len(strings);
   int count = _sv0t0;
@@ -908,14 +1048,16 @@ static int encode_strings(int strings, const char* source, int starts, int ends,
     int s = _sv0t3;
     int _sv0t4 = sv0_vec_get(ends, idx);
     int e = _sv0t4;
-    int slen = (e - s);
-    int _sv0t5 = encode_u32_le(slen, out);
+    int _sv0t5 = sv0_vec_new();
+    int sbuf = _sv0t5;
+    int _sv0t6 = decode_pool_string(source, s, e, sbuf);
+    int slen = _sv0t6;
+    int _sv0t7 = encode_u32_le(slen, out);
     total = (total + 4);
     int j = 0;
     while ((j < slen)) {
-      int _sv0t6 = (s + j);
-      int _sv0t7 = sv0_string_char_at(source, _sv0t6);
-      sv0_vec_push(out, _sv0t7);
+      int _sv0t8 = sv0_vec_get(sbuf, j);
+      sv0_vec_push(out, _sv0t8);
       j = (j + 1);
     }
     total = (total + slen);

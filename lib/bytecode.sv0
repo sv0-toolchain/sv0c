@@ -348,6 +348,85 @@ fn func_table_size(count: i32) -> i32 {
    u32 byte_length followed by byte_length raw bytes (ASCII).
    sv0 strings are ASCII; each char is one byte via string_char_at. */
 
+/* Decode a pool entry's source span [s, e) to its raw bytes. A string-LITERAL
+   token span still carries its surrounding double quotes and unresolved escapes
+   (`"a\nb"`), but SML's VString holds the already-parsed VALUE, so the .sv0b must
+   store the decoded bytes: strip the quotes and interpret escapes (mirroring the
+   lexer's escape_char / scan_escape). Non-literal pool entries — function names,
+   contract keys — never start with `"`, so they are copied verbatim. Returns the
+   number of bytes pushed to `out` (escapes collapse, so this ≠ e - s). */
+fn bc_string_escape_char(c: i32) -> i32 {
+    if c == 110 { return 10; }
+    if c == 116 { return 9; }
+    if c == 114 { return 13; }
+    if c == 92 { return 92; }
+    if c == 34 { return 34; }
+    if c == 39 { return 39; }
+    if c == 48 { return 0; }
+    return c;
+}
+
+fn bc_hex_digit_value(c: i32) -> i32 {
+    if c >= 48 {
+        if c <= 57 { return c - 48; }
+    }
+    if c >= 65 {
+        if c <= 70 { return c - 55; }
+    }
+    if c >= 97 {
+        if c <= 102 { return c - 87; }
+    }
+    return 0;
+}
+
+/* Decode one escape sequence: `pos` is just past the backslash, `end` bounds the
+   literal body. Pushes the decoded byte to `out` and returns the position after
+   the sequence (mirrors the lexer's scan_escape). Kept separate so decode_pool_
+   string's loop body ends in a plain statement, not a value-position if. */
+fn decode_one_escape(source: string, pos: i32, end: i32, out: Vec<i32>) -> i32 {
+    if pos >= end {
+        vec_push(out, 92);
+        return pos;
+    }
+    let nc: i32 = string_char_at(source, pos);
+    if nc == 120 {
+        let mut d1: i32 = 48;
+        let mut d2: i32 = 48;
+        if pos + 1 < end { d1 = string_char_at(source, pos + 1); }
+        if pos + 2 < end { d2 = string_char_at(source, pos + 2); }
+        vec_push(out, bc_hex_digit_value(d1) * 16 + bc_hex_digit_value(d2));
+        return pos + 3;
+    }
+    vec_push(out, bc_string_escape_char(nc));
+    return pos + 1;
+}
+
+fn decode_pool_string(source: string, s: i32, e: i32, out: Vec<i32>) -> i32 {
+    if e <= s { return 0; }
+    if string_char_at(source, s) != 34 {
+        let mut j: i32 = s;
+        while j < e {
+            vec_push(out, string_char_at(source, j));
+            j = j + 1;
+        }
+        return e - s;
+    }
+    let inner_end: i32 = e - 1;
+    let mut pos: i32 = s + 1;
+    let mut n: i32 = 0;
+    while pos < inner_end {
+        let c: i32 = string_char_at(source, pos);
+        if c == 92 {
+            pos = decode_one_escape(source, pos + 1, inner_end, out);
+        } else {
+            vec_push(out, c);
+            pos = pos + 1;
+        }
+        n = n + 1;
+    }
+    return n;
+}
+
 fn encode_strings(strings: Vec<i32>, source: string, starts: Vec<i32>,
                   ends: Vec<i32>, out: Vec<i32>) -> i32 {
     let count: i32 = vec_len(strings);
@@ -358,12 +437,13 @@ fn encode_strings(strings: Vec<i32>, source: string, starts: Vec<i32>,
         let idx: i32 = vec_get(strings, i);
         let s: i32 = vec_get(starts, idx);
         let e: i32 = vec_get(ends, idx);
-        let slen: i32 = e - s;
+        let sbuf: Vec<i32> = vec_new();
+        let slen: i32 = decode_pool_string(source, s, e, sbuf);
         encode_u32_le(slen, out);
         total = total + 4;
         let mut j: i32 = 0;
         while j < slen {
-            vec_push(out, string_char_at(source, s + j));
+            vec_push(out, vec_get(sbuf, j));
             j = j + 1;
         }
         total = total + slen;
