@@ -239,30 +239,27 @@ fn is_variant_opcode(opc: i32) -> bool {
 
 /* ── little-endian byte extraction (division-based) ─────────── */
 
+/* Extract little-endian bytes from the two's-complement i32 representation via
+   bitwise ops. The old division form tried to fix negatives by adding 2^32, but
+   256*256*256*256 overflows i32 to 0 (a no-op) and truncating division of a
+   negative yields 0 for the high bytes — so a backward loop-jump offset like -37
+   encoded as `db 00 00 00` instead of `db ff ff ff`. `>>` is an arithmetic shift
+   on the i32 runtime (sign-extending), and `& 255` masks one byte, so this is
+   correct for negatives and byte-identical to the old form for non-negatives. */
 fn le_byte0(val: i32) -> i32 {
-    let mut v: i32 = val;
-    if v < 0 { v = v + 256 * 256 * 256 * 256; }
-    return v - (v / 256) * 256;
+    return val & 255;
 }
 
 fn le_byte1(val: i32) -> i32 {
-    let mut v: i32 = val;
-    if v < 0 { v = v + 256 * 256 * 256 * 256; }
-    let shifted: i32 = v / 256;
-    return shifted - (shifted / 256) * 256;
+    return (val >> 8) & 255;
 }
 
 fn le_byte2(val: i32) -> i32 {
-    let mut v: i32 = val;
-    if v < 0 { v = v + 256 * 256 * 256 * 256; }
-    let shifted: i32 = v / (256 * 256);
-    return shifted - (shifted / 256) * 256;
+    return (val >> 16) & 255;
 }
 
 fn le_byte3(val: i32) -> i32 {
-    let mut v: i32 = val;
-    if v < 0 { v = v + 256 * 256 * 256 * 256; }
-    return v / (256 * 256 * 256);
+    return (val >> 24) & 255;
 }
 
 fn from_le_u16(b0: i32, b1: i32) -> i32 {

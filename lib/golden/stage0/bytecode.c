@@ -717,66 +717,26 @@ static int is_variant_opcode(int opc) {
 }
 
 static int le_byte0(int val) {
-  int v = val;
-  if ((v < 0)) {
-    int _sv0t0 = (256 * 256);
-    int _sv0t1 = (_sv0t0 * 256);
-    int _sv0t2 = (_sv0t1 * 256);
-    v = (v + _sv0t2);
-  } else {
-  }
-  int _sv0t3 = (v / 256);
-  int _sv0t4 = (_sv0t3 * 256);
-  int _sv0t5 = (v - _sv0t4);
-  return _sv0t5;
+  int _sv0t0 = (val & 255);
+  return _sv0t0;
 }
 
 static int le_byte1(int val) {
-  int v = val;
-  if ((v < 0)) {
-    int _sv0t0 = (256 * 256);
-    int _sv0t1 = (_sv0t0 * 256);
-    int _sv0t2 = (_sv0t1 * 256);
-    v = (v + _sv0t2);
-  } else {
-  }
-  int shifted = (v / 256);
-  int _sv0t3 = (shifted / 256);
-  int _sv0t4 = (_sv0t3 * 256);
-  int _sv0t5 = (shifted - _sv0t4);
-  return _sv0t5;
+  int _sv0t0 = (val >> 8);
+  int _sv0t1 = (_sv0t0 & 255);
+  return _sv0t1;
 }
 
 static int le_byte2(int val) {
-  int v = val;
-  if ((v < 0)) {
-    int _sv0t0 = (256 * 256);
-    int _sv0t1 = (_sv0t0 * 256);
-    int _sv0t2 = (_sv0t1 * 256);
-    v = (v + _sv0t2);
-  } else {
-  }
-  int _sv0t3 = (256 * 256);
-  int shifted = (v / _sv0t3);
-  int _sv0t4 = (shifted / 256);
-  int _sv0t5 = (_sv0t4 * 256);
-  int _sv0t6 = (shifted - _sv0t5);
-  return _sv0t6;
+  int _sv0t0 = (val >> 16);
+  int _sv0t1 = (_sv0t0 & 255);
+  return _sv0t1;
 }
 
 static int le_byte3(int val) {
-  int v = val;
-  if ((v < 0)) {
-    int _sv0t0 = (256 * 256);
-    int _sv0t1 = (_sv0t0 * 256);
-    int _sv0t2 = (_sv0t1 * 256);
-    v = (v + _sv0t2);
-  } else {
-  }
-  int _sv0t3 = (256 * 256);
-  int _sv0t4 = (_sv0t3 * 256);
-  int _sv0t5 = (v / _sv0t4);
-  return _sv0t5;
+  int _sv0t0 = (val >> 24);
+  int _sv0t1 = (_sv0t0 & 255);
+  return _sv0t1;
 }
 
 static int from_le_u16(int b0, int b1) {

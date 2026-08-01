@@ -1093,7 +1093,7 @@ fn emit_instr(ins: Instr,
             if ne < 0 { return 0 - 1; }
             let off_else: i32 = flat_byte_size(then_out) + insn_size(112);
             let off_end: i32 = flat_byte_size(else_out);
-            vec_push(out, 113);
+            vec_push(out, 114);
             vec_push(out, off_else);
             let at: i32 = vec_append(out, then_out);
             vec_push(out, 112);
@@ -1116,14 +1116,14 @@ fn emit_instr(ins: Instr,
             vec_push(body_out, 112);
             vec_push(body_out, loop_exit_sentinel());
             let cond_bytes: i32 = flat_byte_size(cond_out);
-            let jif_bytes: i32 = insn_size(113);
+            let jif_bytes: i32 = insn_size(114);
             let body_bytes: i32 = flat_byte_size(body_out);
             let forward: i32 = body_bytes;
             let back: i32 = 0 - (cond_bytes + jif_bytes + body_bytes);
             replace_loop_exit_jump(body_out, back);
             let loop_out: Vec<i32> = vec_new();
             vec_append(loop_out, cond_out);
-            vec_push(loop_out, 113);
+            vec_push(loop_out, 114);
             vec_push(loop_out, forward);
             vec_append(loop_out, body_out);
             let total_bytes: i32 = flat_byte_size(loop_out);
@@ -2281,7 +2281,7 @@ fn test_emit_ifelse_block() -> i32 {
     if vec_len(out1) != 10 { return 2; }
     if vec_get(out1, 0) != 7 { return 3; }
     if vec_get(out1, 1) != 1 { return 4; }
-    if vec_get(out1, 2) != 113 { return 5; }
+    if vec_get(out1, 2) != 114 { return 5; }
     if vec_get(out1, 3) != 7 { return 6; }
     if vec_get(out1, 4) != 118 { return 7; }
     if vec_get(out1, 5) != 0 { return 8; }
@@ -2303,7 +2303,7 @@ fn test_emit_ifelse_block() -> i32 {
     if vec_len(out2) != 14 { return 14; }
     if vec_get(out2, 0) != 4 { return 15; }
     if vec_get(out2, 1) != 1 { return 16; }
-    if vec_get(out2, 2) != 113 { return 17; }
+    if vec_get(out2, 2) != 114 { return 17; }
     if vec_get(out2, 3) != 17 { return 18; }
     if vec_get(out2, 4) != 4 { return 19; }
     if vec_get(out2, 5) != 42 { return 20; }
@@ -2357,7 +2357,7 @@ fn test_emit_while_loop() -> i32 {
     if vec_len(out1) != 8 { return 2; }
     if vec_get(out1, 0) != 7 { return 3; }
     if vec_get(out1, 1) != 1 { return 4; }
-    if vec_get(out1, 2) != 113 { return 5; }
+    if vec_get(out1, 2) != 114 { return 5; }
     if vec_get(out1, 3) != 7 { return 6; }
     if vec_get(out1, 4) != 118 { return 7; }
     if vec_get(out1, 5) != 0 { return 8; }
@@ -2372,7 +2372,7 @@ fn test_emit_while_loop() -> i32 {
     if vec_len(out2) != 6 { return 12; }
     if vec_get(out2, 0) != 7 { return 13; }
     if vec_get(out2, 1) != 1 { return 14; }
-    if vec_get(out2, 2) != 113 { return 15; }
+    if vec_get(out2, 2) != 114 { return 15; }
     if vec_get(out2, 3) != 5 { return 16; }
     if vec_get(out2, 4) != 112 { return 17; }
     if vec_get(out2, 5) != 0 - 12 { return 18; }
@@ -2410,7 +2410,7 @@ fn test_emit_while_loop() -> i32 {
                               en, eb, ew, efs, eff, pool, source, starts, ends, fns, out5);
     if r5 < 0 { return 31; }
     if vec_len(out5) != 12 { return 32; }
-    if vec_get(out5, 2) != 113 { return 33; }
+    if vec_get(out5, 2) != 114 { return 33; }
     if vec_get(out5, 3) != 17 { return 34; }
     if vec_get(out5, 4) != 4 { return 35; }
     if vec_get(out5, 5) != 42 { return 36; }
