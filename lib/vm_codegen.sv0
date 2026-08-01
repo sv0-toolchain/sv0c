@@ -116,13 +116,20 @@ fn is_scalar_cty(cty: string) -> bool {
    structs_field_counts: Vec of field counts (parallel)
    enums_names: Vec of enum name handles
    enums_widths: Vec of enum widths (1 + maxPayload, parallel) */
+/* A struct/enum type-name handle at a declaration (`let x: T`, a struct literal
+   `T { … }`) differs from the token at the type's definition (`struct T { … }`),
+   so match by resolved NAME (slot_name_eq: source string when both handles index
+   the arena, else integer — empty source falls back to integer for the synthetic
+   layout tests). Width of a struct is its field count, of an enum its slot width
+   (tag + payload), of a scalar 1. */
 fn width_of_cty(cty_handle: i32,
                 structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
-                enums_names: Vec<i32>, enums_widths: Vec<i32>) -> i32 {
+                enums_names: Vec<i32>, enums_widths: Vec<i32>,
+                source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let sn: i32 = vec_len(structs_names);
     let mut si: i32 = 0;
     while si < sn {
-        if vec_get(structs_names, si) == cty_handle {
+        if slot_name_eq(vec_get(structs_names, si), cty_handle, source, starts, ends) {
             return vec_get(structs_field_counts, si);
         }
         si = si + 1;
@@ -130,7 +137,7 @@ fn width_of_cty(cty_handle: i32,
     let en: i32 = vec_len(enums_names);
     let mut ei: i32 = 0;
     while ei < en {
-        if vec_get(enums_names, ei) == cty_handle {
+        if slot_name_eq(vec_get(enums_names, ei), cty_handle, source, starts, ends) {
             return vec_get(enums_widths, ei);
         }
         ei = ei + 1;
@@ -163,10 +170,11 @@ fn index_of_field(fields: Vec<i32>, field_name: i32) -> i32 {
 }
 
 fn index_of_field_range(fields_flat: Vec<i32>, start: i32,
-                        count: i32, name: i32) -> i32 {
+                        count: i32, name: i32,
+                        source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let mut i: i32 = 0;
     while i < count {
-        if vec_get(fields_flat, start + i) == name {
+        if slot_name_eq(vec_get(fields_flat, start + i), name, source, starts, ends) {
             return i;
         }
         i = i + 1;
@@ -533,7 +541,7 @@ fn bind_param(name: i32, cty_handle: i32, slot: i32,
               enums_names: Vec<i32>, enums_widths: Vec<i32>) -> i32 {
     let w: i32 = width_of_cty(cty_handle, structs_names,
                                structs_field_counts, enums_names,
-                               enums_widths);
+                               enums_widths, "", vec_new(), vec_new());
     vec_push(env_names, name);
     vec_push(env_bases, slot);
     vec_push(env_widths, w);
@@ -642,6 +650,67 @@ fn struct_layouts_build(item_tags: Vec<i32>, item_names: Vec<i32>,
         i = i + 1;
     }
     return count;
+}
+
+/* Parallel to struct_layouts_build (same struct iteration order): flatten each
+   struct's field-name tokens into out_fields_flat, recording where each struct's
+   run starts in out_field_starts. `item_field_bases[i]` is the struct's base into
+   `struct_field_name_toks` (the parser's sfn / struct_field_name_toks). Used to
+   populate a struct local's per-slot field layout so StoreField / FieldAccess can
+   resolve field name -> slot offset (SML indexOfField). */
+/* When a slot holds a struct value, record its field-name layout so field access
+   resolves name -> offset. Finds the struct whose name matches `cty` (by resolved
+   string — decl/use tokens differ), appends its field-name tokens to `env_fields_
+   flat`, and returns the start index (the value stored in env_field_starts for
+   this slot). A scalar/enum/unknown cty records nothing and returns 0. */
+fn record_field_layout(cty: i32,
+                       structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
+                       struct_fields_flat: Vec<i32>, struct_field_starts: Vec<i32>,
+                       source: string, starts: Vec<i32>, ends: Vec<i32>,
+                       env_fields_flat: Vec<i32>) -> i32 {
+    let ns: i32 = vec_len(structs_names);
+    let mut k: i32 = 0;
+    while k < ns {
+        if slot_name_eq(vec_get(structs_names, k), cty, source, starts, ends) {
+            /* struct_field_starts is built parallel to structs_names in real emit;
+               a synthetic test may leave it short, so guard before indexing. */
+            if k >= vec_len(struct_field_starts) { return 0; }
+            let fstart: i32 = vec_len(env_fields_flat);
+            let fcount: i32 = vec_get(structs_field_counts, k);
+            let sbase: i32 = vec_get(struct_field_starts, k);
+            let mut j: i32 = 0;
+            while j < fcount {
+                vec_push(env_fields_flat, vec_get(struct_fields_flat, sbase + j));
+                j = j + 1;
+            }
+            return fstart;
+        }
+        k = k + 1;
+    }
+    return 0;
+}
+
+fn struct_fields_build(item_tags: Vec<i32>, item_field_counts: Vec<i32>,
+                       item_field_bases: Vec<i32>,
+                       struct_field_name_toks: Vec<i32>,
+                       out_fields_flat: Vec<i32>,
+                       out_field_starts: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(item_tags);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 1 {
+            vec_push(out_field_starts, vec_len(out_fields_flat));
+            let fc: i32 = vec_get(item_field_counts, i);
+            let base: i32 = vec_get(item_field_bases, i);
+            let mut k: i32 = 0;
+            while k < fc {
+                vec_push(out_fields_flat, vec_get(struct_field_name_toks, base + k));
+                k = k + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return vec_len(out_field_starts);
 }
 
 fn enum_layouts_build(item_tags: Vec<i32>, item_names: Vec<i32>,
@@ -786,6 +855,7 @@ fn member_offset_from_field(width: i32, field_h: i32) -> i32 {
 fn emit_member_load_from_var(x: i32, field_h: i32,
                              env_names: Vec<i32>, env_bases: Vec<i32>,
                              env_widths: Vec<i32>,
+                             env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
                              source: string, starts: Vec<i32>, ends: Vec<i32>,
                              out: Vec<i32>) -> i32 {
     let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
@@ -793,7 +863,17 @@ fn emit_member_load_from_var(x: i32, field_h: i32,
     if si < 0 { return 0 - 1; }
     let base: i32 = slot_base(env_bases, si);
     let width: i32 = slot_width(env_widths, si);
-    let off: i32 = member_offset_from_field(width, field_h);
+    /* Struct field name token (>=0) -> offset by name lookup in the slot's field
+       layout; enum sentinels (<0) and the synthetic tests (which leave
+       env_field_starts short) fall back to member_offset_from_field. */
+    let mut off: i32 = member_offset_from_field(width, field_h);
+    if field_h >= 0 {
+        if si < vec_len(env_field_starts) {
+            let fs: i32 = vec_get(env_field_starts, si);
+            off = index_of_field_range(env_fields_flat, fs, width, field_h,
+                                       source, starts, ends);
+        }
+    }
     if off < 0 { return 0 - 1; }
     vec_push(out, 96);
     vec_push(out, base + off);
@@ -803,6 +883,7 @@ fn emit_member_load_from_var(x: i32, field_h: i32,
 fn emit_value(v: Value,
               env_names: Vec<i32>, env_bases: Vec<i32>,
               env_widths: Vec<i32>,
+              env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
               pool: Vec<i32>,
               source: string, starts: Vec<i32>, ends: Vec<i32>,
               out: Vec<i32>) -> i32 {
@@ -853,6 +934,7 @@ fn emit_value(v: Value,
                     return emit_member_load_from_var(x, f,
                                                      env_names, env_bases,
                                                      env_widths,
+                                                     env_field_starts, env_fields_flat,
                                                      source, starts, ends, out);
                 },
                 Value::VInt(n) => { return 0 - 1; },
@@ -886,13 +968,14 @@ fn emit_value(v: Value,
 fn emit_expr(e: Expr,
              env_names: Vec<i32>, env_bases: Vec<i32>,
              env_widths: Vec<i32>,
+             env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
              pool: Vec<i32>,
              source: string, starts: Vec<i32>, ends: Vec<i32>,
              out: Vec<i32>) -> i32 {
     match e {
         Expr::Literal(bv) => {
             let v: Value = box_deref(bv);
-            return emit_value(v, env_names, env_bases, env_widths, pool, source, starts, ends, out);
+            return emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
         },
         Expr::Load(x) => {
             let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
@@ -911,9 +994,9 @@ fn emit_expr(e: Expr,
         Expr::Binop(op_h, bv1, bv2) => {
             let v1: Value = box_deref(bv1);
             let v2: Value = box_deref(bv2);
-            let n1: i32 = emit_value(v1, env_names, env_bases, env_widths, pool, source, starts, ends, out);
+            let n1: i32 = emit_value(v1, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n1 < 0 { return 0 - 1; }
-            let n2: i32 = emit_value(v2, env_names, env_bases, env_widths, pool, source, starts, ends, out);
+            let n2: i32 = emit_value(v2, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n2 < 0 { return 0 - 1; }
             let opc: i32 = binop_tag_to_insn(op_h);
             vec_push(out, opc);
@@ -921,7 +1004,7 @@ fn emit_expr(e: Expr,
         },
         Expr::Unop(op_h, bv) => {
             let v: Value = box_deref(bv);
-            let n: i32 = emit_value(v, env_names, env_bases, env_widths, pool, source, starts, ends, out);
+            let n: i32 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n < 0 { return 0 - 1; }
             let opc: i32 = unop_tag_to_insn(op_h);
             if opc >= 0 {
@@ -937,6 +1020,7 @@ fn emit_expr(e: Expr,
                     return emit_member_load_from_var(x, f,
                                                      env_names, env_bases,
                                                      env_widths,
+                                                     env_field_starts, env_fields_flat,
                                                      source, starts, ends, out);
                 },
                 Value::VInt(n) => { return 0 - 1; },
@@ -1055,7 +1139,7 @@ fn emit_instr(ins: Instr,
         Instr::DeclNamed(cty, x) => { return 0; },
         Instr::Assign(x, be) => {
             let e: Expr = box_deref(be);
-            let n: i32 = emit_expr(e, env_names, env_bases, env_widths,
+            let n: i32 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                    pool, source, starts, ends, out);
             if n < 0 { return 0 - 1; }
             let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
@@ -1073,7 +1157,7 @@ fn emit_instr(ins: Instr,
         },
         Instr::Store(x, be) => {
             let e: Expr = box_deref(be);
-            let n: i32 = emit_expr(e, env_names, env_bases, env_widths,
+            let n: i32 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                    pool, source, starts, ends, out);
             if n < 0 { return 0 - 1; }
             let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
@@ -1091,16 +1175,22 @@ fn emit_instr(ins: Instr,
         },
         Instr::StoreField(bh, fh, be) => {
             let e: Expr = box_deref(be);
-            let ne: i32 = emit_expr(e, env_names, env_bases, env_widths,
+            let ne: i32 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                     pool, source, starts, ends, out);
             if ne < 0 { return 0 - 1; }
             let si: i32 = lookup_slot(env_names, env_bases, env_widths, bh,
                                       source, starts, ends);
             if si < 0 { return 0 - 1; }
             let b0: i32 = slot_base(env_bases, si);
-            let fs: i32 = vec_get(env_field_starts, si);
             let w: i32 = slot_width(env_widths, si);
-            let off: i32 = index_of_field_range(env_fields_flat, fs, w, fh);
+            let mut off: i32 = member_offset_from_field(w, fh);
+            if fh >= 0 {
+                if si < vec_len(env_field_starts) {
+                    let fs: i32 = vec_get(env_field_starts, si);
+                    off = index_of_field_range(env_fields_flat, fs, w, fh,
+                                               source, starts, ends);
+                }
+            }
             if off < 0 { return 0 - 1; }
             vec_push(out, 97);
             vec_push(out, b0 + off);
@@ -1108,7 +1198,7 @@ fn emit_instr(ins: Instr,
         },
         Instr::IfElse(be, th, el) => {
             let cond: Expr = box_deref(be);
-            let nc: i32 = emit_expr(cond, env_names, env_bases, env_widths,
+            let nc: i32 = emit_expr(cond, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                     pool, source, starts, ends, out);
             if nc < 0 { return 0 - 1; }
             let then_out: Vec<i32> = vec_new();
@@ -1136,7 +1226,7 @@ fn emit_instr(ins: Instr,
         Instr::WhileLoop(be, body) => {
             let cond: Expr = box_deref(be);
             let cond_out: Vec<i32> = vec_new();
-            let nc: i32 = emit_expr(cond, env_names, env_bases, env_widths,
+            let nc: i32 = emit_expr(cond, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                     pool, source, starts, ends, cond_out);
             if nc < 0 { return 0 - 1; }
             let body_out: Vec<i32> = vec_new();
@@ -1198,7 +1288,7 @@ fn emit_instr(ins: Instr,
                     let bv: Box<Value> = vec_get(args, ai);
                     let v: Value = box_deref(bv);
                     let nv: i32 = emit_value(v, env_names, env_bases,
-                                             env_widths, pool, source, starts, ends, out);
+                                             env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
                     if nv < 0 { return 0 - 1; }
                     total = total + nv;
                     ai = ai + 1;
@@ -1232,7 +1322,7 @@ fn emit_instr(ins: Instr,
                                             env_widths, source, starts, ends);
                 nargs_total = nargs_total + w;
                 let nv: i32 = emit_value(v, env_names, env_bases,
-                                         env_widths, pool, source, starts, ends, out);
+                                         env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
                 if nv < 0 { return 0 - 1; }
                 total = total + nv;
                 ai = ai + 1;
@@ -1263,7 +1353,7 @@ fn emit_instr(ins: Instr,
         },
         Instr::Requires(be, fn_h) => {
             let e: Expr = box_deref(be);
-            let ne: i32 = emit_expr(e, env_names, env_bases, env_widths,
+            let ne: i32 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                     pool, source, starts, ends, out);
             if ne < 0 { return 0 - 1; }
             let key: i32 = contract_pool_key(fn_h, 0);
@@ -1274,7 +1364,7 @@ fn emit_instr(ins: Instr,
         },
         Instr::Ensures(be, fn_h) => {
             let e: Expr = box_deref(be);
-            let ne: i32 = emit_expr(e, env_names, env_bases, env_widths,
+            let ne: i32 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                     pool, source, starts, ends, out);
             if ne < 0 { return 0 - 1; }
             let key: i32 = contract_pool_key(fn_h, 1);
@@ -1291,7 +1381,7 @@ fn emit_instr(ins: Instr,
         Instr::ReturnVal(bv) => {
             let v: Value = box_deref(bv);
             let w: i32 = emit_ret_width(v, env_names, env_bases, env_widths, source, starts, ends);
-            let n: i32 = emit_value(v, env_names, env_bases, env_widths, pool, source, starts, ends, out);
+            let n: i32 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n < 0 { return 0 - 1; }
             vec_push(out, 118);
             vec_push(out, w);
@@ -1359,6 +1449,8 @@ fn scan_instr_env(ins: Instr,
                   next_slot: i32,
                   structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
                   enums_names: Vec<i32>, enums_widths: Vec<i32>,
+                  structs_fields_flat: Vec<i32>, structs_field_starts: Vec<i32>,
+                  env_fields_flat: Vec<i32>,
                   source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     match ins {
         Instr::DeclVar(x) => {
@@ -1369,11 +1461,15 @@ fn scan_instr_env(ins: Instr,
         Instr::DeclNamed(cty, x) => {
             let w: i32 = width_of_cty(cty, structs_names,
                                        structs_field_counts,
-                                       enums_names, enums_widths);
+                                       enums_names, enums_widths,
+                                       source, starts, ends);
             vec_push(env_names, x);
             vec_push(env_bases, next_slot);
             vec_push(env_widths, w);
-            vec_push(env_field_starts, 0);
+            vec_push(env_field_starts,
+                     record_field_layout(cty, structs_names, structs_field_counts,
+                                         structs_fields_flat, structs_field_starts,
+                                         source, starts, ends, env_fields_flat));
             return next_slot + w;
         },
         Instr::Assign(x, be) => {
@@ -1385,12 +1481,16 @@ fn scan_instr_env(ins: Instr,
             if dst == 0 { return next_slot; }
             let w0: i32 = width_of_cty(rty, structs_names,
                                         structs_field_counts,
-                                        enums_names, enums_widths);
+                                        enums_names, enums_widths,
+                                        source, starts, ends);
             let w: i32 = if w0 < 1 { 1 } else { w0 };
             vec_push(env_names, dst);
             vec_push(env_bases, next_slot);
             vec_push(env_widths, w);
-            vec_push(env_field_starts, 0);
+            vec_push(env_field_starts,
+                     record_field_layout(rty, structs_names, structs_field_counts,
+                                         structs_fields_flat, structs_field_starts,
+                                         source, starts, ends, env_fields_flat));
             return next_slot + w;
         },
         Instr::IfElse(be, th, el) => {
@@ -1399,11 +1499,15 @@ fn scan_instr_env(ins: Instr,
                                            next_slot,
                                            structs_names, structs_field_counts,
                                            enums_names, enums_widths,
+                                           structs_fields_flat, structs_field_starts,
+                                           env_fields_flat,
                                            source, starts, ends);
             return scan_instrs_env(el, env_names, env_bases,
                                   env_widths, env_field_starts, ns1,
                                   structs_names, structs_field_counts,
                                   enums_names, enums_widths,
+                                  structs_fields_flat, structs_field_starts,
+                                  env_fields_flat,
                                   source, starts, ends);
         },
         Instr::WhileLoop(be, body) => {
@@ -1412,6 +1516,8 @@ fn scan_instr_env(ins: Instr,
                                   next_slot,
                                   structs_names, structs_field_counts,
                                   enums_names, enums_widths,
+                                  structs_fields_flat, structs_field_starts,
+                                  env_fields_flat,
                                   source, starts, ends);
         },
         Instr::BlockInstr(body) => {
@@ -1420,6 +1526,8 @@ fn scan_instr_env(ins: Instr,
                                   next_slot,
                                   structs_names, structs_field_counts,
                                   enums_names, enums_widths,
+                                  structs_fields_flat, structs_field_starts,
+                                  env_fields_flat,
                                   source, starts, ends);
         },
         Instr::Nop => { return next_slot; },
@@ -1442,6 +1550,8 @@ fn scan_instrs_env(instrs: Vec<i32>,
                    next_slot: i32,
                    structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
                    enums_names: Vec<i32>, enums_widths: Vec<i32>,
+                   structs_fields_flat: Vec<i32>, structs_field_starts: Vec<i32>,
+                   env_fields_flat: Vec<i32>,
                    source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let n: i32 = vec_len(instrs);
     let mut ns: i32 = next_slot;
@@ -1453,6 +1563,8 @@ fn scan_instrs_env(instrs: Vec<i32>,
                             env_field_starts, ns,
                             structs_names, structs_field_counts,
                             enums_names, enums_widths,
+                            structs_fields_flat, structs_field_starts,
+                            env_fields_flat,
                             source, starts, ends);
         i = i + 1;
     }
@@ -1474,6 +1586,8 @@ fn local_count_and_env(param_names: Vec<i32>, param_ctys: Vec<i32>,
                        structs_field_counts: Vec<i32>,
                        enums_names: Vec<i32>,
                        enums_widths: Vec<i32>,
+                       structs_fields_flat: Vec<i32>, structs_field_starts: Vec<i32>,
+                       env_fields_flat: Vec<i32>,
                        source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let np: i32 = vec_len(param_names);
     let mut ns: i32 = 0;
@@ -1482,11 +1596,15 @@ fn local_count_and_env(param_names: Vec<i32>, param_ctys: Vec<i32>,
         let pn: i32 = vec_get(param_names, pi);
         let pc: i32 = vec_get(param_ctys, pi);
         let w: i32 = width_of_cty(pc, structs_names, structs_field_counts,
-                                   enums_names, enums_widths);
+                                   enums_names, enums_widths,
+                                   source, starts, ends);
         vec_push(env_names, pn);
         vec_push(env_bases, ns);
         vec_push(env_widths, w);
-        vec_push(env_field_starts, 0);
+        vec_push(env_field_starts,
+                 record_field_layout(pc, structs_names, structs_field_counts,
+                                     structs_fields_flat, structs_field_starts,
+                                     source, starts, ends, env_fields_flat));
         ns = ns + w;
         pi = pi + 1;
     }
@@ -1494,6 +1612,8 @@ fn local_count_and_env(param_names: Vec<i32>, param_ctys: Vec<i32>,
                            env_field_starts, ns,
                            structs_names, structs_field_counts,
                            enums_names, enums_widths,
+                           structs_fields_flat, structs_field_starts,
+                           env_fields_flat,
                            source, starts, ends);
 }
 
@@ -1503,14 +1623,16 @@ fn compute_arity(param_ctys: Vec<i32>,
                  structs_names: Vec<i32>,
                  structs_field_counts: Vec<i32>,
                  enums_names: Vec<i32>,
-                 enums_widths: Vec<i32>) -> i32 {
+                 enums_widths: Vec<i32>,
+                 source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let np: i32 = vec_len(param_ctys);
     let mut total: i32 = 0;
     let mut i: i32 = 0;
     while i < np {
         total = total + width_of_cty(vec_get(param_ctys, i),
                                       structs_names, structs_field_counts,
-                                      enums_names, enums_widths);
+                                      enums_names, enums_widths,
+                                      source, starts, ends);
         i = i + 1;
     }
     return total;
@@ -1530,6 +1652,7 @@ fn emit_fn(label: i32,
            instrs: Vec<i32>,
            structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
            enums_names: Vec<i32>, enums_widths: Vec<i32>,
+           structs_fields_flat: Vec<i32>, structs_field_starts: Vec<i32>,
            pool: Vec<i32>,
            source: string, starts: Vec<i32>, ends: Vec<i32>,
            fn_names: Vec<i32>,
@@ -1543,6 +1666,8 @@ fn emit_fn(label: i32,
                                        instrs, en, eb, ew, efs,
                                        structs_names, structs_field_counts,
                                        enums_names, enums_widths,
+                                       structs_fields_flat, structs_field_starts,
+                                       eff,
                                        source, starts, ends);
     let code: Vec<i32> = vec_new();
     let n: i32 = emit_instrs(instrs, en, eb, ew, efs, eff,
@@ -1550,7 +1675,8 @@ fn emit_fn(label: i32,
     if n < 0 { return 0 - 1; }
     let arity: i32 = compute_arity(param_ctys, structs_names,
                                     structs_field_counts,
-                                    enums_names, enums_widths);
+                                    enums_names, enums_widths,
+                                    source, starts, ends);
     let name_idx: i32 = pool_add(pool, label, source, starts, ends);
     vec_push(ft_entries, name_idx);
     vec_push(ft_entries, arity);
@@ -1603,6 +1729,8 @@ fn build_func_order(block_labels: Vec<i32>, source: string,
 fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
                 item_field_counts: Vec<i32>,
                 item_variant_max_payload: Vec<i32>,
+                item_field_bases: Vec<i32>,
+                struct_field_name_toks: Vec<i32>,
                 block_labels: Vec<i32>,
                 block_param_names: Vec<i32>,
                 block_param_ctys: Vec<i32>,
@@ -1613,6 +1741,10 @@ fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
     let sfc: Vec<i32> = vec_new();
     struct_layouts_build(item_tags, item_names, item_field_counts,
                          sn, sfc);
+    let sff: Vec<i32> = vec_new();
+    let sfs: Vec<i32> = vec_new();
+    struct_fields_build(item_tags, item_field_counts, item_field_bases,
+                        struct_field_name_toks, sff, sfs);
     let enn: Vec<i32> = vec_new();
     let enw: Vec<i32> = vec_new();
     enum_layouts_build(item_tags, item_names, item_field_counts,
@@ -1636,6 +1768,7 @@ fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
         let lab: i32 = vec_get(block_labels, bi2);
         let r: i32 = emit_fn(lab, pn, pc, ins,
                               sn, sfc, enn, enw,
+                              sff, sfs,
                               out_pool, source, starts, ends,
                               fn_names, out_ft);
         if r < 0 { return 0 - 1; }
@@ -1676,10 +1809,10 @@ fn test_width_of_cty() -> i32 {
     vec_push(sn, 100); vec_push(sf, 3);
     vec_push(sn, 200); vec_push(sf, 5);
     vec_push(en, 300); vec_push(ew, 4);
-    if width_of_cty(100, sn, sf, en, ew) != 3 { return 1; }
-    if width_of_cty(200, sn, sf, en, ew) != 5 { return 2; }
-    if width_of_cty(300, sn, sf, en, ew) != 4 { return 3; }
-    if width_of_cty(999, sn, sf, en, ew) != 1 { return 4; }
+    if width_of_cty(100, sn, sf, en, ew, "", vec_new(), vec_new()) != 3 { return 1; }
+    if width_of_cty(200, sn, sf, en, ew, "", vec_new(), vec_new()) != 5 { return 2; }
+    if width_of_cty(300, sn, sf, en, ew, "", vec_new(), vec_new()) != 4 { return 3; }
+    if width_of_cty(999, sn, sf, en, ew, "", vec_new(), vec_new()) != 1 { return 4; }
     return 0;
 }
 
@@ -1963,43 +2096,43 @@ fn test_emit_value() -> i32 {
     let pool: Vec<i32> = vec_new();
     let out: Vec<i32> = vec_new();
     let vi: Value = Value::VInt(42);
-    let r1: i32 = emit_value(vi, en, eb, ew, pool, "", vec_new(), vec_new(), out);
+    let r1: i32 = emit_value(vi, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out);
     if r1 != 2 { return 1; }
     if vec_get(out, 0) != 4 { return 2; }
     if vec_get(out, 1) != 42 { return 3; }
     let out2: Vec<i32> = vec_new();
     let vb: Value = Value::VBoolTrue;
-    let r2: i32 = emit_value(vb, en, eb, ew, pool, "", vec_new(), vec_new(), out2);
+    let r2: i32 = emit_value(vb, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out2);
     if r2 != 2 { return 4; }
     if vec_get(out2, 0) != 7 { return 5; }
     if vec_get(out2, 1) != 1 { return 6; }
     let out3: Vec<i32> = vec_new();
     let vbf: Value = Value::VBoolFalse;
-    let r2b: i32 = emit_value(vbf, en, eb, ew, pool, "", vec_new(), vec_new(), out3);
+    let r2b: i32 = emit_value(vbf, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out3);
     if r2b != 2 { return 7; }
     if vec_get(out3, 1) != 0 { return 8; }
     let out4: Vec<i32> = vec_new();
     let vu: Value = Value::VUnit;
-    let r3: i32 = emit_value(vu, en, eb, ew, pool, "", vec_new(), vec_new(), out4);
+    let r3: i32 = emit_value(vu, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out4);
     if r3 != 1 { return 9; }
     if vec_get(out4, 0) != 3 { return 10; }
     let out5: Vec<i32> = vec_new();
     let vs: Value = Value::VString(99);
-    let r4: i32 = emit_value(vs, en, eb, ew, pool, "", vec_new(), vec_new(), out5);
+    let r4: i32 = emit_value(vs, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out5);
     if r4 != 2 { return 11; }
     if vec_get(out5, 0) != 8 { return 12; }
     if vec_get(out5, 1) != 0 { return 13; }
     vec_push(en, 50); vec_push(eb, 2); vec_push(ew, 1);
     let out6: Vec<i32> = vec_new();
     let vv: Value = Value::VVar(50);
-    let r5: i32 = emit_value(vv, en, eb, ew, pool, "", vec_new(), vec_new(), out6);
+    let r5: i32 = emit_value(vv, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out6);
     if r5 != 2 { return 14; }
     if vec_get(out6, 0) != 96 { return 15; }
     if vec_get(out6, 1) != 2 { return 16; }
     vec_push(en, 60); vec_push(eb, 5); vec_push(ew, 3);
     let out7: Vec<i32> = vec_new();
     let vv2: Value = Value::VVar(60);
-    let r6: i32 = emit_value(vv2, en, eb, ew, pool, "", vec_new(), vec_new(), out7);
+    let r6: i32 = emit_value(vv2, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out7);
     if r6 != 6 { return 17; }
     if vec_get(out7, 0) != 96 { return 18; }
     if vec_get(out7, 1) != 5 { return 19; }
@@ -2009,25 +2142,25 @@ fn test_emit_value() -> i32 {
     if vec_get(out7, 5) != 7 { return 23; }
     let out8: Vec<i32> = vec_new();
     let va: Value = Value::VAddrOf(50);
-    let r7: i32 = emit_value(va, en, eb, ew, pool, "", vec_new(), vec_new(), out8);
+    let r7: i32 = emit_value(va, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out8);
     if r7 != 2 { return 24; }
     if vec_get(out8, 0) != 4 { return 25; }
     if vec_get(out8, 1) != 2 { return 26; }
     let out9: Vec<i32> = vec_new();
     let vm0: Value = Value::VMember(box_new(Value::VVar(60)), 0);
-    let r8: i32 = emit_value(vm0, en, eb, ew, pool, "", vec_new(), vec_new(), out9);
+    let r8: i32 = emit_value(vm0, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out9);
     if r8 != 2 { return 27; }
     if vec_get(out9, 0) != 96 { return 28; }
     if vec_get(out9, 1) != 5 { return 29; }
     let out10: Vec<i32> = vec_new();
     let vm_tag: Value = Value::VMember(box_new(Value::VVar(60)), 0 - 1);
-    let r9: i32 = emit_value(vm_tag, en, eb, ew, pool, "", vec_new(), vec_new(), out10);
+    let r9: i32 = emit_value(vm_tag, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out10);
     if r9 != 2 { return 30; }
     if vec_get(out10, 0) != 96 { return 31; }
     if vec_get(out10, 1) != 5 { return 32; }
     let out11: Vec<i32> = vec_new();
     let vm_oob: Value = Value::VMember(box_new(Value::VVar(60)), 3);
-    let r10: i32 = emit_value(vm_oob, en, eb, ew, pool, "", vec_new(), vec_new(), out11);
+    let r10: i32 = emit_value(vm_oob, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out11);
     if r10 != 0 - 1 { return 33; }
     return 0;
 }
@@ -2046,13 +2179,13 @@ fn test_emit_expr() -> i32 {
     vec_push(starts, 3); vec_push(ends, 6);
     let out1: Vec<i32> = vec_new();
     let lit: Expr = Expr::Literal(box_new(Value::VInt(7)));
-    let r1: i32 = emit_expr(lit, en, eb, ew, pool, source, starts, ends, out1);
+    let r1: i32 = emit_expr(lit, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out1);
     if r1 != 2 { return 1; }
     if vec_get(out1, 0) != 4 { return 2; }
     if vec_get(out1, 1) != 7 { return 3; }
     let out2: Vec<i32> = vec_new();
     let binop: Expr = Expr::Binop(0, box_new(Value::VInt(3)), box_new(Value::VInt(4)));
-    let r2: i32 = emit_expr(binop, en, eb, ew, pool, source, starts, ends, out2);
+    let r2: i32 = emit_expr(binop, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out2);
     if r2 != 5 { return 4; }
     if vec_get(out2, 0) != 4 { return 5; }
     if vec_get(out2, 1) != 3 { return 6; }
@@ -2061,14 +2194,14 @@ fn test_emit_expr() -> i32 {
     if vec_get(out2, 4) != 16 { return 9; }
     let out3: Vec<i32> = vec_new();
     let unop_not: Expr = Expr::Unop(1, box_new(Value::VBoolTrue));
-    let r3: i32 = emit_expr(unop_not, en, eb, ew, pool, source, starts, ends, out3);
+    let r3: i32 = emit_expr(unop_not, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out3);
     if r3 != 3 { return 10; }
     if vec_get(out3, 0) != 7 { return 11; }
     if vec_get(out3, 1) != 1 { return 12; }
     if vec_get(out3, 2) != 82 { return 13; }
     let out4: Vec<i32> = vec_new();
     let unop_neg: Expr = Expr::Unop(0, box_new(Value::VInt(5)));
-    let r4: i32 = emit_expr(unop_neg, en, eb, ew, pool, source, starts, ends, out4);
+    let r4: i32 = emit_expr(unop_neg, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out4);
     if r4 != 3 { return 14; }
     if vec_get(out4, 0) != 4 { return 15; }
     if vec_get(out4, 1) != 5 { return 16; }
@@ -2076,32 +2209,32 @@ fn test_emit_expr() -> i32 {
     vec_push(en, 70); vec_push(eb, 0); vec_push(ew, 1);
     let out5: Vec<i32> = vec_new();
     let load: Expr = Expr::Load(70);
-    let r5: i32 = emit_expr(load, en, eb, ew, pool, source, starts, ends, out5);
+    let r5: i32 = emit_expr(load, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out5);
     if r5 != 2 { return 18; }
     if vec_get(out5, 0) != 96 { return 19; }
     if vec_get(out5, 1) != 0 { return 20; }
     let out6: Vec<i32> = vec_new();
     let unop_cast: Expr = Expr::Unop(99, box_new(Value::VInt(9)));
-    let r6: i32 = emit_expr(unop_cast, en, eb, ew, pool, source, starts, ends, out6);
+    let r6: i32 = emit_expr(unop_cast, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out6);
     if r6 != 2 { return 21; }
     if vec_get(out6, 0) != 4 { return 22; }
     if vec_get(out6, 1) != 9 { return 23; }
     vec_push(en, 80); vec_push(eb, 4); vec_push(ew, 3);
     let out7: Vec<i32> = vec_new();
     let f0: Expr = Expr::FieldAccess(box_new(Value::VVar(80)), 0);
-    let r7: i32 = emit_expr(f0, en, eb, ew, pool, source, starts, ends, out7);
+    let r7: i32 = emit_expr(f0, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out7);
     if r7 != 2 { return 24; }
     if vec_get(out7, 0) != 96 { return 25; }
     if vec_get(out7, 1) != 4 { return 26; }
     let out8: Vec<i32> = vec_new();
     let ftag: Expr = Expr::FieldAccess(box_new(Value::VVar(80)), 0 - 1);
-    let r8: i32 = emit_expr(ftag, en, eb, ew, pool, source, starts, ends, out8);
+    let r8: i32 = emit_expr(ftag, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out8);
     if r8 != 2 { return 27; }
     if vec_get(out8, 0) != 96 { return 28; }
     if vec_get(out8, 1) != 4 { return 29; }
     let out9: Vec<i32> = vec_new();
     let foob: Expr = Expr::FieldAccess(box_new(Value::VVar(80)), 3);
-    let r9: i32 = emit_expr(foob, en, eb, ew, pool, source, starts, ends, out9);
+    let r9: i32 = emit_expr(foob, en, eb, ew, vec_new(), vec_new(), pool, source, starts, ends, out9);
     if r9 != 0 - 1 { return 30; }
     return 0;
 }
@@ -2678,16 +2811,16 @@ fn test_compute_arity() -> i32 {
     let enw: Vec<i32> = vec_new();
     /* --- no params → arity 0 --- */
     let pc0: Vec<i32> = vec_new();
-    if compute_arity(pc0, sn, sfc, enn, enw) != 0 { return 1; }
+    if compute_arity(pc0, sn, sfc, enn, enw, "", vec_new(), vec_new()) != 0 { return 1; }
     /* --- one scalar param → arity 1 --- */
     let pc1: Vec<i32> = vec_new();
     vec_push(pc1, 777);
-    if compute_arity(pc1, sn, sfc, enn, enw) != 1 { return 2; }
+    if compute_arity(pc1, sn, sfc, enn, enw, "", vec_new(), vec_new()) != 1 { return 2; }
     /* --- two scalar params → arity 2 --- */
     let pc2: Vec<i32> = vec_new();
     vec_push(pc2, 777);
     vec_push(pc2, 778);
-    if compute_arity(pc2, sn, sfc, enn, enw) != 2 { return 3; }
+    if compute_arity(pc2, sn, sfc, enn, enw, "", vec_new(), vec_new()) != 2 { return 3; }
     /* --- struct param (width 3) → arity 3 --- */
     let sn2: Vec<i32> = vec_new();
     let sfc2: Vec<i32> = vec_new();
@@ -2695,12 +2828,12 @@ fn test_compute_arity() -> i32 {
     vec_push(sfc2, 3);
     let pc3: Vec<i32> = vec_new();
     vec_push(pc3, 500);
-    if compute_arity(pc3, sn2, sfc2, enn, enw) != 3 { return 4; }
+    if compute_arity(pc3, sn2, sfc2, enn, enw, "", vec_new(), vec_new()) != 3 { return 4; }
     /* --- mixed: scalar + struct(3) → arity 4 --- */
     let pc4: Vec<i32> = vec_new();
     vec_push(pc4, 777);
     vec_push(pc4, 500);
-    if compute_arity(pc4, sn2, sfc2, enn, enw) != 4 { return 5; }
+    if compute_arity(pc4, sn2, sfc2, enn, enw, "", vec_new(), vec_new()) != 4 { return 5; }
     /* --- enum param (width 2) → arity 2 --- */
     let enn2: Vec<i32> = vec_new();
     let enw2: Vec<i32> = vec_new();
@@ -2708,7 +2841,7 @@ fn test_compute_arity() -> i32 {
     vec_push(enw2, 2);
     let pc5: Vec<i32> = vec_new();
     vec_push(pc5, 600);
-    if compute_arity(pc5, sn, sfc, enn2, enw2) != 2 { return 6; }
+    if compute_arity(pc5, sn, sfc, enn2, enw2, "", vec_new(), vec_new()) != 2 { return 6; }
     return 0;
 }
 
@@ -2731,6 +2864,7 @@ fn test_emit_fn() -> i32 {
     vec_push(ins0, box_new(Instr::ReturnVoid));
     let r0: i32 = emit_fn(42, pn0, pc0, ins0,
                             sn, sfc, enn, enw,
+                            vec_new(), vec_new(),
                             pool, source, starts, ends, fns, ft);
     if r0 != 0 { return 1; }
     if vec_len(ft) != 4 { return 2; }
@@ -2754,6 +2888,7 @@ fn test_emit_fn() -> i32 {
         box_new(Value::VVar(20)))));
     let r1: i32 = emit_fn(43, pn1, pc1, ins1,
                             sn, sfc, enn, enw,
+                            vec_new(), vec_new(),
                             pool, source, starts, ends, fns, ft);
     if r1 != 0 { return 9; }
     if vec_len(ft) != 8 { return 10; }
@@ -2779,6 +2914,7 @@ fn test_emit_fn() -> i32 {
     let ft2: Vec<i32> = vec_new();
     let r2: i32 = emit_fn(44, pn2, pc2, ins2,
                             sn3, sfc3, enn, enw,
+                            vec_new(), vec_new(),
                             pool2, source, starts, ends, fns, ft2);
     if r2 != 0 { return 15; }
     if vec_get(ft2, 1) != 3 { return 16; }
@@ -2790,6 +2926,7 @@ fn test_emit_fn() -> i32 {
     vec_push(ins3, box_new(Instr::ReturnVoid));
     let r3: i32 = emit_fn(45, pn3, pc3, ins3,
                             sn, sfc, enn, enw,
+                            vec_new(), vec_new(),
                             pool2, source, starts, ends, fns, ft2);
     if r3 != 0 { return 18; }
     if vec_len(ft2) != 8 { return 19; }
@@ -2813,6 +2950,7 @@ fn test_local_count_and_env() -> i32 {
     let lc0: i32 = local_count_and_env(pn0, pc0, ins0,
                                         en0, eb0, ew0, efs0,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc0 != 0 { return 1; }
     if vec_len(en0) != 0 { return 2; }
@@ -2831,6 +2969,7 @@ fn test_local_count_and_env() -> i32 {
     let lc1: i32 = local_count_and_env(pn1, pc1, ins1,
                                         en1, eb1, ew1, efs1,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc1 != 2 { return 3; }
     if vec_len(en1) != 2 { return 4; }
@@ -2856,6 +2995,7 @@ fn test_local_count_and_env() -> i32 {
     let lc2: i32 = local_count_and_env(pn2, pc2, ins2,
                                         en2, eb2, ew2, efs2,
                                         sn2, sfc2, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc2 != 3 { return 10; }
     if vec_get(ew2, 0) != 3 { return 11; }
@@ -2872,6 +3012,7 @@ fn test_local_count_and_env() -> i32 {
     let lc3: i32 = local_count_and_env(pn3, pc3, ins3,
                                         en3, eb3, ew3, efs3,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc3 != 1 { return 13; }
     if vec_get(en3, 0) != 40 { return 14; }
@@ -2890,6 +3031,7 @@ fn test_local_count_and_env() -> i32 {
     let lc4: i32 = local_count_and_env(pn4, pc4, ins4,
                                         en4, eb4, ew4, efs4,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc4 != 1 { return 17; }
     if vec_len(en4) != 1 { return 18; }
@@ -2906,6 +3048,7 @@ fn test_local_count_and_env() -> i32 {
     let lc5: i32 = local_count_and_env(pn5, pc5, ins5,
                                         en5, eb5, ew5, efs5,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc5 != 1 { return 19; }
     if vec_get(en5, 0) != 60 { return 20; }
@@ -2922,6 +3065,7 @@ fn test_local_count_and_env() -> i32 {
     let lc6: i32 = local_count_and_env(pn6, pc6, ins6,
                                         en6, eb6, ew6, efs6,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc6 != 1 { return 21; }
     if vec_get(en6, 0) != 70 { return 22; }
@@ -2938,6 +3082,7 @@ fn test_local_count_and_env() -> i32 {
     let lc7: i32 = local_count_and_env(pn7, pc7, ins7,
                                         en7, eb7, ew7, efs7,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc7 != 0 { return 23; }
     if vec_len(en7) != 0 { return 24; }
@@ -2954,6 +3099,7 @@ fn test_local_count_and_env() -> i32 {
     let lc8: i32 = local_count_and_env(pn8, pc8, ins8,
                                         en8, eb8, ew8, efs8,
                                         sn2, sfc2, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc8 != 3 { return 25; }
     if vec_get(ew8, 0) != 3 { return 26; }
@@ -2975,6 +3121,7 @@ fn test_local_count_and_env() -> i32 {
     let lc9: i32 = local_count_and_env(pn9, pc9, ins9,
                                         en9, eb9, ew9, efs9,
                                         sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc9 != 2 { return 27; }
     if vec_get(en9, 0) != 90 { return 28; }
@@ -2995,6 +3142,7 @@ fn test_local_count_and_env() -> i32 {
     let lc10: i32 = local_count_and_env(pn10, pc10, ins10,
                                          en10, eb10, ew10, efs10,
                                          sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc10 != 1 { return 30; }
     if vec_get(en10, 0) != 95 { return 31; }
@@ -3013,6 +3161,7 @@ fn test_local_count_and_env() -> i32 {
     let lc11: i32 = local_count_and_env(pn11, pc11, ins11,
                                          en11, eb11, ew11, efs11,
                                          sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc11 != 3 { return 32; }
     if vec_len(en11) != 3 { return 33; }
@@ -3034,6 +3183,7 @@ fn test_local_count_and_env() -> i32 {
     let lc12: i32 = local_count_and_env(pn12, pc12, ins12,
                                          en12, eb12, ew12, efs12,
                                          sn, sfc, enn, enw,
+                                        vec_new(), vec_new(), vec_new(),
                                         "", vec_new(), vec_new());
     if lc12 != 0 { return 37; }
     if vec_len(en12) != 0 { return 38; }
@@ -3085,7 +3235,7 @@ fn emit_program_1fn(source: string, starts: Vec<i32>,
     vec_push(bpc, pc);
     let bi: Vec<i32> = vec_new();
     vec_push(bi, ins);
-    return emit_program(it, in2, ifc, ivp, bl, bpn, bpc, bi,
+    return emit_program(it, in2, ifc, ivp, vec_new(), vec_new(), bl, bpn, bpc, bi,
                          source, starts, ends, pool, ft);
 }
 
