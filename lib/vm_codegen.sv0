@@ -324,11 +324,43 @@ fn pool_new() -> Vec<i32> {
     return vec_new();
 }
 
-fn pool_add(pool: Vec<i32>, s: i32) -> i32 {
+/* Resolve a pool handle to the string VALUE used for deduplication, matching SML's
+   value-keyed poolAdd. A string-literal token's span carries surrounding quotes
+   (`"main"`); strip them so the literal `"main"` dedups against the `main` function
+   name, as it does in SML. (Escapes are collapsed at encode time; the quote-stripped
+   form is a consistent dedup key for the common no-escape case.) Empty source is the
+   synthetic-test signal — fall back to handle identity there. */
+fn pool_resolve(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let raw: string = handle_to_str(h, source, starts, ends);
+    let n: i32 = string_len(raw);
+    if n >= 2 {
+        if string_char_at(raw, 0) == 34 {
+            return string_substr(raw, 1, n - 2);
+        }
+    }
+    return raw;
+}
+
+/* Two pool handles denote the same string iff they resolve to the same value.
+   Resolve by source only when BOTH handles index the token arena (as with
+   slot_name_eq); otherwise compare integers, so the synthetic low-level unit
+   tests (which key the pool on bare integers, not real tokens) keep working. */
+fn pool_key_eq(a: i32, b: i32, source: string,
+               starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    if a == b { return true; }
+    if string_len(source) == 0 { return false; }
+    if slot_handle_in_range(a, starts) != true { return false; }
+    if slot_handle_in_range(b, starts) != true { return false; }
+    return string_eq(pool_resolve(a, source, starts, ends),
+                     pool_resolve(b, source, starts, ends));
+}
+
+fn pool_add(pool: Vec<i32>, s: i32,
+            source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let n: i32 = vec_len(pool);
     let mut i: i32 = 0;
     while i < n {
-        if vec_get(pool, i) == s {
+        if pool_key_eq(vec_get(pool, i), s, source, starts, ends) {
             return i;
         }
         i = i + 1;
@@ -791,7 +823,7 @@ fn emit_value(v: Value,
             return 2;
         },
         Value::VString(s) => {
-            let idx: i32 = pool_add(pool, s);
+            let idx: i32 = pool_add(pool, s, source, starts, ends);
             vec_push(out, 8);
             vec_push(out, idx);
             return 2;
@@ -1235,7 +1267,7 @@ fn emit_instr(ins: Instr,
                                     pool, source, starts, ends, out);
             if ne < 0 { return 0 - 1; }
             let key: i32 = contract_pool_key(fn_h, 0);
-            let pidx: i32 = pool_add(pool, key);
+            let pidx: i32 = pool_add(pool, key, source, starts, ends);
             vec_push(out, 160);
             vec_push(out, pidx);
             return ne + 2;
@@ -1246,7 +1278,7 @@ fn emit_instr(ins: Instr,
                                     pool, source, starts, ends, out);
             if ne < 0 { return 0 - 1; }
             let key: i32 = contract_pool_key(fn_h, 1);
-            let pidx: i32 = pool_add(pool, key);
+            let pidx: i32 = pool_add(pool, key, source, starts, ends);
             vec_push(out, 160);
             vec_push(out, pidx);
             return ne + 2;
@@ -1519,7 +1551,7 @@ fn emit_fn(label: i32,
     let arity: i32 = compute_arity(param_ctys, structs_names,
                                     structs_field_counts,
                                     enums_names, enums_widths);
-    let name_idx: i32 = pool_add(pool, label);
+    let name_idx: i32 = pool_add(pool, label, source, starts, ends);
     vec_push(ft_entries, name_idx);
     vec_push(ft_entries, arity);
     vec_push(ft_entries, lc);
@@ -1730,11 +1762,11 @@ fn test_sentinels() -> i32 {
 
 fn test_pool() -> i32 {
     let pool: Vec<i32> = pool_new();
-    let i0: i32 = pool_add(pool, 100);
+    let i0: i32 = pool_add(pool, 100, "", vec_new(), vec_new());
     if i0 != 0 { return 1; }
-    let i1: i32 = pool_add(pool, 200);
+    let i1: i32 = pool_add(pool, 200, "", vec_new(), vec_new());
     if i1 != 1 { return 2; }
-    let i0b: i32 = pool_add(pool, 100);
+    let i0b: i32 = pool_add(pool, 100, "", vec_new(), vec_new());
     if i0b != 0 { return 3; }
     if pool_size(pool) != 2 { return 4; }
     return 0;

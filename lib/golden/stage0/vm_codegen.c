@@ -48,7 +48,9 @@ static int is_loop_exit_sentinel(int v);
 static int is_loop_continue_sentinel(int v);
 static int is_loop_break_sentinel(int v);
 static int pool_new(void);
-static int pool_add(int pool, int s);
+static const char* pool_resolve(int h, const char* source, int starts, int ends);
+static int pool_key_eq(int a, int b, const char* source, int starts, int ends);
+static int pool_add(int pool, int s, const char* source, int starts, int ends);
 static int pool_size(int pool);
 static int contract_pool_key(int fn_h, int kind);
 static int builtin_id(const char* name);
@@ -657,13 +659,59 @@ static int pool_new(void) {
   return _sv0t0;
 }
 
-static int pool_add(int pool, int s) {
+static const char* pool_resolve(int h, const char* source, int starts, int ends) {
+  const char* _sv0t0 = handle_to_str(h, source, starts, ends);
+  const char* raw;
+  raw = _sv0t0;
+  int _sv0t1 = sv0_string_len(raw);
+  int n = _sv0t1;
+  if ((n >= 2)) {
+    int _sv0t2 = sv0_string_char_at(raw, 0);
+    if ((_sv0t2 == 34)) {
+      int _sv0t3 = (n - 2);
+      const char* _sv0t4 = sv0_string_substr(raw, 1, _sv0t3);
+      return _sv0t4;
+    } else {
+    }
+  } else {
+  }
+  return raw;
+}
+
+static int pool_key_eq(int a, int b, const char* source, int starts, int ends) {
+  if ((a == b)) {
+    return 1;
+  } else {
+  }
+  int _sv0t0 = sv0_string_len(source);
+  if ((_sv0t0 == 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = slot_handle_in_range(a, starts);
+  if ((_sv0t1 != 1)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = slot_handle_in_range(b, starts);
+  if ((_sv0t2 != 1)) {
+    return 0;
+  } else {
+  }
+  const char* _sv0t3 = pool_resolve(a, source, starts, ends);
+  const char* _sv0t4 = pool_resolve(b, source, starts, ends);
+  int _sv0t5 = sv0_string_eq(_sv0t3, _sv0t4);
+  return _sv0t5;
+}
+
+static int pool_add(int pool, int s, const char* source, int starts, int ends) {
   int _sv0t0 = sv0_vec_len(pool);
   int n = _sv0t0;
   int i = 0;
   while ((i < n)) {
     int _sv0t1 = sv0_vec_get(pool, i);
-    if ((_sv0t1 == s)) {
+    int _sv0t2 = pool_key_eq(_sv0t1, s, source, starts, ends);
+    if (_sv0t2) {
       return i;
     } else {
     }
@@ -1405,7 +1453,7 @@ static int emit_value(Value v, int env_names, int env_bases, int env_widths, int
       } else {
         if ((v.tag == 5)) {
           int s = v.p0;
-          int _sv0t24 = pool_add(pool, s);
+          int _sv0t24 = pool_add(pool, s, source, starts, ends);
           int idx = _sv0t24;
           sv0_vec_push(out, 8);
           sv0_vec_push(out, idx);
@@ -2316,7 +2364,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                             }
                             int _sv0t26 = contract_pool_key(fn_h, 0);
                             int key = _sv0t26;
-                            int _sv0t27 = pool_add(pool, key);
+                            int _sv0t27 = pool_add(pool, key, source, starts, ends);
                             int pidx = _sv0t27;
                             sv0_vec_push(out, 160);
                             sv0_vec_push(out, pidx);
@@ -2350,7 +2398,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                               }
                               int _sv0t16 = contract_pool_key(fn_h, 1);
                               int key = _sv0t16;
-                              int _sv0t17 = pool_add(pool, key);
+                              int _sv0t17 = pool_add(pool, key, source, starts, ends);
                               int pidx = _sv0t17;
                               sv0_vec_push(out, 160);
                               sv0_vec_push(out, pidx);
@@ -2702,7 +2750,7 @@ static int emit_fn(int label, int param_names, int param_ctys, int instrs, int s
   }
   int _sv0t9 = compute_arity(param_ctys, structs_names, structs_field_counts, enums_names, enums_widths);
   int arity = _sv0t9;
-  int _sv0t10 = pool_add(pool, label);
+  int _sv0t10 = pool_add(pool, label, source, starts, ends);
   int name_idx = _sv0t10;
   sv0_vec_push(ft_entries, name_idx);
   sv0_vec_push(ft_entries, arity);
@@ -3149,26 +3197,32 @@ static int test_sentinels(void) {
 static int test_pool(void) {
   int _sv0t0 = pool_new();
   int pool = _sv0t0;
-  int _sv0t1 = pool_add(pool, 100);
-  int i0 = _sv0t1;
+  int _sv0t1 = sv0_vec_new();
+  int _sv0t2 = sv0_vec_new();
+  int _sv0t3 = pool_add(pool, 100, "", _sv0t1, _sv0t2);
+  int i0 = _sv0t3;
   if ((i0 != 0)) {
     return 1;
   } else {
   }
-  int _sv0t2 = pool_add(pool, 200);
-  int i1 = _sv0t2;
+  int _sv0t4 = sv0_vec_new();
+  int _sv0t5 = sv0_vec_new();
+  int _sv0t6 = pool_add(pool, 200, "", _sv0t4, _sv0t5);
+  int i1 = _sv0t6;
   if ((i1 != 1)) {
     return 2;
   } else {
   }
-  int _sv0t3 = pool_add(pool, 100);
-  int i0b = _sv0t3;
+  int _sv0t7 = sv0_vec_new();
+  int _sv0t8 = sv0_vec_new();
+  int _sv0t9 = pool_add(pool, 100, "", _sv0t7, _sv0t8);
+  int i0b = _sv0t9;
   if ((i0b != 0)) {
     return 3;
   } else {
   }
-  int _sv0t4 = pool_size(pool);
-  if ((_sv0t4 != 2)) {
+  int _sv0t10 = pool_size(pool);
+  if ((_sv0t10 != 2)) {
     return 4;
   } else {
   }

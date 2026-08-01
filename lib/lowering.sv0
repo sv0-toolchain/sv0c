@@ -642,14 +642,15 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         }
         if s_tag == 28 {
             let semi_idx: i32 = vec_get(ed1, s_idx);
-            let discard1: Value = lower_expr_to_value(et, ed1, ed2, ed3,
-                                                       ed4, pp, tok_tags,
-                                                       semi_idx, ctr,
-                                                       out_instrs,
-                                                       enum_names,
-                                                       enum_tag_offsets,
-                                                       enum_tag_counts,
-                                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+            /* A bare expression statement is lowered FOR EFFECT (SML lowerStmt
+               StmtSemi → lowerExprForEffect), so an `if c {…} else {…}` statement
+               emits IfElse with effect branches, not the value path's result temps.
+               lower_for_effect routes ExprReturn to lower_return and everything
+               else to the value form, matching the old discard behaviour. */
+            let de1: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
+                                            tok_tags, semi_idx, ctr, out_instrs,
+                                            enum_names, enum_tag_offsets, enum_tag_counts,
+                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
         }
         si = si + 1;
     }
@@ -1610,6 +1611,36 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
+    /* SML lowerExprForEffect ExprIf: `ic @ [IfElse(ec, effect-then, effect-else)]`
+       — an if used for effect (a bare `if c {…} else {…}` statement) does NOT
+       allocate result temps. lower_expr_to_value routes it through lower_tag_if's
+       value path, which declares two result slots and stores each branch value
+       into them (dead work that diverges the bytecode). Lower the condition
+       faithfully (lower_cond_expr) and lower each branch FOR EFFECT instead. */
+    let etag: i32 = vec_get(et, idx);
+    if etag == 10 {
+        let cond_idx: i32 = vec_get(ed1, idx);
+        let then_idx: i32 = vec_get(ed2, idx);
+        let else_idx: i32 = vec_get(ed3, idx);
+        let cond_e: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp,
+                                           tok_tags, cond_idx, ctr, out_instrs,
+                                           enum_names, enum_tag_offsets, enum_tag_counts,
+                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        let then_is: Vec<i32> = vec_new();
+        let rt: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                       then_idx, ctr, then_is,
+                                       enum_names, enum_tag_offsets, enum_tag_counts,
+                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        let else_is: Vec<i32> = vec_new();
+        if else_idx >= 0 {
+            let re: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                           else_idx, ctr, else_is,
+                                           enum_names, enum_tag_offsets, enum_tag_counts,
+                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        }
+        vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e), then_is, else_is)));
+        return 0;
+    }
     let discard5: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                                tok_tags, idx, ctr,
                                                out_instrs, enum_names,
