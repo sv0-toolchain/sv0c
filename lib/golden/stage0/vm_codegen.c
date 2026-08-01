@@ -2048,7 +2048,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                 int off_else = (_sv0t106 + _sv0t107);
                 int _sv0t108 = flat_byte_size(else_out);
                 int off_end = _sv0t108;
-                sv0_vec_push(out, 113);
+                sv0_vec_push(out, 114);
                 sv0_vec_push(out, off_else);
                 int _sv0t109 = vec_append(out, then_out);
                 int at = _sv0t109;
@@ -2103,7 +2103,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                   sv0_vec_push(body_out, _sv0t79);
                   int _sv0t80 = flat_byte_size(cond_out);
                   int cond_bytes = _sv0t80;
-                  int _sv0t81 = insn_size(113);
+                  int _sv0t81 = insn_size(114);
                   int jif_bytes = _sv0t81;
                   int _sv0t82 = flat_byte_size(body_out);
                   int body_bytes = _sv0t82;
@@ -2115,7 +2115,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                   int _sv0t86 = sv0_vec_new();
                   int loop_out = _sv0t86;
                   int _sv0t87 = vec_append(loop_out, cond_out);
-                  sv0_vec_push(loop_out, 113);
+                  sv0_vec_push(loop_out, 114);
                   sv0_vec_push(loop_out, forward);
                   int _sv0t88 = vec_append(loop_out, body_out);
                   int _sv0t89 = flat_byte_size(loop_out);
@@ -5065,7 +5065,7 @@ static int test_emit_ifelse_block(void) {
   } else {
   }
   int _sv0t25 = sv0_vec_get(out1, 2);
-  if ((_sv0t25 != 113)) {
+  if ((_sv0t25 != 114)) {
     return 5;
   } else {
   }
@@ -5197,7 +5197,7 @@ static int test_emit_ifelse_block(void) {
   } else {
   }
   int _sv0t54 = sv0_vec_get(out2, 2);
-  if ((_sv0t54 != 113)) {
+  if ((_sv0t54 != 114)) {
     return 17;
   } else {
   }
@@ -5399,7 +5399,7 @@ static int test_emit_while_loop(void) {
   } else {
   }
   int _sv0t22 = sv0_vec_get(out1, 2);
-  if ((_sv0t22 != 113)) {
+  if ((_sv0t22 != 114)) {
     return 5;
   } else {
   }
@@ -5474,7 +5474,7 @@ static int test_emit_while_loop(void) {
   } else {
   }
   int _sv0t40 = sv0_vec_get(out2, 2);
-  if ((_sv0t40 != 113)) {
+  if ((_sv0t40 != 114)) {
     return 15;
   } else {
   }
@@ -5693,7 +5693,7 @@ static int test_emit_while_loop(void) {
   } else {
   }
   int _sv0t94 = sv0_vec_get(out5, 2);
-  if ((_sv0t94 != 113)) {
+  if ((_sv0t94 != 114)) {
     return 33;
   } else {
   }

@@ -672,12 +672,15 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let cond_idx: i32 = vec_get(ed1, idx);
     let then_idx: i32 = vec_get(ed2, idx);
     let else_idx: i32 = vec_get(ed3, idx);
-    let vc: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+    /* SML IfElse lowers the condition via lowerExprWithInstrs — a top-level binop
+       is kept as Ir.Binop directly (JUMP_IF_NOT tests it inline), NOT spilled to a
+       temp. lower_cond_expr does exactly that (writing any operand sub-instrs to
+       out_instrs, empty for a simple `x > 3`), matching the while-loop condition. */
+    let cond_expr: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp,
                                          tok_tags, cond_idx, ctr,
                                          out_instrs, enum_names,
                                          enum_tag_offsets, enum_tag_counts,
                                          enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-    let cond_expr: Expr = Expr::Literal(box_new(vc));
     if else_idx >= 0 {
         let t: i32 = ctr_fresh(ctr);
         let u: i32 = ctr_fresh(ctr);
@@ -1375,13 +1378,14 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if tag == 18 {
         let lhs_idx: i32 = vec_get(ed1, idx);
         let rhs_idx: i32 = vec_get(ed2, idx);
-        let rhs_v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+        /* SML ExprAssign: Store(x, <rhs as Ir.expr>) via lowerExprWithInstrs —
+           a binop RHS is stored directly, not spilled through a temp. */
+        let rhs_e: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                                 tok_tags, rhs_idx, ctr,
                                                 out_instrs, enum_names,
                                                 enum_tag_offsets,
                                                 enum_tag_counts,
                                                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-        let rhs_e: Expr = Expr::Literal(box_new(rhs_v));
         let mut aout: Vec<i32> = vec_new();
         let cls: i32 = classify_assign_lhs_arena(et, ed1, ed2, pp, lhs_idx,
                                                   aout);
@@ -1544,6 +1548,30 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Expr {
+    /* Faithful to SML lowerExprWithInstrs: a top-level binop returns Ir.Binop
+       DIRECTLY (operands lowered to values, which may spill sub-exprs), NOT a
+       temp — otherwise `x = a + b` becomes Assign(tmp, Binop); Store(x, tmp)
+       (an extra slot + load/store) instead of SML's Store(x, Binop). Other
+       shapes fall back to value_to_expr(lower_expr_to_value): a bare path lowers
+       to VVar and a literal to VInt, and value_to_expr wraps those to the same
+       bytecode Load/Literal would emit, so only binop needs the direct form. */
+    let etag: i32 = vec_get(et, idx);
+    if etag == 3 {
+        let binop_tag: i32 = vec_get(ed1, idx);
+        let lhs_idx: i32 = vec_get(ed2, idx);
+        let rhs_idx: i32 = vec_get(ed3, idx);
+        let vl: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, lhs_idx, ctr,
+                                             out_instrs, enum_names,
+                                             enum_tag_offsets, enum_tag_counts,
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                             tok_tags, rhs_idx, ctr,
+                                             out_instrs, enum_names,
+                                             enum_tag_offsets, enum_tag_counts,
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        return Expr::Binop(binop_tag, box_new(vl), box_new(vr));
+    }
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                         tok_tags, idx, ctr, out_instrs,
                                         enum_names, enum_tag_offsets,
