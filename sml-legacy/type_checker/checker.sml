@@ -1038,7 +1038,10 @@ structure Checker :> CHECKER = struct
       val acc1n =
         extend acc1m "write_file"
           (Types.TyFn ([Types.TyString, Types.TyString], Types.TyUnit)) false
-      val acc1o = extend acc1n "read_dir" (Types.TyFn ([Types.TyString], Types.TyString)) false
+      val acc1n2 =
+        extend acc1n "write_bytes"
+          (Types.TyFn ([Types.TyString, Types.TyNamed ("Vec", [Types.TyInt 32])], Types.TyUnit)) false
+      val acc1o = extend acc1n2 "read_dir" (Types.TyFn ([Types.TyString], Types.TyString)) false
       val acc2 =
         List.foldl
           (fn ((en, vars), acc) =>

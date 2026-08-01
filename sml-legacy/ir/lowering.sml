@@ -675,6 +675,10 @@ structure Lowering :> LOWERING = struct
         let val (ia, va) = lowerExprToValue a
             val (ib, vb) = lowerExprToValue b
         in (ia @ ib @ [Ir.Call (NONE, "sv0_write_file", [va, vb], "void")], Ir.VUnit) end
+    | Ast.ExprCall (Ast.ExprPath (["write_bytes"], _), [a, b], _) =>
+        let val (ia, va) = lowerExprToValue a
+            val (ib, vb) = lowerExprToValue b
+        in (ia @ ib @ [Ir.Call (NONE, "sv0_write_bytes", [va, vb], "void")], Ir.VUnit) end
     | Ast.ExprCall (Ast.ExprPath (["read_dir"], _), [arg], _) =>
         let val (is, v) = lowerExprToValue arg
             val t = freshTmp ()
