@@ -843,10 +843,15 @@ fn index_of_fn(fn_h: i32, fn_names: Vec<i32>,
    Vec elements pushed, or -1 on error.
    VMember deferred — requires per-slot field name data. */
 
+/* Enum field sentinels (lowering emits these for `match` extraction and enum
+   construction): the tag is field -1 -> slot 0; payload i is field -10 - i ->
+   slot i + 1 (SML enumFieldNames: "tag", "p0", "p1", …). A non-negative field is a
+   struct field token and is resolved by name elsewhere, not here. */
 fn member_offset_from_field(width: i32, field_h: i32) -> i32 {
     if width <= 0 { return 0 - 1; }
     let mut off: i32 = field_h;
     if field_h == 0 - 1 { off = 0; }
+    if field_h <= 0 - 10 { off = (0 - 10 - field_h) + 1; }
     if off < 0 { return 0 - 1; }
     if off >= width { return 0 - 1; }
     return off;

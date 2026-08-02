@@ -39,6 +39,7 @@ fn main() -> i32 {
     let evpt: Vec<i32> = vec_new();
     let evpb: Vec<i32> = vec_new();
     let evpc: Vec<i32> = vec_new();
+    let evpm: Vec<i32> = vec_new();
     let ptt: Vec<i32> = vec_new();
     let ptd1: Vec<i32> = vec_new();
     let ptd2: Vec<i32> = vec_new();
@@ -53,7 +54,7 @@ fn main() -> i32 {
 
     let pr: i32 = parse_program(tags, starts, ends, source, 0,
         it, id1, id2, id3, id4, id5, pp,
-        evn, sfn, fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc,
+        evn, sfn, fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc, evpm,
         ptt, ptd1, ptd2, ptd3, sft,
         bet, bed1, bed2, bed3, bed4, bsf);
 
@@ -106,7 +107,7 @@ fn main() -> i32 {
            bound on the max-per-variant width the SML compiler uses, so it
            over-allocates slots but is behaviorally correct (exact max would need
            per-variant counts the parser does not retain — future work for P4). */
-        vec_push(ivm, vec_get(evpc, ii));
+        vec_push(ivm, vec_get(evpm, ii));
         ii = ii + 1;
     }
     /* Struct field name tokens come straight from the parser (sfn). Field types:

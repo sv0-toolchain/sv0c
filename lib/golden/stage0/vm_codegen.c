@@ -1461,14 +1461,21 @@ static int member_offset_from_field(int width, int field_h) {
     off = 0;
   } else {
   }
+  int _sv0t2 = (0 - 10);
+  if ((field_h <= _sv0t2)) {
+    int _sv0t3 = (0 - 10);
+    int _sv0t4 = (_sv0t3 - field_h);
+    off = (_sv0t4 + 1);
+  } else {
+  }
   if ((off < 0)) {
-    int _sv0t2 = (0 - 1);
-    return _sv0t2;
+    int _sv0t5 = (0 - 1);
+    return _sv0t5;
   } else {
   }
   if ((off >= width)) {
-    int _sv0t3 = (0 - 1);
-    return _sv0t3;
+    int _sv0t6 = (0 - 1);
+    return _sv0t6;
   } else {
   }
   return off;
