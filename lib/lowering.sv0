@@ -2895,12 +2895,36 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if init_idx >= 0 {
             if vec_get(et, init_idx) == 24 {
                 let sppc: i32 = vec_get(ed2, init_idx);
+                let fc_ls: i32 = vec_get(ed3, init_idx);
                 if sppc >= 1 {
-                    let sty_tok: i32 = vec_get(pp,
-                        vec_get(ed1, init_idx) + sppc - 1);
-                    let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
-                    vec_push(out_instrs, box_new(decl_n));
-                    let_declared = 1;
+                    if fc_ls > 0 {
+                        let sty_tok: i32 = vec_get(pp,
+                            vec_get(ed1, init_idx) + sppc - 1);
+                        let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
+                        vec_push(out_instrs, box_new(decl_n));
+                        let_declared = 1;
+                        /* Construct the struct DIRECTLY into the let var (SML
+                           StmtLet ExprStruct: `[DeclNamed(sn,x)] @ per-field
+                           StoreField(x,fname,ei)`) — not into a fresh temp that is
+                           then copied, which SML never does and which costs a full
+                           struct-width of extra locals. Fields interleave
+                           spill-then-store, matching SML `pi @ [StoreField]`. */
+                        let sf0_ls: i32 = vec_get(ed4, init_idx);
+                        let mut fi_ls: i32 = 0;
+                        while fi_ls < fc_ls {
+                            let ch_ls: i32 = vec_get(lit_sf_names, sf0_ls + fi_ls * 2 + 1);
+                            let fv_ls: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                tok_tags, ch_ls, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                            let fnm_ls: i32 = vec_get(lit_sf_names, sf0_ls + fi_ls * 2);
+                            vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fnm_ls,
+                                                        box_new(value_to_expr(fv_ls)))));
+                            fi_ls = fi_ls + 1;
+                        }
+                        init_handled = 1;
+                    }
                 }
             }
             /* Enum nullary constructor init (`let x = Enum::Variant`, 2-seg
