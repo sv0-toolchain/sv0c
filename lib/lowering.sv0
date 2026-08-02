@@ -230,7 +230,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Value {
     let callee_idx: i32 = vec_get(ed1, idx);
     let args_first: i32 = vec_get(ed2, idx);
@@ -269,7 +269,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             fn_ctx, builtin_map, lit_sf_names,
                                             source, starts, ends, item_tags,
                                             item_names, item_d2, item_d3, item_d4,
-                                            item_field_counts, enum_vnames_flat,
+                                            item_field_counts, enum_vnames_flat, enum_max_payloads,
                                             item_fn_row, match_env_inherit,
                                             import_aliases);
                         let e_hi_q: Expr = value_to_expr(v_hi_q);
@@ -282,7 +282,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             fn_ctx, builtin_map, lit_sf_names,
                                             source, starts, ends, item_tags,
                                             item_names, item_d2, item_d3, item_d4,
-                                            item_field_counts, enum_vnames_flat,
+                                            item_field_counts, enum_vnames_flat, enum_max_payloads,
                                             item_fn_row, match_env_inherit,
                                             import_aliases);
                         let e_lo_q: Expr = value_to_expr(v_lo_q);
@@ -314,7 +314,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             fn_ctx, builtin_map, lit_sf_names,
                             source, starts, ends, item_tags,
                             item_names, item_d2, item_d3, item_d4,
-                            item_field_counts, enum_vnames_flat,
+                            item_field_counts, enum_vnames_flat, enum_max_payloads,
                             item_fn_row, match_env_inherit,
                             import_aliases);
                         let dv_q: Instr = Instr::DeclVar(p_t_q);
@@ -390,7 +390,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_offsets,
                                              enum_tag_counts,
                                              enum_tags_flat, fn_ctx,
-                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         vec_push(arg_vals, box_new(av));
         ai = ai + 1;
     }
@@ -517,7 +517,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>,
                     for_effect: i32, into_dest: i32) -> Value {
     let stmts_first: i32 = vec_get(ed1, idx);
@@ -629,7 +629,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         out_instrs, enum_names, enum_tag_offsets, enum_tag_counts,
                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source,
                         starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
-                        item_field_counts, enum_vnames_flat, item_fn_row,
+                        item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row,
                         match_env_inherit, import_aliases);
                     if bdb == 1 {
                         let_declared = 1;
@@ -657,7 +657,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                          enum_names,
                                                          enum_tag_offsets,
                                                          enum_tag_counts,
-                                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
                     if has_deferred_decl == 1 {
                         vec_push(out_instrs, box_new(Instr::DeclNamed(deferred_ty, name_tok)));
                     } else {
@@ -684,7 +684,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let de1: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, semi_idx, ctr, out_instrs,
                                             enum_names, enum_tag_offsets, enum_tag_counts,
-                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         }
         si = si + 1;
     }
@@ -697,7 +697,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                   tail_idx, into_dest, ctr, out_instrs,
                                   enum_names, enum_tag_offsets,
                                   enum_tag_counts, enum_tags_flat,
-                                  fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                  fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         } else {
             vec_push(out_instrs, box_new(Instr::Store(into_dest,
                 box_new(Expr::Literal(box_new(Value::VUnit))))));
@@ -714,14 +714,14 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                              tail_idx, ctr, out_instrs,
                              enum_names, enum_tag_offsets,
                              enum_tag_counts, enum_tags_flat,
-                             fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                             fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             return Value::VUnit;
         }
         return lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                     tail_idx, ctr, out_instrs,
                                     enum_names, enum_tag_offsets,
                                     enum_tag_counts, enum_tags_flat,
-                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     return Value::VUnit;
 }
@@ -740,7 +740,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Value {
     let cond_idx: i32 = vec_get(ed1, idx);
     let then_idx: i32 = vec_get(ed2, idx);
@@ -753,7 +753,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                          tok_tags, cond_idx, ctr,
                                          out_instrs, enum_names,
                                          enum_tag_offsets, enum_tag_counts,
-                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     if else_idx >= 0 {
         let t: i32 = ctr_fresh(ctr);
         let u: i32 = ctr_fresh(ctr);
@@ -763,7 +763,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              then_instrs, enum_names,
                                              enum_tag_offsets,
                                              enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let t_lit: Expr = Expr::Literal(box_new(vt));
         let t_store: Instr = Instr::Store(u, box_new(t_lit));
         vec_push(then_instrs, box_new(t_store));
@@ -773,7 +773,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              else_instrs, enum_names,
                                              enum_tag_offsets,
                                              enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let e_lit: Expr = Expr::Literal(box_new(ve));
         let e_store: Instr = Instr::Store(u, box_new(e_lit));
         vec_push(else_instrs, box_new(e_store));
@@ -810,7 +810,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                then_only, enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     let mut no_else: Vec<i32> = vec_new();
     let if_no_el: Instr = Instr::IfElse(box_new(cond_expr),
                                           then_only, no_else);
@@ -832,7 +832,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Value {
     let pat_tok: i32 = vec_get(ed1, idx);
     let range_idx: i32 = vec_get(ed2, idx);
@@ -849,7 +849,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let e_hi: Expr = value_to_expr(v_hi);
         let assign_hi: Instr = Instr::Assign(hi_t, box_new(e_hi));
         vec_push(out_instrs, box_new(assign_hi));
@@ -859,7 +859,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let e_lo: Expr = value_to_expr(v_lo);
         let assign_it: Instr = Instr::Assign(i_t, box_new(e_lo));
         vec_push(out_instrs, box_new(assign_it));
@@ -881,7 +881,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                       enum_names,
                                                       enum_tag_offsets,
                                                       enum_tag_counts,
-                                                      enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                      enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let wl: Instr = Instr::WhileLoop(box_new(cond_e), loop_body);
         vec_push(out_instrs, box_new(wl));
     }
@@ -908,7 +908,7 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Value {
     let inner: i32 = vec_get(ed1, idx);
     let fc_len: i32 = vec_len(fn_ctx);
@@ -956,7 +956,7 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                               out_instrs, enum_names,
                                               enum_tag_offsets,
                                               enum_tag_counts,
-                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     let u: i32 = ctr_fresh(ctr);
     let decl_u: Instr = Instr::DeclNamed(enum_name, u);
     vec_push(out_instrs, box_new(decl_u));
@@ -1002,7 +1002,7 @@ fn lower_cond_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    source: string, starts: Vec<i32>, ends: Vec<i32>,
                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
                    item_d3: Vec<i32>, item_d4: Vec<i32>, item_field_counts: Vec<i32>,
-                   enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                   enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                    match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Expr {
     let ctag: i32 = vec_get(et, idx);
     if ctag == 3 {
@@ -1013,12 +1013,12 @@ fn lower_cond_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             lhs_i, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
             item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
-            enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+            enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
             rhs_i, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
             item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
-            enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+            enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         return Expr::Binop(op, box_new(vl), box_new(vr));
     }
     /* Plain unary (! ~ -, tags 0/1/2); borrow/cast (4/5/99) are not loop
@@ -1031,7 +1031,7 @@ fn lower_cond_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 operand_i, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
                 item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
-                enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             return Expr::Unop(uop, box_new(uv));
         }
     }
@@ -1039,7 +1039,7 @@ fn lower_cond_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         idx, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
         item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
-        enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     return value_to_expr(gv);
 }
 
@@ -1058,7 +1058,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Value {
     let tag: i32 = vec_get(et, idx);
     if tag == 0 {
@@ -1116,7 +1116,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             tok_tags, operand_idx, ctr,
                                             out_instrs, enum_names,
                                             enum_tag_offsets, enum_tag_counts,
-                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let t: i32 = ctr_fresh(ctr);
         let expr: Expr = Expr::Unop(unop_tag, box_new(v));
         let instr: Instr = Instr::Assign(t, box_new(expr));
@@ -1131,12 +1131,12 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              tok_tags, lhs_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, rhs_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let t: i32 = ctr_fresh(ctr);
         let expr: Expr = Expr::Binop(binop_tag, box_new(vl), box_new(vr));
         let instr: Instr = Instr::Assign(t, box_new(expr));
@@ -1147,7 +1147,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         return lower_tag_call(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                idx, ctr, out_instrs, enum_names,
                                enum_tag_offsets, enum_tag_counts,
-                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     if tag == 6 {
         let obj_idx: i32 = vec_get(ed1, idx);
@@ -1156,7 +1156,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              tok_tags, obj_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         return Value::VMember(box_new(v1), field_tok);
     }
     /* ExprTupleField: obj.N — encode tuple projection as VMember with
@@ -1171,7 +1171,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_tag_offsets,
                                                enum_tag_counts,
                                                enum_tags_flat, fn_ctx,
-                                               builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                               builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let fh: i32 = 500 + field_num;
         return Value::VMember(box_new(vobj), fh);
     }
@@ -1190,7 +1190,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                 enum_tag_offsets,
                                                 enum_tag_counts,
                                                 enum_tags_flat, fn_ctx,
-                                                builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let mut arg_vals_mc: Vec<i32> = vec_new();
         vec_push(arg_vals_mc, box_new(v_rcv));
         let mut aj_mc: i32 = 0;
@@ -1203,7 +1203,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx,
-                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             vec_push(arg_vals_mc, box_new(av_mc));
             aj_mc = aj_mc + 1;
         }
@@ -1251,14 +1251,14 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_offsets,
                                              enum_tag_counts,
                                              enum_tags_flat, fn_ctx,
-                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let v_i: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, ix, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets,
                                              enum_tag_counts,
                                              enum_tags_flat, fn_ctx,
-                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let t_ix: i32 = ctr_fresh(ctr);
         let mut arg_ix: Vec<i32> = vec_new();
         vec_push(arg_ix, box_new(v_o));
@@ -1290,7 +1290,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                   enum_tag_offsets,
                                                   enum_tag_counts,
                                                   enum_tags_flat, fn_ctx,
-                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             let mut args_push: Vec<i32> = vec_new();
             vec_push(args_push, box_new(Value::VVar(t_ar)));
             vec_push(args_push, box_new(v_el));
@@ -1313,13 +1313,13 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, lo_ix,
                              ctr, out_instrs, enum_names, enum_tag_offsets,
                              enum_tag_counts, enum_tags_flat, fn_ctx,
-                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         }
         if hi_ix >= 0 {
             lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, hi_ix,
                              ctr, out_instrs, enum_names, enum_tag_offsets,
                              enum_tag_counts, enum_tags_flat, fn_ctx,
-                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                             builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         }
         return Value::VUnit;
     }
@@ -1327,19 +1327,19 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         return lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 idx, ctr, out_instrs, enum_names,
                                 enum_tag_offsets, enum_tag_counts,
-                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 0, 0 - 1);
+                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 0, 0 - 1);
     }
     if tag == 10 {
         return lower_tag_if(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                              idx, ctr, out_instrs, enum_names,
                              enum_tag_offsets, enum_tag_counts,
-                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     if tag == 11 {
         return lower_tag_match(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 idx, ctr, out_instrs, enum_names,
                                 enum_tag_offsets, enum_tag_counts,
-                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     if tag == 12 {
         let cond_idx2: i32 = vec_get(ed1, idx);
@@ -1353,7 +1353,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
                                         source, starts, ends, item_tags, item_names,
                                         item_d2, item_d3, item_d4, item_field_counts,
-                                        enum_vnames_flat, item_fn_row, match_env_inherit,
+                                        enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit,
                                         import_aliases);
         let mut body_is: Vec<i32> = vec_new();
         let discard3: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
@@ -1361,7 +1361,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    body_is, enum_names,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
-                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         if vec_len(cond_is) == 0 {
             /* Simple condition (no sub-instructions): while (cond) { body } — C
                re-evaluates the condition expression each iteration. */
@@ -1404,7 +1404,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         return lower_tag_for(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                               idx, ctr, out_instrs, enum_names,
                               enum_tag_offsets, enum_tag_counts,
-                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     if tag == 14 {
         let loop_body: i32 = vec_get(ed1, idx);
@@ -1416,7 +1416,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    loop_is, enum_names,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
-                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let ll: Instr = Instr::WhileLoop(box_new(true_e), loop_is);
         vec_push(out_instrs, box_new(ll));
         return Value::VUnit;
@@ -1429,7 +1429,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                  out_instrs, enum_names,
                                                  enum_tag_offsets,
                                                  enum_tag_counts,
-                                                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             let ret_instr: Instr = Instr::ReturnVal(box_new(rv));
             vec_push(out_instrs, box_new(ret_instr));
             return Value::VUnit;
@@ -1458,7 +1458,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                 out_instrs, enum_names,
                                                 enum_tag_offsets,
                                                 enum_tag_counts,
-                                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let mut aout: Vec<i32> = vec_new();
         let cls: i32 = classify_assign_lhs_arena(et, ed1, ed2, pp, lhs_idx,
                                                   aout);
@@ -1490,7 +1490,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                   out_instrs, enum_names,
                                                   enum_tag_offsets,
                                                   enum_tag_counts,
-                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             let be: Expr = Expr::Binop(op_tag, box_new(cur), box_new(rv2));
             let st2: Instr = Instr::Store(var_tok2, box_new(be));
             vec_push(out_instrs, box_new(st2));
@@ -1503,7 +1503,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              tok_tags, cast_src, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let ct2: i32 = ctr_fresh(ctr);
         let cast_e: Expr = Expr::Unop(99, box_new(cv));
         let cast_i: Instr = Instr::Assign(ct2, box_new(cast_e));
@@ -1517,7 +1517,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                               enum_tags_flat, fn_ctx, builtin_map,
                               lit_sf_names, source, starts, ends,
                               item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
-                              enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                              enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     if tag == 24 {
         let pps_s: i32 = vec_get(ed1, idx);
@@ -1551,7 +1551,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                   enum_tag_offsets,
                                                   enum_tag_counts,
                                                   enum_tags_flat, fn_ctx,
-                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             let fe_s: Expr = value_to_expr(fv_s);
             let fnm_s: i32 = vec_get(lit_sf_names, sf0 + fi_s * 2);
             let stf_s: Instr = Instr::StoreField(t_s, fnm_s, box_new(fe_s));
@@ -1568,7 +1568,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         tok_tags, first_idx, ctr,
                                         out_instrs, enum_names,
                                         enum_tag_offsets, enum_tag_counts,
-                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         }
     }
     /* ExprAssert: evaluate condition for side effects only; runtime
@@ -1578,7 +1578,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, assert_expr,
                          ctr, out_instrs, enum_names, enum_tag_offsets,
                          enum_tag_counts, enum_tags_flat, fn_ctx,
-                         builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                         builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         return Value::VUnit;
     }
     if tag == 30 {
@@ -1619,7 +1619,7 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                            source: string, starts: Vec<i32>, ends: Vec<i32>,
                            item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Expr {
     /* Faithful to SML lowerExprWithInstrs: a top-level binop returns Ir.Binop
        DIRECTLY (operands lowered to values, which may spill sub-exprs), NOT a
@@ -1637,19 +1637,19 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              tok_tags, lhs_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, rhs_idx, ctr,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
-                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         return Expr::Binop(binop_tag, box_new(vl), box_new(vr));
     }
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                         tok_tags, idx, ctr, out_instrs,
                                         enum_names, enum_tag_offsets,
                                         enum_tag_counts, enum_tags_flat,
-                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     return value_to_expr(v);
 }
 
@@ -1671,7 +1671,7 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     /* SML lowerExprForEffect ExprIf: `ic @ [IfElse(ec, effect-then, effect-else)]`
        — an if used for effect (a bare `if c {…} else {…}` statement) does NOT
@@ -1687,7 +1687,7 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                         idx, ctr, out_instrs, enum_names,
                         enum_tag_offsets, enum_tag_counts,
-                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 1, 0 - 1);
+                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 1, 0 - 1);
         return 0;
     }
     if etag == 10 {
@@ -1697,18 +1697,18 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let cond_e: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp,
                                            tok_tags, cond_idx, ctr, out_instrs,
                                            enum_names, enum_tag_offsets, enum_tag_counts,
-                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let then_is: Vec<i32> = vec_new();
         let rt: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        then_idx, ctr, then_is,
                                        enum_names, enum_tag_offsets, enum_tag_counts,
-                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let else_is: Vec<i32> = vec_new();
         if else_idx >= 0 {
             let re: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                            else_idx, ctr, else_is,
                                            enum_names, enum_tag_offsets, enum_tag_counts,
-                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         }
         vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e), then_is, else_is)));
         return 0;
@@ -1718,7 +1718,7 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                out_instrs, enum_names,
                                                enum_tag_offsets,
                                                enum_tag_counts,
-                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     return 0;
 }
 
@@ -1743,7 +1743,7 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     /* SML lowerIntoVarInstrs: a block lowers its stmts then its tail INTO dest
        (no tail => Store(dest, VUnit)); a no-else `if` stores VUnit in the empty
@@ -1757,7 +1757,7 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                         body_idx, ctr, out_instrs, enum_names,
                         enum_tag_offsets, enum_tag_counts,
-                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 0, dest);
+                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 0, dest);
         return 0;
     }
     if btag == 10 {
@@ -1768,12 +1768,12 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let cond_e_iv: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp,
                                                   tok_tags, cond_idx_iv, ctr, out_instrs,
                                                   enum_names, enum_tag_offsets, enum_tag_counts,
-                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             let mut then_is_iv: Vec<i32> = vec_new();
             lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                   then_idx_iv, dest, ctr, then_is_iv,
                                   enum_names, enum_tag_offsets, enum_tag_counts,
-                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
             let mut else_is_iv: Vec<i32> = vec_new();
             vec_push(else_is_iv, box_new(Instr::Store(dest,
                 box_new(Expr::Literal(box_new(Value::VUnit))))));
@@ -1786,7 +1786,7 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                            out_instrs, enum_names,
                                            enum_tag_offsets,
                                            enum_tag_counts,
-                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                           enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     let si: Instr = Instr::Store(dest, box_new(ee));
     vec_push(out_instrs, box_new(si));
     return 0;
@@ -1813,7 +1813,7 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    lit_sf_names: Vec<i32>,
                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                    item_field_counts: Vec<i32>,
-                   enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                   enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                    match_env_ctx: Vec<i32>,
                    scrut_cty: i32,
                    source: string, starts: Vec<i32>, ends: Vec<i32>,
@@ -1823,7 +1823,7 @@ fn bind_scrut_var(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         out_instrs, enum_names,
                                         enum_tag_offsets,
                                         enum_tag_counts, enum_tags_flat,
-                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_ctx, import_aliases);
+                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_ctx, import_aliases);
     let vtag: i32 = ir_value_tag(v);
     if vtag == 3 {
         match v {
@@ -1914,7 +1914,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     lit_sf_names: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env: Vec<i32>,
                     source: string, starts: Vec<i32>,
                     ends: Vec<i32>,
@@ -2288,7 +2288,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let discard_body: i32 = lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp,
                                   tok_tags, body_idx, out_var, ctr, body_is,
                                   enum_names, enum_tag_offsets, enum_tag_counts,
-                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, arm_menv, import_aliases);
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, arm_menv, import_aliases);
         let mut th: Vec<i32> = body_is;
         if guard_idx >= 0 {
             let mut guard_is: Vec<i32> = vec_new();
@@ -2298,7 +2298,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx,
-                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, arm_menv, import_aliases);
+                                                   builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, arm_menv, import_aliases);
             let guard_if: Instr = Instr::IfElse(box_new(ge), body_is,
                                                   result_instrs);
             vec_push(guard_is, box_new(guard_if));
@@ -2855,7 +2855,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Value {
     let scrut_idx: i32 = vec_get(ed1, idx);
     let arms_first: i32 = vec_get(ed2, idx);
@@ -2882,7 +2882,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                          builtin_map, lit_sf_names,
                                          item_tags, item_names, item_d2,
                                          item_d3, item_d4, item_field_counts,
-                                         enum_vnames_flat, item_fn_row,
+                                         enum_vnames_flat, enum_max_payloads, item_fn_row,
                                          match_env,
                                          sct, source, starts, ends,
                                          import_aliases);
@@ -2909,7 +2909,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             builtin_map, lit_sf_names,
                                             item_tags, item_names, item_d2,
                                             item_d3, item_d4, item_field_counts,
-                                            enum_vnames_flat, item_fn_row,
+                                            enum_vnames_flat, enum_max_payloads, item_fn_row,
                                             match_env,
                                             source, starts, ends,
                                             import_aliases);
@@ -2934,7 +2934,7 @@ fn lower_return(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     /* Bare `return;` (ExprReturn d1 = value_idx = -1) has no value to lower —
        emit ReturnVoid. Without this the -1 index reaches lower_expr_to_value and
@@ -2948,7 +2948,7 @@ fn lower_return(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         tok_tags, idx, ctr, out_instrs,
                                         enum_names, enum_tag_offsets,
                                         enum_tag_counts, enum_tags_flat,
-                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     let ri: Instr = Instr::ReturnVal(box_new(v));
     vec_push(out_instrs, box_new(ri));
     return 0;
@@ -2973,7 +2973,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>,
                     str_locals: Vec<i32>) -> i32 {
     let s_tag: i32 = vec_get(et, s_idx);
@@ -3025,7 +3025,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 tok_tags, ch_ls, ctr, out_instrs, enum_names, enum_tag_offsets,
                                 enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
                                 source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
-                                item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
                             let fnm_ls: i32 = vec_get(lit_sf_names, sf0_ls + fi_ls * 2);
                             vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fnm_ls,
                                                         box_new(value_to_expr(fv_ls)))));
@@ -3083,7 +3083,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 tok_tags, a_idx_c, ctr, out_instrs, enum_names, enum_tag_offsets,
                                 enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
                                 source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
-                                item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
                             vec_push(arg_vals_c, box_new(av_c));
                             ai_c = ai_c + 1;
                         }
@@ -3167,7 +3167,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     out_instrs, enum_names, enum_tag_offsets, enum_tag_counts,
                     enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source,
                     starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
-                    item_field_counts, enum_vnames_flat, item_fn_row,
+                    item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row,
                     match_env_inherit, import_aliases);
                 if bd == 1 {
                     let_declared = 1;
@@ -3190,7 +3190,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                        out_instrs, enum_names,
                                                        enum_tag_offsets,
                                                        enum_tag_counts,
-                                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
                 if has_deferred_decl == 1 {
                     vec_push(out_instrs, box_new(Instr::DeclNamed(deferred_ty, name_tok)));
                 } else {
@@ -3221,14 +3221,14 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
                                 source, starts, ends, item_tags, item_names,
                                 item_d2, item_d3, item_d4, item_field_counts,
-                                enum_vnames_flat, item_fn_row, match_env_inherit,
+                                enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit,
                                 import_aliases);
         }
         let rc: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
                                         tok_tags, expr_idx, ctr,
                                         out_instrs, enum_names,
                                         enum_tag_offsets, enum_tag_counts,
-                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         return 0;
     }
     return 0;
@@ -3254,7 +3254,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     let mut si: i32 = 0;
     /* Running set of string-typed local name tokens for this block, so a later
@@ -3266,7 +3266,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                   s_idx, ctr, out_instrs, enum_names,
                                   enum_tag_offsets, enum_tag_counts,
-                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, str_locals);
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, str_locals);
         si = si + 1;
     }
     if tail_idx >= 0 {
@@ -3274,7 +3274,7 @@ fn lower_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                      tail_idx, ctr, out_instrs,
                                      enum_names, enum_tag_offsets,
                                      enum_tag_counts, enum_tags_flat,
-                                     fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                                     fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     return 0;
 }
@@ -3297,7 +3297,7 @@ fn lower_body(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     let btag: i32 = vec_get(et, body_idx);
     if btag == 9 {
@@ -3309,13 +3309,13 @@ fn lower_body(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                            sf, sc, ti, sidecar, ctr, out_instrs,
                            enum_names, enum_tag_offsets,
                            enum_tag_counts, enum_tags_flat,
-                           fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                           fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     return lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                         body_idx, ctr, out_instrs,
                         enum_names, enum_tag_offsets,
                         enum_tag_counts, enum_tags_flat,
-                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                        fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
 }
 
 /* ── lower_fn (SML lowerFn — simplified, no contracts) ──────
@@ -3339,7 +3339,7 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>,
                     item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
                     item_field_counts: Vec<i32>,
-                    enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     let mut ctr: Vec<i32> = vec_new();
     /* Start the temp counter above the token-index range so synthetic temps
@@ -3357,7 +3357,7 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                               source, starts, ends, item_tags,
                                               item_names, item_d2, item_d3,
                                               item_d4, item_field_counts,
-                                              enum_vnames_flat, item_fn_row,
+                                              enum_vnames_flat, enum_max_payloads, item_fn_row,
                                               match_env_inherit, import_aliases);
         vec_push(req_instrs, box_new(Instr::Requires(box_new(re), fn_name_h)));
         ri = ri + 1;
@@ -3370,7 +3370,7 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                   fn_ctx, builtin_map, lit_sf_names, source,
                                   starts, ends, item_tags, item_names, item_d2,
                                   item_d3, item_d4, item_field_counts,
-                                  enum_vnames_flat, item_fn_row,
+                                  enum_vnames_flat, enum_max_payloads, item_fn_row,
                                   match_env_inherit, import_aliases);
     if rc_body != 0 { return rc_body; }
     let mut mentions_res: bool = false;
@@ -3411,7 +3411,7 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx,
             builtin_map, lit_sf_names, source, starts, ends, item_tags,
             item_names, item_d2, item_d3, item_d4, item_field_counts,
-            enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+            enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         ej = ej + 1;
     }
     let body_final: Vec<i32> = inject_ensures_and_ret_slot(
@@ -3568,7 +3568,7 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
                                                     item_tags, item_names,
                                                     item_d2, item_d3, item_d4,
                                                     item_field_counts,
-                                                    enum_vnames_flat, i,
+                                                    enum_vnames_flat, out_enum_max, i,
                                                     vec_new(),
                                                     import_aliases);
                 }
@@ -3944,7 +3944,7 @@ fn lower_typed_box_deref_let(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         lit_sf_names: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>,
         item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
         item_d3: Vec<i32>, item_d4: Vec<i32>, item_field_counts: Vec<i32>,
-        enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+        enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
         match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
     if ann_tok < 0 { return 0; }
     if lower_tok_in_bounds(ann_tok, starts, ends) != true { return 0; }
@@ -3980,7 +3980,7 @@ fn lower_typed_box_deref_let(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         arg_idx, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts,
         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
         item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
-        enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     let args: Vec<i32> = vec_new();
     vec_push(args, box_new(av));
     let call: Instr = Instr::Call(name_tok, 0 - 13, args, ann_tok);
@@ -4466,7 +4466,7 @@ fn lower_ensures_clause(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         item_tags: Vec<i32>, item_names: Vec<i32>,
                         item_d2: Vec<i32>, item_d3: Vec<i32>,
                         item_d4: Vec<i32>, item_field_counts: Vec<i32>,
-                        enum_vnames_flat: Vec<i32>, item_fn_row: i32,
+                        enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
                         match_env_inherit: Vec<i32>,
                         import_aliases: Vec<i32>) -> i32 {
     /* M3-S-034 follow-up: map `result` references to return-slot when map_result=true. */
@@ -4478,7 +4478,7 @@ fn lower_ensures_clause(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                           lit_sf_names, source, starts, ends,
                                           item_tags, item_names, item_d2,
                                           item_d3, item_d4, item_field_counts,
-                                          enum_vnames_flat, item_fn_row,
+                                          enum_vnames_flat, enum_max_payloads, item_fn_row,
                                           match_env_inherit, import_aliases);
     if map_result == true {
         let keep_shape: i32 = 0;
@@ -7074,6 +7074,7 @@ fn test_lower_expr_val() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     vec_push(et, 0);
     vec_push(ed1, 0);
     vec_push(ed2, 0);
@@ -7081,7 +7082,7 @@ fn test_lower_expr_val() -> i32 {
     vec_push(ed4, 0);
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          0, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 0 { return 1; }
     vec_push(et, 1);
     vec_push(ed1, 0);
@@ -7090,7 +7091,7 @@ fn test_lower_expr_val() -> i32 {
     vec_push(ed4, 0);
     let v2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v2) != 3 { return 2; }
     vec_push(et, 3);
     vec_push(ed1, 7);
@@ -7099,7 +7100,7 @@ fn test_lower_expr_val() -> i32 {
     vec_push(ed4, 0);
     let v3: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v3) != 3 { return 3; }
     if vec_len(out) != 1 { return 4; }
     if vec_get(ctr, 0) != 1 { return 5; }
@@ -7140,9 +7141,10 @@ fn test_lower_return() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          0, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -7193,9 +7195,10 @@ fn test_lower_if() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -7242,9 +7245,10 @@ fn test_lower_block() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 0 { return 1; }
     vec_push(et, 9);
     vec_push(ed1, 0);
@@ -7253,7 +7257,7 @@ fn test_lower_block() -> i32 {
     vec_push(ed4, 0);
     let v2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v2) != 4 { return 2; }
     return 0;
 }
@@ -7304,9 +7308,10 @@ fn test_lower_assign() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -7360,9 +7365,10 @@ fn test_lower_while() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -7409,9 +7415,10 @@ fn test_lower_loop() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 4 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -7458,9 +7465,10 @@ fn test_lower_cast() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          1, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 3 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -7502,9 +7510,10 @@ fn test_lower_body_fn() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let rc: i32 = lower_body(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                               0, ctr, out, en_n, en_to, en_tc, en_tf,
-                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -7554,9 +7563,10 @@ fn test_lower_fn_fn() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let rc: i32 = lower_fn(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                             2, 99, vec_new(), vec_new(), out, en_n, en_to, en_tc, en_tf,
-                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) < 3 { return 2; }
     return 0;
@@ -7592,7 +7602,7 @@ fn test_lower_fn_contract_glue() -> i32 {
                            vec_new(), vec_new(), vec_new(),
                            source, starts, ends,
                            vec_new(), vec_new(), vec_new(), vec_new(), vec_new(),
-                           vec_new(), vec_new(), 0 - 1, vec_new(), vec_new());
+                           vec_new(), vec_new(), vec_new(), 0 - 1, vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) < 5 { return 2; }
     let i0: Instr = box_deref(vec_get(out, 0));
@@ -7668,10 +7678,11 @@ fn test_lower_for_loop() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let rv: Value = lower_expr_to_value(et, ed1v, ed2v, ed3v, ed4v,
                                          ppv, ttv, 4, ctr, out,
                                          en_n, en_to, en_tc, en_tf,
-                                         fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if vec_len(out) < 3 { return 1; }
     return 0;
 }
@@ -7716,9 +7727,10 @@ fn test_lower_expr_assert() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         1, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v) != 4 { return 1; }
     return 0;
 }
@@ -7768,9 +7780,10 @@ fn test_lower_expr_range() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v2) != 4 { return 1; }
     let mut et2: Vec<i32> = vec_new();
     let mut ed1b: Vec<i32> = vec_new();
@@ -7793,7 +7806,7 @@ fn test_lower_expr_range() -> i32 {
                                          en_tf, fn_ctx, builtin_map, lit_sf_names,
                                          source, starts, ends, item_tags,
                                          item_names, item_d2, item_d3, item_d4,
-                                         item_field_counts, enum_vnames_flat,
+                                         item_field_counts, enum_vnames_flat, enum_max_payloads,
                                          item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v3) != 4 { return 2; }
     return 0;
@@ -7840,9 +7853,10 @@ fn test_lower_expr_tuple_field() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         1, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v) != 6 { return 1; }
     return 0;
 }
@@ -7868,6 +7882,7 @@ fn test_lower_expr_index_effect() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let mut et: Vec<i32> = vec_new();
     let mut ed1: Vec<i32> = vec_new();
     let mut ed2: Vec<i32> = vec_new();
@@ -7894,7 +7909,7 @@ fn test_lower_expr_index_effect() -> i32 {
     let mut out: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
-                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
@@ -7920,6 +7935,7 @@ fn test_lower_expr_method_call_effect() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let mut et: Vec<i32> = vec_new();
     let mut ed1: Vec<i32> = vec_new();
     let mut ed2: Vec<i32> = vec_new();
@@ -7946,7 +7962,7 @@ fn test_lower_expr_method_call_effect() -> i32 {
     let mut out: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
-                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
@@ -7972,6 +7988,7 @@ fn test_lower_expr_array_effect() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let mut et: Vec<i32> = vec_new();
     let mut ed1: Vec<i32> = vec_new();
     let mut ed2: Vec<i32> = vec_new();
@@ -7998,7 +8015,7 @@ fn test_lower_expr_array_effect() -> i32 {
     let mut out: Vec<i32> = vec_new();
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                        2, ctr, out, en_n, en_to, en_tc, en_tf,
-                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                       fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v) != 3 { return 1; }
     return 0;
 }
@@ -8049,13 +8066,14 @@ fn test_lower_expr_struct() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     vec_push(lit_sf_names, 201);
     vec_push(lit_sf_names, 0);
     vec_push(lit_sf_names, 202);
     vec_push(lit_sf_names, 1);
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v) != 3 { return 1; }
     if vec_len(out) < 3 { return 2; }
     return 0;
@@ -8108,13 +8126,14 @@ fn test_lower_expr_struct_qualified_path() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     vec_push(lit_sf_names, 201);
     vec_push(lit_sf_names, 0);
     vec_push(lit_sf_names, 202);
     vec_push(lit_sf_names, 1);
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                         2, ctr, out, en_n, en_to, en_tc,
-                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                        en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v) != 3 { return 1; }
     if vec_len(out) < 3 { return 2; }
     return 0;
@@ -8239,9 +8258,10 @@ fn test_lower_return_fn() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let rc: i32 = lower_return(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 0, ctr, out, en_n, en_to, en_tc, en_tf,
-                                fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) != 1 { return 2; }
     return 0;
@@ -8288,9 +8308,10 @@ fn test_lower_stmt_fn() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let rc: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                               1, ctr, out, en_n, en_to, en_tc, en_tf,
-                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new(), vec_new());
+                              fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) != 2 { return 2; }
     let mut out2: Vec<i32> = vec_new();
@@ -8301,7 +8322,7 @@ fn test_lower_stmt_fn() -> i32 {
     vec_push(ed4, 0);
     let rc2: i32 = lower_stmt(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                2, ctr, out2, en_n, en_to, en_tc, en_tf,
-                               fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new(), vec_new());
+                               fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new(), vec_new());
     if rc2 != 0 { return 3; }
     return 0;
 }
@@ -8347,15 +8368,16 @@ fn test_lower_block_fn() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let rc: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                1, 1, 0, 0, ctr, out, en_n, en_to, en_tc,
-                               en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                               en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if rc != 0 { return 1; }
     if vec_len(out) < 3 { return 2; }
     let mut out2: Vec<i32> = vec_new();
     let rc2: i32 = lower_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 1, 1, 0 - 1, 0, ctr, out2,
-                                en_n, en_to, en_tc, en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                en_n, en_to, en_tc, en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if rc2 != 0 { return 3; }
     if vec_len(out2) != 2 { return 4; }
     return 0;
@@ -8413,10 +8435,11 @@ fn test_lower_with_instrs() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let e1: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, 0, ctr, out,
                                             en_n, en_to, en_tc, en_tf,
-                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_expr_tag(e1) != 0 { return 1; }
     vec_push(et, 1);
     vec_push(ed1, 0);
@@ -8426,7 +8449,7 @@ fn test_lower_with_instrs() -> i32 {
     let e2: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, 1, ctr, out,
                                             en_n, en_to, en_tc, en_tf,
-                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                            fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_expr_tag(e2) != 1 { return 2; }
     return 0;
 }
@@ -8467,10 +8490,11 @@ fn test_lower_for_effect_fn() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     let rc: i32 = lower_for_effect(et, ed1, ed2, ed3, ed4, pp,
                                     tok_tags, 0, ctr, out,
                                     en_n, en_to, en_tc, en_tf,
-                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                    fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if rc != 0 { return 1; }
     return 0;
 }
@@ -8513,6 +8537,7 @@ fn test_lower_enum_ctor() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     vec_push(en_n, 0);
     vec_push(en_to, 0);
     vec_push(en_tc, 2);
@@ -8529,7 +8554,7 @@ fn test_lower_enum_ctor() -> i32 {
     vec_push(ed4, 0);
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          0, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 3 { return 1; }
     if vec_len(out) != 2 { return 2; }
     return 0;
@@ -8589,12 +8614,13 @@ fn test_lower_try() -> i32 {
     let item_fn_row: i32 = 0 - 1;
     let item_field_counts: Vec<i32> = vec_new();
     let enum_vnames_flat: Vec<i32> = vec_new();
+    let enum_max_payloads: Vec<i32> = vec_new();
     vec_push(fn_ctx, 1);
     vec_push(fn_ctx, 300);
     vec_push(fn_ctx, 500);
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
-                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, vec_new(), vec_new());
+                                         en_tf, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, vec_new(), vec_new());
     if ir_value_tag(v1) != 3 { return 1; }
     if vec_len(out) < 4 { return 2; }
     let i0: Instr = box_deref(vec_get(out, 0));
