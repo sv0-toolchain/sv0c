@@ -2903,26 +2903,57 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     let_declared = 1;
                 }
             }
-            /* Enum nullary constructor init (ExprPath `Enum::Variant`, 2-seg):
-               declare the let with the enum type (the first path segment). */
+            /* Enum nullary constructor init (`let x = Enum::Variant`, 2-seg
+               ExprPath): declare x with the enum type and store the tag DIRECTLY
+               into x (SML constructs into x, not a temp that is then copied). */
             if vec_get(et, init_idx) == 1 {
                 if vec_get(ed2, init_idx) == 2 {
                     let ety_tok: i32 = vec_get(pp, vec_get(ed1, init_idx));
-                    let decl_e: Instr = Instr::DeclNamed(ety_tok, name_tok);
-                    vec_push(out_instrs, box_new(decl_e));
+                    let vn_tok_n: i32 = vec_get(pp, vec_get(ed1, init_idx) + 1);
+                    vec_push(out_instrs, box_new(Instr::DeclNamed(ety_tok, name_tok)));
+                    let k_n: i32 = enum_tag_lookup_str(enum_names, enum_tags_flat,
+                                                       enum_tag_offsets, enum_tag_counts,
+                                                       ety_tok, vn_tok_n, source, starts, ends);
+                    let tag_en: Expr = Expr::Literal(box_new(Value::VInt(k_n)));
+                    vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1, box_new(tag_en))));
                     let_declared = 1;
+                    init_handled = 1;
                 }
             }
-            /* Enum payload constructor init (ExprCall `Enum::Variant(args)`): the
-               callee is a 2-seg ExprPath; declare the let with the enum type. */
+            /* Enum payload constructor init (`let x = Enum::Variant(args)`): declare
+               x with the enum type and construct the variant DIRECTLY into x (tag +
+               payload StoreFields), as SML does (`[DeclNamed(en,x)] @
+               enumConstructInstrs x ...`) — not into a temp that is then copied. */
             if vec_get(et, init_idx) == 4 {
                 let callee_ci: i32 = vec_get(ed1, init_idx);
                 if vec_get(et, callee_ci) == 1 {
                     if vec_get(ed2, callee_ci) == 2 {
-                        let ety_c: i32 = vec_get(pp, vec_get(ed1, callee_ci));
-                        let decl_ec: Instr = Instr::DeclNamed(ety_c, name_tok);
-                        vec_push(out_instrs, box_new(decl_ec));
+                        let en_tok_c: i32 = vec_get(pp, vec_get(ed1, callee_ci));
+                        let vn_tok_c: i32 = vec_get(pp, vec_get(ed1, callee_ci) + 1);
+                        vec_push(out_instrs, box_new(Instr::DeclNamed(en_tok_c, name_tok)));
+                        let k_c: i32 = enum_tag_lookup_str(enum_names, enum_tags_flat,
+                                                           enum_tag_offsets, enum_tag_counts,
+                                                           en_tok_c, vn_tok_c, source, starts, ends);
+                        let tag_ec: Expr = Expr::Literal(box_new(Value::VInt(k_c)));
+                        vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1, box_new(tag_ec))));
+                        let args_first_c: i32 = vec_get(ed2, init_idx);
+                        let args_count_c: i32 = vec_get(ed3, init_idx);
+                        let args_sidecar_c: i32 = vec_get(ed4, init_idx);
+                        let mut ai_c: i32 = 0;
+                        while ai_c < args_count_c {
+                            let a_idx_c: i32 = block_stmt_index(pp, args_first_c, args_sidecar_c, ai_c);
+                            let av_c: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                tok_tags, a_idx_c, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+                            let fs_c: i32 = 0 - 10 - ai_c;
+                            vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fs_c,
+                                                        box_new(value_to_expr(av_c)))));
+                            ai_c = ai_c + 1;
+                        }
                         let_declared = 1;
+                        init_handled = 1;
                     }
                 }
             }
