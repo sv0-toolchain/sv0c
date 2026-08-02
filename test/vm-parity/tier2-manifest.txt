@@ -4,3 +4,8 @@ lib/span.sv0
 lexer/token.sv0
 lib/ast.sv0
 lib/bytecode.sv0
+lib/env.sv0
+lib/include_expand.sv0
+lib/lexer.sv0
+lib/resolver.sv0
+lib/parser.sv0
