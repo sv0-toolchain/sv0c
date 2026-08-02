@@ -11,3 +11,8 @@ lib/resolver.sv0
 lib/parser.sv0
 lib/main.sv0
 lib/diagnostic.sv0
+lib/ir.sv0
+lib/types.sv0
+lib/unify.sv0
+lib/codegen.sv0
+lib/checker.sv0

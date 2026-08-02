@@ -2440,6 +2440,10 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                               bid = 14;
                             } else {
                             }
+                            if ((bid == 21)) {
+                              bid = 14;
+                            } else {
+                            }
                           } else {
                             const char* _sv0t29 = handle_to_str(fn_h, source, starts, ends);
                             const char* fn_name;

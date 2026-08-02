@@ -3981,12 +3981,92 @@ fn lower_typed_box_deref_let(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
         item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
         enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+    /* av is always a VVar for a box_deref arg (lower_expr_to_value spills a complex
+       arg like vec_get(..) to a temp and returns VVar(temp)); capture its handle so
+       it can be re-read per slot without moving av. */
+    let mut box_h: i32 = 0 - 1;
+    match av {
+        Value::VVar(h) => { box_h = h; },
+        Value::VInt(n) => {},
+        Value::VBoolTrue => {},
+        Value::VBoolFalse => {},
+        Value::VString(s) => {},
+        Value::VUnit => {},
+        Value::VMember(bv, f) => {},
+        Value::VAddrOf(h2) => {},
+    }
+    /* Is the annotated type an enum? If so, find its max payload (by NAME — the
+       annotation is a use-token that won't integer-match the enum decl token). */
+    let mut is_enum_bd: i32 = 0;
+    let mut maxp_bd: i32 = 0;
+    let ne_bd: i32 = vec_len(enum_names);
+    let mut ei_bd: i32 = 0;
+    while ei_bd < ne_bd {
+        let enh_bd: i32 = vec_get(enum_names, ei_bd);
+        if lower_tok_in_bounds(enh_bd, starts, ends) {
+            if string_eq(handle_to_str(enh_bd, source, starts, ends), ann_name) {
+                is_enum_bd = 1;
+                if ei_bd < vec_len(enum_max_payloads) {
+                    maxp_bd = vec_get(enum_max_payloads, ei_bd);
+                }
+                ei_bd = ne_bd;
+            }
+        }
+        ei_bd = ei_bd + 1;
+    }
+    /* VM target + enum: reconstruct per-slot (SML boxDerefFromValue + copyFields):
+       load each box word into a temp, StoreField it into a fresh `out`, then copy
+       out's fields into x. box_load = builtin id 21 (vm_codegen remaps 21->14). The
+       C backend (lower_vm_target()==0) keeps the single sv0__box_deref_raw call, so
+       its packed box representation is untouched. */
+    if lower_vm_target() == 1 {
+        if is_enum_bd == 1 {
+            if box_h >= 0 {
+                let out_bd: i32 = ctr_fresh(ctr);
+                vec_push(out_instrs, box_new(Instr::DeclNamed(ann_tok, out_bd)));
+                let t_tag: i32 = ctr_fresh(ctr);
+                let mut a_tag: Vec<i32> = vec_new();
+                vec_push(a_tag, box_new(Value::VVar(box_h)));
+                vec_push(a_tag, box_new(Value::VInt(0)));
+                vec_push(out_instrs, box_new(Instr::Call(t_tag, 0 - 21, a_tag, 0)));
+                vec_push(out_instrs, box_new(Instr::StoreField(out_bd, 0 - 1,
+                    box_new(value_to_expr(Value::VVar(t_tag))))));
+                let mut pi_bd: i32 = 0;
+                while pi_bd < maxp_bd {
+                    let t_p: i32 = ctr_fresh(ctr);
+                    let mut a_p: Vec<i32> = vec_new();
+                    vec_push(a_p, box_new(Value::VVar(box_h)));
+                    vec_push(a_p, box_new(Value::VInt(pi_bd + 1)));
+                    vec_push(out_instrs, box_new(Instr::Call(t_p, 0 - 21, a_p, 0)));
+                    vec_push(out_instrs, box_new(Instr::StoreField(out_bd, 0 - 10 - pi_bd,
+                        box_new(value_to_expr(Value::VVar(t_p))))));
+                    pi_bd = pi_bd + 1;
+                }
+                vec_push(out_instrs, box_new(Instr::DeclNamed(ann_tok, name_tok)));
+                vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1,
+                    box_new(value_to_expr(Value::VMember(box_new(Value::VVar(out_bd)), 0 - 1))))));
+                let mut ci_bd: i32 = 0;
+                while ci_bd < maxp_bd {
+                    vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 10 - ci_bd,
+                        box_new(value_to_expr(Value::VMember(box_new(Value::VVar(out_bd)), 0 - 10 - ci_bd))))));
+                    ci_bd = ci_bd + 1;
+                }
+                return 1;
+            }
+        }
+    }
     let args: Vec<i32> = vec_new();
-    vec_push(args, box_new(av));
+    vec_push(args, box_new(Value::VVar(box_h)));
     let call: Instr = Instr::Call(name_tok, 0 - 13, args, ann_tok);
     vec_push(out_instrs, box_new(call));
     return 1;
 }
+
+/* VM-target flag (0 = C backend, single sv0__box_deref_raw box_deref; 1 = VM, which
+   reconstructs a typed box_deref per-slot to match SML --target=vm). The C compose
+   builds leave this 0; the native VM emitter recipe patches the assembled mega-TU to
+   return 1. Kept as a plain constant fn so no target flag has to be threaded. */
+fn lower_vm_target() -> i32 { return 0; }
 
 /* True if a `let` init evaluates to a `string` (const char*): a string literal
    (ExprLit lit_tag 3) or a call to a string-returning builtin. Used to give the
