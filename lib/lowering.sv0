@@ -548,36 +548,90 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let mut deferred_ty: i32 = 0 - 1;
             let mut has_deferred_decl: i32 = 0;
             if init_idx >= 0 {
+                /* Struct-literal / enum-ctor lets CONSTRUCT DIRECTLY into the let
+                   var (mirrors lower_stmt's fn-body path), not into a fresh temp
+                   that is then copied — the temp copy costs a full struct/enum
+                   width of extra locals per let, which nested-block-heavy functions
+                   (the forall/exists desugar in lower_tag_call, the for desugar)
+                   pay hundreds of times over. */
                 if vec_get(et, init_idx) == 24 {
                     let sppc: i32 = vec_get(ed2, init_idx);
+                    let fc_lb: i32 = vec_get(ed3, init_idx);
                     if sppc >= 1 {
-                        let sty_tok: i32 = vec_get(pp,
-                            vec_get(ed1, init_idx) + sppc - 1);
-                        let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
-                        vec_push(out_instrs, box_new(decl_n));
-                        let_declared = 1;
+                        if fc_lb > 0 {
+                            let sty_tok: i32 = vec_get(pp,
+                                vec_get(ed1, init_idx) + sppc - 1);
+                            vec_push(out_instrs, box_new(Instr::DeclNamed(sty_tok, name_tok)));
+                            let_declared = 1;
+                            let sf0_lb: i32 = vec_get(ed4, init_idx);
+                            let mut fi_lb: i32 = 0;
+                            while fi_lb < fc_lb {
+                                let ch_lb: i32 = vec_get(lit_sf_names, sf0_lb + fi_lb * 2 + 1);
+                                let fv_lb: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                    tok_tags, ch_lb, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                    enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                    source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                    item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                                let fnm_lb: i32 = vec_get(lit_sf_names, sf0_lb + fi_lb * 2);
+                                vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fnm_lb,
+                                                            box_new(value_to_expr(fv_lb)))));
+                                fi_lb = fi_lb + 1;
+                            }
+                            init_handled = 1;
+                        }
                     }
                 }
-                /* Enum nullary constructor init (ExprPath `Enum::Variant`, 2-seg):
-                   declare the let with the enum type (the first path segment). */
                 if vec_get(et, init_idx) == 1 {
                     if vec_get(ed2, init_idx) == 2 {
                         let ety_tok: i32 = vec_get(pp, vec_get(ed1, init_idx));
-                        let decl_e: Instr = Instr::DeclNamed(ety_tok, name_tok);
-                        vec_push(out_instrs, box_new(decl_e));
+                        let vn_tok_lb: i32 = vec_get(pp, vec_get(ed1, init_idx) + 1);
+                        vec_push(out_instrs, box_new(Instr::DeclNamed(ety_tok, name_tok)));
+                        let k_lb: i32 = enum_tag_lookup_str(enum_names, enum_tags_flat,
+                                                            enum_tag_offsets, enum_tag_counts,
+                                                            ety_tok, vn_tok_lb, source, starts, ends);
+                        let tag_elb: Expr = Expr::Literal(box_new(Value::VInt(k_lb)));
+                        vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1, box_new(tag_elb))));
                         let_declared = 1;
+                        init_handled = 1;
                     }
                 }
-                /* Enum payload constructor init (ExprCall `Enum::Variant(args)`):
-                   callee is a 2-seg ExprPath; declare with the enum type. */
                 if vec_get(et, init_idx) == 4 {
                     let callee_cb: i32 = vec_get(ed1, init_idx);
                     if vec_get(et, callee_cb) == 1 {
                         if vec_get(ed2, callee_cb) == 2 {
-                            let ety_cb: i32 = vec_get(pp, vec_get(ed1, callee_cb));
-                            let decl_eb: Instr = Instr::DeclNamed(ety_cb, name_tok);
-                            vec_push(out_instrs, box_new(decl_eb));
+                            let en_tok_lb: i32 = vec_get(pp, vec_get(ed1, callee_cb));
+                            let vnc_lb: i32 = vec_get(pp, vec_get(ed1, callee_cb) + 1);
+                            vec_push(out_instrs, box_new(Instr::DeclNamed(en_tok_lb, name_tok)));
+                            let kc_lb: i32 = enum_tag_lookup_str(enum_names, enum_tags_flat,
+                                                                enum_tag_offsets, enum_tag_counts,
+                                                                en_tok_lb, vnc_lb, source, starts, ends);
+                            let af_lb: i32 = vec_get(ed2, init_idx);
+                            let ac_lb: i32 = vec_get(ed3, init_idx);
+                            let asc_lb: i32 = vec_get(ed4, init_idx);
+                            let mut avals_lb: Vec<i32> = vec_new();
+                            let mut aic_lb: i32 = 0;
+                            while aic_lb < ac_lb {
+                                let aidx_lb: i32 = block_stmt_index(pp, af_lb, asc_lb, aic_lb);
+                                let avc_lb: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                    tok_tags, aidx_lb, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                    enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                    source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                    item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                                vec_push(avals_lb, box_new(avc_lb));
+                                aic_lb = aic_lb + 1;
+                            }
+                            let tagc_lb: Expr = Expr::Literal(box_new(Value::VInt(kc_lb)));
+                            vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1, box_new(tagc_lb))));
+                            let mut pic_lb: i32 = 0;
+                            while pic_lb < ac_lb {
+                                let pvc_lb: Value = box_deref(vec_get(avals_lb, pic_lb));
+                                let fsc_lb: i32 = 0 - 10 - pic_lb;
+                                vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fsc_lb,
+                                                            box_new(value_to_expr(pvc_lb)))));
+                                pic_lb = pic_lb + 1;
+                            }
                             let_declared = 1;
+                            init_handled = 1;
                         }
                     }
                 }
@@ -611,14 +665,19 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         let_declared = 1;
                     }
                 }
-                /* `let x = f(..)` where f returns a user struct/enum. */
+                /* `let x = f(..)` where f returns a user struct/enum: DEFER the
+                   DeclNamed to after the init (SML lowerStmt lowers the call temp
+                   first, so x's slot follows it). Emitting DeclNamed(x) up front
+                   here gave x the lower slot and swapped it with the call-result
+                   temp — the fn-body path (lower_stmt) already defers via
+                   deferred_ty/has_deferred_decl; this mirrors it for nested blocks. */
                 if let_declared == 0 {
                     let uty_lb: i32 = lower_call_ret_user_ty_tok(et, ed1, ed2, pp,
                         init_idx, item_tags, item_names, item_d2, tok_tags,
                         source, starts, ends);
                     if uty_lb >= 0 {
-                        let decl_utb: Instr = Instr::DeclNamed(uty_lb, name_tok);
-                        vec_push(out_instrs, box_new(decl_utb));
+                        deferred_ty = uty_lb;
+                        has_deferred_decl = 1;
                         let_declared = 1;
                     }
                 }
