@@ -519,7 +519,7 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>,
-                    for_effect: i32) -> Value {
+                    for_effect: i32, into_dest: i32) -> Value {
     let stmts_first: i32 = vec_get(ed1, idx);
     let stmts_count: i32 = vec_get(ed2, idx);
     let tail_idx: i32 = vec_get(ed3, idx);
@@ -687,6 +687,22 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
         }
         si = si + 1;
+    }
+    if into_dest >= 0 {
+        /* Into-var context (SML lowerIntoVarInstrs ExprBlock): lower the tail INTO
+           the dest var; a block with no tail stores VUnit (`NONE => [Store(t,
+           VUnit)]`). Used for match arm bodies. */
+        if tail_idx >= 0 {
+            lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  tail_idx, into_dest, ctr, out_instrs,
+                                  enum_names, enum_tag_offsets,
+                                  enum_tag_counts, enum_tags_flat,
+                                  fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+        } else {
+            vec_push(out_instrs, box_new(Instr::Store(into_dest,
+                box_new(Expr::Literal(box_new(Value::VUnit))))));
+        }
+        return Value::VUnit;
     }
     if tail_idx >= 0 {
         if for_effect == 1 {
@@ -1311,7 +1327,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         return lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                 idx, ctr, out_instrs, enum_names,
                                 enum_tag_offsets, enum_tag_counts,
-                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 0);
+                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 0, 0 - 1);
     }
     if tag == 10 {
         return lower_tag_if(et, ed1, ed2, ed3, ed4, pp, tok_tags,
@@ -1671,7 +1687,7 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                         idx, ctr, out_instrs, enum_names,
                         enum_tag_offsets, enum_tag_counts,
-                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 1);
+                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 1, 0 - 1);
         return 0;
     }
     if etag == 10 {
@@ -1729,6 +1745,42 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     item_field_counts: Vec<i32>,
                     enum_vnames_flat: Vec<i32>, item_fn_row: i32,
                     match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> i32 {
+    /* SML lowerIntoVarInstrs: a block lowers its stmts then its tail INTO dest
+       (no tail => Store(dest, VUnit)); a no-else `if` stores VUnit in the empty
+       branch. sv0 previously always fell to `Store(dest, lower_expr_with_instrs)`,
+       which drops those unit stores for a block/if arm body whose value is unit
+       (e.g. a match arm ending in `if c { return N }`). Handle those two shapes
+       faithfully; if-with-else stays on the default path (unchanged — the
+       byte-identical modules rely on it). */
+    let btag: i32 = vec_get(et, body_idx);
+    if btag == 9 {
+        lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                        body_idx, ctr, out_instrs, enum_names,
+                        enum_tag_offsets, enum_tag_counts,
+                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases, 0, dest);
+        return 0;
+    }
+    if btag == 10 {
+        let else_idx_iv: i32 = vec_get(ed3, body_idx);
+        if else_idx_iv < 0 {
+            let cond_idx_iv: i32 = vec_get(ed1, body_idx);
+            let then_idx_iv: i32 = vec_get(ed2, body_idx);
+            let cond_e_iv: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp,
+                                                  tok_tags, cond_idx_iv, ctr, out_instrs,
+                                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+            let mut then_is_iv: Vec<i32> = vec_new();
+            lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  then_idx_iv, dest, ctr, then_is_iv,
+                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
+            let mut else_is_iv: Vec<i32> = vec_new();
+            vec_push(else_is_iv, box_new(Instr::Store(dest,
+                box_new(Expr::Literal(box_new(Value::VUnit))))));
+            vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e_iv), then_is_iv, else_is_iv)));
+            return 0;
+        }
+    }
     let ee: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                            tok_tags, body_idx, ctr,
                                            out_instrs, enum_names,
