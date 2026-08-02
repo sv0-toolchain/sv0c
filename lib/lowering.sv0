@@ -364,6 +364,21 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             }
         }
     }
+    /* Enum-ctor call as an EXPRESSION (`Enum::Variant(args)`): SML
+       lowerExprToValue declares the enum result temp FIRST — `[DeclNamed(en,t)] @
+       enumConstructInstrs t …` — and freshTmp's it before lowering the args, so
+       the enum's slots precede any temp an arg spills (e.g. `return
+       Err(some_call())`). Pre-create + declare it here, before the shared arg
+       loop, and reuse it in the cppc==2 branch (which otherwise declares it AFTER
+       the args, swapping the slots). Only 2-seg-path callees are enum ctors. */
+    let mut ec_t: i32 = 0 - 1;
+    if vec_get(et, callee_idx) == 1 {
+        if vec_get(ed2, callee_idx) == 2 {
+            let en_tok_pre: i32 = vec_get(pp, vec_get(ed1, callee_idx));
+            ec_t = ctr_fresh(ctr);
+            vec_push(out_instrs, box_new(Instr::DeclNamed(en_tok_pre, ec_t)));
+        }
+    }
     let mut arg_vals: Vec<i32> = vec_new();
     let mut ai: i32 = 0;
     loop {
@@ -453,9 +468,9 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                           enum_tag_offsets,
                                           enum_tag_counts,
                                           en_tok, vn_tok, source, starts, ends);
-            let t: i32 = ctr_fresh(ctr);
-            let decl: Instr = Instr::DeclNamed(en_tok, t);
-            vec_push(out_instrs, box_new(decl));
+            /* t was pre-created + DeclNamed before the arg loop (SML declares the
+               enum temp first). */
+            let t: i32 = ec_t;
             let tag_e: Expr = Expr::Literal(box_new(Value::VInt(k)));
             let sf_tag: Instr = Instr::StoreField(t, 0 - 1,
                                                    box_new(tag_e));
