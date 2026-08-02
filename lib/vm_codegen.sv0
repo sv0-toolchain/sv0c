@@ -1354,6 +1354,13 @@ fn emit_instr(ins: Instr,
             let mut bid: i32 = 0 - 1;
             if fn_h < 0 {
                 bid = 0 - fn_h;
+                /* Remap lowering builtin ids to VM CALL_BUILTIN indices. Most
+                   align (string/vec 2-11, file 15-18), but println is lowering id
+                   1 while its VM index is 0, and box_deref is lowering id 13 while
+                   its VM op is box_load = 14. box_new (12) is intercepted below;
+                   no_alias (14) is resolved in lowering and never reaches here. */
+                if bid == 1 { bid = 0; }
+                if bid == 13 { bid = 14; }
             } else {
                 let fn_name: string = handle_to_str(fn_h, source, starts, ends);
                 bid = builtin_id(fn_name);

@@ -2432,6 +2432,14 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                           int bid = (0 - 1);
                           if ((fn_h < 0)) {
                             bid = (0 - fn_h);
+                            if ((bid == 1)) {
+                              bid = 0;
+                            } else {
+                            }
+                            if ((bid == 13)) {
+                              bid = 14;
+                            } else {
+                            }
                           } else {
                             const char* _sv0t29 = handle_to_str(fn_h, source, starts, ends);
                             const char* fn_name;

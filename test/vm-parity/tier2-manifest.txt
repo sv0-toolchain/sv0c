@@ -10,3 +10,4 @@ lib/lexer.sv0
 lib/resolver.sv0
 lib/parser.sv0
 lib/main.sv0
+lib/diagnostic.sv0
