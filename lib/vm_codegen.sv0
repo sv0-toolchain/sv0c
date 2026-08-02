@@ -1361,6 +1361,7 @@ fn emit_instr(ins: Instr,
                    no_alias (14) is resolved in lowering and never reaches here. */
                 if bid == 1 { bid = 0; }
                 if bid == 13 { bid = 14; }
+                if bid == 21 { bid = 14; }
             } else {
                 let fn_name: string = handle_to_str(fn_h, source, starts, ends);
                 bid = builtin_id(fn_name);
