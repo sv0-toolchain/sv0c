@@ -1130,6 +1130,79 @@ enum Instr {
    field-name lookup.  Requires/Ensures use contract_pool_key to
    encode contract-message pool entries (decoded at serialisation). */
 
+/* box_new(inner) multi-slot unpack (SML lowering boxNewFromValue +
+   vm_codegen sv0_box_alloc/sv0_box_store).  sv0 lowering keeps box_new as a
+   single builtin Call (bid 12) so the C backend can memcpy-box it; the VM,
+   however, needs the SML flat form: box_alloc(W) then one box_store per slot.
+   The box_new result temp (dst_h) is the same freshTmp SML allocates for the
+   box handle, so slot numbering matches SML byte-for-byte with no lowering
+   change.  For a struct/enum arg (a local, so VVar) each slot k copies
+   inner[k] — SML emits box_store(h, k, VMember(va, field_k)) and VMember always
+   resolves to slot base(va)+k, so a direct local-load is byte-identical and
+   needs no enum/struct field data here.  A non-VVar (scalar literal) arg boxes
+   as width 1 with the raw value.  Opcodes: PUSH_INT 4, LOAD_LOCAL 96,
+   STORE_LOCAL 97, CALL_BUILTIN 117 (box_alloc=12, box_store=13). */
+fn emit_box_new(dst_h: i32, args: Vec<i32>,
+                env_names: Vec<i32>, env_bases: Vec<i32>, env_widths: Vec<i32>,
+                env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
+                pool: Vec<i32>,
+                source: string, starts: Vec<i32>, ends: Vec<i32>,
+                out: Vec<i32>) -> i32 {
+    if vec_len(args) < 1 { return 0 - 1; }
+    let inner_v: Value = box_deref(vec_get(args, 0));
+    let dsi: i32 = lookup_slot(env_names, env_bases, env_widths, dst_h,
+                               source, starts, ends);
+    if dsi < 0 { return 0 - 1; }
+    let base_d: i32 = slot_base(env_bases, dsi);
+    let mut is_var: i32 = 0;
+    let mut base_in: i32 = 0;
+    let mut w: i32 = 1;
+    match inner_v {
+        Value::VVar(x) => {
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
+                                      source, starts, ends);
+            if si < 0 { return 0 - 1; }
+            base_in = slot_base(env_bases, si);
+            w = slot_width(env_widths, si);
+            is_var = 1;
+        },
+        Value::VInt(n) => { w = 1; },
+        Value::VBoolTrue => { w = 1; },
+        Value::VBoolFalse => { w = 1; },
+        Value::VString(s) => { w = 1; },
+        Value::VUnit => { w = 1; },
+        Value::VMember(bv, f) => { w = 1; },
+        Value::VAddrOf(h2) => { w = 1; },
+    }
+    /* box_alloc(W): PUSH_INT W ; CALL_BUILTIN 12 ; STORE_LOCAL base_d */
+    vec_push(out, 4);   vec_push(out, w);
+    vec_push(out, 117); vec_push(out, 12);
+    vec_push(out, 97);  vec_push(out, base_d);
+    let mut total: i32 = 6;
+    if is_var == 1 {
+        let mut k: i32 = 0;
+        while k < w {
+            vec_push(out, 96);  vec_push(out, base_d);        /* LOAD box handle */
+            vec_push(out, 4);   vec_push(out, k);             /* PUSH_INT k */
+            vec_push(out, 96);  vec_push(out, base_in + k);   /* LOAD inner slot k */
+            vec_push(out, 117); vec_push(out, 13);            /* CALL_BUILTIN box_store */
+            total = total + 8;
+            k = k + 1;
+        }
+    } else {
+        /* scalar literal: box_store(h, 0, <raw value>) */
+        vec_push(out, 96); vec_push(out, base_d);
+        vec_push(out, 4);  vec_push(out, 0);
+        let nv: i32 = emit_value(inner_v, env_names, env_bases, env_widths,
+                                 env_field_starts, env_fields_flat, pool,
+                                 source, starts, ends, out);
+        if nv < 0 { return 0 - 1; }
+        vec_push(out, 117); vec_push(out, 13);
+        total = total + 4 + nv + 2;
+    }
+    return total;
+}
+
 fn emit_instr(ins: Instr,
               env_names: Vec<i32>, env_bases: Vec<i32>,
               env_widths: Vec<i32>,
@@ -1284,6 +1357,14 @@ fn emit_instr(ins: Instr,
             } else {
                 let fn_name: string = handle_to_str(fn_h, source, starts, ends);
                 bid = builtin_id(fn_name);
+            }
+            /* box_new (lowering builtin id 12): unpack to box_alloc + per-slot
+               box_store (SML flat VM form). The generic path below would mis-emit
+               it as a single CALL_BUILTIN 12 over the multi-slot arg. */
+            if bid == 12 {
+                return emit_box_new(dst_h, args, env_names, env_bases, env_widths,
+                                    env_field_starts, env_fields_flat, pool,
+                                    source, starts, ends, out);
             }
             let nargs_vec: i32 = vec_len(args);
             let mut total: i32 = 0;

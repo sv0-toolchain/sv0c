@@ -2934,11 +2934,16 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         let k_c: i32 = enum_tag_lookup_str(enum_names, enum_tags_flat,
                                                            enum_tag_offsets, enum_tag_counts,
                                                            en_tok_c, vn_tok_c, source, starts, ends);
-                        let tag_ec: Expr = Expr::Literal(box_new(Value::VInt(k_c)));
-                        vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1, box_new(tag_ec))));
+                        /* SML enumConstructInstrs order: lower ALL args first
+                           (`inss`), THEN the tag StoreField, THEN the payload
+                           StoreFields (`inss @ [tag] @ enumStorePayload`). Emitting
+                           the tag store before the args, or interleaving arg
+                           lowering with payload stores, misplaces any side-effect
+                           instructions an arg spills (e.g. box_new's alloc/stores). */
                         let args_first_c: i32 = vec_get(ed2, init_idx);
                         let args_count_c: i32 = vec_get(ed3, init_idx);
                         let args_sidecar_c: i32 = vec_get(ed4, init_idx);
+                        let mut arg_vals_c: Vec<i32> = vec_new();
                         let mut ai_c: i32 = 0;
                         while ai_c < args_count_c {
                             let a_idx_c: i32 = block_stmt_index(pp, args_first_c, args_sidecar_c, ai_c);
@@ -2947,10 +2952,18 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
                                 source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
                                 item_field_counts, enum_vnames_flat, item_fn_row, match_env_inherit, import_aliases);
-                            let fs_c: i32 = 0 - 10 - ai_c;
-                            vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fs_c,
-                                                        box_new(value_to_expr(av_c)))));
+                            vec_push(arg_vals_c, box_new(av_c));
                             ai_c = ai_c + 1;
+                        }
+                        let tag_ec: Expr = Expr::Literal(box_new(Value::VInt(k_c)));
+                        vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1, box_new(tag_ec))));
+                        let mut pi_c: i32 = 0;
+                        while pi_c < args_count_c {
+                            let pv_c: Value = box_deref(vec_get(arg_vals_c, pi_c));
+                            let fs_c: i32 = 0 - 10 - pi_c;
+                            vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fs_c,
+                                                        box_new(value_to_expr(pv_c)))));
+                            pi_c = pi_c + 1;
                         }
                         let_declared = 1;
                         init_handled = 1;
