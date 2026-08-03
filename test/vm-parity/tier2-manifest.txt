@@ -16,3 +16,4 @@ lib/types.sv0
 lib/unify.sv0
 lib/codegen.sv0
 lib/checker.sv0
+lib/lowering.sv0
