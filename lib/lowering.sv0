@@ -1838,6 +1838,35 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 box_new(Expr::Literal(box_new(Value::VUnit))))));
             vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e_iv), then_is_iv, else_is_iv)));
             return 0;
+        } else {
+            /* ExprIf WITH else into a var (SML lowerIntoVarInstrs): a fresh `u`
+               holds the if's value, each branch lowers INTO u, then `dest = u`
+               (`u=freshTmp; ic @ [declU, IfElse(ec, into_var(th,u), into_var(el,u)),
+               Store(t, Load u)]`). Otherwise the tail if-else of a match arm falls
+               to lower_expr_with_instrs' value path, whose temp numbering differs
+               from SML. u is freshTmp'd BEFORE the condition (lower slot); its
+               DeclVar is emitted AFTER the condition's spill instrs. */
+            let cond_idx_we: i32 = vec_get(ed1, body_idx);
+            let then_idx_we: i32 = vec_get(ed2, body_idx);
+            let u_we: i32 = ctr_fresh(ctr);
+            let cond_e_we: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp,
+                                                  tok_tags, cond_idx_we, ctr, out_instrs,
+                                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            vec_push(out_instrs, box_new(Instr::DeclVar(u_we)));
+            let mut then_we: Vec<i32> = vec_new();
+            lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  then_idx_we, u_we, ctr, then_we,
+                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let mut else_we: Vec<i32> = vec_new();
+            lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  else_idx_iv, u_we, ctr, else_we,
+                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e_we), then_we, else_we)));
+            vec_push(out_instrs, box_new(Instr::Store(dest, box_new(Expr::Load(u_we)))));
+            return 0;
         }
     }
     let ee: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
