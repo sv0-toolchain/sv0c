@@ -414,7 +414,13 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 if lower_callee_is_void(et, ed1, ed2, pp, idx,
                         item_tags, item_names, item_d2, tok_tags,
                         source, starts, ends) {
-                    let void_call_instr: Instr = Instr::Call(0, callee_tok, arg_vals, 0);
+                    /* SML lowerExprForEffect assigns even a void call's (unit) value
+                       to a fresh temp, so its VM emit reserves a slot per void-call
+                       statement. The C backend can't (`int t = voidf()` is invalid),
+                       so gate on lower_vm_target(): dst=temp for the VM, dst=0 for C. */
+                    let mut vdst: i32 = 0;
+                    if lower_vm_target() == 1 { vdst = ctr_fresh(ctr); }
+                    let void_call_instr: Instr = Instr::Call(vdst, callee_tok, arg_vals, 0);
                     vec_push(out_instrs, box_new(void_call_instr));
                     return Value::VUnit;
                 }
@@ -1688,6 +1694,38 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
        to VVar and a literal to VInt, and value_to_expr wraps those to the same
        bytecode Load/Literal would emit, so only binop needs the direct form. */
     let etag: i32 = vec_get(et, idx);
+    if etag == 10 {
+        let else_idx_wi: i32 = vec_get(ed3, idx);
+        /* VM-only (lower_vm_target): the t/u DeclVar form matches SML's VM temp
+           numbering but assumes int-typed temps; a struct/enum-valued if would emit
+           `int t;` for a struct in C. The C backend keeps its valid value-path
+           lowering (lower_tag_if), which handles the type correctly. */
+        if else_idx_wi >= 0 && lower_vm_target() == 1 {
+            let cond_idx_wi: i32 = vec_get(ed1, idx);
+            let then_idx_wi: i32 = vec_get(ed2, idx);
+            let t_wi: i32 = ctr_fresh(ctr);
+            let u_wi: i32 = ctr_fresh(ctr);
+            let cond_e_wi: Expr = lower_cond_expr(et, ed1, ed2, ed3, ed4, pp,
+                                                  tok_tags, cond_idx_wi, ctr, out_instrs,
+                                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            vec_push(out_instrs, box_new(Instr::DeclVar(t_wi)));
+            vec_push(out_instrs, box_new(Instr::DeclVar(u_wi)));
+            let mut then_wi: Vec<i32> = vec_new();
+            lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  then_idx_wi, u_wi, ctr, then_wi,
+                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let mut else_wi: Vec<i32> = vec_new();
+            lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                  else_idx_wi, u_wi, ctr, else_wi,
+                                  enum_names, enum_tag_offsets, enum_tag_counts,
+                                  enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e_wi), then_wi, else_wi)));
+            vec_push(out_instrs, box_new(Instr::Store(t_wi, box_new(Expr::Load(u_wi)))));
+            return value_to_expr(Value::VVar(t_wi));
+        }
+    }
     if etag == 3 {
         let binop_tag: i32 = vec_get(ed1, idx);
         let lhs_idx: i32 = vec_get(ed2, idx);
