@@ -99,3 +99,4 @@ lib/codegen.sv0
 lib/link.sv0
 lib/lexer.sv0
 lib/resolver.sv0
+lib/driver.sv0
