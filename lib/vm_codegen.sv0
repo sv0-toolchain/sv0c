@@ -1307,6 +1307,12 @@ fn emit_instr(ins: Instr,
             let nc: i32 = emit_expr(cond, env_names, env_bases, env_widths, env_field_starts, env_fields_flat,
                                     pool, source, starts, ends, cond_out);
             if nc < 0 { return 0 - 1; }
+            /* Pre-pool the body in SML emitLoopSeq order (continuation-first at
+               each IfElse) so string-pool indices match SML --target=vm. Cond is
+               already pooled above (SML pools condC first too); body dedups. */
+            prepool_loop_seq(body, 0, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
             let body_out: Vec<i32> = vec_new();
             let nb: i32 = emit_instrs(body, env_names, env_bases, env_widths,
                                       env_field_starts, env_fields_flat,
@@ -1511,6 +1517,93 @@ fn emit_instrs(instrs: Vec<i32>,
         idx = idx + 1;
     }
     return total;
+}
+
+/* ── prepool_loop_seq (matches SML emitLoopSeq/emitLoopStmt POOL ORDER) ──
+   SML's emitLoopStmt (vm_codegen.sml) for an IfElse inside a loop body
+   evaluates the CONTINUATION first (to size break jumps), so poolAdd runs in
+   the order continuation -> else -> then -> cond — reversed from natural
+   emission. Native's sentinel-based loop emitter (Instr::WhileLoop) emits in
+   natural order, giving different string-pool INDICES (same bytecode). This
+   pre-pass walks a WhileLoop body in SML's emitLoopSeq order, calling the real
+   emit_expr/emit_instr into a THROWAWAY buffer purely for the pool_add side
+   effect; the subsequent real emission dedups, so byte output is unchanged and
+   only the pool order is corrected. Non-IfElse statements keep natural order. */
+fn prepool_loop_seq(instrs: Vec<i32>, i0: i32,
+                    env_names: Vec<i32>, env_bases: Vec<i32>,
+                    env_widths: Vec<i32>,
+                    env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
+                    pool: Vec<i32>,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>,
+                    fn_names: Vec<i32>) -> i32 {
+    if i0 >= vec_len(instrs) { return 0; }
+    let bh: Box<Instr> = vec_get(instrs, i0);
+    let ins: Instr = box_deref(bh);
+    match ins {
+        Instr::IfElse(be, th, el) => {
+            /* emitLoopStmt IfElse: contCode = cont() FIRST, then else, then, cond */
+            prepool_loop_seq(instrs, i0 + 1, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            prepool_loop_seq(el, 0, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            prepool_loop_seq(th, 0, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            let ce_if: Expr = box_deref(be);
+            let cscratch: Vec<i32> = vec_new();
+            emit_expr(ce_if, env_names, env_bases, env_widths,
+                      env_field_starts, env_fields_flat, pool,
+                      source, starts, ends, cscratch);
+            return 0;
+        },
+        Instr::WhileLoop(be, body) => {
+            /* emitLoopStmt While: emitWhileLoop (cond then body-seq) THEN cont() */
+            let ce_wh: Expr = box_deref(be);
+            let cscratch: Vec<i32> = vec_new();
+            emit_expr(ce_wh, env_names, env_bases, env_widths,
+                      env_field_starts, env_fields_flat, pool,
+                      source, starts, ends, cscratch);
+            prepool_loop_seq(body, 0, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            prepool_loop_seq(instrs, i0 + 1, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            return 0;
+        },
+        Instr::BlockInstr(body) => {
+            /* emitLoopStmt Block: emitLoopSeq xs cont — the block's stmts join the
+               sequence, then the outer continuation. Approximate by pooling the
+               block body in loop order, then the continuation. */
+            prepool_loop_seq(body, 0, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            prepool_loop_seq(instrs, i0 + 1, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            return 0;
+        },
+        Instr::Continue => {
+            /* emitLoopSeq Continue: terminates the sequence (rest not emitted). */
+            return 0;
+        },
+        _ => {
+            /* Any other instr (Store/Assign/StoreField/Call/Break/…): emitInstr in
+               natural order (pool side effect), then the continuation. Break falls
+               here — SML still pools the rest, so continue to i0+1. */
+            let scratch: Vec<i32> = vec_new();
+            emit_instr(ins, env_names, env_bases, env_widths,
+                       env_field_starts, env_fields_flat, pool,
+                       source, starts, ends, fn_names, scratch);
+            prepool_loop_seq(instrs, i0 + 1, env_names, env_bases, env_widths,
+                             env_field_starts, env_fields_flat, pool,
+                             source, starts, ends, fn_names);
+            return 0;
+        },
+    }
+    return 0;
 }
 
 /* ── ensure_var_int (SML ensureVarInt) ─────────────────────────
