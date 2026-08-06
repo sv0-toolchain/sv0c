@@ -1,0 +1,12 @@
+module lib;
+
+/* Cross-module struct: defined here, a local of this type is declared in the
+   importing module. PC-1a fixture (post-M3 Phase C, Epic 1 / Gap 1). */
+struct Point {
+  x: i32,
+  y: i32,
+}
+
+fn origin() -> Point {
+  return Point { x: 3, y: 4, };
+}

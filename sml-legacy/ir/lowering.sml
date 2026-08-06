@@ -63,15 +63,16 @@ structure Lowering :> LOWERING = struct
       | NONE => (en, vn)
     end
 
-  (* Canonicalize a bare enum/struct type name through the import aliases
-     (short -> mangled, e.g. Signal -> lib__Signal). Mirrors the checker's
-     canonTyImport so cross-module enum lookups (match, construction, `?`)
-     resolve against the linkProjectDir-mangled definition. A single-segment
-     target is a type alias; multi-segment (ctor path) entries are ignored. *)
-  fun canonEnumName (en : string) : string =
-    case List.find (fn (a, _) => String.compare (a, en) = EQUAL) (!importAliases) of
-      SOME (_, t) => (case splitQName t of [_] => t | _ => en)
-    | NONE => en
+  (* Canonicalize a bare user type name (enum or struct) through the import
+     aliases (short -> mangled, e.g. Signal -> lib__Signal, Point -> lib__Point).
+     Mirrors the checker's canonTyImport so cross-module enum lookups (match,
+     construction, `?`) and a local's declared struct C type resolve against the
+     linkProjectDir-mangled definition. A single-segment target is a type alias;
+     multi-segment (ctor path) entries are ignored. *)
+  fun canonTyName (n : string) : string =
+    case List.find (fn (a, _) => String.compare (a, n) = EQUAL) (!importAliases) of
+      SOME (_, t) => (case splitQName t of [_] => t | _ => n)
+    | NONE => n
 
   datatype assign_lhs = ALVar of string | ALField of string * string
 
@@ -121,10 +122,15 @@ structure Lowering :> LOWERING = struct
     | Ast.TyName (["String"], _, _) => "const char*"
     | Ast.TyName (["Vec"], _, _) => "int"
     | Ast.TyName (["Box"], _, _) => "int"
-    | Ast.TyName ([n], _, _) =>
-        if List.exists (fn (sn, _) => sn = n) (!structFieldOrder) then n
-        else if List.exists (fn (en, _) => en = n) (!enumVariants) then n
-        else "int"
+    | Ast.TyName ([n0], _, _) =>
+        (* Canonicalize a use-imported user type (Point -> lib__Point) so a
+           local's declared C type keeps the cross-module alias instead of
+           falling back to `int` (Gap 1). *)
+        let val n = canonTyName n0 in
+          if List.exists (fn (sn, _) => sn = n) (!structFieldOrder) then n
+          else if List.exists (fn (en, _) => en = n) (!enumVariants) then n
+          else "int"
+        end
     | _ => "int"
 
   fun calleeRetCty (name : string) : string =
@@ -185,7 +191,7 @@ structure Lowering :> LOWERING = struct
     | NONE => raise Fail ("lowering: unknown struct `" ^ sn ^ "`")
 
   fun enumTag (en0 : string) (vn : string) : int =
-    let val en = canonEnumName en0 in
+    let val en = canonTyName en0 in
     case List.find (fn (n, _) => n = en) (!enumVariants) of
       SOME (_, (tags, _)) =>
         (case List.find (fn (v, _) => v = vn) tags of
@@ -208,7 +214,7 @@ structure Lowering :> LOWERING = struct
     end
 
   fun findVariantAst (en0 : string) (vn : string) : Ast.variant =
-    let val en = canonEnumName en0 in
+    let val en = canonTyName en0 in
     case List.find (fn it => case it of Ast.ItemEnum r => #name r = en | _ => false)
       (!theProg) of
       SOME (Ast.ItemEnum {variants, ...}) =>
@@ -233,7 +239,7 @@ structure Lowering :> LOWERING = struct
     | _ => raise Fail "literal not supported in lowering slice"
 
   fun tryVariantNames (en0 : string) : {success: string, failure: string} =
-    let val en = canonEnumName en0 in
+    let val en = canonTyName en0 in
     case List.find (fn (n, _) => n = en) (!enumVariants) of
       SOME (_, (tags, _)) =>
         let
@@ -251,7 +257,7 @@ structure Lowering :> LOWERING = struct
     end
 
   fun enumMaxPayload (en0 : string) : int =
-    let val en = canonEnumName en0 in
+    let val en = canonTyName en0 in
     case List.find (fn (n, _) => n = en) (!enumVariants) of
       SOME (_, (_, maxP)) => maxP
     | NONE => raise Fail ("lowering: unknown enum `" ^ en ^ "` (maxPayload)")
