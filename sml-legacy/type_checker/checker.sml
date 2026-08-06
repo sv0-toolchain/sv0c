@@ -367,7 +367,11 @@ structure Checker :> CHECKER = struct
     | Ast.PatEnum (path, inners, _) =>
         (case path of
            [en, vn] =>
-             let val () = expect (scrutTy, Types.TyEnum en)
+             (* Cross-module: the scrutinee's enum type is the linkProjectDir-
+                mangled name (e.g. lib__Signal) while the pattern path carries the
+                use-imported short name (Signal). Canonicalize via the import alias
+                so the match unifies, matching within-module behavior. *)
+             let val () = expect (scrutTy, Types.TyEnum (canonTyImport en))
              in
                case variantShapeOf en vn of
                  VSUnit =>
@@ -387,7 +391,8 @@ structure Checker :> CHECKER = struct
              end
          | _ => raise Fail "E0427: bad enum pattern path")
     | Ast.PatStruct ([en, vn], fieldPats, _) =>
-        let val () = expect (scrutTy, Types.TyEnum en)
+        (* Same cross-module canonicalization as PatEnum (struct-shaped variant). *)
+        let val () = expect (scrutTy, Types.TyEnum (canonTyImport en))
         in
           case variantShapeOf en vn of
             VSStruct fs =>
