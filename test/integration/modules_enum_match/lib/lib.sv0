@@ -1,0 +1,14 @@
+module lib;
+
+/* Cross-module enum: defined here, matched in the importing module.
+   PC-2a fixture (post-M3 Phase C, Epic 2). `make()` returns a Signal so the
+   importer obtains a value without a local type annotation (isolates the
+   enum-match gap from the imported-struct-local-type gap, Gap 1). */
+enum Signal {
+  On(i32),
+  Off(),
+}
+
+fn make() -> Signal {
+  return Signal::On(7);
+}

@@ -51,7 +51,7 @@ the local's C type loses the cross-module alias. Fixture base:
 
 | ID | Task | Files | Size | Notes |
 |----|------|-------|------|-------|
-| **PC-2a** | Lock a **failing** fixture: module A defines `enum Color { Red, Green(i32) }`; module B does `match c { A::Color::Green(v) => …, … }`; assert type-check passes and it runs. | `test/integration/modules_types/` | S | [delegable] test-only |
+| **PC-2a** | **DONE (2026-08-05).** Fixture `test/integration/modules_enum_match/`: `lib` defines `enum Signal { On(i32), Off() }` + `make()`, importer `match`es on it. Reproduces `E0400: type mismatch` via `--project`; within-module control compiles → gap is cross-module. Not yet in the pass harness (fails to compile). | `test/integration/modules_enum_match/` | S | [delegable] test-only |
 | **PC-2b** | Resolver: **enum variant-constructor alias plumbing** for payload variants — register per-variant qualified names (`A::Color::Green`), not just the enum type name (today's gap, `resolver.sv0` ~L788). | `lib/resolver.sv0` | M | [design] feeds PC-2c/2d |
 | **PC-2c** | Lowering: thread the **fn/param type table** into `lower_tag_match` so `match_scrut_cty` resolves 1-segment local/param scrutinees to the precise enum typedef (today it passes empty tables). | `lib/lowering.sv0` | M | [design] the `match_scrut_cty` threading called out in the roadmap |
 | **PC-2d** | Checker: multi-module `check_program` resolves the cross-module enum + variant so the `match` type-checks (clear E0400) with the merged/aliased name env. | `lib/checker.sv0` | M | [design] depends on PC-2b |
@@ -83,7 +83,7 @@ Independent of the cross-module epics; each is a self-contained parity gap.
 
 | ID | Task | Files | Size | Notes |
 |----|------|-------|------|-------|
-| **PC-4a** | **Resolver `TyArray` size-expr (tag 5)** resolution — resolve the size expression (currently deferred, `resolver.sv0` ~L598). Failing test: a fn with `[T; N]`. | `lib/resolver.sv0` | S | [delegable] contained; cross-check SML `resolveTy` |
+| **PC-4a** | **RECLASSIFIED low-priority (2026-08-05, grounding).** Arrays are **unused** in the compiler corpus (only a parser literal-length test); the flat arena stores the length as a single **token** (`data2=len_tok_pos`), not an expr, so faithful parity vs SML `TyArray (t2,e,_) => (resolveTy t2; resolveExpr e)` needs parser enrichment + threading `tags`+`mod_vals` through `resolve_ty`'s **17** call sites. Not the small warm-up assumed — defer. | `lib/resolver.sv0`, `lib/parser.sv0` | M | [design, low value] |
 | **PC-4b** | **Lowering `PatStruct` nested field patterns** — bind with nested field patterns vs SML `Lower.lowerPat` (`lowering.sv0` ~L2015). Failing test: `match s { S { a: Inner { … } } => … }`. | `lib/lowering.sv0` | M | [design] |
 | **PC-4c** | **Resolver impl method bodies** resolved independently — cross-check SML `resolveTopItem` `ItemEnum`/impl. Failing test: an `impl` block with a method referencing `self` fields. | `lib/resolver.sv0` | M | [design] |
 
@@ -117,14 +117,16 @@ byte-identical, ~109% line churn on real modules).
 
 ## Recommended execution order
 
-1. **PC-4a** (TyArray) — smallest, independent, delegable warm-up.
-2. **Epic 2** (PC-2a → 2b → 2c → 2d) — cross-module enum match; highest
-   feature-parity value, exercises resolver+lowering+checker together.
-3. **Epic 1** (PC-1a → 1b → 1c) — imported-struct local type; shares resolver
+*(Updated 2026-08-05 after grounding: PC-4a deprioritized — see its row.)*
+
+1. **Epic 2** (**PC-2a ✅** → 2b → 2c → 2d) — cross-module enum match; highest
+   feature-parity value; failing fixture already in place.
+2. **Epic 1** (PC-1a → 1b → 1c) — imported-struct local type; shares resolver
    alias work with Epic 2.
-4. **Epic 3** (PC-3a → 3b → 3c) — the native multi-module link path (larger).
-5. **PC-4b, PC-4c, PC-5a** — parallelizable cleanup, delegable in parts.
-6. **Epic 6** (PC-6a decision → 6b) — promotion, once the pipeline gaps close.
+3. **Epic 3** (PC-3a → 3b → 3c) — the native multi-module link path (larger).
+4. **PC-4b, PC-4c, PC-5a** — parallelizable cleanup, delegable in parts.
+5. **Epic 6** (PC-6a decision → 6b) — promotion, once the pipeline gaps close.
+6. **PC-4a** (TyArray) — low-priority; only when a real array-length use case appears.
 
 **Milestone marker:** when Epics 1–3 land, the two reference cross-module gaps
 compile+run and `transliteration-plan.md` § Feature + diagnostic parity rows can

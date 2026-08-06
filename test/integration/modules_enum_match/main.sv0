@@ -1,0 +1,13 @@
+use lib::Signal;
+use lib::make;
+
+/* Match on a cross-module enum value. Expected exit 42 (7 + 35) once the
+   cross-module enum/variant resolves; currently reproduces the reference-
+   pipeline gap (E0400 on the cross-module match). */
+fn main() -> i32 {
+  let s = make();
+  return match s {
+    Signal::On(v) => v + 35,
+    Signal::Off() => 0,
+  };
+}
