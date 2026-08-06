@@ -1,0 +1,10 @@
+use lib::Point;
+use lib::origin;
+
+/* `let p: Point = origin()` — the local's declared type is a use-imported
+   struct. Expected exit 42 (3 + 4 + 35); currently reproduces Gap 1 (the
+   local's C type loses the cross-module alias -> `int p`). */
+fn main() -> i32 {
+  let p: Point = origin();
+  return p.x + p.y + 35;
+}

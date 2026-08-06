@@ -376,8 +376,18 @@ structure Resolver :> RESOLVER = struct
                                 end) envT variants
                          end
                      | NONE =>
-                         Env.registerTypeAlias env nm tgt
-                           handle Fail msg => asDiag msg
+                         let
+                           val envS =
+                             Env.registerTypeAlias env nm tgt
+                               handle Fail msg => asDiag msg
+                           (* Record the bare struct TYPE alias (short -> mangled)
+                              so lowering can canonicalize an imported struct's
+                              name for a local's declared C type (Gap 1). *)
+                           val () =
+                             recordedImportAliases := (nm, tgt) :: !recordedImportAliases
+                         in
+                           envS
+                         end
                    else
                      asDiag
                        ("unknown module item `" ^ pathToString path ^ "`")
