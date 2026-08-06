@@ -11,10 +11,14 @@ on it with cross-module variant paths `Signal::On(v)` / `Signal::Off()`.
 
 **Expected (target):** exit **42** (`7 + 35`).
 
-**Current (gap, verified 2026-08-05):** `sv0c error: E0400: type mismatch` via
-`--project`. The identical code **within a single module compiles** (control:
-`modules_types` `color_code()` and a one-file repro both emit C) — so the gap is
-**specifically cross-module**.
+**Status: FIXED (2026-08-05, sml-legacy) — exit 42, wired into the pass harness.**
+Originally reproduced `sv0c error: E0400: type mismatch` via `--project` (control:
+the same code within one module compiled — the gap was cross-module). Closed by
+canonicalizing the cross-module enum name through the import alias in three
+reference passes (checker PatEnum/PatStruct `expect`; lowering enum lookups via
+`canonEnumName`; resolver records the bare enum type alias). sv0 transliteration
+of the same fix is PC-2e (gated on Epic 3). See `task/…-milestone-3-checklist.Rmd`
+§ Post-M3 Phase C slice backlog PC-2b/2c/2d/2e.
 
 **Reproduce:**
 ```

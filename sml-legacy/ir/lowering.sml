@@ -63,6 +63,16 @@ structure Lowering :> LOWERING = struct
       | NONE => (en, vn)
     end
 
+  (* Canonicalize a bare enum/struct type name through the import aliases
+     (short -> mangled, e.g. Signal -> lib__Signal). Mirrors the checker's
+     canonTyImport so cross-module enum lookups (match, construction, `?`)
+     resolve against the linkProjectDir-mangled definition. A single-segment
+     target is a type alias; multi-segment (ctor path) entries are ignored. *)
+  fun canonEnumName (en : string) : string =
+    case List.find (fn (a, _) => String.compare (a, en) = EQUAL) (!importAliases) of
+      SOME (_, t) => (case splitQName t of [_] => t | _ => en)
+    | NONE => en
+
   datatype assign_lhs = ALVar of string | ALField of string * string
 
   fun classifyAssignLhs (lhs : Ast.expr) : assign_lhs option =
@@ -174,13 +184,15 @@ structure Lowering :> LOWERING = struct
       SOME (_, fs) => fs
     | NONE => raise Fail ("lowering: unknown struct `" ^ sn ^ "`")
 
-  fun enumTag (en : string) (vn : string) : int =
+  fun enumTag (en0 : string) (vn : string) : int =
+    let val en = canonEnumName en0 in
     case List.find (fn (n, _) => n = en) (!enumVariants) of
       SOME (_, (tags, _)) =>
         (case List.find (fn (v, _) => v = vn) tags of
            SOME (_, k) => k
          | NONE => raise Fail ("lowering: unknown enum variant `" ^ en ^ "::" ^ vn ^ "`"))
     | NONE => raise Fail ("lowering: unknown enum `" ^ en ^ "`")
+    end
 
   fun valueToExpr (v : Ir.value) : Ir.expr =
     case v of
@@ -195,7 +207,8 @@ structure Lowering :> LOWERING = struct
       List.tabulate (length vals, fn i => one (i, List.nth (vals, i)))
     end
 
-  fun findVariantAst (en : string) (vn : string) : Ast.variant =
+  fun findVariantAst (en0 : string) (vn : string) : Ast.variant =
+    let val en = canonEnumName en0 in
     case List.find (fn it => case it of Ast.ItemEnum r => #name r = en | _ => false)
       (!theProg) of
       SOME (Ast.ItemEnum {variants, ...}) =>
@@ -209,6 +222,7 @@ structure Lowering :> LOWERING = struct
            SOME v => v
          | NONE => raise Fail ("lowering: variant not in AST `" ^ en ^ "::" ^ vn ^ "`"))
     | _ => raise Fail ("lowering: enum not in AST `" ^ en ^ "`")
+    end
 
   fun lowerLit (l : Ast.literal) : Ir.value =
     case l of
@@ -218,7 +232,8 @@ structure Lowering :> LOWERING = struct
     | Ast.StringLit s => Ir.VString s
     | _ => raise Fail "literal not supported in lowering slice"
 
-  fun tryVariantNames (en : string) : {success: string, failure: string} =
+  fun tryVariantNames (en0 : string) : {success: string, failure: string} =
+    let val en = canonEnumName en0 in
     case List.find (fn (n, _) => n = en) (!enumVariants) of
       SOME (_, (tags, _)) =>
         let
@@ -233,11 +248,14 @@ structure Lowering :> LOWERING = struct
           else raise Fail "lowering: `?` requires Ok/Err or Some/None variants"
         end
     | NONE => raise Fail ("lowering: unknown enum `" ^ en ^ "`")
+    end
 
-  fun enumMaxPayload (en : string) : int =
+  fun enumMaxPayload (en0 : string) : int =
+    let val en = canonEnumName en0 in
     case List.find (fn (n, _) => n = en) (!enumVariants) of
       SOME (_, (_, maxP)) => maxP
     | NONE => raise Fail ("lowering: unknown enum `" ^ en ^ "` (maxPayload)")
+    end
 
   fun isEnumCty (n : string) : bool =
     List.exists (fn (en, _) => en = n) (!enumVariants)

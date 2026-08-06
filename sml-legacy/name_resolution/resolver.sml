@@ -355,6 +355,12 @@ structure Resolver :> RESOLVER = struct
                            val envT =
                              Env.registerTypeAlias env nm tgt
                                handle Fail msg => asDiag msg
+                           (* Also record the bare enum TYPE alias (short -> mangled)
+                              so downstream passes (lowering) can canonicalize a
+                              cross-module enum name from a pattern/scrutinee, not
+                              only the per-variant ctor paths recorded below. *)
+                           val () =
+                             recordedImportAliases := (nm, tgt) :: !recordedImportAliases
                          in
                            List.foldl
                              (fn (v, e) =>
