@@ -24,6 +24,7 @@ static const char* expand(const char* host_abs, const char* source);
 static const char* expand_from_file(const char* host_abs);
 static int test_expand_alias_matches_expand_file(void);
 static int test_expand_from_file_smoke(void);
+static int test_expand_from_file_multi_include(void);
 static int test_expand_text_table2_simple(void);
 static int test_expand_text_table2_nested(void);
 static int test_expand_text_table2_miss(void);
@@ -615,6 +616,24 @@ static int test_expand_from_file_smoke(void) {
   int _sv0t1 = sv0_string_eq(got, "line\n");
   if ((_sv0t1 != 1)) {
     return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_expand_from_file_multi_include(void) {
+  const char* inc;
+  inc = "/tmp/sv0_pc5a_inc.sv0";
+  sv0_write_file(inc, "INC_BODY");
+  const char* root;
+  root = "/tmp/sv0_pc5a_main.sv0";
+  sv0_write_file(root, "include \"sv0_pc5a_inc.sv0\";\nAFTER");
+  const char* _sv0t0 = expand_from_file(root);
+  const char* got;
+  got = _sv0t0;
+  int _sv0t1 = sv0_string_eq(got, "INC_BODY\nAFTER");
+  if ((_sv0t1 != 1)) {
+    return 1;
   } else {
   }
   return 0;
@@ -1303,6 +1322,13 @@ int main(void) {
   if ((r18 != 0)) {
     int _sv0t36 = (170 + r18);
     return _sv0t36;
+  } else {
+  }
+  int _sv0t37 = test_expand_from_file_multi_include();
+  int r19 = _sv0t37;
+  if ((r19 != 0)) {
+    int _sv0t38 = (180 + r19);
+    return _sv0t38;
   } else {
   }
   return 0;
