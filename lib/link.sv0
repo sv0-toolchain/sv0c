@@ -3344,6 +3344,98 @@ fn test_split_module_name() -> i32 {
     return 0;
 }
 
+/* PC-3a (post-M3 Phase C, Epic 3): two-file project merge — composition test.
+   Merges two minimal single-fn programs (module `a` defines `Foo`, module `b`
+   defines `Bar`) by composing the M3-S-040 merge primitives: per-module
+   defining-name mangling (link_apply_map_link_pass_program_source), item-arena
+   append (link_program_item_vecs_append), and source concat
+   (link_merge_sources_two). This characterizes the mechanical core of the
+   missing `link_project_dir_from_listing` (PC-3b). The per-file `parse_program`
+   + cross-arena (expr/ty/item) index relocation that PC-3b adds cannot be
+   exercised with hand-built arenas alone — it needs the parser wired into a
+   composed pipeline (the standalone-unit wall; see doc/link-g6-blockers.md).
+   Cross-module CALL resolution (B referencing a__Foo) is separately handled by
+   the import-alias canonicalization in resolver/checker/lowering (PC-1/PC-2),
+   not by this link-level defining-name merge. */
+fn test_link_project_dir_merge_two_files() -> i32 {
+    /* --- Program A: one ItemFn `Foo` (src "Foo", name token 0) --- */
+    let tt_a: Vec<i32> = vec_new();
+    let td1_a: Vec<i32> = vec_new();
+    let td2_a: Vec<i32> = vec_new();
+    let et_a: Vec<i32> = vec_new();
+    let ed1_a: Vec<i32> = vec_new();
+    let ed2_a: Vec<i32> = vec_new();
+    let pt_a: Vec<i32> = vec_new();
+    let pd1_a: Vec<i32> = vec_new();
+    let pd2_a: Vec<i32> = vec_new();
+    let pp_a: Vec<i32> = vec_new();
+    let it_a: Vec<i32> = vec_new();
+    vec_push(it_a, 1);
+    let inm_a: Vec<i32> = vec_new();
+    vec_push(inm_a, 0);
+    let st_a: Vec<i32> = vec_new();
+    vec_push(st_a, 0);
+    let en_a: Vec<i32> = vec_new();
+    vec_push(en_a, 3);
+    let tops_a: Vec<i32> = vec_new();
+    let out_a: string = link_apply_map_link_pass_program_source(tt_a, td1_a,
+        td2_a, et_a, ed1_a, ed2_a, pt_a, pd1_a, pd2_a, pp_a, it_a, inm_a,
+        tops_a, "a", st_a, en_a, "Foo");
+    if string_eq(out_a, "Foo\na__Foo") != true { return 1; }
+    /* --- Program B: one ItemFn `Bar` (src "Bar", name token 0) --- */
+    let tt_b: Vec<i32> = vec_new();
+    let td1_b: Vec<i32> = vec_new();
+    let td2_b: Vec<i32> = vec_new();
+    let et_b: Vec<i32> = vec_new();
+    let ed1_b: Vec<i32> = vec_new();
+    let ed2_b: Vec<i32> = vec_new();
+    let pt_b: Vec<i32> = vec_new();
+    let pd1_b: Vec<i32> = vec_new();
+    let pd2_b: Vec<i32> = vec_new();
+    let pp_b: Vec<i32> = vec_new();
+    let it_b: Vec<i32> = vec_new();
+    vec_push(it_b, 1);
+    let inm_b: Vec<i32> = vec_new();
+    vec_push(inm_b, 0);
+    let st_b: Vec<i32> = vec_new();
+    vec_push(st_b, 0);
+    let en_b: Vec<i32> = vec_new();
+    vec_push(en_b, 3);
+    let tops_b: Vec<i32> = vec_new();
+    let out_b: string = link_apply_map_link_pass_program_source(tt_b, td1_b,
+        td2_b, et_b, ed1_b, ed2_b, pt_b, pd1_b, pd2_b, pp_b, it_b, inm_b,
+        tops_b, "b", st_b, en_b, "Bar");
+    if string_eq(out_b, "Bar\nb__Bar") != true { return 2; }
+    /* --- Merge item arenas (append B's items onto A's) --- */
+    let id1_a: Vec<i32> = vec_new();
+    vec_push(id1_a, 0);
+    let id2_a: Vec<i32> = vec_new();
+    vec_push(id2_a, 0);
+    let id3_a: Vec<i32> = vec_new();
+    vec_push(id3_a, 0);
+    let id4_a: Vec<i32> = vec_new();
+    vec_push(id4_a, 0);
+    let id5_a: Vec<i32> = vec_new();
+    vec_push(id5_a, 0);
+    let id1_b: Vec<i32> = vec_new();
+    vec_push(id1_b, 0);
+    let id2_b: Vec<i32> = vec_new();
+    vec_push(id2_b, 0);
+    let id3_b: Vec<i32> = vec_new();
+    vec_push(id3_b, 0);
+    let id4_b: Vec<i32> = vec_new();
+    vec_push(id4_b, 0);
+    let id5_b: Vec<i32> = vec_new();
+    vec_push(id5_b, 0);
+    link_program_item_vecs_append(it_a, id1_a, id2_a, id3_a, id4_a, id5_a,
+        it_b, id1_b, id2_b, id3_b, id4_b, id5_b);
+    if vec_len(it_a) != 2 { return 3; }
+    /* --- Merge sources --- */
+    let merged: string = link_merge_sources_two(out_a, out_b);
+    if string_eq(merged, "Foo\na__Foo\nBar\nb__Bar") != true { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_sv0();
     if r1 != 0 { return r1; }
@@ -3473,5 +3565,7 @@ fn main() -> i32 {
     if r21mv7 != 0 { return 292 + r21mv7; }
     let r22: i32 = test_g2_link_host_io_aliases();
     if r22 != 0 { return 220 + r22; }
+    let rpc3a: i32 = test_link_project_dir_merge_two_files();
+    if rpc3a != 0 { return 400 + rpc3a; }
     return 0;
 }

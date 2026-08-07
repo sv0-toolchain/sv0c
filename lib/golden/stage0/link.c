@@ -154,6 +154,7 @@ static int test_link_program_item_vecs_append(void);
 static int test_link_listing_index_helpers(void);
 static int test_link_project_concat_sources_offsets_from_listing(void);
 static int test_split_module_name(void);
+static int test_link_project_dir_merge_two_files(void);
 
 static int is_sv0(const char* name) {
   int _sv0t0 = sv0_string_len(name);
@@ -5773,6 +5774,138 @@ static int test_split_module_name(void) {
   return 0;
 }
 
+static int test_link_project_dir_merge_two_files(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tt_a = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int td1_a = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int td2_a = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int et_a = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed1_a = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int ed2_a = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int pt_a = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int pd1_a = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int pd2_a = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int pp_a = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int it_a = _sv0t10;
+  sv0_vec_push(it_a, 1);
+  int _sv0t11 = sv0_vec_new();
+  int inm_a = _sv0t11;
+  sv0_vec_push(inm_a, 0);
+  int _sv0t12 = sv0_vec_new();
+  int st_a = _sv0t12;
+  sv0_vec_push(st_a, 0);
+  int _sv0t13 = sv0_vec_new();
+  int en_a = _sv0t13;
+  sv0_vec_push(en_a, 3);
+  int _sv0t14 = sv0_vec_new();
+  int tops_a = _sv0t14;
+  const char* _sv0t15 = link_apply_map_link_pass_program_source(tt_a, td1_a, td2_a, et_a, ed1_a, ed2_a, pt_a, pd1_a, pd2_a, pp_a, it_a, inm_a, tops_a, "a", st_a, en_a, "Foo");
+  const char* out_a;
+  out_a = _sv0t15;
+  int _sv0t16 = sv0_string_eq(out_a, "Foo\na__Foo");
+  if ((_sv0t16 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_new();
+  int tt_b = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int td1_b = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int td2_b = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int et_b = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int ed1_b = _sv0t21;
+  int _sv0t22 = sv0_vec_new();
+  int ed2_b = _sv0t22;
+  int _sv0t23 = sv0_vec_new();
+  int pt_b = _sv0t23;
+  int _sv0t24 = sv0_vec_new();
+  int pd1_b = _sv0t24;
+  int _sv0t25 = sv0_vec_new();
+  int pd2_b = _sv0t25;
+  int _sv0t26 = sv0_vec_new();
+  int pp_b = _sv0t26;
+  int _sv0t27 = sv0_vec_new();
+  int it_b = _sv0t27;
+  sv0_vec_push(it_b, 1);
+  int _sv0t28 = sv0_vec_new();
+  int inm_b = _sv0t28;
+  sv0_vec_push(inm_b, 0);
+  int _sv0t29 = sv0_vec_new();
+  int st_b = _sv0t29;
+  sv0_vec_push(st_b, 0);
+  int _sv0t30 = sv0_vec_new();
+  int en_b = _sv0t30;
+  sv0_vec_push(en_b, 3);
+  int _sv0t31 = sv0_vec_new();
+  int tops_b = _sv0t31;
+  const char* _sv0t32 = link_apply_map_link_pass_program_source(tt_b, td1_b, td2_b, et_b, ed1_b, ed2_b, pt_b, pd1_b, pd2_b, pp_b, it_b, inm_b, tops_b, "b", st_b, en_b, "Bar");
+  const char* out_b;
+  out_b = _sv0t32;
+  int _sv0t33 = sv0_string_eq(out_b, "Bar\nb__Bar");
+  if ((_sv0t33 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t34 = sv0_vec_new();
+  int id1_a = _sv0t34;
+  sv0_vec_push(id1_a, 0);
+  int _sv0t35 = sv0_vec_new();
+  int id2_a = _sv0t35;
+  sv0_vec_push(id2_a, 0);
+  int _sv0t36 = sv0_vec_new();
+  int id3_a = _sv0t36;
+  sv0_vec_push(id3_a, 0);
+  int _sv0t37 = sv0_vec_new();
+  int id4_a = _sv0t37;
+  sv0_vec_push(id4_a, 0);
+  int _sv0t38 = sv0_vec_new();
+  int id5_a = _sv0t38;
+  sv0_vec_push(id5_a, 0);
+  int _sv0t39 = sv0_vec_new();
+  int id1_b = _sv0t39;
+  sv0_vec_push(id1_b, 0);
+  int _sv0t40 = sv0_vec_new();
+  int id2_b = _sv0t40;
+  sv0_vec_push(id2_b, 0);
+  int _sv0t41 = sv0_vec_new();
+  int id3_b = _sv0t41;
+  sv0_vec_push(id3_b, 0);
+  int _sv0t42 = sv0_vec_new();
+  int id4_b = _sv0t42;
+  sv0_vec_push(id4_b, 0);
+  int _sv0t43 = sv0_vec_new();
+  int id5_b = _sv0t43;
+  sv0_vec_push(id5_b, 0);
+  link_program_item_vecs_append(it_a, id1_a, id2_a, id3_a, id4_a, id5_a, it_b, id1_b, id2_b, id3_b, id4_b, id5_b);
+  int _sv0t45 = sv0_vec_len(it_a);
+  if ((_sv0t45 != 2)) {
+    return 3;
+  } else {
+  }
+  const char* _sv0t46 = link_merge_sources_two(out_a, out_b);
+  const char* merged;
+  merged = _sv0t46;
+  int _sv0t47 = sv0_string_eq(merged, "Foo\na__Foo\nBar\nb__Bar");
+  if ((_sv0t47 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_is_sv0();
   int r1 = _sv0t0;
@@ -6219,6 +6352,13 @@ int main(void) {
   if ((r22 != 0)) {
     int _sv0t126 = (220 + r22);
     return _sv0t126;
+  } else {
+  }
+  int _sv0t127 = test_link_project_dir_merge_two_files();
+  int rpc3a = _sv0t127;
+  if ((rpc3a != 0)) {
+    int _sv0t128 = (400 + rpc3a);
+    return _sv0t128;
   } else {
   }
   return 0;
