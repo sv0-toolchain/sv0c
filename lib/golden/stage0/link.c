@@ -74,6 +74,10 @@ static int link_second_file_byte_offset_after_concat(const char* first);
 static void link_reloc_i32_vec_inplace(int v, int delta);
 static int link_merge_parallel_token_streams_reloc_b(int tags_a, int starts_a, int ends_a, int tags_b, int starts_b, int ends_b, int delta_b, int out_tags, int out_starts, int out_ends);
 static void link_program_item_vecs_append(int it_dst, int id1_dst, int id2_dst, int id3_dst, int id4_dst, int id5_dst, int it_src, int id1_src, int id2_src, int id3_src, int id4_src, int id5_src);
+static void link_reloc_skip_neg(int v, int delta);
+static void link_reloc_item_arena(int it, int id1, int id2, int id3, int id4, int id5, int d_tok, int d_pp, int d_body, int d_paramname, int d_structname, int d_enumname);
+static void link_reloc_pty_arena(int pty_tt, int td1, int td2, int td3, int d_pty, int d_pp, int d_tok);
+static void link_reloc_body_arena(int bet, int ed1, int ed2, int ed3, int ed4, int d_body, int d_pp, int d_tok, int d_pty, int d_sf);
 static const char* link_listing_path_at_index(const char* listing, int idx);
 static const char* link_listing_module_id_at_index(const char* listing, int idx);
 static const char* link_project_concat_sources_offsets_from_listing(const char* listing, int starts_out, int lens_out);
@@ -155,6 +159,7 @@ static int test_link_listing_index_helpers(void);
 static int test_link_project_concat_sources_offsets_from_listing(void);
 static int test_split_module_name(void);
 static int test_link_project_dir_merge_two_files(void);
+static int test_link_reloc_arenas(void);
 
 static int is_sv0(const char* name) {
   int _sv0t0 = sv0_string_len(name);
@@ -1343,6 +1348,534 @@ static void link_program_item_vecs_append(int it_dst, int id1_dst, int id2_dst, 
     sv0_vec_push(id4_dst, _sv0t5);
     int _sv0t6 = sv0_vec_get(id5_src, i);
     sv0_vec_push(id5_dst, _sv0t6);
+    i = (i + 1);
+  }
+  return;
+}
+
+static void link_reloc_skip_neg(int v, int delta) {
+  int _sv0t0 = sv0_vec_len(v);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(v, i);
+    int x = _sv0t1;
+    if ((x >= 0)) {
+      int _sv0t2 = (x + delta);
+      sv0_vec_set(v, i, _sv0t2);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return;
+}
+
+static void link_reloc_item_arena(int it, int id1, int id2, int id3, int id4, int id5, int d_tok, int d_pp, int d_body, int d_paramname, int d_structname, int d_enumname) {
+  int _sv0t0 = sv0_vec_len(it);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(it, i);
+    int tag = _sv0t1;
+    if ((tag == 0)) {
+      int _sv0t2 = sv0_vec_get(id1, i);
+      int _sv0t3 = (_sv0t2 + d_tok);
+      sv0_vec_set(id1, i, _sv0t3);
+      int _sv0t4 = sv0_vec_get(id4, i);
+      int br = _sv0t4;
+      if ((br >= 0)) {
+        int _sv0t5 = (br + d_body);
+        sv0_vec_set(id4, i, _sv0t5);
+      } else {
+      }
+      int _sv0t6 = sv0_vec_get(id5, i);
+      int pb = _sv0t6;
+      if ((pb >= 0)) {
+        int _sv0t7 = (pb + d_paramname);
+        sv0_vec_set(id5, i, _sv0t7);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 1)) {
+      int _sv0t8 = sv0_vec_get(id1, i);
+      int _sv0t9 = (_sv0t8 + d_tok);
+      sv0_vec_set(id1, i, _sv0t9);
+      int _sv0t10 = sv0_vec_get(id3, i);
+      int _sv0t11 = (_sv0t10 + d_structname);
+      sv0_vec_set(id3, i, _sv0t11);
+    } else {
+    }
+    if ((tag == 2)) {
+      int _sv0t12 = sv0_vec_get(id1, i);
+      int _sv0t13 = (_sv0t12 + d_tok);
+      sv0_vec_set(id1, i, _sv0t13);
+      int _sv0t14 = sv0_vec_get(id3, i);
+      int _sv0t15 = (_sv0t14 + d_enumname);
+      sv0_vec_set(id3, i, _sv0t15);
+    } else {
+    }
+    if ((tag == 3)) {
+      int _sv0t16 = sv0_vec_get(id1, i);
+      int _sv0t17 = (_sv0t16 + d_tok);
+      sv0_vec_set(id1, i, _sv0t17);
+    } else {
+    }
+    if ((tag == 5)) {
+      int _sv0t18 = sv0_vec_get(id1, i);
+      int _sv0t19 = (_sv0t18 + d_pp);
+      sv0_vec_set(id1, i, _sv0t19);
+    } else {
+    }
+    if ((tag == 6)) {
+      int _sv0t20 = sv0_vec_get(id1, i);
+      int _sv0t21 = (_sv0t20 + d_pp);
+      sv0_vec_set(id1, i, _sv0t21);
+    } else {
+    }
+    if ((tag == 7)) {
+      int _sv0t22 = sv0_vec_get(id1, i);
+      int _sv0t23 = (_sv0t22 + d_tok);
+      sv0_vec_set(id1, i, _sv0t23);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return;
+}
+
+static void link_reloc_pty_arena(int pty_tt, int td1, int td2, int td3, int d_pty, int d_pp, int d_tok) {
+  int _sv0t0 = sv0_vec_len(pty_tt);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(pty_tt, i);
+    int tag = _sv0t1;
+    if ((tag == 0)) {
+      int _sv0t2 = sv0_vec_get(td1, i);
+      int _sv0t3 = (_sv0t2 + d_pp);
+      sv0_vec_set(td1, i, _sv0t3);
+    } else {
+    }
+    if ((tag == 1)) {
+      int _sv0t4 = sv0_vec_get(td1, i);
+      int _sv0t5 = (_sv0t4 + d_pty);
+      sv0_vec_set(td1, i, _sv0t5);
+    } else {
+    }
+    if ((tag == 2)) {
+      int _sv0t6 = sv0_vec_get(td1, i);
+      int _sv0t7 = (_sv0t6 + d_pty);
+      sv0_vec_set(td1, i, _sv0t7);
+    } else {
+    }
+    if ((tag == 3)) {
+      int _sv0t8 = sv0_vec_get(td1, i);
+      int _sv0t9 = (_sv0t8 + d_pty);
+      sv0_vec_set(td1, i, _sv0t9);
+      int _sv0t10 = sv0_vec_get(td2, i);
+      int _sv0t11 = (_sv0t10 + d_tok);
+      sv0_vec_set(td2, i, _sv0t11);
+    } else {
+    }
+    if ((tag == 4)) {
+      int _sv0t12 = sv0_vec_get(td1, i);
+      int _sv0t13 = (_sv0t12 + d_pty);
+      sv0_vec_set(td1, i, _sv0t13);
+    } else {
+    }
+    if ((tag == 5)) {
+      int _sv0t14 = sv0_vec_get(td1, i);
+      int _sv0t15 = (_sv0t14 + d_pty);
+      sv0_vec_set(td1, i, _sv0t15);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return;
+}
+
+static void link_reloc_body_arena(int bet, int ed1, int ed2, int ed3, int ed4, int d_body, int d_pp, int d_tok, int d_pty, int d_sf) {
+  int _sv0t0 = sv0_vec_len(bet);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(bet, i);
+    int tag = _sv0t1;
+    if ((tag == 0)) {
+      int _sv0t2 = sv0_vec_get(ed2, i);
+      int _sv0t3 = (_sv0t2 + d_tok);
+      sv0_vec_set(ed2, i, _sv0t3);
+    } else {
+    }
+    if ((tag == 1)) {
+      int _sv0t4 = sv0_vec_get(ed1, i);
+      int _sv0t5 = (_sv0t4 + d_pp);
+      sv0_vec_set(ed1, i, _sv0t5);
+    } else {
+    }
+    if ((tag == 2)) {
+      int _sv0t6 = sv0_vec_get(ed2, i);
+      int _sv0t7 = (_sv0t6 + d_body);
+      sv0_vec_set(ed2, i, _sv0t7);
+    } else {
+    }
+    if ((tag == 3)) {
+      int _sv0t8 = sv0_vec_get(ed2, i);
+      int _sv0t9 = (_sv0t8 + d_body);
+      sv0_vec_set(ed2, i, _sv0t9);
+      int _sv0t10 = sv0_vec_get(ed3, i);
+      int _sv0t11 = (_sv0t10 + d_body);
+      sv0_vec_set(ed3, i, _sv0t11);
+    } else {
+    }
+    if ((tag == 4)) {
+      int _sv0t12 = sv0_vec_get(ed1, i);
+      int _sv0t13 = (_sv0t12 + d_body);
+      sv0_vec_set(ed1, i, _sv0t13);
+      int _sv0t14 = sv0_vec_get(ed2, i);
+      int _sv0t15 = (_sv0t14 + d_body);
+      sv0_vec_set(ed2, i, _sv0t15);
+    } else {
+    }
+    if ((tag == 5)) {
+      int _sv0t16 = sv0_vec_get(ed1, i);
+      int _sv0t17 = (_sv0t16 + d_body);
+      sv0_vec_set(ed1, i, _sv0t17);
+      int _sv0t18 = sv0_vec_get(ed2, i);
+      int _sv0t19 = (_sv0t18 + d_tok);
+      sv0_vec_set(ed2, i, _sv0t19);
+      int _sv0t20 = sv0_vec_get(ed3, i);
+      int _sv0t21 = (_sv0t20 + d_body);
+      sv0_vec_set(ed3, i, _sv0t21);
+    } else {
+    }
+    if ((tag == 6)) {
+      int _sv0t22 = sv0_vec_get(ed1, i);
+      int _sv0t23 = (_sv0t22 + d_body);
+      sv0_vec_set(ed1, i, _sv0t23);
+      int _sv0t24 = sv0_vec_get(ed2, i);
+      int _sv0t25 = (_sv0t24 + d_tok);
+      sv0_vec_set(ed2, i, _sv0t25);
+    } else {
+    }
+    if ((tag == 7)) {
+      int _sv0t26 = sv0_vec_get(ed1, i);
+      int _sv0t27 = (_sv0t26 + d_body);
+      sv0_vec_set(ed1, i, _sv0t27);
+    } else {
+    }
+    if ((tag == 8)) {
+      int _sv0t28 = sv0_vec_get(ed1, i);
+      int _sv0t29 = (_sv0t28 + d_body);
+      sv0_vec_set(ed1, i, _sv0t29);
+      int _sv0t30 = sv0_vec_get(ed2, i);
+      int _sv0t31 = (_sv0t30 + d_body);
+      sv0_vec_set(ed2, i, _sv0t31);
+    } else {
+    }
+    if ((tag == 9)) {
+      int _sv0t32 = sv0_vec_get(ed1, i);
+      int _sv0t33 = (_sv0t32 + d_body);
+      sv0_vec_set(ed1, i, _sv0t33);
+      int _sv0t34 = sv0_vec_get(ed3, i);
+      int t9 = _sv0t34;
+      if ((t9 >= 0)) {
+        int _sv0t35 = (t9 + d_body);
+        sv0_vec_set(ed3, i, _sv0t35);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 10)) {
+      int _sv0t36 = sv0_vec_get(ed1, i);
+      int _sv0t37 = (_sv0t36 + d_body);
+      sv0_vec_set(ed1, i, _sv0t37);
+      int _sv0t38 = sv0_vec_get(ed2, i);
+      int _sv0t39 = (_sv0t38 + d_body);
+      sv0_vec_set(ed2, i, _sv0t39);
+      int _sv0t40 = sv0_vec_get(ed3, i);
+      int e10 = _sv0t40;
+      if ((e10 >= 0)) {
+        int _sv0t41 = (e10 + d_body);
+        sv0_vec_set(ed3, i, _sv0t41);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 11)) {
+      int _sv0t42 = sv0_vec_get(ed1, i);
+      int _sv0t43 = (_sv0t42 + d_body);
+      sv0_vec_set(ed1, i, _sv0t43);
+      int _sv0t44 = sv0_vec_get(ed2, i);
+      int _sv0t45 = (_sv0t44 + d_body);
+      sv0_vec_set(ed2, i, _sv0t45);
+    } else {
+    }
+    if ((tag == 12)) {
+      int _sv0t46 = sv0_vec_get(ed1, i);
+      int _sv0t47 = (_sv0t46 + d_body);
+      sv0_vec_set(ed1, i, _sv0t47);
+      int _sv0t48 = sv0_vec_get(ed2, i);
+      int _sv0t49 = (_sv0t48 + d_body);
+      sv0_vec_set(ed2, i, _sv0t49);
+      int _sv0t50 = sv0_vec_get(ed3, i);
+      int _sv0t51 = (_sv0t50 + d_body);
+      sv0_vec_set(ed3, i, _sv0t51);
+    } else {
+    }
+    if ((tag == 13)) {
+      int _sv0t52 = sv0_vec_get(ed1, i);
+      int _sv0t53 = (_sv0t52 + d_body);
+      sv0_vec_set(ed1, i, _sv0t53);
+      int _sv0t54 = sv0_vec_get(ed2, i);
+      int _sv0t55 = (_sv0t54 + d_body);
+      sv0_vec_set(ed2, i, _sv0t55);
+      int _sv0t56 = sv0_vec_get(ed3, i);
+      int _sv0t57 = (_sv0t56 + d_body);
+      sv0_vec_set(ed3, i, _sv0t57);
+    } else {
+    }
+    if ((tag == 14)) {
+      int _sv0t58 = sv0_vec_get(ed1, i);
+      int _sv0t59 = (_sv0t58 + d_body);
+      sv0_vec_set(ed1, i, _sv0t59);
+    } else {
+    }
+    if ((tag == 15)) {
+      int _sv0t60 = sv0_vec_get(ed1, i);
+      int v15 = _sv0t60;
+      if ((v15 >= 0)) {
+        int _sv0t61 = (v15 + d_body);
+        sv0_vec_set(ed1, i, _sv0t61);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 16)) {
+      int _sv0t62 = sv0_vec_get(ed1, i);
+      int v16 = _sv0t62;
+      if ((v16 >= 0)) {
+        int _sv0t63 = (v16 + d_body);
+        sv0_vec_set(ed1, i, _sv0t63);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 18)) {
+      int _sv0t64 = sv0_vec_get(ed1, i);
+      int _sv0t65 = (_sv0t64 + d_body);
+      sv0_vec_set(ed1, i, _sv0t65);
+      int _sv0t66 = sv0_vec_get(ed2, i);
+      int _sv0t67 = (_sv0t66 + d_body);
+      sv0_vec_set(ed2, i, _sv0t67);
+    } else {
+    }
+    if ((tag == 19)) {
+      int _sv0t68 = sv0_vec_get(ed2, i);
+      int _sv0t69 = (_sv0t68 + d_body);
+      sv0_vec_set(ed2, i, _sv0t69);
+      int _sv0t70 = sv0_vec_get(ed3, i);
+      int _sv0t71 = (_sv0t70 + d_body);
+      sv0_vec_set(ed3, i, _sv0t71);
+    } else {
+    }
+    if ((tag == 20)) {
+      int _sv0t72 = sv0_vec_get(ed1, i);
+      int _sv0t73 = (_sv0t72 + d_body);
+      sv0_vec_set(ed1, i, _sv0t73);
+      int _sv0t74 = sv0_vec_get(ed2, i);
+      int _sv0t75 = (_sv0t74 + d_pty);
+      sv0_vec_set(ed2, i, _sv0t75);
+    } else {
+    }
+    if ((tag == 21)) {
+      int _sv0t76 = sv0_vec_get(ed1, i);
+      int lo = _sv0t76;
+      if ((lo >= 0)) {
+        int _sv0t77 = (lo + d_body);
+        sv0_vec_set(ed1, i, _sv0t77);
+      } else {
+      }
+      int _sv0t78 = sv0_vec_get(ed2, i);
+      int hi = _sv0t78;
+      if ((hi >= 0)) {
+        int _sv0t79 = (hi + d_body);
+        sv0_vec_set(ed2, i, _sv0t79);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 22)) {
+      int _sv0t80 = sv0_vec_get(ed1, i);
+      int _sv0t81 = (_sv0t80 + d_body);
+      sv0_vec_set(ed1, i, _sv0t81);
+    } else {
+    }
+    if ((tag == 23)) {
+      int _sv0t82 = sv0_vec_get(ed1, i);
+      int _sv0t83 = (_sv0t82 + d_body);
+      sv0_vec_set(ed1, i, _sv0t83);
+    } else {
+    }
+    if ((tag == 24)) {
+      int _sv0t84 = sv0_vec_get(ed1, i);
+      int _sv0t85 = (_sv0t84 + d_pp);
+      sv0_vec_set(ed1, i, _sv0t85);
+      int _sv0t86 = sv0_vec_get(ed4, i);
+      int _sv0t87 = (_sv0t86 + d_sf);
+      sv0_vec_set(ed4, i, _sv0t87);
+    } else {
+    }
+    if ((tag == 25)) {
+      int _sv0t88 = sv0_vec_get(ed1, i);
+      int _sv0t89 = (_sv0t88 + d_body);
+      sv0_vec_set(ed1, i, _sv0t89);
+    } else {
+    }
+    if ((tag == 26)) {
+      int _sv0t90 = sv0_vec_get(ed1, i);
+      int _sv0t91 = (_sv0t90 + d_body);
+      sv0_vec_set(ed1, i, _sv0t91);
+    } else {
+    }
+    if ((tag == 27)) {
+      int _sv0t92 = sv0_vec_get(ed1, i);
+      int _sv0t93 = (_sv0t92 + d_tok);
+      sv0_vec_set(ed1, i, _sv0t93);
+      int _sv0t94 = sv0_vec_get(ed2, i);
+      int a27 = _sv0t94;
+      if ((a27 >= 0)) {
+        int _sv0t95 = (a27 + d_tok);
+        sv0_vec_set(ed2, i, _sv0t95);
+      } else {
+      }
+      int _sv0t96 = sv0_vec_get(ed3, i);
+      int ini = _sv0t96;
+      if ((ini >= 0)) {
+        int _sv0t97 = (ini + d_body);
+        sv0_vec_set(ed3, i, _sv0t97);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 28)) {
+      int _sv0t98 = sv0_vec_get(ed1, i);
+      int _sv0t99 = (_sv0t98 + d_body);
+      sv0_vec_set(ed1, i, _sv0t99);
+    } else {
+    }
+    if ((tag == 29)) {
+      int _sv0t100 = sv0_vec_get(ed1, i);
+      int ptag29 = _sv0t100;
+      if ((ptag29 == 1)) {
+        int _sv0t101 = sv0_vec_get(ed2, i);
+        int _sv0t102 = (_sv0t101 + d_tok);
+        sv0_vec_set(ed2, i, _sv0t102);
+      } else {
+      }
+      if ((ptag29 == 2)) {
+        int _sv0t103 = sv0_vec_get(ed2, i);
+        int _sv0t104 = (_sv0t103 + d_body);
+        sv0_vec_set(ed2, i, _sv0t104);
+      } else {
+      }
+      if ((ptag29 == 4)) {
+        int _sv0t105 = sv0_vec_get(ed2, i);
+        int _sv0t106 = (_sv0t105 + d_body);
+        sv0_vec_set(ed2, i, _sv0t106);
+      } else {
+      }
+      if ((ptag29 == 5)) {
+        int _sv0t107 = sv0_vec_get(ed2, i);
+        int _sv0t108 = (_sv0t107 + d_body);
+        sv0_vec_set(ed2, i, _sv0t108);
+      } else {
+      }
+      int _sv0t109 = sv0_vec_get(ed3, i);
+      int g29 = _sv0t109;
+      if ((g29 >= 0)) {
+        int _sv0t110 = (g29 + d_body);
+        sv0_vec_set(ed3, i, _sv0t110);
+      } else {
+      }
+      int _sv0t111 = sv0_vec_get(ed4, i);
+      int _sv0t112 = (_sv0t111 + d_body);
+      sv0_vec_set(ed4, i, _sv0t112);
+    } else {
+    }
+    if ((tag == 30)) {
+      int _sv0t113 = sv0_vec_get(ed4, i);
+      int ptag30 = _sv0t113;
+      if ((ptag30 == 2)) {
+        int _sv0t114 = sv0_vec_get(ed2, i);
+        int _sv0t115 = (_sv0t114 + d_tok);
+        sv0_vec_set(ed2, i, _sv0t115);
+      } else {
+      }
+      if ((ptag30 == 4)) {
+        int _sv0t116 = sv0_vec_get(ed1, i);
+        int _sv0t117 = (_sv0t116 + d_pp);
+        sv0_vec_set(ed1, i, _sv0t117);
+      } else {
+      }
+      if ((ptag30 == 5)) {
+        int _sv0t118 = sv0_vec_get(ed1, i);
+        int _sv0t119 = (_sv0t118 + d_pp);
+        sv0_vec_set(ed1, i, _sv0t119);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 31)) {
+      int _sv0t120 = sv0_vec_get(ed4, i);
+      int ptag31 = _sv0t120;
+      if ((ptag31 == 1)) {
+        int _sv0t121 = sv0_vec_get(ed1, i);
+        int _sv0t122 = (_sv0t121 + d_tok);
+        sv0_vec_set(ed1, i, _sv0t122);
+      } else {
+      }
+      if ((ptag31 == 2)) {
+        int _sv0t123 = sv0_vec_get(ed2, i);
+        int _sv0t124 = (_sv0t123 + d_tok);
+        sv0_vec_set(ed2, i, _sv0t124);
+      } else {
+      }
+      if ((ptag31 == 4)) {
+        int _sv0t125 = sv0_vec_get(ed1, i);
+        int _sv0t126 = (_sv0t125 + d_pp);
+        sv0_vec_set(ed1, i, _sv0t126);
+      } else {
+      }
+      if ((ptag31 == 5)) {
+        int _sv0t127 = sv0_vec_get(ed1, i);
+        int _sv0t128 = (_sv0t127 + d_pp);
+        sv0_vec_set(ed1, i, _sv0t128);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 32)) {
+      int _sv0t129 = sv0_vec_get(ed2, i);
+      int f32 = _sv0t129;
+      if ((f32 >= 0)) {
+        int _sv0t130 = (f32 + d_body);
+        sv0_vec_set(ed2, i, _sv0t130);
+      } else {
+      }
+    } else {
+    }
+    if ((tag == 33)) {
+      int _sv0t131 = sv0_vec_get(ed2, i);
+      int f33 = _sv0t131;
+      if ((f33 >= 0)) {
+        int _sv0t132 = (f33 + d_body);
+        sv0_vec_set(ed2, i, _sv0t132);
+      } else {
+      }
+    } else {
+    }
     i = (i + 1);
   }
   return;
@@ -5906,6 +6439,210 @@ static int test_link_project_dir_merge_two_files(void) {
   return 0;
 }
 
+static int test_link_reloc_arenas(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  sv0_vec_push(sn, 5);
+  int _sv0t1 = (0 - 1);
+  sv0_vec_push(sn, _sv0t1);
+  sv0_vec_push(sn, 7);
+  link_reloc_skip_neg(sn, 100);
+  int _sv0t3 = sv0_vec_get(sn, 0);
+  if ((_sv0t3 != 105)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(sn, 1);
+  int _sv0t5 = (0 - 1);
+  if ((_sv0t4 != _sv0t5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(sn, 2);
+  if ((_sv0t6 != 107)) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_new();
+  int bet = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int ed1 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ed2 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int ed3 = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int ed4 = _sv0t11;
+  sv0_vec_push(bet, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 5);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(bet, 1);
+  sv0_vec_push(ed1, 3);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(bet, 3);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 1);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(bet, 10);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 1);
+  int _sv0t12 = (0 - 1);
+  sv0_vec_push(ed3, _sv0t12);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(bet, 20);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 2);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(bet, 24);
+  sv0_vec_push(ed1, 4);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 6);
+  sv0_vec_push(bet, 29);
+  sv0_vec_push(ed1, 5);
+  sv0_vec_push(ed2, 3);
+  int _sv0t13 = (0 - 1);
+  sv0_vec_push(ed3, _sv0t13);
+  sv0_vec_push(ed4, 4);
+  link_reloc_body_arena(bet, ed1, ed2, ed3, ed4, 10, 100, 1000, 20, 50);
+  int _sv0t15 = sv0_vec_get(ed2, 0);
+  if ((_sv0t15 != 1005)) {
+    return 10;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_get(ed1, 1);
+  if ((_sv0t16 != 103)) {
+    return 11;
+  } else {
+  }
+  int _sv0t17 = sv0_vec_get(ed2, 2);
+  if ((_sv0t17 != 10)) {
+    return 12;
+  } else {
+  }
+  int _sv0t18 = sv0_vec_get(ed3, 2);
+  if ((_sv0t18 != 11)) {
+    return 13;
+  } else {
+  }
+  int _sv0t19 = sv0_vec_get(ed3, 3);
+  int _sv0t20 = (0 - 1);
+  if ((_sv0t19 != _sv0t20)) {
+    return 14;
+  } else {
+  }
+  int _sv0t21 = sv0_vec_get(ed2, 4);
+  if ((_sv0t21 != 22)) {
+    return 15;
+  } else {
+  }
+  int _sv0t22 = sv0_vec_get(ed1, 5);
+  if ((_sv0t22 != 104)) {
+    return 16;
+  } else {
+  }
+  int _sv0t23 = sv0_vec_get(ed4, 5);
+  if ((_sv0t23 != 56)) {
+    return 17;
+  } else {
+  }
+  int _sv0t24 = sv0_vec_get(ed2, 6);
+  if ((_sv0t24 != 13)) {
+    return 18;
+  } else {
+  }
+  int _sv0t25 = sv0_vec_get(ed4, 6);
+  if ((_sv0t25 != 14)) {
+    return 19;
+  } else {
+  }
+  int _sv0t26 = sv0_vec_new();
+  int it = _sv0t26;
+  int _sv0t27 = sv0_vec_new();
+  int id1 = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int id2 = _sv0t28;
+  int _sv0t29 = sv0_vec_new();
+  int id3 = _sv0t29;
+  int _sv0t30 = sv0_vec_new();
+  int id4 = _sv0t30;
+  int _sv0t31 = sv0_vec_new();
+  int id5 = _sv0t31;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(id1, 2);
+  sv0_vec_push(id2, 0);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 1);
+  sv0_vec_push(id5, 3);
+  sv0_vec_push(it, 5);
+  sv0_vec_push(id1, 5);
+  sv0_vec_push(id2, 0);
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id4, 0);
+  int _sv0t32 = (0 - 1);
+  sv0_vec_push(id5, _sv0t32);
+  link_reloc_item_arena(it, id1, id2, id3, id4, id5, 1000, 100, 10, 30, 40, 50);
+  int _sv0t34 = sv0_vec_get(id1, 0);
+  if ((_sv0t34 != 1002)) {
+    return 20;
+  } else {
+  }
+  int _sv0t35 = sv0_vec_get(id4, 0);
+  if ((_sv0t35 != 11)) {
+    return 21;
+  } else {
+  }
+  int _sv0t36 = sv0_vec_get(id5, 0);
+  if ((_sv0t36 != 33)) {
+    return 22;
+  } else {
+  }
+  int _sv0t37 = sv0_vec_get(id1, 1);
+  if ((_sv0t37 != 105)) {
+    return 23;
+  } else {
+  }
+  int _sv0t38 = sv0_vec_new();
+  int ptt = _sv0t38;
+  int _sv0t39 = sv0_vec_new();
+  int ptd1 = _sv0t39;
+  int _sv0t40 = sv0_vec_new();
+  int ptd2 = _sv0t40;
+  int _sv0t41 = sv0_vec_new();
+  int ptd3 = _sv0t41;
+  sv0_vec_push(ptt, 0);
+  sv0_vec_push(ptd1, 4);
+  sv0_vec_push(ptd2, 0);
+  sv0_vec_push(ptd3, 0);
+  sv0_vec_push(ptt, 3);
+  sv0_vec_push(ptd1, 0);
+  sv0_vec_push(ptd2, 7);
+  sv0_vec_push(ptd3, 0);
+  link_reloc_pty_arena(ptt, ptd1, ptd2, ptd3, 20, 100, 1000);
+  int _sv0t43 = sv0_vec_get(ptd1, 0);
+  if ((_sv0t43 != 104)) {
+    return 24;
+  } else {
+  }
+  int _sv0t44 = sv0_vec_get(ptd1, 1);
+  if ((_sv0t44 != 20)) {
+    return 25;
+  } else {
+  }
+  int _sv0t45 = sv0_vec_get(ptd2, 1);
+  if ((_sv0t45 != 1007)) {
+    return 26;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_is_sv0();
   int r1 = _sv0t0;
@@ -6359,6 +7096,13 @@ int main(void) {
   if ((rpc3a != 0)) {
     int _sv0t128 = (400 + rpc3a);
     return _sv0t128;
+  } else {
+  }
+  int _sv0t129 = test_link_reloc_arenas();
+  int rpc3b2 = _sv0t129;
+  if ((rpc3b2 != 0)) {
+    int _sv0t130 = (410 + rpc3b2);
+    return _sv0t130;
   } else {
   }
   return 0;
