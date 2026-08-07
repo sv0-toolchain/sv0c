@@ -922,6 +922,218 @@ fn link_program_item_vecs_append(it_dst: Vec<i32>,
     }
 }
 
+/* ── PC-3b.2 parse-arena relocation primitives ───────────────────────
+   Merging a second parsed file B into file A requires offsetting every
+   cross-arena index in B by A's arena sizes. Per-column/per-tag rules are
+   pinned in `doc/pc3b1-arena-reloc-semantics.md`. Each function mutates B's
+   arenas in place; -1 sentinels (none/wildcard) are left untouched. */
+
+/* Whole-column shift, skipping negative sentinels (unlike link_reloc_i32_vec_inplace). */
+fn link_reloc_skip_neg(v: Vec<i32>, delta: i32) -> () {
+    let n: i32 = vec_len(v);
+    let mut i: i32 = 0;
+    while i < n {
+        let x: i32 = vec_get(v, i);
+        if x >= 0 { vec_set(v, i, x + delta); }
+        i = i + 1;
+    }
+}
+
+/* Item arena (it/id1..id5), tag-aware. d_tok/d_pp = token/path-pool deltas;
+   d_body = body-expr arena delta; d_paramname/d_structname/d_enumname = sidecar
+   base deltas. See semantics doc § Item arena. */
+fn link_reloc_item_arena(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                         id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
+                         d_tok: i32, d_pp: i32, d_body: i32,
+                         d_paramname: i32, d_structname: i32,
+                         d_enumname: i32) -> () {
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(it, i);
+        if tag == 0 {
+            vec_set(id1, i, vec_get(id1, i) + d_tok);
+            let br: i32 = vec_get(id4, i);
+            if br >= 0 { vec_set(id4, i, br + d_body); }
+            let pb: i32 = vec_get(id5, i);
+            if pb >= 0 { vec_set(id5, i, pb + d_paramname); }
+        }
+        if tag == 1 {
+            vec_set(id1, i, vec_get(id1, i) + d_tok);
+            vec_set(id3, i, vec_get(id3, i) + d_structname);
+        }
+        if tag == 2 {
+            vec_set(id1, i, vec_get(id1, i) + d_tok);
+            vec_set(id3, i, vec_get(id3, i) + d_enumname);
+        }
+        if tag == 3 { vec_set(id1, i, vec_get(id1, i) + d_tok); }
+        if tag == 5 { vec_set(id1, i, vec_get(id1, i) + d_pp); }
+        if tag == 6 { vec_set(id1, i, vec_get(id1, i) + d_pp); }
+        if tag == 7 { vec_set(id1, i, vec_get(id1, i) + d_tok); }
+        i = i + 1;
+    }
+}
+
+/* Parse-type arena (pty_tt/td1..td3), tag-aware. See doc § Parse-type arena. */
+fn link_reloc_pty_arena(pty_tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
+                        td3: Vec<i32>, d_pty: i32, d_pp: i32,
+                        d_tok: i32) -> () {
+    let n: i32 = vec_len(pty_tt);
+    let mut i: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(pty_tt, i);
+        if tag == 0 { vec_set(td1, i, vec_get(td1, i) + d_pp); }
+        if tag == 1 { vec_set(td1, i, vec_get(td1, i) + d_pty); }
+        if tag == 2 { vec_set(td1, i, vec_get(td1, i) + d_pty); }
+        if tag == 3 {
+            vec_set(td1, i, vec_get(td1, i) + d_pty);
+            vec_set(td2, i, vec_get(td2, i) + d_tok);
+        }
+        if tag == 4 { vec_set(td1, i, vec_get(td1, i) + d_pty); }
+        if tag == 5 { vec_set(td1, i, vec_get(td1, i) + d_pty); }
+        i = i + 1;
+    }
+}
+
+/* Body-expr arena (body_et/ed1..ed4), tag-aware over tags 0..33. d_body/d_pp/
+   d_tok/d_pty/d_sf = body/path-pool/token/parse-type/struct-field-name deltas.
+   See doc § Body-expr arena (the authoritative per-tag table). */
+fn link_reloc_body_arena(bet: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                         ed3: Vec<i32>, ed4: Vec<i32>,
+                         d_body: i32, d_pp: i32, d_tok: i32,
+                         d_pty: i32, d_sf: i32) -> () {
+    let n: i32 = vec_len(bet);
+    let mut i: i32 = 0;
+    while i < n {
+        let tag: i32 = vec_get(bet, i);
+        if tag == 0 { vec_set(ed2, i, vec_get(ed2, i) + d_tok); }
+        if tag == 1 { vec_set(ed1, i, vec_get(ed1, i) + d_pp); }
+        if tag == 2 { vec_set(ed2, i, vec_get(ed2, i) + d_body); }
+        if tag == 3 {
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+            vec_set(ed3, i, vec_get(ed3, i) + d_body);
+        }
+        if tag == 4 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+        }
+        if tag == 5 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_tok);
+            vec_set(ed3, i, vec_get(ed3, i) + d_body);
+        }
+        if tag == 6 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_tok);
+        }
+        if tag == 7 { vec_set(ed1, i, vec_get(ed1, i) + d_body); }
+        if tag == 8 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+        }
+        if tag == 9 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            let t9: i32 = vec_get(ed3, i);
+            if t9 >= 0 { vec_set(ed3, i, t9 + d_body); }
+        }
+        if tag == 10 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+            let e10: i32 = vec_get(ed3, i);
+            if e10 >= 0 { vec_set(ed3, i, e10 + d_body); }
+        }
+        if tag == 11 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+        }
+        if tag == 12 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+            vec_set(ed3, i, vec_get(ed3, i) + d_body);
+        }
+        if tag == 13 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+            vec_set(ed3, i, vec_get(ed3, i) + d_body);
+        }
+        if tag == 14 { vec_set(ed1, i, vec_get(ed1, i) + d_body); }
+        if tag == 15 {
+            let v15: i32 = vec_get(ed1, i);
+            if v15 >= 0 { vec_set(ed1, i, v15 + d_body); }
+        }
+        if tag == 16 {
+            let v16: i32 = vec_get(ed1, i);
+            if v16 >= 0 { vec_set(ed1, i, v16 + d_body); }
+        }
+        if tag == 18 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+        }
+        if tag == 19 {
+            vec_set(ed2, i, vec_get(ed2, i) + d_body);
+            vec_set(ed3, i, vec_get(ed3, i) + d_body);
+        }
+        if tag == 20 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_body);
+            vec_set(ed2, i, vec_get(ed2, i) + d_pty);
+        }
+        if tag == 21 {
+            let lo: i32 = vec_get(ed1, i);
+            if lo >= 0 { vec_set(ed1, i, lo + d_body); }
+            let hi: i32 = vec_get(ed2, i);
+            if hi >= 0 { vec_set(ed2, i, hi + d_body); }
+        }
+        if tag == 22 { vec_set(ed1, i, vec_get(ed1, i) + d_body); }
+        if tag == 23 { vec_set(ed1, i, vec_get(ed1, i) + d_body); }
+        if tag == 24 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_pp);
+            vec_set(ed4, i, vec_get(ed4, i) + d_sf);
+        }
+        if tag == 25 { vec_set(ed1, i, vec_get(ed1, i) + d_body); }
+        if tag == 26 { vec_set(ed1, i, vec_get(ed1, i) + d_body); }
+        if tag == 27 {
+            vec_set(ed1, i, vec_get(ed1, i) + d_tok);
+            let a27: i32 = vec_get(ed2, i);
+            if a27 >= 0 { vec_set(ed2, i, a27 + d_tok); }
+            let ini: i32 = vec_get(ed3, i);
+            if ini >= 0 { vec_set(ed3, i, ini + d_body); }
+        }
+        if tag == 28 { vec_set(ed1, i, vec_get(ed1, i) + d_body); }
+        if tag == 29 {
+            let ptag29: i32 = vec_get(ed1, i);
+            if ptag29 == 1 { vec_set(ed2, i, vec_get(ed2, i) + d_tok); }
+            if ptag29 == 2 { vec_set(ed2, i, vec_get(ed2, i) + d_body); }
+            if ptag29 == 4 { vec_set(ed2, i, vec_get(ed2, i) + d_body); }
+            if ptag29 == 5 { vec_set(ed2, i, vec_get(ed2, i) + d_body); }
+            let g29: i32 = vec_get(ed3, i);
+            if g29 >= 0 { vec_set(ed3, i, g29 + d_body); }
+            vec_set(ed4, i, vec_get(ed4, i) + d_body);
+        }
+        if tag == 30 {
+            let ptag30: i32 = vec_get(ed4, i);
+            if ptag30 == 2 { vec_set(ed2, i, vec_get(ed2, i) + d_tok); }
+            if ptag30 == 4 { vec_set(ed1, i, vec_get(ed1, i) + d_pp); }
+            if ptag30 == 5 { vec_set(ed1, i, vec_get(ed1, i) + d_pp); }
+        }
+        if tag == 31 {
+            let ptag31: i32 = vec_get(ed4, i);
+            if ptag31 == 1 { vec_set(ed1, i, vec_get(ed1, i) + d_tok); }
+            if ptag31 == 2 { vec_set(ed2, i, vec_get(ed2, i) + d_tok); }
+            if ptag31 == 4 { vec_set(ed1, i, vec_get(ed1, i) + d_pp); }
+            if ptag31 == 5 { vec_set(ed1, i, vec_get(ed1, i) + d_pp); }
+        }
+        if tag == 32 {
+            let f32: i32 = vec_get(ed2, i);
+            if f32 >= 0 { vec_set(ed2, i, f32 + d_body); }
+        }
+        if tag == 33 {
+            let f33: i32 = vec_get(ed2, i);
+            if f33 >= 0 { vec_set(ed2, i, f33 + d_body); }
+        }
+        i = i + 1;
+    }
+}
+
 fn link_listing_path_at_index(listing: string, idx: i32) -> string {
     if idx < 0 { return ""; }
     let len: i32 = string_len(listing);
@@ -3436,6 +3648,67 @@ fn test_link_project_dir_merge_two_files() -> i32 {
     return 0;
 }
 
+/* PC-3b.2: relocation-pass unit test — one assertion per delta class
+   (skip_neg / body-expr tok,pp,body,pty,sf + -1 skip + tag-aware MatchArm /
+   item tok,body,parambase,pp / pty pp,pty,tok). See doc/pc3b1-arena-reloc-semantics.md. */
+fn test_link_reloc_arenas() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    vec_push(sn, 5);
+    vec_push(sn, 0 - 1);
+    vec_push(sn, 7);
+    link_reloc_skip_neg(sn, 100);
+    if vec_get(sn, 0) != 105 { return 1; }
+    if vec_get(sn, 1) != 0 - 1 { return 2; }
+    if vec_get(sn, 2) != 107 { return 3; }
+    let bet: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(bet, 0); vec_push(ed1, 0); vec_push(ed2, 5); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(bet, 1); vec_push(ed1, 3); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(bet, 3); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 1); vec_push(ed4, 0);
+    vec_push(bet, 10); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 0 - 1); vec_push(ed4, 0);
+    vec_push(bet, 20); vec_push(ed1, 0); vec_push(ed2, 2); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(bet, 24); vec_push(ed1, 4); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 6);
+    vec_push(bet, 29); vec_push(ed1, 5); vec_push(ed2, 3); vec_push(ed3, 0 - 1); vec_push(ed4, 4);
+    link_reloc_body_arena(bet, ed1, ed2, ed3, ed4, 10, 100, 1000, 20, 50);
+    if vec_get(ed2, 0) != 1005 { return 10; }
+    if vec_get(ed1, 1) != 103 { return 11; }
+    if vec_get(ed2, 2) != 10 { return 12; }
+    if vec_get(ed3, 2) != 11 { return 13; }
+    if vec_get(ed3, 3) != 0 - 1 { return 14; }
+    if vec_get(ed2, 4) != 22 { return 15; }
+    if vec_get(ed1, 5) != 104 { return 16; }
+    if vec_get(ed4, 5) != 56 { return 17; }
+    if vec_get(ed2, 6) != 13 { return 18; }
+    if vec_get(ed4, 6) != 14 { return 19; }
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    vec_push(it, 0); vec_push(id1, 2); vec_push(id2, 0); vec_push(id3, 0); vec_push(id4, 1); vec_push(id5, 3);
+    vec_push(it, 5); vec_push(id1, 5); vec_push(id2, 0); vec_push(id3, 0); vec_push(id4, 0); vec_push(id5, 0 - 1);
+    link_reloc_item_arena(it, id1, id2, id3, id4, id5, 1000, 100, 10, 30, 40, 50);
+    if vec_get(id1, 0) != 1002 { return 20; }
+    if vec_get(id4, 0) != 11 { return 21; }
+    if vec_get(id5, 0) != 33 { return 22; }
+    if vec_get(id1, 1) != 105 { return 23; }
+    let ptt: Vec<i32> = vec_new();
+    let ptd1: Vec<i32> = vec_new();
+    let ptd2: Vec<i32> = vec_new();
+    let ptd3: Vec<i32> = vec_new();
+    vec_push(ptt, 0); vec_push(ptd1, 4); vec_push(ptd2, 0); vec_push(ptd3, 0);
+    vec_push(ptt, 3); vec_push(ptd1, 0); vec_push(ptd2, 7); vec_push(ptd3, 0);
+    link_reloc_pty_arena(ptt, ptd1, ptd2, ptd3, 20, 100, 1000);
+    if vec_get(ptd1, 0) != 104 { return 24; }
+    if vec_get(ptd1, 1) != 20 { return 25; }
+    if vec_get(ptd2, 1) != 1007 { return 26; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_sv0();
     if r1 != 0 { return r1; }
@@ -3567,5 +3840,7 @@ fn main() -> i32 {
     if r22 != 0 { return 220 + r22; }
     let rpc3a: i32 = test_link_project_dir_merge_two_files();
     if rpc3a != 0 { return 400 + rpc3a; }
+    let rpc3b2: i32 = test_link_reloc_arenas();
+    if rpc3b2 != 0 { return 410 + rpc3b2; }
     return 0;
 }
