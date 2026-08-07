@@ -350,6 +350,20 @@ fn test_expand_from_file_smoke() -> i32 {
     return 0;
 }
 
+/* PC-5a (post-M3 Phase C, Epic 5): real two-file include. A root file includes
+   a second REAL file; both are written to disk and loaded via `read_file`,
+   exercising expand_file's `read_file(merged)` host-I/O path end-to-end (the
+   existing table tests use in-memory bodies, not the filesystem). */
+fn test_expand_from_file_multi_include() -> i32 {
+    let inc: string = "/tmp/sv0_pc5a_inc.sv0";
+    write_file(inc, "INC_BODY");
+    let root: string = "/tmp/sv0_pc5a_main.sv0";
+    write_file(root, "include \"sv0_pc5a_inc.sv0\";\nAFTER");
+    let got: string = expand_from_file(root);
+    if string_eq(got, "INC_BODY\nAFTER") != true { return 1; }
+    return 0;
+}
+
 fn test_expand_text_table2_simple() -> i32 {
     let host: string = "/tmp/pkg/main.sv0";
     let src: string = "include \"inc.sv0\";\nfn x() -> i32 { 1 }";
@@ -593,5 +607,7 @@ fn main() -> i32 {
     if r17 != 0 { return 160 + r17; }
     let r18: i32 = test_expand_from_file_smoke();
     if r18 != 0 { return 170 + r18; }
+    let r19: i32 = test_expand_from_file_multi_include();
+    if r19 != 0 { return 180 + r19; }
     return 0;
 }
