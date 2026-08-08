@@ -1035,6 +1035,11 @@ fn link_reloc_body_arena(bet: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_set(ed1, i, vec_get(ed1, i) + d_body);
             let t9: i32 = vec_get(ed3, i);
             if t9 >= 0 { vec_set(ed3, i, t9 + d_body); }
+            /* ed4 = block statement-order sidecar base (offset+1 into pp; 0 = none).
+               The sidecar lives in the shared pp pool, so its base shifts by d_pp.
+               See parser.sv0 block_stmt_sidecar_push + doc/pc3b1 §pp-heterogeneity. */
+            let s9: i32 = vec_get(ed4, i);
+            if s9 > 0 { vec_set(ed4, i, s9 + d_pp); }
         }
         if tag == 10 {
             vec_set(ed1, i, vec_get(ed1, i) + d_body);
@@ -1131,6 +1136,51 @@ fn link_reloc_body_arena(bet: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if f33 >= 0 { vec_set(ed2, i, f33 + d_body); }
         }
         i = i + 1;
+    }
+}
+
+/* PC-3b.2 (pp heterogeneity fix): the shared `pp` pool holds TWO index classes —
+   path-segment TOKEN indices (ExprPath/ExprStruct/TyName/ItemUse `pp_start`) and
+   block statement-order BODY-EXPR indices (ExprBlock `d4 = offset+1`; see
+   parser.sv0 block_stmt_sidecar_push). A single whole-column shift is therefore
+   wrong. This walks B's body arena to mark which `pp` entries are block-order
+   (shift by `d_body`); every other entry is a token index (shift by `d_tok`).
+   Call on B's ORIGINAL arenas (before `link_reloc_body_arena` shifts ed4). */
+fn link_reloc_pp_contents_hetero(pp: Vec<i32>, bet: Vec<i32>, ed2: Vec<i32>,
+                                 ed4: Vec<i32>, d_tok: i32, d_body: i32) -> () {
+    let np: i32 = vec_len(pp);
+    let is_body: Vec<i32> = vec_new();
+    let mut z: i32 = 0;
+    while z < np {
+        vec_push(is_body, 0);
+        z = z + 1;
+    }
+    let nb: i32 = vec_len(bet);
+    let mut i: i32 = 0;
+    while i < nb {
+        if vec_get(bet, i) == 9 {
+            let base1: i32 = vec_get(ed4, i);
+            if base1 > 0 {
+                let base: i32 = base1 - 1;
+                let cnt: i32 = vec_get(ed2, i);
+                let mut k: i32 = 0;
+                while k < cnt {
+                    vec_set(is_body, base + k, 1);
+                    k = k + 1;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    let mut j: i32 = 0;
+    while j < np {
+        if vec_get(is_body, j) == 1 {
+            vec_set(pp, j, vec_get(pp, j) + d_body);
+        } else {
+            let v: i32 = vec_get(pp, j);
+            if v >= 0 { vec_set(pp, j, v + d_tok); }
+        }
+        j = j + 1;
     }
 }
 
@@ -3786,6 +3836,7 @@ fn test_link_reloc_arenas() -> i32 {
     vec_push(bet, 20); vec_push(ed1, 0); vec_push(ed2, 2); vec_push(ed3, 0); vec_push(ed4, 0);
     vec_push(bet, 24); vec_push(ed1, 4); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 6);
     vec_push(bet, 29); vec_push(ed1, 5); vec_push(ed2, 3); vec_push(ed3, 0 - 1); vec_push(ed4, 4);
+    vec_push(bet, 9); vec_push(ed1, 2); vec_push(ed2, 0); vec_push(ed3, 0 - 1); vec_push(ed4, 3);
     link_reloc_body_arena(bet, ed1, ed2, ed3, ed4, 10, 100, 1000, 20, 50);
     if vec_get(ed2, 0) != 1005 { return 10; }
     if vec_get(ed1, 1) != 103 { return 11; }
@@ -3820,6 +3871,24 @@ fn test_link_reloc_arenas() -> i32 {
     if vec_get(ptd1, 0) != 104 { return 24; }
     if vec_get(ptd1, 1) != 20 { return 25; }
     if vec_get(ptd2, 1) != 1007 { return 26; }
+    /* tag-9 Block: ed1 stmts_first 2 -> +d_body(10)=12; ed4 sidecar base 3 ->
+       +d_pp(100)=103 (the pp-heterogeneity sidecar-base fix). */
+    if vec_get(ed1, 7) != 12 { return 27; }
+    if vec_get(ed4, 7) != 103 { return 28; }
+    /* pp heterogeneity: entries marked block-order (by a tag-9 d4 base) shift by
+       d_body; all others (token indices) by d_tok. */
+    let pph: Vec<i32> = vec_new();
+    vec_push(pph, 7);
+    vec_push(pph, 2);
+    vec_push(pph, 9);
+    let hbet: Vec<i32> = vec_new();
+    let hed2: Vec<i32> = vec_new();
+    let hed4: Vec<i32> = vec_new();
+    vec_push(hbet, 9); vec_push(hed2, 1); vec_push(hed4, 2);
+    link_reloc_pp_contents_hetero(pph, hbet, hed2, hed4, 1000, 10);
+    if vec_get(pph, 0) != 1007 { return 30; }
+    if vec_get(pph, 1) != 12 { return 31; }
+    if vec_get(pph, 2) != 1009 { return 32; }
     return 0;
 }
 
