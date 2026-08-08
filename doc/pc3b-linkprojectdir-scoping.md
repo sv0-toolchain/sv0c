@@ -211,16 +211,28 @@ Consequences for the merge:
    indexes `tags` by handle → OOB/`-1` on the mangled handles. `tags`/`starts`
    must stay parallel.
 
-**Prerequisite fix — PC-3b.4a2 (complete the mangle token model):** make
-`link_append_synth_ident` also push an **IDENT tag (`token.sv0` `IDENT` = 5)** to
-a `tags` vec so `tags`/`starts`/`ends` stay parallel; thread `tags` through the
-mangle handles (`link_ty_tyname_rewrite`, `link_expr_path_rewrite`,
-`link_body_path_rewrite_one`, `link_item_row_rewrite_defining_name`) + the map
-wrappers. Standalone-testable in `link.sv0` (assert `len(tags)==len(starts)`
-after a mangle). **Then** PC-3b.4b's orchestration (use `d_tok=len(a_starts)`;
-merge `m_tags` parallel to `m_starts`) is correct. The `megaTU-main.sv0`
-orchestration was reverted to keep the gates green; re-apply it from §5c after
-3b.4a2 lands.
+**Fix for the tags/starts parallelism (simpler than threading):** the mangled
+tokens are all appended contiguously at the **end** of `starts`, and they are all
+identifiers, so instead of threading `tags` through ~12 mangle functions, just
+**pad `tags` to `len(starts)` with `IDENT=5` after each file's mangle** (in the
+orchestration), and use `d_tok = len(a_starts)`. Verified: this is required not
+only for `check_program` but also for `link_merge_parallel_token_streams_reloc_b`
+(it iterates by `len(tags_a)`, so an unpadded `tags` drops the mangled tokens).
+
+**2026-08-05 re-attempt result (with the padding fix):** the orchestration runs;
+**`resolve_program` now PASSES** on the merged program (the padding fixed the
+token-stream consistency). **`check_program` still returns `-1`** — and by reading
+`checker.sv0`, that `-1` is its **body-check** path (`_ec < 0` at ~L49), **not**
+the struct/enum name-clash (the test program has no structs/enums). So a real
+bug remains in the merged program's fn-body check. **Next diagnostic (clean
+isolation, not yet conclusive):** run `resolve+check` on **A-alone (mangled)**
+with *no* merge and *no* second resolve call — distinct small return codes — to
+determine whether the fault is in the **mangle** (a mangled single fn fails
+`check_fn_body`) or the **merge** (relocation of B's body/item refs). A prior
+attempt to add this diagnostic inline gave an inconsistent early-return, likely a
+confound from running `resolve_program` twice over the same arenas; redo it as a
+*separate* minimal function. Orchestration + padding are captured in §5c + here;
+`megaTU-main.sv0` reverted to keep the gates green.
 
 ## 6. Recommendation
 
