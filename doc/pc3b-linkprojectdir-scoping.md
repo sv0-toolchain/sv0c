@@ -189,6 +189,39 @@ by 3b.6 (the real `--project` fixtures) once 3b.5 wires the CLI.
 unaffected), full `./scripts/sv0 test`, VM 18/18. Refresh no goldens (megaTU-main
 is not in stage0/vm-parity/self-host sets — it only lives in the assembly).
 
+## 5d. PC-3b.4b attempt (2026-08-05): runtime validation found a mangle token-model bug
+
+Implemented the full `test_megatu_link_merge` orchestration per §5c in
+`megaTU-main.sv0` (parse×2 → mangle×2 → reloc → merge → resolve+check), added a
+temporary `main` call, built the native mega-TU, and ran it. **It compiled but
+crashed/failed at runtime** (corpus went 0/98) — exactly what runtime validation
+is for. Root cause, confirmed by reading `link_append_synth_ident`:
+
+> The M3-S-039 mangle appends each synthetic (mangled) identifier to **`starts`
+> and `ends` but NOT `tags`**, and `link_last_tok_handle` returns
+> `len(starts)-1`. So after mangling, `len(starts) > len(tags)`, and mangled
+> token handles have **no `tags` entry**.
+
+Consequences for the merge:
+1. **Wrong `d_tok`.** It must be `len(a_starts)` (the mangle-extended token
+   count), **not** `len(a_tags)` — otherwise B's relocated token refs collide
+   with A's appended mangled tokens.
+2. **`check_program` breaks.** C-emit only needs `starts/ends` (`handle_to_str`
+   reads `source`), so the single-file path never noticed. But `check_program`
+   indexes `tags` by handle → OOB/`-1` on the mangled handles. `tags`/`starts`
+   must stay parallel.
+
+**Prerequisite fix — PC-3b.4a2 (complete the mangle token model):** make
+`link_append_synth_ident` also push an **IDENT tag (`token.sv0` `IDENT` = 5)** to
+a `tags` vec so `tags`/`starts`/`ends` stay parallel; thread `tags` through the
+mangle handles (`link_ty_tyname_rewrite`, `link_expr_path_rewrite`,
+`link_body_path_rewrite_one`, `link_item_row_rewrite_defining_name`) + the map
+wrappers. Standalone-testable in `link.sv0` (assert `len(tags)==len(starts)`
+after a mangle). **Then** PC-3b.4b's orchestration (use `d_tok=len(a_starts)`;
+merge `m_tags` parallel to `m_starts`) is correct. The `megaTU-main.sv0`
+orchestration was reverted to keep the gates green; re-apply it from §5c after
+3b.4a2 lands.
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the
