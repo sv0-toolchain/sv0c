@@ -284,6 +284,41 @@ on the real fixtures. The mangle (PC-3b.4a) is retained in `link.sv0` as unit-te
 code but **deferred** to a future genuine-collision slice; it must not be on the
 acceptance path until the checker can consume mangled names positionally.
 
+## 5f. PC-3b.4b collision-free merge VALIDATED (2026-08-08) + the pp-heterogeneity fix
+
+Implemented the no-mangle merge in the compose main (parse A + parse B → reloc B by
+A's arena sizes → contiguous append → resolve+check) on `A = fn helper()->i32{return
+7;}` + `B = fn main()->i32{return helper();}` (B calls A across the file boundary).
+**Result: exit 77 — resolve AND check both PASS, zero mangle.** This proves
+cross-file merge + cross-file reference resolution end-to-end.
+
+**The last blocker was a gap in PC-3b.1's table: `pp` is HETEROGENEOUS.** The shared
+`pp` pool holds two index classes:
+- path-segment **token** indices (`ExprPath`/`ExprStruct`/`TyName`/`ItemUse`
+  `pp_start`) → shift by `dTok`;
+- block statement-order **body-expr** indices (`parser.sv0 block_stmt_sidecar_push`;
+  base recorded in **`ExprBlock.d4 = offset+1`**) → the *contents* shift by `dBody`.
+
+PC-3b.1 §pp assumed `pp` was all token indices and **omitted `ExprBlock.d4`
+entirely**, so (a) `link_reloc_body_arena` never shifted the sidecar base and (b) a
+single whole-column `pp` shift corrupts the block-order entries. Even a
+single-statement block (`{ return 7; }`) creates a sidecar, so this bit every fn.
+
+Two fixes landed in `lib/link.sv0` (both covered by new `test_link_reloc_arenas`
+assertions, stage0 golden refreshed):
+1. `link_reloc_body_arena` tag-9 (Block) now shifts `ed4` (sidecar base) by `dPP`
+   when `> 0`.
+2. new `link_reloc_pp_contents_hetero(pp, bet, ed2, ed4, dTok, dBody)` — marks the
+   `pp` ranges owned by tag-9 `d4` bases (→ `dBody`), shifts every other entry by
+   `dTok`. **Call it on B's ORIGINAL arenas, before `link_reloc_body_arena` shifts
+   `d4`.**
+
+The compose-main orchestration was reverted (megaTU-main stays the smoke main,
+gates green); the reusable primitives stay in `link.sv0`. **Next:** PC-2e (sv0-side
+import-alias canonicalization) so cross-module *type* refs check on the real
+fixtures, then PC-3b.5 (`--project` CLI → general N-file linkProjectDir fold reusing
+these primitives), then PC-3b.6 acceptance.
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the

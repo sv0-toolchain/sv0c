@@ -56,7 +56,7 @@ tags / counts / packed / flags / `-1` sentinels → NOT relocated.**
 - 6 Field: d1 obj `dBody`, d2 field_tok `dTok`
 - 7 TupleField: d1 obj `dBody`, d2 field_num —
 - 8 Index: d1 obj `dBody`, d2 index `dBody`
-- 9 Block: d1 stmts_first `dBody`, d2 count —, d3 tail `dBody`(-1)
+- 9 Block: d1 stmts_first `dBody`, d2 count —, d3 tail `dBody`(-1), **d4 stmt-order sidecar base `dPP`** (`offset+1`; 0 = none — see pp-heterogeneity note below)
 - 10 If: d1 cond `dBody`, d2 then `dBody`, d3 else `dBody`(-1)
 - 11 Match: d1 scrut `dBody`, d2 arms_first `dBody`, d3 count —
 - 12 While: d1 cond `dBody`, d2 body `dBody`, d3 inv_first `dBody`, d4 count —
@@ -94,13 +94,29 @@ This is the one column needing tag-aware handling beyond the table.
 
 | Array | element class | delta |
 |-------|---------------|-------|
-| `pp` (path pool) | token index | `dTok` |
+| `pp` (path pool) | **HETEROGENEOUS** — token index OR block-order body index (see note) | `dTok` **or** `dBody` |
 | `enum_variant_name_toks`, `struct_field_name_toks`, `fn_param_name_toks` | token index (or -1) | `dTok` |
 | `fn_param_ty_root`, `fn_ret_ty_root_by_item`, `struct_field_ty_root`, `enum_variant_payload_ty_root` | pty root | `dPty` |
 | `fn_contract_root` | body-expr root (contract exprs live in body arena) | `dBody` |
 | `fn_contract_base_by_item` | base into `fn_contract_root` | `dContract` |
 | `enum_variant_payload_base_by_item` | base into `enum_variant_payload_ty_root` | `dPayloadTy` |
 | `enum_variant_payload_count_by_item`, `enum_variant_payload_max_by_item` | count | — |
+
+## pp heterogeneity (CORRECTION, 2026-08-08 — found in PC-3b.4b)
+
+The `pp` pool is **not** uniformly token indices. `parser.sv0
+block_stmt_sidecar_push` stores each block's ordered **body-expr** statement indices
+in `pp` (a block's statements are interleaved with their sub-exprs in the body arena
+so `stmts_first + si` can't recover order); the block records that sidecar's base in
+`ExprBlock.d4 = offset+1` (0 = no sidecar). So a `pp` entry owned by a block's
+sidecar is a **body index** (`dBody`); every other `pp` entry (path segments from
+`ExprPath`/`ExprStruct`/`TyName`/`ItemUse`) is a **token index** (`dTok`). A single
+whole-column shift is therefore wrong. `lib/link.sv0
+link_reloc_pp_contents_hetero(pp, bet, ed2, ed4, dTok, dBody)` marks the block-order
+ranges (from tag-9 `d4` bases) and shifts them by `dBody`, the rest by `dTok`; and
+`link_reloc_body_arena` tag-9 shifts `ExprBlock.d4` by `dPP`. Even single-statement
+blocks create a sidecar, so this affects every fn body. (This corrects the `pp` row
+above and the omitted `ExprBlock.d4` in the body-expr table.)
 
 ## Consequences for PC-3b.2 (the relocation pass)
 
