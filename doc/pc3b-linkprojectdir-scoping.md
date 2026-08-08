@@ -137,6 +137,58 @@ already added in PC-1/PC-2 (checker/lowering), **not** via link mangling. Link
 mangling covers each module's **defining names** + its **intra-module** qualified
 references. So 3b.4a is specifically about intra-module struct/pattern mangling.
 
+## 5c. PC-3b.4b implementation spec (ready to execute)
+
+All primitives (3b.1–3b.4a) are done + unit-tested. 3b.4b is the orchestration,
+which **must live in `megaTU-main.sv0`** (parse_program callable) and be
+**runtime-validated** (a temporary test call at the top of `main` → build the
+native mega-TU → run → confirm → **remove the test call before commit**; do NOT
+ship a self-test in the shared corpus `main`, and do NOT restructure `main`'s
+`let source` line or phase-6 emit — the build scripts regex-patch them).
+
+**Algorithm — `megatu_link_two_programs(entry_a, src_a, entry_b, src_b, <~30 out arenas>) -> merged_src`:**
+1. **Parse A into the out arenas:** `tokenize(src_a, out_tags, out_starts, out_ends)`;
+   `parse_program(out_tags, …, src_a, 0, <out arenas>)`.
+2. **Mangle A** (order matters — mangle mutates source + appends tokens, so do it
+   before computing deltas): `mod_a = module_id_from_entry_path(entry_a)`;
+   `tops_a = collect_top_names(out_it, out_inm)`;
+   `s = link_item_arena_rewrite_defining_names(out_it, out_inm, mod_a, out_starts, out_ends, src_a)`;
+   `s = link_ty_arena_rewrite_all_first_seg(out_ptt, out_ptd1, out_ptd2, out_pp, tops_a, mod_a, out_starts, out_ends, s)`;
+   `s = link_body_arena_rewrite_all_paths(out_bet, out_bed1, out_bed2, out_bed4, out_pp, tops_a, mod_a, out_starts, out_ends, s)`.
+   (Mangling appends synthetic-ident tokens to `out_tags/out_starts/out_ends` and
+   updates arena refs; so after this, A's token count = `len(out_tags)`.)
+3. **Parse B into temp arenas** (declare ~30 `tb_*` locals): tokenize + parse `src_b`.
+4. **Mangle B** the same way with `mod_b` (into `tb_*` + `s_b`).
+5. **Compute deltas from A's post-mangle sizes:** `d_tok=len(out_tags)`,
+   `d_pp=len(out_pp)`, `d_body=len(out_bet)`, `d_pty=len(out_ptt)`,
+   `d_sf=len(out_bsf)`, `d_paramname=len(out_fpn)`, `d_structname=len(out_sfn)`,
+   `d_enumname=len(out_evn)`, `d_contract=len(out_fcr)`, `d_payloadty=len(out_evpt)`,
+   `d_byte = len(s) + 1` (byte offset for B's token positions).
+6. **Reloc B** (PC-3b.2): `link_reloc_item_arena` / `link_reloc_pty_arena` /
+   `link_reloc_body_arena` on the `tb_*` body/item/pty; `link_reloc_skip_neg` per
+   sidecar with its delta (fpn/sfn/evn→`d_tok`; fpt/frt/sft/evpt→`d_pty`;
+   fcr→`d_body`; fcb→`d_contract`; evpb→`d_payloadty`; pp→`d_tok`).
+7. **Merge token streams:** `link_merge_parallel_token_streams_reloc_b(out_tags,
+   out_starts, out_ends, tb_tags, tb_starts, tb_ends, d_byte, …)` into out (or
+   append tb_tags to out_tags and `tb_starts/ends += d_byte`).
+8. **Merge arenas** (PC-3b.3): `link_program_item_vecs_append` (item) +
+   `link_append_body_arena` + `link_append_pty_arena` + `link_append_vec` per
+   sidecar (pp, evn, sfn, fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc, evpm, sft).
+9. **Return** `merged_src = s + "\n" + s_b`.
+
+**Validation test (temporary, in `main`, removed before commit):**
+`A = "fn helper() -> i32 { return 7; }"` (no main), `B = "fn main() -> i32 { return 35; }"`.
+Merge → run phases 3–6 (resolve/check/lower/emit) on the merged arenas → assert
+`megatu_emit_program` returns non-empty C containing `helper` (mangled) + a
+`main` returning 35. This proves the merge is structurally sound + the reloc is
+correct (arena refs resolve). Cross-module *calls/types* are validated separately
+by 3b.6 (the real `--project` fixtures) once 3b.5 wires the CLI.
+
+**Gates to keep green throughout:** `./scripts/sv0 assemble-megatu --check`
+(mega-TU compiles), `./scripts/sv0-megatu-corpus-parity.sh` (98/98, single-file
+unaffected), full `./scripts/sv0 test`, VM 18/18. Refresh no goldens (megaTU-main
+is not in stage0/vm-parity/self-host sets — it only lives in the assembly).
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the
