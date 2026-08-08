@@ -1188,6 +1188,66 @@ fn link_append_pty_arena(d_tt: Vec<i32>, d_td1: Vec<i32>, d_td2: Vec<i32>,
     }
 }
 
+/* ── PC-3b.4a complete the body-arena path mangle ────────────────────
+   The M3-S-039 expr mangle (link_expr_path_rewrite_first_seg_handle) only
+   rewrites ExprPath (body tag 1). parse_program's body arena also carries
+   paths in ExprStruct (24) and the embedded pattern rows PatExtra(30)/
+   PatFieldEmbed(31) — for PatStruct(4)/PatEnum(5), pat_tag in ed4. All use
+   ed1=pp_start, ed2=pp_count (seg count). This standalone pass mangles the
+   first path segment of every such node whose head is in `tops`, mirroring
+   SML mapPathSegs on parse_program's real layout. Reuses the existing
+   in_tops / link_tok_text / mangle / link_append_synth_ident helpers. */
+
+fn link_body_path_rewrite_one(bet: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                              ed4: Vec<i32>, pp: Vec<i32>, tops: Vec<i32>,
+                              mod_id: string, starts: Vec<i32>, ends: Vec<i32>,
+                              source: string, idx: i32) -> string {
+    if idx < 0 { return source; }
+    let tag: i32 = vec_get(bet, idx);
+    let mut is_path: bool = false;
+    if tag == 1 { is_path = true; }
+    if tag == 24 { is_path = true; }
+    if tag == 30 {
+        let pt: i32 = vec_get(ed4, idx);
+        if pt == 4 { is_path = true; }
+        if pt == 5 { is_path = true; }
+    }
+    if tag == 31 {
+        let pt2: i32 = vec_get(ed4, idx);
+        if pt2 == 4 { is_path = true; }
+        if pt2 == 5 { is_path = true; }
+    }
+    if is_path != true { return source; }
+    let ps: i32 = vec_get(ed1, idx);
+    let sc: i32 = vec_get(ed2, idx);
+    if sc != 1 {
+        if sc != 2 { return source; }
+    }
+    let h0: i32 = vec_get(pp, ps);
+    if in_tops(tops, h0) != true { return source; }
+    let t0: string = link_tok_text(source, starts, ends, h0);
+    let mangled: string = mangle(mod_id, t0);
+    let out: string = link_append_synth_ident(source, starts, ends, mangled);
+    let nh: i32 = link_last_tok_handle(starts);
+    vec_set(pp, ps, nh);
+    return out;
+}
+
+fn link_body_arena_rewrite_all_paths(bet: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                                     ed4: Vec<i32>, pp: Vec<i32>, tops: Vec<i32>,
+                                     mod_id: string, starts: Vec<i32>,
+                                     ends: Vec<i32>, source: string) -> string {
+    let mut out: string = source;
+    let n: i32 = vec_len(bet);
+    let mut i: i32 = 0;
+    while i < n {
+        out = link_body_path_rewrite_one(bet, ed1, ed2, ed4, pp, tops,
+                                         mod_id, starts, ends, out, i);
+        i = i + 1;
+    }
+    return out;
+}
+
 fn link_listing_path_at_index(listing: string, idx: i32) -> string {
     if idx < 0 { return ""; }
     let len: i32 = string_len(listing);
@@ -3816,6 +3876,38 @@ fn test_link_append_arenas() -> i32 {
     return 0;
 }
 
+/* PC-3b.4a: body-arena path-mangle test — ExprStruct(24) + PatExtra(30,PatEnum)
+   first segs get mangled (head in tops); a non-path node (ExprLit) is untouched. */
+fn test_link_body_arena_rewrite_all_paths() -> i32 {
+    let bet: Vec<i32> = vec_new();
+    let e1: Vec<i32> = vec_new();
+    let e2: Vec<i32> = vec_new();
+    let e4: Vec<i32> = vec_new();
+    vec_push(bet, 24); vec_push(e1, 0); vec_push(e2, 1); vec_push(e4, 0);
+    vec_push(bet, 30); vec_push(e1, 1); vec_push(e2, 2); vec_push(e4, 5);
+    vec_push(bet, 0); vec_push(e1, 0); vec_push(e2, 5); vec_push(e4, 0);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    vec_push(pp, 2);
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    vec_push(starts, 8); vec_push(ends, 11);
+    let tops: Vec<i32> = vec_new();
+    vec_push(tops, 0);
+    vec_push(tops, 1);
+    let src: string = "Foo\nBar\nBaz";
+    let out: string = link_body_arena_rewrite_all_paths(bet, e1, e2, e4, pp,
+        tops, "m", starts, ends, src);
+    if vec_get(pp, 0) != 3 { return 1; }
+    if vec_get(pp, 1) != 4 { return 2; }
+    if vec_get(pp, 2) != 2 { return 3; }
+    if string_eq(out, "Foo\nBar\nBaz\nm__Foo\nm__Bar") != true { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_sv0();
     if r1 != 0 { return r1; }
@@ -3951,5 +4043,7 @@ fn main() -> i32 {
     if rpc3b2 != 0 { return 410 + rpc3b2; }
     let rpc3b3: i32 = test_link_append_arenas();
     if rpc3b3 != 0 { return 420 + rpc3b3; }
+    let rpc3b4a: i32 = test_link_body_arena_rewrite_all_paths();
+    if rpc3b4a != 0 { return 430 + rpc3b4a; }
     return 0;
 }
