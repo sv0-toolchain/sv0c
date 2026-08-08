@@ -1134,6 +1134,60 @@ fn link_reloc_body_arena(bet: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     }
 }
 
+/* ── PC-3b.3 parse-arena merge primitives ────────────────────────────
+   After relocating file B (PC-3b.2), append B's arena columns onto A's.
+   Parallel-column loops (not chained void calls — see note above
+   link_reloc_i32_vec_inplace). The item arena append is the existing
+   link_program_item_vecs_append; sidecars use the generic link_append_vec. */
+
+fn link_append_vec(dst: Vec<i32>, src: Vec<i32>) -> () {
+    let n: i32 = vec_len(src);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(dst, vec_get(src, i));
+        i = i + 1;
+    }
+}
+
+/* Body-expr arena: bet/ed1..ed4 are parallel (one row each); body_sf is a
+   separate-length sidecar (struct-field-name token positions). */
+fn link_append_body_arena(d_bet: Vec<i32>, d_ed1: Vec<i32>, d_ed2: Vec<i32>,
+                          d_ed3: Vec<i32>, d_ed4: Vec<i32>, d_sf: Vec<i32>,
+                          s_bet: Vec<i32>, s_ed1: Vec<i32>, s_ed2: Vec<i32>,
+                          s_ed3: Vec<i32>, s_ed4: Vec<i32>, s_sf: Vec<i32>) -> () {
+    let n: i32 = vec_len(s_bet);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(d_bet, vec_get(s_bet, i));
+        vec_push(d_ed1, vec_get(s_ed1, i));
+        vec_push(d_ed2, vec_get(s_ed2, i));
+        vec_push(d_ed3, vec_get(s_ed3, i));
+        vec_push(d_ed4, vec_get(s_ed4, i));
+        i = i + 1;
+    }
+    let m: i32 = vec_len(s_sf);
+    let mut j: i32 = 0;
+    while j < m {
+        vec_push(d_sf, vec_get(s_sf, j));
+        j = j + 1;
+    }
+}
+
+/* Parse-type arena: pty_tt/td1..td3 parallel. */
+fn link_append_pty_arena(d_tt: Vec<i32>, d_td1: Vec<i32>, d_td2: Vec<i32>,
+                         d_td3: Vec<i32>, s_tt: Vec<i32>, s_td1: Vec<i32>,
+                         s_td2: Vec<i32>, s_td3: Vec<i32>) -> () {
+    let n: i32 = vec_len(s_tt);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(d_tt, vec_get(s_tt, i));
+        vec_push(d_td1, vec_get(s_td1, i));
+        vec_push(d_td2, vec_get(s_td2, i));
+        vec_push(d_td3, vec_get(s_td3, i));
+        i = i + 1;
+    }
+}
+
 fn link_listing_path_at_index(listing: string, idx: i32) -> string {
     if idx < 0 { return ""; }
     let len: i32 = string_len(listing);
@@ -3709,6 +3763,59 @@ fn test_link_reloc_arenas() -> i32 {
     return 0;
 }
 
+/* PC-3b.3: arena-merge unit test — generic append + body-arena (parallel
+   bet/ed1-4 + separate sf) + pty-arena appends. */
+fn test_link_append_arenas() -> i32 {
+    let a: Vec<i32> = vec_new();
+    vec_push(a, 1);
+    vec_push(a, 2);
+    let b: Vec<i32> = vec_new();
+    vec_push(b, 3);
+    vec_push(b, 4);
+    link_append_vec(a, b);
+    if vec_len(a) != 4 { return 1; }
+    if vec_get(a, 2) != 3 { return 2; }
+    if vec_get(a, 3) != 4 { return 3; }
+    let dbet: Vec<i32> = vec_new();
+    let de1: Vec<i32> = vec_new();
+    let de2: Vec<i32> = vec_new();
+    let de3: Vec<i32> = vec_new();
+    let de4: Vec<i32> = vec_new();
+    let dsf: Vec<i32> = vec_new();
+    vec_push(dbet, 0); vec_push(de1, 0); vec_push(de2, 0); vec_push(de3, 0); vec_push(de4, 0);
+    vec_push(dsf, 9);
+    let sbet: Vec<i32> = vec_new();
+    let se1: Vec<i32> = vec_new();
+    let se2: Vec<i32> = vec_new();
+    let se3: Vec<i32> = vec_new();
+    let se4: Vec<i32> = vec_new();
+    let ssf: Vec<i32> = vec_new();
+    vec_push(sbet, 1); vec_push(se1, 11); vec_push(se2, 0); vec_push(se3, 0); vec_push(se4, 0);
+    vec_push(sbet, 2); vec_push(se1, 22); vec_push(se2, 0); vec_push(se3, 0); vec_push(se4, 0);
+    vec_push(ssf, 7); vec_push(ssf, 8);
+    link_append_body_arena(dbet, de1, de2, de3, de4, dsf, sbet, se1, se2, se3, se4, ssf);
+    if vec_len(dbet) != 3 { return 4; }
+    if vec_get(dbet, 1) != 1 { return 5; }
+    if vec_get(de1, 2) != 22 { return 6; }
+    if vec_len(dsf) != 3 { return 7; }
+    if vec_get(dsf, 2) != 8 { return 8; }
+    let dtt: Vec<i32> = vec_new();
+    let dt1: Vec<i32> = vec_new();
+    let dt2: Vec<i32> = vec_new();
+    let dt3: Vec<i32> = vec_new();
+    vec_push(dtt, 0); vec_push(dt1, 0); vec_push(dt2, 0); vec_push(dt3, 0);
+    let stt: Vec<i32> = vec_new();
+    let st1: Vec<i32> = vec_new();
+    let st2: Vec<i32> = vec_new();
+    let st3: Vec<i32> = vec_new();
+    vec_push(stt, 3); vec_push(st1, 5); vec_push(st2, 6); vec_push(st3, 0);
+    link_append_pty_arena(dtt, dt1, dt2, dt3, stt, st1, st2, st3);
+    if vec_len(dtt) != 2 { return 9; }
+    if vec_get(dtt, 1) != 3 { return 10; }
+    if vec_get(dt2, 1) != 6 { return 11; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_is_sv0();
     if r1 != 0 { return r1; }
@@ -3842,5 +3949,7 @@ fn main() -> i32 {
     if rpc3a != 0 { return 400 + rpc3a; }
     let rpc3b2: i32 = test_link_reloc_arenas();
     if rpc3b2 != 0 { return 410 + rpc3b2; }
+    let rpc3b3: i32 = test_link_append_arenas();
+    if rpc3b3 != 0 { return 420 + rpc3b3; }
     return 0;
 }

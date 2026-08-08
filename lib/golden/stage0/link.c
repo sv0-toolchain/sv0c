@@ -78,6 +78,9 @@ static void link_reloc_skip_neg(int v, int delta);
 static void link_reloc_item_arena(int it, int id1, int id2, int id3, int id4, int id5, int d_tok, int d_pp, int d_body, int d_paramname, int d_structname, int d_enumname);
 static void link_reloc_pty_arena(int pty_tt, int td1, int td2, int td3, int d_pty, int d_pp, int d_tok);
 static void link_reloc_body_arena(int bet, int ed1, int ed2, int ed3, int ed4, int d_body, int d_pp, int d_tok, int d_pty, int d_sf);
+static void link_append_vec(int dst, int src);
+static void link_append_body_arena(int d_bet, int d_ed1, int d_ed2, int d_ed3, int d_ed4, int d_sf, int s_bet, int s_ed1, int s_ed2, int s_ed3, int s_ed4, int s_sf);
+static void link_append_pty_arena(int d_tt, int d_td1, int d_td2, int d_td3, int s_tt, int s_td1, int s_td2, int s_td3);
 static const char* link_listing_path_at_index(const char* listing, int idx);
 static const char* link_listing_module_id_at_index(const char* listing, int idx);
 static const char* link_project_concat_sources_offsets_from_listing(const char* listing, int starts_out, int lens_out);
@@ -160,6 +163,7 @@ static int test_link_project_concat_sources_offsets_from_listing(void);
 static int test_split_module_name(void);
 static int test_link_project_dir_merge_two_files(void);
 static int test_link_reloc_arenas(void);
+static int test_link_append_arenas(void);
 
 static int is_sv0(const char* name) {
   int _sv0t0 = sv0_string_len(name);
@@ -1876,6 +1880,64 @@ static void link_reloc_body_arena(int bet, int ed1, int ed2, int ed3, int ed4, i
       }
     } else {
     }
+    i = (i + 1);
+  }
+  return;
+}
+
+static void link_append_vec(int dst, int src) {
+  int _sv0t0 = sv0_vec_len(src);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(src, i);
+    sv0_vec_push(dst, _sv0t1);
+    i = (i + 1);
+  }
+  return;
+}
+
+static void link_append_body_arena(int d_bet, int d_ed1, int d_ed2, int d_ed3, int d_ed4, int d_sf, int s_bet, int s_ed1, int s_ed2, int s_ed3, int s_ed4, int s_sf) {
+  int _sv0t0 = sv0_vec_len(s_bet);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(s_bet, i);
+    sv0_vec_push(d_bet, _sv0t1);
+    int _sv0t2 = sv0_vec_get(s_ed1, i);
+    sv0_vec_push(d_ed1, _sv0t2);
+    int _sv0t3 = sv0_vec_get(s_ed2, i);
+    sv0_vec_push(d_ed2, _sv0t3);
+    int _sv0t4 = sv0_vec_get(s_ed3, i);
+    sv0_vec_push(d_ed3, _sv0t4);
+    int _sv0t5 = sv0_vec_get(s_ed4, i);
+    sv0_vec_push(d_ed4, _sv0t5);
+    i = (i + 1);
+  }
+  int _sv0t6 = sv0_vec_len(s_sf);
+  int m = _sv0t6;
+  int j = 0;
+  while ((j < m)) {
+    int _sv0t7 = sv0_vec_get(s_sf, j);
+    sv0_vec_push(d_sf, _sv0t7);
+    j = (j + 1);
+  }
+  return;
+}
+
+static void link_append_pty_arena(int d_tt, int d_td1, int d_td2, int d_td3, int s_tt, int s_td1, int s_td2, int s_td3) {
+  int _sv0t0 = sv0_vec_len(s_tt);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(s_tt, i);
+    sv0_vec_push(d_tt, _sv0t1);
+    int _sv0t2 = sv0_vec_get(s_td1, i);
+    sv0_vec_push(d_td1, _sv0t2);
+    int _sv0t3 = sv0_vec_get(s_td2, i);
+    sv0_vec_push(d_td2, _sv0t3);
+    int _sv0t4 = sv0_vec_get(s_td3, i);
+    sv0_vec_push(d_td3, _sv0t4);
     i = (i + 1);
   }
   return;
@@ -6643,6 +6705,142 @@ static int test_link_reloc_arenas(void) {
   return 0;
 }
 
+static int test_link_append_arenas(void) {
+  int _sv0t0 = sv0_vec_new();
+  int a = _sv0t0;
+  sv0_vec_push(a, 1);
+  sv0_vec_push(a, 2);
+  int _sv0t1 = sv0_vec_new();
+  int b = _sv0t1;
+  sv0_vec_push(b, 3);
+  sv0_vec_push(b, 4);
+  link_append_vec(a, b);
+  int _sv0t3 = sv0_vec_len(a);
+  if ((_sv0t3 != 4)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(a, 2);
+  if ((_sv0t4 != 3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(a, 3);
+  if ((_sv0t5 != 4)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int dbet = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int de1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int de2 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int de3 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int de4 = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int dsf = _sv0t11;
+  sv0_vec_push(dbet, 0);
+  sv0_vec_push(de1, 0);
+  sv0_vec_push(de2, 0);
+  sv0_vec_push(de3, 0);
+  sv0_vec_push(de4, 0);
+  sv0_vec_push(dsf, 9);
+  int _sv0t12 = sv0_vec_new();
+  int sbet = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int se1 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int se2 = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int se3 = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int se4 = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int ssf = _sv0t17;
+  sv0_vec_push(sbet, 1);
+  sv0_vec_push(se1, 11);
+  sv0_vec_push(se2, 0);
+  sv0_vec_push(se3, 0);
+  sv0_vec_push(se4, 0);
+  sv0_vec_push(sbet, 2);
+  sv0_vec_push(se1, 22);
+  sv0_vec_push(se2, 0);
+  sv0_vec_push(se3, 0);
+  sv0_vec_push(se4, 0);
+  sv0_vec_push(ssf, 7);
+  sv0_vec_push(ssf, 8);
+  link_append_body_arena(dbet, de1, de2, de3, de4, dsf, sbet, se1, se2, se3, se4, ssf);
+  int _sv0t19 = sv0_vec_len(dbet);
+  if ((_sv0t19 != 3)) {
+    return 4;
+  } else {
+  }
+  int _sv0t20 = sv0_vec_get(dbet, 1);
+  if ((_sv0t20 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t21 = sv0_vec_get(de1, 2);
+  if ((_sv0t21 != 22)) {
+    return 6;
+  } else {
+  }
+  int _sv0t22 = sv0_vec_len(dsf);
+  if ((_sv0t22 != 3)) {
+    return 7;
+  } else {
+  }
+  int _sv0t23 = sv0_vec_get(dsf, 2);
+  if ((_sv0t23 != 8)) {
+    return 8;
+  } else {
+  }
+  int _sv0t24 = sv0_vec_new();
+  int dtt = _sv0t24;
+  int _sv0t25 = sv0_vec_new();
+  int dt1 = _sv0t25;
+  int _sv0t26 = sv0_vec_new();
+  int dt2 = _sv0t26;
+  int _sv0t27 = sv0_vec_new();
+  int dt3 = _sv0t27;
+  sv0_vec_push(dtt, 0);
+  sv0_vec_push(dt1, 0);
+  sv0_vec_push(dt2, 0);
+  sv0_vec_push(dt3, 0);
+  int _sv0t28 = sv0_vec_new();
+  int stt = _sv0t28;
+  int _sv0t29 = sv0_vec_new();
+  int st1 = _sv0t29;
+  int _sv0t30 = sv0_vec_new();
+  int st2 = _sv0t30;
+  int _sv0t31 = sv0_vec_new();
+  int st3 = _sv0t31;
+  sv0_vec_push(stt, 3);
+  sv0_vec_push(st1, 5);
+  sv0_vec_push(st2, 6);
+  sv0_vec_push(st3, 0);
+  link_append_pty_arena(dtt, dt1, dt2, dt3, stt, st1, st2, st3);
+  int _sv0t33 = sv0_vec_len(dtt);
+  if ((_sv0t33 != 2)) {
+    return 9;
+  } else {
+  }
+  int _sv0t34 = sv0_vec_get(dtt, 1);
+  if ((_sv0t34 != 3)) {
+    return 10;
+  } else {
+  }
+  int _sv0t35 = sv0_vec_get(dt2, 1);
+  if ((_sv0t35 != 6)) {
+    return 11;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_is_sv0();
   int r1 = _sv0t0;
@@ -7103,6 +7301,13 @@ int main(void) {
   if ((rpc3b2 != 0)) {
     int _sv0t130 = (410 + rpc3b2);
     return _sv0t130;
+  } else {
+  }
+  int _sv0t131 = test_link_append_arenas();
+  int rpc3b3 = _sv0t131;
+  if ((rpc3b3 != 0)) {
+    int _sv0t132 = (420 + rpc3b3);
+    return _sv0t132;
   } else {
   }
   return 0;
