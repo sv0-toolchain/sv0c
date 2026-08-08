@@ -234,6 +234,56 @@ confound from running `resolve_program` twice over the same arenas; redo it as a
 *separate* minimal function. Orchestration + padding are captured in §5c + here;
 `megaTU-main.sv0` reverted to keep the gates green.
 
+## 5e. PC-3b.4b root cause (2026-08-08): the defining-name mangle is fundamentally incompatible with the checker, AND unnecessary for acceptance
+
+The A-alone isolation (run as a standalone `test_megatu_check_a_alone` in
+`megaTU-main.sv0`, single-file `helper`+`main` mangled with mod `"a"`, no merge,
+single resolve) **bisected the fault to `check_program`**: mangle+pad complete
+(probe returns 51), `resolve_program` passes (probe returns 52), and
+`check_program` **panics with `vec: index out of bounds`**. The merged case did
+*not* panic (returned `-1`) only because B's appended tokens keep the bad read
+in-bounds — the merge **masks** the panic, it does not fix anything.
+
+**Root cause:** the token-model mangle (`link_item_arena_rewrite_defining_names`)
+repoints `id1` — the fn's *defining-name token index* — to a **synthetic ident
+token appended at the END of the token arena**. `handle_to_str` reads that fine
+(`"a__helper"`), which is why resolve passes. But `check_program`'s param scanners
+`scan_fn_param_names` / `scan_fn_param_type_tags` start at `name_tok_pos + 1` and
+walk the token stream **forward** (`p = p + 1`, unbounded) expecting the fn's
+`( params )` to immediately follow the name token. When the name token is a
+synthetic end-of-stream ident, `name_pos+1` is past the real `(params)` — off the
+end of the arena (single-file → OOB panic) or into foreign appended/B tokens
+(merged → wrong read → `-1`). This is the same *class* of defect as the tags bug
+(§5d): the "append synth token + repoint handle" model works for anything that
+`handle_to_str`s a name, but **breaks any pass that scans the token stream
+positionally from a name token** — and the checker's param logic does exactly that.
+Fixing it via the checker would mean rebuilding its param scanners to read from the
+item/param arenas (id2/id3, fpn/fpt) instead of re-scanning tokens — a large,
+risky checker refactor.
+
+**The reframe that avoids all of it:** the defining-name mangle exists only to
+disambiguate *genuinely colliding* top-level names across modules. **Neither
+acceptance fixture has any collision** — `modules_enum_match` = {`main`, `Signal`,
+`make`}, `modules_struct_type` = {`main`, `Point`, `origin`}, all distinct. So the
+merge for PC-3b.6 acceptance needs **NO mangle at all**: `linkProjectDir` =
+per-file parse → **reloc B by A's arena sizes** (PC-3b.2 primitives) → **contiguous
+append** (PC-3b.3 primitives) → single program. Contiguous append + uniform
+`d_tok` shift **preserves each file's `name → (params)` token adjacency**, so the
+checker's forward-scan works unchanged. Cross-module *type* refs (`Signal::On`,
+`Point`) resolve through the **import-alias canonicalization** path (Epics 1/2 in
+the reference; PC-2e is its sv0 transliteration), **not** through link mangling.
+
+**Revised plan for PC-3b.4b:** implement **collision-free merge** (reloc + append,
+no `link_*_rewrite_*` mangle, no tag padding) in the compose main. Validate first
+on a two-file no-collision program where B calls A's fn by plain name
+(A=`fn helper()->i32{return 7;}`, B=`fn main()->i32{return helper();}`): merged
+`helper`+`main`, `main` calls `helper`, resolve+check must PASS — this exercises the
+merge mechanism with zero mangle and zero PC-2e dependency. Then PC-2e (sv0-side
+import-alias canonicalization) + the `--project` CLI (PC-3b.5) complete acceptance
+on the real fixtures. The mangle (PC-3b.4a) is retained in `link.sv0` as unit-tested
+code but **deferred** to a future genuine-collision slice; it must not be on the
+acceptance path until the checker can consume mangled names positionally.
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the
