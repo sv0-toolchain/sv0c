@@ -106,6 +106,37 @@ CLI/VM/native mains) are **single-file only** (`megaTU-main.sv0` hardcodes one
 - **Golden/gotcha:** editing `megaTU-main.sv0` / parser consumers ⇒ refresh
   stage0 + vm-parity goldens; never edit sv0c source mid-pre-push.
 
+## 5b. PC-3b.4 blocker found (2026-08-05): the mangle passes are partial
+
+Investigating 3b.4 surfaced that the M3-S-039 mangle primitives
+(`link_apply_map_link_pass_program_source` → `link_expr_path_rewrite_first_seg_handle`)
+only rewrite **ExprPath (body tag 1)** — the per-row handle bails on any other
+tag. They do **not** mangle:
+- **ExprStruct (24)** — intra-module struct construction `Point { … }`.
+- **pattern rows (30 PatExtra / 31 PatFieldEmbed)** — the `pp_start` of a
+  `PatStruct`/`PatEnum` arm (intra-module `match c { Color::Red => … }`).
+- (verify) the **pty TyName** first-seg for intra-module type references.
+
+SML `mapProgramUnit`/`mapPathSegs` rewrites all of these (that is why the
+existing `modules_types` fixture — struct+enum used *within* `lib` — passes via
+SML `--project`). So a faithful sv0 merge needs the mangle extended to cover
+`parse_program`'s real body-embedded path-bearing tags. This is a real
+prerequisite, decomposed as:
+
+- **PC-3b.4a — complete the mangle passes.** Extend the expr path-rewrite to
+  handle ExprStruct(24) + pattern rows(30/31) (and confirm pty TyName), matching
+  SML `mapPathSegs`. Standalone-testable in `link.sv0` (hand-built arenas, like
+  PC-3a/3b.2/3b.3) — **safe, low-risk**.
+- **PC-3b.4b — the per-file parse loop** (compose main): parse each file →
+  extended-mangle → reloc (3b.2) → merge (3b.3). Then 3b.5 `--project` CLI +
+  3b.6 acceptance.
+
+**Note on the cross-module reference model:** cross-*module* references
+(`use lib::Signal; Signal::On`) resolve via the import-alias canonicalization
+already added in PC-1/PC-2 (checker/lowering), **not** via link mangling. Link
+mangling covers each module's **defining names** + its **intra-module** qualified
+references. So 3b.4a is specifically about intra-module struct/pattern mangling.
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the
