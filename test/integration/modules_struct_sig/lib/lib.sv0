@@ -1,0 +1,12 @@
+module lib;
+
+/* Cross-module struct used in an IMPORTING module's fn SIGNATURE (param + return),
+   not just a local annotation (PC-3c). */
+struct Point {
+  x: i32,
+  y: i32,
+}
+
+fn origin() -> Point {
+  return Point { x: 3, y: 4, };
+}

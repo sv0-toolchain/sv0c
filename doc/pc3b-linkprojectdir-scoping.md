@@ -370,6 +370,25 @@ identical either way: duplicate top-level names across modules are unsupported
 (source-concat → duplicate-def error; SML mangles to avoid this — deferred, and it
 needs the checker to consume mangled defining names positionally per §5e).
 
+## 5i. PC-3c DONE (2026-08-08) — cross-module type in a fn signature; native exceeds SML here
+
+PC-3c targets `lib/checker.sv0` resolving a cross-module type used in a fn
+**signature** (param/return), e.g. importer `fn shift(p: Point) -> Point` for `Point`
+from `lib`. Fixture `test/integration/modules_struct_sig/`. Under source-concat the
+sv0 checker **already handles it** — native `--project` emits `Point shift(Point p)`
+and runs to **exit 42** (struct and the enum-signature analogue both). No sv0 change
+needed; added to the native acceptance (`scripts/pc3b6-native-project-acceptance.sh`).
+
+**Notable divergence:** the **SML `--project` reference FAILS this fixture with
+`E0406: unknown return type`** — its mangling `linkProjectDir` renames `Point →
+lib__Point` but the checker does not canonicalize the fn-signature return/param type
+through the import alias (Epic-1 covered only the local-declaration C type in
+lowering, not the checker's signature type). Source-concat sidesteps the whole class
+by never mangling. So this fixture is native-only (not wired into the SML integration
+harness). Fixing the frozen SML reference for full parity would be a separate slice
+(mirror `canonTyImport` into the SML checker's fn-signature type check) — not required
+for PC-3c, whose owning path is the sv0 checker.
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the
