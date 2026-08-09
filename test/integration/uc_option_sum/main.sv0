@@ -1,0 +1,15 @@
+/* Use case: Option-style enum with a payload + an unwrap_or helper via match. */
+enum Opt { None(), Some(i32) }
+
+fn unwrap_or(o: Opt, d: i32) -> i32 {
+  return match o {
+    Opt::None() => d,
+    Opt::Some(v) => v,
+  };
+}
+
+fn main() -> i32 {
+  let a: Opt = Opt::Some(40);
+  let b: Opt = Opt::None();
+  return unwrap_or(a, 0) + unwrap_or(b, 2);
+}
