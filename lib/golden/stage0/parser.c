@@ -2172,125 +2172,143 @@ static int parse_pat_atom(int tags, int starts, int ends, const char* source, in
       return _sv0t15;
     } else {
     }
+    int _sv0t16 = (pos + 1);
+    int _sv0t17 = ps_peek(tags, _sv0t16);
+    if ((_sv0t17 == 8)) {
+      int _sv0t18 = sv0_vec_len(path_pool);
+      int sp_start = _sv0t18;
+      int _sv0t19 = parse_path(tags, pos, path_pool);
+      int sp1 = _sv0t19;
+      if ((sp1 < 0)) {
+        int _sv0t20 = (0 - 1);
+        return _sv0t20;
+      } else {
+      }
+      int _sv0t21 = sv0_vec_len(path_pool);
+      int sp_count = (_sv0t21 - sp_start);
+      int _sv0t22 = path_pattern_from(tags, starts, ends, source, sp1, pat_tags, pat_data1, pat_data2, pat_data3, path_pool, sp_start, sp_count);
+      return _sv0t22;
+    } else {
+    }
     sv0_vec_push(pat_tags, 1);
     sv0_vec_push(pat_data1, pos);
     sv0_vec_push(pat_data2, 0);
     sv0_vec_push(pat_data3, 0);
-    int _sv0t16 = (pos + 1);
-    return _sv0t16;
+    int _sv0t23 = (pos + 1);
+    return _sv0t23;
   } else {
   }
   if ((t == 23)) {
-    int _sv0t17 = (pos + 1);
-    int _sv0t18 = ps_peek(tags, _sv0t17);
-    int nt = _sv0t18;
+    int _sv0t24 = (pos + 1);
+    int _sv0t25 = ps_peek(tags, _sv0t24);
+    int nt = _sv0t25;
     if ((nt == 0)) {
       sv0_vec_push(pat_tags, 2);
       sv0_vec_push(pat_data1, 0);
-      int _sv0t19 = (pos + 1);
-      sv0_vec_push(pat_data2, _sv0t19);
+      int _sv0t26 = (pos + 1);
+      sv0_vec_push(pat_data2, _sv0t26);
       sv0_vec_push(pat_data3, 1);
-      int _sv0t20 = (pos + 2);
-      return _sv0t20;
+      int _sv0t27 = (pos + 2);
+      return _sv0t27;
     } else {
     }
     if ((nt == 1)) {
       sv0_vec_push(pat_tags, 2);
       sv0_vec_push(pat_data1, 1);
-      int _sv0t21 = (pos + 1);
-      sv0_vec_push(pat_data2, _sv0t21);
+      int _sv0t28 = (pos + 1);
+      sv0_vec_push(pat_data2, _sv0t28);
       sv0_vec_push(pat_data3, 1);
-      int _sv0t22 = (pos + 2);
-      return _sv0t22;
+      int _sv0t29 = (pos + 2);
+      return _sv0t29;
     } else {
     }
-    int _sv0t23 = (0 - 1);
-    return _sv0t23;
+    int _sv0t30 = (0 - 1);
+    return _sv0t30;
   } else {
   }
-  int _sv0t24 = lit_from_tok(t);
-  int lt = _sv0t24;
+  int _sv0t31 = lit_from_tok(t);
+  int lt = _sv0t31;
   if ((lt >= 0)) {
     sv0_vec_push(pat_tags, 2);
     sv0_vec_push(pat_data1, lt);
     sv0_vec_push(pat_data2, pos);
     sv0_vec_push(pat_data3, 0);
-    int _sv0t25 = (pos + 1);
-    return _sv0t25;
+    int _sv0t32 = (pos + 1);
+    return _sv0t32;
   } else {
   }
   if ((t == 6)) {
     int p1 = (pos + 1);
-    int _sv0t26 = ps_peek(tags, p1);
-    if ((_sv0t26 == 7)) {
+    int _sv0t33 = ps_peek(tags, p1);
+    if ((_sv0t33 == 7)) {
       sv0_vec_push(pat_tags, 3);
       sv0_vec_push(pat_data1, 0);
       sv0_vec_push(pat_data2, 0);
       sv0_vec_push(pat_data3, 0);
-      int _sv0t27 = (p1 + 1);
-      return _sv0t27;
+      int _sv0t34 = (p1 + 1);
+      return _sv0t34;
     } else {
     }
-    int _sv0t28 = sv0_vec_len(pat_tags);
-    int first_idx = _sv0t28;
-    int _sv0t29 = parse_pat(tags, starts, ends, source, p1, pat_tags, pat_data1, pat_data2, pat_data3, path_pool);
-    int p2 = _sv0t29;
+    int _sv0t35 = sv0_vec_len(pat_tags);
+    int first_idx = _sv0t35;
+    int _sv0t36 = parse_pat(tags, starts, ends, source, p1, pat_tags, pat_data1, pat_data2, pat_data3, path_pool);
+    int p2 = _sv0t36;
     if ((p2 < 0)) {
-      int _sv0t30 = (0 - 1);
-      return _sv0t30;
+      int _sv0t37 = (0 - 1);
+      return _sv0t37;
     } else {
     }
-    int _sv0t31 = ps_peek(tags, p2);
-    if ((_sv0t31 == 7)) {
-      int _sv0t32 = (p2 + 1);
-      return _sv0t32;
+    int _sv0t38 = ps_peek(tags, p2);
+    if ((_sv0t38 == 7)) {
+      int _sv0t39 = (p2 + 1);
+      return _sv0t39;
     } else {
     }
-    int _sv0t33 = ps_peek(tags, p2);
-    if ((_sv0t33 == 12)) {
+    int _sv0t40 = ps_peek(tags, p2);
+    if ((_sv0t40 == 12)) {
       int p = (p2 + 1);
       int count = 1;
       int done = 0;
       while ((done != 1)) {
-        int _sv0t34 = ps_peek(tags, p);
-        if ((_sv0t34 == 7)) {
+        int _sv0t41 = ps_peek(tags, p);
+        if ((_sv0t41 == 7)) {
           sv0_vec_push(pat_tags, 3);
           sv0_vec_push(pat_data1, first_idx);
           sv0_vec_push(pat_data2, count);
           sv0_vec_push(pat_data3, 0);
-          int _sv0t35 = (p + 1);
-          return _sv0t35;
+          int _sv0t42 = (p + 1);
+          return _sv0t42;
         } else {
         }
-        int _sv0t36 = parse_pat(tags, starts, ends, source, p, pat_tags, pat_data1, pat_data2, pat_data3, path_pool);
-        int pn = _sv0t36;
+        int _sv0t43 = parse_pat(tags, starts, ends, source, p, pat_tags, pat_data1, pat_data2, pat_data3, path_pool);
+        int pn = _sv0t43;
         if ((pn < 0)) {
-          int _sv0t37 = (0 - 1);
-          return _sv0t37;
+          int _sv0t44 = (0 - 1);
+          return _sv0t44;
         } else {
         }
         count = (count + 1);
         p = pn;
-        int _sv0t38 = ps_peek(tags, p);
-        if ((_sv0t38 == 12)) {
+        int _sv0t45 = ps_peek(tags, p);
+        if ((_sv0t45 == 12)) {
           p = (p + 1);
         } else {
-          int _sv0t39 = ps_peek(tags, p);
-          if ((_sv0t39 != 7)) {
-            int _sv0t40 = (0 - 1);
-            return _sv0t40;
+          int _sv0t46 = ps_peek(tags, p);
+          if ((_sv0t46 != 7)) {
+            int _sv0t47 = (0 - 1);
+            return _sv0t47;
           } else {
           }
         }
       }
     } else {
     }
-    int _sv0t41 = (0 - 1);
-    return _sv0t41;
+    int _sv0t48 = (0 - 1);
+    return _sv0t48;
   } else {
   }
-  int _sv0t42 = (0 - 1);
-  return _sv0t42;
+  int _sv0t49 = (0 - 1);
+  return _sv0t49;
 }
 
 static int parse_pat(int tags, int starts, int ends, const char* source, int pos, int pat_tags, int pat_data1, int pat_data2, int pat_data3, int path_pool) {

@@ -601,6 +601,24 @@ structure Lowering :> LOWERING = struct
         in
           ([], cond, bindPre)
         end
+    | Ast.PatStruct ([_], fieldPats, _) =>
+        (* Plain struct pattern `S { f, … }` (single-segment path): irrefutable (one
+           shape), so bind each field via its real C member name (not the enum payload
+           p<i> slot used by the two-segment `E::V { … }` case above). *)
+        let
+          val bindPre =
+            List.concat
+              (map (fn (fname, pat) =>
+                 case pat of
+                   Ast.PatWild _ => []
+                 | Ast.PatBind (xb, _) =>
+                     [ Ir.Assign
+                         (xb, Ir.Literal (Ir.VMember (Ir.VVar scrVar, fname))) ]
+                 | _ => raise Fail "lowering: nested struct field pattern not supported")
+               fieldPats)
+        in
+          ([], Ir.Literal (Ir.VBool true), bindPre)
+        end
     | _ => raise Fail "lowering: match pattern not supported"
 
   fun lowerExprToValue (e : Ast.expr) : Ir.instr list * Ir.value =

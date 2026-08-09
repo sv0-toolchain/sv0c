@@ -304,6 +304,11 @@ structure Parser :> PARSER = struct
            (Token.COLONCOLON, _) :: _ =>
              let val (path, r2) = parsePath ts
              in pathPatternFrom (ts, path, r2) end
+         (* `Ident { … }` in pattern position is a plain struct pattern (PC-4b).
+            Unambiguous here: the scrutinee's `{` is parsed by parseExpr, not here. *)
+         | (Token.LBRACE, _) :: _ =>
+             let val (path, r2) = parsePath ts
+             in pathPatternFrom (ts, path, r2) end
          | _ => (Ast.PatBind (i, s), r))
     | (Token.MINUS, s0) :: r1 =>
         (case r1 of

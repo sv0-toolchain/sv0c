@@ -2290,7 +2290,43 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                             }
                         }
                     } else {
+                        /* PC-4b: plain struct pattern `S { f, … }` (single-segment
+                           path): irrefutable (cond true); extract each field by its
+                           real C member name — VMember(scrut, field_name_tok) — not
+                           the enum payload p<i> slot used by the 2-segment case. */
                         cexp = Expr::Literal(box_new(Value::VBoolTrue));
+                        let meta_idxp: i32 = paux4 - 1;
+                        if vec_get(et, meta_idxp) == 32 {
+                            let sfcp: i32 = vec_get(ed1, meta_idxp);
+                            let first_embp: i32 = vec_get(ed2, meta_idxp);
+                            if sfcp > 0 {
+                                let mut fjp: i32 = 0;
+                                while fjp < sfcp {
+                                    let eidxp: i32 = first_embp + fjp;
+                                    if vec_get(et, eidxp) == 31 {
+                                        if vec_get(ed4, eidxp) == 1 {
+                                            let bind_tokp: i32 = vec_get(ed1, eidxp);
+                                            let fld_metap: i32 = vec_get(ed3, eidxp);
+                                            let mut fnam_tokp: i32 = bind_tokp;
+                                            if fld_metap != 0 {
+                                                fnam_tokp = fld_metap;
+                                            }
+                                            if bind_tokp >= 0 {
+                                                let rhsvp: Value = Value::VMember(
+                                                    box_new(Value::VVar(scrut_var)),
+                                                    fnam_tokp);
+                                                let asgxp: Instr = Instr::Assign(
+                                                    bind_tokp,
+                                                    box_new(Expr::Literal(
+                                                        box_new(rhsvp))));
+                                                vec_push(bind_instrs, box_new(asgxp));
+                                            }
+                                        }
+                                    }
+                                    fjp = fjp + 1;
+                                }
+                            }
+                        }
                     }
                 } else {
                     cexp = Expr::Literal(box_new(Value::VBoolFalse));
