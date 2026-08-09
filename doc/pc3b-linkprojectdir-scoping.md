@@ -336,13 +336,39 @@ gaps beyond the fn-only PC-3b.4b validation:
 With both fixes, a compose-main collision-free merge of **modules_enum_match** AND
 **modules_struct_type** (module + use + enum/struct + match/field-access + typed &
 untyped let) **resolves and type-checks (exit 77), zero mangle.** Diagnostic reverted;
-primitives + PC-2e fallback are committed and gated. **Next:** PC-3b.5 — wire the
-sv0-native `--project` CLI to a general N-file linkProjectDir fold (read_dir →
-per-file parse → reloc+append using these primitives + the unmangled use fallback) →
-then PC-3b.6 acceptance (native `--project` on the two fixtures = exit 42).
+primitives + PC-2e fallback are committed and gated.
 
-**Next (superseded plan):** PC-3b.5 (`--project` CLI → general N-file linkProjectDir
-fold reusing these primitives), then PC-3b.6 acceptance.
+## 5h. PC-3b.5 + PC-3b.6 DONE via SOURCE-CONCAT (2026-08-08) — the arena merge was not the CLI path
+
+Wiring the CLI surfaced a simpler truth: for the **collision-free** case you do
+**not** need to merge parsed arenas at all — **concatenate the project's .sv0 sources
+into one string and parse it once**. The parser already accepts a sequence of
+top-level `module`/`use`/`enum`/`struct`/`fn` items in a single TU, so one parse
+yields the merged arenas directly with correct byte offsets — no reloc, no append, no
+sidecar bookkeeping. `link_project_concat_sources_from_dir` (already in link.sv0:
+`read_dir` → per-path `read_file` → concat with `\n`, lexicographic so `lib/…`
+precedes `main`) does exactly this.
+
+**PC-3b.5 (parent-only, scripts/build-sv0-megatu-native.sh):** the native compiler's
+control file now accepts `--project <dir>` (else a single .sv0 path); in project mode
+the CLI-derived compose main sets `source =
+link_project_concat_sources_from_dir(dir)`, then runs the unchanged
+tokenize→parse→resolve→check→lower→emit pipeline. One control file ⇒ no stale-state
+contamination of the single-file corpus/self-host harnesses.
+
+**PC-3b.6 acceptance (scripts/pc3b6-native-project-acceptance.sh + CI step in
+self-host-native.yml):** native `--project` on **modules_enum_match** AND
+**modules_struct_type** → emit → cc → run → **exit 42**; single-file mode unregressed.
+
+**Load-bearing vs not:** source-concat **relies on PC-2e** (the `apply_use_clause`
+unmangled fallback — the `use lib::X` clauses resolve against the bare `X` in the
+concatenated program) but **bypasses the arena-reloc primitives entirely** (PC-3b.2/3/4b
++ the Call/Match sidecar reloc). Those primitives remain a correct, unit-tested library
+for a future scenario that must merge already-parsed arenas (incremental comp /
+mangling-based linking); the CLI does not use them. The collision-free constraint is
+identical either way: duplicate top-level names across modules are unsupported
+(source-concat → duplicate-def error; SML mangles to avoid this — deferred, and it
+needs the checker to consume mangled defining names positionally per §5e).
 
 ## 6. Recommendation
 
