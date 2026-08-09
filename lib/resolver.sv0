@@ -1336,6 +1336,24 @@ fn apply_use_clause(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
         vec_push(mod_tys, nm_tok);
         return 0;
     }
+    /* PC-2e collision-free fallback: sv0's linkProjectDir merges modules WITHOUT
+       mangling top-level names (unlike the SML reference — see
+       doc/pc3b-linkprojectdir-scoping.md §5e/§5f, the token-model defining-name
+       mangle breaks check_program's forward param scan). So in a merged program
+       `use lib::make` finds the bare `make`/`Signal` definition, not `lib__make`.
+       Register the short alias against the unmangled target. */
+    let uarity: i32 = res_lookup_fn_arity_str(fn_arities, nm_str,
+                                              source, starts, ends);
+    if uarity >= 0 {
+        vec_push(mod_vals, nm_tok);
+        vec_push(fn_arities, nm_tok);
+        vec_push(fn_arities, uarity);
+        return 0;
+    }
+    if res_type_exists(mod_tys, nm_str, source, starts, ends) {
+        vec_push(mod_tys, nm_tok);
+        return 0;
+    }
     return 309;
 }
 
@@ -2210,6 +2228,52 @@ fn test_apply_use_clause_unknown() -> i32 {
     return 0;
 }
 
+/* PC-2e: unmangled fallback — sv0's collision-free linkProjectDir merge leaves
+   top-level names UNMANGLED, so `use mymod::bar` must resolve against the bare
+   `bar`/`Sig` definition (not `mymod__bar`). Covers both fallback branches. */
+fn test_apply_use_clause_unmangled() -> i32 {
+    let source: string = "mymod bar Sig";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 5);
+    vec_push(starts, 6); vec_push(ends, 9);
+    vec_push(starts, 10); vec_push(ends, 13);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    vec_push(mt, 2);
+    let fa: Vec<i32> = vec_new();
+    vec_push(fa, 1);
+    vec_push(fa, 3);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    vec_push(it, 5);
+    vec_push(id1, 0);
+    vec_push(id2, 2);
+    let r: i32 = apply_use_clause(it, id1, id2, 0,
+                                   source, starts, ends,
+                                   mv, mt, fa, pp);
+    if r != 0 { return 1; }
+    if res_lookup_fn_arity_str(fa, "bar", source, starts, ends) != 3 { return 2; }
+    let pp2: Vec<i32> = vec_new();
+    vec_push(pp2, 0);
+    vec_push(pp2, 2);
+    let it2: Vec<i32> = vec_new();
+    let id1b: Vec<i32> = vec_new();
+    let id2b: Vec<i32> = vec_new();
+    vec_push(it2, 5);
+    vec_push(id1b, 0);
+    vec_push(id2b, 2);
+    let r2: i32 = apply_use_clause(it2, id1b, id2b, 0,
+                                    source, starts, ends,
+                                    mv, mt, fa, pp2);
+    if r2 != 0 { return 3; }
+    return 0;
+}
+
 fn test_path_join_vec_three() -> i32 {
     let source: string = "a b c";
     let starts: Vec<i32> = vec_new();
@@ -2656,6 +2720,8 @@ fn main() -> i32 {
     if r36 != 0 { return 156 + r36; }
     let r37: i32 = test_apply_use_clause_unknown();
     if r37 != 0 { return 159 + r37; }
+    let r37e: i32 = test_apply_use_clause_unmangled();
+    if r37e != 0 { return 159 + r37e; }
     let r37b: i32 = test_resolve_top_item_struct_field();
     if r37b != 0 { return 161 + r37b; }
     let r37c: i32 = test_resolve_top_item_fn_signature_contracts();
