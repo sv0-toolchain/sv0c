@@ -314,10 +314,35 @@ assertions, stage0 golden refreshed):
    `d4`.**
 
 The compose-main orchestration was reverted (megaTU-main stays the smoke main,
-gates green); the reusable primitives stay in `link.sv0`. **Next:** PC-2e (sv0-side
-import-alias canonicalization) so cross-module *type* refs check on the real
-fixtures, then PC-3b.5 (`--project` CLI → general N-file linkProjectDir fold reusing
-these primitives), then PC-3b.6 acceptance.
+gates green); the reusable primitives stay in `link.sv0`.
+
+## 5g. Enum/struct/match merge completeness + PC-2e (2026-08-08): BOTH acceptance fixtures resolve+check
+
+Merging the real fixtures (lib as A so defs precede uses; main as B) exposed two more
+gaps beyond the fn-only PC-3b.4b validation:
+
+1. **PC-2e (resolver):** `apply_use_clause` built the *mangled* target
+   `mangle_use_target(lib,make)=lib__make` and looked that up → E0309, because the
+   collision-free merge leaves the def unmangled (`make`). Fix = an **unmangled
+   fallback** (look up the bare `nm_str` in fn_arities/mod_tys, register the short
+   alias). Backward-compatible; genuine unknowns still 309. (sv0c e6bf9e3.)
+2. **pp sidecar for Call/Match (link):** the pp-heterogeneity fix (§5f) handled only
+   Block(9); **Call(4) and Match(11) also carry a `d4` pp sidecar** of body indices
+   (see pc3b1 §pp-heterogeneity table). Their `d4` base wasn't shifted by `dPP` and
+   their pp contents were mis-shifted by `dTok` instead of `dBody`, so resolving
+   `main`'s `match`/call body OOB-panicked. Fix = generalize both link primitives to
+   tags 4/9/11.
+
+With both fixes, a compose-main collision-free merge of **modules_enum_match** AND
+**modules_struct_type** (module + use + enum/struct + match/field-access + typed &
+untyped let) **resolves and type-checks (exit 77), zero mangle.** Diagnostic reverted;
+primitives + PC-2e fallback are committed and gated. **Next:** PC-3b.5 — wire the
+sv0-native `--project` CLI to a general N-file linkProjectDir fold (read_dir →
+per-file parse → reloc+append using these primitives + the unmangled use fallback) →
+then PC-3b.6 acceptance (native `--project` on the two fixtures = exit 42).
+
+**Next (superseded plan):** PC-3b.5 (`--project` CLI → general N-file linkProjectDir
+fold reusing these primitives), then PC-3b.6 acceptance.
 
 ## 6. Recommendation
 

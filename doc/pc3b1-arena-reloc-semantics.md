@@ -102,21 +102,31 @@ This is the one column needing tag-aware handling beyond the table.
 | `enum_variant_payload_base_by_item` | base into `enum_variant_payload_ty_root` | `dPayloadTy` |
 | `enum_variant_payload_count_by_item`, `enum_variant_payload_max_by_item` | count | — |
 
-## pp heterogeneity (CORRECTION, 2026-08-08 — found in PC-3b.4b)
+## pp heterogeneity (CORRECTION, 2026-08-08 — found in PC-3b.4b, extended in PC-2e/enum-struct)
 
 The `pp` pool is **not** uniformly token indices. `parser.sv0
-block_stmt_sidecar_push` stores each block's ordered **body-expr** statement indices
-in `pp` (a block's statements are interleaved with their sub-exprs in the body arena
-so `stmts_first + si` can't recover order); the block records that sidecar's base in
-`ExprBlock.d4 = offset+1` (0 = no sidecar). So a `pp` entry owned by a block's
-sidecar is a **body index** (`dBody`); every other `pp` entry (path segments from
-`ExprPath`/`ExprStruct`/`TyName`/`ItemUse`) is a **token index** (`dTok`). A single
-whole-column shift is therefore wrong. `lib/link.sv0
-link_reloc_pp_contents_hetero(pp, bet, ed2, ed4, dTok, dBody)` marks the block-order
-ranges (from tag-9 `d4` bases) and shifts them by `dBody`, the rest by `dTok`; and
-`link_reloc_body_arena` tag-9 shifts `ExprBlock.d4` by `dPP`. Even single-statement
-blocks create a sidecar, so this affects every fn body. (This corrects the `pp` row
-above and the omitted `ExprBlock.d4` in the body-expr table.)
+block_stmt_sidecar_push` stores an ordered list of **body-expr** child indices in
+`pp` (children are interleaved with their sub-exprs in the body arena, so
+`first + si` can't recover order); the owning node records that sidecar's base in
+its **`d4 = offset+1`** column (0 = no sidecar). **Three body tags carry such a
+sidecar** (the only `block_stmt_sidecar_push` callers — parser.sv0 L1627/2560/2584/3017):
+
+| tag | node | count column | sidecar-base column |
+|-----|------|--------------|---------------------|
+| 4 | Call (arg roots) | `ed3` (args_count) | `ed4` |
+| 9 | Block (stmt ids) | `ed2` (stmt_count) | `ed4` |
+| 11 | Match (arm ids) | `ed3` (arms_count) | `ed4` |
+
+(MethodCall tag 5 is **contiguous** — `margs_first + mi`, no sidecar.) So a `pp`
+entry owned by one of these sidecars is a **body index** (`dBody`); every other `pp`
+entry (path segments from `ExprPath`/`ExprStruct`/`TyName`/`ItemUse`) is a **token
+index** (`dTok`). A single whole-column shift is wrong. Fixes in `lib/link.sv0`:
+`link_reloc_pp_contents_hetero(pp, bet, ed2, ed3, ed4, dTok, dBody)` marks the
+sidecar ranges (base `d4-1`, count per `link_pp_sidecar_count`) → `dBody`, the rest
+→ `dTok`; and `link_reloc_body_arena` shifts the `d4` base by `dPP` for **all three**
+tags (4/9/11). Even single-statement blocks / single-arg calls create a sidecar, so
+this affects nearly every fn body. (This corrects the `pp` row above and the omitted
+`d4` sidecar-base columns in the body-expr table for Call/Block/Match.)
 
 ## Consequences for PC-3b.2 (the relocation pass)
 
