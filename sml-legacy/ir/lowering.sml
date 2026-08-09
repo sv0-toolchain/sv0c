@@ -154,7 +154,7 @@ structure Lowering :> LOWERING = struct
 
   fun exprInitCty (e : Ast.expr) : string =
     case e of
-      Ast.ExprStruct (n :: _, _, _) => n
+      Ast.ExprStruct (n :: _, _, _) => canonTyName n
     | Ast.ExprPath ([en, vn], _) => #1 (resolveEnumCtorPath en vn)
     | Ast.ExprCall (Ast.ExprPath ([f], _), _, _) => calleeRetCty f
     | Ast.ExprCall (Ast.ExprPath ([en, vn], _), _, _) =>
@@ -185,10 +185,12 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprLit (Ast.IntLit _, _) => "int"
     | _ => "int"
 
-  fun structFields (sn : string) : string list =
+  fun structFields (sn0 : string) : string list =
+    let val sn = canonTyName sn0 in
     case List.find (fn (n, _) => n = sn) (!structFieldOrder) of
       SOME (_, fs) => fs
     | NONE => raise Fail ("lowering: unknown struct `" ^ sn ^ "`")
+    end
 
   fun enumTag (en0 : string) (vn : string) : int =
     let val en = canonTyName en0 in
@@ -629,7 +631,10 @@ structure Lowering :> LOWERING = struct
         let val (i1, v1) = lowerExprToValue e1 in (i1, Ir.VMember (v1, f)) end
     | Ast.ExprStruct (path, fields, _) =>
         let
-          val sn = hd path
+          (* Canonicalize a cross-module struct name (Point -> lib__Point) so the
+             emitted temp declaration uses the real (mangled) C type, not the
+             use-imported short name -> `Point _sv0t0;` (undeclared type). *)
+          val sn = canonTyName (hd path)
           val order = structFields sn
           val t = freshTmp ()
           fun findField n =

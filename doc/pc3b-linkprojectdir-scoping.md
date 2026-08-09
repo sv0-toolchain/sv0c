@@ -379,15 +379,24 @@ sv0 checker **already handles it** — native `--project` emits `Point shift(Poi
 and runs to **exit 42** (struct and the enum-signature analogue both). No sv0 change
 needed; added to the native acceptance (`scripts/pc3b6-native-project-acceptance.sh`).
 
-**Notable divergence:** the **SML `--project` reference FAILS this fixture with
-`E0406: unknown return type`** — its mangling `linkProjectDir` renames `Point →
-lib__Point` but the checker does not canonicalize the fn-signature return/param type
-through the import alias (Epic-1 covered only the local-declaration C type in
-lowering, not the checker's signature type). Source-concat sidesteps the whole class
-by never mangling. So this fixture is native-only (not wired into the SML integration
-harness). Fixing the frozen SML reference for full parity would be a separate slice
-(mirror `canonTyImport` into the SML checker's fn-signature type check) — not required
-for PC-3c, whose owning path is the sv0 checker.
+**SML reference parity (2026-08-08):** the SML `--project` initially FAILED this
+fixture — its mangling `linkProjectDir` renames `Point → lib__Point`, so every
+type-name site must canonicalize the imported short name through the import alias, and
+four were missing. Fixed (peeling them off one build at a time):
+1. **checker `E0406` (fn signature):** `modEnvFromProg` typed fn signatures
+   (`itemFnTy → astTyToTy → canonTyImport`) in the `one` fold *before* the `oneUse`
+   fold registered the `Point↦lib__Point` type alias → added a `preAliasUse` pre-pass
+   that registers the struct/enum type aliases first.
+2. **checker `E0400` (struct literal):** `ExprStruct` returned `TyStruct sn` with the
+   unmangled `sn` → `TyStruct (canonTyImport sn)`.
+3. **lowering unknown-struct:** `structFields` didn't canonicalize → `canonTyName sn0`.
+4. **lowering temp C type:** the `ExprStruct` `DeclNamed` emitted `Point _sv0t0;`
+   (undeclared) → `sn = canonTyName (hd path)` (+ `exprInitCty` for direct literal
+   lets). Now **both** pipelines run the fixture to exit 42; it is wired into the SML
+   `--project` integration harness too. Source-concat needed none of this — it never
+   mangles — which is exactly why it is the more robust linking model. These SML edits
+   are no-ops for single-file programs (`canonTyImport`/`canonTyName` are identity with
+   no import aliases), so no goldens shift.
 
 ## 6. Recommendation
 
