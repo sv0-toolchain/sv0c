@@ -97,6 +97,7 @@ static int test_resolve_stmt_let(void);
 static int test_apply_use_clause_value(void);
 static int test_apply_use_clause_type(void);
 static int test_apply_use_clause_unknown(void);
+static int test_apply_use_clause_unmangled(void);
 static int test_path_join_vec_three(void);
 static int test_resolve_top_item_struct_field(void);
 static int test_resolve_top_item_fn_signature_contracts(void);
@@ -2018,6 +2019,21 @@ static int apply_use_clause(int it, int id1, int id2, int idx, const char* sourc
     return 0;
   } else {
   }
+  int _sv0t11 = res_lookup_fn_arity_str(fn_arities, nm_str, source, starts, ends);
+  int uarity = _sv0t11;
+  if ((uarity >= 0)) {
+    sv0_vec_push(mod_vals, nm_tok);
+    sv0_vec_push(fn_arities, nm_tok);
+    sv0_vec_push(fn_arities, uarity);
+    return 0;
+  } else {
+  }
+  int _sv0t12 = res_type_exists(mod_tys, nm_str, source, starts, ends);
+  if (_sv0t12) {
+    sv0_vec_push(mod_tys, nm_tok);
+    return 0;
+  } else {
+  }
   return 309;
 }
 
@@ -3836,6 +3852,74 @@ static int test_apply_use_clause_unknown(void) {
   return 0;
 }
 
+static int test_apply_use_clause_unmangled(void) {
+  const char* source;
+  source = "mymod bar Sig";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 5);
+  sv0_vec_push(starts, 6);
+  sv0_vec_push(ends, 9);
+  sv0_vec_push(starts, 10);
+  sv0_vec_push(ends, 13);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  sv0_vec_push(mt, 2);
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  sv0_vec_push(fa, 1);
+  sv0_vec_push(fa, 3);
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t6 = sv0_vec_new();
+  int it = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id1 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id2 = _sv0t8;
+  sv0_vec_push(it, 5);
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(id2, 2);
+  int _sv0t9 = apply_use_clause(it, id1, id2, 0, source, starts, ends, mv, mt, fa, pp);
+  int r = _sv0t9;
+  if ((r != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t10 = res_lookup_fn_arity_str(fa, "bar", source, starts, ends);
+  if ((_sv0t10 != 3)) {
+    return 2;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int pp2 = _sv0t11;
+  sv0_vec_push(pp2, 0);
+  sv0_vec_push(pp2, 2);
+  int _sv0t12 = sv0_vec_new();
+  int it2 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int id1b = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int id2b = _sv0t14;
+  sv0_vec_push(it2, 5);
+  sv0_vec_push(id1b, 0);
+  sv0_vec_push(id2b, 2);
+  int _sv0t15 = apply_use_clause(it2, id1b, id2b, 0, source, starts, ends, mv, mt, fa, pp2);
+  int r2 = _sv0t15;
+  if ((r2 != 0)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 static int test_path_join_vec_three(void) {
   const char* source;
   source = "a b c";
@@ -4652,46 +4736,53 @@ int main(void) {
     return _sv0t72;
   } else {
   }
-  int _sv0t73 = test_resolve_top_item_struct_field();
-  int r37b = _sv0t73;
-  if ((r37b != 0)) {
-    int _sv0t74 = (161 + r37b);
+  int _sv0t73 = test_apply_use_clause_unmangled();
+  int r37e = _sv0t73;
+  if ((r37e != 0)) {
+    int _sv0t74 = (159 + r37e);
     return _sv0t74;
   } else {
   }
-  int _sv0t75 = test_resolve_top_item_fn_signature_contracts();
-  int r37c = _sv0t75;
-  if ((r37c != 0)) {
-    int _sv0t76 = (162 + r37c);
+  int _sv0t75 = test_resolve_top_item_struct_field();
+  int r37b = _sv0t75;
+  if ((r37b != 0)) {
+    int _sv0t76 = (161 + r37b);
     return _sv0t76;
   } else {
   }
-  int _sv0t77 = test_resolve_top_item_enum_payload_type();
-  int r37d = _sv0t77;
-  if ((r37d != 0)) {
-    int _sv0t78 = (163 + r37d);
+  int _sv0t77 = test_resolve_top_item_fn_signature_contracts();
+  int r37c = _sv0t77;
+  if ((r37c != 0)) {
+    int _sv0t78 = (162 + r37c);
     return _sv0t78;
   } else {
   }
-  int _sv0t79 = test_resolve_program();
-  int r38 = _sv0t79;
-  if ((r38 != 0)) {
-    int _sv0t80 = (164 + r38);
+  int _sv0t79 = test_resolve_top_item_enum_payload_type();
+  int r37d = _sv0t79;
+  if ((r37d != 0)) {
+    int _sv0t80 = (163 + r37d);
     return _sv0t80;
   } else {
   }
-  int _sv0t81 = test_resolve_program_cast_type_roots();
-  int r38a = _sv0t81;
-  if ((r38a != 0)) {
-    int _sv0t82 = (166 + r38a);
+  int _sv0t81 = test_resolve_program();
+  int r38 = _sv0t81;
+  if ((r38 != 0)) {
+    int _sv0t82 = (164 + r38);
     return _sv0t82;
   } else {
   }
-  int _sv0t83 = test_path_join_vec_three();
-  int r39 = _sv0t83;
-  if ((r39 != 0)) {
-    int _sv0t84 = (167 + r39);
+  int _sv0t83 = test_resolve_program_cast_type_roots();
+  int r38a = _sv0t83;
+  if ((r38a != 0)) {
+    int _sv0t84 = (166 + r38a);
     return _sv0t84;
+  } else {
+  }
+  int _sv0t85 = test_path_join_vec_three();
+  int r39 = _sv0t85;
+  if ((r39 != 0)) {
+    int _sv0t86 = (167 + r39);
+    return _sv0t86;
   } else {
   }
   return 0;
