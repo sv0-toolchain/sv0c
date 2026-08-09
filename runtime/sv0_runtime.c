@@ -15,6 +15,19 @@ typedef struct {
   size_t cap;
 } sv0_path_list;
 
+/* Self-contained C string duplicate: `strdup` is POSIX, not C99, so a strict
+   `-std=c99` compile (as the corpus/acceptance harnesses use) leaves it undeclared
+   on glibc. An implicit `int strdup()` then TRUNCATES the returned 64-bit pointer to
+   32 bits -> a garbage `char*` -> SIGSEGV in the qsort comparator. macOS declares
+   strdup even in c99 mode, hiding the bug. Use only C89 <string.h>/<stdlib.h> funcs. */
+static char *sv0_dup_cstr(const char *s) {
+  size_t n = strlen(s) + 1u;
+  char *r = (char *)malloc(n);
+  if (r)
+    memcpy(r, s, n);
+  return r;
+}
+
 static void sv0_path_list_push(sv0_path_list *pl, const char *s) {
   if (pl->len >= pl->cap) {
     pl->cap = pl->cap ? pl->cap * 2 : 16u;
@@ -22,7 +35,7 @@ static void sv0_path_list_push(sv0_path_list *pl, const char *s) {
     if (!pl->items)
       sv0_panic("read_dir: realloc failed");
   }
-  pl->items[pl->len++] = strdup(s);
+  pl->items[pl->len++] = sv0_dup_cstr(s);
   if (!pl->items[pl->len - 1])
     sv0_panic("read_dir: strdup failed");
 }
