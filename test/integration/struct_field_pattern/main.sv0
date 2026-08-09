@@ -1,0 +1,11 @@
+/* PC-4b: plain struct field pattern in a `match` — `S { x, y } => …`.
+   Irrefutable single-variant destructure; fields bind to their real members.
+   Expected exit 42 (8 + 34). */
+struct Point { x: i32, y: i32 }
+
+fn main() -> i32 {
+  let p: Point = Point { x: 8, y: 34 };
+  return match p {
+    Point { x, y } => x + y,
+  };
+}

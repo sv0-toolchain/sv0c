@@ -409,6 +409,22 @@ structure Checker :> CHECKER = struct
           | _ => raise Fail ("E0429: struct pattern on non-struct variant `"
                              ^ en ^ "::" ^ vn ^ "`")
         end
+    | Ast.PatStruct ([sn], fieldPats, _) =>
+        (* Plain struct pattern `S { f: pat, … }` (single-segment path): irrefutable,
+           binds each field to its struct field type. The two-segment `E::V { … }`
+           enum-variant case is handled above. *)
+        let
+          val () = expect (scrutTy, Types.TyStruct (canonTyImport sn))
+          val fs = fieldsOfStruct sn
+          fun bindField env (fieldName, fieldPat) =
+            case List.find (fn (n, _) => n = fieldName) fs of
+              SOME (_, fieldTy) => bindPat fieldTy fieldPat env
+            | NONE =>
+                raise Fail ("E0429: unknown field `" ^ fieldName
+                            ^ "` in struct pattern `" ^ sn ^ "`")
+        in
+          List.foldl (fn (fp, e) => bindField e fp) env fieldPats
+        end
     | _ => raise Fail "E0428: pattern form not supported in match"
 
   (* Multi-segment path calls: builtins, quantifiers, println, user fns. *)
@@ -757,6 +773,7 @@ structure Checker :> CHECKER = struct
               Types.TyEnum _ => ()
             | Types.TyBool => ()
             | Types.TyInt 32 => ()
+            | Types.TyStruct _ => ()  (* plain struct pattern match (PC-4b) *)
             | _ =>
                 raise Fail
                   "E0433: match scrutinee must be enum, bool, or i32 in this slice"

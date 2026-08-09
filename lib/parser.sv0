@@ -1024,6 +1024,18 @@ fn parse_pat_atom(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                       pat_data3, path_pool,
                                       pp_start, pp_count);
         }
+        /* `Ident { … }` in pattern position = plain struct pattern (PC-4b).
+           Unambiguous here: the match scrutinee's `{` is parsed by parse_expr. */
+        if ps_peek(tags, pos + 1) == 8 {
+            let sp_start: i32 = vec_len(path_pool);
+            let sp1: i32 = parse_path(tags, pos, path_pool);
+            if sp1 < 0 { return 0 - 1; }
+            let sp_count: i32 = vec_len(path_pool) - sp_start;
+            return path_pattern_from(tags, starts, ends, source, sp1,
+                                      pat_tags, pat_data1, pat_data2,
+                                      pat_data3, path_pool,
+                                      sp_start, sp_count);
+        }
         vec_push(pat_tags, 1);
         vec_push(pat_data1, pos);
         vec_push(pat_data2, 0);
