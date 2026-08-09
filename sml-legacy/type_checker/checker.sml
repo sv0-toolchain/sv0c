@@ -734,7 +734,11 @@ structure Checker :> CHECKER = struct
                  app (fn (f, e) =>
                         expect (synth retTy env e, tyOfField f)) fields
              in
-               Types.TyStruct sn
+               (* Canonicalize the constructed struct name through the import alias
+                  (Point -> lib__Point) so a cross-module `Point { … }` in an importer
+                  unifies with the mangled struct type from signatures/returns; else
+                  E0400. `fieldsOfStruct` already canonicalizes for field lookup. *)
+               Types.TyStruct (canonTyImport sn)
              end
          | _ => raise Fail "E0431: struct literal needs a simple type name")
     | Ast.ExprField (e1, f, _) =>
@@ -1019,6 +1023,26 @@ structure Checker :> CHECKER = struct
 
   fun modEnvFromProg (prog : Ast.program) : venv =
     let
+      (* Register cross-module TYPE aliases (`use lib::Point` -> Point↦lib__Point)
+         BEFORE typing fn signatures below. `itemFnTy` -> `astTyToTy` ->
+         `canonTyImport` needs the alias so an importer's `fn f(p: Point) -> Point`
+         resolves the linkProjectDir-mangled struct/enum, else E0406 (the `oneUse`
+         fold that also does this runs only AFTER `one`, too late for signatures).
+         `initTypes` has already populated structNames/enumNames. Value uses + enum
+         ctors are still bound by `oneUse`. *)
+      fun preAliasUse (it : Ast.item) : unit =
+        case it of
+          Ast.ItemUse ([m, nm], _) =>
+            let val q = m ^ "__" ^ nm
+            in
+              if List.exists (fn s => String.compare (s, q) = EQUAL) (structNames ()) then
+                addTyImportAlias nm q
+              else if List.exists (fn e => String.compare (e, q) = EQUAL) (enumNames ()) then
+                addTyImportAlias nm q
+              else ()
+            end
+        | _ => ()
+      val () = List.app preAliasUse prog
       fun one (it : Ast.item, acc : venv) : venv =
         case it of
           Ast.ItemFn r => extend acc (#name r) (itemFnTy r) false
