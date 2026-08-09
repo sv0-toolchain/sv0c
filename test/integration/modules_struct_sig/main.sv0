@@ -1,0 +1,12 @@
+use lib::Point;
+use lib::origin;
+
+/* `shift` takes and returns a cross-module `Point` in its signature. */
+fn shift(p: Point) -> Point {
+  return Point { x: p.x + 1, y: p.y, };
+}
+
+fn main() -> i32 {
+  let p: Point = shift(origin());
+  return p.x + p.y + 34;
+}
