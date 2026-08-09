@@ -1,0 +1,10 @@
+/* Use case: imperative loop with mutable accumulator. Sum of squares 1..=5 = 55. */
+fn main() -> i32 {
+  let mut acc: i32 = 0;
+  let mut i: i32 = 1;
+  while i <= 5 {
+    acc = acc + i * i;
+    i = i + 1;
+  }
+  return acc - 13;
+}

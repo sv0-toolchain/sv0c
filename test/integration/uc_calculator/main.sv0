@@ -1,0 +1,15 @@
+/* Use case: enum-dispatched calculator over a small op set. */
+enum Op { Add(), Sub(), Mul() }
+
+fn apply(op: Op, a: i32, b: i32) -> i32 {
+  return match op {
+    Op::Add() => a + b,
+    Op::Sub() => a - b,
+    Op::Mul() => a * b,
+  };
+}
+
+fn main() -> i32 {
+  let s: i32 = apply(Op::Add(), 6, 7);
+  return apply(Op::Mul(), s, 3) + 3;
+}

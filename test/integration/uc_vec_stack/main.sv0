@@ -1,0 +1,14 @@
+/* Use case: Vec<i32> as a growable stack; push then sum via index loop. */
+fn main() -> i32 {
+  let v: Vec<i32> = vec_new();
+  vec_push(v, 10);
+  vec_push(v, 15);
+  vec_push(v, 17);
+  let mut total: i32 = 0;
+  let mut i: i32 = 0;
+  while i < vec_len(v) {
+    total = total + vec_get(v, i);
+    i = i + 1;
+  }
+  return total;
+}

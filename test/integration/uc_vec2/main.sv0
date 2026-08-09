@@ -1,0 +1,17 @@
+/* Use case: struct with free helper functions (2D vector add + dot). */
+struct Vec2 { x: i32, y: i32 }
+
+fn add(a: Vec2, b: Vec2) -> Vec2 {
+  return Vec2 { x: a.x + b.x, y: a.y + b.y };
+}
+
+fn dot(a: Vec2, b: Vec2) -> i32 {
+  return a.x * b.x + a.y * b.y;
+}
+
+fn main() -> i32 {
+  let p: Vec2 = Vec2 { x: 1, y: 2 };
+  let q: Vec2 = Vec2 { x: 3, y: 4 };
+  let r: Vec2 = add(p, q);
+  return dot(r, q) + 6;
+}
