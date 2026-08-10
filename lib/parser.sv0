@@ -1350,6 +1350,18 @@ fn parse_primary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(ed4, 0);
         return pos + 1;
     }
+    /* `self` (TK_SELF=86) as a value expression (PC-4c): parse as ExprPath(["self"])
+       — a 1-seg path — so `self.x` in a method body resolves to the `self` param. */
+    if t == 86 {
+        let ppself: i32 = vec_len(pp);
+        vec_push(pp, pos);
+        vec_push(et, 1);
+        vec_push(ed1, ppself);
+        vec_push(ed2, 1);
+        vec_push(ed3, 0);
+        vec_push(ed4, 0);
+        return pos + 1;
+    }
     if t == 5 {
         let pps: i32 = vec_len(pp);
         let p1: i32 = parse_path(tags, pos, pp);
@@ -3108,7 +3120,9 @@ fn parse_param(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(fn_param_name_toks, p);
     } else {
         if t != 86 { return 0 - 1; }
-        vec_push(fn_param_name_toks, 0 - 1);
+        /* `self` is a NAMED parameter (PC-4c): store its token so the method body
+           can reference `self` (was -1 = treated like `_`/unnamed, unbindable). */
+        vec_push(fn_param_name_toks, p);
     }
     p = p + 1;
     if ps_peek(tags, p) != 14 { return 0 - 1; }
