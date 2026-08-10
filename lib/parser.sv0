@@ -766,14 +766,21 @@ fn parse_type(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         let elem: i32 = vec_len(ty_tags) - 1;
         if ps_peek(tags, p2) == 13 {
             let p3: i32 = p2 + 1;
-            if ps_peek(tags, p3) != 0 { return 0 - 1; }
+            /* Array length `N` in `[T; N]`: an INT_LIT (0) is a constant; an IDENT (5)
+               is a length identifier the resolver must validate is bound (PC-4a).
+               ty_data3 flags it: 0 = int literal, 1 = identifier. */
+            let mut len_kind: i32 = 0;
+            if ps_peek(tags, p3) != 0 {
+                if ps_peek(tags, p3) != 5 { return 0 - 1; }
+                len_kind = 1;
+            }
             let len_pos: i32 = p3;
             let p4: i32 = p3 + 1;
             if ps_peek(tags, p4) != 11 { return 0 - 1; }
             vec_push(ty_tags, 3);
             vec_push(ty_data1, elem);
             vec_push(ty_data2, len_pos);
-            vec_push(ty_data3, 0);
+            vec_push(ty_data3, len_kind);
             return p4 + 1;
         }
         if ps_peek(tags, p2) == 11 {
