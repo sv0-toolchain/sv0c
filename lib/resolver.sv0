@@ -601,7 +601,7 @@ fn resolve_pat_shape(pt: Vec<i32>, pd1: Vec<i32>, pd2: Vec<i32>,
 fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
               td3: Vec<i32>, idx: i32,
               source: string, starts: Vec<i32>, ends: Vec<i32>,
-              mod_tys: Vec<i32>, pp: Vec<i32>) -> i32 {
+              mod_tys: Vec<i32>, mod_vals: Vec<i32>, pp: Vec<i32>) -> i32 {
     let tag: i32 = vec_get(tt, idx);
     if tag == 6 { return 0; }
     if tag == 0 {
@@ -624,7 +624,7 @@ fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
         while ti < tac {
             let child_idx: i32 = idx - tac + ti;
             let r: i32 = resolve_ty(tt, td1, td2, td3, child_idx,
-                                     source, starts, ends, mod_tys, pp);
+                                     source, starts, ends, mod_tys, mod_vals, pp);
             if r != 0 { return r; }
             ti = ti + 1;
         }
@@ -632,19 +632,32 @@ fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
     }
     if tag == 1 {
         return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
-                           source, starts, ends, mod_tys, pp);
+                           source, starts, ends, mod_tys, mod_vals, pp);
     }
     if tag == 2 {
         return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
-                           source, starts, ends, mod_tys, pp);
+                           source, starts, ends, mod_tys, mod_vals, pp);
     }
     if tag == 3 {
+        /* TyArray `[T; N]` (PC-4a): resolve the element type, and if the length is
+           an IDENT (td3==1, set by the parser), it must be a bound value — an
+           unbound length identifier is E0300. An INT_LIT length (td3==0) is a
+           constant and needs no lookup. sv0 has no const-generics, so the check is
+           just boundedness, mirroring SML resolveTy `resolveExpr` on the length. */
+        if vec_get(td3, idx) == 1 {
+            let len_tok: i32 = vec_get(td2, idx);
+            let ln: string = tok_str(source, starts, ends, len_tok);
+            if res_full_value_exists(mod_vals, vec_new(), ln,
+                                     source, starts, ends) != true {
+                return 300;
+            }
+        }
         return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
-                           source, starts, ends, mod_tys, pp);
+                           source, starts, ends, mod_tys, mod_vals, pp);
     }
     if tag == 4 {
         return resolve_ty(tt, td1, td2, td3, vec_get(td1, idx),
-                           source, starts, ends, mod_tys, pp);
+                           source, starts, ends, mod_tys, mod_vals, pp);
     }
     if tag == 5 {
         let first: i32 = vec_get(td1, idx);
@@ -652,7 +665,7 @@ fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
         let mut i: i32 = 0;
         while i < count {
             let r: i32 = resolve_ty(tt, td1, td2, td3, first + i,
-                                     source, starts, ends, mod_tys, pp);
+                                     source, starts, ends, mod_tys, mod_vals, pp);
             if r != 0 { return r; }
             i = i + 1;
         }
@@ -1278,7 +1291,7 @@ fn resolve_expr_cast_roots_program(et: Vec<i32>, ed2: Vec<i32>,
                                    pty_td2: Vec<i32>, pty_td3: Vec<i32>,
                                    source: string, starts: Vec<i32>,
                                    ends: Vec<i32>,
-                                   mod_tys: Vec<i32>,
+                                   mod_tys: Vec<i32>, mod_vals: Vec<i32>,
                                    pp: Vec<i32>) -> i32 {
     let mut i: i32 = 0;
     let n: i32 = vec_len(et);
@@ -1289,7 +1302,7 @@ fn resolve_expr_cast_roots_program(et: Vec<i32>, ed2: Vec<i32>,
             if tr >= 0 {
                 if tr < tn {
                     let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
-                                             source, starts, ends, mod_tys, pp);
+                                             source, starts, ends, mod_tys, mod_vals, pp);
                     if rr != 0 { return rr; }
                 }
             }
@@ -1419,14 +1432,14 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
         while pti < param_count {
             let tr: i32 = vec_get(fn_param_ty_root, pbase + pti);
             let rty: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
-                                      source, starts, ends, mod_tys, pp);
+                                      source, starts, ends, mod_tys, mod_vals, pp);
             if rty != 0 { return rty; }
             pti = pti + 1;
         }
         let ret_root: i32 = vec_get(fn_ret_ty_root_by_item, idx);
         if ret_root >= 0 {
             let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, ret_root,
-                                     source, starts, ends, mod_tys, pp);
+                                     source, starts, ends, mod_tys, mod_vals, pp);
             if rr != 0 { return rr; }
         }
         res_enter_scope(frames);
@@ -1461,7 +1474,7 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
         while fi < fc {
             let tr: i32 = vec_get(struct_field_ty_root, sfb + fi);
             let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
-                                      source, starts, ends, mod_tys, pp);
+                                      source, starts, ends, mod_tys, mod_vals, pp);
             if rr != 0 { return rr; }
             fi = fi + 1;
         }
@@ -1474,7 +1487,7 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
         while vi < cnt {
             let tr: i32 = vec_get(enum_variant_payload_ty_root, base + vi);
             let rr: i32 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr,
-                                     source, starts, ends, mod_tys, pp);
+                                     source, starts, ends, mod_tys, mod_vals, pp);
             if rr != 0 { return rr; }
             vi = vi + 1;
         }
@@ -1483,7 +1496,7 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
     if tag == 7 {
         let alias_root: i32 = vec_get(id2, idx);
         return resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, alias_root,
-                           source, starts, ends, mod_tys, pp);
+                           source, starts, ends, mod_tys, mod_vals, pp);
     }
     return 0;
 }
@@ -1528,7 +1541,7 @@ fn resolve_program(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                      pty_tt, pty_td1,
                                                      pty_td2, pty_td3,
                                                      source, starts, ends,
-                                                     mod_tys, pp);
+                                                     mod_tys, mod_vals, pp);
     if rcast != 0 { return rcast; }
     let len: i32 = vec_len(it);
     let mut i: i32 = 0;
@@ -1939,14 +1952,44 @@ fn test_resolve_ty_simple() -> i32 {
     let td3: Vec<i32> = vec_new();
     vec_push(tt, 0); vec_push(td1, 0); vec_push(td2, 1); vec_push(td3, 0);
     if resolve_ty(tt, td1, td2, td3, 0,
-                   source, starts, ends, mt, pp) != 0 { return 1; }
+                   source, starts, ends, mt, vec_new(), pp) != 0 { return 1; }
     vec_push(pp, 1);
     vec_push(tt, 0); vec_push(td1, 1); vec_push(td2, 1); vec_push(td3, 0);
     if resolve_ty(tt, td1, td2, td3, 1,
-                   source, starts, ends, mt, pp) != 0 { return 2; }
+                   source, starts, ends, mt, vec_new(), pp) != 0 { return 2; }
     let mt2: Vec<i32> = vec_new();
     if resolve_ty(tt, td1, td2, td3, 1,
-                   source, starts, ends, mt2, pp) != 301 { return 3; }
+                   source, starts, ends, mt2, vec_new(), pp) != 301 { return 3; }
+    return 0;
+}
+
+/* PC-4a: TyArray `[T; N]` length validation — an IDENT length (td3==1) must be a
+   bound value (E0300 if unbound); an INT_LIT length (td3==0) needs no lookup. */
+fn test_resolve_ty_array_len() -> i32 {
+    let source: string = "i32 N";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 5);
+    let mt: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let tt: Vec<i32> = vec_new();
+    let td1: Vec<i32> = vec_new();
+    let td2: Vec<i32> = vec_new();
+    let td3: Vec<i32> = vec_new();
+    vec_push(tt, 0); vec_push(td1, 0); vec_push(td2, 1); vec_push(td3, 0);
+    vec_push(tt, 3); vec_push(td1, 0); vec_push(td2, 1); vec_push(td3, 1);
+    let mv_empty: Vec<i32> = vec_new();
+    if resolve_ty(tt, td1, td2, td3, 1,
+                   source, starts, ends, mt, mv_empty, pp) != 300 { return 1; }
+    let mv_bound: Vec<i32> = vec_new();
+    vec_push(mv_bound, 1);
+    if resolve_ty(tt, td1, td2, td3, 1,
+                   source, starts, ends, mt, mv_bound, pp) != 0 { return 2; }
+    vec_set(td3, 1, 0);
+    if resolve_ty(tt, td1, td2, td3, 1,
+                   source, starts, ends, mt, mv_empty, pp) != 0 { return 3; }
     return 0;
 }
 
@@ -1965,10 +2008,10 @@ fn test_resolve_ty_ref() -> i32 {
     vec_push(tt, 0); vec_push(td1, 0); vec_push(td2, 1); vec_push(td3, 0);
     vec_push(tt, 1); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
     if resolve_ty(tt, td1, td2, td3, 1,
-                   source, starts, ends, mt, pp) != 0 { return 1; }
+                   source, starts, ends, mt, vec_new(), pp) != 0 { return 1; }
     vec_push(tt, 6); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
     if resolve_ty(tt, td1, td2, td3, 2,
-                   source, starts, ends, mt, pp) != 0 { return 2; }
+                   source, starts, ends, mt, vec_new(), pp) != 0 { return 2; }
     return 0;
 }
 
@@ -2702,6 +2745,8 @@ fn main() -> i32 {
     if r27 != 0 { return 270 + r27; }
     let r28: i32 = test_resolve_ty_ref();
     if r28 != 0 { return 280 + r28; }
+    let r28a: i32 = test_resolve_ty_array_len();
+    if r28a != 0 { return 285 + r28a; }
     let r29: i32 = test_scope_mgmt();
     if r29 != 0 { return 3 + r29; }
     let r30: i32 = test_resolve_expr_lit();
