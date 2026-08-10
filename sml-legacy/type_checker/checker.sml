@@ -720,6 +720,10 @@ structure Checker :> CHECKER = struct
         else raise Fail "E0416: continue outside loop"
     | Ast.ExprCall (Ast.ExprPath (segs, _), args, _) =>
         synthExprCall retTy env segs args
+    (* Method call `recv.m(args)` (PC-4c): impl methods are free functions with
+       `self` as the first parameter, so UFCS — check as `m(recv, args)`. *)
+    | Ast.ExprMethodCall (recv, m, args, _) =>
+        synthExprCall retTy env [m] (recv :: args)
     | Ast.ExprStruct (path, fields, _) =>
         (case path of
            [sn] =>
@@ -1063,6 +1067,15 @@ structure Checker :> CHECKER = struct
       fun one (it : Ast.item, acc : venv) : venv =
         case it of
           Ast.ItemFn r => extend acc (#name r) (itemFnTy r) false
+        (* impl methods are free functions with `self` first (PC-4c UFCS): register
+           each so `recv.m(args)` resolves as `m(recv, args)`. *)
+        | Ast.ItemImpl r =>
+            List.foldl
+              (fn (m, a) =>
+                 case m of
+                   Ast.ItemFn f => extend a (#name f) (itemFnTy f) false
+                 | _ => a)
+              acc (#items r)
         | _ => acc
       val acc0 = List.foldl one [] prog
       val acc1 = extend acc0 "println" (Types.TyFn ([Types.TyString], Types.TyUnit)) false
@@ -1170,6 +1183,9 @@ structure Checker :> CHECKER = struct
       fun checkOne it =
         case it of
           Ast.ItemFn r => checkFn modEnv r
+        (* PC-4c: check each impl method body (a free fn with `self` first). *)
+        | Ast.ItemImpl r =>
+            app (fn m => case m of Ast.ItemFn f => checkFn modEnv f | _ => ()) (#items r)
         | _ => ()
     in
       (app checkOne prog; prog)

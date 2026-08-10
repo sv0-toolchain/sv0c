@@ -2532,36 +2532,49 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
     return _sv0t5;
   } else {
   }
-  if ((t == 5)) {
+  if ((t == 86)) {
     int _sv0t6 = sv0_vec_len(pp);
-    int pps = _sv0t6;
-    int _sv0t7 = parse_path(tags, pos, pp);
-    int p1 = _sv0t7;
+    int ppself = _sv0t6;
+    sv0_vec_push(pp, pos);
+    sv0_vec_push(et, 1);
+    sv0_vec_push(ed1, ppself);
+    sv0_vec_push(ed2, 1);
+    sv0_vec_push(ed3, 0);
+    sv0_vec_push(ed4, 0);
+    int _sv0t7 = (pos + 1);
+    return _sv0t7;
+  } else {
+  }
+  if ((t == 5)) {
+    int _sv0t8 = sv0_vec_len(pp);
+    int pps = _sv0t8;
+    int _sv0t9 = parse_path(tags, pos, pp);
+    int p1 = _sv0t9;
     if ((p1 < 0)) {
-      int _sv0t8 = (0 - 1);
-      return _sv0t8;
+      int _sv0t10 = (0 - 1);
+      return _sv0t10;
     } else {
     }
-    int _sv0t9 = sv0_vec_len(pp);
-    int ppc = (_sv0t9 - pps);
+    int _sv0t11 = sv0_vec_len(pp);
+    int ppc = (_sv0t11 - pps);
     if ((allow_struct == 1)) {
-      int _sv0t10 = ps_peek(tags, p1);
-      if ((_sv0t10 == 8)) {
-        int _sv0t11 = sv0_vec_len(sf_names);
-        int fc_before = _sv0t11;
-        int _sv0t12 = sv0_vec_len(et);
-        int first_val = _sv0t12;
-        int _sv0t13 = (p1 + 1);
-        int _sv0t14 = parse_struct_fields(tags, starts, ends, source, _sv0t13, et, ed1, ed2, ed3, ed4, pp, sf_names);
-        int pf = _sv0t14;
+      int _sv0t12 = ps_peek(tags, p1);
+      if ((_sv0t12 == 8)) {
+        int _sv0t13 = sv0_vec_len(sf_names);
+        int fc_before = _sv0t13;
+        int _sv0t14 = sv0_vec_len(et);
+        int first_val = _sv0t14;
+        int _sv0t15 = (p1 + 1);
+        int _sv0t16 = parse_struct_fields(tags, starts, ends, source, _sv0t15, et, ed1, ed2, ed3, ed4, pp, sf_names);
+        int pf = _sv0t16;
         if ((pf < 0)) {
-          int _sv0t15 = (0 - 1);
-          return _sv0t15;
+          int _sv0t17 = (0 - 1);
+          return _sv0t17;
         } else {
         }
-        int _sv0t16 = sv0_vec_len(sf_names);
-        int _sv0t17 = (_sv0t16 - fc_before);
-        int fc = (_sv0t17 / 2);
+        int _sv0t18 = sv0_vec_len(sf_names);
+        int _sv0t19 = (_sv0t18 - fc_before);
+        int fc = (_sv0t19 / 2);
         sv0_vec_push(et, 24);
         sv0_vec_push(ed1, pps);
         sv0_vec_push(ed2, ppc);
@@ -2581,123 +2594,123 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
   } else {
   }
   if ((t == 6)) {
-    int _sv0t18 = (pos + 1);
-    int _sv0t19 = ps_peek(tags, _sv0t18);
-    int nt = _sv0t19;
+    int _sv0t20 = (pos + 1);
+    int _sv0t21 = ps_peek(tags, _sv0t20);
+    int nt = _sv0t21;
     if ((nt == 7)) {
       sv0_vec_push(et, 0);
       sv0_vec_push(ed1, 5);
       sv0_vec_push(ed2, pos);
       sv0_vec_push(ed3, 0);
       sv0_vec_push(ed4, 0);
-      int _sv0t20 = (pos + 2);
-      return _sv0t20;
+      int _sv0t22 = (pos + 2);
+      return _sv0t22;
     } else {
     }
-    int _sv0t21 = (pos + 1);
-    int _sv0t22 = parse_expr_sf(tags, starts, ends, source, _sv0t21, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-    int p1 = _sv0t22;
+    int _sv0t23 = (pos + 1);
+    int _sv0t24 = parse_expr_sf(tags, starts, ends, source, _sv0t23, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+    int p1 = _sv0t24;
     if ((p1 < 0)) {
-      int _sv0t23 = (0 - 1);
-      return _sv0t23;
-    } else {
-    }
-    int _sv0t24 = ps_peek(tags, p1);
-    if ((_sv0t24 == 7)) {
-      int _sv0t25 = (p1 + 1);
+      int _sv0t25 = (0 - 1);
       return _sv0t25;
     } else {
     }
     int _sv0t26 = ps_peek(tags, p1);
-    if ((_sv0t26 == 12)) {
-      int _sv0t27 = sv0_vec_len(et);
-      int first_idx = (_sv0t27 - 1);
+    if ((_sv0t26 == 7)) {
+      int _sv0t27 = (p1 + 1);
+      return _sv0t27;
+    } else {
+    }
+    int _sv0t28 = ps_peek(tags, p1);
+    if ((_sv0t28 == 12)) {
+      int _sv0t29 = sv0_vec_len(et);
+      int first_idx = (_sv0t29 - 1);
       int count = 1;
       int p = (p1 + 1);
       int td = 0;
       while ((td != 1)) {
-        int _sv0t28 = ps_peek(tags, p);
-        if ((_sv0t28 == 7)) {
+        int _sv0t30 = ps_peek(tags, p);
+        if ((_sv0t30 == 7)) {
           sv0_vec_push(et, 25);
           sv0_vec_push(ed1, first_idx);
           sv0_vec_push(ed2, count);
           sv0_vec_push(ed3, 0);
           sv0_vec_push(ed4, 0);
-          int _sv0t29 = (p + 1);
-          return _sv0t29;
+          int _sv0t31 = (p + 1);
+          return _sv0t31;
         } else {
         }
-        int _sv0t30 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-        int pa = _sv0t30;
+        int _sv0t32 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+        int pa = _sv0t32;
         if ((pa < 0)) {
-          int _sv0t31 = (0 - 1);
-          return _sv0t31;
+          int _sv0t33 = (0 - 1);
+          return _sv0t33;
         } else {
         }
         count = (count + 1);
         p = pa;
-        int _sv0t32 = ps_peek(tags, p);
-        if ((_sv0t32 == 12)) {
+        int _sv0t34 = ps_peek(tags, p);
+        if ((_sv0t34 == 12)) {
           p = (p + 1);
         } else {
-          int _sv0t33 = ps_peek(tags, p);
-          if ((_sv0t33 == 7)) {
+          int _sv0t35 = ps_peek(tags, p);
+          if ((_sv0t35 == 7)) {
             sv0_vec_push(et, 25);
             sv0_vec_push(ed1, first_idx);
             sv0_vec_push(ed2, count);
             sv0_vec_push(ed3, 0);
             sv0_vec_push(ed4, 0);
-            int _sv0t34 = (p + 1);
-            return _sv0t34;
+            int _sv0t36 = (p + 1);
+            return _sv0t36;
           } else {
           }
-          int _sv0t35 = (0 - 1);
-          return _sv0t35;
+          int _sv0t37 = (0 - 1);
+          return _sv0t37;
         }
       }
     } else {
     }
-    int _sv0t36 = (0 - 1);
-    return _sv0t36;
+    int _sv0t38 = (0 - 1);
+    return _sv0t38;
   } else {
   }
   if ((t == 10)) {
-    int _sv0t37 = (pos + 1);
-    int _sv0t38 = ps_peek(tags, _sv0t37);
-    if ((_sv0t38 == 11)) {
+    int _sv0t39 = (pos + 1);
+    int _sv0t40 = ps_peek(tags, _sv0t39);
+    if ((_sv0t40 == 11)) {
       sv0_vec_push(et, 26);
       sv0_vec_push(ed1, 0);
       sv0_vec_push(ed2, 0);
       sv0_vec_push(ed3, 0);
       sv0_vec_push(ed4, 0);
-      int _sv0t39 = (pos + 2);
-      return _sv0t39;
+      int _sv0t41 = (pos + 2);
+      return _sv0t41;
     } else {
     }
-    int _sv0t40 = sv0_vec_len(et);
-    int first_idx = _sv0t40;
-    int _sv0t41 = (pos + 1);
-    int _sv0t42 = parse_expr_sf(tags, starts, ends, source, _sv0t41, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-    int p1 = _sv0t42;
+    int _sv0t42 = sv0_vec_len(et);
+    int first_idx = _sv0t42;
+    int _sv0t43 = (pos + 1);
+    int _sv0t44 = parse_expr_sf(tags, starts, ends, source, _sv0t43, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+    int p1 = _sv0t44;
     if ((p1 < 0)) {
-      int _sv0t43 = (0 - 1);
-      return _sv0t43;
+      int _sv0t45 = (0 - 1);
+      return _sv0t45;
     } else {
     }
-    int _sv0t44 = ps_peek(tags, p1);
-    if ((_sv0t44 == 13)) {
-      int _sv0t45 = (p1 + 1);
-      int _sv0t46 = parse_expr_sf(tags, starts, ends, source, _sv0t45, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-      int p2 = _sv0t46;
+    int _sv0t46 = ps_peek(tags, p1);
+    if ((_sv0t46 == 13)) {
+      int _sv0t47 = (p1 + 1);
+      int _sv0t48 = parse_expr_sf(tags, starts, ends, source, _sv0t47, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+      int p2 = _sv0t48;
       if ((p2 < 0)) {
-        int _sv0t47 = (0 - 1);
-        return _sv0t47;
-      } else {
-      }
-      int _sv0t48 = ps_peek(tags, p2);
-      if ((_sv0t48 != 11)) {
         int _sv0t49 = (0 - 1);
         return _sv0t49;
+      } else {
+      }
+      int _sv0t50 = ps_peek(tags, p2);
+      if ((_sv0t50 != 11)) {
+        int _sv0t51 = (0 - 1);
+        return _sv0t51;
       } else {
       }
       sv0_vec_push(et, 26);
@@ -2705,124 +2718,124 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
       sv0_vec_push(ed2, 2);
       sv0_vec_push(ed3, 0);
       sv0_vec_push(ed4, 0);
-      int _sv0t50 = (p2 + 1);
-      return _sv0t50;
+      int _sv0t52 = (p2 + 1);
+      return _sv0t52;
     } else {
     }
-    int _sv0t51 = ps_peek(tags, p1);
-    if ((_sv0t51 == 11)) {
+    int _sv0t53 = ps_peek(tags, p1);
+    if ((_sv0t53 == 11)) {
       sv0_vec_push(et, 26);
       sv0_vec_push(ed1, first_idx);
       sv0_vec_push(ed2, 1);
       sv0_vec_push(ed3, 0);
       sv0_vec_push(ed4, 0);
-      int _sv0t52 = (p1 + 1);
-      return _sv0t52;
+      int _sv0t54 = (p1 + 1);
+      return _sv0t54;
     } else {
     }
-    int _sv0t53 = ps_peek(tags, p1);
-    if ((_sv0t53 == 12)) {
+    int _sv0t55 = ps_peek(tags, p1);
+    if ((_sv0t55 == 12)) {
       int count = 1;
       int p = (p1 + 1);
       int ad = 0;
       while ((ad != 1)) {
-        int _sv0t54 = ps_peek(tags, p);
-        if ((_sv0t54 == 11)) {
+        int _sv0t56 = ps_peek(tags, p);
+        if ((_sv0t56 == 11)) {
           sv0_vec_push(et, 26);
           sv0_vec_push(ed1, first_idx);
           sv0_vec_push(ed2, count);
           sv0_vec_push(ed3, 0);
           sv0_vec_push(ed4, 0);
-          int _sv0t55 = (p + 1);
-          return _sv0t55;
+          int _sv0t57 = (p + 1);
+          return _sv0t57;
         } else {
         }
-        int _sv0t56 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-        int pa = _sv0t56;
+        int _sv0t58 = parse_expr_sf(tags, starts, ends, source, p, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+        int pa = _sv0t58;
         if ((pa < 0)) {
-          int _sv0t57 = (0 - 1);
-          return _sv0t57;
+          int _sv0t59 = (0 - 1);
+          return _sv0t59;
         } else {
         }
         count = (count + 1);
         p = pa;
-        int _sv0t58 = ps_peek(tags, p);
-        if ((_sv0t58 == 12)) {
+        int _sv0t60 = ps_peek(tags, p);
+        if ((_sv0t60 == 12)) {
           p = (p + 1);
         } else {
-          int _sv0t59 = ps_peek(tags, p);
-          if ((_sv0t59 == 11)) {
+          int _sv0t61 = ps_peek(tags, p);
+          if ((_sv0t61 == 11)) {
             sv0_vec_push(et, 26);
             sv0_vec_push(ed1, first_idx);
             sv0_vec_push(ed2, count);
             sv0_vec_push(ed3, 0);
             sv0_vec_push(ed4, 0);
-            int _sv0t60 = (p + 1);
-            return _sv0t60;
+            int _sv0t62 = (p + 1);
+            return _sv0t62;
           } else {
           }
-          int _sv0t61 = (0 - 1);
-          return _sv0t61;
+          int _sv0t63 = (0 - 1);
+          return _sv0t63;
         }
       }
     } else {
     }
-    int _sv0t62 = (0 - 1);
-    return _sv0t62;
+    int _sv0t64 = (0 - 1);
+    return _sv0t64;
   } else {
   }
   if ((t == 8)) {
-    int _sv0t63 = parse_block(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf_names);
-    return _sv0t63;
-  } else {
-  }
-  if ((t == 68)) {
-    int _sv0t64 = (pos + 1);
-    int _sv0t65 = parse_if_expr(tags, starts, ends, source, _sv0t64, et, ed1, ed2, ed3, ed4, pp, sf_names);
+    int _sv0t65 = parse_block(tags, starts, ends, source, pos, et, ed1, ed2, ed3, ed4, pp, sf_names);
     return _sv0t65;
   } else {
   }
-  if ((t == 96)) {
+  if ((t == 68)) {
     int _sv0t66 = (pos + 1);
-    int _sv0t67 = parse_while_expr(tags, starts, ends, source, _sv0t66, et, ed1, ed2, ed3, ed4, pp, sf_names);
+    int _sv0t67 = parse_if_expr(tags, starts, ends, source, _sv0t66, et, ed1, ed2, ed3, ed4, pp, sf_names);
     return _sv0t67;
   } else {
   }
-  if ((t == 66)) {
+  if ((t == 96)) {
     int _sv0t68 = (pos + 1);
-    int _sv0t69 = parse_for_expr(tags, starts, ends, source, _sv0t68, et, ed1, ed2, ed3, ed4, pp, sf_names);
+    int _sv0t69 = parse_while_expr(tags, starts, ends, source, _sv0t68, et, ed1, ed2, ed3, ed4, pp, sf_names);
     return _sv0t69;
   } else {
   }
-  if ((t == 72)) {
+  if ((t == 66)) {
     int _sv0t70 = (pos + 1);
-    int _sv0t71 = parse_loop_expr(tags, starts, ends, source, _sv0t70, et, ed1, ed2, ed3, ed4, pp, sf_names);
+    int _sv0t71 = parse_for_expr(tags, starts, ends, source, _sv0t70, et, ed1, ed2, ed3, ed4, pp, sf_names);
     return _sv0t71;
   } else {
   }
-  if ((t == 85)) {
+  if ((t == 72)) {
     int _sv0t72 = (pos + 1);
-    int _sv0t73 = parse_return_expr(tags, starts, ends, source, _sv0t72, et, ed1, ed2, ed3, ed4, pp, sf_names);
+    int _sv0t73 = parse_loop_expr(tags, starts, ends, source, _sv0t72, et, ed1, ed2, ed3, ed4, pp, sf_names);
     return _sv0t73;
   } else {
   }
-  if ((t == 93)) {
+  if ((t == 85)) {
     int _sv0t74 = (pos + 1);
-    int _sv0t75 = parse_block(tags, starts, ends, source, _sv0t74, et, ed1, ed2, ed3, ed4, pp, sf_names);
+    int _sv0t75 = parse_return_expr(tags, starts, ends, source, _sv0t74, et, ed1, ed2, ed3, ed4, pp, sf_names);
     return _sv0t75;
   } else {
   }
-  if ((t == 55)) {
+  if ((t == 93)) {
     int _sv0t76 = (pos + 1);
-    int _sv0t77 = parse_expr_sf(tags, starts, ends, source, _sv0t76, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-    int pa = _sv0t77;
+    int _sv0t77 = parse_block(tags, starts, ends, source, _sv0t76, et, ed1, ed2, ed3, ed4, pp, sf_names);
+    return _sv0t77;
+  } else {
+  }
+  if ((t == 55)) {
+    int _sv0t78 = (pos + 1);
+    int _sv0t79 = parse_expr_sf(tags, starts, ends, source, _sv0t78, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+    int pa = _sv0t79;
     if ((pa < 0)) {
-      int _sv0t78 = (0 - 1);
-      return _sv0t78;
+      int _sv0t80 = (0 - 1);
+      return _sv0t80;
     } else {
     }
-    int _sv0t79 = sv0_vec_len(et);
-    int ei = (_sv0t79 - 1);
+    int _sv0t81 = sv0_vec_len(et);
+    int ei = (_sv0t81 - 1);
     sv0_vec_push(et, 23);
     sv0_vec_push(ed1, ei);
     sv0_vec_push(ed2, 0);
@@ -2832,123 +2845,123 @@ static int parse_primary_expr(int tags, int starts, int ends, const char* source
   } else {
   }
   if ((t == 74)) {
-    int _sv0t80 = (pos + 1);
-    int _sv0t81 = parse_match_expr(tags, starts, ends, source, _sv0t80, et, ed1, ed2, ed3, ed4, pp, sf_names);
-    return _sv0t81;
-  } else {
-  }
-  if ((t == 67)) {
-    int _sv0t82 = parse_quant(tags, starts, ends, source, pos, 1, et, ed1, ed2, ed3, ed4, pp);
-    return _sv0t82;
-  } else {
-  }
-  if ((t == 63)) {
-    int _sv0t83 = parse_quant(tags, starts, ends, source, pos, 0, et, ed1, ed2, ed3, ed4, pp);
+    int _sv0t82 = (pos + 1);
+    int _sv0t83 = parse_match_expr(tags, starts, ends, source, _sv0t82, et, ed1, ed2, ed3, ed4, pp, sf_names);
     return _sv0t83;
   } else {
   }
+  if ((t == 67)) {
+    int _sv0t84 = parse_quant(tags, starts, ends, source, pos, 1, et, ed1, ed2, ed3, ed4, pp);
+    return _sv0t84;
+  } else {
+  }
+  if ((t == 63)) {
+    int _sv0t85 = parse_quant(tags, starts, ends, source, pos, 0, et, ed1, ed2, ed3, ed4, pp);
+    return _sv0t85;
+  } else {
+  }
   if ((t == 80)) {
-    int _sv0t84 = (pos + 1);
-    int _sv0t85 = ps_peek(tags, _sv0t84);
-    if ((_sv0t85 != 6)) {
-      int _sv0t86 = (0 - 1);
-      return _sv0t86;
+    int _sv0t86 = (pos + 1);
+    int _sv0t87 = ps_peek(tags, _sv0t86);
+    if ((_sv0t87 != 6)) {
+      int _sv0t88 = (0 - 1);
+      return _sv0t88;
     } else {
     }
-    int _sv0t87 = sv0_vec_len(et);
-    int first_idx = _sv0t87;
-    int _sv0t88 = (pos + 2);
-    int _sv0t89 = parse_expr_sf(tags, starts, ends, source, _sv0t88, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-    int pe = _sv0t89;
+    int _sv0t89 = sv0_vec_len(et);
+    int first_idx = _sv0t89;
+    int _sv0t90 = (pos + 2);
+    int _sv0t91 = parse_expr_sf(tags, starts, ends, source, _sv0t90, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+    int pe = _sv0t91;
     if ((pe < 0)) {
-      int _sv0t90 = (0 - 1);
-      return _sv0t90;
-    } else {
-    }
-    int _sv0t91 = ps_peek(tags, pe);
-    if ((_sv0t91 != 7)) {
       int _sv0t92 = (0 - 1);
       return _sv0t92;
     } else {
     }
-    int _sv0t93 = sv0_vec_len(pp);
-    int pps = _sv0t93;
+    int _sv0t93 = ps_peek(tags, pe);
+    if ((_sv0t93 != 7)) {
+      int _sv0t94 = (0 - 1);
+      return _sv0t94;
+    } else {
+    }
+    int _sv0t95 = sv0_vec_len(pp);
+    int pps = _sv0t95;
     sv0_vec_push(pp, pos);
     sv0_vec_push(et, 1);
     sv0_vec_push(ed1, pps);
     sv0_vec_push(ed2, 1);
     sv0_vec_push(ed3, 0);
     sv0_vec_push(ed4, 0);
-    int _sv0t94 = sv0_vec_len(et);
-    int callee_idx = (_sv0t94 - 1);
+    int _sv0t96 = sv0_vec_len(et);
+    int callee_idx = (_sv0t96 - 1);
     sv0_vec_push(et, 4);
     sv0_vec_push(ed1, callee_idx);
     sv0_vec_push(ed2, first_idx);
     sv0_vec_push(ed3, 1);
     sv0_vec_push(ed4, 0);
-    int _sv0t95 = (pe + 1);
-    return _sv0t95;
+    int _sv0t97 = (pe + 1);
+    return _sv0t97;
   } else {
   }
   if ((t == 79)) {
-    int _sv0t96 = (pos + 1);
-    int _sv0t97 = ps_peek(tags, _sv0t96);
-    if ((_sv0t97 != 6)) {
-      int _sv0t98 = (0 - 1);
-      return _sv0t98;
+    int _sv0t98 = (pos + 1);
+    int _sv0t99 = ps_peek(tags, _sv0t98);
+    if ((_sv0t99 != 6)) {
+      int _sv0t100 = (0 - 1);
+      return _sv0t100;
     } else {
     }
-    int _sv0t99 = sv0_vec_len(et);
-    int first_idx = _sv0t99;
-    int _sv0t100 = (pos + 2);
-    int _sv0t101 = parse_expr_sf(tags, starts, ends, source, _sv0t100, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-    int pa = _sv0t101;
+    int _sv0t101 = sv0_vec_len(et);
+    int first_idx = _sv0t101;
+    int _sv0t102 = (pos + 2);
+    int _sv0t103 = parse_expr_sf(tags, starts, ends, source, _sv0t102, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+    int pa = _sv0t103;
     if ((pa < 0)) {
-      int _sv0t102 = (0 - 1);
-      return _sv0t102;
-    } else {
-    }
-    int _sv0t103 = ps_peek(tags, pa);
-    if ((_sv0t103 != 12)) {
       int _sv0t104 = (0 - 1);
       return _sv0t104;
     } else {
     }
-    int _sv0t105 = (pa + 1);
-    int _sv0t106 = parse_expr_sf(tags, starts, ends, source, _sv0t105, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-    int pb = _sv0t106;
-    if ((pb < 0)) {
-      int _sv0t107 = (0 - 1);
-      return _sv0t107;
+    int _sv0t105 = ps_peek(tags, pa);
+    if ((_sv0t105 != 12)) {
+      int _sv0t106 = (0 - 1);
+      return _sv0t106;
     } else {
     }
-    int _sv0t108 = ps_peek(tags, pb);
-    if ((_sv0t108 != 7)) {
+    int _sv0t107 = (pa + 1);
+    int _sv0t108 = parse_expr_sf(tags, starts, ends, source, _sv0t107, et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+    int pb = _sv0t108;
+    if ((pb < 0)) {
       int _sv0t109 = (0 - 1);
       return _sv0t109;
     } else {
     }
-    int _sv0t110 = sv0_vec_len(pp);
-    int pps = _sv0t110;
+    int _sv0t110 = ps_peek(tags, pb);
+    if ((_sv0t110 != 7)) {
+      int _sv0t111 = (0 - 1);
+      return _sv0t111;
+    } else {
+    }
+    int _sv0t112 = sv0_vec_len(pp);
+    int pps = _sv0t112;
     sv0_vec_push(pp, pos);
     sv0_vec_push(et, 1);
     sv0_vec_push(ed1, pps);
     sv0_vec_push(ed2, 1);
     sv0_vec_push(ed3, 0);
     sv0_vec_push(ed4, 0);
-    int _sv0t111 = sv0_vec_len(et);
-    int callee_idx = (_sv0t111 - 1);
+    int _sv0t113 = sv0_vec_len(et);
+    int callee_idx = (_sv0t113 - 1);
     sv0_vec_push(et, 4);
     sv0_vec_push(ed1, callee_idx);
     sv0_vec_push(ed2, first_idx);
     sv0_vec_push(ed3, 2);
     sv0_vec_push(ed4, 0);
-    int _sv0t112 = (pb + 1);
-    return _sv0t112;
+    int _sv0t114 = (pb + 1);
+    return _sv0t114;
   } else {
   }
-  int _sv0t113 = (0 - 1);
-  return _sv0t113;
+  int _sv0t115 = (0 - 1);
+  return _sv0t115;
 }
 
 static int parse_postfix_expr(int tags, int starts, int ends, const char* source, int pos, int et, int ed1, int ed2, int ed3, int ed4, int pp, int sf_names, int allow_struct) {
@@ -4913,27 +4926,26 @@ static int parse_param(int tags, int starts, int ends, const char* source, int p
       return _sv0t2;
     } else {
     }
-    int _sv0t3 = (0 - 1);
-    sv0_vec_push(fn_param_name_toks, _sv0t3);
+    sv0_vec_push(fn_param_name_toks, p);
   }
   p = (p + 1);
-  int _sv0t4 = ps_peek(tags, p);
-  if ((_sv0t4 != 14)) {
-    int _sv0t5 = (0 - 1);
-    return _sv0t5;
+  int _sv0t3 = ps_peek(tags, p);
+  if ((_sv0t3 != 14)) {
+    int _sv0t4 = (0 - 1);
+    return _sv0t4;
   } else {
   }
-  int _sv0t6 = (p + 1);
-  int _sv0t7 = parse_type(tags, starts, ends, source, _sv0t6, pty_tt, pty_td1, pty_td2, pty_td3, pp);
-  int pt = _sv0t7;
+  int _sv0t5 = (p + 1);
+  int _sv0t6 = parse_type(tags, starts, ends, source, _sv0t5, pty_tt, pty_td1, pty_td2, pty_td3, pp);
+  int pt = _sv0t6;
   if ((pt < 0)) {
-    int _sv0t8 = (0 - 1);
-    return _sv0t8;
+    int _sv0t7 = (0 - 1);
+    return _sv0t7;
   } else {
   }
-  int _sv0t9 = sv0_vec_len(pty_tt);
-  int _sv0t10 = (_sv0t9 - 1);
-  sv0_vec_push(fn_param_ty_root, _sv0t10);
+  int _sv0t8 = sv0_vec_len(pty_tt);
+  int _sv0t9 = (_sv0t8 - 1);
+  sv0_vec_push(fn_param_ty_root, _sv0t9);
   return pt;
 }
 

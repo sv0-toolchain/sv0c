@@ -775,6 +775,19 @@ structure Lowering :> LOWERING = struct
         in
           (inss @ [Ir.Call (SOME t, callee0, vals, rty)], Ir.VVar t)
         end
+    (* Method call `recv.m(args)` (PC-4c UFCS): lower as `m(recv, args)`. *)
+    | Ast.ExprMethodCall (recv, m, args, _) =>
+        let
+          fun oneArg a = let val (ia, va) = lowerExprToValue a in (ia, va) end
+          val pairs = map oneArg (recv :: args)
+          val inss = List.concat (map #1 pairs)
+          val vals = map #2 pairs
+          val t = freshTmp ()
+          val callee0 = resolveFnCallee m
+          val rty = calleeRetCty m
+        in
+          (inss @ [Ir.Call (SOME t, callee0, vals, rty)], Ir.VVar t)
+        end
     | Ast.ExprMatch (scrut, arms, _) =>
         let
           val sct = matchScrutCty scrut
@@ -1475,9 +1488,14 @@ structure Lowering :> LOWERING = struct
         ; enumVariants := buildEnumVariants prog)
       fun one it =
         case it of
-          Ast.ItemFn r => SOME (lowerFn r)
-        | _ => NONE
+          Ast.ItemFn r => [lowerFn r]
+        (* PC-4c: emit each impl method as a free C function (self is its 1st param). *)
+        | Ast.ItemImpl r =>
+            List.mapPartial
+              (fn m => case m of Ast.ItemFn f => SOME (lowerFn f) | _ => NONE)
+              (#items r)
+        | _ => []
     in
-      {typedefs = collectTypedefs prog, blocks = List.mapPartial one prog}
+      {typedefs = collectTypedefs prog, blocks = List.concat (map one prog)}
     end
 end
