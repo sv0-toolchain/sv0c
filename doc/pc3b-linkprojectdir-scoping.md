@@ -398,6 +398,67 @@ four were missing. Fixed (peeling them off one build at a time):
    are no-ops for single-file programs (`canonTyImport`/`canonTyName` are identity with
    no import aliases), so no goldens shift.
 
+## 5j. PC-7 — unblock the §5e checker forward-scan (name-collision mangling)
+
+**Goal:** make the checker survive the defining-name mangle so genuine cross-module
+name collisions can be linked by mangling (`a__helper` / `b__helper`), the one Phase-C
+capability the collision-free source-concat CLI cannot provide (duplicate top-level
+names → duplicate-def error today).
+
+**Root cause recap (§5e):** the token-model mangle repoints ItemFn `id1` (the
+defining-name token index) to a synthetic ident appended at the END of the token
+arena. `handle_to_str(id1)` reads the mangled name (resolve passes), but the checker's
+param scanners `scan_fn_param_type_tags` / `scan_fn_param_names` do `p = id1 + 1` and
+walk the token stream FORWARD expecting `[<generics>] ( params )` to follow the name —
+which now points past the real params → OOB (single-file) / wrong read (merged → -1).
+The scanners conflate two roles of `id1`: **name-string handle** (mangled) and
+**positional anchor for the signature scan** (must stay original).
+
+**Fix (confirmed feasible — decouple the scan from `id1`):** the parser already
+records a per-fn param arena that carries everything the scanners re-derive from
+tokens, indexed WITHOUT reference to the name token position:
+- `fn_param_name_toks[pbase + j]` = param j's IDENT token (parser skips `mut` before
+  storing, so this is the bare name token). `ItemFn id5 = pbase`; `id3 = param_count`.
+- `fn_param_ty_root[pbase + j]` = param j's type root into the pty arena
+  (`pty_tt/td1/td2/td3`). pty `TyName` (tag 0): `td1 = path_pool_start`, `td2 =
+  seg_count` → name token = `pp[td1 + td2 - 1]`; `TyArray` (3): `td1 = elem_ty_idx`;
+  `TyRef/TyRefMut`, `TyUnit`, `TyTuple` map to the checker's existing type tags.
+- **`mut` is recoverable mangle-robustly** with a LOCAL check: `is_mut = (nt >= 1 &&
+  tok_tags[nt-1] == 77 /*MUT*/)` — the MUT token sits immediately before the IDENT, so
+  `nt-1` needs no name-position anchor. (`(a`→`(`=6; `,mut b`→`mut`=77; `,b`→`,`=12.)
+
+Because `id5`/`fn_param_name_toks`/`fn_param_ty_root` and the pty arena are computed
+by the parser (not the token re-scan), reading params from them is invariant to the
+`id1` repoint — the mangle no longer breaks the checker.
+
+**Decomposition (each step gated + committed; checker.sv0 edits shift its stage0 +
+vm-parity goldens — refresh both):**
+- **PC-7a — pty→tag classifier.** New `checker_pty_root_to_type_tag(pty_tt, pty_td1,
+  pty_td2, pty_td3, pp, root, source, starts, ends, struct_names, enum_names,
+  type_params, tp_limit, out_tag)` mirroring `scan_type_tag_at`'s name classification
+  but reading the type-name token from the pty arena. Unit-tested in isolation
+  (primitive / struct / enum / type-param / array), NOT yet wired.
+- **PC-7b — arena param readers.** `scan_fn_param_type_tags_arena` +
+  `scan_fn_param_names_arena` reading via `pbase`/`count` + the arenas above (mut via
+  the `nt-1` local check). Unit test: identical output to the token scanners on a
+  normal (unmangled) program.
+- **PC-7c — thread + swap.** Thread `id5`, `fn_param_name_toks`, `fn_param_ty_root`,
+  and the pty arena into `check_program` + all callers (compose main + the ~4 test
+  sites), swap the two call sites (checker.sv0 ~2042/2054) to the arena readers.
+  **Acceptance gate: the ENTIRE corpus + all fixtures still type-check identically**
+  (behavior-preserving on non-mangled programs) — full `./scripts/sv0 test` green.
+- **PC-7d — collision fixture + mangle-path test.** Re-enable the defining-name mangle
+  on a genuine-collision two-module program (each defines `fn helper()` / same name),
+  merge via the link.sv0 mangle+reloc+append primitives (NOT source-concat), and show
+  resolve + check + emit + run succeeds. Gate it (a compose-main-level or link.sv0
+  test; do NOT ship a self-test in the corpus `main`, per §5c). This is the capability
+  the slice delivers.
+
+**Open sub-questions to settle in PC-7a/b:** exact pty→checker-tag map for
+`TyArray`/`TyTuple`/`TyRef` params (params are almost always `TyName`; arrays/tuples
+are the tail); `_` param handling (parser stores the token, not -1, for `t==5|86` —
+confirm `_`'s token tag); generic type-arg params (`Vec<i32>` → tag 15 today).
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the
