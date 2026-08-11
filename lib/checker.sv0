@@ -1592,6 +1592,35 @@ fn scan_fn_param_type_tags_arena(fn_param_ty_root: Vec<i32>,
    needs no fn-name anchor and survives the §5e mangle. Pushes name
    token position + mut flag per param. Returns 0. */
 
+/* ── scan_fn_ret_type_tag_arena (PC-7c) ───────────────────────
+   Arena analogue of scan_fn_ret_type_tag. `has_ret` is the PACKED
+   id2 value (ret bit + contract_count*2); `fn_ret_ty_root_by_item`
+   holds each item's return-type pty root (-1 when the fn has no
+   `-> T`). Replicates the token scanner EXACTLY, including its quirk
+   that a fn with contracts but no return type (packed has_ret != 0,
+   root == -1) yields TY_UNKNOWN rather than TY_UNIT. Independent of
+   the fn name-token position → survives the §5e mangle. */
+
+fn scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item: Vec<i32>,
+                              item_idx: i32, has_ret: i32,
+                              pty_tt: Vec<i32>, pty_td1: Vec<i32>,
+                              pty_td2: Vec<i32>, pty_td3: Vec<i32>,
+                              pp: Vec<i32>,
+                              source: string, starts: Vec<i32>,
+                              ends: Vec<i32>,
+                              struct_names: Vec<i32>,
+                              enum_names: Vec<i32>,
+                              type_params: Vec<i32>,
+                              tp_limit: i32) -> i32 {
+    if has_ret == 0 { return TY_UNIT(); }
+    let root: i32 = vec_get(fn_ret_ty_root_by_item, item_idx);
+    if root < 0 { return TY_UNKNOWN(); }
+    return pty_root_to_type_tag(pty_tt, pty_td1, pty_td2, pty_td3, pp,
+                               root, source, starts, ends,
+                               struct_names, enum_names,
+                               type_params, tp_limit);
+}
+
 fn scan_fn_param_names_arena(fn_param_name_toks: Vec<i32>,
                              pbase: i32, param_count: i32,
                              tok_tags: Vec<i32>,
@@ -1742,13 +1771,24 @@ fn scan_fn_ret_type_tag(tok_tags: Vec<i32>, source: string,
    scan_fn_ret_type_tag), then registers in the function type
    table via fn_table_add.  Returns 0 on success, -1 on error. */
 
+/* PC-7c: reads param + return types from the parser's per-fn arenas
+   (id5=pbase → fn_param_ty_root; fn_ret_ty_root_by_item) via
+   pty_root_to_type_tag, instead of walking the token stream from the fn
+   name position — so the §5e defining-name mangle no longer breaks the
+   fn-table build. name_pos (id1) is still used only as the fn's table
+   key (a name-string handle, mangle-friendly), never as a scan anchor. */
 fn item_fn_ty_to_table(tok_tags: Vec<i32>, source: string,
                        starts: Vec<i32>, ends: Vec<i32>,
                        struct_names: Vec<i32>,
                        enum_names: Vec<i32>,
                        type_params: Vec<i32>, tp_limit: i32,
                        id1: Vec<i32>, id2: Vec<i32>,
-                       id3: Vec<i32>,
+                       id3: Vec<i32>, id5: Vec<i32>,
+                       fn_param_ty_root: Vec<i32>,
+                       fn_ret_ty_root_by_item: Vec<i32>,
+                       pty_tt: Vec<i32>, pty_td1: Vec<i32>,
+                       pty_td2: Vec<i32>, pty_td3: Vec<i32>,
+                       pp: Vec<i32>,
                        fn_names: Vec<i32>,
                        fn_param_counts: Vec<i32>,
                        fn_ret_types: Vec<i32>,
@@ -1758,17 +1798,18 @@ fn item_fn_ty_to_table(tok_tags: Vec<i32>, source: string,
     let name_pos: i32 = vec_get(id1, item_idx);
     let has_ret: i32 = vec_get(id2, item_idx);
     let param_count: i32 = vec_get(id3, item_idx);
+    let pbase: i32 = vec_get(id5, item_idx);
     let param_types: Vec<i32> = vec_new();
-    let r1: i32 = scan_fn_param_type_tags(tok_tags, source, starts, ends,
-                                           struct_names, enum_names,
-                                           type_params, tp_limit,
-                                           name_pos, param_count,
-                                           param_types);
+    let r1: i32 = scan_fn_param_type_tags_arena(fn_param_ty_root, pbase,
+                     param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp,
+                     source, starts, ends, struct_names, enum_names,
+                     type_params, tp_limit, param_types);
     if r1 < 0 { return 0 - 1; }
-    let ret_tag: i32 = scan_fn_ret_type_tag(tok_tags, source, starts, ends,
-                                             struct_names, enum_names,
-                                             type_params, tp_limit,
-                                             name_pos, has_ret);
+    let ret_tag: i32 = scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item,
+                          item_idx, has_ret, pty_tt, pty_td1, pty_td2,
+                          pty_td3, pp, source, starts, ends,
+                          struct_names, enum_names, type_params,
+                          tp_limit);
     let _idx: i32 = fn_table_add(fn_names, fn_param_counts,
                                   fn_ret_types, fn_param_offsets,
                                   fn_param_types_flat,
@@ -1788,7 +1829,12 @@ fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
                          enum_names: Vec<i32>,
                          type_params: Vec<i32>, tp_limit: i32,
                          it: Vec<i32>, id1: Vec<i32>,
-                         id2: Vec<i32>, id3: Vec<i32>,
+                         id2: Vec<i32>, id3: Vec<i32>, id5: Vec<i32>,
+                         fn_param_ty_root: Vec<i32>,
+                         fn_ret_ty_root_by_item: Vec<i32>,
+                         pty_tt: Vec<i32>, pty_td1: Vec<i32>,
+                         pty_td2: Vec<i32>, pty_td3: Vec<i32>,
+                         pp: Vec<i32>,
                          fn_names: Vec<i32>,
                          fn_param_counts: Vec<i32>,
                          fn_ret_types: Vec<i32>,
@@ -1803,7 +1849,11 @@ fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
                                               starts, ends,
                                               struct_names, enum_names,
                                               type_params, tp_limit,
-                                              id1, id2, id3,
+                                              id1, id2, id3, id5,
+                                              fn_param_ty_root,
+                                              fn_ret_ty_root_by_item,
+                                              pty_tt, pty_td1, pty_td2,
+                                              pty_td3, pp,
                                               fn_names, fn_param_counts,
                                               fn_ret_types, fn_param_offsets,
                                               fn_param_types_flat, i);
@@ -2087,6 +2137,10 @@ fn check_program(
     starts: Vec<i32>, ends: Vec<i32>,
     pp: Vec<i32>,
     it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
+    id5: Vec<i32>,
+    fn_param_name_toks: Vec<i32>, fn_param_ty_root: Vec<i32>,
+    fn_ret_ty_root_by_item: Vec<i32>,
+    pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>, pty_td3: Vec<i32>,
     body_et: Vec<i32>, body_ed1: Vec<i32>, body_ed2: Vec<i32>,
     body_ed3: Vec<i32>, body_ed4: Vec<i32>,
     type_params: Vec<i32>, tp_limit: i32) -> i32 {
@@ -2138,7 +2192,11 @@ fn check_program(
     let _fc: i32 = register_all_item_fns(tok_tags, source, starts, ends,
                                           struct_names, enum_names,
                                           type_params, tp_limit,
-                                          it, id1, id2, id3,
+                                          it, id1, id2, id3, id5,
+                                          fn_param_ty_root,
+                                          fn_ret_ty_root_by_item,
+                                          pty_tt, pty_td1, pty_td2, pty_td3,
+                                          pp,
                                           fn_names, fn_param_counts,
                                           fn_ret_types, fn_param_offsets,
                                           fn_param_types_flat);
@@ -2169,23 +2227,19 @@ fn check_program(
             let name_pos: i32 = vec_get(id1, ii);
             let param_count: i32 = vec_get(id3, ii);
             let body_root_idx: i32 = vec_get(id4, ii);
+            let pbase: i32 = vec_get(id5, ii);
             let param_types: Vec<i32> = vec_new();
-            let rpt: i32 = scan_fn_param_type_tags(tok_tags, source,
-                                                    starts, ends,
-                                                    struct_names,
-                                                    enum_names,
-                                                    type_params,
-                                                    tp_limit,
-                                                    name_pos,
-                                                    param_count,
-                                                    param_types);
+            let rpt: i32 = scan_fn_param_type_tags_arena(fn_param_ty_root,
+                              pbase, param_count, pty_tt, pty_td1, pty_td2,
+                              pty_td3, pp, source, starts, ends,
+                              struct_names, enum_names, type_params,
+                              tp_limit, param_types);
             if rpt < 0 { return 0 - 1; }
             let param_name_pos: Vec<i32> = vec_new();
             let param_muts: Vec<i32> = vec_new();
-            let rpn: i32 = scan_fn_param_names(tok_tags, name_pos,
-                                                param_count,
-                                                param_name_pos,
-                                                param_muts);
+            let rpn: i32 = scan_fn_param_names_arena(fn_param_name_toks,
+                              pbase, param_count, tok_tags,
+                              param_name_pos, param_muts);
             if rpn < 0 { return 0 - 1; }
             let fidx: i32 = fn_table_lookup(fn_names, name_pos);
             if fidx < 0 { return 0 - 1; }
@@ -4941,10 +4995,33 @@ fn test_register_all_item_fns() -> i32 {
     let frets: Vec<i32> = vec_new();
     let foffs: Vec<i32> = vec_new();
     let fptf: Vec<i32> = vec_new();
+    /* PC-7c arenas. foo(x: i32)->bool: param x type i32 @tok5, ret bool
+       @tok8; bar()->i32: ret i32 @tok16. pty roots 0=i32(param) 1=bool
+       2=i32; pp=[5,8,16]. id5=[0,1] (pbase); fpt=[0] (foo's one param);
+       frt=[1,2] (ret roots). */
+    let r_id5: Vec<i32> = vec_new();
+    vec_push(r_id5, 0); vec_push(r_id5, 1);
+    let r_fpt: Vec<i32> = vec_new();
+    vec_push(r_fpt, 0);
+    let r_frt: Vec<i32> = vec_new();
+    vec_push(r_frt, 1); vec_push(r_frt, 2);
+    let r_pp: Vec<i32> = vec_new();
+    vec_push(r_pp, 5); vec_push(r_pp, 8); vec_push(r_pp, 16);
+    let r_ptt: Vec<i32> = vec_new();
+    vec_push(r_ptt, 0); vec_push(r_ptt, 0); vec_push(r_ptt, 0);
+    let r_ptd1: Vec<i32> = vec_new();
+    vec_push(r_ptd1, 0); vec_push(r_ptd1, 1); vec_push(r_ptd1, 2);
+    let r_ptd2: Vec<i32> = vec_new();
+    vec_push(r_ptd2, 1); vec_push(r_ptd2, 1); vec_push(r_ptd2, 1);
+    let r_ptd3: Vec<i32> = vec_new();
+    vec_push(r_ptd3, 0); vec_push(r_ptd3, 0); vec_push(r_ptd3, 0);
     let count: i32 = register_all_item_fns(tt, source, starts, ends,
                                             sn, en, tp, 0,
                                             item_t, item_d1,
-                                            item_d2, item_d3,
+                                            item_d2, item_d3, r_id5,
+                                            r_fpt, r_frt,
+                                            r_ptt, r_ptd1, r_ptd2, r_ptd3,
+                                            r_pp,
                                             fnames, fpcs,
                                             frets, foffs, fptf);
     if count != 2 { return 1; }
@@ -5732,10 +5809,29 @@ fn test_check_program() -> i32 {
     vec_push(body_et_a, 0); vec_push(body_ed1_a, 0);
     vec_push(body_ed2_a, 0); vec_push(body_ed3_a, 0);
     vec_push(body_ed4_a, 0);
+    /* PC-7c arenas: foo is paramless with ret i32 (token 5). pp[0]→tok5;
+       pty root 0 = TyName(i32); frt[0]=0; id5[0]=0 (pbase, unused). */
     let pp_a: Vec<i32> = vec_new();
+    vec_push(pp_a, 5);
+    let id5_a: Vec<i32> = vec_new();
+    vec_push(id5_a, 0);
+    let fpn_a: Vec<i32> = vec_new();
+    let fpt_a: Vec<i32> = vec_new();
+    let frt_a: Vec<i32> = vec_new();
+    vec_push(frt_a, 0);
+    let ptt_a: Vec<i32> = vec_new();
+    vec_push(ptt_a, 0);
+    let ptd1_a: Vec<i32> = vec_new();
+    vec_push(ptd1_a, 0);
+    let ptd2_a: Vec<i32> = vec_new();
+    vec_push(ptd2_a, 1);
+    let ptd3_a: Vec<i32> = vec_new();
+    vec_push(ptd3_a, 0);
     let tp_a: Vec<i32> = vec_new();
     let ra: i32 = check_program(tt_a, source_a, starts_a, ends_a, pp_a,
-                                 it_a, id1_a, id2_a, id3_a, id4_a,
+                                 it_a, id1_a, id2_a, id3_a, id4_a, id5_a,
+                                 fpn_a, fpt_a, frt_a, ptt_a, ptd1_a,
+                                 ptd2_a, ptd3_a,
                                  body_et_a, body_ed1_a, body_ed2_a,
                                  body_ed3_a, body_ed4_a, tp_a, 0);
     if ra != 0 { return 1; }
@@ -5793,10 +5889,29 @@ fn test_check_program() -> i32 {
     vec_push(body_et_b, 0); vec_push(body_ed1_b, 0);
     vec_push(body_ed2_b, 0); vec_push(body_ed3_b, 0);
     vec_push(body_ed4_b, 0);
+    /* PC-7c arenas: foo (ret i32 @tok5) + bar (ret i32 @tok13), both
+       paramless. pp=[5,13]; pty roots 0,1 = TyName(i32); frt=[0,1]. */
     let pp_b: Vec<i32> = vec_new();
+    vec_push(pp_b, 5); vec_push(pp_b, 13);
+    let id5_b: Vec<i32> = vec_new();
+    vec_push(id5_b, 0); vec_push(id5_b, 0);
+    let fpn_b: Vec<i32> = vec_new();
+    let fpt_b: Vec<i32> = vec_new();
+    let frt_b: Vec<i32> = vec_new();
+    vec_push(frt_b, 0); vec_push(frt_b, 1);
+    let ptt_b: Vec<i32> = vec_new();
+    vec_push(ptt_b, 0); vec_push(ptt_b, 0);
+    let ptd1_b: Vec<i32> = vec_new();
+    vec_push(ptd1_b, 0); vec_push(ptd1_b, 1);
+    let ptd2_b: Vec<i32> = vec_new();
+    vec_push(ptd2_b, 1); vec_push(ptd2_b, 1);
+    let ptd3_b: Vec<i32> = vec_new();
+    vec_push(ptd3_b, 0); vec_push(ptd3_b, 0);
     let tp_b: Vec<i32> = vec_new();
     let rb: i32 = check_program(tt_b, source_b, starts_b, ends_b, pp_b,
-                                 it_b, id1_b, id2_b, id3_b, id4_b,
+                                 it_b, id1_b, id2_b, id3_b, id4_b, id5_b,
+                                 fpn_b, fpt_b, frt_b, ptt_b, ptd1_b,
+                                 ptd2_b, ptd3_b,
                                  body_et_b, body_ed1_b, body_ed2_b,
                                  body_ed3_b, body_ed4_b, tp_b, 0);
     if rb != 0 { return 2; }

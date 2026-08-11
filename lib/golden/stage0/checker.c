@@ -123,17 +123,18 @@ static int type_param_lookup_str(int type_params, int limit, const char* source,
 static int scan_type_tag_at(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int pos, int out_tag);
 static int pty_root_to_type_tag(int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, int root, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit);
 static int scan_fn_param_type_tags_arena(int fn_param_ty_root, int pbase, int param_count, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int out_param_types);
+static int scan_fn_ret_type_tag_arena(int fn_ret_ty_root_by_item, int item_idx, int has_ret, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit);
 static int scan_fn_param_names_arena(int fn_param_name_toks, int pbase, int param_count, int tok_tags, int out_param_name_pos, int out_param_muts);
 static int scan_struct_field_type_tags(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int field_name_positions, int out_field_types);
 static int scan_fn_param_type_tags(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int name_tok_pos, int param_count, int out_param_types);
 static int scan_fn_ret_type_tag(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int name_tok_pos, int has_ret);
-static int item_fn_ty_to_table(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int id1, int id2, int id3, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int item_idx);
-static int register_all_item_fns(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int it, int id1, int id2, int id3, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat);
+static int item_fn_ty_to_table(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int id1, int id2, int id3, int id5, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int item_idx);
+static int register_all_item_fns(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int it, int id1, int id2, int id3, int id5, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat);
 static int scan_fn_param_names(int tok_tags, int name_tok_pos, int param_count, int out_param_name_pos, int out_param_muts);
 static int check_fn_body(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, const char* source, int starts, int ends, int mod_env_names, int mod_env_types, int mod_env_muts, int param_name_pos, int param_type_tags, int param_muts, int param_count, int ret_ty, int body_root_idx, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types);
 static int process_item_use(const char* source, int starts, int ends, int pp, int id1, int id2, int item_idx, int fn_names, int fn_ret_types, int sdef_names, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int env_names, int env_types, int env_muts, int aliases, int alias_targets);
 static int build_mod_env(const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int fn_names, int fn_ret_types, int sdef_names, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int env_names, int env_types, int env_muts, int aliases, int alias_targets);
-static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit);
+static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit);
 static int contract_expr_new(void);
 static int contract_expr_enter(int flag);
 static int contract_expr_exit(int flag, int saved);
@@ -2640,6 +2641,23 @@ static int scan_fn_param_type_tags_arena(int fn_param_ty_root, int pbase, int pa
   return 0;
 }
 
+static int scan_fn_ret_type_tag_arena(int fn_ret_ty_root_by_item, int item_idx, int has_ret, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit) {
+  if ((has_ret == 0)) {
+    int _sv0t0 = TY_UNIT();
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(fn_ret_ty_root_by_item, item_idx);
+  int root = _sv0t1;
+  if ((root < 0)) {
+    int _sv0t2 = TY_UNKNOWN();
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = pty_root_to_type_tag(pty_tt, pty_td1, pty_td2, pty_td3, pp, root, source, starts, ends, struct_names, enum_names, type_params, tp_limit);
+  return _sv0t3;
+}
+
 static int scan_fn_param_names_arena(int fn_param_name_toks, int pbase, int param_count, int tok_tags, int out_param_name_pos, int out_param_muts) {
   int j = 0;
   while ((j < param_count)) {
@@ -2820,30 +2838,32 @@ static int scan_fn_ret_type_tag(int tok_tags, const char* source, int starts, in
   return _sv0t13;
 }
 
-static int item_fn_ty_to_table(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int id1, int id2, int id3, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int item_idx) {
+static int item_fn_ty_to_table(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int id1, int id2, int id3, int id5, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int item_idx) {
   int _sv0t0 = sv0_vec_get(id1, item_idx);
   int name_pos = _sv0t0;
   int _sv0t1 = sv0_vec_get(id2, item_idx);
   int has_ret = _sv0t1;
   int _sv0t2 = sv0_vec_get(id3, item_idx);
   int param_count = _sv0t2;
-  int _sv0t3 = sv0_vec_new();
-  int param_types = _sv0t3;
-  int _sv0t4 = scan_fn_param_type_tags(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, name_pos, param_count, param_types);
-  int r1 = _sv0t4;
+  int _sv0t3 = sv0_vec_get(id5, item_idx);
+  int pbase = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int param_types = _sv0t4;
+  int _sv0t5 = scan_fn_param_type_tags_arena(fn_param_ty_root, pbase, param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, param_types);
+  int r1 = _sv0t5;
   if ((r1 < 0)) {
-    int _sv0t5 = (0 - 1);
-    return _sv0t5;
+    int _sv0t6 = (0 - 1);
+    return _sv0t6;
   } else {
   }
-  int _sv0t6 = scan_fn_ret_type_tag(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, name_pos, has_ret);
-  int ret_tag = _sv0t6;
-  int _sv0t7 = fn_table_add(fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, name_pos, ret_tag, param_types, param_count);
-  int _idx = _sv0t7;
+  int _sv0t7 = scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item, item_idx, has_ret, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit);
+  int ret_tag = _sv0t7;
+  int _sv0t8 = fn_table_add(fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, name_pos, ret_tag, param_types, param_count);
+  int _idx = _sv0t8;
   return 0;
 }
 
-static int register_all_item_fns(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int it, int id1, int id2, int id3, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat) {
+static int register_all_item_fns(int tok_tags, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int it, int id1, int id2, int id3, int id5, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat) {
   int _sv0t0 = sv0_vec_len(it);
   int n = _sv0t0;
   int count = 0;
@@ -2851,7 +2871,7 @@ static int register_all_item_fns(int tok_tags, const char* source, int starts, i
   while ((i < n)) {
     int _sv0t1 = sv0_vec_get(it, i);
     if ((_sv0t1 == 0)) {
-      int _sv0t2 = item_fn_ty_to_table(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, id1, id2, id3, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, i);
+      int _sv0t2 = item_fn_ty_to_table(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, id1, id2, id3, id5, fn_param_ty_root, fn_ret_ty_root_by_item, pty_tt, pty_td1, pty_td2, pty_td3, pp, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, i);
       int r = _sv0t2;
       if ((r == 0)) {
         count = (count + 1);
@@ -3142,7 +3162,7 @@ static int build_mod_env(const char* source, int starts, int ends, int pp, int i
   return 0;
 }
 
-static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit) {
+static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit) {
   int _sv0t0 = sv0_vec_new();
   int struct_names = _sv0t0;
   int _sv0t1 = sv0_vec_new();
@@ -3212,7 +3232,7 @@ static int check_program(int tok_tags, const char* source, int starts, int ends,
   int fn_param_offsets = _sv0t25;
   int _sv0t26 = sv0_vec_new();
   int fn_param_types_flat = _sv0t26;
-  int _sv0t27 = register_all_item_fns(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, it, id1, id2, id3, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat);
+  int _sv0t27 = register_all_item_fns(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, it, id1, id2, id3, id5, fn_param_ty_root, fn_ret_ty_root_by_item, pty_tt, pty_td1, pty_td2, pty_td3, pp, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat);
   int _fc = _sv0t27;
   int _sv0t28 = sv0_vec_new();
   int mod_env_names = _sv0t28;
@@ -3242,40 +3262,42 @@ static int check_program(int tok_tags, const char* source, int starts, int ends,
       int param_count = _sv0t37;
       int _sv0t38 = sv0_vec_get(id4, ii);
       int body_root_idx = _sv0t38;
-      int _sv0t39 = sv0_vec_new();
-      int param_types = _sv0t39;
-      int _sv0t40 = scan_fn_param_type_tags(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, name_pos, param_count, param_types);
-      int rpt = _sv0t40;
+      int _sv0t39 = sv0_vec_get(id5, ii);
+      int pbase = _sv0t39;
+      int _sv0t40 = sv0_vec_new();
+      int param_types = _sv0t40;
+      int _sv0t41 = scan_fn_param_type_tags_arena(fn_param_ty_root, pbase, param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, param_types);
+      int rpt = _sv0t41;
       if ((rpt < 0)) {
-        int _sv0t41 = (0 - 1);
-        return _sv0t41;
+        int _sv0t42 = (0 - 1);
+        return _sv0t42;
       } else {
       }
-      int _sv0t42 = sv0_vec_new();
-      int param_name_pos = _sv0t42;
       int _sv0t43 = sv0_vec_new();
-      int param_muts = _sv0t43;
-      int _sv0t44 = scan_fn_param_names(tok_tags, name_pos, param_count, param_name_pos, param_muts);
-      int rpn = _sv0t44;
+      int param_name_pos = _sv0t43;
+      int _sv0t44 = sv0_vec_new();
+      int param_muts = _sv0t44;
+      int _sv0t45 = scan_fn_param_names_arena(fn_param_name_toks, pbase, param_count, tok_tags, param_name_pos, param_muts);
+      int rpn = _sv0t45;
       if ((rpn < 0)) {
-        int _sv0t45 = (0 - 1);
-        return _sv0t45;
+        int _sv0t46 = (0 - 1);
+        return _sv0t46;
       } else {
       }
-      int _sv0t46 = fn_table_lookup(fn_names, name_pos);
-      int fidx = _sv0t46;
+      int _sv0t47 = fn_table_lookup(fn_names, name_pos);
+      int fidx = _sv0t47;
       if ((fidx < 0)) {
-        int _sv0t47 = (0 - 1);
-        return _sv0t47;
+        int _sv0t48 = (0 - 1);
+        return _sv0t48;
       } else {
       }
-      int _sv0t48 = fn_table_ret_type(fn_ret_types, fidx);
-      int ret_ty = _sv0t48;
-      int _sv0t49 = check_fn_body(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, source, starts, ends, mod_env_names, mod_env_types, mod_env_muts, param_name_pos, param_types, param_muts, param_count, ret_ty, body_root_idx, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types);
-      int chk = _sv0t49;
+      int _sv0t49 = fn_table_ret_type(fn_ret_types, fidx);
+      int ret_ty = _sv0t49;
+      int _sv0t50 = check_fn_body(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, source, starts, ends, mod_env_names, mod_env_types, mod_env_muts, param_name_pos, param_types, param_muts, param_count, ret_ty, body_root_idx, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types);
+      int chk = _sv0t50;
       if ((chk != 0)) {
-        int _sv0t50 = (0 - 1);
-        return _sv0t50;
+        int _sv0t51 = (0 - 1);
+        return _sv0t51;
       } else {
       }
     } else {
@@ -8009,54 +8031,90 @@ static int test_register_all_item_fns(void) {
   int foffs = _sv0t13;
   int _sv0t14 = sv0_vec_new();
   int fptf = _sv0t14;
-  int _sv0t15 = register_all_item_fns(tt, source, starts, ends, sn, en, tp, 0, item_t, item_d1, item_d2, item_d3, fnames, fpcs, frets, foffs, fptf);
-  int count = _sv0t15;
+  int _sv0t15 = sv0_vec_new();
+  int r_id5 = _sv0t15;
+  sv0_vec_push(r_id5, 0);
+  sv0_vec_push(r_id5, 1);
+  int _sv0t16 = sv0_vec_new();
+  int r_fpt = _sv0t16;
+  sv0_vec_push(r_fpt, 0);
+  int _sv0t17 = sv0_vec_new();
+  int r_frt = _sv0t17;
+  sv0_vec_push(r_frt, 1);
+  sv0_vec_push(r_frt, 2);
+  int _sv0t18 = sv0_vec_new();
+  int r_pp = _sv0t18;
+  sv0_vec_push(r_pp, 5);
+  sv0_vec_push(r_pp, 8);
+  sv0_vec_push(r_pp, 16);
+  int _sv0t19 = sv0_vec_new();
+  int r_ptt = _sv0t19;
+  sv0_vec_push(r_ptt, 0);
+  sv0_vec_push(r_ptt, 0);
+  sv0_vec_push(r_ptt, 0);
+  int _sv0t20 = sv0_vec_new();
+  int r_ptd1 = _sv0t20;
+  sv0_vec_push(r_ptd1, 0);
+  sv0_vec_push(r_ptd1, 1);
+  sv0_vec_push(r_ptd1, 2);
+  int _sv0t21 = sv0_vec_new();
+  int r_ptd2 = _sv0t21;
+  sv0_vec_push(r_ptd2, 1);
+  sv0_vec_push(r_ptd2, 1);
+  sv0_vec_push(r_ptd2, 1);
+  int _sv0t22 = sv0_vec_new();
+  int r_ptd3 = _sv0t22;
+  sv0_vec_push(r_ptd3, 0);
+  sv0_vec_push(r_ptd3, 0);
+  sv0_vec_push(r_ptd3, 0);
+  int _sv0t23 = register_all_item_fns(tt, source, starts, ends, sn, en, tp, 0, item_t, item_d1, item_d2, item_d3, r_id5, r_fpt, r_frt, r_ptt, r_ptd1, r_ptd2, r_ptd3, r_pp, fnames, fpcs, frets, foffs, fptf);
+  int count = _sv0t23;
   if ((count != 2)) {
     return 1;
   } else {
   }
-  int _sv0t16 = sv0_vec_len(fnames);
-  if ((_sv0t16 != 2)) {
+  int _sv0t24 = sv0_vec_len(fnames);
+  if ((_sv0t24 != 2)) {
     return 2;
   } else {
   }
-  int _sv0t17 = fn_table_lookup_str(fnames, source, starts, ends, "foo");
-  int idx0 = _sv0t17;
+  int _sv0t25 = fn_table_lookup_str(fnames, source, starts, ends, "foo");
+  int idx0 = _sv0t25;
   if ((idx0 < 0)) {
     return 3;
   } else {
   }
-  int _sv0t18 = fn_table_ret_type(frets, idx0);
-  int _sv0t19 = TY_BOOL();
-  if ((_sv0t18 != _sv0t19)) {
+  int _sv0t26 = fn_table_ret_type(frets, idx0);
+  int _sv0t27 = TY_BOOL();
+  if ((_sv0t26 != _sv0t27)) {
     return 4;
   } else {
   }
-  int _sv0t20 = fn_table_param_count(fpcs, idx0);
-  if ((_sv0t20 != 1)) {
+  int _sv0t28 = fn_table_param_count(fpcs, idx0);
+  if ((_sv0t28 != 1)) {
     return 5;
   } else {
   }
-  int _sv0t21 = fn_table_param_type(foffs, fptf, idx0, 0);
-  int _sv0t22 = TY_INT();
-  if ((_sv0t21 != _sv0t22)) {
+  int _sv0t29 = fn_table_param_type(foffs, fptf, idx0, 0);
+  int _sv0t30 = TY_INT();
+  if ((_sv0t29 != _sv0t30)) {
     return 6;
   } else {
   }
-  int _sv0t23 = fn_table_lookup_str(fnames, source, starts, ends, "bar");
-  int idx1 = _sv0t23;
+  int _sv0t31 = fn_table_lookup_str(fnames, source, starts, ends, "bar");
+  int idx1 = _sv0t31;
   if ((idx1 < 0)) {
     return 7;
   } else {
   }
-  int _sv0t24 = fn_table_ret_type(frets, idx1);
-  int _sv0t25 = TY_INT();
-  if ((_sv0t24 != _sv0t25)) {
+  int _sv0t32 = fn_table_ret_type(frets, idx1);
+  int _sv0t33 = TY_INT();
+  if ((_sv0t32 != _sv0t33)) {
     return 8;
   } else {
   }
-  int _sv0t26 = fn_table_param_count(fpcs, idx1);
-  if ((_sv0t26 != 0)) {
+  int _sv0t34 = fn_table_param_count(fpcs, idx1);
+  if ((_sv0t34 != 0)) {
     return 9;
   } else {
   }
@@ -9486,20 +9544,43 @@ static int test_check_program(void) {
   sv0_vec_push(body_ed4_a, 0);
   int _sv0t13 = sv0_vec_new();
   int pp_a = _sv0t13;
+  sv0_vec_push(pp_a, 5);
   int _sv0t14 = sv0_vec_new();
-  int tp_a = _sv0t14;
-  int _sv0t15 = check_program(tt_a, source_a, starts_a, ends_a, pp_a, it_a, id1_a, id2_a, id3_a, id4_a, body_et_a, body_ed1_a, body_ed2_a, body_ed3_a, body_ed4_a, tp_a, 0);
-  int ra = _sv0t15;
+  int id5_a = _sv0t14;
+  sv0_vec_push(id5_a, 0);
+  int _sv0t15 = sv0_vec_new();
+  int fpn_a = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int fpt_a = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int frt_a = _sv0t17;
+  sv0_vec_push(frt_a, 0);
+  int _sv0t18 = sv0_vec_new();
+  int ptt_a = _sv0t18;
+  sv0_vec_push(ptt_a, 0);
+  int _sv0t19 = sv0_vec_new();
+  int ptd1_a = _sv0t19;
+  sv0_vec_push(ptd1_a, 0);
+  int _sv0t20 = sv0_vec_new();
+  int ptd2_a = _sv0t20;
+  sv0_vec_push(ptd2_a, 1);
+  int _sv0t21 = sv0_vec_new();
+  int ptd3_a = _sv0t21;
+  sv0_vec_push(ptd3_a, 0);
+  int _sv0t22 = sv0_vec_new();
+  int tp_a = _sv0t22;
+  int _sv0t23 = check_program(tt_a, source_a, starts_a, ends_a, pp_a, it_a, id1_a, id2_a, id3_a, id4_a, id5_a, fpn_a, fpt_a, frt_a, ptt_a, ptd1_a, ptd2_a, ptd3_a, body_et_a, body_ed1_a, body_ed2_a, body_ed3_a, body_ed4_a, tp_a, 0);
+  int ra = _sv0t23;
   if ((ra != 0)) {
     return 1;
   } else {
   }
   const char* source_b;
   source_b = "fn foo ( ) -> i32 { } fn bar ( ) -> i32 { }";
-  int _sv0t16 = sv0_vec_new();
-  int starts_b = _sv0t16;
-  int _sv0t17 = sv0_vec_new();
-  int ends_b = _sv0t17;
+  int _sv0t24 = sv0_vec_new();
+  int starts_b = _sv0t24;
+  int _sv0t25 = sv0_vec_new();
+  int ends_b = _sv0t25;
   sv0_vec_push(starts_b, 0);
   sv0_vec_push(ends_b, 2);
   sv0_vec_push(starts_b, 3);
@@ -9532,8 +9613,8 @@ static int test_check_program(void) {
   sv0_vec_push(ends_b, 41);
   sv0_vec_push(starts_b, 42);
   sv0_vec_push(ends_b, 43);
-  int _sv0t18 = sv0_vec_new();
-  int tt_b = _sv0t18;
+  int _sv0t26 = sv0_vec_new();
+  int tt_b = _sv0t26;
   sv0_vec_push(tt_b, 65);
   sv0_vec_push(tt_b, 5);
   sv0_vec_push(tt_b, 6);
@@ -9550,16 +9631,16 @@ static int test_check_program(void) {
   sv0_vec_push(tt_b, 5);
   sv0_vec_push(tt_b, 8);
   sv0_vec_push(tt_b, 9);
-  int _sv0t19 = sv0_vec_new();
-  int it_b = _sv0t19;
-  int _sv0t20 = sv0_vec_new();
-  int id1_b = _sv0t20;
-  int _sv0t21 = sv0_vec_new();
-  int id2_b = _sv0t21;
-  int _sv0t22 = sv0_vec_new();
-  int id3_b = _sv0t22;
-  int _sv0t23 = sv0_vec_new();
-  int id4_b = _sv0t23;
+  int _sv0t27 = sv0_vec_new();
+  int it_b = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int id1_b = _sv0t28;
+  int _sv0t29 = sv0_vec_new();
+  int id2_b = _sv0t29;
+  int _sv0t30 = sv0_vec_new();
+  int id3_b = _sv0t30;
+  int _sv0t31 = sv0_vec_new();
+  int id4_b = _sv0t31;
   sv0_vec_push(it_b, 0);
   sv0_vec_push(id1_b, 1);
   sv0_vec_push(id2_b, 1);
@@ -9570,16 +9651,16 @@ static int test_check_program(void) {
   sv0_vec_push(id2_b, 1);
   sv0_vec_push(id3_b, 0);
   sv0_vec_push(id4_b, 1);
-  int _sv0t24 = sv0_vec_new();
-  int body_et_b = _sv0t24;
-  int _sv0t25 = sv0_vec_new();
-  int body_ed1_b = _sv0t25;
-  int _sv0t26 = sv0_vec_new();
-  int body_ed2_b = _sv0t26;
-  int _sv0t27 = sv0_vec_new();
-  int body_ed3_b = _sv0t27;
-  int _sv0t28 = sv0_vec_new();
-  int body_ed4_b = _sv0t28;
+  int _sv0t32 = sv0_vec_new();
+  int body_et_b = _sv0t32;
+  int _sv0t33 = sv0_vec_new();
+  int body_ed1_b = _sv0t33;
+  int _sv0t34 = sv0_vec_new();
+  int body_ed2_b = _sv0t34;
+  int _sv0t35 = sv0_vec_new();
+  int body_ed3_b = _sv0t35;
+  int _sv0t36 = sv0_vec_new();
+  int body_ed4_b = _sv0t36;
   sv0_vec_push(body_et_b, 0);
   sv0_vec_push(body_ed1_b, 0);
   sv0_vec_push(body_ed2_b, 0);
@@ -9590,12 +9671,42 @@ static int test_check_program(void) {
   sv0_vec_push(body_ed2_b, 0);
   sv0_vec_push(body_ed3_b, 0);
   sv0_vec_push(body_ed4_b, 0);
-  int _sv0t29 = sv0_vec_new();
-  int pp_b = _sv0t29;
-  int _sv0t30 = sv0_vec_new();
-  int tp_b = _sv0t30;
-  int _sv0t31 = check_program(tt_b, source_b, starts_b, ends_b, pp_b, it_b, id1_b, id2_b, id3_b, id4_b, body_et_b, body_ed1_b, body_ed2_b, body_ed3_b, body_ed4_b, tp_b, 0);
-  int rb = _sv0t31;
+  int _sv0t37 = sv0_vec_new();
+  int pp_b = _sv0t37;
+  sv0_vec_push(pp_b, 5);
+  sv0_vec_push(pp_b, 13);
+  int _sv0t38 = sv0_vec_new();
+  int id5_b = _sv0t38;
+  sv0_vec_push(id5_b, 0);
+  sv0_vec_push(id5_b, 0);
+  int _sv0t39 = sv0_vec_new();
+  int fpn_b = _sv0t39;
+  int _sv0t40 = sv0_vec_new();
+  int fpt_b = _sv0t40;
+  int _sv0t41 = sv0_vec_new();
+  int frt_b = _sv0t41;
+  sv0_vec_push(frt_b, 0);
+  sv0_vec_push(frt_b, 1);
+  int _sv0t42 = sv0_vec_new();
+  int ptt_b = _sv0t42;
+  sv0_vec_push(ptt_b, 0);
+  sv0_vec_push(ptt_b, 0);
+  int _sv0t43 = sv0_vec_new();
+  int ptd1_b = _sv0t43;
+  sv0_vec_push(ptd1_b, 0);
+  sv0_vec_push(ptd1_b, 1);
+  int _sv0t44 = sv0_vec_new();
+  int ptd2_b = _sv0t44;
+  sv0_vec_push(ptd2_b, 1);
+  sv0_vec_push(ptd2_b, 1);
+  int _sv0t45 = sv0_vec_new();
+  int ptd3_b = _sv0t45;
+  sv0_vec_push(ptd3_b, 0);
+  sv0_vec_push(ptd3_b, 0);
+  int _sv0t46 = sv0_vec_new();
+  int tp_b = _sv0t46;
+  int _sv0t47 = check_program(tt_b, source_b, starts_b, ends_b, pp_b, it_b, id1_b, id2_b, id3_b, id4_b, id5_b, fpn_b, fpt_b, frt_b, ptt_b, ptd1_b, ptd2_b, ptd3_b, body_et_b, body_ed1_b, body_ed2_b, body_ed3_b, body_ed4_b, tp_b, 0);
+  int rb = _sv0t47;
   if ((rb != 0)) {
     return 2;
   } else {
