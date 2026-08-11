@@ -79,7 +79,8 @@ fn main() -> i32 {
        TY_VAR and unifies with the declared return type — see checker.sv0.) */
     let tp: Vec<i32> = vec_new();
     let cr: i32 = check_program(tags, source, starts, ends, pp,
-        it, id1, id2, id3, id4,
+        it, id1, id2, id3, id4, id5,
+        fpn, fpt, frt, ptt, ptd1, ptd2, ptd3,
         bet, bed1, bed2, bed3, bed4, tp, 0);
     if cr != 0 { return 4; }
 
