@@ -687,6 +687,19 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         let_declared = 1;
                     }
                 }
+                /* `let q: Point = p.m(..)` where method m returns a user
+                   struct/enum: same deferred DeclNamed as the tag-4 call path
+                   (methods lower to free fns, so the return-type scan matches). */
+                if let_declared == 0 {
+                    let mty_lb: i32 = lower_mcall_ret_user_ty_tok(et, ed2,
+                        init_idx, item_tags, item_names, item_d2, tok_tags,
+                        source, starts, ends);
+                    if mty_lb >= 0 {
+                        deferred_ty = mty_lb;
+                        has_deferred_decl = 1;
+                        let_declared = 1;
+                    }
+                }
                 /* `let x: T = box_deref(bv)` with T a user struct/enum. */
                 if let_declared == 0 {
                     let bdb: i32 = lower_typed_box_deref_let(et, ed1, ed2, ed3, ed4,
@@ -1280,7 +1293,16 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             }
         }
         if bid_mc == 0 {
-            let call_mc: Instr = Instr::Call(t_mc, method_tok, arg_vals_mc, 0);
+            /* Type the result temp by the method's return type: a user
+               struct/enum -> its type-name token, so `let q: Point =
+               p.scaled(2)` declares `Point _sv0tN` not `int`. */
+            let mut rt_mc: i32 = 0;
+            let uty_mc: i32 = lower_mcall_ret_user_ty_tok(et, ed2, idx,
+                item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+            if uty_mc >= 0 {
+                rt_mc = uty_mc;
+            }
+            let call_mc: Instr = Instr::Call(t_mc, method_tok, arg_vals_mc, rt_mc);
             vec_push(out_instrs, box_new(call_mc));
             return Value::VVar(t_mc);
         }
@@ -3321,6 +3343,18 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     has_deferred_decl = 1;
                 }
             }
+            /* `let x = rcv.m(..)` where method m returns a user struct/enum:
+               same deferred typed DeclNamed as the tag-4 call path (methods
+               lower to free fns, so the method-name return scan matches). */
+            if let_declared == 0 {
+                let mty_ls: i32 = lower_mcall_ret_user_ty_tok(et, ed2,
+                    init_idx, item_tags, item_names, item_d2, tok_tags,
+                    source, starts, ends);
+                if mty_ls >= 0 {
+                    deferred_ty = mty_ls;
+                    has_deferred_decl = 1;
+                }
+            }
             /* `let x: T = box_deref(bv)` with T a user struct/enum: emit a single
                typed box_deref Call (declare + reconstruct element type T). */
             if let_declared == 0 {
@@ -4015,6 +4049,21 @@ fn lower_callee_ret_ty_head(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<
     let ctok: i32 = vec_get(pp, cpps);
     if lower_tok_in_bounds(ctok, starts, ends) != true { return 0 - 1; }
     let cname: string = handle_to_str(ctok, source, starts, ends);
+    return lower_ret_ty_head_from_name(cname, item_tags, item_names, item_d2,
+        tok_tags, source, starts, ends);
+}
+
+/* ── lower_ret_ty_head_from_name ─────────────────────────────
+   Scan the item arena for a top-level ItemFn (tag 0) whose name matches
+   `cname`; return its first return-type token when `has_ret == 1` and the
+   token is in bounds, else -1. Shared by the direct-call head scan
+   (`lower_callee_ret_ty_head`) and the method-call scan
+   (`lower_mcall_ret_user_ty_tok`) — impl methods are flattened to
+   top-level ItemFns, so a method name resolves here too. */
+
+fn lower_ret_ty_head_from_name(cname: string, item_tags: Vec<i32>,
+        item_names: Vec<i32>, item_d2: Vec<i32>, tok_tags: Vec<i32>,
+        source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let n: i32 = vec_len(item_tags);
     let nn: i32 = vec_len(item_names);
     let nd: i32 = vec_len(item_d2);
@@ -4082,6 +4131,33 @@ fn lower_call_ret_user_ty_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Ve
         source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let head: i32 = lower_callee_ret_ty_head(et, ed1, ed2, pp, call_idx,
         item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+    if head < 0 { return 0 - 1; }
+    let rty: string = handle_to_str(head, source, starts, ends);
+    if lower_name_is_user_type(rty, item_tags, item_names, source, starts, ends) {
+        return head;
+    }
+    return 0 - 1;
+}
+
+/* ── lower_mcall_ret_user_ty_tok ─────────────────────────────
+   Method-call (tag 5) analogue of lower_call_ret_user_ty_tok. The method
+   name token is ed2[mcall_idx] (methods lower via UFCS to a free fn of the
+   same name). Returns the method's return-type token when it names a user
+   struct/enum, else -1. The method_tok bounds guard avoids the
+   `test_lower_expr_method_call` OOB (method_tok=99, empty starts/ends). */
+
+fn lower_mcall_ret_user_ty_tok(et: Vec<i32>, ed2: Vec<i32>, mcall_idx: i32,
+        item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
+        tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
+        ends: Vec<i32>) -> i32 {
+    if mcall_idx < 0 { return 0 - 1; }
+    if mcall_idx >= vec_len(et) { return 0 - 1; }
+    if vec_get(et, mcall_idx) != 5 { return 0 - 1; }
+    let mtok: i32 = vec_get(ed2, mcall_idx);
+    if lower_tok_in_bounds(mtok, starts, ends) != true { return 0 - 1; }
+    let mname: string = handle_to_str(mtok, source, starts, ends);
+    let head: i32 = lower_ret_ty_head_from_name(mname, item_tags, item_names,
+        item_d2, tok_tags, source, starts, ends);
     if head < 0 { return 0 - 1; }
     let rty: string = handle_to_str(head, source, starts, ends);
     if lower_name_is_user_type(rty, item_tags, item_names, source, starts, ends) {
