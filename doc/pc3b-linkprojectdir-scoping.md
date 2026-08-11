@@ -459,6 +459,38 @@ vm-parity goldens — refresh both):**
 are the tail); `_` param handling (parser stores the token, not -1, for `t==5|86` —
 confirm `_`'s token tag); generic type-arg params (`Vec<i32>` → tag 15 today).
 
+### PC-7 progress (2026-08-11) — the §5e checker blocker is RESOLVED
+
+- **PC-7a DONE** (sv0c a37c971): `pty_root_to_type_tag` — arena analogue of
+  `scan_type_tag_at` (verified pty tag map 0/1/2/3/4/5/6; `TyArray`/`TySlice`→-1 to
+  match the token scanner's absent bracket case). Unit-tested; not yet wired.
+- **PC-7b DONE** (sv0c f97912d): `scan_fn_param_type_tags_arena` +
+  `scan_fn_param_names_arena` (mut via the local `tok[nt-1]==77` check). Unit-tested.
+- **PC-7c DONE** (sv0c 42bfbf3): threaded `id5` + `fn_param_name_toks` +
+  `fn_param_ty_root` + `fn_ret_ty_root_by_item` + the pty arena through
+  `check_program` → `register_all_item_fns` → `item_fn_ty_to_table`; added
+  `scan_fn_ret_type_tag_arena` (replicates the void+contract `TY_UNKNOWN` quirk via
+  `root<0`); swapped all three pipeline scan sites. **`id1` (defining-name token) is
+  now used ONLY as the fn-table name-string key — never as a positional scan anchor.**
+  Behavior-preserving: whole corpus + 25 fixtures type-check identically, self-host-loop
+  98/98 matched SML, vm-parity 98 match. The §5e forward-scan defect can no longer occur.
+- **PC-7d DONE** (permanent regression guard): `test_check_program_mangled_name` —
+  a param-bearing fn (`fn foo(x: i32) -> i32`) whose `id1` is repointed to an
+  end-of-stream synthetic mangled ident (`a__foo`), exactly as
+  `link_item_arena_rewrite_defining_names` does. The OLD token scanners would walk
+  `id1+1` past the token stream and panic (the §5e defect); the arena readers pass.
+  Gated in `./scripts/sv0 test`.
+
+**Remaining (follow-up, NOT the §5e blocker):** the full end-to-end demonstration —
+*two colliding modules* → parse×2 → `link_item_arena_rewrite_defining_names` +
+reloc + append (§5f/§5g primitives) → resolve → check → **emit → cc → run → exit 42**.
+§5f/§5g validated the collision-FREE merge (exit 77, no mangle); the mangle path was
+never run to completion because §5e blocked the checker. That checker gap is now
+closed, so the composition should work — but running it requires re-instating the
+mega-TU merge orchestration that §5h deliberately reverted for the source-concat CLI,
+plus a decision on how to permanently gate a non-CLI mangle-merge path (the corpus
+`main` cannot host a self-test per §5c). Tracked as the PC-7 tail.
+
 ## 6. Recommendation
 
 **Do it incrementally, PC-3b.1 → 3b.2 first, gated behind `--project` so the

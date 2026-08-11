@@ -5918,6 +5918,91 @@ fn test_check_program() -> i32 {
     return 0;
 }
 
+/* PC-7d: the payoff of PC-7a/b/c — check_program survives the §5e
+   defining-name mangle. Models `fn foo ( x : i32 ) -> i32 { }` whose
+   defining-name token id1[0] has been REPOINTED to a synthetic mangled
+   ident (`a__foo`) appended at the END of the token stream (token 11),
+   exactly as link_item_arena_rewrite_defining_names does. The fn has a
+   PARAM, so the old token scanners (walking `( params )` forward from
+   id1+1 = token 12, past the 12-token stream) would read out of bounds
+   and panic — the very defect §5e documented. The arena readers ignore
+   id1 for scanning (params via id5/fn_param_ty_root/fn_param_name_toks,
+   ret via fn_ret_ty_root_by_item), and id1 is used only as the fn-table
+   name key (handle_to_str → "a__foo"), so the mangled program checks
+   cleanly. A regression here means someone reinstated token-position
+   scanning of fn signatures. */
+fn test_check_program_mangled_name() -> i32 {
+    /* source layout — real program then the synth mangled name at the end:
+       "fn foo ( x : i32 ) -> i32 { } a__foo"
+       tok 0 fn[0,2) 1 foo[3,6) 2 ([7,8) 3 x[9,10) 4 :[11,12) 5 i32[13,16)
+       6 )[17,18) 7 ->[19,21) 8 i32[22,25) 9 {[26,27) 10 }[28,29)
+       11 a__foo[30,36)  ← synthetic mangled defining-name token */
+    let source: string = "fn foo ( x : i32 ) -> i32 { } a__foo";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(starts, 3); vec_push(ends, 6);
+    vec_push(starts, 7); vec_push(ends, 8);
+    vec_push(starts, 9); vec_push(ends, 10);
+    vec_push(starts, 11); vec_push(ends, 12);
+    vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(starts, 17); vec_push(ends, 18);
+    vec_push(starts, 19); vec_push(ends, 21);
+    vec_push(starts, 22); vec_push(ends, 25);
+    vec_push(starts, 26); vec_push(ends, 27);
+    vec_push(starts, 28); vec_push(ends, 29);
+    vec_push(starts, 30); vec_push(ends, 36);
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 65); vec_push(tt, 5); vec_push(tt, 6); vec_push(tt, 5);
+    vec_push(tt, 14); vec_push(tt, 5); vec_push(tt, 7); vec_push(tt, 19);
+    vec_push(tt, 5); vec_push(tt, 8); vec_push(tt, 9); vec_push(tt, 5);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    vec_push(it, 0);
+    vec_push(id1, 11);
+    vec_push(id2, 1);
+    vec_push(id3, 1);
+    vec_push(id4, 0);
+    vec_push(id5, 0);
+    /* param x's real IDENT token (3); type roots from the pty arena */
+    let fpn: Vec<i32> = vec_new();
+    vec_push(fpn, 3);
+    let fpt: Vec<i32> = vec_new();
+    vec_push(fpt, 0);
+    let frt: Vec<i32> = vec_new();
+    vec_push(frt, 1);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 5); vec_push(pp, 8);
+    let ptt: Vec<i32> = vec_new();
+    vec_push(ptt, 0); vec_push(ptt, 0);
+    let ptd1: Vec<i32> = vec_new();
+    vec_push(ptd1, 0); vec_push(ptd1, 1);
+    let ptd2: Vec<i32> = vec_new();
+    vec_push(ptd2, 1); vec_push(ptd2, 1);
+    let ptd3: Vec<i32> = vec_new();
+    vec_push(ptd3, 0); vec_push(ptd3, 0);
+    let body_et: Vec<i32> = vec_new();
+    let body_ed1: Vec<i32> = vec_new();
+    let body_ed2: Vec<i32> = vec_new();
+    let body_ed3: Vec<i32> = vec_new();
+    let body_ed4: Vec<i32> = vec_new();
+    vec_push(body_et, 0); vec_push(body_ed1, 0);
+    vec_push(body_ed2, 0); vec_push(body_ed3, 0);
+    vec_push(body_ed4, 0);
+    let tp: Vec<i32> = vec_new();
+    let cr: i32 = check_program(tt, source, starts, ends, pp,
+                                it, id1, id2, id3, id4, id5,
+                                fpn, fpt, frt, ptt, ptd1, ptd2, ptd3,
+                                body_et, body_ed1, body_ed2, body_ed3,
+                                body_ed4, tp, 0);
+    if cr != 0 { return 1; }
+    return 0;
+}
+
 fn test_process_item_use() -> i32 {
     /* source: "use Mod :: bar fn Mod__bar ( ) -> i32 { 0 }"
        tok: 0=use  1=Mod  2=::  3=bar  4=fn  5=Mod__bar
@@ -6222,6 +6307,8 @@ fn main() -> i32 {
     if r64 != 0 { return 680 + r64; }
     let r65: i32 = test_check_program();
     if r65 != 0 { return 685 + r65; }
+    let r65m: i32 = test_check_program_mangled_name();
+    if r65m != 0 { return 695 + r65m; }
     let r66: i32 = test_named_only_ty_basic();
     if r66 != 0 { return 690 + r66; }
     return 0;

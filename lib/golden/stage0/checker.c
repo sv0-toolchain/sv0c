@@ -229,6 +229,7 @@ static int test_synth_expr(void);
 static int test_scan_fn_param_names(void);
 static int test_check_fn_body(void);
 static int test_check_program(void);
+static int test_check_program_mangled_name(void);
 static int test_process_item_use(void);
 static int test_build_mod_env(void);
 static int test_synth_building_blocks(void);
@@ -9714,6 +9715,124 @@ static int test_check_program(void) {
   return 0;
 }
 
+static int test_check_program_mangled_name(void) {
+  const char* source;
+  source = "fn foo ( x : i32 ) -> i32 { } a__foo";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(starts, 3);
+  sv0_vec_push(ends, 6);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 12);
+  sv0_vec_push(starts, 13);
+  sv0_vec_push(ends, 16);
+  sv0_vec_push(starts, 17);
+  sv0_vec_push(ends, 18);
+  sv0_vec_push(starts, 19);
+  sv0_vec_push(ends, 21);
+  sv0_vec_push(starts, 22);
+  sv0_vec_push(ends, 25);
+  sv0_vec_push(starts, 26);
+  sv0_vec_push(ends, 27);
+  sv0_vec_push(starts, 28);
+  sv0_vec_push(ends, 29);
+  sv0_vec_push(starts, 30);
+  sv0_vec_push(ends, 36);
+  int _sv0t2 = sv0_vec_new();
+  int tt = _sv0t2;
+  sv0_vec_push(tt, 65);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 14);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 7);
+  sv0_vec_push(tt, 19);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 8);
+  sv0_vec_push(tt, 9);
+  sv0_vec_push(tt, 5);
+  int _sv0t3 = sv0_vec_new();
+  int it = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int id1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int id2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int id3 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id4 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id5 = _sv0t8;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(id1, 11);
+  sv0_vec_push(id2, 1);
+  sv0_vec_push(id3, 1);
+  sv0_vec_push(id4, 0);
+  sv0_vec_push(id5, 0);
+  int _sv0t9 = sv0_vec_new();
+  int fpn = _sv0t9;
+  sv0_vec_push(fpn, 3);
+  int _sv0t10 = sv0_vec_new();
+  int fpt = _sv0t10;
+  sv0_vec_push(fpt, 0);
+  int _sv0t11 = sv0_vec_new();
+  int frt = _sv0t11;
+  sv0_vec_push(frt, 1);
+  int _sv0t12 = sv0_vec_new();
+  int pp = _sv0t12;
+  sv0_vec_push(pp, 5);
+  sv0_vec_push(pp, 8);
+  int _sv0t13 = sv0_vec_new();
+  int ptt = _sv0t13;
+  sv0_vec_push(ptt, 0);
+  sv0_vec_push(ptt, 0);
+  int _sv0t14 = sv0_vec_new();
+  int ptd1 = _sv0t14;
+  sv0_vec_push(ptd1, 0);
+  sv0_vec_push(ptd1, 1);
+  int _sv0t15 = sv0_vec_new();
+  int ptd2 = _sv0t15;
+  sv0_vec_push(ptd2, 1);
+  sv0_vec_push(ptd2, 1);
+  int _sv0t16 = sv0_vec_new();
+  int ptd3 = _sv0t16;
+  sv0_vec_push(ptd3, 0);
+  sv0_vec_push(ptd3, 0);
+  int _sv0t17 = sv0_vec_new();
+  int body_et = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int body_ed1 = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int body_ed2 = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int body_ed3 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int body_ed4 = _sv0t21;
+  sv0_vec_push(body_et, 0);
+  sv0_vec_push(body_ed1, 0);
+  sv0_vec_push(body_ed2, 0);
+  sv0_vec_push(body_ed3, 0);
+  sv0_vec_push(body_ed4, 0);
+  int _sv0t22 = sv0_vec_new();
+  int tp = _sv0t22;
+  int _sv0t23 = check_program(tt, source, starts, ends, pp, it, id1, id2, id3, id4, id5, fpn, fpt, frt, ptt, ptd1, ptd2, ptd3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, tp, 0);
+  int cr = _sv0t23;
+  if ((cr != 0)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_process_item_use(void) {
   const char* source;
   source = "use Mod :: bar fn Mod__bar ( ) -> i32 { 0 }";
@@ -10510,11 +10629,18 @@ int main(void) {
     return _sv0t134;
   } else {
   }
-  int _sv0t135 = test_named_only_ty_basic();
-  int r66 = _sv0t135;
-  if ((r66 != 0)) {
-    int _sv0t136 = (690 + r66);
+  int _sv0t135 = test_check_program_mangled_name();
+  int r65m = _sv0t135;
+  if ((r65m != 0)) {
+    int _sv0t136 = (695 + r65m);
     return _sv0t136;
+  } else {
+  }
+  int _sv0t137 = test_named_only_ty_basic();
+  int r66 = _sv0t137;
+  if ((r66 != 0)) {
+    int _sv0t138 = (690 + r66);
+    return _sv0t138;
   } else {
   }
   return 0;
