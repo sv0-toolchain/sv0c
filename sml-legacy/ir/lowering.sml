@@ -133,6 +133,28 @@ structure Lowering :> LOWERING = struct
         end
     | _ => "int"
 
+  (* PC-4c: impl methods live inside Ast.ItemImpl (not top-level ItemFn), so
+     the top-level scan in calleeRetCty misses a method name. Fall back to
+     scanning impl bodies for a method `name0` and return its declared ret
+     type. Only consulted when the top-level scan fails, so it never changes
+     an existing top-level resolution — it only rescues method names that
+     previously defaulted to "int". *)
+  fun implMethodRetCty (name0 : string) : string option =
+    let
+      fun implFn it =
+        case it of
+          Ast.ItemImpl r =>
+            List.find
+              (fn m => case m of Ast.ItemFn f => #name f = name0 | _ => false)
+              (#items r)
+        | _ => NONE
+    in
+      case List.mapPartial implFn (!theProg) of
+        (Ast.ItemFn f) :: _ =>
+          SOME (case #ret f of SOME at => astTyToCString at | NONE => "int")
+      | _ => NONE
+    end
+
   fun calleeRetCty (name : string) : string =
     let val name0 = resolveFnCallee name
     in
@@ -149,7 +171,10 @@ structure Lowering :> LOWERING = struct
           of
             SOME (Ast.ItemFn r) =>
               (case #ret r of SOME at => astTyToCString at | NONE => "int")
-          | _ => "int")
+          | _ =>
+              (case implMethodRetCty name0 of
+                 SOME cty => cty
+               | NONE => "int"))
     end
 
   fun exprInitCty (e : Ast.expr) : string =

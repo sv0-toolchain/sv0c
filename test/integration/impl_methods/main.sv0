@@ -7,9 +7,13 @@ impl Point {
   fn plus(self: Point, k: i32) -> i32 {
     return self.sum() + k;
   }
+  fn scaled(self: Point, k: i32) -> Point {
+    return Point { x: self.x * k, y: self.y * k };
+  }
 }
 
 fn main() -> i32 {
-  let p: Point = Point { x: 8, y: 30 };
-  return p.plus(4);
+  let p: Point = Point { x: 4, y: 15 };
+  let q: Point = p.scaled(2);
+  return q.plus(4);
 }
