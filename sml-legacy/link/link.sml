@@ -109,9 +109,14 @@ structure Link :> LINK = struct
         Ast.ExprCall
           (mapExpr tops modId f, map (mapExpr tops modId) args, sp)
     | Ast.ExprMethodCall (recv, m, args, sp) =>
+        (* Method defs are mangled unconditionally by mapFn (`modId__name`), so the
+           call's method name must be mangled the same way — else `p.m()` looks up the
+           unmangled `m` and is unbound (E0401). Intra-module (the method is defined in
+           this same unit); cross-module method calls would need import-alias
+           resolution, like cross-module fn/type refs. *)
         Ast.ExprMethodCall
           ( mapExpr tops modId recv
-          , m
+          , mangle modId m
           , map (mapExpr tops modId) args
           , sp)
     | Ast.ExprField (e1, f, sp) =>
