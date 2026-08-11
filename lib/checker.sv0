@@ -1549,6 +1549,68 @@ fn pty_root_to_type_tag(pty_tt: Vec<i32>, pty_td1: Vec<i32>,
     return 0 - 1;
 }
 
+/* ── scan_fn_param_type_tags_arena (PC-7b) ────────────────────
+   Arena analogue of scan_fn_param_type_tags: reads each param's type
+   from the parser's per-fn arena instead of walking tokens from the fn
+   name position. `pbase` is ItemFn id5 (offset into fn_param_ty_root);
+   `param_count` is id3. Pushes one type tag per param into
+   out_param_types via pty_root_to_type_tag. Independent of the fn
+   name-token position → survives the §5e defining-name mangle. Always
+   returns 0 (the arena is well-formed by construction; an unresolved
+   name is the tag -1, exactly as the token scanner records it). */
+
+fn scan_fn_param_type_tags_arena(fn_param_ty_root: Vec<i32>,
+                                 pbase: i32, param_count: i32,
+                                 pty_tt: Vec<i32>, pty_td1: Vec<i32>,
+                                 pty_td2: Vec<i32>, pty_td3: Vec<i32>,
+                                 pp: Vec<i32>,
+                                 source: string, starts: Vec<i32>,
+                                 ends: Vec<i32>,
+                                 struct_names: Vec<i32>,
+                                 enum_names: Vec<i32>,
+                                 type_params: Vec<i32>, tp_limit: i32,
+                                 out_param_types: Vec<i32>) -> i32 {
+    let mut j: i32 = 0;
+    while j < param_count {
+        let root: i32 = vec_get(fn_param_ty_root, pbase + j);
+        let tag: i32 = pty_root_to_type_tag(pty_tt, pty_td1, pty_td2,
+                                            pty_td3, pp, root, source,
+                                            starts, ends, struct_names,
+                                            enum_names, type_params,
+                                            tp_limit);
+        vec_push(out_param_types, tag);
+        j = j + 1;
+    }
+    return 0;
+}
+
+/* ── scan_fn_param_names_arena (PC-7b) ────────────────────────
+   Arena analogue of scan_fn_param_names. `fn_param_name_toks[pbase+j]`
+   is param j's IDENT token (the parser skips `mut` before storing it,
+   so this is the bare name token). Mutability is recovered with a LOCAL
+   check — the MUT token (77) sits immediately before the IDENT — so it
+   needs no fn-name anchor and survives the §5e mangle. Pushes name
+   token position + mut flag per param. Returns 0. */
+
+fn scan_fn_param_names_arena(fn_param_name_toks: Vec<i32>,
+                             pbase: i32, param_count: i32,
+                             tok_tags: Vec<i32>,
+                             out_param_name_pos: Vec<i32>,
+                             out_param_muts: Vec<i32>) -> i32 {
+    let mut j: i32 = 0;
+    while j < param_count {
+        let nt: i32 = vec_get(fn_param_name_toks, pbase + j);
+        vec_push(out_param_name_pos, nt);
+        let mut is_mut: i32 = 0;
+        if nt >= 1 {
+            if vec_get(tok_tags, nt - 1) == 77 { is_mut = 1; }
+        }
+        vec_push(out_param_muts, is_mut);
+        j = j + 1;
+    }
+    return 0;
+}
+
 /* ── scan_struct_field_type_tags (field type extraction) ────────
    Given field name positions (from scan_struct_field_names),
    resolves each field's type by calling scan_type_tag_at at
@@ -4589,6 +4651,67 @@ fn test_pty_root_to_type_tag() -> i32 {
     return 0;
 }
 
+/* PC-7b: the arena param readers reproduce a token signature's param
+   names/muts/types without walking from the fn name. Models
+   `fn foo ( mut a : i32 , p : Point )` — name tokens 4 (`a`, preceded by
+   mut@3) and 8 (`p`, preceded by comma@7); types i32 and Point (a struct).
+   pty roots 0 (i32) and 1 (Point); pp[0]→tok6, pp[1]→tok10. Token offsets
+   only matter for the two type-name tokens: 6="i32"[0,3), 10="Point"[4,9). */
+fn test_scan_fn_param_arena() -> i32 {
+    let source: string = "i32 Point";
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < 12 {
+        if i == 6 { vec_push(st, 0); vec_push(en, 3); }
+        else {
+            if i == 10 { vec_push(st, 4); vec_push(en, 9); }
+            else { vec_push(st, 0); vec_push(en, 0); }
+        }
+        i = i + 1;
+    }
+    let tok_tags: Vec<i32> = vec_new();
+    vec_push(tok_tags, 65); vec_push(tok_tags, 5); vec_push(tok_tags, 6);
+    vec_push(tok_tags, 77); vec_push(tok_tags, 5); vec_push(tok_tags, 14);
+    vec_push(tok_tags, 5); vec_push(tok_tags, 12); vec_push(tok_tags, 5);
+    vec_push(tok_tags, 14); vec_push(tok_tags, 5); vec_push(tok_tags, 7);
+    let fn_param_name_toks: Vec<i32> = vec_new();
+    vec_push(fn_param_name_toks, 4); vec_push(fn_param_name_toks, 8);
+    let out_names: Vec<i32> = vec_new();
+    let out_muts: Vec<i32> = vec_new();
+    let rn: i32 = scan_fn_param_names_arena(fn_param_name_toks, 0, 2,
+                                            tok_tags, out_names, out_muts);
+    if rn != 0 { return 1; }
+    if vec_get(out_names, 0) != 4 { return 2; }
+    if vec_get(out_names, 1) != 8 { return 3; }
+    if vec_get(out_muts, 0) != 1 { return 4; }
+    if vec_get(out_muts, 1) != 0 { return 5; }
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 6); vec_push(pp, 10);
+    let pty_tt: Vec<i32> = vec_new();
+    vec_push(pty_tt, 0); vec_push(pty_tt, 0);
+    let pty_td1: Vec<i32> = vec_new();
+    vec_push(pty_td1, 0); vec_push(pty_td1, 1);
+    let pty_td2: Vec<i32> = vec_new();
+    vec_push(pty_td2, 1); vec_push(pty_td2, 1);
+    let pty_td3: Vec<i32> = vec_new();
+    vec_push(pty_td3, 0); vec_push(pty_td3, 0);
+    let sn: Vec<i32> = vec_new();
+    vec_push(sn, 10);
+    let en2: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let fn_param_ty_root: Vec<i32> = vec_new();
+    vec_push(fn_param_ty_root, 0); vec_push(fn_param_ty_root, 1);
+    let out_types: Vec<i32> = vec_new();
+    let rt: i32 = scan_fn_param_type_tags_arena(fn_param_ty_root, 0, 2,
+                     pty_tt, pty_td1, pty_td2, pty_td3, pp, source, st, en,
+                     sn, en2, tp, 0, out_types);
+    if rt != 0 { return 6; }
+    if vec_get(out_types, 0) != 0 { return 7; }
+    if vec_get(out_types, 1) != 6 { return 8; }
+    return 0;
+}
+
 fn test_scan_struct_field_type_tags() -> i32 {
     let source: string = "struct Pt { x : i32 , y : bool }";
     let starts: Vec<i32> = vec_new();
@@ -5944,6 +6067,8 @@ fn main() -> i32 {
     if r47 != 0 { return 490 + r47; }
     let r47b: i32 = test_pty_root_to_type_tag();
     if r47b != 0 { return 460 + r47b; }
+    let r47c: i32 = test_scan_fn_param_arena();
+    if r47c != 0 { return 470 + r47c; }
     let r48: i32 = test_scan_struct_field_type_tags();
     if r48 != 0 { return 500 + r48; }
     let r49: i32 = test_scan_fn_param_type_tags();
