@@ -4467,9 +4467,9 @@ static int synth_expr(int et, int ed1, int ed2, int ed3, int ed4, int pp, const 
     int _sv0t34 = sv0_vec_get(ed1, idx);
     int mc_obj = _sv0t34;
     int _sv0t35 = sv0_vec_get(ed3, idx);
-    int mc_args_first = _sv0t35;
+    int mc_args_count = _sv0t35;
     int _sv0t36 = sv0_vec_get(ed4, idx);
-    int mc_args_count = _sv0t36;
+    int mc_args_sidecar = _sv0t36;
     int _sv0t37 = synth_expr(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, mc_obj);
     int mc_obj_ty = _sv0t37;
     if ((mc_obj_ty < 0)) {
@@ -4479,7 +4479,7 @@ static int synth_expr(int et, int ed1, int ed2, int ed3, int ed4, int pp, const 
     }
     int mc_i = 0;
     while ((mc_i < mc_args_count)) {
-      int _sv0t39 = (mc_args_first + mc_i);
+      int _sv0t39 = block_stmt_index(pp, 0, mc_args_sidecar, mc_i);
       int _sv0t40 = synth_expr(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, _sv0t39);
       int mc_arg_ty = _sv0t40;
       if ((mc_arg_ty < 0)) {

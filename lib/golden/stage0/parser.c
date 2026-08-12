@@ -3026,31 +3026,30 @@ static int parse_postfix_expr(int tags, int starts, int ends, const char* source
           int n2 = _sv0t17;
           if ((n2 == 6)) {
             int method_tok = (p + 1);
-            int _sv0t18 = sv0_vec_len(et);
-            int args_before = _sv0t18;
-            int _sv0t19 = sv0_vec_new();
-            int arg_roots_m = _sv0t19;
-            int _sv0t20 = (p + 3);
-            int _sv0t21 = parse_arg_list(tags, starts, ends, source, _sv0t20, et, ed1, ed2, ed3, ed4, pp, sf_names, arg_roots_m);
-            int pa = _sv0t21;
+            int _sv0t18 = sv0_vec_new();
+            int arg_roots_m = _sv0t18;
+            int _sv0t19 = (p + 3);
+            int _sv0t20 = parse_arg_list(tags, starts, ends, source, _sv0t19, et, ed1, ed2, ed3, ed4, pp, sf_names, arg_roots_m);
+            int pa = _sv0t20;
             if ((pa < 0)) {
-              int _sv0t22 = (0 - 1);
-              return _sv0t22;
+              int _sv0t21 = (0 - 1);
+              return _sv0t21;
             } else {
             }
-            int _sv0t23 = sv0_vec_len(arg_roots_m);
-            int argc = _sv0t23;
-            int _sv0t24 = ps_peek(tags, pa);
-            if ((_sv0t24 != 7)) {
-              int _sv0t25 = (0 - 1);
-              return _sv0t25;
+            int _sv0t22 = sv0_vec_len(arg_roots_m);
+            int argc = _sv0t22;
+            int _sv0t23 = ps_peek(tags, pa);
+            if ((_sv0t23 != 7)) {
+              int _sv0t24 = (0 - 1);
+              return _sv0t24;
             } else {
             }
             sv0_vec_push(et, 5);
             sv0_vec_push(ed1, cur);
             sv0_vec_push(ed2, method_tok);
-            sv0_vec_push(ed3, args_before);
-            sv0_vec_push(ed4, argc);
+            sv0_vec_push(ed3, argc);
+            int _sv0t25 = block_stmt_sidecar_push(pp, arg_roots_m);
+            sv0_vec_push(ed4, _sv0t25);
             int _sv0t26 = sv0_vec_len(et);
             cur = (_sv0t26 - 1);
             p = (pa + 1);

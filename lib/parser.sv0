@@ -1665,22 +1665,23 @@ fn parse_postfix_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     let n2: i32 = ps_peek(tags, p + 2);
                     if n2 == 6 {
                         let method_tok: i32 = p + 1;
-                        let args_before: i32 = vec_len(et);
                         let arg_roots_m: Vec<i32> = vec_new();
                         let pa: i32 = parse_arg_list(tags, starts, ends, source,
                                                       p + 3, et, ed1, ed2, ed3,
                                                       ed4, pp, sf_names, arg_roots_m);
                         if pa < 0 { return 0 - 1; }
-                        /* Method calls (tag 5) have no free field for an arg
-                           sidecar; store the real arg count (flat method args are
-                           contiguous — nested method args are not yet supported). */
+                        /* d3 = real argument count; d4 = pp sidecar of arg-root
+                           indices — same as ExprCall (tag 4). Arg roots are NOT at
+                           contiguous arena indices (parse_arg_list interleaves each
+                           arg's sub-nodes before its root), so consumers must read
+                           arg k via block_stmt_index(pp, _, d4, k), not args_before+k. */
                         let argc: i32 = vec_len(arg_roots_m);
                         if ps_peek(tags, pa) != 7 { return 0 - 1; }
                         vec_push(et, 5);
                         vec_push(ed1, cur);
                         vec_push(ed2, method_tok);
-                        vec_push(ed3, args_before);
-                        vec_push(ed4, argc);
+                        vec_push(ed3, argc);
+                        vec_push(ed4, block_stmt_sidecar_push(pp, arg_roots_m));
                         cur = vec_len(et) - 1;
                         p = pa + 1;
                     } else {

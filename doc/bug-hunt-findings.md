@@ -20,7 +20,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 
 | # | Finding | Sev | Backend(s) | Status |
 |---|---------|-----|-----------|--------|
-| 1 | Method calls miscompile compound arguments (`p.m(a+b)` → `m(p,a)`) | P1 | native |
+| 1 | Method calls miscompile compound arguments (`p.m(a+b)` → `m(p,a)`) | P1 | native | ✅ **FIXED** (sv0c) |
 | 2 | VM integer arithmetic ≠ i32: overflow no-wrap + floor div/mod | P1 | VM | ✅ **FIXED** (sv0vm `a0876d9`) |
 | 3 | Stale pty type-tag scheme in checker type-resolvers (2/3/7) | P2/P3 | native (dead) |
 | 4 | Void fn + contract, no `-> T`: native fails silently vs SML E0409 | P3 | native |
@@ -56,9 +56,22 @@ diagnostic corpus would have caught #1, #2, #8, #10, #12, and #13 — see task
 
 ---
 
-## 1. Native method calls silently miscompile any compound argument — **P1 (live, native-only)**
+## 1. Native method calls silently miscompile any compound argument — **P1 (live, native-only)** — ✅ FIXED (sv0c)
 
 **Files:** `lib/parser.sv0` ~L1670 (method-call parse), `lib/lowering.sv0` ~L1263-1290 (tag-5 lowering).
+
+> **Fixed 2026-08-11:** tag-5 (ExprMethodCall) now carries the same `pp` arg-root
+> sidecar as tag-4 ExprCall — the parser stores `ed3 = argc`,
+> `ed4 = block_stmt_sidecar_push(pp, arg_roots)`, and all three consumers
+> (`resolver.sv0`, `checker.sv0`, `lowering.sv0`) read arg *k* via
+> `block_stmt_index(pp, _, ed4, k)` instead of `args_first + k`. Fixture
+> `test/integration/mcall_compound_arg/` (compound + nested-method args → exit 42)
+> gated in the native `--project` acceptance and the SML harness; parser/resolver/
+> checker/lowering stage0 + vm-parity goldens refreshed; full gate green
+> (behavior-preserving — self-host-loop 98/98, 26/26 integration). **BH-1d
+> deferred:** the link.sv0 arena-reloc/merge path does not yet treat the tag-5 pp
+> sidecar (add tag 5 to the tags-4/9/11 handling) — latent only, since the CLI
+> uses source-concat, not arena-merge.
 
 A method call `recv.m(arg)` whose argument is anything other than a single atomic
 node (a binop, a nested call, another method call, etc.) is **silently
@@ -640,12 +653,12 @@ change to any of them requires refreshing **both** its stage0 golden
 then a green `./scripts/sv0 test`. `sml-legacy/*` and `sv0vm/*` changes shift no
 sv0c goldens.
 
-### #1 — Native method-call compound args (P1)
-- [ ] **BH-1a** Add fixture `test/integration/mcall_compound_arg/` (`p.add(n+17)` → exit 42); confirm it fails native today, passes SML. *(fixture only)*
-- [ ] **BH-1b** `parser.sv0` tag-5 parse (~L1670): store `arg_roots_m` into the `pp` sidecar (mirror Call(4) via `block_stmt_sidecar_push`); record the sidecar base in the tag-5 node.
-- [ ] **BH-1c** `lowering.sv0` tag-5 lowering (~L1277): read arg roots from the sidecar instead of `args_first + j`.
-- [ ] **BH-1d** `link.sv0` reloc/merge: add tag-5 to the pp-sidecar handling (join tags 4/9/11 in `link_reloc_body_arena` / `link_pp_sidecar_count` / `link_reloc_pp_contents_hetero`).
-- [ ] **BH-1e** Refresh parser+lowering goldens; gate the fixture in `pc3b6-native-project-acceptance.sh` + SML harness.
+### #1 — Native method-call compound args (P1) — ✅ DONE (sv0c)
+- [x] **BH-1a** Added fixture `test/integration/mcall_compound_arg/` (`p.add(n+17)` → exit 42); confirmed it failed native (returned 25), passed SML.
+- [x] **BH-1b** `parser.sv0` tag-5 parse: `ed3 = argc`, `ed4 = block_stmt_sidecar_push(pp, arg_roots_m)` (mirrors Call(4)).
+- [x] **BH-1c** Arg-root reads via `block_stmt_index(pp, _, ed4, k)` in **all three** consumers — `lowering.sv0`, `resolver.sv0` (site 911), `checker.sv0` (site 3222) — plus the tag-5 unit test (`test_lower_expr_method_call_effect`).
+- [ ] **BH-1d** `link.sv0` reloc/merge: add tag-5 to the pp-sidecar handling (join tags 4/9/11). **Deferred** — latent (CLI uses source-concat, not arena-merge).
+- [x] **BH-1e** Refreshed parser+resolver+checker+lowering stage0 + vm-parity goldens; gated in `pc3b6-native-project-acceptance.sh` + SML harness (26/26 integration).
 
 ### #2 — VM integer arithmetic (P1) — ✅ DONE (sv0vm `a0876d9`)
 - [x] **BH-2a** `interpreter.sml`: wrapped `ADD_I32`/`SUB_I32`/`MUL_I32`/`NEG_I32` to 32-bit via `Word32`.

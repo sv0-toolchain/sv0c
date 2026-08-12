@@ -910,8 +910,8 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     }
     if tag == 5 {
         let recv: i32 = vec_get(ed1, idx);
-        let margs_first: i32 = vec_get(ed3, idx);
-        let margs_count: i32 = vec_get(ed4, idx);
+        let margs_count: i32 = vec_get(ed3, idx);
+        let margs_sidecar: i32 = vec_get(ed4, idx);
         let rr: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, recv,
                                     source, starts, ends,
                                     mod_vals, mod_tys, fn_arities, frames, pp);
@@ -919,7 +919,7 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let mut mi: i32 = 0;
         while mi < margs_count {
             let rm: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
-                                        margs_first + mi,
+                                        block_stmt_index(pp, 0, margs_sidecar, mi),
                                         source, starts, ends,
                                         mod_vals, mod_tys, fn_arities, frames, pp);
             if rm != 0 { return rm; }
