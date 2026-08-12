@@ -1480,9 +1480,9 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
     int _sv0t54 = sv0_vec_get(ed1, idx);
     int recv = _sv0t54;
     int _sv0t55 = sv0_vec_get(ed3, idx);
-    int margs_first = _sv0t55;
+    int margs_count = _sv0t55;
     int _sv0t56 = sv0_vec_get(ed4, idx);
-    int margs_count = _sv0t56;
+    int margs_sidecar = _sv0t56;
     int _sv0t57 = resolve_expr(et, ed1, ed2, ed3, ed4, recv, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
     int rr = _sv0t57;
     if ((rr != 0)) {
@@ -1491,7 +1491,7 @@ static int resolve_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, con
     }
     int mi = 0;
     while ((mi < margs_count)) {
-      int _sv0t58 = (margs_first + mi);
+      int _sv0t58 = block_stmt_index(pp, 0, margs_sidecar, mi);
       int _sv0t59 = resolve_expr(et, ed1, ed2, ed3, ed4, _sv0t58, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
       int rm = _sv0t59;
       if ((rm != 0)) {

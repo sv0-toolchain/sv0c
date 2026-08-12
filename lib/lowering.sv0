@@ -1260,8 +1260,8 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if tag == 5 {
         let rcv_mc: i32 = vec_get(ed1, idx);
         let method_tok: i32 = vec_get(ed2, idx);
-        let args_first_mc: i32 = vec_get(ed3, idx);
-        let args_count_mc: i32 = vec_get(ed4, idx);
+        let args_count_mc: i32 = vec_get(ed3, idx);
+        let args_sidecar_mc: i32 = vec_get(ed4, idx);
         let v_rcv: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                                 tok_tags, rcv_mc, ctr,
                                                 out_instrs, enum_names,
@@ -1274,7 +1274,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let mut aj_mc: i32 = 0;
         loop {
             if aj_mc >= args_count_mc { break; }
-            let ax_mc: i32 = args_first_mc + aj_mc;
+            let ax_mc: i32 = block_stmt_index(pp, 0, args_sidecar_mc, aj_mc);
             let av_mc: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                                    tok_tags, ax_mc, ctr,
                                                    out_instrs, enum_names,
@@ -8259,7 +8259,10 @@ fn test_lower_expr_method_call_effect() -> i32 {
     let mut ed2: Vec<i32> = vec_new();
     let mut ed3: Vec<i32> = vec_new();
     let mut ed4: Vec<i32> = vec_new();
-    let pp: Vec<i32> = vec_new();
+    /* pp[0] = arg-root index (node 1); the tag-5 node's d4 sidecar base is 1 so
+       block_stmt_index(pp, _, 1, 0) = pp[0] = node 1 (the single argument). */
+    let mut pp: Vec<i32> = vec_new();
+    vec_push(pp, 1);
     vec_push(et, 0);
     vec_push(ed1, 0);
     vec_push(ed2, 0);

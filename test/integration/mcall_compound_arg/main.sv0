@@ -1,0 +1,11 @@
+struct Point { x: i32, y: i32 }
+impl Point {
+  fn add(self: Point, k: i32) -> i32 { return self.x + self.y + k; }
+  fn sum(self: Point) -> i32 { return self.x + self.y; }
+}
+fn main() -> i32 {
+  let p: Point = Point { x: 8, y: 12 };
+  let n: i32 = 5;
+  // compound arg (binop) and nested method-call arg — both must lower correctly
+  return p.add(n + 17) - p.sum() + 20;   // (20+22) - 20 + 20 = 42
+}
