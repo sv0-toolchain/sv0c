@@ -18,10 +18,10 @@ worth revisiting.
 13 findings across 6 probing passes. Each finding below has a bite-sized task
 breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 
-| # | Finding | Sev | Backend(s) |
-|---|---------|-----|-----------|
+| # | Finding | Sev | Backend(s) | Status |
+|---|---------|-----|-----------|--------|
 | 1 | Method calls miscompile compound arguments (`p.m(a+b)` → `m(p,a)`) | P1 | native |
-| 2 | VM integer arithmetic ≠ i32: overflow no-wrap + floor div/mod | P1 | VM |
+| 2 | VM integer arithmetic ≠ i32: overflow no-wrap + floor div/mod | P1 | VM | ✅ **FIXED** (sv0vm `a0876d9`) |
 | 3 | Stale pty type-tag scheme in checker type-resolvers (2/3/7) | P2/P3 | native (dead) |
 | 4 | Void fn + contract, no `-> T`: native fails silently vs SML E0409 | P3 | native |
 | 5 | Cross-module method calls fail SML `--project` (E0401) | P2 | SML |
@@ -110,9 +110,17 @@ primitives already treat Call/Match pp sidecars (PC-3b §5g); tag-5 would join t
 
 ---
 
-## 2. VM integer arithmetic does not match i32 (C) semantics — **P1 (live, backend divergence)**
+## 2. VM integer arithmetic does not match i32 (C) semantics — **P1 (live, backend divergence)** — ✅ FIXED (sv0vm `a0876d9`)
 
 **File:** `sv0vm/src/interpreter/interpreter.sml` (arithmetic opcodes, ~L217-227).
+
+> **Fixed 2026-08-11:** `ADD/SUB/MUL/NEG_I32` now wrap through `Word32`
+> (`Word32.toIntX (Word32.+ (asWord32 a, asWord32 b))`), and `DIV/MOD_I32` use
+> `Int.quot`/`Int.rem` (truncate toward zero); `MOD` gained a by-zero guard.
+> Verified: overflow add/mul, negative div/mod, and `INT_MIN / -1` now match the
+> C backend. Regression test added to `sv0vm/test/bytecode_test.sml`; full
+> `./scripts/sv0 test` green (VM integration, bootstrap-on-VM, vm-parity 98,
+> self-host-loop all pass).
 
 The VM executes the i32 arithmetic opcodes with SML's native `int` operations
 (63-bit on SML/NJ, floor-based `div`/`mod`) **without truncating to 32-bit
@@ -639,11 +647,11 @@ sv0c goldens.
 - [ ] **BH-1d** `link.sv0` reloc/merge: add tag-5 to the pp-sidecar handling (join tags 4/9/11 in `link_reloc_body_arena` / `link_pp_sidecar_count` / `link_reloc_pp_contents_hetero`).
 - [ ] **BH-1e** Refresh parser+lowering goldens; gate the fixture in `pc3b6-native-project-acceptance.sh` + SML harness.
 
-### #2 — VM integer arithmetic (P1)
-- [ ] **BH-2a** `interpreter.sml`: wrap `ADD_I32`/`SUB_I32`/`MUL_I32` to 32-bit (`Word32.toIntX (asWord32 a + asWord32 b)`, etc.).
-- [ ] **BH-2b** `interpreter.sml`: `DIV_I32 => Int.quot`, `MOD_I32 => Int.rem`, wrapped through `Word32` (fixes INT_MIN/-1 too).
-- [ ] **BH-2c** Define + implement div-by-zero (deterministic panic w/ message + exit code; check `sv0doc`).
-- [ ] **BH-2d** Add C-vs-VM arithmetic differential test (overflow add/mul, negative div/mod, boundaries); wire into `sv0vm` tests. *(overlaps BH-X1)*
+### #2 — VM integer arithmetic (P1) — ✅ DONE (sv0vm `a0876d9`)
+- [x] **BH-2a** `interpreter.sml`: wrapped `ADD_I32`/`SUB_I32`/`MUL_I32`/`NEG_I32` to 32-bit via `Word32`.
+- [x] **BH-2b** `interpreter.sml`: `DIV_I32 => Int.quot`, `MOD_I32 => Int.rem`, wrapped through `Word32` (fixes INT_MIN/-1 too).
+- [x] **BH-2c** Div-by-zero: `DIV` already raised `Fail`; added the matching `MOD`-by-zero guard. *(kept the existing `Fail` abort; a clean exit-code panic is deferred to BH-10c's VM-abort cleanup.)*
+- [x] **BH-2d** Added an arithmetic regression test to `sv0vm/test/bytecode_test.sml` (overflow add/mul, negative div/mod, INT_MIN/-1). The full cross-backend differential harness is still **BH-X1**.
 
 ### #3 — Stale pty tag scheme (P2/P3)
 - [ ] **BH-3a** `checker.sv0` `resolve_field_ty_tag`: fix mapping to 1→TY_REF, 2→TY_REFMUT, 5→TY_TUPLE, 3/4→-1 (mirror `pty_root_to_type_tag`).
