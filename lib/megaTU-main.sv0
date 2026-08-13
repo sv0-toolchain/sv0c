@@ -516,15 +516,15 @@ fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> s
     if h == lower_string_cty() {
         return "const char*";
     }
-    /* name_of maps handles 500..599 to tuple-field names (f<n>) for
-       megatu_field_name; a *type* token that lands in that range is a real source
-       token (large files reach 500+), not a field, so skip name_of there and
-       resolve via handle_to_str — the same collision fixed for megatu_val_name.
-       Below 500, name_of still resolves the int(9)/void(10) sentinels. */
-    if h < 500 {
-        let n: string = name_of(h);
-        if !string_eq(n, "?") { return n; }
-    }
+    /* A type ctype `h` (DeclNamed type, Call rt, box_deref elem type) is a REAL
+       source token — resolve it directly by its source text. Do NOT consult
+       `name_of` (a codegen *value-name* test stub that maps handles 1..15 and
+       500..599 to fabricated identifiers): a genuine type token landing in those
+       ranges — e.g. an enum return type at token index 15 — would be corrupted to
+       the stub's name ("i" for 15), emitting `i x;` instead of `EnumName x;`.
+       Lowering only ever passes a real token here (or the string sentinel above),
+       never an int(9)/void(10) sentinel (rt==0 → "int" is handled by the caller),
+       so handle_to_str is always correct. */
     return handle_to_str(h, source, starts, ends);
 }
 
