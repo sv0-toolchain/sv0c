@@ -125,6 +125,8 @@ Anchors **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## L0 closure** →
 
 **Do not** mark the **L0** table row **Done** until **Semantic pipeline** + **Lowering/link/driver** rows above match stakeholder **## completion criteria** in the milestone task (not only diagnostics **`println`** parity).
 
+**Update (2026-08-12).** M3 stakeholder completion criteria were **met 2026-08-05** on the corpus surface, and post-M3 **Phase C** closed the cross-module **feature** gaps: `resolve_ty` tails (PC-4a), multi-module linking via native `--project` source-concat + SML `--project` mangling (PC-3b/3c), multi-module checker over the merged program, `PatStruct`/impl-methods/method-calls (PC-4b/4c), and the §5e checker forward-scan blocker for name-collision mangling (PC-7). So the **Semantic pipeline** and **Lowering/link/driver** rows are at cross-module parity on the acceptance fixtures. The rows are **not** flipped to **Done** here because L0's remaining criterion is promoting the native binary to the *default* `SV0_SELF_HOST_COMPILER`, which the 2026-08-12 bug hunt shows is gated on native-completeness defects (`sv0c/doc/bug-hunt-findings.md` #8/#10/#11 — the native checker under-diagnoses, drops runtime contracts, and silently mis-emits several constructs). Authoritative live status: `task/sv0-toolchain-progress.md` ## Post-M3 hardening status.
+
 ## Suggested sequencing (high level)
 
 1. **Parser + lexer closure** — one front-end entry that matches SML acceptance on a growing corpus.
