@@ -6,6 +6,21 @@
 feature parity) + the deferred **native-default compiler promotion** (Phase B3) —
 into small, dependency-ordered, individually-shippable tasks.
 
+> **STATUS (2026-08-12).** **All numbered PC slices below are DONE** — Epics 1–6
+> (cross-module E1/E2/E3, standalone gaps PC-4a/4b/4c, include E5, native-default
+> behavioral-mode loop E6). Live per-slice status: `task/sv0-toolchain-milestone-3-checklist.Rmd`
+> (PC-### rows). **PC-7 — the §5e checker forward-scan blocker — is RESOLVED**
+> (2026-08-11), so genuine cross-module name-collision *mangling* is unblocked at the
+> checker (see `pc3b-linkprojectdir-scoping.md` §5j). **Still open:** (a) the
+> **native-default promotion** (Epic 6 tail — flipping the local
+> `SV0_SELF_HOST_COMPILER` default) is gated on the native-completeness bugs below;
+> (b) **bug-hunt remediation** — `bug-hunt-findings.md` catalogs 13 correctness
+> findings (4 P1), of which **BH-1** (native method-call compound args) and **BH-2**
+> (VM i32 arithmetic) are fixed; the native-completeness cluster (#8 checker
+> under-diagnoses, #10 dropped contracts, #11 `?`/enum-ret/tuple/nested-struct
+> mis-emit) is the real blocker for making native the default front end. Rollup:
+> `task/sv0-toolchain-progress.md` ## Post-M3 hardening status.
+
 **Standing discipline (applies to every task):**
 - **Test-first.** Write the failing test (fixture) before the fix.
 - **Acceptance surface.** Cross-module behavior is driven through the **SML
