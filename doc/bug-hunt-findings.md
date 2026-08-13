@@ -30,7 +30,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 | 8 | Native checker accepts type errors + emits no diagnostics | P1 | native |
 | 9 | `include` unwired on native (works on SML) | P2 | native |
 | 10 | All runtime contracts dropped on native; VM aborts ungracefully | P1 / P3 | native / VM |
-| 11 | `?` / enum-return / tuple / nested-struct silently mis-emit | P1/P2 | native |
+| 11 | `?` / enum-return / tuple / nested-struct silently mis-emit | P1/P2 | native | ⚠️ enum-return **FIXED** (BH-11b); `?`/tuple/nested-struct open |
 | 12 | Variable shadowing → invalid C (redeclare) + VM scope leak | P2 | SML + native + VM |
 | 13 | Match guards → invalid C (guard evaluated before binding) | P2 | SML + native |
 
@@ -444,18 +444,25 @@ not native.
   `lowering.sv0`, so the drop is in how the compose-main pipeline handles a
   `?`-bearing function (it appears to bail and emit the fallback stub `main`).
 
-- **Enum-returning function into a typed `let` → invalid C type `i`.**
+- **Enum-returning function into a typed `let` → invalid C type `i`.** ✅ **FIXED (BH-11b, sv0c).**
   ```sv0
   enum Opt { Some(i32), None }
   fn mk() -> Opt { return Opt::None; }
   fn main() -> i32 { let r: Opt = mk(); return match r { Opt::Some(x)=>x, Opt::None=>42 }; }
   ```
-  Native emits `i _sv0t0 = mk(); i r;` — the enum type `Opt` became the bogus
-  type name **`i`** (cc: "use of undeclared identifier 'i'"). The `mk` forward
-  decl is correctly `static Opt mk(void)`, so only the *call-result / let* C type
-  is wrong. This is the enum analogue of the struct-returning-`let` cty issue
-  (fixed for struct methods in PC-4c) — but instead of `int` it emits a truncated
-  garbage type, so it fails to compile rather than mis-running.
+  Native emitted `i _sv0t0 = mk(); i r;` — the enum type `Opt` became the bogus
+  type name **`i`** (cc: "use of undeclared identifier 'i'"). **Root cause:**
+  `megatu_ty_name` (`lib/megaTU-main.sv0`) resolved a real *type* token by first
+  consulting `name_of` — a codegen *value-name* **test stub** that maps handles
+  1..15 (and 500..599) to fabricated identifiers, with `15 → "i"`. An enum
+  return-type token landing at index 15 was corrupted to "i". (The comment had
+  already patched the 500..599 collision but not 1..15.) **Fix:** resolve type
+  ctypes directly via `handle_to_str` — a type token is always a real source
+  token; only the string sentinel (`lower_string_cty` = -7) needs special-casing,
+  and lowering never passes an int(9)/void(10) sentinel here. Fixture
+  `test/integration/enum_return_let/` (exit 42, native `--project` + SML + native
+  single-file); `megaTU-main.sv0` is not in the golden sets so no golden churn.
+  (`?`/tuple/nested-struct below remain open.)
 
 - **Tuple type annotation → empty emit.** `let t: (i32, i32) = (40, 2);` makes the
   native compiler emit **nothing at all** (0 lines / empty output), exit non-clean.
@@ -702,7 +709,7 @@ sv0c goldens.
 
 ### #11 — Native `?` / enum-ret / tuple / nested-struct mis-emit (P1/P2)
 - [ ] **BH-11a** Fix `?` (ExprTry, tag 22): route it through the native compose-main lowering so a `?`-bearing fn doesn't collapse `main` to the stub. Fixture: `?` on `Some`/`None` → exit 42.
-- [ ] **BH-11b** Fix enum-returning-`let` C type: emit the enum type (not `i`) — mirror the PC-4c struct-return fix for enum returns.
+- [x] **BH-11b** Fixed enum-returning-`let` C type: `megatu_ty_name` now resolves type tokens via `handle_to_str` instead of the `name_of` value-name stub (which mapped index 15 → "i"). Fixture `enum_return_let` gated. (sv0c)
 - [ ] **BH-11c** Tuples on native: either support, or emit a clean "tuples unsupported" diagnostic instead of empty output.
 - [ ] **BH-11d** Nested structs (multi-slot sub-struct fields) on native + VM: support, or a clean diagnostic (see `span.sv0`).
 

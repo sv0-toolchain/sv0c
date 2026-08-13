@@ -1,0 +1,11 @@
+enum Opt { Some(i32), None }
+fn mk_none() -> Opt { return Opt::None; }
+fn mk_some(v: i32) -> Opt { return Opt::Some(v); }
+fn unwrap_or(o: Opt, d: i32) -> i32 { return match o { Opt::Some(x) => x, Opt::None => d }; }
+fn main() -> i32 {
+  // enum-returning function bound into an annotated `let` — the C type must be
+  // the enum (Opt), not a stub-truncated name.
+  let a: Opt = mk_none();
+  let b: Opt = mk_some(20);
+  return unwrap_or(a, 22) + unwrap_or(b, 0);   // 22 + 20 = 42
+}
