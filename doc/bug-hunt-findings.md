@@ -758,9 +758,13 @@ Sliced:
   Restricted to `ExprLit` because `synth_expr` returns imprecise primitives for
   field/call/method returns (broadly trusting it false-positived `lib/span.sv0`).
   Broaden to non-literal returns once inference tightens.
-- [ ] **BH-8b** `let` annotation vs init type — LetStmt arm (checker.sv0:3061)
-  ignores the annotation; read it via `ed2`→pty→`pty_root_to_type_tag`, `expect`,
-  extend env with the annotation type. → E0400.
+- [x] **BH-8b (Slice 1)** ✅ `let x: T = <literal>` where primitive `T` conflicts
+  with the literal's type (`let x: i32 = true`). Done in the same top-level
+  `check_fn_body` walk: LetStmt d2 = the annotation type-head **token** (not a pty
+  root), so `ast_type_name_to_tag(name)` gives the primitive tag (or -1 for
+  struct/enum, which is skipped), `infer_lit` gives the init type, and a primitive
+  mismatch pushes E0400. Literal-only (same inference caveat as Slice 0). Case
+  `let_type_mismatch.sv0`, gated SML + native.
 - [ ] **BH-8e** Unknown-type annotation (`TyName` not builtin/struct/enum). → E0301.
 - [ ] **BH-8d** Field-existence check in ExprField synth. → E0429.
 - [ ] **BH-8g** Route resolver's unbound (E0300) / arity (E0307) rejections

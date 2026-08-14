@@ -83,10 +83,13 @@ constructs with precise inference), or first tighten `synth_expr` for the
 construct in question. The 98-module corpus-parity is the false-positive backstop
 — run `scripts/sv0-megatu-corpus-parity.sh` after every checker edit.
 
-### Slice 1 — BH-8b let annotation vs init (E0400)
-Read the annotation (`ed2` → pty root → `pty_root_to_type_tag`, the PC-7
-classifier), `expect(ty_init, annot)`, push E0400 on mismatch, and extend env
-with the **annotation** type. + corpus case.
+### Slice 1 — BH-8b let annotation vs init (E0400) — DONE
+The LetStmt d2 is the annotation type-head **token** (not a pty root), so
+`ast_type_name_to_tag(name)` maps it directly to a primitive tag (or -1 for a
+struct/enum name, which is skipped). Done in the same top-level `check_fn_body`
+walk as Slice 0, restricted to **literal** inits (`infer_lit` is trustworthy;
+non-literal inits await tighter inference). Case `let_type_mismatch.sv0`, gated
+SML + native.
 
 ### Slice 2 — BH-8e unknown type annotation (E0301)
 Reject a `TyName` that resolves to neither a builtin nor a registered
