@@ -1,0 +1,3 @@
+/* BH-8 Slice 2 — wrong argument count. `add` takes 2 args, called with 1: E0307. */
+fn add(a: i32, b: i32) -> i32 { return a + b; }
+fn main() -> i32 { return add(1); }

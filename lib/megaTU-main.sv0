@@ -21,7 +21,9 @@ fn megatu_diag_code_str(code: i32) -> string {
     if code == 400 { return "E0400"; }
     if code == 300 { return "E0300"; }
     if code == 301 { return "E0301"; }
+    if code == 306 { return "E0306"; }
     if code == 307 { return "E0307"; }
+    if code == 309 { return "E0309"; }
     if code == 409 { return "E0409"; }
     if code == 429 { return "E0429"; }
     return "E0000";
@@ -31,7 +33,9 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 400 { return "type mismatch"; }
     if code == 300 { return "unbound name"; }
     if code == 301 { return "unknown type"; }
+    if code == 306 { return "unsupported pattern"; }
     if code == 307 { return "wrong number of arguments"; }
+    if code == 309 { return "invalid use clause"; }
     if code == 409 { return "contract requires an explicit return type"; }
     if code == 429 { return "no such field"; }
     return "error";
@@ -158,7 +162,18 @@ fn main() -> i32 {
         fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc,
         ptt, ptd1, ptd2, ptd3, sft,
         source, starts, ends, mv, mt, fa, pp);
-    if rr != 0 { return 3; }
+    if rr != 0 {
+        /* resolve_program returns the specific error CODE (300 unbound / 301
+           unknown type / 306 unsupported pat / 307 arity / 309 use clause), not
+           a bare flag. Surface it as an Exxxx diagnostic (BH-8: E0300/E0301/
+           E0307 were previously a silent exit 3). No span is threaded from the
+           resolver yet, so the token defaults (line 1). */
+        let rdiag: Vec<i32> = vec_new();
+        vec_push(rdiag, rr);
+        vec_push(rdiag, 0 - 1);
+        megatu_emit_diagnostics(rdiag, source, starts);
+        return 3;
+    }
 
     /* Phase 4: type check (real checker.sv0). tp = type params (none). 0 = ok.
        (Reconciled: a tailless block whose last stmt is `return` now types as

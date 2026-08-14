@@ -765,10 +765,19 @@ Sliced:
   struct/enum, which is skipped), `infer_lit` gives the init type, and a primitive
   mismatch pushes E0400. Literal-only (same inference caveat as Slice 0). Case
   `let_type_mismatch.sv0`, gated SML + native.
-- [ ] **BH-8e** Unknown-type annotation (`TyName` not builtin/struct/enum). → E0301.
+- [x] **BH-8e + BH-8g (Slice 2)** ✅ E0300 / E0301 / E0307 (and E0306 / E0309) all
+  at once. **Key insight:** these are *name-resolution* diagnostics, and
+  `resolve_program` already **returns the specific code** (301 unknown type, 300
+  unbound, 307 arity …) — the compose main was collapsing it to a bare `exit 3`.
+  Fix is entirely in `megaTU-main.sv0`: on `rr != 0`, map the code → `Exxxx` +
+  message and emit via the existing formatter. No checker/resolver change, no
+  golden churn (megaTU-main is not a bootstrap/golden module). Default span (the
+  resolver threads no token yet). Cases `unknown_type.sv0` (E0301),
+  `unbound_name.sv0` (E0300), `wrong_arity.sv0` (E0307); all dual-gated SML +
+  native. (Handles the unknown-type case via the pty arena, so generics like
+  `Vec<i32>` correctly resolve to `TY_NAMED`, not "unknown" — the head-token
+  approach a checker-side E0301 would have needed was unsafe here.)
 - [ ] **BH-8d** Field-existence check in ExprField synth. → E0429.
-- [ ] **BH-8g** Route resolver's unbound (E0300) / arity (E0307) rejections
-  through the diagnostic layer (message, not bare exit 3). *(resolver.sv0)*
 - [ ] **BH-8a** Each slice appends its `rel|code` row to
   `test/diagnostics/manifest.txt`, gated on both SML + native. *(overlaps BH-X2)*
 

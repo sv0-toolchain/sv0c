@@ -1,0 +1,4 @@
+/* BH-8 Slice 2 (BH-8e) — unknown type name in a signature. `Widget` is not a
+   builtin/struct/enum, so name resolution rejects it: E0301 on SML and native. */
+fn f(p: Widget) -> i32 { return 0; }
+fn main() -> i32 { return 0; }
