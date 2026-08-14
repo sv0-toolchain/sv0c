@@ -1,0 +1,130 @@
+# BH-8 — Native diagnostics attack plan
+
+Bug-hunt finding **#8**: the native checker (`lib/checker.sv0`) silently accepts
+several type errors and, where it does reject, emits no `Exxxx` code or message —
+just a bare nonzero exit. This blocks promoting the native compiler to the
+default (and eventually only) front end, since it would accept ill-typed
+programs. See `doc/bug-hunt-findings.md` §8.
+
+## What already exists (this is wiring + missing-checks, not build-from-scratch)
+
+- **Type inference** — `lib/checker.sv0` has `synth_expr` (expression type
+  synthesis), `infer_lit`, `expect` (checker.sv0:582), `binop_result_ty_tag`,
+  and the full `TY_*` tag set. It already synthesizes a function body's type and
+  compares it to the return type in `check_fn_body` (checker.sv0:1999-2012).
+- **A diagnostic layer** — `lib/diagnostic.sv0`: `make_error(code, msg, span)`,
+  `diag_list_push` / `diag_list_has_errors` / `diag_list_error_count` /
+  `diag_sort_by_span`, and `format_diagnostic` / `format_header` /
+  `format_location` / `format_snippet`. Its output mirrors SML's
+  `Diagnostic.format` (`sml-legacy/error/diagnostic.sml`) exactly:
+  `error[E0400]: <msg>\n  --> <file>:<line>:<col>\n` + a `LN | source` gutter and
+  a caret underline.
+- **A gate harness** — `scripts/verify_diagnostics_corpus_behavior.py` reads
+  `test/diagnostics/manifest.txt` rows (`rel_path | needle`), compiles each case,
+  and asserts the needle appears in combined stdout+stderr. Today it is
+  **SML-only** and has **one** case (`type_mismatch.sv0 | E0400`).
+
+## The two real gaps
+
+1. **No diagnostic sink.** Checker error sites `return -1`, which the native
+   compose main (`lib/megaTU-main.sv0:85`) collapses into `exit 4`. The code,
+   message, and span are discarded. Nothing carries an `Exxxx` code or a span out
+   to stderr.
+2. **Missing / no-op checks** (exact sites):
+   - **BH-8c return type** — `synth_expr` ExprReturn arm (checker.sv0:3353-3366)
+     synths `val_ty` then **unconditionally `return ret_ty`**; never calls
+     `expect`. Hence `fn main() -> i32 { return true; }` is accepted.
+   - **BH-8b let annot vs init** — LetStmt arm (checker.sv0:3061-3078) **ignores
+     the annotation** and `env_extend`s with the *inferred* `ty_init`; no compare.
+   - **BH-8d field existence** — ExprField synth has no struct-field membership
+     check (`p.z` for a missing `z` defers to `cc`).
+   - **BH-8e unknown type** — type-annotation resolution does not reject an
+     unknown `TyName` (`let p: Widget = 0;` is accepted).
+   - **E0300 unbound / E0307 arity** — caught by the *resolver* (`resolver.sv0`),
+     surfaced as a bare exit 3 with no message.
+
+## Reference output format (native must match the code needle)
+
+SML `Diagnostic.format` (`sml-legacy/error/diagnostic.sml`):
+
+```
+error[E0400]: <message>
+  --> <file>:<line>:<col>
+LN | <source line>
+   |    ^^^^
+```
+
+The behavioral gate only requires the **code** substring (e.g. `E0400`) to appear
+in output, so native messages can be a fixed short string per code; span/caret
+fidelity is a bonus, not a gate requirement.
+
+## Sequenced slices (each independently gated, refresh goldens + full gate)
+
+### Slice 0 — the enabler (de-risks the whole approach)
+Thread a **diagnostic sink** (parallel `Vec<i32>`: code, span_line, span_col,
+span_len — via the existing `diag_list_push`) through
+`check_program → check_fn_body → synth_expr`. Wire **one** check to prove the
+loop: ExprReturn `expect(val_ty, ret_ty)` → push `E0400` on mismatch.
+`check_program` formats the sink to **stderr** via `format_diagnostic` and returns
+nonzero. Add a **native twin** of the verifier (run
+`build/sv0-megatu-compiler-native <case>`, assert needle in stderr + nonzero
+exit). Gates on the case already in the corpus (`type_mismatch.sv0 | E0400`).
+- Sub-dependency: a `tok → (line, col)` helper if diagnostic.sv0 lacks one (scan
+  newlines up to `starts[tok]`). Folded into Slice 0.
+
+**Slice 0 status: DONE.** Landed as above. **Key learning that constrains every
+later slice:** `synth_expr` returns *imprecise primitive* types for
+field/call/method returns (e.g. a string-typed struct field synths as int), so
+you cannot broadly trust its result to flag a mismatch — doing so false-positived
+`lib/span.sv0` (`return sp.file`). Slice 0 is therefore restricted to **literal**
+returns (`ExprLit`, where `infer_lit` is reliable). Later slices must likewise
+only flag when the synthesised type is *trustworthy* (literals, params, and
+constructs with precise inference), or first tighten `synth_expr` for the
+construct in question. The 98-module corpus-parity is the false-positive backstop
+— run `scripts/sv0-megatu-corpus-parity.sh` after every checker edit.
+
+### Slice 1 — BH-8b let annotation vs init (E0400)
+Read the annotation (`ed2` → pty root → `pty_root_to_type_tag`, the PC-7
+classifier), `expect(ty_init, annot)`, push E0400 on mismatch, and extend env
+with the **annotation** type. + corpus case.
+
+### Slice 2 — BH-8e unknown type annotation (E0301)
+Reject a `TyName` that resolves to neither a builtin nor a registered
+struct/enum. + case.
+
+### Slice 3 — BH-8d field existence (E0429)
+In the ExprField synth arm, look up the field in the struct definition; push
+E0429 if absent. + case.
+
+### Slice 4 — E0300 unbound / E0307 arity (messages)
+Route the resolver's existing rejections through the diagnostic layer (code +
+message, not a bare exit 3). Lives in `resolver.sv0`. + cases.
+
+### Slice 5 — BH-4a void + contract (E0409)
+Finding #4: when `id2` shows a contract but no return type, push E0409. Trivial
+once the layer exists. + case.
+
+Each slice appends its row to `test/diagnostics/manifest.txt` with the code
+needle, gated on **both** SML (existing verifier) and native (Slice 0's twin).
+This incrementally discharges BH-8a / BH-X2 (expand the fail corpus).
+
+## Dominant risk & mitigation
+
+`checker.sv0` is a bootstrap module: every edit shifts its stage0
+(`lib/golden/stage0/checker.c`) + vm-parity (`test/vm-parity/golden/sml/checker.sv0b`)
+goldens and must keep **self-host-loop 98/98 + all integration fixtures green**.
+A new soundness check could reject currently-valid code if inference is imprecise
+(`i64` → TY_INT, `isize`/`usize`, TY_NAMED aliasing). Mitigation: start
+permissive, tighten per-case, lean on the 98-module corpus + fixtures as the
+regression backstop, and run the full `./scripts/sv0 test` gate every slice. The
+SML reference stays **untouched** (native-only work), so its diagnostics gate
+keeps passing throughout.
+
+## Invariants (per slice)
+
+- SML reference untouched — native-only edits.
+- Refresh `checker.c` stage0 + `checker.sv0b` vm-parity goldens after each edit;
+  confirm churn is isolated to checker.
+- `printf '' > /tmp/.sv0_drv_path` before any gate/push (see
+  `feedback_drv_path_reset`).
+- Full gate green; commit sv0c first, then parent (gitlink + README pin).

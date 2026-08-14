@@ -1958,6 +1958,59 @@ fn scan_fn_param_names(tok_tags: Vec<i32>,
    program body_et (children-before-parents arena); not always
    vec_len(bet)-1 when multiple ItemFn bodies share one arena.    */
 
+/* ── diagnostic helpers (BH-8 Slice 0) ──────────────────────── */
+
+fn ty_is_intlike(t: i32) -> bool {
+    if t == TY_INT() { return true; }
+    if t == TY_UINT() { return true; }
+    if t == TY_ISIZE() { return true; }
+    if t == TY_USIZE() { return true; }
+    return false;
+}
+
+fn ty_is_primitive(t: i32) -> bool {
+    if ty_is_intlike(t) { return true; }
+    if t == TY_BOOL() { return true; }
+    if t == TY_CHAR() { return true; }
+    if t == TY_STRING() { return true; }
+    if t == TY_UNIT() { return true; }
+    if t == TY_FLOAT() { return true; }
+    return false;
+}
+
+/* Conservative return/annotation mismatch (Slice 0): only flag when both types
+   are concrete primitives, distinct, and not merely different integer widths.
+   Struct/enum/ref/tuple/unknown/var types are left alone so imprecise inference
+   on the (well-typed) bootstrap corpus never produces a false positive. */
+fn ty_mismatch_primitive(got: i32, want: i32) -> bool {
+    if got == want { return false; }
+    if got == TY_VAR() { return false; }
+    if want == TY_VAR() { return false; }
+    if got == TY_UNKNOWN() { return false; }
+    if want == TY_UNKNOWN() { return false; }
+    if ty_is_intlike(got) {
+        if ty_is_intlike(want) { return false; }
+    }
+    if !ty_is_primitive(got) { return false; }
+    if !ty_is_primitive(want) { return false; }
+    return true;
+}
+
+/* Best-effort source token for an expr arena node, for the diagnostic span.
+   ExprPath (tag 1) exposes its first path token via pp; other shapes return -1
+   (the compose main then defaults the span). Never fails on a valid arena. */
+fn expr_span_tok(et: Vec<i32>, ed1: Vec<i32>, pp: Vec<i32>, idx: i32) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    if idx >= vec_len(et) { return 0 - 1; }
+    if vec_get(et, idx) == 1 {
+        let pps: i32 = vec_get(ed1, idx);
+        if pps < 0 { return 0 - 1; }
+        if pps >= vec_len(pp) { return 0 - 1; }
+        return vec_get(pp, pps);
+    }
+    return 0 - 1;
+}
+
 fn check_fn_body(
     bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>,
     bed4: Vec<i32>, bpp: Vec<i32>,
@@ -1973,7 +2026,8 @@ fn check_fn_body(
     edef_variant_counts: Vec<i32>,
     edef_vnames_flat: Vec<i32>,
     edef_vshapes_flat: Vec<i32>,
-    fn_names: Vec<i32>, fn_ret_types: Vec<i32>) -> i32 {
+    fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
+    diag_sink: Vec<i32>) -> i32 {
     let env_n: Vec<i32> = vec_new();
     let env_t: Vec<i32> = vec_new();
     let env_m: Vec<i32> = vec_new();
@@ -2007,6 +2061,57 @@ fn check_fn_body(
                                    fn_names, fn_ret_types,
                                    ret_ty, 0, body_root);
     if body_ty < 0 { return 0 - 1; }
+    /* BH-8c (Slice 0): the ExprReturn synth arm returns ret_ty unconditionally,
+       so `return <wrong-type>` was silently accepted. Re-check each top-level
+       `return e` in the body block: synth the value type and, on a conservative
+       primitive mismatch, push E0400 (code 400) to the diagnostic sink with a
+       best-effort span token. env_n/t/m now hold the block's lets. */
+    if vec_get(bet, body_root) == 9 {
+        let rstmts_first: i32 = vec_get(bed1, body_root);
+        let rstmts_count: i32 = vec_get(bed2, body_root);
+        let rsidecar: i32 = vec_get(bed4, body_root);
+        let mut rsi: i32 = 0;
+        while rsi < rstmts_count {
+            let st: i32 = block_stmt_index(bpp, rstmts_first, rsidecar, rsi);
+            let mut rnode: i32 = 0 - 1;
+            let stag: i32 = vec_get(bet, st);
+            if stag == 15 { rnode = st; }
+            if stag == 28 {
+                let inner: i32 = vec_get(bed1, st);
+                if inner >= 0 {
+                    if vec_get(bet, inner) == 15 { rnode = inner; }
+                }
+            }
+            if rnode >= 0 {
+                let rval: i32 = vec_get(bed1, rnode);
+                if rval >= 0 {
+                    /* Slice 0 is deliberately narrow: only a *literal* return
+                       value has a type we can fully trust (infer_lit). synth_expr
+                       still returns imprecise primitives for field/call/method
+                       returns (e.g. a string-typed field synths as int), which
+                       would false-positive on valid code. So restrict the flag to
+                       ExprLit (tag 0); broaden as inference tightens (BH-8 later). */
+                    if vec_get(bet, rval) == 0 {
+                        let rvty: i32 = synth_expr(bet, bed1, bed2, bed3, bed4, bpp,
+                                                   source, starts, ends,
+                                                   env_n, env_t, env_m,
+                                                   edef_names, edef_variant_offsets,
+                                                   edef_variant_counts,
+                                                   edef_vnames_flat, edef_vshapes_flat,
+                                                   fn_names, fn_ret_types,
+                                                   ret_ty, 0, rval);
+                        if rvty >= 0 {
+                            if ty_mismatch_primitive(rvty, ret_ty) {
+                                vec_push(diag_sink, 400);
+                                vec_push(diag_sink, expr_span_tok(bet, bed1, bpp, rval));
+                            }
+                        }
+                    }
+                }
+            }
+            rsi = rsi + 1;
+        }
+    }
     if expect(body_ty, ret_ty) { return 0; }
     if ret_ty == TY_UNIT() { return 0; }
     return 0 - 1;
@@ -2151,7 +2256,8 @@ fn check_program(
     pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>, pty_td3: Vec<i32>,
     body_et: Vec<i32>, body_ed1: Vec<i32>, body_ed2: Vec<i32>,
     body_ed3: Vec<i32>, body_ed4: Vec<i32>,
-    type_params: Vec<i32>, tp_limit: i32) -> i32 {
+    type_params: Vec<i32>, tp_limit: i32,
+    diag_sink: Vec<i32>) -> i32 {
     let struct_names: Vec<i32> = vec_new();
     let enum_names: Vec<i32> = vec_new();
     let nitems: i32 = vec_len(it);
@@ -2265,11 +2371,15 @@ fn check_program(
                                           edef_variant_counts,
                                           edef_vnames_flat,
                                           edef_vshapes_flat,
-                                          fn_names, fn_ret_types);
+                                          fn_names, fn_ret_types,
+                                          diag_sink);
             if chk != 0 { return 0 - 1; }
         }
         ii = ii + 1;
     }
+    /* Any diagnostic pushed by a check (even one that did not short-circuit the
+       per-fn return) makes the whole program fail the check phase. */
+    if vec_len(diag_sink) > 0 { return 0 - 1; }
     return 0;
 }
 
@@ -5778,7 +5888,7 @@ fn test_check_fn_body() -> i32 {
                                  ppn, ppt, ppm, 0,
                                  TY_INT(), 0,
                                  edn, edvo, edvc, edvn, edvs,
-                                 fnn, fnrt);
+                                 fnn, fnrt, vec_new());
     if r1 != 0 { return 1; }
     let r2: i32 = check_fn_body(bet, bed1, bed2, bed3, bed4, bpp,
                                  source, starts, ends,
@@ -5786,7 +5896,7 @@ fn test_check_fn_body() -> i32 {
                                  ppn, ppt, ppm, 0,
                                  TY_BOOL(), 0,
                                  edn, edvo, edvc, edvn, edvs,
-                                 fnn, fnrt);
+                                 fnn, fnrt, vec_new());
     if r2 != 0 - 1 { return 2; }
     let r3: i32 = check_fn_body(bet, bed1, bed2, bed3, bed4, bpp,
                                  source, starts, ends,
@@ -5794,7 +5904,7 @@ fn test_check_fn_body() -> i32 {
                                  ppn, ppt, ppm, 0,
                                  TY_UNIT(), 0,
                                  edn, edvo, edvc, edvn, edvs,
-                                 fnn, fnrt);
+                                 fnn, fnrt, vec_new());
     if r3 != 0 { return 3; }
     return 0;
 }
@@ -5858,7 +5968,7 @@ fn test_check_program() -> i32 {
                                  fpn_a, fpt_a, frt_a, ptt_a, ptd1_a,
                                  ptd2_a, ptd3_a,
                                  body_et_a, body_ed1_a, body_ed2_a,
-                                 body_ed3_a, body_ed4_a, tp_a, 0);
+                                 body_ed3_a, body_ed4_a, tp_a, 0, vec_new());
     if ra != 0 { return 1; }
     /* B: two ItemFns share body_et — roots 0 and 1; literals 42 and 7. */
     let source_b: string =
@@ -5938,7 +6048,7 @@ fn test_check_program() -> i32 {
                                  fpn_b, fpt_b, frt_b, ptt_b, ptd1_b,
                                  ptd2_b, ptd3_b,
                                  body_et_b, body_ed1_b, body_ed2_b,
-                                 body_ed3_b, body_ed4_b, tp_b, 0);
+                                 body_ed3_b, body_ed4_b, tp_b, 0, vec_new());
     if rb != 0 { return 2; }
     return 0;
 }
@@ -6023,7 +6133,7 @@ fn test_check_program_mangled_name() -> i32 {
                                 it, id1, id2, id3, id4, id5,
                                 fpn, fpt, frt, ptt, ptd1, ptd2, ptd3,
                                 body_et, body_ed1, body_ed2, body_ed3,
-                                body_ed4, tp, 0);
+                                body_ed4, tp, 0, vec_new());
     if cr != 0 { return 1; }
     return 0;
 }

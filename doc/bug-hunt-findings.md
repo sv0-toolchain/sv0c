@@ -738,13 +738,35 @@ existing runtime behavior; all three backends now agree.
 - [x] **BH-7c** Fixture `test/integration/int_min/` (exit 42) gated on all three:
   native `--project` (pc3b6), SML `one` mode, sv0vm integration.
 
-### #8 — Native checker under-diagnoses (P1, milestone) 
-- [ ] **BH-8a** Expand golden **fail** corpus with E0300/E0301/E0307/E0400/E0429 cases (gate the gap first). *(overlaps BH-X2)*
-- [ ] **BH-8b** Native: type-equality check on `let` annotation vs init type.
-- [ ] **BH-8c** Native: return-type check (body value vs signature).
-- [ ] **BH-8d** Native: field-existence check on `expr.field`.
-- [ ] **BH-8e** Native: unknown-type check on type annotations.
-- [ ] **BH-8f** Native diagnostic layer emitting `Exxxx` codes (covers unbound/arity + BH-8b..e + BH-4a).
+### #8 — Native checker under-diagnoses (P1, milestone) — 🔨 IN PROGRESS
+Full plan: **`doc/bh8-native-diagnostics-plan.md`** (sink threading, slice order,
+risk). Key discovery: the diagnostic layer (`lib/diagnostic.sv0`) and type
+inference (`synth_expr`/`expect`) already exist — this is wiring a *diagnostic
+sink* into the checker + adding the missing checks, not building from scratch.
+Sliced:
+- [x] **BH-8f / Slice 0 (enabler)** ✅ DONE. Threaded a `diag_sink: Vec<i32>`
+  (flat `(code, span_tok)` pairs) through `check_program → check_fn_body` — the
+  checker stays formatter-free (just `vec_push`). The compose main
+  (`megaTU-main.sv0`) maps codes→`Exxxx`+message, resolves the token→(line,col),
+  and formats via diagnostic.sv0's SML-parity formatters to stderr. Added
+  `scripts/verify_diagnostics_corpus_behavior_native.py` (native twin — asserts
+  the needle **and** a nonzero exit) wired into `./scripts/sv0 test`. Gates on
+  `type_mismatch.sv0 | E0400`.
+- [x] **BH-8c (Slice 0 scope)** ✅ Return-type mismatch for **literal** returns:
+  `check_fn_body` re-checks each top-level `return <ExprLit>` and pushes `E0400`
+  when the literal's type conflicts with the signature (`return true` in `-> i32`).
+  Restricted to `ExprLit` because `synth_expr` returns imprecise primitives for
+  field/call/method returns (broadly trusting it false-positived `lib/span.sv0`).
+  Broaden to non-literal returns once inference tightens.
+- [ ] **BH-8b** `let` annotation vs init type — LetStmt arm (checker.sv0:3061)
+  ignores the annotation; read it via `ed2`→pty→`pty_root_to_type_tag`, `expect`,
+  extend env with the annotation type. → E0400.
+- [ ] **BH-8e** Unknown-type annotation (`TyName` not builtin/struct/enum). → E0301.
+- [ ] **BH-8d** Field-existence check in ExprField synth. → E0429.
+- [ ] **BH-8g** Route resolver's unbound (E0300) / arity (E0307) rejections
+  through the diagnostic layer (message, not bare exit 3). *(resolver.sv0)*
+- [ ] **BH-8a** Each slice appends its `rel|code` row to
+  `test/diagnostics/manifest.txt`, gated on both SML + native. *(overlaps BH-X2)*
 
 ### #9 — `include` unwired on native (P2) — ✅ FIXED
 - [x] **BH-9a** Native compose main now reads the single-file source via
