@@ -110,7 +110,16 @@ fn int_to_str_pos(n: i32) -> string {
 
 fn int_to_string(n: i32) -> string {
     if n == 0 { return "0"; }
-    if n < 0 { return string_concat("-", int_to_str_pos(0 - n)); }
+    if n < 0 {
+        /* INT_MIN (-2147483648): its magnitude has no positive i32, so `0 - n`
+           overflows back to a negative value. int_to_str_pos would then feed a
+           negative n to digit_char and emit "?" (yielding a bogus "-?"). Emit
+           the literal directly. Detected without writing the 2^31 literal (which
+           would itself overflow at parse time). */
+        let m: i32 = 0 - n;
+        if m < 0 { return "-2147483648"; }
+        return string_concat("-", int_to_str_pos(m));
+    }
     return int_to_str_pos(n);
 }
 
@@ -571,6 +580,10 @@ fn test_int_format() -> i32 {
     if !string_eq(int_to_string(9999), "9999") { return 5; }
     if !string_eq(int_to_string(-1), "-1") { return 6; }
     if !string_eq(int_to_string(-42), "-42") { return 7; }
+    if !string_eq(int_to_string(2147483647), "2147483647") { return 8; }
+    /* INT_MIN edge: 0 - n overflows; must not emit "-?" (BH-7). Built as
+       INT_MAX+1 via a runtime add to avoid the un-parseable 2^31 literal. */
+    if !string_eq(int_to_string(0 - 2147483647 - 1), "-2147483648") { return 9; }
     return 0;
 }
 
