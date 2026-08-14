@@ -26,7 +26,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 | 4 | Void fn + contract, no `-> T`: native fails silently vs SML E0409 | P3 | native |
 | 5 | Cross-module method calls fail SML `--project` (E0401) | P2 | SML |
 | 6 | Checker doesn't scope block-local bindings | P3 | native |
-| 7 | Literal `2147483648` (2³¹) handled 3 different ways | P2/P3 | all |
+| 7 | Literal `2147483648` (2³¹) handled 3 different ways | P2/P3 | all | ✅ **FIXED** (wrap to INT_MIN, all 3) |
 | 8 | Native checker accepts type errors + emits no diagnostics | P1 | native |
 | 9 | `include` unwired on native (works on SML) | P2 | native | ✅ **FIXED** (native build + fixture) |
 | 10 | All runtime contracts dropped on native; VM aborts ungracefully | P1 / P3 | native / VM |
@@ -298,7 +298,7 @@ type-checker's scope enforcement that the promotion plan should close.
 
 ---
 
-## 7. The literal `2147483648` (2³¹) is handled inconsistently across the three backends — P2/P3 (edge)
+## 7. The literal `2147483648` (2³¹) is handled inconsistently across the three backends — P2/P3 (edge) — ✅ FIXED (wrap to INT_MIN on all three)
 
 **Files:** literal lexing/parsing (`lib/lexer.sv0` / `lib/parser.sv0`), native emit.
 
@@ -721,8 +721,22 @@ sv0c goldens.
 ### #6 — Checker block-scope leak (P3)
 - [ ] **BH-6a** `checker.sv0` `check_stmt_in_block`: save env length before a block, restore after (drop bindings that go out of scope). Pairs with BH-12b.
 
-### #7 — `2³¹` literal inconsistency (P2/P3)
-- [ ] **BH-7a** Decide the semantics (reject-as-overflow vs INT_MIN) and make lexer/parser (native) + VM bytecode-int encoding agree with SML→C. Add a boundary-literal test.
+### #7 — `2³¹` literal inconsistency (P2/P3) — ✅ FIXED
+Semantics chosen: **wrap to i32** (`2147483648` → INT_MIN), matching SML→C's
+existing runtime behavior; all three backends now agree.
+- [x] **BH-7a** Native C: `int_to_string(INT_MIN)` special-cased — `0 - n`
+  overflows back to negative, so `int_to_str_pos` emitted `-?` (invalid C). Now
+  detects the negation-overflow (`0 - n` still `< 0`) and emits `"-2147483648"`
+  directly (`lib/codegen.sv0`). This is a general codegen robustness fix (any
+  INT_MIN constant, not just this literal). Unit case added to `test_int_format`.
+- [x] **BH-7b** VM emit: `VmCodegen.int32` did `Int32.fromLarge 2147483648` →
+  uncaught `Overflow` (silent exit 1). Now wraps through `Word32`
+  (`sml-legacy/backend/vm/vm_codegen.sml`), truncating `2³¹` → INT_MIN to match
+  the C wrap; the VM interpreter's Word32 arithmetic (BH-2) then evaluates
+  `0 - INT_MIN` correctly at run time. Identity for in-range values (only
+  `codegen.sv0b` vm-parity golden shifted, from the codegen.sv0 source edit).
+- [x] **BH-7c** Fixture `test/integration/int_min/` (exit 42) gated on all three:
+  native `--project` (pc3b6), SML `one` mode, sv0vm integration.
 
 ### #8 — Native checker under-diagnoses (P1, milestone) 
 - [ ] **BH-8a** Expand golden **fail** corpus with E0300/E0301/E0307/E0400/E0429 cases (gate the gap first). *(overlaps BH-X2)*

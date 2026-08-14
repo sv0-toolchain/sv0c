@@ -346,14 +346,18 @@ static const char* int_to_string(int n) {
   } else {
   }
   if ((n < 0)) {
-    int _sv0t0 = (0 - n);
-    const char* _sv0t1 = int_to_str_pos(_sv0t0);
-    const char* _sv0t2 = sv0_string_concat("-", _sv0t1);
-    return _sv0t2;
+    int m = (0 - n);
+    if ((m < 0)) {
+      return "-2147483648";
+    } else {
+    }
+    const char* _sv0t0 = int_to_str_pos(m);
+    const char* _sv0t1 = sv0_string_concat("-", _sv0t0);
+    return _sv0t1;
   } else {
   }
-  const char* _sv0t3 = int_to_str_pos(n);
-  return _sv0t3;
+  const char* _sv0t2 = int_to_str_pos(n);
+  return _sv0t2;
 }
 
 static const char* c_escape_one(int c, const char* src, int pos) {
@@ -1605,6 +1609,20 @@ static int test_int_format(void) {
   int _sv0t15 = sv0_string_eq(_sv0t14, "-42");
   if ((!_sv0t15)) {
     return 7;
+  } else {
+  }
+  const char* _sv0t16 = int_to_string(2147483647);
+  int _sv0t17 = sv0_string_eq(_sv0t16, "2147483647");
+  if ((!_sv0t17)) {
+    return 8;
+  } else {
+  }
+  int _sv0t18 = (0 - 2147483647);
+  int _sv0t19 = (_sv0t18 - 1);
+  const char* _sv0t20 = int_to_string(_sv0t19);
+  int _sv0t21 = sv0_string_eq(_sv0t20, "-2147483648");
+  if ((!_sv0t21)) {
+    return 9;
   } else {
   }
   return 0;

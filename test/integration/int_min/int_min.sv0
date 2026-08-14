@@ -1,0 +1,7 @@
+/* BH-7 regression: the literal 2147483648 (2^31, one past i32::MAX) must wrap to
+   INT_MIN consistently across all three backends, not diverge.
+   `0 - 2147483648` overflow-wraps to INT_MIN (negative) -> a < 0 is true -> 42. */
+fn main() -> i32 {
+    let a: i32 = 0 - 2147483648;
+    return if a < 0 { 42 } else { 7 };
+}

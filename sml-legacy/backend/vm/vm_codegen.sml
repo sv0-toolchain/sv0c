@@ -6,8 +6,12 @@ structure VmCodegen :> VM_CODEGEN = struct
   structure I = Ir
   structure B = Bytecode
 
+  (* Wrap into 32 bits rather than raising Overflow on a literal at/above i32's
+     range (e.g. 2147483648 = 2^31): Word32 truncation gives the two's-complement
+     i32 (2^31 -> INT_MIN), matching the C backend's runtime wrap. Identity for
+     values already in [-2^31, 2^31-1]. (BH-7) *)
   fun int32 (i : IntInf.int) : Int32.int =
-    Int32.fromLarge (IntInf.toLarge i)
+    Int32.fromLarge (Word32.toLargeIntX (Word32.fromLargeInt (IntInf.toLarge i)))
 
   fun variantSlots (v : A.variant) : int =
     case v of
