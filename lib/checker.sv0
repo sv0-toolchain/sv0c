@@ -3439,6 +3439,14 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                     }
                 }
             }
+            /* Top-level bind pattern (`x => …` / `x if g => …`): bind `x` (the
+               arm's ed2 token) into the env with the scrutinee's type, so the arm
+               body AND guard can reference it. Without this the checker rejects
+               every catch-all bind arm and any guard over a bind pattern. */
+            if arm_pt == 1 {
+                env_extend(env_names, env_types, env_muts,
+                           vec_get(ed2, arm_idx), scrut_ty, 0);
+            }
             if guard_idx >= 0 {
                 let g_ty: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
                                             source, starts, ends,
