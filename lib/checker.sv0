@@ -2109,6 +2109,39 @@ fn check_fn_body(
                     }
                 }
             }
+            /* BH-8b (Slice 1): a `let x: T = <literal>` whose annotation T is a
+               primitive that conflicts with the literal's type (`let x: i32 =
+               true`). The LetStmt arm otherwise ignores the annotation entirely
+               and binds the inferred type. Same literal-only narrowing as the
+               return check: a non-literal init would need trustworthy inference.
+               d2 = annotation type-head token (-1 = none); d3 = init idx. */
+            if stag == 27 {
+                let lannot: i32 = vec_get(bed2, st);
+                let linit: i32 = vec_get(bed3, st);
+                if lannot >= 0 {
+                    if linit >= 0 {
+                        if vec_get(bet, linit) == 0 {
+                            let las: i32 = vec_get(starts, lannot);
+                            let lae: i32 = vec_get(ends, lannot);
+                            if las >= 0 {
+                                if lae > las {
+                                    let aname: string = string_substr(source, las, lae - las);
+                                    let annot_ty: i32 = ast_type_name_to_tag(aname);
+                                    let init_ty: i32 = infer_lit(vec_get(bed1, linit));
+                                    if annot_ty >= 0 {
+                                        if init_ty >= 0 {
+                                            if ty_mismatch_primitive(init_ty, annot_ty) {
+                                                vec_push(diag_sink, 400);
+                                                vec_push(diag_sink, lannot);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             rsi = rsi + 1;
         }
     }

@@ -3241,22 +3241,70 @@ static int check_fn_body(int bet, int bed1, int bed2, int bed3, int bed4, int bp
         }
       } else {
       }
+      if ((stag == 27)) {
+        int _sv0t29 = sv0_vec_get(bed2, st);
+        int lannot = _sv0t29;
+        int _sv0t30 = sv0_vec_get(bed3, st);
+        int linit = _sv0t30;
+        if ((lannot >= 0)) {
+          if ((linit >= 0)) {
+            int _sv0t31 = sv0_vec_get(bet, linit);
+            if ((_sv0t31 == 0)) {
+              int _sv0t32 = sv0_vec_get(starts, lannot);
+              int las = _sv0t32;
+              int _sv0t33 = sv0_vec_get(ends, lannot);
+              int lae = _sv0t33;
+              if ((las >= 0)) {
+                if ((lae > las)) {
+                  int _sv0t34 = (lae - las);
+                  const char* _sv0t35 = sv0_string_substr(source, las, _sv0t34);
+                  const char* aname;
+                  aname = _sv0t35;
+                  int _sv0t36 = ast_type_name_to_tag(aname);
+                  int annot_ty = _sv0t36;
+                  int _sv0t37 = sv0_vec_get(bed1, linit);
+                  int _sv0t38 = infer_lit(_sv0t37);
+                  int init_ty = _sv0t38;
+                  if ((annot_ty >= 0)) {
+                    if ((init_ty >= 0)) {
+                      int _sv0t39 = ty_mismatch_primitive(init_ty, annot_ty);
+                      if (_sv0t39) {
+                        sv0_vec_push(diag_sink, 400);
+                        sv0_vec_push(diag_sink, lannot);
+                      } else {
+                      }
+                    } else {
+                    }
+                  } else {
+                  }
+                } else {
+                }
+              } else {
+              }
+            } else {
+            }
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
       rsi = (rsi + 1);
     }
   } else {
   }
-  int _sv0t29 = expect(body_ty, ret_ty);
-  if (_sv0t29) {
+  int _sv0t40 = expect(body_ty, ret_ty);
+  if (_sv0t40) {
     return 0;
   } else {
   }
-  int _sv0t30 = TY_UNIT();
-  if ((ret_ty == _sv0t30)) {
+  int _sv0t41 = TY_UNIT();
+  if ((ret_ty == _sv0t41)) {
     return 0;
   } else {
   }
-  int _sv0t31 = (0 - 1);
-  return _sv0t31;
+  int _sv0t42 = (0 - 1);
+  return _sv0t42;
 }
 
 static int process_item_use(const char* source, int starts, int ends, int pp, int id1, int id2, int item_idx, int fn_names, int fn_ret_types, int sdef_names, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int env_names, int env_types, int env_muts, int aliases, int alias_targets) {

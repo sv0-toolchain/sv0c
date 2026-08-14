@@ -1,0 +1,6 @@
+/* BH-8 Slice 1 (BH-8b) — let annotation vs init mismatch. `x` is annotated i32
+   but initialised with a bool literal: E0400 on both SML and native. */
+fn main() -> i32 {
+    let x: i32 = true;
+    return x;
+}
