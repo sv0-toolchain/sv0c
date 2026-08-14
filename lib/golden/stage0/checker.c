@@ -1893,17 +1893,17 @@ static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
     return _sv0t2;
   } else {
   }
-  if ((tag == 2)) {
+  if ((tag == 1)) {
     int _sv0t3 = TY_REF();
     return _sv0t3;
   } else {
   }
-  if ((tag == 3)) {
+  if ((tag == 2)) {
     int _sv0t4 = TY_REFMUT();
     return _sv0t4;
   } else {
   }
-  if ((tag == 7)) {
+  if ((tag == 5)) {
     int _sv0t5 = TY_TUPLE();
     return _sv0t5;
   } else {
@@ -1994,17 +1994,17 @@ static int ast_ty_to_ty_payload(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
     return _sv0t2;
   } else {
   }
-  if ((tag == 2)) {
+  if ((tag == 1)) {
     int _sv0t3 = TY_REF();
     return _sv0t3;
   } else {
   }
-  if ((tag == 3)) {
+  if ((tag == 2)) {
     int _sv0t4 = TY_REFMUT();
     return _sv0t4;
   } else {
   }
-  if ((tag == 7)) {
+  if ((tag == 5)) {
     int _sv0t5 = TY_TUPLE();
     return _sv0t5;
   } else {
@@ -6524,6 +6524,54 @@ static int test_resolve_field_ty(void) {
   int _sv0t19 = (0 - 1);
   if ((r_bad != _sv0t19)) {
     return 6;
+  } else {
+  }
+  sv0_vec_push(tt, 1);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td3, 0);
+  int _sv0t20 = sv0_vec_len(tt);
+  int _sv0t21 = (_sv0t20 - 1);
+  int _sv0t22 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, _sv0t21);
+  int _sv0t23 = TY_REF();
+  if ((_sv0t22 != _sv0t23)) {
+    return 7;
+  } else {
+  }
+  sv0_vec_push(tt, 2);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td3, 0);
+  int _sv0t24 = sv0_vec_len(tt);
+  int _sv0t25 = (_sv0t24 - 1);
+  int _sv0t26 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, _sv0t25);
+  int _sv0t27 = TY_REFMUT();
+  if ((_sv0t26 != _sv0t27)) {
+    return 8;
+  } else {
+  }
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td3, 0);
+  int _sv0t28 = sv0_vec_len(tt);
+  int _sv0t29 = (_sv0t28 - 1);
+  int _sv0t30 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, _sv0t29);
+  int _sv0t31 = TY_TUPLE();
+  if ((_sv0t30 != _sv0t31)) {
+    return 9;
+  } else {
+  }
+  sv0_vec_push(tt, 3);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td3, 0);
+  int _sv0t32 = sv0_vec_len(tt);
+  int _sv0t33 = (_sv0t32 - 1);
+  int _sv0t34 = resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, _sv0t33);
+  int _sv0t35 = (0 - 1);
+  if ((_sv0t34 != _sv0t35)) {
+    return 10;
   } else {
   }
   return 0;

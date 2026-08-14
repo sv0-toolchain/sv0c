@@ -22,7 +22,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 |---|---------|-----|-----------|--------|
 | 1 | Method calls miscompile compound arguments (`p.m(a+b)` → `m(p,a)`) | P1 | native | ✅ **FIXED** (sv0c) |
 | 2 | VM integer arithmetic ≠ i32: overflow no-wrap + floor div/mod | P1 | VM | ✅ **FIXED** (sv0vm `a0876d9`) |
-| 3 | Stale pty type-tag scheme in checker type-resolvers (2/3/7) | P2/P3 | native (dead) |
+| 3 | Stale pty type-tag scheme in checker type-resolvers (2/3/7) | P2/P3 | native (dead) | ✅ **FIXED** (sv0c) |
 | 4 | Void fn + contract, no `-> T`: native fails silently vs SML E0409 | P3 | native |
 | 5 | Cross-module method calls fail SML `--project` (E0401) | P2 | SML |
 | 6 | Checker doesn't scope block-local bindings | P3 | native |
@@ -233,11 +233,14 @@ misclassify.
 `TyUnit` (6) nodes, so it never exercises the wrong 1/2/3/5/7 branches — the bug
 is neither caught nor locked in.
 
-**Fix:** align both functions with the canonical scheme (tag 1→TY_REF,
-2→TY_REFMUT, 5→TY_TUPLE, 3/4→-1), mirroring `pty_root_to_type_tag`; add
-ref/refmut/tuple/infer test cases; or delete the dead functions if the intent is
-that `pty_root_to_type_tag` is the single type-resolver. (A background task chip
-for this was already spawned during PC-7.)
+**Fix:** ✅ **DONE (sv0c).** Both `resolve_field_ty_tag` and `ast_ty_to_ty_payload`
+now use the canonical scheme (tag 1→TY_REF, 2→TY_REFMUT, 5→TY_TUPLE; 3 TyArray /
+4 TySlice / 7 TyInfer fall through to -1), matching `pty_root_to_type_tag`.
+`test_resolve_field_ty_tag` gained ref/refmut/tuple/array cases (the old test
+only built TyName/TyUnit, so the wrong branches were unexercised). checker
+stage0 + vm-parity goldens refreshed; full gate green. (Kept both functions
+rather than deleting the dead chain — the fix is minimal and now correct if ever
+wired.)
 
 ---
 
@@ -440,9 +443,22 @@ not native.
   fn main() -> i32 { let s: Opt = Opt::Some(42); let r: Opt = f(s);
                      return match r { Opt::Some(x) => x, Opt::None => 0 }; }
   ```
-  SML → 42; native → the stub (returns 0). `lower_tag_try` (tag 22) exists in
-  `lowering.sv0`, so the drop is in how the compose-main pipeline handles a
-  `?`-bearing function (it appears to bail and emit the fallback stub `main`).
+  SML → 42; native → the stub (returns 0). **Root cause (diagnosed 2026-08-12):**
+  *two* gaps. (1) The **parser** never produces an `ExprTry` node — `parse_postfix_expr`
+  has no `?` (token 34) case, so `let v = o?;` stops parsing at `o`, truncating
+  the item arena to whatever preceded the `?`-bearing fn (`num_blocks == 0` →
+  `megatu_emit_program` emits the `int main(){return 0;}` stub). A one-line parser
+  addition (push tag-22 `ExprTry(inner)`) fixes the parse. (2) But then
+  `lower_tag_try` — which *is* implemented — can only resolve the operand's enum
+  type when the operand is a **call** (`f()?`, via `fn_ctx`) or a 2-segment path
+  (`Enum::V(..)?`); for the common `o?` where `o` is a **bound variable**, it can't
+  find the enum type (the native lowering doesn't track variable types) → bails to
+  `VUnit` → wrong `v = 0`. So the parser fix alone makes `?` *parse* but produce
+  silently-wrong results (worse than the loud stub) — it was reverted.
+  **Remaining work (BH-11a):** give `lower_tag_try` operand-type resolution for
+  bound variables (look up a param's type via the fn's `id5`/`fpn`/`fpt` arenas;
+  locals need a lowering-side var→type map). Deferred — a real native-completeness
+  addition, not a quick fix.
 
 - **Enum-returning function into a typed `let` → invalid C type `i`.** ✅ **FIXED (BH-11b, sv0c).**
   ```sv0
@@ -691,10 +707,10 @@ sv0c goldens.
 - [x] **BH-2c** Div-by-zero: `DIV` already raised `Fail`; added the matching `MOD`-by-zero guard. *(kept the existing `Fail` abort; a clean exit-code panic is deferred to BH-10c's VM-abort cleanup.)*
 - [x] **BH-2d** Added an arithmetic regression test to `sv0vm/test/bytecode_test.sml` (overflow add/mul, negative div/mod, INT_MIN/-1). The full cross-backend differential harness is still **BH-X1**.
 
-### #3 — Stale pty tag scheme (P2/P3)
-- [ ] **BH-3a** `checker.sv0` `resolve_field_ty_tag`: fix mapping to 1→TY_REF, 2→TY_REFMUT, 5→TY_TUPLE, 3/4→-1 (mirror `pty_root_to_type_tag`).
-- [ ] **BH-3b** Either fix `ast_ty_to_ty_payload` identically, **or** delete it + `item_fn_ret_ty_tag` if `pty_root_to_type_tag` is the intended single resolver.
-- [ ] **BH-3c** Add ref/refmut/tuple/infer cases to `test_resolve_field_ty_tag`. *(covers the existing task chip)*
+### #3 — Stale pty tag scheme (P2/P3) — ✅ DONE (sv0c)
+- [x] **BH-3a** `resolve_field_ty_tag`: fixed mapping to 1→TY_REF, 2→TY_REFMUT, 5→TY_TUPLE, 3/4/7→-1.
+- [x] **BH-3b** `ast_ty_to_ty_payload` fixed identically (same wrong block; one `replace_all`). Both kept (minimal fix; dead but now correct).
+- [x] **BH-3c** Added ref/refmut/tuple/array cases to `test_resolve_field_ty_tag`.
 
 ### #4 — Void+contract silent native fail (P3)
 - [ ] **BH-4a** `checker.sv0`: when `id2` shows a contract but no return type, emit `E0409` (route through the diagnostic layer from BH-8f) instead of a bare nonzero exit.
@@ -726,7 +742,7 @@ sv0c goldens.
 - [ ] **BH-10c** `interpreter.sml:484`: replace the uncaught `Fail` with a clean contract-violation abort (message + exit code) matching the C runtime.
 
 ### #11 — Native `?` / enum-ret / tuple / nested-struct mis-emit (P1/P2)
-- [ ] **BH-11a** Fix `?` (ExprTry, tag 22): route it through the native compose-main lowering so a `?`-bearing fn doesn't collapse `main` to the stub. Fixture: `?` on `Some`/`None` → exit 42.
+- [ ] **BH-11a** Fix `?` (ExprTry): (a) add the `?` postfix case to `parse_postfix_expr` (token 34 → tag-22 `ExprTry(inner)`) — *trivial, but insufficient alone*; (b) give `lower_tag_try` operand-type resolution for **bound variables** (`o?` where `o` is a param/local of enum type) — it currently only handles call / 2-seg-path operands and bails to `VUnit` otherwise, so (a) without (b) makes `?` silently wrong. **Deferred** — needs a lowering-side operand→enum-type lookup (params via `id5`/`fpn`/`fpt`; locals need a var→type map). Diagnosed 2026-08-12; see finding #11.
 - [x] **BH-11b** Fixed enum-returning-`let` C type: `megatu_ty_name` now resolves type tokens via `handle_to_str` instead of the `name_of` value-name stub (which mapped index 15 → "i"). Fixture `enum_return_let` gated. (sv0c)
 - [ ] **BH-11c** Tuples on native: either support, or emit a clean "tuples unsupported" diagnostic instead of empty output.
 - [ ] **BH-11d** Nested structs (multi-slot sub-struct fields) on native + VM: support, or a clean diagnostic (see `span.sv0`).

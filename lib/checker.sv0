@@ -1083,9 +1083,13 @@ fn resolve_field_ty_tag(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
     if idx < 0 { return 0 - 1; }
     let tag: i32 = vec_get(ty_tags, idx);
     if tag == 6 { return TY_UNIT(); }
-    if tag == 2 { return TY_REF(); }
-    if tag == 3 { return TY_REFMUT(); }
-    if tag == 7 { return TY_TUPLE(); }
+    /* pty tags (parse_type / ast.sv0 ty_tag): 1 TyRef, 2 TyRefMut, 5 TyTuple.
+       3 TyArray / 4 TySlice / 7 TyInfer are unsupported here and fall through to
+       the TyName (0) / -1 paths below. (Matches pty_root_to_type_tag; the old
+       2→REF / 3→REFMUT / 7→TUPLE was a stale/wrong tag scheme.) */
+    if tag == 1 { return TY_REF(); }
+    if tag == 2 { return TY_REFMUT(); }
+    if tag == 5 { return TY_TUPLE(); }
     if tag == 0 {
         let seg_count: i32 = vec_get(ty_d2, idx);
         if seg_count == 1 {
@@ -1138,9 +1142,13 @@ fn ast_ty_to_ty_payload(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
     if idx < 0 { return 0 - 1; }
     let tag: i32 = vec_get(ty_tags, idx);
     if tag == 6 { return TY_UNIT(); }
-    if tag == 2 { return TY_REF(); }
-    if tag == 3 { return TY_REFMUT(); }
-    if tag == 7 { return TY_TUPLE(); }
+    /* pty tags (parse_type / ast.sv0 ty_tag): 1 TyRef, 2 TyRefMut, 5 TyTuple.
+       3 TyArray / 4 TySlice / 7 TyInfer are unsupported here and fall through to
+       the TyName (0) / -1 paths below. (Matches pty_root_to_type_tag; the old
+       2→REF / 3→REFMUT / 7→TUPLE was a stale/wrong tag scheme.) */
+    if tag == 1 { return TY_REF(); }
+    if tag == 2 { return TY_REFMUT(); }
+    if tag == 5 { return TY_TUPLE(); }
     if tag == 0 {
         let seg_count: i32 = vec_get(ty_d2, idx);
         if seg_count == 1 {
@@ -4288,6 +4296,15 @@ fn test_resolve_field_ty() -> i32 {
                                            source, starts, ends,
                                            sn, en, tp, 0, 0 - 1);
     if r_bad != 0 - 1 { return 6; }
+    /* BH-3: ref / refmut / tuple tags (previously mis-mapped as 2/3/7). */
+    vec_push(tt, 1); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
+    if resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, vec_len(tt) - 1) != TY_REF() { return 7; }
+    vec_push(tt, 2); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
+    if resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, vec_len(tt) - 1) != TY_REFMUT() { return 8; }
+    vec_push(tt, 5); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
+    if resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, vec_len(tt) - 1) != TY_TUPLE() { return 9; }
+    vec_push(tt, 3); vec_push(td1, 0); vec_push(td2, 0); vec_push(td3, 0);
+    if resolve_field_ty_tag(tt, td1, td2, td3, pp, source, starts, ends, sn, en, tp, 0, vec_len(tt) - 1) != 0 - 1 { return 10; }
     return 0;
 }
 
