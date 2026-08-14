@@ -1,0 +1,2 @@
+include "helper.sv0";
+fn main() -> i32 { return helper(); }

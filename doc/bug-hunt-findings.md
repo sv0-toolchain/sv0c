@@ -28,7 +28,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 | 6 | Checker doesn't scope block-local bindings | P3 | native |
 | 7 | Literal `2147483648` (2³¹) handled 3 different ways | P2/P3 | all |
 | 8 | Native checker accepts type errors + emits no diagnostics | P1 | native |
-| 9 | `include` unwired on native (works on SML) | P2 | native |
+| 9 | `include` unwired on native (works on SML) | P2 | native | ✅ **FIXED** (native build + fixture) |
 | 10 | All runtime contracts dropped on native; VM aborts ungracefully | P1 / P3 | native / VM |
 | 11 | `?` / enum-return / tuple / nested-struct silently mis-emit | P1/P2 | native | ⚠️ enum-return **FIXED** (BH-11b); `?`/tuple/nested-struct open |
 | 12 | Variable shadowing → invalid C (redeclare) + VM scope leak | P2 | SML + native + VM |
@@ -732,9 +732,16 @@ sv0c goldens.
 - [ ] **BH-8e** Native: unknown-type check on type annotations.
 - [ ] **BH-8f** Native diagnostic layer emitting `Exxxx` codes (covers unbound/arity + BH-8b..e + BH-4a).
 
-### #9 — `include` unwired on native (P2)
-- [ ] **BH-9a** `megaTU-main.sv0`: call `expand_from_file`/`include_expand` when setting `source` (single-file and `--project`).
-- [ ] **BH-9b** Add a native `include` fixture (root includes a helper → exit 42).
+### #9 — `include` unwired on native (P2) — ✅ FIXED
+- [x] **BH-9a** Native compose main now reads the single-file source via
+  `expand_from_file` (read + `expand_file`) instead of `read_file`, mirroring
+  SML's `expandFile` — done in `scripts/build-sv0-megatu-native.sh` (the
+  `cli_read` patch, file-mode branch). `--project` intentionally left on plain
+  source-concat: expanding an `include` there would double-define the includee.
+- [x] **BH-9b** Fixture `test/integration/include_basic/` (`main.sv0` includes
+  `helper.sv0` → exit 42). Gated single-file on **both** pipelines: native via
+  `scripts/pc3b6-native-project-acceptance.sh` (file-mode wrapper), SML `one`
+  mode via `task/sv0c-milestone-1/02-integration-test.sh`.
 
 ### #10 — Native drops contracts / VM ungraceful abort (P1 / P3)
 - [ ] **BH-10a** Route `Instr::Requires`/`Ensures` through the native compose-main lowering→codegen (the codegen at `codegen.sv0:368` / `megaTU-main.sv0:800` already emits `sv0_requires`).
