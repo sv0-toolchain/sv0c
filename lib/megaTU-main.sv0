@@ -11,6 +11,92 @@
    a fixed program and asserts one item parses. Later A2 increments thread
    resolve → check → lower → emit_program over the shared arenas. */
 
+/* ── diagnostics (BH-8 Slice 0) ──────────────────────────────
+   The checker populates a flat `diag_sink` of (code, span_tok) pairs (span_tok
+   = -1 when unknown). Map each code to its `Exxxx` string + a short message,
+   resolve the token to a 1-based (line, col), and format via diagnostic.sv0's
+   SML-parity formatters into one stderr write. */
+
+fn megatu_diag_code_str(code: i32) -> string {
+    if code == 400 { return "E0400"; }
+    if code == 300 { return "E0300"; }
+    if code == 301 { return "E0301"; }
+    if code == 307 { return "E0307"; }
+    if code == 409 { return "E0409"; }
+    if code == 429 { return "E0429"; }
+    return "E0000";
+}
+
+fn megatu_diag_code_msg(code: i32) -> string {
+    if code == 400 { return "type mismatch"; }
+    if code == 300 { return "unbound name"; }
+    if code == 301 { return "unknown type"; }
+    if code == 307 { return "wrong number of arguments"; }
+    if code == 409 { return "contract requires an explicit return type"; }
+    if code == 429 { return "no such field"; }
+    return "error";
+}
+
+fn megatu_line_of_pos(source: string, pos: i32) -> i32 {
+    if pos < 0 { return 1; }
+    let n: i32 = string_len(source);
+    let mut line: i32 = 1;
+    let mut i: i32 = 0;
+    while i < pos {
+        if i >= n { return line; }
+        if string_char_at(source, i) == 10 { line = line + 1; }
+        i = i + 1;
+    }
+    return line;
+}
+
+fn megatu_col_of_pos(source: string, pos: i32) -> i32 {
+    if pos < 0 { return 1; }
+    let n: i32 = string_len(source);
+    let mut col: i32 = 1;
+    let mut i: i32 = 0;
+    while i < pos {
+        if i >= n { return col; }
+        if string_char_at(source, i) == 10 { col = 1; } else { col = col + 1; }
+        i = i + 1;
+    }
+    return col;
+}
+
+fn megatu_emit_diagnostics(diag_sink: Vec<i32>, source: string,
+                           starts: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(diag_sink);
+    let mut out: string = "";
+    let mut i: i32 = 0;
+    while i + 1 < n {
+        let code: i32 = vec_get(diag_sink, i);
+        let tok: i32 = vec_get(diag_sink, i + 1);
+        let mut line: i32 = 1;
+        let mut col: i32 = 1;
+        if tok >= 0 {
+            if tok < vec_len(starts) {
+                let pos: i32 = vec_get(starts, tok);
+                line = megatu_line_of_pos(source, pos);
+                col = megatu_col_of_pos(source, pos);
+            }
+        }
+        let header: string = format_header_with_code(0,
+            megatu_diag_code_msg(code), megatu_diag_code_str(code));
+        out = string_concat(out, header);
+        out = string_concat(out, "\n");
+        out = string_concat(out, format_location("", line, col));
+        out = string_concat(out, "\n");
+        let snip: string = format_snippet(source, line, col, 1);
+        if string_len(snip) > 0 {
+            out = string_concat(out, snip);
+            out = string_concat(out, "\n");
+        }
+        i = i + 2;
+    }
+    if string_len(out) > 0 { write_file("/dev/stderr", out); }
+    return 0;
+}
+
 fn main() -> i32 {
     let source: string = "enum Opt { None, Some(i32) } fn main() -> i32 { let o: Opt = Opt::Some(5); return match o { Opt::None => 0, Opt::Some(x) => x }; }";
 
@@ -78,11 +164,15 @@ fn main() -> i32 {
        (Reconciled: a tailless block whose last stmt is `return` now types as
        TY_VAR and unifies with the declared return type — see checker.sv0.) */
     let tp: Vec<i32> = vec_new();
+    let diag_sink: Vec<i32> = vec_new();
     let cr: i32 = check_program(tags, source, starts, ends, pp,
         it, id1, id2, id3, id4, id5,
         fpn, fpt, frt, ptt, ptd1, ptd2, ptd3,
-        bet, bed1, bed2, bed3, bed4, tp, 0);
-    if cr != 0 { return 4; }
+        bet, bed1, bed2, bed3, bed4, tp, 0, diag_sink);
+    if cr != 0 {
+        megatu_emit_diagnostics(diag_sink, source, starts);
+        return 4;
+    }
 
     /* Phase 5: lower (real lowering.sv0) — parse arenas -> IR out_blocks; returns
        the typedefs string. item_field_counts (ifc) is the struct field count /
