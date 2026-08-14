@@ -91,9 +91,17 @@ walk as Slice 0, restricted to **literal** inits (`infer_lit` is trustworthy;
 non-literal inits await tighter inference). Case `let_type_mismatch.sv0`, gated
 SML + native.
 
-### Slice 2 — BH-8e unknown type annotation (E0301)
-Reject a `TyName` that resolves to neither a builtin nor a registered
-struct/enum. + case.
+### Slice 2 — resolver diagnostics: E0301 / E0300 / E0307 — DONE
+Reframed from a checker-side E0301: unknown-type, unbound, and arity are all
+*name-resolution* diagnostics, and `resolve_program` **already returns the exact
+code** (301/300/307/306/309) — the compose main was discarding it as a bare
+`exit 3`. So Slice 2 is entirely in `megaTU-main.sv0`: on `rr != 0`, map the code
+→ `Exxxx` + message and emit via the existing formatter. No checker/resolver
+change, no golden churn. A checker-side E0301 off the let head-token was rejected
+as unsafe (can't tell `Vec<i32>` from bare `Widget` without the pty arena's
+type-arg count); the resolver path uses the pty arena and handles generics
+correctly. Cases `unknown_type.sv0` / `unbound_name.sv0` / `wrong_arity.sv0`,
+dual-gated. This also discharges the old **Slice 4 (BH-8g)**.
 
 ### Slice 3 — BH-8d field existence (E0429)
 In the ExprField synth arm, look up the field in the struct definition; push

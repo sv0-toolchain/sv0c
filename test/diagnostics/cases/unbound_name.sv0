@@ -1,0 +1,2 @@
+/* BH-8 Slice 2 — unbound identifier. `y` is never bound: E0300 (resolver). */
+fn main() -> i32 { return y; }
