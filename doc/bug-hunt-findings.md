@@ -777,7 +777,15 @@ Sliced:
   native. (Handles the unknown-type case via the pty arena, so generics like
   `Vec<i32>` correctly resolve to `TY_NAMED`, not "unknown" — the head-token
   approach a checker-side E0301 would have needed was unsafe here.)
-- [ ] **BH-8d** Field-existence check in ExprField synth. → E0429.
+- [x] **BH-8d (Slice 3)** ✅ Field-existence → E0429. The ExprField synth arm
+  returned `TY_INT()` unconditionally and the env carries no struct *identity*, so
+  this is done as a focused pass in `check_program` (which holds the `sdef_*`
+  struct tables + pty arena): for a top-level `<param>.<field>` where the
+  parameter is a **bare struct** (resolved from its signature type root) and the
+  struct lacks that field, push E0429. Deliberately narrow (single-seg ExprPath
+  object, bare-`TyName` param — refs/generics/locals skipped) so the corpus's
+  pervasive valid field access is never misflagged (corpus-parity stayed 98/98).
+  Case `field_missing.sv0`, dual-gated.
 - [ ] **BH-8a** Each slice appends its `rel|code` row to
   `test/diagnostics/manifest.txt`, gated on both SML + native. *(overlaps BH-X2)*
 

@@ -103,9 +103,16 @@ type-arg count); the resolver path uses the pty arena and handles generics
 correctly. Cases `unknown_type.sv0` / `unbound_name.sv0` / `wrong_arity.sv0`,
 dual-gated. This also discharges the old **Slice 4 (BH-8g)**.
 
-### Slice 3 — BH-8d field existence (E0429)
-In the ExprField synth arm, look up the field in the struct definition; push
-E0429 if absent. + case.
+### Slice 3 — BH-8d field existence (E0429) — DONE
+The ExprField synth arm returned `TY_INT()` unconditionally, and the env stores
+no struct *identity* (only `TY_STRUCT`). Rather than add struct-identity tracking
+to the env + thread struct tables through `synth_expr` (72 sites), the check runs
+as a focused pass in `check_program` — which already holds the `sdef_*` struct
+tables and the pty arena. For a top-level `<param>.<field>` whose parameter is a
+**bare struct** (name recovered from its signature type root, refs/generics
+excluded) and whose struct lacks the field, push E0429. Narrow by construction so
+the corpus's heavy valid field access is never misflagged; corpus-parity stayed
+98/98. Case `field_missing.sv0`.
 
 ### Slice 4 — E0300 unbound / E0307 arity (messages)
 Route the resolver's existing rejections through the diagnostic layer (code +

@@ -2271,11 +2271,186 @@ fn build_mod_env(
     return 0;
 }
 
-/* ── check_program (SML check — program-level orchestration) ─
-   After init_struct_defs + init_enum_defs + register_all_item_fns +
-   build_mod_env, walks each ItemFn (tag 0) and runs check_fn_body
-   with that item's id4 body root in the shared body_et arena.
-   Returns 0 on success, -1 on setup or any function failure.     */
+/* ── field-existence check (BH-8d / Slice 3) ─────────────────
+   Tri-state field lookup by name: 1 = the struct named `tname` exists and has a
+   field named `fname`; 0 = the struct exists but has no such field (-> E0429);
+   -1 = `tname` is not a known struct (skip — could be an enum/primitive/generic
+   or a type we cannot resolve, so make no claim). String-keyed because the def
+   table and the access site carry different tokens for the same name. */
+fn struct_field_status(sdef_names: Vec<i32>,
+                       sdef_field_offsets: Vec<i32>,
+                       sdef_field_counts: Vec<i32>,
+                       sdef_fnames_flat: Vec<i32>,
+                       source: string, starts: Vec<i32>, ends: Vec<i32>,
+                       tname: string, fname: string) -> i32 {
+    let ns: i32 = vec_len(sdef_names);
+    let mut s: i32 = 0;
+    while s < ns {
+        let ntok: i32 = vec_get(sdef_names, s);
+        let nsx: i32 = vec_get(starts, ntok);
+        let nex: i32 = vec_get(ends, ntok);
+        let sn: string = string_substr(source, nsx, nex - nsx);
+        if string_eq(sn, tname) {
+            let off: i32 = vec_get(sdef_field_offsets, s);
+            let cnt: i32 = vec_get(sdef_field_counts, s);
+            let mut j: i32 = 0;
+            while j < cnt {
+                let ftok: i32 = vec_get(sdef_fnames_flat, off + j);
+                let fsx: i32 = vec_get(starts, ftok);
+                let fex: i32 = vec_get(ends, ftok);
+                let fnm: string = string_substr(source, fsx, fex - fsx);
+                if string_eq(fnm, fname) { return 1; }
+                j = j + 1;
+            }
+            return 0;
+        }
+        s = s + 1;
+    }
+    return 0 - 1;
+}
+
+/* Resolve `obj_tok`'s identifier text to the struct-type name of a matching
+   parameter, or "" if `obj` is not a bare parameter of known bare-struct type.
+   param_name_toks[i] is param i's name token; param_tyname_toks[i] is its
+   type-head name token (-1 unless the param is a bare `TyName` with no type
+   args — refs/generics are intentionally excluded so we never mis-resolve). */
+fn param_struct_name_of(obj_tok: i32,
+                        param_name_toks: Vec<i32>, param_tyname_toks: Vec<i32>,
+                        source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let os: i32 = vec_get(starts, obj_tok);
+    let oe: i32 = vec_get(ends, obj_tok);
+    if oe <= os { return ""; }
+    let oname: string = string_substr(source, os, oe - os);
+    let np: i32 = vec_len(param_name_toks);
+    let mut i: i32 = 0;
+    while i < np {
+        let ptok: i32 = vec_get(param_name_toks, i);
+        let ps: i32 = vec_get(starts, ptok);
+        let pe: i32 = vec_get(ends, ptok);
+        let pnm: string = string_substr(source, ps, pe - ps);
+        if string_eq(pnm, oname) {
+            let tytok: i32 = vec_get(param_tyname_toks, i);
+            if tytok < 0 { return ""; }
+            let ts: i32 = vec_get(starts, tytok);
+            let te: i32 = vec_get(ends, tytok);
+            if te <= ts { return ""; }
+            return string_substr(source, ts, te - ts);
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+/* Walk a function body's top-level statements for `<param>.<field>` accesses
+   (in a return value or a let initializer) and push E0429 when the param's
+   struct is known but has no such field. Deliberately narrow — object must be a
+   single-segment ExprPath naming a bare-struct parameter — so valid field access
+   (the corpus does this pervasively) is never misflagged. */
+/* Per-param type-head name token, or -1 unless the param is a bare `TyName`
+   with no type args (td3==0). Refs/generics/tuples deliberately yield -1 so the
+   field check only ever fires on an unambiguous bare-struct parameter. */
+fn scan_param_tyname_toks(fn_param_ty_root: Vec<i32>, pbase: i32, param_count: i32,
+                          pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td3: Vec<i32>,
+                          pp: Vec<i32>, out: Vec<i32>) -> i32 {
+    let mut j: i32 = 0;
+    while j < param_count {
+        let root: i32 = vec_get(fn_param_ty_root, pbase + j);
+        let mut tok: i32 = 0 - 1;
+        if root >= 0 {
+            if root < vec_len(pty_tt) {
+                if vec_get(pty_tt, root) == 0 {
+                    if vec_get(pty_td3, root) == 0 {
+                        let pps: i32 = vec_get(pty_td1, root);
+                        if pps >= 0 {
+                            if pps < vec_len(pp) {
+                                tok = vec_get(pp, pps);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        vec_push(out, tok);
+        j = j + 1;
+    }
+    return 0;
+}
+
+fn field_access_check_node(fnode: i32,
+                           bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                           bpp: Vec<i32>,
+                           param_name_toks: Vec<i32>, param_tyname_toks: Vec<i32>,
+                           sdef_names: Vec<i32>, sdef_field_offsets: Vec<i32>,
+                           sdef_field_counts: Vec<i32>, sdef_fnames_flat: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>,
+                           diag_sink: Vec<i32>) -> i32 {
+    if fnode < 0 { return 0; }
+    if fnode >= vec_len(bet) { return 0; }
+    if vec_get(bet, fnode) != 6 { return 0; }
+    let obj: i32 = vec_get(bed1, fnode);
+    if obj < 0 { return 0; }
+    if vec_get(bet, obj) != 1 { return 0; }
+    if vec_get(bed2, obj) != 1 { return 0; }
+    let obj_pps: i32 = vec_get(bed1, obj);
+    if obj_pps < 0 { return 0; }
+    if obj_pps >= vec_len(bpp) { return 0; }
+    let obj_tok: i32 = vec_get(bpp, obj_pps);
+    let tname: string = param_struct_name_of(obj_tok, param_name_toks,
+                                             param_tyname_toks, source, starts, ends);
+    if string_len(tname) == 0 { return 0; }
+    let field_tok: i32 = vec_get(bed2, fnode);
+    if field_tok < 0 { return 0; }
+    let fs: i32 = vec_get(starts, field_tok);
+    let fe: i32 = vec_get(ends, field_tok);
+    if fe <= fs { return 0; }
+    let fname: string = string_substr(source, fs, fe - fs);
+    let status: i32 = struct_field_status(sdef_names, sdef_field_offsets,
+                                          sdef_field_counts, sdef_fnames_flat,
+                                          source, starts, ends, tname, fname);
+    if status == 0 {
+        vec_push(diag_sink, 429);
+        vec_push(diag_sink, field_tok);
+    }
+    return 0;
+}
+
+fn check_body_field_access(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                           bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>,
+                           body_root: i32,
+                           param_name_toks: Vec<i32>, param_tyname_toks: Vec<i32>,
+                           sdef_names: Vec<i32>, sdef_field_offsets: Vec<i32>,
+                           sdef_field_counts: Vec<i32>, sdef_fnames_flat: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>,
+                           diag_sink: Vec<i32>) -> i32 {
+    if body_root < 0 { return 0; }
+    if body_root >= vec_len(bet) { return 0; }
+    if vec_get(bet, body_root) != 9 { return 0; }
+    let sfirst: i32 = vec_get(bed1, body_root);
+    let scount: i32 = vec_get(bed2, body_root);
+    let sidecar: i32 = vec_get(bed4, body_root);
+    let mut si: i32 = 0;
+    while si < scount {
+        let st: i32 = block_stmt_index(bpp, sfirst, sidecar, si);
+        let stag: i32 = vec_get(bet, st);
+        /* return <field-access> */
+        let mut fnode: i32 = 0 - 1;
+        if stag == 15 { fnode = vec_get(bed1, st); }
+        if stag == 28 {
+            let inner: i32 = vec_get(bed1, st);
+            if inner >= 0 {
+                if vec_get(bet, inner) == 15 { fnode = vec_get(bed1, inner); }
+            }
+        }
+        /* let x = <field-access> */
+        if stag == 27 { fnode = vec_get(bed3, st); }
+        let _r: i32 = field_access_check_node(fnode, bet, bed1, bed2, bpp,
+                          param_name_toks, param_tyname_toks,
+                          sdef_names, sdef_field_offsets, sdef_field_counts,
+                          sdef_fnames_flat, source, starts, ends, diag_sink);
+        si = si + 1;
+    }
+    return 0;
+}
 
 fn check_program(
     tok_tags: Vec<i32>,
@@ -2406,6 +2581,20 @@ fn check_program(
                                           edef_vshapes_flat,
                                           fn_names, fn_ret_types,
                                           diag_sink);
+            /* BH-8d (Slice 3): flag `<param>.<field>` on a bare-struct parameter
+               whose struct has no such field (E0429). Runs in check_program
+               where the sdef_* struct tables + pty arena live, avoiding a deep
+               synth_expr thread; strictly narrower than check_fn_body so it never
+               misflags valid access. */
+            let param_tyname_toks: Vec<i32> = vec_new();
+            let _ptn: i32 = scan_param_tyname_toks(fn_param_ty_root, pbase,
+                                param_count, pty_tt, pty_td1, pty_td3, pp,
+                                param_tyname_toks);
+            let _rfa: i32 = check_body_field_access(body_et, body_ed1, body_ed2,
+                                body_ed3, body_ed4, bpp, body_root_idx,
+                                param_name_pos, param_tyname_toks,
+                                sdef_names, sdef_field_offsets, sdef_field_counts,
+                                sdef_fnames_flat, source, starts, ends, diag_sink);
             if chk != 0 { return 0 - 1; }
         }
         ii = ii + 1;
