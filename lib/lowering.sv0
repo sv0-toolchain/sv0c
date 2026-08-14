@@ -2462,31 +2462,42 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 }
             }
         }
+        /* Body-only (no pattern binds prepended). `th` is assembled below as
+           binds → (guard | body) so the pattern var is bound BEFORE the guard
+           evaluates it — previously the binds lived inside body_is, which the
+           guard test wrapped, so a guard referenced the bind before it existed
+           (invalid C). */
         let mut body_is: Vec<i32> = vec_new();
-        let bli: i32 = vec_len(bind_instrs);
-        let mut bi: i32 = 0;
-        while bi < bli {
-            vec_push(body_is, vec_get(bind_instrs, bi));
-            bi = bi + 1;
-        }
         let discard_body: i32 = lower_into_var_instrs(et, ed1, ed2, ed3, ed4, pp,
                                   tok_tags, body_idx, out_var, ctr, body_is,
                                   enum_names, enum_tag_offsets, enum_tag_counts,
                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, arm_menv, import_aliases);
-        let mut th: Vec<i32> = body_is;
+        let mut th: Vec<i32> = vec_new();
+        let bli: i32 = vec_len(bind_instrs);
+        let mut bi: i32 = 0;
+        while bi < bli {
+            vec_push(th, vec_get(bind_instrs, bi));
+            bi = bi + 1;
+        }
         if guard_idx >= 0 {
-            let mut guard_is: Vec<i32> = vec_new();
+            /* guard preamble appends to th (after the binds); the guard test then
+               wraps the body-only instrs. */
             let ge: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
                                                    tok_tags, guard_idx, ctr,
-                                                   guard_is, enum_names,
+                                                   th, enum_names,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx,
                                                    builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, arm_menv, import_aliases);
             let guard_if: Instr = Instr::IfElse(box_new(ge), body_is,
                                                   result_instrs);
-            vec_push(guard_is, box_new(guard_if));
-            th = guard_is;
+            vec_push(th, box_new(guard_if));
+        } else {
+            let mut bj: i32 = 0;
+            while bj < vec_len(body_is) {
+                vec_push(th, vec_get(body_is, bj));
+                bj = bj + 1;
+            }
         }
         let arm_if: Instr = Instr::IfElse(box_new(cexp), th, result_instrs);
         let mut new_result: Vec<i32> = vec_new();

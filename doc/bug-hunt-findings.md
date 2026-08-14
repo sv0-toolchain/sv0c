@@ -32,7 +32,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 | 10 | All runtime contracts dropped on native; VM aborts ungracefully | P1 / P3 | native / VM |
 | 11 | `?` / enum-return / tuple / nested-struct silently mis-emit | P1/P2 | native | ⚠️ enum-return **FIXED** (BH-11b); `?`/tuple/nested-struct open |
 | 12 | Variable shadowing → invalid C (redeclare) + VM scope leak | P2 | SML + native + VM |
-| 13 | Match guards → invalid C (guard evaluated before binding) | P2 | SML + native |
+| 13 | Match guards → invalid C (guard evaluated before binding) | P2 | SML + native | ✅ **FIXED** (sv0c) — also fixed native catch-all bind arms |
 
 **Two systemic stories:**
 
@@ -532,9 +532,27 @@ block bindings (#6).
 
 ---
 
-## 13. Match guards (`pat if cond => …`) emit invalid C on both C backends — **P2 (SML + native)**
+## 13. Match guards (`pat if cond => …`) emit invalid C on both C backends — **P2 (SML + native)** — ✅ FIXED (sv0c)
 
-**Files:** `sml-legacy/ir/lowering.sml` / `lib/lowering.sv0` match lowering.
+**Files:** `sml-legacy/ir/lowering.sml` / `lib/lowering.sv0` match lowering; `lib/checker.sv0` (native).
+
+> **Fixed 2026-08-12.** Two defects, both closed:
+> 1. **Lowering order (both C backends):** `lowerMatchArms` / `lower_match_arms`
+>    put the pattern bind *inside* the guard's then-branch (`th = guard_pre @
+>    [if guard then (bind; body)]`), so the guard referenced the bind before it
+>    was declared. Now the bind comes first: `th = bind @ guard_pre @ [if guard
+>    then body else next]`. Byte-identical for non-guard arms (so the corpus /
+>    self-host loop are unaffected).
+> 2. **Native checker gap (broader):** the native checker never bound a
+>    *top-level* PatBind (`arm_pt == 1`), so not only guards but **every**
+>    catch-all `x => …` arm failed to type-check (silent exit 4). Added the
+>    PatBind case (bind the arm's `ed2` token with the scrutinee's type).
+>
+> Fixture `test/integration/match_guard/` (guards + catch-all bind → exit 42) on
+> native `--project`, native single-file, and SML. checker + lowering stage0 +
+> vm-parity goldens refreshed; full gate green. *(NB: the self-host-loop runs
+> `driver.sv0`'s binary against the ambient `/tmp/.sv0_drv_path`; a stale guard
+> program there fails it spuriously — a pre-existing gate fragility, not this fix.)*
 
 ```sv0
 fn classify(n: i32) -> i32 { return match n { x if x > 10 => 42, _ => 0 }; }
@@ -718,9 +736,10 @@ sv0c goldens.
 - [ ] **BH-12b** VM: give each shadowing `let` a fresh slot so an inner block shadow doesn't clobber the outer. Pairs with BH-6a.
 - [ ] **BH-12c** Add shadowing fixtures (sequential same-block + nested-block) across all three backends → exit 42.
 
-### #13 — Match guards invalid C (P2)
-- [ ] **BH-13a** Match lowering (SML `lowering.sml` + native `lowering.sv0`): emit the guard test **after** binding the pattern variable (bind → test guard → arm body).
-- [ ] **BH-13b** Add a match-guard fixture (`x if x > 10 => …`) → exit 42 on all backends.
+### #13 — Match guards invalid C (P2) — ✅ DONE (sv0c)
+- [x] **BH-13a** Match lowering (SML `lowering.sml` + native `lowering.sv0`): bind → guard → body (bind now precedes the guard test).
+- [x] **BH-13a2** Native checker (`lib/checker.sv0`): bind a top-level PatBind (`arm_pt == 1`) into the env — fixes catch-all `x => …` arms (which failed check) in addition to guards.
+- [x] **BH-13b** Fixture `match_guard` (guards + catch-all bind → exit 42) on native `--project` + native single-file + SML.
 
 ### Cross-cutting
 - [ ] **BH-X1** Build a behavioral 3-way differential harness (SML→C run vs SML→VM run vs native→C run) over a feature+arithmetic battery; wire into `./scripts/sv0 test`. Catches #1, #2, #8, #10, #12, #13 as regressions.

@@ -1221,13 +1221,16 @@ structure Lowering :> LOWERING = struct
           val isLast = null rest
           val next = if isLast then [] else lowerMatchArms out scrVar scrCty rest
           val (cpre, cexp, bindPre) = matchArmSetup pat scrVar scrCty
-          val bodyIs = bindPre @ lowerIntoVarInstrs body out
+          val bodyOnly = lowerIntoVarInstrs body out
+          (* Bind the pattern var(s) BEFORE the guard so the guard can reference
+             them (previously bindPre was inside the guard's then-branch, so the
+             guard used the bind before it was declared → invalid C). *)
           val th =
             case guard of
-              NONE => bodyIs
+              NONE => bindPre @ bodyOnly
             | SOME g =>
                 let val (gi, ge) = lowerExprWithInstrs g
-                in gi @ [Ir.IfElse (ge, bodyIs, next)] end
+                in bindPre @ gi @ [Ir.IfElse (ge, bodyOnly, next)] end
         in
           cpre @ [Ir.IfElse (cexp, th, next)]
         end
