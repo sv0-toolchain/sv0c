@@ -1,0 +1,5 @@
+/* BH-8 Slice 3 (BH-8d) — access to a nonexistent struct field. `Point` has x/y
+   but not z, so `p.z` is E0429 on both SML and native. */
+struct Point { x: i32, y: i32 }
+fn get(p: Point) -> i32 { return p.z; }
+fn main() -> i32 { return 0; }
