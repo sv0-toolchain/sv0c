@@ -360,6 +360,30 @@ fn error_code_pat_or_unsupported() -> string { return "E0306"; }
 fn error_code_wrong_arity() -> string { return "E0307"; }
 fn error_code_use_clause() -> string { return "E0309"; }
 
+/* ── diagnostic span packing (span fidelity) ──────────────────
+   The resolve* functions signal an error by returning a numeric code, which
+   propagates up unchanged through `if r != 0 { return r; }`. To carry the
+   offending source TOKEN out to the compose main for a real (line, col) —
+   without threading a span param through resolve_expr's 56 call sites — fold the
+   token into that return value: packed = code*1000000 + (tok+1). code stays in
+   [300,999]; tok in [0,999999], else -1 (default span). Any real code packs
+   nonzero, so success (0) is still distinguishable. Bare codes (< 1000, from
+   sites that do not pack) decode to themselves with tok = -1. */
+fn diag_pack(code: i32, tok: i32) -> i32 {
+    let mut t: i32 = tok;
+    if t < 0 { t = 0 - 1; }
+    if t >= 1000000 { t = 0 - 1; }
+    return code * 1000000 + t + 1;
+}
+fn diag_code_of(packed: i32) -> i32 {
+    if packed < 1000 { return packed; }
+    return packed / 1000000;
+}
+fn diag_tok_of(packed: i32) -> i32 {
+    if packed < 1000 { return 0 - 1; }
+    return packed - (packed / 1000000) * 1000000 - 1;
+}
+
 /* ── arity checking ─────────────────────────────────────────── */
 
 fn arity_matches(expected: i32, actual: i32) -> bool {
@@ -617,7 +641,7 @@ fn resolve_ty(tt: Vec<i32>, td1: Vec<i32>, td2: Vec<i32>,
         let ps: string = path_join_vec(source, starts, ends, path);
         if res_type_exists(mod_tys, ps, source, starts, ends) != true {
             if res_is_prelude_type(ps) != true {
-                return 301;
+                return diag_pack(301, vec_get(pp, pps));
             }
         }
         let mut ti: i32 = 0;
@@ -809,7 +833,7 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 return 0;
             }
         }
-        return 300;
+        return diag_pack(300, vec_get(pp, pps));
     }
     if tag == 2 {
         return resolve_expr(et, ed1, ed2, ed3, ed4, vec_get(ed2, idx),
@@ -890,7 +914,7 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let arity: i32 = res_lookup_fn_arity_str(fn_arities, cps,
                                                       source, starts, ends);
             if arity >= 0 {
-                if arity != args_count { return 307; }
+                if arity != args_count { return diag_pack(307, vec_get(pp, cpps)); }
             }
         }
         let rf: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, callee,
@@ -1958,8 +1982,8 @@ fn test_resolve_ty_simple() -> i32 {
     if resolve_ty(tt, td1, td2, td3, 1,
                    source, starts, ends, mt, vec_new(), pp) != 0 { return 2; }
     let mt2: Vec<i32> = vec_new();
-    if resolve_ty(tt, td1, td2, td3, 1,
-                   source, starts, ends, mt2, vec_new(), pp) != 301 { return 3; }
+    if diag_code_of(resolve_ty(tt, td1, td2, td3, 1,
+                   source, starts, ends, mt2, vec_new(), pp)) != 301 { return 3; }
     return 0;
 }
 
@@ -2083,8 +2107,8 @@ fn test_resolve_expr_path() -> i32 {
     vec_push(pp, 1);
     vec_push(et, 1); vec_push(ed1, 1); vec_push(ed2, 1);
     vec_push(ed3, 0); vec_push(ed4, 0);
-    if resolve_expr(et, ed1, ed2, ed3, ed4, 1, source, starts, ends,
-                     mv, mt, fa, frames, pp) != 300 { return 2; }
+    if diag_code_of(resolve_expr(et, ed1, ed2, ed3, ed4, 1, source, starts, ends,
+                     mv, mt, fa, frames, pp)) != 300 { return 2; }
     return 0;
 }
 
@@ -2149,8 +2173,8 @@ fn test_resolve_expr_call_arity() -> i32 {
                      mv, mt, fa, frames, pp) != 0 { return 1; }
     vec_push(et, 4); vec_push(ed1, 0); vec_push(ed2, 1);
     vec_push(ed3, 1); vec_push(ed4, 0);
-    if resolve_expr(et, ed1, ed2, ed3, ed4, 4, source, starts, ends,
-                     mv, mt, fa, frames, pp) != 307 { return 2; }
+    if diag_code_of(resolve_expr(et, ed1, ed2, ed3, ed4, 4, source, starts, ends,
+                     mv, mt, fa, frames, pp)) != 307 { return 2; }
     return 0;
 }
 
@@ -2267,7 +2291,7 @@ fn test_apply_use_clause_unknown() -> i32 {
     let r: i32 = apply_use_clause(it, id1, id2, 0,
                                    source, starts, ends,
                                    mv, mt, fa, pp);
-    if r != 309 { return 1; }
+    if diag_code_of(r) != 309 { return 1; }
     return 0;
 }
 
@@ -2525,7 +2549,7 @@ fn test_resolve_top_item_enum_payload_type() -> i32 {
                                    enum_payload_base, enum_payload_count,
                                    pty_tt, pty_td1, pty_td2, pty_td3, sf_root,
                                    source, starts, ends, mv, mt, fa, pp);
-    if r != 301 { return 1; }
+    if diag_code_of(r) != 301 { return 1; }
     return 0;
 }
 
@@ -2669,7 +2693,7 @@ fn test_resolve_program_cast_type_roots() -> i32 {
                                   pty_tt, pty_td1, pty_td2, pty_td3, sf_tr,
                                   source, starts, ends,
                                   mv, mt, fa, pp);
-    if r1 != 301 { return 1; }
+    if diag_code_of(r1) != 301 { return 1; }
     vec_push(mt, 1);
     let r2: i32 = resolve_program(et, ed1, ed2, ed3, ed4,
                                   it, id1, id2, id3, id4, id5,
