@@ -1,0 +1,12 @@
+/* BH-12 — `let` shadowing must work, not emit redeclared C.
+   x: sequential same-block shadow (x = 10, then x = x + 32 = 42).
+   a: nested-block shadow (inner a=40 is discarded; the outer a=1 survives).
+   Result = (42-42) + 1(outer a) + 2(b) + 39 = 42. */
+fn main() -> i32 {
+    let x: i32 = 10;
+    let x: i32 = x + 32;
+    let a: i32 = 1;
+    { let a: i32 = 40; }
+    let b: i32 = 2;
+    return (x - 42) + a + b + 39;
+}
