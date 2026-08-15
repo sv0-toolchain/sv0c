@@ -836,9 +836,28 @@ Sliced:
 - [ ] **BH-11d** Nested structs (multi-slot sub-struct fields) on native + VM: support, or a clean diagnostic (see `span.sv0`).
 
 ### #12 — Shadowing invalid C + VM leak (P2)
-- [ ] **BH-12a** C emit (SML `lowering.sml` + native `lowering.sv0`): rename shadowed `let` bindings to fresh C identifiers (or nest each in its own block).
-- [ ] **BH-12b** VM: give each shadowing `let` a fresh slot so an inner block shadow doesn't clobber the outer. Pairs with BH-6a.
-- [ ] **BH-12c** Add shadowing fixtures (sequential same-block + nested-block) across all three backends → exit 42.
+- [x] **BH-12a native** ✅ (sv0c `40667e4`) Native C: a shadowing pre-pass in
+  `megaTU-main.sv0` (`assign_shadow_indices` + `sh_walk`, a scope-stack arena
+  walk) assigns each local-var name token a shadow index = number of currently
+  **live** bindings of that name (0 = first). The emit (`megatu_val_name`)
+  renders index N>0 as `<name>_N`; a `let` initializer is walked before the new
+  binding is pushed, so `let x = x + 32` reads the old `x`. Live-depth (not a
+  persistent counter) keeps disjoint sibling bindings at 0, so non-shadowing code
+  is byte-identical → no golden churn, corpus-parity 98/98.
+- [ ] **BH-12a SML→C reference** (`sml-legacy/ir/lowering.sml`): mirror via a
+  `shadowStack` scope ref + `shadowLoc`/`shadowAlias`/`withShadowScope` (helpers
+  drafted). Apply at the ~4 parallel expr-lowering variants: wrap each ExprBlock
+  in `withShadowScope`; `shadowLoc` at the `Ir.VVar x`/`Ir.Load x` reference sites
+  and assign-LHS/`old`; at `lowerStmt`'s `StmtLet`, rebind the pattern name to
+  `shadowAlias` and `shadowBind` after lowering init. Bootstrap has no live
+  shadows so goldens should not shift — **must validate the full self-host-loop**
+  (this is the reference compiler).
+- [ ] **BH-12b** VM (`VmCodegen.sml`): give each shadowing `let` a fresh slot so
+  an inner-block shadow doesn't clobber the outer (the "returns 81" leak). Pairs
+  with BH-6a.
+- [x] **BH-12c native** ✅ Fixture `test/integration/shadowing/` (sequential `x` +
+  nested-block `a` → 42), gated on native `--project` (pc3b6). SML `one`-mode +
+  VM gates to be added with BH-12a-SML / BH-12b.
 
 ### #13 — Match guards invalid C (P2) — ✅ DONE (sv0c)
 - [x] **BH-13a** Match lowering (SML `lowering.sml` + native `lowering.sv0`): bind → guard → body (bind now precedes the guard test).
