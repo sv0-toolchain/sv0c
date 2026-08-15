@@ -164,13 +164,14 @@ fn main() -> i32 {
         source, starts, ends, mv, mt, fa, pp);
     if rr != 0 {
         /* resolve_program returns the specific error CODE (300 unbound / 301
-           unknown type / 306 unsupported pat / 307 arity / 309 use clause), not
-           a bare flag. Surface it as an Exxxx diagnostic (BH-8: E0300/E0301/
-           E0307 were previously a silent exit 3). No span is threaded from the
-           resolver yet, so the token defaults (line 1). */
+           unknown type / 306 unsupported pat / 307 arity / 309 use clause) with
+           the offending source token packed in (diag_pack) where available.
+           Unpack both for a real (line, col); a bare code decodes with tok -1
+           (default span). Surfaces E0300/E0301/E0307 (previously a silent
+           exit 3). */
         let rdiag: Vec<i32> = vec_new();
-        vec_push(rdiag, rr);
-        vec_push(rdiag, 0 - 1);
+        vec_push(rdiag, diag_code_of(rr));
+        vec_push(rdiag, diag_tok_of(rr));
         megatu_emit_diagnostics(rdiag, source, starts);
         return 3;
     }

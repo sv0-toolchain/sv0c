@@ -129,6 +129,23 @@ Each slice appends its row to `test/diagnostics/manifest.txt` with the code
 needle, gated on **both** SML (existing verifier) and native (Slice 0's twin).
 This incrementally discharges BH-8a / BH-X2 (expand the fail corpus).
 
+## Span fidelity (follow-up) — DONE for the resolver diagnostics
+
+The resolver-sourced diagnostics (E0300/E0301/E0307) originally emitted a default
+1:1 span because `resolve_program` returns only a numeric code. Rather than thread
+a span param through `resolve_expr`'s 56 call sites, the offending token is
+**packed into the return value**: `diag_pack(code, tok) = code*1000000 + tok+1`.
+The code rides the existing `if r != 0 { return r; }` propagation untouched; the
+compose main unpacks `diag_code_of` / `diag_tok_of` → real (line, col). Packed at
+the three gated sites (unbound `pp[pps]`, unknown-type `pp[pps]`, arity
+`pp[cpps]`); other coded sites stay bare and decode to a default span. **Gotcha:**
+resolver self-tests that assert an exact code (`resolve_expr(...) != 300`) must be
+wrapped in `diag_code_of(...)` or the packed value fails the compare and the
+module RUNFAILs in corpus-parity — found `test_resolve_expr_path` (300) and
+`test_resolve_expr_call_arity` (307) this way. Still default-span: the
+checker-side E0400 *literal* return/init (an `ExprLit` has no path token) and the
+non-gated resolver sites.
+
 ## Dominant risk & mitigation
 
 `checker.sv0` is a bootstrap module: every edit shifts its stage0
