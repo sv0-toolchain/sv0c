@@ -1,0 +1,6 @@
+/* BH-10c — a runtime `requires` violation must abort CLEANLY on the VM
+   (message + exit 1), not as an uncaught SML exception. `f(-5)` violates
+   `requires(x > 0)`. On SML->C the runtime aborts with exit 1 too; native->C
+   currently drops the check (BH-10a). */
+fn f(x: i32) -> i32 requires(x > 0) { return x + 100; }
+fn main() -> i32 { return f(0 - 5); }

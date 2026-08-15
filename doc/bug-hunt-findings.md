@@ -808,7 +808,11 @@ Sliced:
 ### #10 — Native drops contracts / VM ungraceful abort (P1 / P3)
 - [ ] **BH-10a** Route `Instr::Requires`/`Ensures` through the native compose-main lowering→codegen (the codegen at `codegen.sv0:368` / `megaTU-main.sv0:800` already emits `sv0_requires`).
 - [ ] **BH-10b** Add a native runtime contract-violation fixture (`requires`/`ensures` violated → clean abort, exit 1).
-- [ ] **BH-10c** `interpreter.sml:484`: replace the uncaught `Fail` with a clean contract-violation abort (message + exit code) matching the C runtime.
+- [x] **BH-10c** ✅ `interpreter.sml`: a runtime contract violation now raises a
+  dedicated `ContractViolation` exception caught in `runWithStack`, which prints
+  `sv0 contract violation: <msg>` to stderr and returns exit code 1 — a clean
+  abort (and a proper `vm_exit:1`), not an uncaught `Fail`. Fixture
+  `test/integration/contract_violation/` gated on the sv0vm harness (→ vm_exit:1).
 
 ### #11 — Native `?` / enum-ret / tuple / nested-struct mis-emit (P1/P2)
 - [ ] **BH-11a** Fix `?` (ExprTry): (a) add the `?` postfix case to `parse_postfix_expr` (token 34 → tag-22 `ExprTry(inner)`) — *trivial, but insufficient alone*; (b) give `lower_tag_try` operand-type resolution for **bound variables** (`o?` where `o` is a param/local of enum type) — it currently only handles call / 2-seg-path operands and bails to `VUnit` otherwise, so (a) without (b) makes `?` silently wrong. **Deferred** — needs a lowering-side operand→enum-type lookup (params via `id5`/`fpn`/`fpt`; locals need a var→type map). Diagnosed 2026-08-12; see finding #11.
