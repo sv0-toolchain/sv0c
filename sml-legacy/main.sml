@@ -34,6 +34,7 @@ structure Main = struct
       val ast = Checker.check ast
       val ast = ContractAnalyzer.analyze ast
       val ast = Link.stripLinkDirectives ast
+      val ast = ShadowRename.renameProgram ast
       val ir = Lowering.lower ast
       val cCode = Codegen.emit ir
     in
@@ -68,6 +69,7 @@ structure Main = struct
       val ast = Checker.check ast
       val ast = ContractAnalyzer.analyze ast
       val ast = Link.stripLinkDirectives ast
+      val ast = ShadowRename.renameProgram ast
       val ir = Lowering.lower ast
       val bytes = VmCodegen.emit (ast, ir)
       val () = OS.FileSys.mkDir "build/vm" handle OS.SysErr _ => ()

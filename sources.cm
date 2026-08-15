@@ -38,6 +38,7 @@ Group is
   sml-legacy/contract_analyzer/analyzer.sml
 
   (* IR *)
+  sml-legacy/ir/shadow_rename.sml
   sml-legacy/ir/ir.sml
   sml-legacy/ir/lowering.sig
   sml-legacy/ir/lowering.sml

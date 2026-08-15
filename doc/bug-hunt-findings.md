@@ -503,7 +503,7 @@ or an explicit "unsupported" error — never a stub/garbage emit at exit 0.
 
 ---
 
-## 12. Variable shadowing emits invalid C (redeclaration) on BOTH C backends — **P2 (SML + native; VM correct)**
+## 12. Variable shadowing emits invalid C (redeclaration) on BOTH C backends — **P2 (SML + native; VM correct)** — ✅ FIXED (all 3 backends)
 
 **Files:** `sml-legacy/ir/lowering.sml` and `lib/lowering.sv0` (C emit), + the C
 backend variable-naming.
@@ -844,27 +844,23 @@ Sliced:
   binding is pushed, so `let x = x + 32` reads the old `x`. Live-depth (not a
   persistent counter) keeps disjoint sibling bindings at 0, so non-shadowing code
   is byte-identical → no golden churn, corpus-parity 98/98.
-- [ ] **BH-12a SML→C reference** (`sml-legacy/ir/lowering.sml`): the naive
-  ref-rename mirror was **attempted and reverted** — it breaks the self-host-loop.
-  **Why it fails (learning):** unlike the native pass (which keys by distinct
-  source *tokens*), SML lowering keys locals by name *string*, and `let` is not
-  the only binding form — `match`-arm pattern bindings, `for`-loop indices, and
-  the `match` scrutinee local are declared *directly* with their source names and
-  never go through the shadow-env. Applying `shadowLoc` at every reference then
-  mis-renames references to those bindings whenever a same-named `let` alias is on
-  the stack, and match arms accumulate `let` binds on the shadow-stack without a
-  per-arm restore (observed `s_3` from three un-popped arms). So the correct SML
-  fix must integrate **all** binding forms (match/for/scrutinee, not just `let`)
-  into the scope-env and wrap each match arm in its own scope — a larger, higher-
-  risk change to the reference compiler. Deferred to a focused pass. Helpers
-  (`shadowStack`/`shadowLoc`/`shadowAlias`/`withShadowScope`/`withBlockScope`) are
-  the right primitives; the gap is coverage of the non-`let` binders.
-- [ ] **BH-12b** VM (`VmCodegen.sml`): give each shadowing `let` a fresh slot so
-  an inner-block shadow doesn't clobber the outer (the "returns 81" leak). Pairs
-  with BH-6a.
-- [x] **BH-12c native** ✅ Fixture `test/integration/shadowing/` (sequential `x` +
-  nested-block `a` → 42), gated on native `--project` (pc3b6). SML `one`-mode +
-  VM gates to be added with BH-12a-SML / BH-12b.
+- [x] **BH-12a SML→C + BH-12b VM** ✅ Both fixed by **one** AST→AST alpha-rename
+  pass, `ShadowRename.renameProgram` (`sml-legacy/ir/shadow_rename.sml`), run in
+  `main.sml` after checking and before `Lowering.lower` for **both** targets (they
+  share `Lowering.lower`, and the VM's `VmCodegen.emit` takes the same renamed
+  AST). It renames a binding to a fresh `x__N` **only** when it shadows a
+  currently-live binding of the same name, rewriting `ExprPath [x]` references to
+  the current alias; a `let x = <init>` renames its init under the pre-binding env
+  so it reads the old `x`. Crucially it participates for **every** binder — `let`,
+  match-arm patterns, `for` indices — and enters every scope (block, arm, for
+  body) with the enclosing env, so the match/for entanglement that sank the naive
+  in-lowering rename does not arise. Non-shadowing code is structurally unchanged,
+  so the (shadow-free) bootstrap corpus is **byte-identical → no golden churn**,
+  self-host-loop 98/98. This supersedes the reverted in-lowering attempt and is
+  cleaner than the native token pre-pass (one pass vs. two backends).
+- [x] **BH-12c** ✅ Fixture `test/integration/shadowing/` (sequential `x` +
+  nested-block `a` → 42), gated on **all three** backends: native `--project`
+  (pc3b6), SML `one` mode, and sv0vm (`vm_exit:42`).
 
 ### #13 — Match guards invalid C (P2) — ✅ DONE (sv0c)
 - [x] **BH-13a** Match lowering (SML `lowering.sml` + native `lowering.sv0`): bind → guard → body (bind now precedes the guard test).
