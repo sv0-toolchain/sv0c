@@ -3695,6 +3695,77 @@ fn build_builtin_map(tok_tags: Vec<i32>, source: string,
        out_enum_max — enum variant data
    Returns the typedefs string (C typedef declarations). */
 
+/* Any source token within an expr subtree (BH-10a): recurse down the leftmost
+   child to a leaf (ExprPath/ExprLit) that carries a token. Used only to locate a
+   contract clause in the token stream. Returns -1 if the subtree has no leaf
+   token (never the case for a contract condition). */
+fn expr_any_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
+                pp: Vec<i32>, idx: i32) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    if idx >= vec_len(et) { return 0 - 1; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 0 { return vec_get(ed2, idx); }
+    if tag == 1 {
+        let pps: i32 = vec_get(ed1, idx);
+        if pps < 0 { return 0 - 1; }
+        if pps >= vec_len(pp) { return 0 - 1; }
+        return vec_get(pp, pps);
+    }
+    if tag == 2 { return expr_any_tok(et, ed1, ed2, ed3, pp, vec_get(ed2, idx)); }
+    if tag == 3 { return expr_any_tok(et, ed1, ed2, ed3, pp, vec_get(ed2, idx)); }
+    if tag == 4 { return expr_any_tok(et, ed1, ed2, ed3, pp, vec_get(ed1, idx)); }
+    if tag == 5 { return expr_any_tok(et, ed1, ed2, ed3, pp, vec_get(ed1, idx)); }
+    if tag == 6 { return expr_any_tok(et, ed1, ed2, ed3, pp, vec_get(ed1, idx)); }
+    if tag == 8 { return expr_any_tok(et, ed1, ed2, ed3, pp, vec_get(ed1, idx)); }
+    return 0 - 1;
+}
+
+/* Contract clause kind for a contract-expr root (BH-10a): find a token inside the
+   expr, then scan the token stream BACKWARD to the nearest requires(83) /
+   ensures(61) / loop_invariant(73) keyword. Those keywords sit immediately before
+   the clause's `(` and never occur inside an expression, so the nearest preceding
+   one is exactly this clause's kind. The native parser stores contract roots but
+   not their kind; this recovers it without threading a kind array through the
+   whole parser. Returns 83/61/73, or -1. */
+fn contract_kw_pos_of_root(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
+                           pp: Vec<i32>, tok_tags: Vec<i32>, root: i32) -> i32 {
+    let anytok: i32 = expr_any_tok(et, ed1, ed2, ed3, pp, root);
+    if anytok < 0 { return 0 - 1; }
+    let mut t: i32 = anytok;
+    while t >= 0 {
+        let tg: i32 = vec_get(tok_tags, t);
+        if tg == 83 { return t; }
+        if tg == 61 { return t; }
+        if tg == 73 { return t; }
+        t = t - 1;
+    }
+    return 0 - 1;
+}
+
+/* A contract clause is "advanced" if its condition uses a quantifier
+   (exists=63 / forall=67) or old(80). The native emit does not yet lower those
+   (SML does), so BH-10a scopes to simple requires/ensures and DROPS advanced
+   clauses (leaving them unchecked, as before) rather than emitting invalid C.
+   Scans the clause's `( … )` range from its keyword; LPAREN=6, RPAREN=7. */
+fn contract_is_advanced(tok_tags: Vec<i32>, kw_pos: i32) -> bool {
+    let n: i32 = vec_len(tok_tags);
+    let mut t: i32 = kw_pos + 1;
+    let mut depth: i32 = 0;
+    while t < n {
+        let tg: i32 = vec_get(tok_tags, t);
+        if tg == 6 { depth = depth + 1; }
+        if tg == 7 {
+            depth = depth - 1;
+            if depth == 0 { return false; }
+        }
+        if tg == 63 { return true; }
+        if tg == 67 { return true; }
+        if tg == 80 { return true; }
+        t = t + 1;
+    }
+    return false;
+}
+
 fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
          item_field_counts: Vec<i32>, item_vmax: Vec<i32>,
@@ -3717,7 +3788,9 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          body_pp: Vec<i32>,
          tok_tags: Vec<i32>,
          out_blocks: Vec<i32>,
-         import_aliases: Vec<i32>) -> string {
+         import_aliases: Vec<i32>,
+         fn_contract_root: Vec<i32>,
+         fn_contract_base: Vec<i32>) -> string {
     /* Merge ItemUse value imports into any caller-provided alias table
        (SML lowering sees resolver importAliases ∪ synthetic use rows). */
     let discard_fill_alias: i32 = lower_fill_import_aliases_from_use_items(
@@ -3760,12 +3833,44 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
             vec_push(out_block_labels, label_h);
             let body_root: i32 = vec_get(item_d4, i);
             let instrs: Vec<i32> = vec_new();
+            /* BH-10a: route this fn's contracts to lowering. The parser stores all
+               clause roots flat in fn_contract_root[base .. base+count) (base =
+               fn_contract_base[i], count = item_d2[i]/2) without their kind;
+               recover requires(83)/ensures(61) per clause and split — loop_invariant
+               (73) is not a fn-level contract and is dropped. lower_fn then builds
+               Instr::Requires/Ensures, which the emit turns into sv0_requires/
+               sv0_ensures. Previously both were passed empty, silently dropping
+               every runtime contract. */
+            let req_roots: Vec<i32> = vec_new();
+            let ens_roots: Vec<i32> = vec_new();
+            if i < vec_len(fn_contract_base) {
+                let cbase: i32 = vec_get(fn_contract_base, i);
+                if cbase >= 0 {
+                    let ccount: i32 = vec_get(item_d2, i) / 2;
+                    let mut cj: i32 = 0;
+                    while cj < ccount {
+                        let croot: i32 = vec_get(fn_contract_root, cbase + cj);
+                        let kwpos: i32 = contract_kw_pos_of_root(body_et, body_ed1,
+                                            body_ed2, body_ed3, body_pp, tok_tags, croot);
+                        if kwpos >= 0 {
+                            if contract_is_advanced(tok_tags, kwpos) != true {
+                                let ckind: i32 = vec_get(tok_tags, kwpos);
+                                if ckind == 83 { vec_push(req_roots, croot); }
+                                else {
+                                    if ckind == 61 { vec_push(ens_roots, croot); }
+                                }
+                            }
+                        }
+                        cj = cj + 1;
+                    }
+                }
+            }
             if has_body_arenas > 0 {
                 if body_root >= 0 {
                     let discard_lf: i32 = lower_fn(body_et, body_ed1, body_ed2,
                                                     body_ed3, body_ed4, body_pp,
                                                     tok_tags, body_root, label_h,
-                                                    vec_new(), vec_new(), instrs,
+                                                    req_roots, ens_roots, instrs,
                                                     out_enum_names,
                                                     out_enum_tag_offsets,
                                                     out_enum_tag_counts,
@@ -8544,7 +8649,7 @@ fn test_lower_program_fn() -> i32 {
                              oen, oeto, oetc, oetf, oem,
                              bet, be1, be2, be3, be4, bsf,
                              bpp, ttags, oblks,
-                             vec_new());
+                             vec_new(), vec_new(), vec_new());
     if vec_len(ob) != 1 { return 1; }
     if vec_get(ob, 0) != 3 { return 2; }
     if vec_len(osn) != 1 { return 3; }
