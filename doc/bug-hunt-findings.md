@@ -844,14 +844,21 @@ Sliced:
   binding is pushed, so `let x = x + 32` reads the old `x`. Live-depth (not a
   persistent counter) keeps disjoint sibling bindings at 0, so non-shadowing code
   is byte-identical → no golden churn, corpus-parity 98/98.
-- [ ] **BH-12a SML→C reference** (`sml-legacy/ir/lowering.sml`): mirror via a
-  `shadowStack` scope ref + `shadowLoc`/`shadowAlias`/`withShadowScope` (helpers
-  drafted). Apply at the ~4 parallel expr-lowering variants: wrap each ExprBlock
-  in `withShadowScope`; `shadowLoc` at the `Ir.VVar x`/`Ir.Load x` reference sites
-  and assign-LHS/`old`; at `lowerStmt`'s `StmtLet`, rebind the pattern name to
-  `shadowAlias` and `shadowBind` after lowering init. Bootstrap has no live
-  shadows so goldens should not shift — **must validate the full self-host-loop**
-  (this is the reference compiler).
+- [ ] **BH-12a SML→C reference** (`sml-legacy/ir/lowering.sml`): the naive
+  ref-rename mirror was **attempted and reverted** — it breaks the self-host-loop.
+  **Why it fails (learning):** unlike the native pass (which keys by distinct
+  source *tokens*), SML lowering keys locals by name *string*, and `let` is not
+  the only binding form — `match`-arm pattern bindings, `for`-loop indices, and
+  the `match` scrutinee local are declared *directly* with their source names and
+  never go through the shadow-env. Applying `shadowLoc` at every reference then
+  mis-renames references to those bindings whenever a same-named `let` alias is on
+  the stack, and match arms accumulate `let` binds on the shadow-stack without a
+  per-arm restore (observed `s_3` from three un-popped arms). So the correct SML
+  fix must integrate **all** binding forms (match/for/scrutinee, not just `let`)
+  into the scope-env and wrap each match arm in its own scope — a larger, higher-
+  risk change to the reference compiler. Deferred to a focused pass. Helpers
+  (`shadowStack`/`shadowLoc`/`shadowAlias`/`withShadowScope`/`withBlockScope`) are
+  the right primitives; the gap is coverage of the non-`let` binders.
 - [ ] **BH-12b** VM (`VmCodegen.sml`): give each shadowing `let` a fresh slot so
   an inner-block shadow doesn't clobber the outer (the "returns 81" leak). Pairs
   with BH-6a.
