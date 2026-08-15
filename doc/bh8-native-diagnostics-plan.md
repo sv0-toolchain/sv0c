@@ -118,9 +118,12 @@ the corpus's heavy valid field access is never misflagged; corpus-parity stayed
 Route the resolver's existing rejections through the diagnostic layer (code +
 message, not a bare exit 3). Lives in `resolver.sv0`. + cases.
 
-### Slice 5 — BH-4a void + contract (E0409)
-Finding #4: when `id2` shows a contract but no return type, push E0409. Trivial
-once the layer exists. + case.
+### Slice 5 — BH-4a void + contract (E0409) — DONE
+`id2` packs `has_ret = ret_bit + contract_count*2`. A fn with `contract_count > 0`
+but `ret_bit == 0` (contract, no `-> T`) is E0409 in SML; the native ret scan
+resolved it to `TY_UNKNOWN` and the body check failed silently. `check_program`
+now pushes E0409 (span = fn name token) for that shape. Valid code never has it
+(SML rejects), so corpus-parity stayed 98/98. Case `void_contract.sv0`.
 
 Each slice appends its row to `test/diagnostics/manifest.txt` with the code
 needle, gated on **both** SML (existing verifier) and native (Slice 0's twin).

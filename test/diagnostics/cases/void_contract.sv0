@@ -1,0 +1,4 @@
+/* BH-8 Slice 5 (BH-4a) — a fn with a contract but no explicit return type.
+   `requires(x > 0)` with no `-> T` is E0409 on both SML and native. */
+fn f(x: i32) requires(x > 0) { }
+fn main() -> i32 { return 0; }
