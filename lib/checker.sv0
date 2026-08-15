@@ -2546,6 +2546,19 @@ fn check_program(
     let mut ii: i32 = 0;
     while ii < nitems {
         if vec_get(it, ii) == 0 {
+            /* BH-4a (Slice 5): id2 packs has_ret = ret_bit + contract_count*2. A
+               fn with a contract (contract_count > 0) but no `-> T` (ret_bit 0)
+               is E0409 in SML; the native ret scan otherwise resolves it to
+               TY_UNKNOWN and the body check fails silently (bare exit 4). Emit the
+               code. The body check below still runs and returns -1 (no spurious
+               push for the empty body), so check_program fails with E0409 shown. */
+            let id2v: i32 = vec_get(id2, ii);
+            if id2v % 2 == 0 {
+                if id2v / 2 > 0 {
+                    vec_push(diag_sink, 409);
+                    vec_push(diag_sink, vec_get(id1, ii));
+                }
+            }
             let name_pos: i32 = vec_get(id1, ii);
             let param_count: i32 = vec_get(id3, ii);
             let body_root_idx: i32 = vec_get(id4, ii);

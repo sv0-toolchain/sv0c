@@ -244,7 +244,7 @@ wired.)
 
 ---
 
-## 4. Void fn with a contract but no explicit return type: native fails silently — P3 (diagnostic divergence)
+## 4. Void fn with a contract but no explicit return type: native fails silently — P3 (diagnostic divergence) — ✅ FIXED (BH-4a / Slice 5, emits E0409)
 
 **Files:** `lib/checker.sv0` (ret-type resolution → check failure path).
 
@@ -712,8 +712,13 @@ sv0c goldens.
 - [x] **BH-3b** `ast_ty_to_ty_payload` fixed identically (same wrong block; one `replace_all`). Both kept (minimal fix; dead but now correct).
 - [x] **BH-3c** Added ref/refmut/tuple/array cases to `test_resolve_field_ty_tag`.
 
-### #4 — Void+contract silent native fail (P3)
-- [ ] **BH-4a** `checker.sv0`: when `id2` shows a contract but no return type, emit `E0409` (route through the diagnostic layer from BH-8f) instead of a bare nonzero exit.
+### #4 — Void+contract silent native fail (P3) — ✅ FIXED
+- [x] **BH-4a (Slice 5)** ✅ `check_program`: `id2` packs `has_ret = ret_bit +
+  contract_count*2`; a fn with `contract_count > 0` but `ret_bit == 0` (contract,
+  no `-> T`) now pushes `E0409` to the diagnostic sink (span = fn name token),
+  matching SML, instead of the ret scan silently resolving `TY_UNKNOWN` → bare
+  exit 4. Valid code never has this shape (SML rejects it), so corpus-parity
+  stayed 98/98. Case `void_contract.sv0`, dual-gated.
 
 ### #5 — Cross-module methods on SML `--project` (P2, optional)
 - [ ] **BH-5a** `link.sml` `mapExpr` ExprMethodCall: resolve the method via the receiver's type module (type-directed) instead of mangling with the calling module id. *(deferred — native already works)*
