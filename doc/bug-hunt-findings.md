@@ -805,9 +805,24 @@ Sliced:
   `scripts/pc3b6-native-project-acceptance.sh` (file-mode wrapper), SML `one`
   mode via `task/sv0c-milestone-1/02-integration-test.sh`.
 
-### #10 — Native drops contracts / VM ungraceful abort (P1 / P3)
-- [ ] **BH-10a** Route `Instr::Requires`/`Ensures` through the native compose-main lowering→codegen (the codegen at `codegen.sv0:368` / `megaTU-main.sv0:800` already emits `sv0_requires`).
-- [ ] **BH-10b** Add a native runtime contract-violation fixture (`requires`/`ensures` violated → clean abort, exit 1).
+### #10 — Native drops contracts / VM ungraceful abort (P1 / P3) — ✅ FIXED
+- [x] **BH-10a** ✅ `lower` (lib/lowering.sv0) called `lower_fn` with **empty**
+  `req_roots`/`ens_roots` (line ~3768), dropping every contract. Now `lower`
+  receives `fn_contract_root`/`fn_contract_base` and, per fn, splits the flat
+  clause roots into requires/ensures and passes them through — `lower_fn` builds
+  `Instr::Requires`/`Ensures` and the emit turns them into `sv0_requires`/
+  `sv0_ensures`. The parser stores clause roots but not their **kind**; rather
+  than thread a kind array through the whole parser, `contract_kw_pos_of_root`
+  recovers it by finding a token in the clause expr (`expr_any_tok`) and scanning
+  the token stream back to the nearest `requires`(83)/`ensures`(61) keyword.
+  Advanced clauses (quantifiers `exists`/`forall`, `old`) are detected
+  (`contract_is_advanced`) and **dropped** — the native emit doesn't lower them
+  yet — so scope is simple requires/ensures. Verified: `f(-5)`, `ensures`
+  violation, and `main requires(false)` all abort with exit 1 + the C-runtime
+  message; `requires(true)` runs normally; corpus-parity 98/98.
+- [x] **BH-10b** ✅ Fixture `test/integration/contract_violation/` gated on native
+  (pc3b6: emit has `sv0_requires`, runs → exit 1 + "contract violation") and the
+  VM (BH-10c → vm_exit:1).
 - [x] **BH-10c** ✅ `interpreter.sml`: a runtime contract violation now raises a
   dedicated `ContractViolation` exception caught in `runWithStack`, which prints
   `sv0 contract violation: <msg>` to stderr and returns exit code 1 — a clean
