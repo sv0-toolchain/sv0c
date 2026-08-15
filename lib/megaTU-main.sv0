@@ -257,9 +257,14 @@ fn main() -> i32 {
        resolves body var/temp names and AST binop/unop operators against the real
        source. This is the native-compose (A) de-stub, done in the compose main so
        codegen.sv0 stays standalone-compilable. */
+    /* BH-12: assign shadow indices to local-var name tokens (0 = no shadow) so
+       the emit renders re-bound names as `x_N` instead of redeclaring `x`. */
+    let sidx: Vec<i32> = assign_shadow_indices(it, id3, id4, id5, fpn,
+                                               bet, bed1, bed2, bed3, bed4, pp,
+                                               source, starts, ends);
     let c: string = megatu_emit_program(td, out_blocks, source, starts, ends,
                                         it, id1, id2, id3, id5, fpn,
-                                        fpt, frt, ptt, ptd1, ptd2, pp);
+                                        fpt, frt, ptt, ptd1, ptd2, pp, sidx);
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
@@ -456,7 +461,7 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                        id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
                        fpt: Vec<i32>, frt: Vec<i32>,
                        ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
-                       pp: Vec<i32>) -> string {
+                       pp: Vec<i32>, sidx: Vec<i32>) -> string {
     let num_blocks: i32 = vec_len(blocks) / 4;
     if num_blocks == 0 {
         return "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
@@ -503,7 +508,7 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
            name_of/op_of are test stubs): resolves var/temp names and operators
            against the real source. This is the body-level de-stub. */
         let body: string = megatu_emit_instrs(instrs, "  ", ret_name,
-                                              source, starts, ends);
+                                              source, starts, ends, sidx);
         if string_eq(fn_name, "main") {
             let proto: string = string_concat(ret_name, string_concat(" ", sig));
             main_part = emit_block_defn(proto, body);
@@ -539,7 +544,244 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
    time; the flat i32 IR defers resolution to emit, which is what happens here.
    Lives in the compose main so codegen.sv0 stays a standalone-compilable unit. */
 
-fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+/* ── shadowing pre-pass (BH-12) ───────────────────────────────
+   sv0 permits `let` shadowing (`let x = 10; let x = x + 32`), but a flat C
+   function scope cannot redeclare `x`. This pass assigns each local-variable name
+   TOKEN a shadow index N: the first binding of a name in a function is 0 (emitted
+   as `x`), each subsequent binding (sequential or in a nested block) gets a fresh
+   N (emitted as `x_N`); a reference resolves to the index of its currently-live
+   binding. Non-shadowing code keeps index 0 everywhere, so its emit is byte
+   identical — the whole thing lives in the compose main (not a golden module) and
+   only kicks in when a name is actually re-bound. env_len is a logical stack
+   length (no vec_pop): a block records the length on entry and restores it on
+   exit; cnt_* is a persistent per-name counter for fresh-index allocation. */
+
+fn sh_name_eq(source: string, starts: Vec<i32>, ends: Vec<i32>, a: i32, b: i32) -> bool {
+    if a < 0 { return false; }
+    if b < 0 { return false; }
+    let as2: i32 = vec_get(starts, a);
+    let ae: i32 = vec_get(ends, a);
+    let bs: i32 = vec_get(starts, b);
+    let be: i32 = vec_get(ends, b);
+    return string_eq(string_substr(source, as2, ae - as2),
+                     string_substr(source, bs, be - bs));
+}
+
+/* A new binding's shadow index = how many bindings of the same name are CURRENTLY
+   LIVE (in scope). 0 when none (the common case) -> bare name; 1 when it shadows
+   one live binding -> `_1`; etc. Scope-depth based, NOT a persistent counter, so
+   two *disjoint* (sibling-scope) bindings of a name both get 0 and are never
+   spuriously renamed — only a genuine live shadow (sequential same-block or a
+   nested inner block) is. */
+fn sh_live_count(env_tok: Vec<i32>, env_len: Vec<i32>,
+                 source: string, starts: Vec<i32>, ends: Vec<i32>, name_tok: i32) -> i32 {
+    let len: i32 = vec_get(env_len, 0);
+    let mut c: i32 = 0;
+    let mut j: i32 = 0;
+    while j < len {
+        if sh_name_eq(source, starts, ends, vec_get(env_tok, j), name_tok) {
+            c = c + 1;
+        }
+        j = j + 1;
+    }
+    return c;
+}
+
+fn sh_lookup_idx(env_tok: Vec<i32>, env_idx: Vec<i32>, env_len: Vec<i32>,
+                 source: string, starts: Vec<i32>, ends: Vec<i32>, name_tok: i32) -> i32 {
+    let mut j: i32 = vec_get(env_len, 0) - 1;
+    while j >= 0 {
+        if sh_name_eq(source, starts, ends, vec_get(env_tok, j), name_tok) {
+            return vec_get(env_idx, j);
+        }
+        j = j - 1;
+    }
+    return 0;
+}
+
+fn sh_env_push(env_tok: Vec<i32>, env_idx: Vec<i32>, env_len: Vec<i32>,
+               tok: i32, idx: i32) -> i32 {
+    let len: i32 = vec_get(env_len, 0);
+    if len < vec_len(env_tok) {
+        vec_set(env_tok, len, tok);
+        vec_set(env_idx, len, idx);
+    } else {
+        vec_push(env_tok, tok);
+        vec_push(env_idx, idx);
+    }
+    vec_set(env_len, 0, len + 1);
+    return 0;
+}
+
+fn sh_set_sidx(sidx: Vec<i32>, tok: i32, idx: i32) -> i32 {
+    if tok >= 0 {
+        if tok < vec_len(sidx) {
+            vec_set(sidx, tok, idx);
+        }
+    }
+    return 0;
+}
+
+fn sh_walk(idx: i32, bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+           bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>,
+           source: string, starts: Vec<i32>, ends: Vec<i32>,
+           sidx: Vec<i32>, env_tok: Vec<i32>, env_idx: Vec<i32>, env_len: Vec<i32>,
+           cnt_tok: Vec<i32>, cnt_val: Vec<i32>) -> i32 {
+    if idx < 0 { return 0; }
+    if idx >= vec_len(bet) { return 0; }
+    let tag: i32 = vec_get(bet, idx);
+    if tag == 9 {
+        let mark: i32 = vec_get(env_len, 0);
+        let sfirst: i32 = vec_get(bed1, idx);
+        let scount: i32 = vec_get(bed2, idx);
+        let tail: i32 = vec_get(bed3, idx);
+        let sidecar: i32 = vec_get(bed4, idx);
+        let mut si: i32 = 0;
+        while si < scount {
+            let st: i32 = block_stmt_index(bpp, sfirst, sidecar, si);
+            let _r: i32 = sh_walk(st, bet, bed1, bed2, bed3, bed4, bpp,
+                                  source, starts, ends, sidx, env_tok, env_idx,
+                                  env_len, cnt_tok, cnt_val);
+            si = si + 1;
+        }
+        if tail >= 0 {
+            let _t: i32 = sh_walk(tail, bet, bed1, bed2, bed3, bed4, bpp,
+                                  source, starts, ends, sidx, env_tok, env_idx,
+                                  env_len, cnt_tok, cnt_val);
+        }
+        vec_set(env_len, 0, mark);
+        return 0;
+    }
+    if tag == 27 {
+        let init: i32 = vec_get(bed3, idx);
+        if init >= 0 {
+            let _i: i32 = sh_walk(init, bet, bed1, bed2, bed3, bed4, bpp,
+                                  source, starts, ends, sidx, env_tok, env_idx,
+                                  env_len, cnt_tok, cnt_val);
+        }
+        let name_tok: i32 = vec_get(bed1, idx);
+        let nidx: i32 = sh_live_count(env_tok, env_len, source, starts, ends, name_tok);
+        let _s: i32 = sh_set_sidx(sidx, name_tok, nidx);
+        let _p: i32 = sh_env_push(env_tok, env_idx, env_len, name_tok, nidx);
+        return 0;
+    }
+    if tag == 28 {
+        return sh_walk(vec_get(bed1, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                       source, starts, ends, sidx, env_tok, env_idx, env_len,
+                       cnt_tok, cnt_val);
+    }
+    if tag == 1 {
+        if vec_get(bed2, idx) == 1 {
+            let pps: i32 = vec_get(bed1, idx);
+            if pps >= 0 {
+                if pps < vec_len(bpp) {
+                    let rtok: i32 = vec_get(bpp, pps);
+                    let ridx: i32 = sh_lookup_idx(env_tok, env_idx, env_len,
+                                                  source, starts, ends, rtok);
+                    let _s: i32 = sh_set_sidx(sidx, rtok, ridx);
+                }
+            }
+        }
+        return 0;
+    }
+    if tag == 2 {
+        return sh_walk(vec_get(bed2, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                       source, starts, ends, sidx, env_tok, env_idx, env_len,
+                       cnt_tok, cnt_val);
+    }
+    if tag == 3 {
+        let _l: i32 = sh_walk(vec_get(bed2, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                              source, starts, ends, sidx, env_tok, env_idx, env_len,
+                              cnt_tok, cnt_val);
+        return sh_walk(vec_get(bed3, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                       source, starts, ends, sidx, env_tok, env_idx, env_len,
+                       cnt_tok, cnt_val);
+    }
+    if tag == 15 {
+        return sh_walk(vec_get(bed1, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                       source, starts, ends, sidx, env_tok, env_idx, env_len,
+                       cnt_tok, cnt_val);
+    }
+    if tag == 18 {
+        let _l: i32 = sh_walk(vec_get(bed1, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                              source, starts, ends, sidx, env_tok, env_idx, env_len,
+                              cnt_tok, cnt_val);
+        return sh_walk(vec_get(bed2, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                       source, starts, ends, sidx, env_tok, env_idx, env_len,
+                       cnt_tok, cnt_val);
+    }
+    if tag == 10 {
+        let _c: i32 = sh_walk(vec_get(bed1, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                              source, starts, ends, sidx, env_tok, env_idx, env_len,
+                              cnt_tok, cnt_val);
+        let _th: i32 = sh_walk(vec_get(bed2, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                               source, starts, ends, sidx, env_tok, env_idx, env_len,
+                               cnt_tok, cnt_val);
+        return sh_walk(vec_get(bed3, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                       source, starts, ends, sidx, env_tok, env_idx, env_len,
+                       cnt_tok, cnt_val);
+    }
+    if tag == 4 {
+        let _ce: i32 = sh_walk(vec_get(bed1, idx), bet, bed1, bed2, bed3, bed4, bpp,
+                               source, starts, ends, sidx, env_tok, env_idx, env_len,
+                               cnt_tok, cnt_val);
+        let af: i32 = vec_get(bed2, idx);
+        let ac: i32 = vec_get(bed3, idx);
+        let asc: i32 = vec_get(bed4, idx);
+        let mut ai: i32 = 0;
+        while ai < ac {
+            let ax: i32 = block_stmt_index(bpp, af, asc, ai);
+            let _a: i32 = sh_walk(ax, bet, bed1, bed2, bed3, bed4, bpp,
+                                  source, starts, ends, sidx, env_tok, env_idx,
+                                  env_len, cnt_tok, cnt_val);
+            ai = ai + 1;
+        }
+        return 0;
+    }
+    return 0;
+}
+
+fn assign_shadow_indices(it: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>, id5: Vec<i32>,
+                         fpn: Vec<i32>, bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                         bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>,
+                         source: string, starts: Vec<i32>, ends: Vec<i32>) -> Vec<i32> {
+    let sidx: Vec<i32> = vec_new();
+    let ntok: i32 = vec_len(starts);
+    let mut z: i32 = 0;
+    while z < ntok { vec_push(sidx, 0); z = z + 1; }
+    let ni: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < ni {
+        if vec_get(it, i) == 0 {
+            let body_root: i32 = vec_get(id4, i);
+            let param_count: i32 = vec_get(id3, i);
+            let pbase: i32 = vec_get(id5, i);
+            let env_tok: Vec<i32> = vec_new();
+            let env_idx: Vec<i32> = vec_new();
+            let env_len: Vec<i32> = vec_new();
+            vec_push(env_len, 0);
+            let cnt_tok: Vec<i32> = vec_new();
+            let cnt_val: Vec<i32> = vec_new();
+            let mut pj: i32 = 0;
+            while pj < param_count {
+                let ptok: i32 = vec_get(fpn, pbase + pj);
+                let pidx: i32 = sh_live_count(env_tok, env_len, source, starts, ends, ptok);
+                let _pp: i32 = sh_env_push(env_tok, env_idx, env_len, ptok, pidx);
+                pj = pj + 1;
+            }
+            if body_root >= 0 {
+                let _w: i32 = sh_walk(body_root, bet, bed1, bed2, bed3, bed4, bpp,
+                                      source, starts, ends, sidx, env_tok, env_idx,
+                                      env_len, cnt_tok, cnt_val);
+            }
+        }
+        i = i + 1;
+    }
+    return sidx;
+}
+
+fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>,
+                   sidx: Vec<i32>) -> string {
     if h >= lower_temp_base() {
         return string_concat("_sv0t", int_to_string(h - lower_temp_base()));
     }
@@ -548,7 +790,19 @@ fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> 
        positions). A *value* handle is a temp (>= lower_temp_base) or a real source
        token — and in a large module real token indices reach 500+, so treating
        them as tuple fields renders e.g. a call to token 524 as `f24`. */
-    return handle_to_str(h, source, starts, ends);
+    let base: string = handle_to_str(h, source, starts, ends);
+    /* BH-12: a shadowed local's token carries a nonzero shadow index -> `<name>_N`;
+       index 0 (the common case: no shadowing, plus fn/field/param names) is the
+       bare source name, so non-shadowing emit is unchanged. */
+    if h >= 0 {
+        if h < vec_len(sidx) {
+            let sN: i32 = vec_get(sidx, h);
+            if sN > 0 {
+                return string_concat(string_concat(base, "_"), int_to_string(sN));
+            }
+        }
+    }
+    return base;
 }
 
 /* Resolve a struct/enum field handle to its C field name. Enum layout (see
@@ -671,12 +925,12 @@ fn megatu_unop_c(t: i32) -> string {
     return "?";
 }
 
-fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>) -> string {
     match v {
         codegen_Value::VInt(i) => { return int_to_string(i); },
         codegen_Value::VBoolTrue => { return "1"; },
         codegen_Value::VBoolFalse => { return "0"; },
-        codegen_Value::VVar(h) => { return megatu_val_name(h, source, starts, ends); },
+        codegen_Value::VVar(h) => { return megatu_val_name(h, source, starts, ends, sidx); },
         codegen_Value::VUnit => { return "0"; },
         codegen_Value::VString(h) => {
             /* A string literal's handle is a source token whose text still includes
@@ -687,7 +941,7 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
                backslash of `\n`, turning the newline into a literal backslash-n
                (broke lexer's skip_line_comment). name_of's stub returned bare names,
                so codegen never hit this. */
-            let raw: string = megatu_val_name(h, source, starts, ends);
+            let raw: string = megatu_val_name(h, source, starts, ends, sidx);
             let mut inner: string = raw;
             let rlen: i32 = string_len(raw);
             if rlen >= 2 {
@@ -701,33 +955,33 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
             let field: string = megatu_field_name(fh, source, starts, ends);
             let tag: i32 = codegen_value_tag(inner);
             if tag == 3 {
-                let prefix: string = megatu_emit_value(inner, source, starts, ends);
+                let prefix: string = megatu_emit_value(inner, source, starts, ends, sidx);
                 return string_concat(string_concat(prefix, "."), field);
             }
-            let prefix: string = string_concat("(", megatu_emit_value(inner, source, starts, ends));
+            let prefix: string = string_concat("(", megatu_emit_value(inner, source, starts, ends, sidx));
             return string_concat(string_concat(prefix, ")."), field);
         },
         codegen_Value::VAddrOf(h) => {
-            return string_concat(string_concat("(&", megatu_val_name(h, source, starts, ends)), ")");
+            return string_concat(string_concat("(&", megatu_val_name(h, source, starts, ends, sidx)), ")");
         },
     }
     return "";
 }
 
-fn megatu_emit_expr(e: codegen_Expr, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+fn megatu_emit_expr(e: codegen_Expr, source: string, starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>) -> string {
     match e {
         codegen_Expr::Literal(bv) => {
             let v: codegen_Value = box_deref(bv);
-            return megatu_emit_value(v, source, starts, ends);
+            return megatu_emit_value(v, source, starts, ends, sidx);
         },
         codegen_Expr::Load(h) => {
-            return megatu_val_name(h, source, starts, ends);
+            return megatu_val_name(h, source, starts, ends, sidx);
         },
         codegen_Expr::Binop(op_h, bv1, bv2) => {
             let v1: codegen_Value = box_deref(bv1);
             let v2: codegen_Value = box_deref(bv2);
-            let s1: string = megatu_emit_value(v1, source, starts, ends);
-            let s2: string = megatu_emit_value(v2, source, starts, ends);
+            let s1: string = megatu_emit_value(v1, source, starts, ends, sidx);
+            let s2: string = megatu_emit_value(v2, source, starts, ends, sidx);
             let op: string = megatu_binop_c(op_h);
             let a: string = string_concat("(", s1);
             let b: string = string_concat(a, " ");
@@ -739,20 +993,20 @@ fn megatu_emit_expr(e: codegen_Expr, source: string, starts: Vec<i32>, ends: Vec
         codegen_Expr::Unop(op_h, bv) => {
             let v: codegen_Value = box_deref(bv);
             let op: string = megatu_unop_c(op_h);
-            let inner: string = megatu_emit_value(v, source, starts, ends);
+            let inner: string = megatu_emit_value(v, source, starts, ends, sidx);
             let a: string = string_concat("(", op);
             return string_concat(a, string_concat(inner, ")"));
         },
         codegen_Expr::FieldAccess(bv, fh) => {
             let v: codegen_Value = box_deref(bv);
-            let a: string = string_concat("(", megatu_emit_value(v, source, starts, ends));
+            let a: string = string_concat("(", megatu_emit_value(v, source, starts, ends, sidx));
             return string_concat(string_concat(a, ")."), megatu_field_name(fh, source, starts, ends));
         },
     }
     return "";
 }
 
-fn megatu_emit_call_args(args: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+fn megatu_emit_call_args(args: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>) -> string {
     let count: i32 = vec_len(args);
     if count == 0 { return ""; }
     let mut out: string = "";
@@ -763,61 +1017,62 @@ fn megatu_emit_call_args(args: Vec<i32>, source: string, starts: Vec<i32>, ends:
         }
         let bv: Box<codegen_Value> = vec_get(args, idx);
         let v: codegen_Value = box_deref(bv);
-        out = string_concat(out, megatu_emit_value(v, source, starts, ends));
+        out = string_concat(out, megatu_emit_value(v, source, starts, ends, sidx));
         idx = idx + 1;
     }
     return out;
 }
 
 fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
-                     source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+                     source: string, starts: Vec<i32>, ends: Vec<i32>,
+                     sidx: Vec<i32>) -> string {
     match ins {
         codegen_Instr::Nop => { return ""; },
         codegen_Instr::DeclVar(h) => {
             let a: string = string_concat(indent, "int ");
-            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends));
+            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends, sidx));
             return string_concat(b, ";\n");
         },
         codegen_Instr::DeclNamed(ct, h) => {
             let a: string = string_concat(indent, megatu_ty_name(ct, source, starts, ends));
             let b: string = string_concat(a, " ");
-            let c: string = string_concat(b, megatu_val_name(h, source, starts, ends));
+            let c: string = string_concat(b, megatu_val_name(h, source, starts, ends, sidx));
             return string_concat(c, ";\n");
         },
         codegen_Instr::Assign(h, be) => {
             let e: codegen_Expr = box_deref(be);
             let a: string = string_concat(indent, "int ");
-            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends));
+            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends, sidx));
             let c: string = string_concat(b, " = ");
-            let d: string = string_concat(c, megatu_emit_expr(e, source, starts, ends));
+            let d: string = string_concat(c, megatu_emit_expr(e, source, starts, ends, sidx));
             return string_concat(d, ";\n");
         },
         codegen_Instr::Store(h, be) => {
             let e: codegen_Expr = box_deref(be);
-            let a: string = string_concat(indent, megatu_val_name(h, source, starts, ends));
+            let a: string = string_concat(indent, megatu_val_name(h, source, starts, ends, sidx));
             let b: string = string_concat(a, " = ");
-            let c: string = string_concat(b, megatu_emit_expr(e, source, starts, ends));
+            let c: string = string_concat(b, megatu_emit_expr(e, source, starts, ends, sidx));
             return string_concat(c, ";\n");
         },
         codegen_Instr::StoreField(bh, fh, be) => {
             let e: codegen_Expr = box_deref(be);
-            let a: string = string_concat(indent, megatu_val_name(bh, source, starts, ends));
+            let a: string = string_concat(indent, megatu_val_name(bh, source, starts, ends, sidx));
             let b: string = string_concat(a, ".");
             let c: string = string_concat(b, megatu_field_name(fh, source, starts, ends));
             let d: string = string_concat(c, " = ");
-            let f: string = string_concat(d, megatu_emit_expr(e, source, starts, ends));
+            let f: string = string_concat(d, megatu_emit_expr(e, source, starts, ends, sidx));
             return string_concat(f, ";\n");
         },
         codegen_Instr::IfElse(be, th, el) => {
             let e: codegen_Expr = box_deref(be);
             let deeper: string = string_concat(indent, "  ");
             let a: string = string_concat(indent, "if (");
-            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends));
+            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx));
             let f: string = string_concat(d, indent);
             let g: string = string_concat(f, "} else {\n");
-            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends));
+            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx));
             let j: string = string_concat(h, indent);
             return string_concat(j, "}\n");
         },
@@ -825,16 +1080,16 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let e: codegen_Expr = box_deref(be);
             let deeper: string = string_concat(indent, "  ");
             let a: string = string_concat(indent, "while (");
-            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends));
+            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx));
             let f: string = string_concat(d, indent);
             return string_concat(f, "}\n");
         },
         codegen_Instr::BlockInstr(body) => {
             let deeper: string = string_concat(indent, "  ");
             let a: string = string_concat(indent, "{\n");
-            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends));
+            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx));
             let c: string = string_concat(b, indent);
             return string_concat(c, "}\n");
         },
@@ -845,7 +1100,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             return string_concat(indent, "continue;\n");
         },
         codegen_Instr::Call(dst_h, fn_h, args, rt_h) => {
-            let mut arg_str: string = megatu_emit_call_args(args, source, starts, ends);
+            let mut arg_str: string = megatu_emit_call_args(args, source, starts, ends, sidx);
             /* box_deref lowers to a Call to builtin 13; sv0__box_deref_raw(h, T)
                takes the target C type as a second argument. Default `int` (values
                are int handles), but a typed box_deref (rt_h set — a `let x: T =
@@ -867,7 +1122,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                the runtime C name `sv0_<builtin>`; a source fn resolves normally. */
             let mut fn_name: string = megatu_builtin_name(0 - fn_h);
             if fn_h >= 0 {
-                fn_name = megatu_val_name(fn_h, source, starts, ends);
+                fn_name = megatu_val_name(fn_h, source, starts, ends, sidx);
             }
             if dst_h == 0 {
                 let a: string = string_concat(indent, fn_name);
@@ -896,7 +1151,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             }
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");
-            let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends));
+            let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends, sidx));
             let d: string = string_concat(c, " = ");
             let e: string = string_concat(d, fn_name);
             let f: string = string_concat(e, "(");
@@ -906,17 +1161,17 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
         codegen_Instr::Requires(be, fh) => {
             let e: codegen_Expr = box_deref(be);
             let a: string = string_concat(indent, "sv0_requires(");
-            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ", \"");
-            let d: string = string_concat(c, megatu_val_name(fh, source, starts, ends));
+            let d: string = string_concat(c, megatu_val_name(fh, source, starts, ends, sidx));
             return string_concat(d, "\");\n");
         },
         codegen_Instr::Ensures(be, fh) => {
             let e: codegen_Expr = box_deref(be);
             let a: string = string_concat(indent, "sv0_ensures(");
-            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends));
+            let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ", \"");
-            let d: string = string_concat(c, megatu_val_name(fh, source, starts, ends));
+            let d: string = string_concat(c, megatu_val_name(fh, source, starts, ends, sidx));
             return string_concat(d, "\");\n");
         },
         codegen_Instr::ReturnVoid => {
@@ -928,7 +1183,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             }
             let v: codegen_Value = box_deref(bv);
             let a: string = string_concat(indent, "return ");
-            let b: string = string_concat(a, megatu_emit_value(v, source, starts, ends));
+            let b: string = string_concat(a, megatu_emit_value(v, source, starts, ends, sidx));
             return string_concat(b, ";\n");
         },
     }
@@ -936,7 +1191,8 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
 }
 
 fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
-                      source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+                      source: string, starts: Vec<i32>, ends: Vec<i32>,
+                      sidx: Vec<i32>) -> string {
     let count: i32 = vec_len(instrs);
     if count == 0 { return ""; }
     let mut out: string = "";
@@ -944,7 +1200,7 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
     while idx < count {
         let bh: Box<codegen_Instr> = vec_get(instrs, idx);
         let ins: codegen_Instr = box_deref(bh);
-        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends));
+        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx));
         idx = idx + 1;
     }
     return out;
