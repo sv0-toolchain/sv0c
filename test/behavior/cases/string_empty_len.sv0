@@ -1,0 +1,2 @@
+/* empty string length — exits 0. */
+fn main() -> i32 { return string_len(""); }

@@ -1,0 +1,4 @@
+/* struct field feeding an enum match — exits 40. */
+struct Box { v: i32 }
+enum Sign { Pos, Neg }
+fn main() -> i32 { let b: Box = Box { v: 40 }; let s: Sign = Sign::Pos; return match s { Sign::Pos => b.v, Sign::Neg => 0 - b.v }; }

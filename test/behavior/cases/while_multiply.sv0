@@ -1,0 +1,2 @@
+/* power of two via loop (2^5) — exits 32. */
+fn main() -> i32 { let mut r: i32 = 1; let mut i: i32 = 0; while i < 5 { r = r * 2; i = i + 1; } return r; }

@@ -1,0 +1,2 @@
+/* nested while loops (6x6 count) — exits 36. */
+fn main() -> i32 { let mut c: i32 = 0; let mut i: i32 = 0; while i < 6 { let mut j: i32 = 0; while j < 6 { c = c + 1; j = j + 1; } i = i + 1; } return c; }

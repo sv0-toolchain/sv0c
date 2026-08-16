@@ -1,0 +1,2 @@
+/* return exactly 255 — exits 255. */
+fn main() -> i32 { return 255; }

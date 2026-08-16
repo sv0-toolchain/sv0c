@@ -1,0 +1,2 @@
+/* chained multiplication — exits 24. */
+fn main() -> i32 { return 1 * 2 * 3 * 4; }
