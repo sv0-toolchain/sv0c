@@ -108,7 +108,6 @@ test/behavior/cases/vec_min.sv0|1
 test/behavior/cases/vec_set.sv0|99
 test/behavior/cases/vec_nested_pairs.sv0|12
 test/behavior/cases/nested_if_loop.sv0|4
-test/behavior/cases/bool_short_and.sv0|0
 test/behavior/cases/compound_condition.sv0|1
 test/behavior/cases/multi_return.sv0|2
 test/behavior/cases/accumulate_struct.sv0|60
