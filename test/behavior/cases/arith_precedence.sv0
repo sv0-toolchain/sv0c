@@ -1,0 +1,2 @@
+/* operator precedence: 2+3*4 — exits 14. */
+fn main() -> i32 { return 2 + 3 * 4; }

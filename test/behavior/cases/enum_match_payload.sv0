@@ -1,0 +1,3 @@
+/* enum match extracts payload — exits 41. */
+enum E { A(i32), B }
+fn main() -> i32 { let e: E = E::A(41); return match e { E::A(n) => n, E::B => 0 }; }

@@ -1,0 +1,2 @@
+/* while loop counts down to 0 — exits 0. */
+fn main() -> i32 { let mut n: i32 = 10; while n > 0 { n = n - 1; } return n; }

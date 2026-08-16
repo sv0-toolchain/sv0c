@@ -1,0 +1,4 @@
+/* struct passed to a function — exits 12. */
+struct P { x: i32, y: i32 }
+fn sum(p: P) -> i32 { return p.x + p.y; }
+fn main() -> i32 { let p: P = P { x: 5, y: 7 }; return sum(p); }

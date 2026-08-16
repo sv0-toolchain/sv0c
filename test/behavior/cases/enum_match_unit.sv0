@@ -1,0 +1,3 @@
+/* enum match on unit variant — exits 7. */
+enum E { A(i32), B }
+fn main() -> i32 { let e: E = E::B; return match e { E::A(n) => n, E::B => 7 }; }

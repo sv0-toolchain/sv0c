@@ -1,0 +1,2 @@
+/* boolean AND in condition — exits 1. */
+fn main() -> i32 { if 1 < 2 && 3 < 4 { return 1; } return 0; }

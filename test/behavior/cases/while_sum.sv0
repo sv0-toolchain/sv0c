@@ -1,0 +1,2 @@
+/* while loop sums 1..5 — exits 15. */
+fn main() -> i32 { let mut s: i32 = 0; let mut i: i32 = 1; while i <= 5 { s = s + i; i = i + 1; } return s; }
