@@ -18,13 +18,21 @@ worth revisiting.
 13 findings across 6 probing passes. Each finding below has a bite-sized task
 breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 
+> **Final status (2026-08-16): bug hunt closed. 12 of 13 fixed; 1 deferred
+> (won't-fix).** All findings that affect the **native** compiler — now the
+> default front end (PC-6c) — are resolved, including the native-completeness
+> cluster #8/#10/#11 and the scope-enforcement gap #6. The one remaining item,
+> **#5**, is confined to the retired **SML `--project`** reference path and is
+> formally deferred (native handles that case). No open finding blocks the native
+> compiler or M4.
+
 | # | Finding | Sev | Backend(s) | Status |
 |---|---------|-----|-----------|--------|
 | 1 | Method calls miscompile compound arguments (`p.m(a+b)` → `m(p,a)`) | P1 | native | ✅ **FIXED** (sv0c) |
 | 2 | VM integer arithmetic ≠ i32: overflow no-wrap + floor div/mod | P1 | VM | ✅ **FIXED** (sv0vm `a0876d9`) |
 | 3 | Stale pty type-tag scheme in checker type-resolvers (2/3/7) | P2/P3 | native (dead) | ✅ **FIXED** (sv0c) |
 | 4 | Void fn + contract, no `-> T`: native fails silently vs SML E0409 | P3 | native |
-| 5 | Cross-module method calls fail SML `--project` (E0401) | P2 | SML |
+| 5 | Cross-module method calls fail SML `--project` (E0401) | P2 | SML | ⏸️ **DEFERRED (won't-fix)** — native (the default) works via source-concat; SML is being retired |
 | 6 | Checker doesn't scope block-local bindings | P3 | native | ✅ **FIXED** — block-locals scoped in resolver + checker; out-of-scope use → E0300 (matches SML), gated |
 | 7 | Literal `2147483648` (2³¹) handled 3 different ways | P2/P3 | all | ✅ **FIXED** (wrap to INT_MIN, all 3) |
 | 8 | Native checker accepts type errors + emits no diagnostics | P1 | native | ✅ **FIXED** — all 6 cases now emit the SML code (E0300/E0301/E0307/E0400/E0429), gated on native + SML |
@@ -266,7 +274,16 @@ path is untested.)
 
 ---
 
-## 5. Cross-module method calls fail on SML `--project` — P2 (known divergence, documented)
+## 5. Cross-module method calls fail on SML `--project` — P2 (known divergence, documented) — ⏸️ DEFERRED (won't-fix)
+
+> **Disposition (2026-08-16):** formally **deferred / won't-fix**. This defect is
+> confined to the **SML `--project`** path, which is a *reference* pipeline being
+> retired now that the native compiler is the default (PC-6c). The **native**
+> pipeline already compiles and runs cross-module method calls correctly via
+> source-concat, so there is no user-facing gap. A fix would require type-directed
+> method resolution inside frozen `sml-legacy` — non-trivial effort on code slated
+> for removal — so it is intentionally not being carried into M4. Reopen only if
+> the SML reference is kept and cross-module method resolution on it is needed.
 
 **Files:** `sml-legacy/link/link.sml` (`mapExpr` ExprMethodCall).
 
