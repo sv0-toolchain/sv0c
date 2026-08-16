@@ -58,6 +58,7 @@ static int alias_lookup(int names, int targets, int name);
 static int canon_ty_import(int names, int targets, int name);
 static int env_lookup(int env_names, int env_types, int name);
 static int env_extend(int env_names, int env_types, int env_muts, int name, int ty, int is_mut);
+static int env_scope_restore(int env_names, int mark);
 static int env_is_mut(int env_muts, int idx);
 static int env_entry_index(int env_names, int name);
 static int fn_table_add(int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int name, int ret_ty, int param_tags, int param_count);
@@ -965,6 +966,17 @@ static int env_extend(int env_names, int env_types, int env_muts, int name, int 
   int _sv0t0 = sv0_vec_len(env_names);
   int _sv0t1 = (_sv0t0 - 1);
   return _sv0t1;
+}
+
+static int env_scope_restore(int env_names, int mark) {
+  int _sv0t0 = sv0_vec_len(env_names);
+  int j = (_sv0t0 - 1);
+  while ((j >= mark)) {
+    int _sv0t1 = (0 - 1);
+    sv0_vec_set(env_names, j, _sv0t1);
+    j = (j - 1);
+  }
+  return 0;
 }
 
 static int env_is_mut(int env_muts, int idx) {
@@ -5060,18 +5072,21 @@ static int env_lookup_str(int env_names, int env_types, const char* source, int 
   while ((i >= 0)) {
     int _sv0t1 = sv0_vec_get(env_names, i);
     int np = _sv0t1;
-    int _sv0t2 = sv0_vec_get(starts, np);
-    int s = _sv0t2;
-    int _sv0t3 = sv0_vec_get(ends, np);
-    int e = _sv0t3;
-    int _sv0t4 = (e - s);
-    const char* _sv0t5 = sv0_string_substr(source, s, _sv0t4);
-    const char* nm;
-    nm = _sv0t5;
-    int _sv0t6 = sv0_string_eq(nm, target_str);
-    if (_sv0t6) {
-      int _sv0t7 = sv0_vec_get(env_types, i);
-      return _sv0t7;
+    if ((np >= 0)) {
+      int _sv0t2 = sv0_vec_get(starts, np);
+      int s = _sv0t2;
+      int _sv0t3 = sv0_vec_get(ends, np);
+      int e = _sv0t3;
+      int _sv0t4 = (e - s);
+      const char* _sv0t5 = sv0_string_substr(source, s, _sv0t4);
+      const char* nm;
+      nm = _sv0t5;
+      int _sv0t6 = sv0_string_eq(nm, target_str);
+      if (_sv0t6) {
+        int _sv0t7 = sv0_vec_get(env_types, i);
+        return _sv0t7;
+      } else {
+      }
     } else {
     }
     i = (i - 1);
@@ -5783,61 +5798,72 @@ static int synth_expr(int et, int ed1, int ed2, int ed3, int ed4, int pp, const 
     int tail_idx = _sv0t184;
     int _sv0t185 = sv0_vec_get(ed4, idx);
     int sidecar = _sv0t185;
+    int _sv0t186 = sv0_vec_len(env_names);
+    int env_mark = _sv0t186;
     int si = 0;
     while ((si < stmts_count)) {
-      int _sv0t186 = block_stmt_index(pp, stmts_first, sidecar, si);
-      int _sv0t187 = check_stmt_in_block(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, _sv0t186);
-      int rc = _sv0t187;
+      int _sv0t187 = block_stmt_index(pp, stmts_first, sidecar, si);
+      int _sv0t188 = check_stmt_in_block(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, _sv0t187);
+      int rc = _sv0t188;
       if ((rc < 0)) {
-        int _sv0t188 = (0 - 1);
-        return _sv0t188;
+        int _sv0t189 = env_scope_restore(env_names, env_mark);
+        int _r0 = _sv0t189;
+        int _sv0t190 = (0 - 1);
+        return _sv0t190;
       } else {
       }
       si = (si + 1);
     }
     if ((tail_idx >= 0)) {
-      int _sv0t189 = synth_expr(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, tail_idx);
-      return _sv0t189;
+      int _sv0t191 = synth_expr(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, tail_idx);
+      int tv = _sv0t191;
+      int _sv0t192 = env_scope_restore(env_names, env_mark);
+      int _r1 = _sv0t192;
+      return tv;
     } else {
     }
     if ((stmts_count > 0)) {
-      int _sv0t190 = (stmts_count - 1);
-      int _sv0t191 = block_stmt_index(pp, stmts_first, sidecar, _sv0t190);
-      int last_idx = _sv0t191;
-      int _sv0t192 = stmt_returns_arena(et, ed1, last_idx);
-      if (_sv0t192) {
-        int _sv0t193 = TY_VAR();
-        return _sv0t193;
+      int _sv0t193 = (stmts_count - 1);
+      int _sv0t194 = block_stmt_index(pp, stmts_first, sidecar, _sv0t193);
+      int last_idx = _sv0t194;
+      int _sv0t195 = stmt_returns_arena(et, ed1, last_idx);
+      if (_sv0t195) {
+        int _sv0t196 = env_scope_restore(env_names, env_mark);
+        int _r2 = _sv0t196;
+        int _sv0t197 = TY_VAR();
+        return _sv0t197;
       } else {
       }
     } else {
     }
-    int _sv0t194 = TY_UNIT();
-    return _sv0t194;
+    int _sv0t198 = env_scope_restore(env_names, env_mark);
+    int _r3 = _sv0t198;
+    int _sv0t199 = TY_UNIT();
+    return _sv0t199;
   } else {
   }
   if ((tag == 30)) {
-    int _sv0t195 = TY_UNIT();
-    return _sv0t195;
+    int _sv0t200 = TY_UNIT();
+    return _sv0t200;
   } else {
   }
   if ((tag == 31)) {
-    int _sv0t196 = TY_UNIT();
-    return _sv0t196;
+    int _sv0t201 = TY_UNIT();
+    return _sv0t201;
   } else {
   }
   if ((tag == 32)) {
-    int _sv0t197 = TY_UNIT();
-    return _sv0t197;
+    int _sv0t202 = TY_UNIT();
+    return _sv0t202;
   } else {
   }
   if ((tag == 33)) {
-    int _sv0t198 = TY_UNIT();
-    return _sv0t198;
+    int _sv0t203 = TY_UNIT();
+    return _sv0t203;
   } else {
   }
-  int _sv0t199 = (0 - 1);
-  return _sv0t199;
+  int _sv0t204 = (0 - 1);
+  return _sv0t204;
 }
 
 static int test_binop_class(void) {

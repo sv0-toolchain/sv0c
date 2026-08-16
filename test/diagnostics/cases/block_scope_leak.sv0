@@ -1,0 +1,5 @@
+/* BH-6 — a `let` binding inside a block does not leak past the block. `x` is
+   bound inside the inner block, so `return x` after it is unbound: E0300 on both
+   SML and native (native previously accepted it — the checker/resolver did not
+   scope block-locals). */
+fn main() -> i32 { { let x: i32 = 5; } return x; }
