@@ -352,6 +352,59 @@ fn test_nested_slice_ref() -> i32 {
     return 0;
 }
 
+fn test_int_width_variants() -> i32 {
+    if unify(Ty::TyInt(8), Ty::TyInt(8)) != true { return 1; }
+    if unify(Ty::TyInt(16), Ty::TyInt(16)) != true { return 2; }
+    if unify(Ty::TyInt(128), Ty::TyInt(128)) != true { return 3; }
+    if unify(Ty::TyInt(8), Ty::TyInt(16)) != false { return 4; }
+    if unify(Ty::TyUint(64), Ty::TyUint(64)) != true { return 5; }
+    if unify(Ty::TyUint(8), Ty::TyUint(128)) != false { return 6; }
+    return 0;
+}
+
+fn test_nested_ref_depth() -> i32 {
+    let a: Ty = Ty::TyRef(box_new(Ty::TyRef(box_new(Ty::TyBool))));
+    let b: Ty = Ty::TyRef(box_new(Ty::TyRef(box_new(Ty::TyBool))));
+    if unify(a, b) != true { return 1; }
+    let c: Ty = Ty::TyRef(box_new(Ty::TyRef(box_new(Ty::TyChar))));
+    if unify(a, c) != false { return 2; }
+    return 0;
+}
+
+fn test_deep_mixed() -> i32 {
+    let a: Ty = Ty::TyRef(box_new(Ty::TySlice(box_new(Ty::TyArray(box_new(Ty::TyInt(32)), 4)))));
+    let b: Ty = Ty::TyRef(box_new(Ty::TySlice(box_new(Ty::TyArray(box_new(Ty::TyInt(32)), 4)))));
+    if unify(a, b) != true { return 1; }
+    let c: Ty = Ty::TyRef(box_new(Ty::TySlice(box_new(Ty::TyArray(box_new(Ty::TyInt(32)), 5)))));
+    if unify(a, c) != false { return 2; }
+    return 0;
+}
+
+fn test_tyvar_nested_wildcard() -> i32 {
+    let tv: Ty = Ty::TyVar(3);
+    let deep: Ty = Ty::TyArray(box_new(Ty::TyRefMut(box_new(Ty::TyString))), 7);
+    if unify(tv, deep) != true { return 1; }
+    if unify(deep, tv) != true { return 2; }
+    return 0;
+}
+
+fn test_ty_tag_distinct() -> i32 {
+    if ty_tag(Ty::TyBool) == ty_tag(Ty::TyChar) { return 1; }
+    if ty_tag(Ty::TyUnit) == ty_tag(Ty::TyString) { return 2; }
+    if ty_tag(Ty::TyBool) != ty_tag(Ty::TyBool) { return 3; }
+    if ty_tag(Ty::TyInt(32)) == ty_tag(Ty::TyUint(32)) { return 4; }
+    if ty_tag(Ty::TyStruct(1)) == ty_tag(Ty::TyEnum(1)) { return 5; }
+    return 0;
+}
+
+fn test_struct_enum_ids() -> i32 {
+    if unify(Ty::TyStruct(0), Ty::TyStruct(0)) != true { return 1; }
+    if unify(Ty::TyEnum(0), Ty::TyEnum(0)) != true { return 2; }
+    if unify(Ty::TyStruct(100), Ty::TyStruct(101)) != false { return 3; }
+    if unify(Ty::TyError, Ty::TyError) != true { return 4; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_unit_variants();
     if r1 != 0 { return r1; }
@@ -369,5 +422,17 @@ fn main() -> i32 {
     if r7 != 0 { return 80 + r7; }
     let r8: i32 = test_nested_slice_ref();
     if r8 != 0 { return 90 + r8; }
+    let r9: i32 = test_int_width_variants();
+    if r9 != 0 { return 100 + r9; }
+    let r10: i32 = test_nested_ref_depth();
+    if r10 != 0 { return 110 + r10; }
+    let r11: i32 = test_deep_mixed();
+    if r11 != 0 { return 120 + r11; }
+    let r12: i32 = test_tyvar_nested_wildcard();
+    if r12 != 0 { return 130 + r12; }
+    let r13: i32 = test_ty_tag_distinct();
+    if r13 != 0 { return 140 + r13; }
+    let r14: i32 = test_struct_enum_ids();
+    if r14 != 0 { return 150 + r14; }
     return 0;
 }
