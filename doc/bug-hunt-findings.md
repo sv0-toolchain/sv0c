@@ -30,7 +30,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 | 8 | Native checker accepts type errors + emits no diagnostics | P1 | native |
 | 9 | `include` unwired on native (works on SML) | P2 | native | ✅ **FIXED** (native build + fixture) |
 | 10 | All runtime contracts dropped on native; VM aborts ungracefully | P1 / P3 | native / VM |
-| 11 | `?` / enum-return / tuple / nested-struct silently mis-emit | P1/P2 | native | ⚠️ enum-return **FIXED** (BH-11b); `?`/tuple/nested-struct open |
+| 11 | `?` / enum-return / tuple / nested-struct silently mis-emit | P1/P2 | native | ✅ `?` **FIXED** (BH-11a), enum-return **FIXED** (BH-11b), nested-struct **FIXED** (BH-11); tuple now a loud **E0446** diagnostic |
 | 12 | Variable shadowing → invalid C (redeclare) + VM scope leak | P2 | SML + native + VM |
 | 13 | Match guards → invalid C (guard evaluated before binding) | P2 | SML + native | ✅ **FIXED** (sv0c) — also fixed native catch-all bind arms |
 
@@ -434,9 +434,10 @@ compiler to emit **wrong or degenerate C with exit 0** (silent) — again invisi
 because the affected fixtures (`option_result`, `box_expr`, …) are gated on SML,
 not native.
 
-- **`?` (try) operator → stub `main`.** Any program using `?` compiles to exactly
-  `#include "sv0_runtime.h"` + `int main(void) { return 0; }` — the whole program
-  (enums, functions, real `main`) is dropped, exit 0. Minimal repro:
+- **`?` (try) operator → stub `main`.** ✅ **FIXED (BH-11a, sv0c).** Any program
+  using `?` used to compile to exactly `#include "sv0_runtime.h"` +
+  `int main(void) { return 0; }` — the whole program (enums, functions, real
+  `main`) dropped, exit 0. Minimal repro:
   ```sv0
   enum Opt { Some(i32), None }
   fn f(o: Opt) -> Opt { let v: i32 = o?; return Opt::Some(v); }
@@ -444,21 +445,30 @@ not native.
                      return match r { Opt::Some(x) => x, Opt::None => 0 }; }
   ```
   SML → 42; native → the stub (returns 0). **Root cause (diagnosed 2026-08-12):**
-  *two* gaps. (1) The **parser** never produces an `ExprTry` node — `parse_postfix_expr`
-  has no `?` (token 34) case, so `let v = o?;` stops parsing at `o`, truncating
+  *two* gaps. (1) The **parser** never produced an `ExprTry` node — `parse_postfix_expr`
+  had no `?` (token 34) case, so `let v = o?;` stopped parsing at `o`, truncating
   the item arena to whatever preceded the `?`-bearing fn (`num_blocks == 0` →
-  `megatu_emit_program` emits the `int main(){return 0;}` stub). A one-line parser
-  addition (push tag-22 `ExprTry(inner)`) fixes the parse. (2) But then
-  `lower_tag_try` — which *is* implemented — can only resolve the operand's enum
-  type when the operand is a **call** (`f()?`, via `fn_ctx`) or a 2-segment path
-  (`Enum::V(..)?`); for the common `o?` where `o` is a **bound variable**, it can't
-  find the enum type (the native lowering doesn't track variable types) → bails to
-  `VUnit` → wrong `v = 0`. So the parser fix alone makes `?` *parse* but produce
-  silently-wrong results (worse than the loud stub) — it was reverted.
-  **Remaining work (BH-11a):** give `lower_tag_try` operand-type resolution for
-  bound variables (look up a param's type via the fn's `id5`/`fpn`/`fpt` arenas;
-  locals need a lowering-side var→type map). Deferred — a real native-completeness
-  addition, not a quick fix.
+  `megatu_emit_program` emits the `int main(){return 0;}` stub). (2) `lower_tag_try`
+  could only resolve the operand's enum type for a **call** (`f()?`) or a 2-segment
+  path (`Enum::V(..)?`); a bare bound variable `o?` bailed to `VUnit` → wrong `v = 0`.
+  **Fix (2026-08-15):**
+  1. **Parser** — `parse_postfix_expr` now pushes a tag-22 `ExprTry(inner)` on
+     token 34 (`?`), so `?` postfixes any primary.
+  2. **`fn_ctx`** — `lower` pre-scans items, mapping each enum-returning fn's name
+     token → its return-enum name token (via `fn_ret_ty_root` + the pty arena +
+     `lower_name_is_enum`), stored as `[count, name…, enum…]`.
+  3. **`lower_tag_try`** — resolves the operand enum three ways: a **call** `g()?`
+     via the callee's `fn_ctx` entry (compared by **name text**, since a use token
+     ≠ the decl token — see `lower_tok_str_eq`); a **2-segment path**; and a **bare
+     variable** `o?`, which propagates the *enclosing* fn's return enum (looked up
+     by the current `item_fn_row`'s name in `fn_ctx`).
+
+  All three backends now agree: `g()?` and `o?` → 42, `None` propagation → 7.
+  Fixture `test/integration/question_op/` (exit 42), gated on native `--project`,
+  SML `one`-mode, and VM. Regression guard: `test_lower_try` was updated to back
+  its synthetic tokens with real `source`/`starts`/`ends` (the name-text compare
+  needs them); `lower_tok_str_eq`/`lower_name_is_enum` bounds-guard against
+  out-of-range token indices.
 
 - **Enum-returning function into a typed `let` → invalid C type `i`.** ✅ **FIXED (BH-11b, sv0c).**
   ```sv0

@@ -3124,7 +3124,18 @@ static int parse_postfix_expr(int tags, int starts, int ends, const char* source
           cur = (_sv0t37 - 1);
           p = (ix_p + 1);
         } else {
-          done = 1;
+          if ((t == 34)) {
+            sv0_vec_push(et, 22);
+            sv0_vec_push(ed1, cur);
+            sv0_vec_push(ed2, 0);
+            sv0_vec_push(ed3, 0);
+            sv0_vec_push(ed4, 0);
+            int _sv0t38 = sv0_vec_len(et);
+            cur = (_sv0t38 - 1);
+            p = (p + 1);
+          } else {
+            done = 1;
+          }
         }
       }
     }
