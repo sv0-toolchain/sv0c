@@ -249,7 +249,7 @@ fn main() -> i32 {
         ob, osn, oso, osc, osf,
         oen, oeto, oetc, oetf, oem,
         bet, bed1, bed2, bed3, bed4, bsf,
-        pp, tags, out_blocks, imp, fcr, fcb);
+        pp, tags, out_blocks, imp, fcr, fcb, frt, ptt, ptd1);
 
     /* Phase 6: emit C. codegen's emit_program AND its body emit (emit_instrs)
        use hardcoded test stubs — name_of (token-index -> fabricated names,

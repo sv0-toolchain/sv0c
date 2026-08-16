@@ -1753,7 +1753,20 @@ fn parse_postfix_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     cur = vec_len(et) - 1;
                     p = ix_p + 1;
                 } else {
-                    done = true;
+                    if t == 34 {
+                        /* `expr?` postfix -> ExprTry (tag 22, d1=inner). Lowering
+                           (lower_tag_try) checks the failure variant and either
+                           propagates or extracts the payload. */
+                        vec_push(et, 22);
+                        vec_push(ed1, cur);
+                        vec_push(ed2, 0);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                        cur = vec_len(et) - 1;
+                        p = p + 1;
+                    } else {
+                        done = true;
+                    }
                 }
             }
         }

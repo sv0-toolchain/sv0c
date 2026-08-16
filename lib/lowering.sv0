@@ -1008,7 +1008,9 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 loop {
                     if fi >= fn_count { break; }
                     let fn_name_h: i32 = vec_get(fn_ctx, 1 + fi);
-                    if fn_name_h == callee_tok {
+                    /* BH-11a: compare by NAME TEXT — the callee's use token differs
+                       from the fn's decl token stored in fn_ctx. */
+                    if lower_tok_str_eq(source, starts, ends, fn_name_h, callee_tok) {
                         enum_name = vec_get(fn_ctx, 1 + fn_count + fi);
                     }
                     fi = fi + 1;
@@ -1025,6 +1027,23 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let ppc: i32 = vec_get(ed2, inner);
         if ppc == 2 {
             enum_name = vec_get(pp, pps);
+        }
+        if ppc == 1 {
+            /* BH-11a: a bare-variable operand (`o?`) — its enum is the one the
+               ENCLOSING fn returns (`?` propagates the same enum). Look up the
+               current fn (item_fn_row) in fn_ctx to get its return enum token. */
+            if item_fn_row >= 0 {
+                if item_fn_row < vec_len(item_names) {
+                    let cur_fn_tok: i32 = vec_get(item_names, item_fn_row);
+                    let mut fj: i32 = 0;
+                    while fj < fn_count {
+                        if vec_get(fn_ctx, 1 + fj) == cur_fn_tok {
+                            enum_name = vec_get(fn_ctx, 1 + fn_count + fj);
+                        }
+                        fj = fj + 1;
+                    }
+                }
+            }
         }
     }
     if enum_name < 0 { return Value::VUnit; }
@@ -3766,6 +3785,49 @@ fn contract_is_advanced(tok_tags: Vec<i32>, kw_pos: i32) -> bool {
     return false;
 }
 
+/* String equality of two source tokens' identifier text (BH-11a). Two occurrences
+   of the same name are DIFFERENT tokens, so fn_ctx lookups must compare by text. */
+fn lower_tok_str_eq(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                    a: i32, b: i32) -> bool {
+    if a < 0 { return false; }
+    if b < 0 { return false; }
+    if a >= vec_len(starts) { return false; }
+    if b >= vec_len(starts) { return false; }
+    let as2: i32 = vec_get(starts, a);
+    let ae: i32 = vec_get(ends, a);
+    let bs: i32 = vec_get(starts, b);
+    let be: i32 = vec_get(ends, b);
+    return string_eq(string_substr(source, as2, ae - as2),
+                     string_substr(source, bs, be - bs));
+}
+
+/* True if `tok`'s identifier text names a declared enum (out_enum_names is a flat
+   list of enum name tokens). Used to decide whether a fn's return type is an enum
+   for the `?`-operator fn_ctx (BH-11a). */
+fn lower_name_is_enum(enum_names: Vec<i32>, tok: i32,
+                      source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    if tok < 0 { return false; }
+    if tok >= vec_len(starts) { return false; }
+    let ts: i32 = vec_get(starts, tok);
+    let te: i32 = vec_get(ends, tok);
+    if te <= ts { return false; }
+    let nm: string = string_substr(source, ts, te - ts);
+    let ne: i32 = vec_len(enum_names);
+    let mut j: i32 = 0;
+    while j < ne {
+        let et: i32 = vec_get(enum_names, j);
+        if et >= 0 {
+            if et < vec_len(starts) {
+                let es: i32 = vec_get(starts, et);
+                let ee: i32 = vec_get(ends, et);
+                if string_eq(nm, string_substr(source, es, ee - es)) { return true; }
+            }
+        }
+        j = j + 1;
+    }
+    return false;
+}
+
 fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
          item_field_counts: Vec<i32>, item_vmax: Vec<i32>,
@@ -3790,7 +3852,9 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          out_blocks: Vec<i32>,
          import_aliases: Vec<i32>,
          fn_contract_root: Vec<i32>,
-         fn_contract_base: Vec<i32>) -> string {
+         fn_contract_base: Vec<i32>,
+         fn_ret_ty_root: Vec<i32>,
+         pty_tt: Vec<i32>, pty_td1: Vec<i32>) -> string {
     /* Merge ItemUse value imports into any caller-provided alias table
        (SML lowering sees resolver importAliases ∪ synthetic use rows). */
     let discard_fill_alias: i32 = lower_fill_import_aliases_from_use_items(
@@ -3826,6 +3890,50 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
     }
     let fn_ctx: Vec<i32> = vec_new();
     let n: i32 = vec_len(item_tags);
+    /* BH-11a: fn_ctx = [count, name_0..name_{c-1}, enum_0..enum_{c-1}] for each
+       ENUM-returning fn (name token -> its return enum's name token). lower_tag_try
+       uses it to type a `?` operand: `f()?` via the callee's entry, and a bare
+       `o?` via the CURRENT fn's entry (`?` propagates the same enum the fn
+       returns). Populated from fn_ret_ty_root + the pty arena. */
+    let ctx_names: Vec<i32> = vec_new();
+    let ctx_enums: Vec<i32> = vec_new();
+    let mut ci: i32 = 0;
+    while ci < n {
+        if vec_get(item_tags, ci) == 0 {
+            if ci < vec_len(fn_ret_ty_root) {
+                let rroot: i32 = vec_get(fn_ret_ty_root, ci);
+                if rroot >= 0 {
+                    if rroot < vec_len(pty_tt) {
+                        if vec_get(pty_tt, rroot) == 0 {
+                            let rpps: i32 = vec_get(pty_td1, rroot);
+                            if rpps >= 0 {
+                                if rpps < vec_len(body_pp) {
+                                    let rtok: i32 = vec_get(body_pp, rpps);
+                                    if lower_name_is_enum(out_enum_names, rtok,
+                                                          source, starts, ends) {
+                                        vec_push(ctx_names, vec_get(item_names, ci));
+                                        vec_push(ctx_enums, rtok);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ci = ci + 1;
+    }
+    vec_push(fn_ctx, vec_len(ctx_names));
+    let mut ck: i32 = 0;
+    while ck < vec_len(ctx_names) {
+        vec_push(fn_ctx, vec_get(ctx_names, ck));
+        ck = ck + 1;
+    }
+    ck = 0;
+    while ck < vec_len(ctx_enums) {
+        vec_push(fn_ctx, vec_get(ctx_enums, ck));
+        ck = ck + 1;
+    }
     let mut i: i32 = 0;
     while i < n {
         if vec_get(item_tags, i) == 0 {
@@ -8649,6 +8757,7 @@ fn test_lower_program_fn() -> i32 {
                              oen, oeto, oetc, oetf, oem,
                              bet, be1, be2, be3, be4, bsf,
                              bpp, ttags, oblks,
+                             vec_new(), vec_new(), vec_new(),
                              vec_new(), vec_new(), vec_new());
     if vec_len(ob) != 1 { return 1; }
     if vec_get(ob, 0) != 3 { return 2; }
@@ -9020,8 +9129,8 @@ fn test_lower_try() -> i32 {
     vec_push(en_tf, 0);
     vec_push(en_tf, 601);
     vec_push(en_tf, 1);
-    vec_push(pp, 300);
-    vec_push(pp, 300);
+    vec_push(pp, 0);
+    vec_push(pp, 0);
     vec_push(et, 1);
     vec_push(ed1, 0);
     vec_push(ed2, 1);
@@ -9040,9 +9149,13 @@ fn test_lower_try() -> i32 {
     let mut fn_ctx: Vec<i32> = vec_new();
     let builtin_map: Vec<i32> = vec_new();
     let lit_sf_names: Vec<i32> = vec_new();
-    let source: string = "";
-    let starts: Vec<i32> = vec_new();
-    let ends: Vec<i32> = vec_new();
+    /* BH-11a: token 0 = "f"; fn_ctx now compares callee text, so source/starts/ends
+       must back token 0. */
+    let source: string = "f";
+    let mut starts: Vec<i32> = vec_new();
+    let mut ends: Vec<i32> = vec_new();
+    vec_push(starts, 0);
+    vec_push(ends, 1);
     let item_tags: Vec<i32> = vec_new();
     let item_names: Vec<i32> = vec_new();
     let item_d2: Vec<i32> = vec_new();
@@ -9053,7 +9166,7 @@ fn test_lower_try() -> i32 {
     let enum_vnames_flat: Vec<i32> = vec_new();
     let enum_max_payloads: Vec<i32> = vec_new();
     vec_push(fn_ctx, 1);
-    vec_push(fn_ctx, 300);
+    vec_push(fn_ctx, 0);
     vec_push(fn_ctx, 500);
     let v1: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                                          2, ctr, out, en_n, en_to, en_tc,
