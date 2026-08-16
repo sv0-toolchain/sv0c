@@ -114,19 +114,20 @@ Independent of the cross-module epics; each is a self-contained parity gap.
 
 ---
 
-## Epic 6 — Native-default compiler promotion (Phase B3 deferred)
+## Epic 6 — Native-default compiler promotion (Phase B3 deferred) — ✅ COMPLETE (2026-08-15)
 
 Promote `build/sv0-self-host-compiler` from the SML **bootstrap delegate** to the
-**native** mega-TU binary. Blocked only by an **acceptance-surface decision**:
-the `self-host-sv0-loop` byte-diff-vs-SML leg (`scripts/sv0:520–546`) is passed
-trivially by the SML delegate but **cannot** be passed by the native composed
-emit (behavioral, not byte-identical — by design, measured in B2: only 40/98
-byte-identical, ~109% line churn on real modules).
+**native** mega-TU binary. Was blocked on an **acceptance-surface decision**:
+the `self-host-sv0-loop` byte-diff-vs-SML leg is passed trivially by the SML
+delegate but **cannot** be passed by the native composed emit (behavioral, not
+byte-identical — by design, measured in B2: only 40/98 byte-identical, ~109%
+line churn on real modules), plus the **native-completeness cluster** (#8/#10/#11).
 
 | ID | Task | Files | Size | Notes |
 |----|------|-------|------|-------|
-| **PC-6a** | **[DECISION]** Choose the promotion path: (i) add a **behavioral-mode** flag to the self-host loop (skip the byte-diff leg, keep emit+cc+run parity), or (ii) accept + document the divergence. Recommend (i). | — | S | [design] stakeholder call — needs sign-off |
-| **PC-6b** | Implement the chosen path: default `SV0_SELF_HOST_COMPILER` → native binary; loop uses behavioral parity (`sv0-megatu-native-parity.sh` is already the 98/98 gate). Update `self-host-native.yml` / `ci.yml` + docs. | `scripts/sv0`, workflows, docs | M | [design] |
+| **PC-6a** | **[DECISION]** Choose the promotion path: (i) add a **behavioral-mode** flag to the self-host loop (skip the byte-diff leg, keep emit+cc+run parity), or (ii) accept + document the divergence. Recommend (i). | — | S | ✅ DONE — chose (i) behavioral-mode |
+| **PC-6b** | Behavioral-mode flag (`SV0_SELF_HOST_LOOP_MODE=behavioral`) + native CI gate in `self-host-native.yml`. | `scripts/sv0`, workflows | M | ✅ DONE (2026-08-05) — 98/98 behavioral |
+| **PC-6c** | **The flip.** Gated on the native-completeness cluster (#8/#10/#11, all closed 2026-08-15). `run_self_host_sv0_loop` now defaults `SV0_SELF_HOST_COMPILER` → `build/sv0-megatu-compiler-native` + behavioral mode when unset (`ensure_sv0_megatu_native` builds it). The **SML byte-guards stay pinned to the SML delegate**: the stage0 golden gate emits via the delegate in a subshell, and the loop's reference leg uses the SML heap directly. `run_test` no longer pre-exports the delegate, so the flip reaches main CI (`./scripts/sv0 test`) automatically. Escape hatch: export `SV0_SELF_HOST_COMPILER=build/sv0-self-host-compiler` (+ `SV0_SELF_HOST_LOOP_MODE=bytediff`) for the old SML byte-diff path. | `scripts/sv0` | M | ✅ DONE (2026-08-15) — parent-only; full gate + escape hatch green |
 
 ---
 
