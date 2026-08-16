@@ -2452,6 +2452,25 @@ fn check_body_field_access(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
     return 0;
 }
 
+/* First multi-element tuple (ExprTuple tag 25, d2 > 1) in a body arena, or -1.
+   sv0 does not support multi-element tuples in this slice — a tuple value makes
+   synth_expr fail with no specific diagnostic — so check_program uses this to
+   attribute an otherwise-silent rejection to E0446 (matching SML). Linear scan;
+   the arena is flat. */
+fn find_multi_element_tuple(bet: Vec<i32>, bed2: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(bet);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(bet, i) == 25 {
+            if vec_get(bed2, i) > 1 {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 fn check_program(
     tok_tags: Vec<i32>,
     source: string,
@@ -2608,7 +2627,21 @@ fn check_program(
                                 param_name_pos, param_tyname_toks,
                                 sdef_names, sdef_field_offsets, sdef_field_counts,
                                 sdef_fnames_flat, source, starts, ends, diag_sink);
-            if chk != 0 { return 0 - 1; }
+            if chk != 0 {
+                /* The body failed to check. If no check pushed a specific
+                   diagnostic, attribute a common silent-reject cause — a
+                   multi-element tuple (unsupported; synth_expr returns -1 with no
+                   message) — to E0446, matching SML. Otherwise the exit stays a
+                   bare nonzero (further silent-reject causes are future BH-8 work). */
+                if vec_len(diag_sink) == 0 {
+                    let tup_i: i32 = find_multi_element_tuple(body_et, body_ed2);
+                    if tup_i >= 0 {
+                        vec_push(diag_sink, 446);
+                        vec_push(diag_sink, expr_span_tok(body_et, body_ed1, bpp, tup_i));
+                    }
+                }
+                return 0 - 1;
+            }
         }
         ii = ii + 1;
     }

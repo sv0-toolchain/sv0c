@@ -7,3 +7,4 @@ test/diagnostics/cases/unbound_name.sv0|E0300
 test/diagnostics/cases/wrong_arity.sv0|E0307
 test/diagnostics/cases/field_missing.sv0|E0429
 test/diagnostics/cases/void_contract.sv0|E0409
+test/diagnostics/cases/tuple_unsupported.sv0|E0446

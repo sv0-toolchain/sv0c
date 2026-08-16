@@ -26,6 +26,7 @@ fn megatu_diag_code_str(code: i32) -> string {
     if code == 309 { return "E0309"; }
     if code == 409 { return "E0409"; }
     if code == 429 { return "E0429"; }
+    if code == 446 { return "E0446"; }
     return "E0000";
 }
 
@@ -38,6 +39,7 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 309 { return "invalid use clause"; }
     if code == 409 { return "contract requires an explicit return type"; }
     if code == 429 { return "no such field"; }
+    if code == 446 { return "multi-element tuples are not supported in this slice"; }
     return "error";
 }
 

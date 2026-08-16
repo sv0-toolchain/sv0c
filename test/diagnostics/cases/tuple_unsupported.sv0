@@ -1,0 +1,7 @@
+/* BH #11: a multi-element tuple is unsupported in this slice. Native used to
+   reject it at the check phase SILENTLY (exit 4, no message); it now emits E0446,
+   matching SML's `E0446: multi-element tuples are not supported`. */
+fn main() -> i32 {
+    let t: (i32, i32) = (40, 2);
+    return 42;
+}
