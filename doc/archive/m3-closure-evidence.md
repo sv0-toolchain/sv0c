@@ -66,7 +66,7 @@ in `l0-closure-roadmap.md` and does not reopen M3.
 - **Recipe — DONE.** `scripts/build-sv0-megatu-native.sh` composes the whole
   multi-module compiler (mega-TU), SML→C→`cc` **once** (bootstrap), producing a
   native binary that runs with no SML. Docs: `doc/native-self-host-compiler-recipe.md`,
-  `doc/native-compose-tradeoffs.md`.
+  `doc/archive/native-compose-tradeoffs.md`.
 - **End-to-end build of sv0 sources — VERIFIED.** Native binary emits+cc+runs the
   corpus at **98/98** (`./scripts/sv0-megatu-native-parity.sh` →
   `PASS=98 FAIL=0 … no SML at runtime`, verified 2026-08-05; per-file

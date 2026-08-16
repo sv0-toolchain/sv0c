@@ -1,6 +1,6 @@
 # modules_struct_type — imported-struct local type (PC-1 fixture)
 
-**Epic 1 / PC-1** (post-M3 Phase C; `sv0c/doc/post-m3-phase-c-plan.md`,
+**Epic 1 / PC-1** (post-M3 Phase C; `sv0c/doc/archive/post-m3-phase-c-plan.md`,
 `task/sv0-toolchain-milestone-3-checklist.Rmd` § Post-M3 Phase C slice backlog).
 
 **What it exercises.** Module `lib` defines `struct Point { x, y }` + `origin()`.

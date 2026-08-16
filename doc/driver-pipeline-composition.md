@@ -19,7 +19,7 @@ The **linear step indices** **`0..DRIVER_FULL_PIPELINE_LEN()-1`** exposed from *
 
 - **`lib/driver.sv0`** now implements a **complete, tested pipeline** — tokenize → parse → resolve → check → emit — in a single translation unit, with **49 self-host tests passing** (exit 0 natively). Key `drv_*` functions: `drv_tokenize`, `drv_parse`, `drv_resolve`, `drv_check`, `drv_emit`, and test helpers. This is the canonical single-TU pipeline implementation for P1/P2.
 - **`lib/main.sv0`** implements **path / CLI / phase naming / VM output paths**, **`driver_tokenize_sketch`** (read file → tokenize boundary sketch), and tests (**`test_driver_pipeline_step_names`**, **`test_phases`**, …). It does **not** yet call the `drv_*` pipeline — that wiring (Phase A3 in the plan) is the P1 next step.
-- Full lexer + parser live in **`lib/lexer.sv0`**, **`lib/parser.sv0`** (see **`lib/LAYOUT.md`** § transliteration order). `lib/driver.sv0` re-implements a self-contained subset of these for its pipeline.
+- Full lexer + parser live in **`lib/lexer.sv0`**, **`lib/parser.sv0`** (see **`doc/archive/lib-LAYOUT.md`** § transliteration order). `lib/driver.sv0` re-implements a self-contained subset of these for its pipeline.
 - **Cross-unit linking for sv0** (multiple **`lib/*.sv0`** compilation units merged into one executable) is **not** the same as `#include` text concatenation; until an agreed multi-unit or single-TU policy lands, “one driver TU” is **documentation + naming parity**, not an end-to-end **`main`** that runs the whole compiler. `driver.sv0` is the working single-TU proof-of-concept.
 
 ### Bootstrap VM-compile unit model (why **M3-S-041** is hard)
@@ -38,7 +38,7 @@ The **linear step indices** **`0..DRIVER_FULL_PIPELINE_LEN()-1`** exposed from *
 
 **Cleanest path toward M3 closure (engineering recommendation):**
 
-1. **Prefer (B) multi-unit linking** for the **maintainable** native compiler: mirrors **`lib/LAYOUT.md`** module boundaries, matches how **`sources.cm`** composes the **SML** driver today (many compilation units → one heap image). Native closure = **`cc`** link of sv0-emitted **`.c`** objects + runtime (**or** agreed package layout).
+1. **Prefer (B) multi-unit linking** for the **maintainable** native compiler: mirrors **`doc/archive/lib-LAYOUT.md`** module boundaries, matches how **`sources.cm`** composes the **SML** driver today (many compilation units → one heap image). Native closure = **`cc`** link of sv0-emitted **`.c`** objects + runtime (**or** agreed package layout).
 2. **Use (A) mega-TU only as an optional spike** if the team needs the **fastest first** proof that **`SV0_SELF_HOST_COMPILER`** can **`diff`** SML on **`lib/self-host-sv0-loop.list`** — e.g. generated single TU or trimmed harness — then **refactor toward (B)** so M3 does not freeze a monolith.
 
 **What “complete both” means for planning:** track **(A)** *spike complete* and **(B)** *linker + roots complete* as **separate milestones** on the way to **one** shipped model (**B)** unless the project explicitly chooses to stay **(A)** (discouraged for long-term sv0 maintenance).
@@ -53,7 +53,7 @@ Promote **M3-S-041** from **Partial** to **Done** when **all** of the following 
    - (A) **one** `.sv0` translation unit whose **`main`** drives **lexer → parse → resolve → check → … → emit** with the same observable phase order as **`sml-legacy/main.sml`** on fixed fixtures, or  
    - (B) explicit **multi-unit** sv0 linking plus a thin **`main`** root that calls the composed pipeline (with tests proving order).
 2. **Automated checks**: extend **`./scripts/sv0 test`** (or a documented subset) so regressions in phase order or wiring fail CI — not only naming tests in **`lib/main.sv0`**. **Partial guard (landed):** **`scripts/verify_m3_g6_pipeline_contract.py`** (via **`./scripts/sv0 test-guards`** / **`test`**) asserts **`PHASE_COUNT`**, **`DRIVER_FULL_PIPELINE_LEN` = 2 + `PHASE_COUNT()`**, and presence of coarse step-name strings — this protects the **documented spine** but **does not** execute lexer→emit inside sv0.
-3. **Cross-reference**: update **`doc/transliteration-plan.md`** Pipeline/driver row and **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## M3 G6 slice status** when (1)–(2) land.
+3. **Cross-reference**: update **`doc/archive/transliteration-plan.md`** Pipeline/driver row and **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## M3 G6 slice status** when (1)–(2) land.
 
 Until then, **`lib/main.sv0`** remains the **staging module** for driver-facing helpers; **M3-S-042** (**`doc/cli-parity.md`**) can be **Done** independently.
 
@@ -75,7 +75,7 @@ For **bootstrap / transliteration milestone tracking**, promote **M3-S-041** fro
 
 ## Related
 
-- **`sv0c/doc/l0-closure-roadmap.md`** — **L0** sequencing toward native **(A)/(B)** closure vs this document’s deferred engineering.
+- **`sv0c/doc/archive/l0-closure-roadmap.md`** — **L0** sequencing toward native **(A)/(B)** closure vs this document’s deferred engineering.
 - **`sv0c/doc/cli-parity.md`** — argv / **`classify_cli`** vs **SML** **`Main.main`** (**M3-S-042**).
 - **`sv0c/doc/link-g6-blockers.md`** — link-time and merge gates (**M3-S-039**, **M3-S-040**).
-- **`sv0c/lib/LAYOUT.md`** — bootstrap directory roles and transliteration spine.
+- **`sv0c/doc/archive/lib-LAYOUT.md`** — bootstrap directory roles and transliteration spine.

@@ -36,7 +36,7 @@ To skip the third leg locally (faster iteration), set **`SV0_SKIP_SELF_HOST_COMP
 | **Pilot / default CI** | **`scripts/sv0-self-host-emit-c.sh`** → loads the **SML** heap **`build/sv0c`** and runs the same job as **`emit-c`** for one absolute **`.sv0`** path, **C on stdout** | Proves the **mechanical** loop (**`cc`**+run on **`lib/self-host-sv0-loop.list`**) and the **stdout contract** for the third-leg **`diff`**. This is **not** semantic self-hosting — it is the **bootstrap stand-in** documented in **`task/sv0-toolchain-milestone-3-self-host.Rmd`**. |
 | **Native semantic path** | Set **`SV0_SELF_HOST_COMPILER`** to a **native executable built from sv0 sources** (or a thin wrapper) that honors the same invocation: **one absolute path** → **C on stdout** | When **`./scripts/sv0 self-host-sv0-loop`** runs, the third leg **`diff`**s that output against SML; **byte-identical C** on the pilot list is the **working definition** of semantic loop closure for those seeds. **M3** completion still requires broader parity and stakeholder criteria in the owning task — not only this hook. |
 
-**Prerequisites for turning on native mode:** a binary (or wrapper) that matches the contract exercised by **`sv0-self-host-emit-c.sh`** and **`./scripts/sv0 emit-c <rel>`** (paths relative to **`sv0c/`** in the latter; the self-host script always passes **absolute** paths). Keep **`doc/transliteration-plan.md`** and **`lib/LAYOUT.md`** current as more compiler modules become sv0.
+**Prerequisites for turning on native mode:** a binary (or wrapper) that matches the contract exercised by **`sv0-self-host-emit-c.sh`** and **`./scripts/sv0 emit-c <rel>`** (paths relative to **`sv0c/`** in the latter; the self-host script always passes **absolute** paths). Keep **`doc/archive/transliteration-plan.md`** and **`doc/archive/lib-LAYOUT.md`** current as more compiler modules become sv0.
 
 ## Commands
 
@@ -66,7 +66,7 @@ From the **sv0-toolchain** repo root:
 ## Related
 
 - **`doc/native-self-host-compiler-recipe.md`** — **M3-S-047**: canonical **`build/sv0-self-host-compiler`** wrapper and **`SV0_SELF_HOST_COMPILER`** setup (bootstrap delegate vs future native binary).
-- **`doc/sml-retirement-cutover-checklist.md`**, **`doc/cold-bootstrap-recovery.md`** — **M3 G9** retirement prep / recovery (**human-gated** cutover).
+- **`doc/archive/sml-retirement-cutover-checklist.md`**, **`doc/cold-bootstrap-recovery.md`** — **M3 G9** retirement prep / recovery (**human-gated** cutover).
 - **`task/sv0-toolchain-milestone-3-self-host.Rmd`** — definition of done for milestone 3 (full parity + SML retirement remain open).
-- **`sv0c/lib/LAYOUT.md`** — transliteration order and bootstrap lists.
+- **`sv0c/doc/archive/lib-LAYOUT.md`** — transliteration order and bootstrap lists.
 - **`./scripts/sv0 emit-c`**, **`self-host-capture-stage0`**, **`self-host-compare`** — C snapshot workflow.

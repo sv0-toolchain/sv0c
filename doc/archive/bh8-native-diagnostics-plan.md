@@ -4,7 +4,7 @@ Bug-hunt finding **#8**: the native checker (`lib/checker.sv0`) silently accepts
 several type errors and, where it does reject, emits no `Exxxx` code or message —
 just a bare nonzero exit. This blocks promoting the native compiler to the
 default (and eventually only) front end, since it would accept ill-typed
-programs. See `doc/bug-hunt-findings.md` §8.
+programs. See `doc/archive/bug-hunt-findings.md` §8.
 
 ## What already exists (this is wiring + missing-checks, not build-from-scratch)
 

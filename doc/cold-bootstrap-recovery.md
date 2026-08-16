@@ -54,5 +54,5 @@ If **`sv0c`** is detached or behind, align submodule gitlink to a known-good SHA
 
 ## Related
 
-- **`doc/sml-retirement-cutover-checklist.md`** — forward cutover order
+- **`doc/archive/sml-retirement-cutover-checklist.md`** — forward cutover order
 - **`doc/self-host-sv0-loop.md`** — pilot vs native semantics

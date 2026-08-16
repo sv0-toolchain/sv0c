@@ -1,6 +1,6 @@
 # Complete transliteration plan (SML bootstrap → sv0 compiler)
 
-This document is a **roadmap** for moving the authoritative implementation from **`sv0c/sml-legacy/`** into **`.sv0`** sources under **`lib/`**, **`lexer/`**, **`parser/`**, and future compiler directories. It complements **`lib/LAYOUT.md`** (directory roles and dependency order) and **`task/sv0-toolchain-milestone-3-checklist.Rmd`** (phase table).
+This document is a **roadmap** for moving the authoritative implementation from **`sv0c/sml-legacy/`** into **`.sv0`** sources under **`lib/`**, **`lexer/`**, **`parser/`**, and future compiler directories. It complements **`doc/archive/lib-LAYOUT.md`** (directory roles and dependency order) and **`task/sv0-toolchain-milestone-3-checklist.Rmd`** (phase table).
 
 **Normative language rules** remain in **`sv0doc/`**. This file is **implementation planning** only.
 
@@ -8,11 +8,11 @@ This document is a **roadmap** for moving the authoritative implementation from 
 
 ## Keeping this plan current (**`PROGRESS.md` C-4**)
 
-This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for milestone 3. **`PROGRESS.md`** checklist **C-4** is satisfied when both stay aligned with the tree as seeds land.
+This file and **`doc/archive/lib-LAYOUT.md`** are the **paired** transliteration map for milestone 3. **`PROGRESS.md`** checklist **C-4** is satisfied when both stay aligned with the tree as seeds land.
 
 **Maintainer contract**
 
-1. When you add, rename, or drop a **`.sv0`** seed under **`lib/`**, **`lexer/`**, or **`parser/`**, update **this** §2 inventory row and **`lib/LAYOUT.md`** (directory table + transliteration §2) in the **same** integration when practical so readers never chase two divergent lists.
+1. When you add, rename, or drop a **`.sv0`** seed under **`lib/`**, **`lexer/`**, or **`parser/`**, update **this** §2 inventory row and **`doc/archive/lib-LAYOUT.md`** (directory table + transliteration §2) in the **same** integration when practical so readers never chase two divergent lists.
 2. **Phase / row-level** tracking lives in **`task/sv0-toolchain-milestone-3-checklist.Rmd`** — link it from decomposition notes; do not fork a second full inventory here.
 3. **Regenerate the snapshot** below after material **`bootstrap-sources.list`**, **`self-host-sv0-loop.list`**, stage0 goldens, or vm-parity manifest churn (counts are advisory; CI truth is the files).
 
@@ -72,7 +72,7 @@ This file and **`lib/LAYOUT.md`** are the **paired** transliteration map for mil
 
 ## Slice backlog (authoritative IDs)
 
-**Milestone-3 execution slices** (stable **`M3-S-###`** IDs, acceptance criteria, dependencies) live in **`task/sv0-toolchain-milestone-3-self-host.Rmd`** section **“documented M3 slice backlog”**. This **`transliteration-plan.md`** file remains the **module inventory** and **SML ↔ sv0 “next focus”** map; when a slice lands, update the relevant inventory rows here and **`lib/LAYOUT.md`** in the same integration when practical.
+**Milestone-3 execution slices** (stable **`M3-S-###`** IDs, acceptance criteria, dependencies) live in **`task/sv0-toolchain-milestone-3-self-host.Rmd`** section **“documented M3 slice backlog”**. This **`transliteration-plan.md`** file remains the **module inventory** and **SML ↔ sv0 “next focus”** map; when a slice lands, update the relevant inventory rows here and **`doc/archive/lib-LAYOUT.md`** in the same integration when practical.
 
 ## M3 G3 — Parser item arena + program sidecars (normative for G4)
 
@@ -125,7 +125,7 @@ Anchors **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## L0 closure** →
 
 **Do not** mark the **L0** table row **Done** until **Semantic pipeline** + **Lowering/link/driver** rows above match stakeholder **## completion criteria** in the milestone task (not only diagnostics **`println`** parity).
 
-**Update (2026-08-12).** M3 stakeholder completion criteria were **met 2026-08-05** on the corpus surface, and post-M3 **Phase C** closed the cross-module **feature** gaps: `resolve_ty` tails (PC-4a), multi-module linking via native `--project` source-concat + SML `--project` mangling (PC-3b/3c), multi-module checker over the merged program, `PatStruct`/impl-methods/method-calls (PC-4b/4c), and the §5e checker forward-scan blocker for name-collision mangling (PC-7). So the **Semantic pipeline** and **Lowering/link/driver** rows are at cross-module parity on the acceptance fixtures. The rows are **not** flipped to **Done** here because L0's remaining criterion is promoting the native binary to the *default* `SV0_SELF_HOST_COMPILER`, which the 2026-08-12 bug hunt shows is gated on native-completeness defects (`sv0c/doc/bug-hunt-findings.md` #8/#10/#11 — the native checker under-diagnoses, drops runtime contracts, and silently mis-emits several constructs). Authoritative live status: `task/sv0-toolchain-progress.md` ## Post-M3 hardening status.
+**Update (2026-08-12).** M3 stakeholder completion criteria were **met 2026-08-05** on the corpus surface, and post-M3 **Phase C** closed the cross-module **feature** gaps: `resolve_ty` tails (PC-4a), multi-module linking via native `--project` source-concat + SML `--project` mangling (PC-3b/3c), multi-module checker over the merged program, `PatStruct`/impl-methods/method-calls (PC-4b/4c), and the §5e checker forward-scan blocker for name-collision mangling (PC-7). So the **Semantic pipeline** and **Lowering/link/driver** rows are at cross-module parity on the acceptance fixtures. The rows are **not** flipped to **Done** here because L0's remaining criterion is promoting the native binary to the *default* `SV0_SELF_HOST_COMPILER`, which the 2026-08-12 bug hunt shows is gated on native-completeness defects (`sv0c/doc/archive/bug-hunt-findings.md` #8/#10/#11 — the native checker under-diagnoses, drops runtime contracts, and silently mis-emits several constructs). Authoritative live status: `task/sv0-toolchain-progress.md` ## Post-M3 hardening status.
 
 ## Suggested sequencing (high level)
 
@@ -145,8 +145,8 @@ Anchors **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **## L0 closure** →
 
 ## Related
 
-- **`doc/l0-closure-roadmap.md`** — phased path toward **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **L0** (native **`SV0_SELF_HOST_COMPILER`**, composed driver, parity, evidence).
-- **`lib/LAYOUT.md`** — transliteration dependency order (§2).
+- **`doc/archive/l0-closure-roadmap.md`** — phased path toward **`task/sv0-toolchain-milestone-3-self-host.Rmd`** **L0** (native **`SV0_SELF_HOST_COMPILER`**, composed driver, parity, evidence).
+- **`doc/archive/lib-LAYOUT.md`** — transliteration dependency order (§2).
 - **`doc/self-host-sv0-loop.md`** — pilot loop and **`SV0_SELF_HOST_COMPILER`**.
 - **`doc/compiler-passes.md`** — phase mapping for the current SML pipeline.
 - **`doc/tooling-formatter-linter.md`** — **`sv0-formatter`** / **`sv0-linter`** design sketch (tooling; not spec).

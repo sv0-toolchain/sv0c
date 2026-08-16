@@ -1,106 +1,117 @@
-# sv0c -- sv0 bootstrap compiler
+# sv0c — the sv0 compiler
 
-the sv0 bootstrap compiler, implemented in Standard ML (SML/NJ).
+sv0c compiles `.sv0` source to **C** (`cc`/`gcc` → native binary) and to **sv0
+bytecode** (run by [sv0vm](../sv0vm/)). It is **self-hosting**: the compiler is
+written in sv0 and compiles itself.
 
-## purpose
+## two implementations, one design
 
-sv0c reads `.sv0` source files and compiles them to C source code, which is then compiled to native binaries by a standard C compiler (`cc`/`gcc`). this is the milestone 1 bootstrap compiler that will eventually be rewritten in sv0 itself. for what is actually in that slice versus deferred to milestone 2, see [sv0doc/milestone-1-complete.md](../sv0doc/milestone-1-complete.md).
+sv0c exists as two compilers that share the same pipeline and pass design:
 
-## architecture
+| | tree | role |
+|---|---|---|
+| **the compiler, in sv0** | [`lib/`](lib/) (21 `*.sv0` modules) | **default.** Built natively into `build/sv0-megatu-compiler-native` (no SML at runtime); this is what the toolchain uses. |
+| **the SML bootstrap** | [`sml-legacy/`](sml-legacy/) (SML/NJ) | **retired reference.** The original bootstrap that first compiled `lib/`. Kept as a byte/behavioral cross-check; not the default (see [SML retirement](#sml-retirement)). |
+
+Both accept the same language and emit equivalent output. The native compiler is
+the source of truth; SML is a reference the CI still diffs against.
+
+## pipeline
 
 ```
 sv0 source (.sv0)
-     |
-     v
-  Lexer         sml-legacy/lexer/
-     |
-     v
-  Parser        sml-legacy/parser/ + sml-legacy/ast/
-     |
-     v
-  Name Resolver sml-legacy/name_resolution/
-     |
-     v
-  Type Checker  sml-legacy/type_checker/
-     |
-     v
-  Contract      sml-legacy/contract_analyzer/
-  Analyzer
-     |
-     v
-  IR Lowering   sml-legacy/ir/
-     |
-     v
-  C Backend     sml-legacy/backend/c/
-     |
-     v
-  C source -> cc -> native binary
+      │
+      ▼
+  lexer          lib/lexer.sv0            tokens
+      │
+      ▼
+  parser         lib/parser.sv0           AST (flat arena) + lib/ast.sv0
+      │
+      ▼
+  resolver       lib/resolver.sv0         name/scope resolution  → E0300/E0301/E0307
+      │
+      ▼
+  checker        lib/checker.sv0          type inference + checking → E0400/E0429/…
+      │
+      ▼
+  contract       lib/contract_analyzer.sv0  requires/ensures/loop_invariant
+      │
+      ▼
+  lowering       lib/lowering.sv0         AST → sv0-IR (lib/ir.sv0)
+      │
+      ├─▶ codegen      lib/codegen.sv0     IR → C99  ─▶ cc ─▶ native binary
+      │
+      └─▶ vm_codegen   lib/vm_codegen.sv0  IR → bytecode (lib/bytecode.sv0) ─▶ sv0vm
 ```
+
+Supporting modules: `driver.sv0` (single-file orchestration), `link.sv0` +
+`megaTU-main.sv0` (multi-module / `--project` composition), `diagnostic.sv0`
+(`Exxxx` codes + source snippets), `span.sv0`/`token.sv0`/`env.sv0`/`types.sv0`/
+`unify.sv0`/`include_expand.sv0` (shared infrastructure).
+
+Pass-by-pass notes: [`doc/compiler-passes.md`](doc/compiler-passes.md). Multi-module
+composition: [`doc/driver-pipeline-composition.md`](doc/driver-pipeline-composition.md).
+
+## quickstart
+
+Run from the **sv0-toolchain** root (the parent repo drives everything through
+`./scripts/sv0`):
+
+```bash
+./scripts/sv0 test            # full gate: units + integration + VM parity + self-host loop
+./scripts/sv0 emit-c lib/lexer.sv0     # print the C a module compiles to
+./scripts/sv0 vm-compile examples/learn/01_hello.sv0   # compile to bytecode
+./scripts/sv0 vm-run build/vm/01_hello.sv0b            # run it on sv0vm
+```
+
+Build the native compiler and use it directly:
+
+```bash
+bash scripts/build-sv0-megatu-native.sh          # → build/sv0-megatu-compiler-native
+printf '' > /tmp/.sv0_drv_path
+build/sv0-megatu-compiler-native path/to/file.sv0 > out.c   # emit C
+```
+
+**Learning path:** numbered tutorials `examples/learn/01_*.sv0 … 22_*.sv0` +
+`examples/learn/23_project_minimal/` — see [`examples/learn/README.md`](examples/learn/README.md).
+
+## self-hosting
+
+The sv0 compiler compiles its own source. `./scripts/sv0 self-host-sv0-loop`
+compiles every module in `lib/self-host-sv0-loop.list` with the native compiler,
+builds and runs the result, and checks **behavioral parity** against the SML
+reference (identical stdout+exit; the emitted C differs by design). This is the
+default; see [`doc/self-host-sv0-loop.md`](doc/self-host-sv0-loop.md) and
+[`doc/native-self-host-compiler-recipe.md`](doc/native-self-host-compiler-recipe.md).
 
 ## directory structure
 
-| directory | description |
+| path | description |
 |---|---|
-| `sml-legacy/` | **Bootstrap compiler** (SML/NJ) — lexer through backends (`sources.cm`) |
-| `sml-legacy/lexer/` | tokenizer -- keywords, identifiers, literals, operators |
-| `sml-legacy/parser/` | recursive descent parser producing AST |
-| `sml-legacy/ast/` | AST type definitions (SML datatypes) |
-| `sml-legacy/name_resolution/` | scope resolution, import handling, module graph |
-| `sml-legacy/type_checker/` | type inference, trait resolution, overload resolution |
-| `sml-legacy/contract_analyzer/` | contract validation, runtime check insertion |
-| `sml-legacy/ir/` | sv0-IR definition and AST-to-IR lowering |
-| `sml-legacy/backend/c/` | sv0-IR to C99 code generation |
-| `sml-legacy/backend/vm/` | sv0-IR to bytecode |
-| `sml-legacy/error/` | error reporting with source spans |
-| `lib/` | **Compiler in sv0** — transliteration seeds, `bootstrap-sources.list`, `golden/stage0/` |
-| `lexer/` | future sv0 lexer sources (parallel to `sml-legacy/lexer/`) |
-| `test/` | test suite |
-| `doc/` | pass-by-pass notes ([compiler-passes.md](doc/compiler-passes.md)) — includes structs, enums, and `match` (Milestone 1 Phase 5) |
-| `examples/learn/` | small **`.sv0`** tutorials + [README](examples/learn/README.md) for **`vm-compile`**, **`emit-c`**, **`repl`** from the toolchain root |
-| `examples/libs/` | **educational library-shaped** multi-file packages (not bootstrap seeds) + [README](examples/libs/README.md) |
+| `lib/` | **the compiler, in sv0** — 21 modules + `bootstrap-sources.list`, `golden/stage0/`. See [`lib/README.md`](lib/README.md). |
+| `sml-legacy/` | retired SML/NJ bootstrap reference (`sources.cm`) |
+| `doc/` | compiler documentation — start at [`doc/README.md`](doc/README.md) |
+| `examples/learn/` | numbered `.sv0` tutorials ([README](examples/learn/README.md)) |
+| `examples/libs/` | educational library-shaped packages, not bootstrap seeds ([README](examples/libs/README.md)) |
+| `test/` | unit + integration + diagnostics + VM-parity suites |
 | `build/` | build artifacts (gitignored) |
-
-## building
-
-requires SML/NJ (tested with 110.99.9).
-
-```bash
-make build         # compile all modules via CM
-make check         # heap + one-file emit smoke (M3-S-052 — scripts/smoke-self-host-compiler.sh)
-make legacy-bootstrap-check   # full CM.make compile (sml-legacy sources.cm)
-make legacy-bootstrap-heap    # alias for heap (explicit bootstrap naming)
-make test          # run test suite (see test_runner for current count)
-make e2e           # emit C, compile with cc, run binary (exit code 42)
-make integration   # Rmd-style scenarios under test/integration/ (needs heap)
-make integration-vm # bytecode compile + sv0vm run (see parent repo `make ci`)
-make test-contract-runtime  # compile requires(false) fixture; expect exit 1
-make heap          # export heap image to build/sv0c
-make clean         # remove .cm cache and build artifacts
-```
-
-VM backend: `Main.main ((), ["--target=vm", "path/to/file.sv0"])` writes `build/vm/<stem>.sv0b`. Multi-file projects: `Main.main ((), ["--target=vm", "--project", "path/to/dir"])` links **every `*.sv0` under `dir` recursively** (skips hidden names), writes `build/vm/main.sv0b` when `main.sv0` exists in that tree. Run bytecode via `sv0vm/scripts/run_sv0b.sml` with `SV0B` set, or `./scripts/sv0 vm-run` / `./scripts/sv0 repl` from the toolchain root.
-
-to run the compiler directly:
-
-```bash
-sml @SMLload=build/sv0c input.sv0       # after make heap
-sml @SMLload=build/sv0c --project path/to/dir   # all *.sv0 under dir (recursive)
-```
-
-or interactively:
-
-```bash
-echo 'CM.make "sources.cm"; Main.compile "input.sv0";' | sml
-```
-
-## SML retirement (milestone 3 — human-gated)
-
-Cutover procedure (**tag `bootstrap-sml-final`**, **`sml-legacy/` → `sml-legacy/`**, default sv0-only build outline): **[doc/sml-retirement-cutover-checklist.md](doc/sml-retirement-cutover-checklist.md)**.
-
-Cold bootstrap if self-host breaks after retirement: **[doc/cold-bootstrap-recovery.md](doc/cold-bootstrap-recovery.md)**.
-
-Do **not** run the checklist until **`task/sv0-toolchain-milestone-3-self-host.Rmd`** L0 criteria and stakeholder sign-off — see **`.cursor/rules/28-sml-retirement-and-self-host-bar.mdc`**.
 
 ## specification
 
-sv0c implements the specification defined in [sv0doc](../sv0doc/).
+sv0c implements the language defined in [sv0doc](../sv0doc/) (grammar, type
+rules, contracts, memory model, keywords).
+
+## SML retirement
+
+`sml-legacy/` is a retired reference, not the default compiler. The formal
+cutover (tag `bootstrap-sml-final`, sv0-only build) is human-gated:
+[`doc/sml-retirement-cutover-checklist.md`](doc/sml-retirement-cutover-checklist.md).
+Cold-bootstrap recovery if self-host breaks:
+[`doc/cold-bootstrap-recovery.md`](doc/cold-bootstrap-recovery.md). Do not run the
+cutover before the criteria in `task/sv0-toolchain-milestone-3-self-host.Rmd`.
+
+## building the SML reference (rarely needed)
+
+Requires SML/NJ (110.99.9). `make -C sv0c heap` builds `build/sv0c` (the SML
+reference emitter used by the byte-guards); `make -C sv0c test` runs the SML unit
+suite. The native path above is the default and needs no SML at runtime.

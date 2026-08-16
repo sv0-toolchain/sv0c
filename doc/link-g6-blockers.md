@@ -34,7 +34,7 @@ This note tracks **bootstrap-transliteration closure** vs **full SML parity** fo
 
 **M3-S-040 bootstrap scope (Done in ## M3 G6):** listing/dir/entry bridges, source offset sidecars, token merge, and item-row append are **shipped** with unit tests + contract script.
 
-**Remaining engineering (not G6 “full SML parity”):** run **`tokenize` + `parse_program` per path**, relocate **expr/ty/pat** arena indices, then feed **`link_program_item_vecs_append`** — end-to-end orchestration for a future milestone slice (see **`doc/transliteration-plan.md`** Link row).
+**Remaining engineering (not G6 “full SML parity”):** run **`tokenize` + `parse_program` per path**, relocate **expr/ty/pat** arena indices, then feed **`link_program_item_vecs_append`** — end-to-end orchestration for a future milestone slice (see **`doc/archive/transliteration-plan.md`** Link row).
 
 ## M3-S-041 — single bootstrap TU driver (staging **Done**)
 
@@ -44,7 +44,7 @@ This note tracks **bootstrap-transliteration closure** vs **full SML parity** fo
 
 ## Related
 
-- **`sv0c/doc/transliteration-plan.md`** — Link row.  
+- **`sv0c/doc/archive/transliteration-plan.md`** — Link row.  
 - **`sv0c/doc/driver-pipeline-composition.md`** — driver single-TU vs composition (**M3-S-041**).  
 - **`sv0c/doc/bootstrap-compiler-workarounds.md`** — synthetic names / arena limits.  
 - **`42-transliteration-complexity-invariant.mdc`**.

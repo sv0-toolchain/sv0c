@@ -50,6 +50,6 @@ A **native** **`SV0_SELF_HOST_COMPILER`** that can compile real compiler sources
 
 ## Related
 
-- **`doc/l0-closure-roadmap.md`** — phased **L0** engineering path (merge orchestration → native composition → parity → evidence).
+- **`doc/archive/l0-closure-roadmap.md`** — phased **L0** engineering path (merge orchestration → native composition → parity → evidence).
 - **`doc/self-host-sv0-loop.md`** — pilot loop, **`SV0_SKIP_SELF_HOST_COMPILER_DIFF`**, retirement guardrails.
 - **`scripts/sv0`** **`build-self-host-compiler`** — alias that runs **`scripts/build-sv0-self-host-compiler.sh`**.
