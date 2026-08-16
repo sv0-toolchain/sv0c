@@ -19,6 +19,12 @@ static int test_tyvar_wildcard(void);
 static int test_list_len(void);
 static int test_unify_list(void);
 static int test_nested_slice_ref(void);
+static int test_int_width_variants(void);
+static int test_nested_ref_depth(void);
+static int test_deep_mixed(void);
+static int test_tyvar_nested_wildcard(void);
+static int test_ty_tag_distinct(void);
+static int test_struct_enum_ids(void);
 
 static int ty_tag(Ty t) {
   int _sv0t0;
@@ -1381,6 +1387,365 @@ static int test_nested_slice_ref(void) {
   return 0;
 }
 
+static int test_int_width_variants(void) {
+  Ty _sv0t0;
+  _sv0t0.tag = 7;
+  _sv0t0.p0 = 8;
+  Ty _sv0t1;
+  _sv0t1.tag = 7;
+  _sv0t1.p0 = 8;
+  int _sv0t2 = unify(_sv0t0, _sv0t1);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  Ty _sv0t3;
+  _sv0t3.tag = 7;
+  _sv0t3.p0 = 16;
+  Ty _sv0t4;
+  _sv0t4.tag = 7;
+  _sv0t4.p0 = 16;
+  int _sv0t5 = unify(_sv0t3, _sv0t4);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  Ty _sv0t6;
+  _sv0t6.tag = 7;
+  _sv0t6.p0 = 128;
+  Ty _sv0t7;
+  _sv0t7.tag = 7;
+  _sv0t7.p0 = 128;
+  int _sv0t8 = unify(_sv0t6, _sv0t7);
+  if ((_sv0t8 != 1)) {
+    return 3;
+  } else {
+  }
+  Ty _sv0t9;
+  _sv0t9.tag = 7;
+  _sv0t9.p0 = 8;
+  Ty _sv0t10;
+  _sv0t10.tag = 7;
+  _sv0t10.p0 = 16;
+  int _sv0t11 = unify(_sv0t9, _sv0t10);
+  if ((_sv0t11 != 0)) {
+    return 4;
+  } else {
+  }
+  Ty _sv0t12;
+  _sv0t12.tag = 8;
+  _sv0t12.p0 = 64;
+  Ty _sv0t13;
+  _sv0t13.tag = 8;
+  _sv0t13.p0 = 64;
+  int _sv0t14 = unify(_sv0t12, _sv0t13);
+  if ((_sv0t14 != 1)) {
+    return 5;
+  } else {
+  }
+  Ty _sv0t15;
+  _sv0t15.tag = 8;
+  _sv0t15.p0 = 8;
+  Ty _sv0t16;
+  _sv0t16.tag = 8;
+  _sv0t16.p0 = 128;
+  int _sv0t17 = unify(_sv0t15, _sv0t16);
+  if ((_sv0t17 != 0)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_nested_ref_depth(void) {
+  Ty a;
+  Ty _sv0t0;
+  Ty _sv0t1;
+  _sv0t1.tag = 1;
+  int _sv0t2 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t2, 0, _sv0t1.tag);
+  sv0_box_store(_sv0t2, 1, _sv0t1.p0);
+  sv0_box_store(_sv0t2, 2, _sv0t1.p1);
+  _sv0t0.tag = 13;
+  _sv0t0.p0 = _sv0t2;
+  int _sv0t3 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t3, 0, _sv0t0.tag);
+  sv0_box_store(_sv0t3, 1, _sv0t0.p0);
+  sv0_box_store(_sv0t3, 2, _sv0t0.p1);
+  a.tag = 13;
+  a.p0 = _sv0t3;
+  Ty b;
+  Ty _sv0t4;
+  Ty _sv0t5;
+  _sv0t5.tag = 1;
+  int _sv0t6 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t6, 0, _sv0t5.tag);
+  sv0_box_store(_sv0t6, 1, _sv0t5.p0);
+  sv0_box_store(_sv0t6, 2, _sv0t5.p1);
+  _sv0t4.tag = 13;
+  _sv0t4.p0 = _sv0t6;
+  int _sv0t7 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t7, 0, _sv0t4.tag);
+  sv0_box_store(_sv0t7, 1, _sv0t4.p0);
+  sv0_box_store(_sv0t7, 2, _sv0t4.p1);
+  b.tag = 13;
+  b.p0 = _sv0t7;
+  int _sv0t8 = unify(a, b);
+  if ((_sv0t8 != 1)) {
+    return 1;
+  } else {
+  }
+  Ty c;
+  Ty _sv0t9;
+  Ty _sv0t10;
+  _sv0t10.tag = 2;
+  int _sv0t11 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t11, 0, _sv0t10.tag);
+  sv0_box_store(_sv0t11, 1, _sv0t10.p0);
+  sv0_box_store(_sv0t11, 2, _sv0t10.p1);
+  _sv0t9.tag = 13;
+  _sv0t9.p0 = _sv0t11;
+  int _sv0t12 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t12, 0, _sv0t9.tag);
+  sv0_box_store(_sv0t12, 1, _sv0t9.p0);
+  sv0_box_store(_sv0t12, 2, _sv0t9.p1);
+  c.tag = 13;
+  c.p0 = _sv0t12;
+  int _sv0t13 = unify(a, c);
+  if ((_sv0t13 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_deep_mixed(void) {
+  Ty a;
+  Ty _sv0t0;
+  Ty _sv0t1;
+  Ty _sv0t2;
+  _sv0t2.tag = 7;
+  _sv0t2.p0 = 32;
+  int _sv0t3 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t3, 0, _sv0t2.tag);
+  sv0_box_store(_sv0t3, 1, _sv0t2.p0);
+  sv0_box_store(_sv0t3, 2, _sv0t2.p1);
+  _sv0t1.tag = 16;
+  _sv0t1.p0 = _sv0t3;
+  _sv0t1.p1 = 4;
+  int _sv0t4 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t4, 0, _sv0t1.tag);
+  sv0_box_store(_sv0t4, 1, _sv0t1.p0);
+  sv0_box_store(_sv0t4, 2, _sv0t1.p1);
+  _sv0t0.tag = 15;
+  _sv0t0.p0 = _sv0t4;
+  int _sv0t5 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t5, 0, _sv0t0.tag);
+  sv0_box_store(_sv0t5, 1, _sv0t0.p0);
+  sv0_box_store(_sv0t5, 2, _sv0t0.p1);
+  a.tag = 13;
+  a.p0 = _sv0t5;
+  Ty b;
+  Ty _sv0t6;
+  Ty _sv0t7;
+  Ty _sv0t8;
+  _sv0t8.tag = 7;
+  _sv0t8.p0 = 32;
+  int _sv0t9 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t9, 0, _sv0t8.tag);
+  sv0_box_store(_sv0t9, 1, _sv0t8.p0);
+  sv0_box_store(_sv0t9, 2, _sv0t8.p1);
+  _sv0t7.tag = 16;
+  _sv0t7.p0 = _sv0t9;
+  _sv0t7.p1 = 4;
+  int _sv0t10 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t10, 0, _sv0t7.tag);
+  sv0_box_store(_sv0t10, 1, _sv0t7.p0);
+  sv0_box_store(_sv0t10, 2, _sv0t7.p1);
+  _sv0t6.tag = 15;
+  _sv0t6.p0 = _sv0t10;
+  int _sv0t11 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t11, 0, _sv0t6.tag);
+  sv0_box_store(_sv0t11, 1, _sv0t6.p0);
+  sv0_box_store(_sv0t11, 2, _sv0t6.p1);
+  b.tag = 13;
+  b.p0 = _sv0t11;
+  int _sv0t12 = unify(a, b);
+  if ((_sv0t12 != 1)) {
+    return 1;
+  } else {
+  }
+  Ty c;
+  Ty _sv0t13;
+  Ty _sv0t14;
+  Ty _sv0t15;
+  _sv0t15.tag = 7;
+  _sv0t15.p0 = 32;
+  int _sv0t16 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t16, 0, _sv0t15.tag);
+  sv0_box_store(_sv0t16, 1, _sv0t15.p0);
+  sv0_box_store(_sv0t16, 2, _sv0t15.p1);
+  _sv0t14.tag = 16;
+  _sv0t14.p0 = _sv0t16;
+  _sv0t14.p1 = 5;
+  int _sv0t17 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t17, 0, _sv0t14.tag);
+  sv0_box_store(_sv0t17, 1, _sv0t14.p0);
+  sv0_box_store(_sv0t17, 2, _sv0t14.p1);
+  _sv0t13.tag = 15;
+  _sv0t13.p0 = _sv0t17;
+  int _sv0t18 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t18, 0, _sv0t13.tag);
+  sv0_box_store(_sv0t18, 1, _sv0t13.p0);
+  sv0_box_store(_sv0t18, 2, _sv0t13.p1);
+  c.tag = 13;
+  c.p0 = _sv0t18;
+  int _sv0t19 = unify(a, c);
+  if ((_sv0t19 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_tyvar_nested_wildcard(void) {
+  Ty tv;
+  tv.tag = 10;
+  tv.p0 = 3;
+  Ty deep;
+  Ty _sv0t0;
+  Ty _sv0t1;
+  _sv0t1.tag = 3;
+  int _sv0t2 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t2, 0, _sv0t1.tag);
+  sv0_box_store(_sv0t2, 1, _sv0t1.p0);
+  sv0_box_store(_sv0t2, 2, _sv0t1.p1);
+  _sv0t0.tag = 14;
+  _sv0t0.p0 = _sv0t2;
+  int _sv0t3 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t3, 0, _sv0t0.tag);
+  sv0_box_store(_sv0t3, 1, _sv0t0.p0);
+  sv0_box_store(_sv0t3, 2, _sv0t0.p1);
+  deep.tag = 16;
+  deep.p0 = _sv0t3;
+  deep.p1 = 7;
+  int _sv0t4 = unify(tv, deep);
+  if ((_sv0t4 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = unify(deep, tv);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_ty_tag_distinct(void) {
+  Ty _sv0t0;
+  _sv0t0.tag = 1;
+  int _sv0t1 = ty_tag(_sv0t0);
+  Ty _sv0t2;
+  _sv0t2.tag = 2;
+  int _sv0t3 = ty_tag(_sv0t2);
+  if ((_sv0t1 == _sv0t3)) {
+    return 1;
+  } else {
+  }
+  Ty _sv0t4;
+  _sv0t4.tag = 0;
+  int _sv0t5 = ty_tag(_sv0t4);
+  Ty _sv0t6;
+  _sv0t6.tag = 3;
+  int _sv0t7 = ty_tag(_sv0t6);
+  if ((_sv0t5 == _sv0t7)) {
+    return 2;
+  } else {
+  }
+  Ty _sv0t8;
+  _sv0t8.tag = 1;
+  int _sv0t9 = ty_tag(_sv0t8);
+  Ty _sv0t10;
+  _sv0t10.tag = 1;
+  int _sv0t11 = ty_tag(_sv0t10);
+  if ((_sv0t9 != _sv0t11)) {
+    return 3;
+  } else {
+  }
+  Ty _sv0t12;
+  _sv0t12.tag = 7;
+  _sv0t12.p0 = 32;
+  int _sv0t13 = ty_tag(_sv0t12);
+  Ty _sv0t14;
+  _sv0t14.tag = 8;
+  _sv0t14.p0 = 32;
+  int _sv0t15 = ty_tag(_sv0t14);
+  if ((_sv0t13 == _sv0t15)) {
+    return 4;
+  } else {
+  }
+  Ty _sv0t16;
+  _sv0t16.tag = 11;
+  _sv0t16.p0 = 1;
+  int _sv0t17 = ty_tag(_sv0t16);
+  Ty _sv0t18;
+  _sv0t18.tag = 12;
+  _sv0t18.p0 = 1;
+  int _sv0t19 = ty_tag(_sv0t18);
+  if ((_sv0t17 == _sv0t19)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
+static int test_struct_enum_ids(void) {
+  Ty _sv0t0;
+  _sv0t0.tag = 11;
+  _sv0t0.p0 = 0;
+  Ty _sv0t1;
+  _sv0t1.tag = 11;
+  _sv0t1.p0 = 0;
+  int _sv0t2 = unify(_sv0t0, _sv0t1);
+  if ((_sv0t2 != 1)) {
+    return 1;
+  } else {
+  }
+  Ty _sv0t3;
+  _sv0t3.tag = 12;
+  _sv0t3.p0 = 0;
+  Ty _sv0t4;
+  _sv0t4.tag = 12;
+  _sv0t4.p0 = 0;
+  int _sv0t5 = unify(_sv0t3, _sv0t4);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  Ty _sv0t6;
+  _sv0t6.tag = 11;
+  _sv0t6.p0 = 100;
+  Ty _sv0t7;
+  _sv0t7.tag = 11;
+  _sv0t7.p0 = 101;
+  int _sv0t8 = unify(_sv0t6, _sv0t7);
+  if ((_sv0t8 != 0)) {
+    return 3;
+  } else {
+  }
+  Ty _sv0t9;
+  _sv0t9.tag = 6;
+  Ty _sv0t10;
+  _sv0t10.tag = 6;
+  int _sv0t11 = unify(_sv0t9, _sv0t10);
+  if ((_sv0t11 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_unit_variants();
   int r1 = _sv0t0;
@@ -1435,6 +1800,48 @@ int main(void) {
   if ((r8 != 0)) {
     int _sv0t14 = (90 + r8);
     return _sv0t14;
+  } else {
+  }
+  int _sv0t15 = test_int_width_variants();
+  int r9 = _sv0t15;
+  if ((r9 != 0)) {
+    int _sv0t16 = (100 + r9);
+    return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = test_nested_ref_depth();
+  int r10 = _sv0t17;
+  if ((r10 != 0)) {
+    int _sv0t18 = (110 + r10);
+    return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_deep_mixed();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (120 + r11);
+    return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_tyvar_nested_wildcard();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (130 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_ty_tag_distinct();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (140 + r13);
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_struct_enum_ids();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (150 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;

@@ -44,6 +44,13 @@ static int test_span_to_string(void);
 static int test_int_to_str(void);
 static int test_int_to_str_negative(void);
 static int test_compile_error_roundtrip(void);
+static int test_digit_char_all(void);
+static int test_int_to_str_boundary(void);
+static int test_span_length_variants(void);
+static int test_merge_keeps_start(void);
+static int test_pos_accessors(void);
+static int test_span_file_accessor(void);
+static int test_span_to_string_single(void);
 
 static CompileError compile_error_new(const char* msg, Span sp) {
   CompileError _sv0t0;
@@ -504,6 +511,181 @@ static int test_compile_error_roundtrip(void) {
   return 0;
 }
 
+static int test_digit_char_all(void) {
+  const char* _sv0t0 = span_digit_char(0);
+  int _sv0t1 = sv0_string_eq(_sv0t0, "0");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = span_digit_char(4);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "4");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = span_digit_char(9);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "9");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_int_to_str_boundary(void) {
+  const char* _sv0t0 = span_int_to_str(9);
+  int _sv0t1 = sv0_string_eq(_sv0t0, "9");
+  if ((_sv0t1 != 1)) {
+    return 1;
+  } else {
+  }
+  const char* _sv0t2 = span_int_to_str(10);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "10");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  const char* _sv0t4 = span_int_to_str(1000);
+  int _sv0t5 = sv0_string_eq(_sv0t4, "1000");
+  if ((_sv0t5 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = (0 - 100);
+  const char* _sv0t7 = span_int_to_str(_sv0t6);
+  int _sv0t8 = sv0_string_eq(_sv0t7, "-100");
+  if ((_sv0t8 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_span_length_variants(void) {
+  Pos _sv0t0 = pos_new(1, 1, 5);
+  Pos a;
+  a = _sv0t0;
+  Span _sv0t1 = span_new("f", a, a);
+  Span sp0;
+  sp0 = _sv0t1;
+  int _sv0t2 = span_length(sp0);
+  if ((_sv0t2 != 0)) {
+    return 1;
+  } else {
+  }
+  Pos _sv0t3 = pos_new(1, 2, 6);
+  Pos b;
+  b = _sv0t3;
+  Span _sv0t4 = span_new("f", a, b);
+  Span sp1;
+  sp1 = _sv0t4;
+  int _sv0t5 = span_length(sp1);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_merge_keeps_start(void) {
+  Pos _sv0t0 = pos_new(2, 3, 20);
+  Pos pa;
+  pa = _sv0t0;
+  Pos _sv0t1 = pos_new(2, 8, 25);
+  Pos pb;
+  pb = _sv0t1;
+  Span _sv0t2 = span_new("a.sv0", pa, pb);
+  Span spa;
+  spa = _sv0t2;
+  Pos _sv0t3 = pos_new(9, 1, 99);
+  Pos pc;
+  pc = _sv0t3;
+  Span _sv0t4 = span_new("a.sv0", pb, pc);
+  Span spb;
+  spb = _sv0t4;
+  Span _sv0t5 = span_merge(spa, spb);
+  Span m;
+  m = _sv0t5;
+  if ((m.start_offset != 20)) {
+    return 1;
+  } else {
+  }
+  if ((m.stop_offset != 99)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = span_length(m);
+  if ((_sv0t6 != 79)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_pos_accessors(void) {
+  Pos _sv0t0 = pos_new(7, 8, 9);
+  Pos p;
+  p = _sv0t0;
+  int _sv0t1 = pos_line(p);
+  if ((_sv0t1 != 7)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = pos_col(p);
+  if ((_sv0t2 != 8)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = pos_offset(p);
+  if ((_sv0t3 != 9)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_span_file_accessor(void) {
+  Pos _sv0t0 = pos_new(1, 1, 0);
+  Pos p;
+  p = _sv0t0;
+  Span _sv0t1 = span_new("main.sv0", p, p);
+  Span sp;
+  sp = _sv0t1;
+  const char* _sv0t2 = span_file(sp);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "main.sv0");
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  Span _sv0t4 = span_bogus();
+  Span bog;
+  bog = _sv0t4;
+  const char* _sv0t5 = span_file(bog);
+  int _sv0t6 = sv0_string_len(_sv0t5);
+  if ((_sv0t6 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_span_to_string_single(void) {
+  Pos _sv0t0 = pos_new(1, 1, 0);
+  Pos p;
+  p = _sv0t0;
+  Span _sv0t1 = span_new("z.sv0", p, p);
+  Span sp;
+  sp = _sv0t1;
+  const char* _sv0t2 = span_to_string(sp);
+  int _sv0t3 = sv0_string_eq(_sv0t2, "z.sv0:1:1-1:1");
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_basics();
   int r1 = _sv0t0;
@@ -551,6 +733,55 @@ int main(void) {
   if ((r7 != 0)) {
     int _sv0t12 = (70 + r7);
     return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = test_digit_char_all();
+  int r8 = _sv0t13;
+  if ((r8 != 0)) {
+    int _sv0t14 = (80 + r8);
+    return _sv0t14;
+  } else {
+  }
+  int _sv0t15 = test_int_to_str_boundary();
+  int r9 = _sv0t15;
+  if ((r9 != 0)) {
+    int _sv0t16 = (90 + r9);
+    return _sv0t16;
+  } else {
+  }
+  int _sv0t17 = test_span_length_variants();
+  int r10 = _sv0t17;
+  if ((r10 != 0)) {
+    int _sv0t18 = (100 + r10);
+    return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_merge_keeps_start();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (110 + r11);
+    return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_pos_accessors();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (120 + r12);
+    return _sv0t22;
+  } else {
+  }
+  int _sv0t23 = test_span_file_accessor();
+  int r13 = _sv0t23;
+  if ((r13 != 0)) {
+    int _sv0t24 = (130 + r13);
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_span_to_string_single();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (140 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;

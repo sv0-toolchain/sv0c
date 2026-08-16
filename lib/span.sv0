@@ -217,6 +217,68 @@ fn test_compile_error_roundtrip() -> i32 {
     return 0;
 }
 
+fn test_digit_char_all() -> i32 {
+    if string_eq(span_digit_char(0), "0") != true { return 1; }
+    if string_eq(span_digit_char(4), "4") != true { return 2; }
+    if string_eq(span_digit_char(9), "9") != true { return 3; }
+    return 0;
+}
+
+fn test_int_to_str_boundary() -> i32 {
+    if string_eq(span_int_to_str(9), "9") != true { return 1; }
+    if string_eq(span_int_to_str(10), "10") != true { return 2; }
+    if string_eq(span_int_to_str(1000), "1000") != true { return 3; }
+    if string_eq(span_int_to_str(0 - 100), "-100") != true { return 4; }
+    return 0;
+}
+
+fn test_span_length_variants() -> i32 {
+    let a: Pos = pos_new(1, 1, 5);
+    let sp0: Span = span_new("f", a, a);
+    if span_length(sp0) != 0 { return 1; }
+    let b: Pos = pos_new(1, 2, 6);
+    let sp1: Span = span_new("f", a, b);
+    if span_length(sp1) != 1 { return 2; }
+    return 0;
+}
+
+fn test_merge_keeps_start() -> i32 {
+    let pa: Pos = pos_new(2, 3, 20);
+    let pb: Pos = pos_new(2, 8, 25);
+    let spa: Span = span_new("a.sv0", pa, pb);
+    let pc: Pos = pos_new(9, 1, 99);
+    let spb: Span = span_new("a.sv0", pb, pc);
+    let m: Span = span_merge(spa, spb);
+    if m.start_offset != 20 { return 1; }
+    if m.stop_offset != 99 { return 2; }
+    if span_length(m) != 79 { return 3; }
+    return 0;
+}
+
+fn test_pos_accessors() -> i32 {
+    let p: Pos = pos_new(7, 8, 9);
+    if pos_line(p) != 7 { return 1; }
+    if pos_col(p) != 8 { return 2; }
+    if pos_offset(p) != 9 { return 3; }
+    return 0;
+}
+
+fn test_span_file_accessor() -> i32 {
+    let p: Pos = pos_new(1, 1, 0);
+    let sp: Span = span_new("main.sv0", p, p);
+    if string_eq(span_file(sp), "main.sv0") != true { return 1; }
+    let bog: Span = span_bogus();
+    if string_len(span_file(bog)) != 0 { return 2; }
+    return 0;
+}
+
+fn test_span_to_string_single() -> i32 {
+    let p: Pos = pos_new(1, 1, 0);
+    let sp: Span = span_new("z.sv0", p, p);
+    if string_eq(span_to_string(sp), "z.sv0:1:1-1:1") != true { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_basics();
     if r1 != 0 { return r1; }
@@ -232,5 +294,19 @@ fn main() -> i32 {
     if r6 != 0 { return 60 + r6; }
     let r7: i32 = test_compile_error_roundtrip();
     if r7 != 0 { return 70 + r7; }
+    let r8: i32 = test_digit_char_all();
+    if r8 != 0 { return 80 + r8; }
+    let r9: i32 = test_int_to_str_boundary();
+    if r9 != 0 { return 90 + r9; }
+    let r10: i32 = test_span_length_variants();
+    if r10 != 0 { return 100 + r10; }
+    let r11: i32 = test_merge_keeps_start();
+    if r11 != 0 { return 110 + r11; }
+    let r12: i32 = test_pos_accessors();
+    if r12 != 0 { return 120 + r12; }
+    let r13: i32 = test_span_file_accessor();
+    if r13 != 0 { return 130 + r13; }
+    let r14: i32 = test_span_to_string_single();
+    if r14 != 0 { return 140 + r14; }
     return 0;
 }
