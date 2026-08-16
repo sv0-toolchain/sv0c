@@ -11,3 +11,27 @@ test/diagnostics/cases/field_missing_local.sv0|E0429
 test/diagnostics/cases/void_contract.sv0|E0409
 test/diagnostics/cases/tuple_unsupported.sv0|E0446
 test/diagnostics/cases/block_scope_leak.sv0|E0300
+# --- expanded error corpus (multiple trigger paths + edges per code; backend tag = both unless noted) ---
+test/diagnostics/cases/unbound_in_binop.sv0|E0300
+test/diagnostics/cases/unbound_in_let_init.sv0|E0300
+test/diagnostics/cases/unbound_call.sv0|E0300
+test/diagnostics/cases/unbound_in_if_cond.sv0|E0300
+test/diagnostics/cases/unbound_arg.sv0|E0300
+test/diagnostics/cases/unknown_type_ret.sv0|E0301
+test/diagnostics/cases/unknown_type_field.sv0|E0301
+test/diagnostics/cases/unknown_type_second_fn.sv0|E0301
+test/diagnostics/cases/arity_too_many.sv0|E0307
+test/diagnostics/cases/arity_zero_called_one.sv0|E0307
+test/diagnostics/cases/arity_two_called_three.sv0|E0307
+test/diagnostics/cases/ret_bool_for_i32.sv0|E0400
+test/diagnostics/cases/let_i32_from_bool.sv0|E0400
+test/diagnostics/cases/let_bool_from_int.sv0|E0400
+test/diagnostics/cases/ensures_void.sv0|E0409
+test/diagnostics/cases/requires_void.sv0|E0409
+test/diagnostics/cases/field_bad_param.sv0|E0429
+test/diagnostics/cases/field_bad_local.sv0|E0429
+test/diagnostics/cases/tuple_in_let.sv0|E0446
+test/diagnostics/cases/tuple_triple.sv0|E0446
+test/diagnostics/cases/invalid_use_clause.sv0|E0309
+test/diagnostics/cases/tuple_pattern_let.sv0|E0446
+test/diagnostics/cases/println_non_string.sv0|E0444|sml

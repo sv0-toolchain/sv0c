@@ -1,0 +1,2 @@
+/* let i32 initialized from a bool literal — expects E0400 (both). */
+fn main() -> i32 { let x: i32 = false; return x; }

@@ -1,0 +1,2 @@
+/* unbound var as a binop operand — expects E0300 (both). */
+fn main() -> i32 { return y + 1; }

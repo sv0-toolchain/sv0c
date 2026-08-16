@@ -1,0 +1,3 @@
+/* requires on a fn with no return type — expects E0409 (both). */
+fn f(x: i32) requires(x > 0) { let y: i32 = x; }
+fn main() -> i32 { return 0; }

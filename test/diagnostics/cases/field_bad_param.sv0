@@ -1,0 +1,4 @@
+/* nonexistent field on a struct parameter — expects E0429 (both). */
+struct P { x: i32, y: i32 }
+fn g(p: P) -> i32 { return p.z; }
+fn main() -> i32 { return 0; }

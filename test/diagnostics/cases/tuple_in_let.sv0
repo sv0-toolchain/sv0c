@@ -1,0 +1,2 @@
+/* multi-element tuple value in a let — expects E0446 (both). */
+fn main() -> i32 { let t: (i32, i32) = (1, 2); return 0; }
