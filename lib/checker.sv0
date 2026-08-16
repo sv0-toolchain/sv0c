@@ -2414,6 +2414,101 @@ fn field_access_check_node(fnode: i32,
     return 0;
 }
 
+/* True if `nm` equals the identifier text of any token in `toks`. */
+fn name_in_tok_list(toks: Vec<i32>, nm: string,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    let n: i32 = vec_len(toks);
+    let mut i: i32 = 0;
+    while i < n {
+        let t: i32 = vec_get(toks, i);
+        if t >= 0 {
+            if t < vec_len(starts) {
+                let s: i32 = vec_get(starts, t);
+                let e: i32 = vec_get(ends, t);
+                if e > s {
+                    if string_eq(string_substr(source, s, e - s), nm) { return true; }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* BH-8 (Slice 5): true if `name` names a type the checker knows — a primitive,
+   a generic builtin head (Vec/Box/Option/Result/Self), a bound type parameter,
+   or a locally-declared struct/enum. Backs the unknown-type diagnostic (E0301).
+   Deliberately permissive: a false "known" only misses a diagnostic, while a
+   false "unknown" would wrongly reject valid code, so the builtin heads and type
+   parameters are allowlisted generously. */
+fn type_name_is_known(name: string,
+                      struct_names: Vec<i32>, enum_names: Vec<i32>,
+                      type_params: Vec<i32>, tp_limit: i32,
+                      source: string, starts: Vec<i32>, ends: Vec<i32>) -> bool {
+    if ast_type_name_to_tag(name) >= 0 { return true; }
+    if string_eq(name, "Vec") { return true; }
+    if string_eq(name, "Box") { return true; }
+    if string_eq(name, "Option") { return true; }
+    if string_eq(name, "Result") { return true; }
+    if string_eq(name, "Self") { return true; }
+    if type_param_lookup_str(type_params, tp_limit, source, starts, ends, name) >= 0 {
+        return true;
+    }
+    if name_in_tok_list(struct_names, name, source, starts, ends) { return true; }
+    if name_in_tok_list(enum_names, name, source, starts, ends) { return true; }
+    return false;
+}
+
+/* BH-8 (Slice 5): flag a `let x: T` whose annotation type T is undeclared
+   (E0301), matching SML. Walks the top-level block's LetStmts (tag 27, d2 =
+   annotation head token). Only fires for a genuinely unknown name — see
+   type_name_is_known's allowlist — so valid builtins/generics/type-params pass. */
+fn check_body_let_unknown_type(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                               bed4: Vec<i32>, bpp: Vec<i32>, body_root: i32,
+                               struct_names: Vec<i32>, enum_names: Vec<i32>,
+                               type_params: Vec<i32>, tp_limit: i32,
+                               tok_tags: Vec<i32>,
+                               source: string, starts: Vec<i32>, ends: Vec<i32>,
+                               diag_sink: Vec<i32>) -> i32 {
+    if body_root < 0 { return 0; }
+    if body_root >= vec_len(bet) { return 0; }
+    if vec_get(bet, body_root) != 9 { return 0; }
+    let sfirst: i32 = vec_get(bed1, body_root);
+    let scount: i32 = vec_get(bed2, body_root);
+    let sidecar: i32 = vec_get(bed4, body_root);
+    let mut si: i32 = 0;
+    while si < scount {
+        let st: i32 = block_stmt_index(bpp, sfirst, sidecar, si);
+        if vec_get(bet, st) == 27 {
+            let lannot: i32 = vec_get(bed2, st);
+            /* Only a bare identifier annotation head is an unknown-type candidate.
+               A tuple/paren type head (`(i32, i32)`, token `(`) is handled by the
+               E0446 tuple check — skip it here so we don't shadow that code. */
+            if lannot >= 0 {
+                if lannot < vec_len(tok_tags) {
+                    if vec_get(tok_tags, lannot) == 5 {
+                if lannot < vec_len(starts) {
+                    let as2: i32 = vec_get(starts, lannot);
+                    let ae: i32 = vec_get(ends, lannot);
+                    if ae > as2 {
+                        let aname: string = string_substr(source, as2, ae - as2);
+                        if type_name_is_known(aname, struct_names, enum_names,
+                                              type_params, tp_limit,
+                                              source, starts, ends) != true {
+                            vec_push(diag_sink, 301);
+                            vec_push(diag_sink, lannot);
+                        }
+                    }
+                }
+                    }
+                }
+            }
+        }
+        si = si + 1;
+    }
+    return 0;
+}
+
 fn check_body_field_access(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
                            bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>,
                            body_root: i32,
@@ -2428,6 +2523,34 @@ fn check_body_field_access(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
     let sfirst: i32 = vec_get(bed1, body_root);
     let scount: i32 = vec_get(bed2, body_root);
     let sidecar: i32 = vec_get(bed4, body_root);
+    /* BH-8 (Slice 4): field access on a LOCAL struct var was unchecked — only
+       parameters were resolvable. Pre-scan the block's `let x: T` bindings and
+       merge them into the name/type maps so `let p: P = …; return p.z` resolves
+       `p` to struct P (E0429 when `z` is absent). Safe: struct_field_status
+       returns -1 for a non-struct type name, so a non-struct local never flags. */
+    let name_toks: Vec<i32> = vec_new();
+    let tyname_toks: Vec<i32> = vec_new();
+    let mut pk: i32 = 0;
+    while pk < vec_len(param_name_toks) {
+        vec_push(name_toks, vec_get(param_name_toks, pk));
+        vec_push(tyname_toks, vec_get(param_tyname_toks, pk));
+        pk = pk + 1;
+    }
+    let mut lp: i32 = 0;
+    while lp < scount {
+        let lst: i32 = block_stmt_index(bpp, sfirst, sidecar, lp);
+        if vec_get(bet, lst) == 27 {
+            let lname: i32 = vec_get(bed1, lst);
+            let lannot: i32 = vec_get(bed2, lst);
+            if lname >= 0 {
+                if lannot >= 0 {
+                    vec_push(name_toks, lname);
+                    vec_push(tyname_toks, lannot);
+                }
+            }
+        }
+        lp = lp + 1;
+    }
     let mut si: i32 = 0;
     while si < scount {
         let st: i32 = block_stmt_index(bpp, sfirst, sidecar, si);
@@ -2444,7 +2567,7 @@ fn check_body_field_access(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
         /* let x = <field-access> */
         if stag == 27 { fnode = vec_get(bed3, st); }
         let _r: i32 = field_access_check_node(fnode, bet, bed1, bed2, bpp,
-                          param_name_toks, param_tyname_toks,
+                          name_toks, tyname_toks,
                           sdef_names, sdef_field_offsets, sdef_field_counts,
                           sdef_fnames_flat, source, starts, ends, diag_sink);
         si = si + 1;
@@ -2627,6 +2750,11 @@ fn check_program(
                                 param_name_pos, param_tyname_toks,
                                 sdef_names, sdef_field_offsets, sdef_field_counts,
                                 sdef_fnames_flat, source, starts, ends, diag_sink);
+            /* BH-8 (Slice 5): unknown type in a `let x: T` annotation → E0301. */
+            let _rut: i32 = check_body_let_unknown_type(body_et, body_ed1,
+                                body_ed2, body_ed4, bpp, body_root_idx,
+                                struct_names, enum_names, type_params, tp_limit,
+                                tok_tags, source, starts, ends, diag_sink);
             if chk != 0 {
                 /* The body failed to check. If no check pushed a specific
                    diagnostic, attribute a common silent-reject cause — a

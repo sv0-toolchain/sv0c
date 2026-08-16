@@ -1,0 +1,4 @@
+/* BH-8 Slice 5 — unknown type name in a LOCAL `let` annotation (not just a
+   signature). `Widget` is not a builtin/struct/enum, so `let p: Widget` is
+   E0301 on SML and native. */
+fn main() -> i32 { let p: Widget = 0; return 0; }

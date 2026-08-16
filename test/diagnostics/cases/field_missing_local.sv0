@@ -1,0 +1,5 @@
+/* BH-8 Slice 4 — access to a nonexistent field on a LOCAL struct binding (not
+   just a parameter). `Point` has x/y but not z, so `p.z` on `let p: Point` is
+   E0429 on both SML and native. */
+struct Point { x: i32, y: i32 }
+fn main() -> i32 { let p: Point = Point { x: 1, y: 2 }; return p.z; }
