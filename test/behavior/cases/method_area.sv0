@@ -1,0 +1,4 @@
+/* struct method self-field — exits 42. */
+struct Rect { w: i32, h: i32 }
+impl Rect { fn area(self: Rect) -> i32 { return self.w * self.h; } }
+fn main() -> i32 { let r: Rect = Rect { w: 6, h: 7 }; return r.area(); }

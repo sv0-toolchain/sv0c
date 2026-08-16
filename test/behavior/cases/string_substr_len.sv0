@@ -1,0 +1,2 @@
+/* length of a substring — exits 3. */
+fn main() -> i32 { return string_len(string_substr("hello", 1, 3)); }

@@ -1,0 +1,2 @@
+/* for product 1..4 inclusive-ish — exits 24. */
+fn main() -> i32 { let mut r: i32 = 1; for i in 1..5 { r = r * i; } return r; }

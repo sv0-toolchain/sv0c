@@ -1,0 +1,2 @@
+/* two Vecs summed pairwise — exits 12. */
+fn main() -> i32 { let a: Vec<i32> = vec_new(); let b: Vec<i32> = vec_new(); vec_push(a, 1); vec_push(a, 2); vec_push(b, 4); vec_push(b, 5); let mut s: i32 = 0; let mut i: i32 = 0; while i < vec_len(a) { s = s + vec_get(a, i) + vec_get(b, i); i = i + 1; } return s; }

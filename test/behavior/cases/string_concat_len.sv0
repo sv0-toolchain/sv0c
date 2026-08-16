@@ -1,0 +1,2 @@
+/* length after concat — exits 5. */
+fn main() -> i32 { return string_len(string_concat("ab", "cde")); }

@@ -1,0 +1,4 @@
+/* method calling another method — exits 12. */
+struct N { v: i32 }
+impl N { fn dbl(self: N) -> i32 { return self.v * 2; } fn quad(self: N) -> i32 { return self.dbl() + self.dbl(); } }
+fn main() -> i32 { let n: N = N { v: 3 }; return n.quad(); }

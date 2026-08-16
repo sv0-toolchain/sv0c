@@ -1,0 +1,2 @@
+/* digit sum of 12345 — exits 15. */
+fn main() -> i32 { let mut n: i32 = 12345; let mut s: i32 = 0; while n > 0 { s = s + n % 10; n = n / 10; } return s; }

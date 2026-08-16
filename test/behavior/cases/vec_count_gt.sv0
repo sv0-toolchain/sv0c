@@ -1,0 +1,2 @@
+/* count elements greater than 5 — exits 2. */
+fn main() -> i32 { let v: Vec<i32> = vec_new(); vec_push(v, 3); vec_push(v, 7); vec_push(v, 9); vec_push(v, 1); let mut c: i32 = 0; let mut i: i32 = 0; while i < vec_len(v) { if vec_get(v, i) > 5 { c = c + 1; } i = i + 1; } return c; }

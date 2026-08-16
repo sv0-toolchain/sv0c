@@ -1,0 +1,2 @@
+/* linear search returns index — exits 2. */
+fn main() -> i32 { let v: Vec<i32> = vec_new(); vec_push(v, 10); vec_push(v, 20); vec_push(v, 30); let mut i: i32 = 0; while i < vec_len(v) { if vec_get(v, i) == 30 { return i; } i = i + 1; } return 0 - 1; }

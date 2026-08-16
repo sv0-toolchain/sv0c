@@ -1,0 +1,2 @@
+/* iterative gcd(54,24) — exits 6. */
+fn main() -> i32 { let mut a: i32 = 54; let mut b: i32 = 24; while b != 0 { let t: i32 = a % b; a = b; b = t; } return a; }
