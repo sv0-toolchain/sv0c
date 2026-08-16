@@ -1,158 +1,50 @@
-# Bootstrap compiler in sv0 (`lib/`)
+# `lib/` — the sv0 compiler, in sv0
 
-This tree holds **sv0 source** that mirrors slices of the SML bootstrap compiler (`sml-legacy/**/*.sml`) for the self-hosting roadmap (`task/sv0-toolchain-milestone-3-self-host.Rmd`).
+These 21 `*.sv0` modules **are** the compiler. They are compiled to a single
+native binary (`build/sv0-megatu-compiler-native`) via the mega-TU compose and
+are the default toolchain; `../sml-legacy/` is the retired SML reference. For the
+big picture see the [repo README](../README.md); for a pass-by-pass walkthrough
+see [`../doc/compiler-passes.md`](../doc/compiler-passes.md).
 
-Sibling directories at the `sv0c/` root (**`lexer/`**, **`parser/`**, …) hold additional transliterated modules as the surface grows. **`sml-legacy/`** is the bootstrap implementation; **`lib/`** + those dirs are the sv0 track.
+## modules by pipeline stage
 
-## Build
+| stage | modules |
+|---|---|
+| **front end** | `lexer.sv0` → `parser.sv0` (+ `ast.sv0`) |
+| **analysis** | `resolver.sv0` (names/scopes), `checker.sv0` (types), `contract_analyzer.sv0` (`requires`/`ensures`/`loop_invariant`) |
+| **lowering** | `lowering.sv0` (AST → sv0-IR, `ir.sv0`) |
+| **backends** | `codegen.sv0` (IR → C99), `vm_codegen.sv0` (IR → bytecode, `bytecode.sv0`) |
+| **composition** | `driver.sv0` (single file), `link.sv0` + `megaTU-main.sv0` (multi-module / `--project`), `main.sv0` (CLI entry) |
+| **infrastructure** | `diagnostic.sv0` (`Exxxx` codes + snippets), `span.sv0`, `env.sv0`, `types.sv0`, `unify.sv0`, `include_expand.sv0` |
+
+Each module carries its own `test_*` unit tests in-file; `./scripts/sv0 test`
+compiles and runs them.
+
+## build & self-host
 
 From the **sv0-toolchain** root:
 
 ```bash
-./scripts/sv0 bootstrap-build
+./scripts/sv0 test                        # full gate (units, integration, VM parity, self-host loop)
+./scripts/sv0 emit-c lib/lexer.sv0        # C a module compiles to
+./scripts/sv0 self-host-sv0-loop          # the sv0→sv0 self-hosting loop (native, behavioral parity)
+bash scripts/build-sv0-megatu-native.sh   # build the native compiler
 ```
 
-CI reads **`lib/bootstrap-sources.list`**: one path per line (relative to `sv0c/`). If the list is missing or empty, every top-level `lib/*.sv0` is used. Each listed file is compiled to **`build/vm/<basename>.sv0b`** (basename only — keep names unique across **`lib/`**, **`lexer/`**, **`parser/`**, …).
-
-**Layout and transliteration order:** [`LAYOUT.md`](./LAYOUT.md).
-
-**Golden bootstrap C:** `golden/stage0/<stem>.c` — compared on `./scripts/sv0 test` / `ci` to fresh SML heap output for the matching source file.
-
-**C snapshots:**
-
-```bash
-./scripts/sv0 emit-c lib/span_core.sv0
-./scripts/sv0 self-host-capture-stage0 lib/span_core.sv0
-./scripts/sv0 self-host-compare span_core
-./scripts/sv0 self-host-check-golden
-./scripts/sv0 self-host-sv0-loop
-```
-
-**Self-host loop pilot (milestone 3):** `lib/self-host-sv0-loop.list` drives **`./scripts/sv0 self-host-sv0-loop`** — SML heap emits C twice (must match), then **`cc`** compiles and runs each program. CI defaults to **`scripts/sv0-self-host-emit-c.sh`** (SML heap on stdout) so the **`diff`** leg always runs; set **`SV0_SELF_HOST_COMPILER`** to a **native** sv0-built compiler when available, or **`SV0_SKIP_SELF_HOST_COMPILER_DIFF=1`** to skip locally. Full story: [`../doc/self-host-sv0-loop.md`](../doc/self-host-sv0-loop.md).
-
-From `sv0c/` after `make heap`:
-
-```bash
-sml @SMLload=build/sv0c lib/span_core.sv0
-echo 'CM.make "sources.cm"; Main.main ((), ["--target=vm", "lib/span_core.sv0"]);' | sml
-```
-
-## `span_core.sv0`
-
-Transliterated subset of `sml-legacy/error/span.sml` / `span.sig`. `main` uses a simple `return` so the bootstrap IR/VM path emits an entry function.
-
-## `diagnostic_core.sv0`
-
-Transliterated subset of `sml-legacy/error/diagnostic.sig` + `diagnostic.sml`: enum `Severity`, proxy `Diagnostic` (i32 fields for code/message/span/related/help shapes), and a **byte-length** model of `format` (header, `-->` line, optional gutter+snippet, related/help block sizes, final newline). Helpers use scalar `i32` parameters; see [`LAYOUT.md`](./LAYOUT.md) for transliteration order.
-
-## `diagnostic_batch_core.sv0`
-
-`hasErrors` / `errorCount` over three severity tags (0 = error), matching `diagnostic.sml` list helpers without a list type.
-
-## `env_core.sv0`
-
-Bounded slice of `sml-legacy/name_resolution/env.*`: two-slot module value list (numeric ids), `env_register` / `env_lookup`, `env_empty`. Exercises **multi-slot struct** arguments and returns on the VM.
-
-## `lib/resolver_value_core.sv0`
-
-Bounded three-slot module-value list with `lookup_value` / `resolve_path_ok` — tiny slice of `ExprPath` resolution (`sml-legacy/name_resolution/resolver.sml` + `Env.lookupValue`).
-
-## `lib/resolver_arity_core.sv0`
-
-Two-slot function arity table (`FnArity2`), `lookup_fn_arity` (−1 = absent), and `call_arity_ok` matching resolver checks when arity is known.
-
-## `lib/env_scope_core.sv0`
-
-`scope_enter` / `scope_bind` / `scope_exit` / `scope_lookup` on a bounded two-frame, two-local-per-frame model (`sml-legacy/name_resolution/env.sml` frames).
-
-## `lib/lookup_value_core.sv0`
-
-**Merged** `FullEnv`: module slots + scope stack in one struct; **`lookup_value`** matches SML order (innermost locals, then `modVals`). Smaller seeds (`env_core`, `env_scope_core`) remain as isolated building blocks.
-
-## `lib/resolver_call_core.sv0`
-
-**Merged** `FullEnvCall`: same shape as `lookup_value_core` plus embedded fn-arity table; **`ec_expr_call_ok`** = value must resolve, then arity check when a row exists (`resolver.sml` `ExprCall` path).
-
-## `lib/lookup_type_core.sv0`
-
-Prelude type tags (`i32`/`bool`/`unit`/`str` as numeric ids), two-slot module types, **`lookup_type_simple`** with optional **Self** (sentinel id 99) when `allow_self` is set — slice of `lookupType` for one-segment paths.
-
-## `lexer/token_keyword_core.sv0`
-
-Keyword discriminants as `i32` tags in band **1–5** (`fn`, `let`, `if`, `break`, `continue`) plus **`is_keyword_tag`** — anchor for `sml-legacy/lexer/token.sml`. **`tag_kw_break`** / **`tag_kw_continue`** wire **`parser/stmt_entry_core.sv0`**. Lives under **`sv0c/lexer/`** (see repo root next to `lib/`).
-
-## `lexer/token_delim_core.sv0`
-
-Delimiter / punctuation tags (`( ) { } , ; [ ] . =`) in band **10–19** (**`=`** is **`Token.EQ`** assignment, not **`==`** — see **`tag_op_eq`** in **`token_op_core`**), disjoint from keyword tags, plus `is_delimiter_tag`.
-
-## `lexer/token_op_core.sv0`
-
-Operator tags (`+ - * / == != -> => :: %`) in band **20–29** (**`%`** = **29**, same mul tier as **`*`**/**`/`** in **parser.sml**), plus `is_operator_tag`. Compound assignment tokens **`+= … >>=`** use band **211–220** (`tag_op_pluseq` … `tag_op_gtgteq`), same numbers as **`parser/assign_binop_core.sv0`**; **`is_compound_assign_tag`** classifies that band (distinct from **`is_operator_tag`** — **`=`** assignment stays **`tag_delim_eq` = 19**).
-
-## `lib/type_alias_core.sv0`
-
-Two-row `tyAlias` table, `has_ty_alias_name`, `resolve_canonical_ty` with unrolled multi-hop resolution (chains into prelude id **1** = `i32` per `lookup_type_core` convention).
-
-## `lib/lookup_type_alias_core.sv0`
-
-**Integrated** `TypeEnvAlias`: module types + aliases together; **`lookup_type_resolved`** = `resolveCanonicalTy` then prelude or `modTys` (matches `lookupType` for a one-segment path). **Self** (99) bypasses alias expansion when `allow_self` is set — use this file as the main reference when testing the type-lookup pipeline end-to-end; keep `lookup_type_core` and `type_alias_core` as smaller pieces.
-
-## `parser/expr_entry_core.sv0`
-
-**parsePrimaryExpr** entry dispatch: **`parse_primary_dispatch`** maps stand-in token tags to arm ids **1–20** in the same order as `parser.sml` after **`litFromTok`**. **`lexer_keyword_tag_to_dispatch`** / **`lexer_delim_tag_to_dispatch`** tie **`token_keyword_core`** (**`if` = 3**) and **`token_delim_core`** (**`(` = 10**, **`[` = 16**, **`{` = 12**) into that table; **`primary_arm_is_compound`** flags arms that always recurse. Compare directly with `parsePrimaryExpr` when extending the bootstrap parser.
-
-## `parser/item_entry_core.sv0`
-
-**parseItem** dispatch (top-level items): arms **1–9** = **module, use, fn, struct, enum, trait, impl, type, newtype** in `parser.sml` case order. Stand-in tags **180–187** plus **`fn` = 1** from **`token_keyword_core`**; **`lexer_keyword_fn_to_item_arm`** maps **`tag_kw_fn`**. **`item_arm_has_item_body`** marks **fn/struct/enum/trait/impl** (items that normally carry a body in the full parser). Pairs with **`parser/stmt_entry_core.sv0`** for block-level **`tryStmt`**.
-
-## `parser/stmt_entry_core.sv0`
-
-**tryStmt** first match: arms **1–5** = **let, break, continue, assert,** then **assign/expr path** (`tryAssignStmt` in SML). **`tag_kw_let` = 2**, **`tag_kw_break` = 4**, **`tag_kw_continue` = 5** from **`token_keyword_core`**; **`tok_stmt_assert` = 56** matches **`parser/expr_entry_core.sv0`** **`tok_assert_kw`**. **`try_stmt_is_assign_fallback_arm`** is true only for arm **5**. **`parse_block_after_try_stmt_failed`** is a numeric placeholder for the **`parseBlock`** branch that calls **`parseExpr`** when **`tryStmt`** returns **`NONE`**. Arm **5** statement shape is expanded in **`parser/try_assign_stmt_core.sv0`** (with **`parser/assign_lhs_core.sv0`** for LHS).
-
-## `parser/assign_lhs_core.sv0`
-
-**parseAssignTarget** + **`tryParseAssignLHS`** (numeric model): **`try_lhs_starts`** accepts **`*`** (**`tag_op_star` = 22**) or **ident** (**73**); **`tok_lhs_dot`** / **`tok_assign_eq`** use **`lexer/token_delim_core`** **`tag_delim_dot` = 18** and **`tag_delim_eq` = 19**; **`is_assign_follow_tok`** is **`Token.EQ`** or any **`assign_binop_ast_tag`** **> 0** (**band 211–220**, see **`parser/assign_binop_core.sv0`**). Depth helpers end at **EQ** or any assign binop. Pairs with **`parser/try_assign_stmt_core.sv0`**.
-
-## `parser/assign_binop_core.sv0`
-
-**assignBinop** in **`parser.sml`**: tags **211–220** = **`+=`** … **`>>=`** in case order (same as **`lexer/token_op_core`** **`tag_op_*eq`**); **`assign_binop_ast_tag`** returns **1–10** (numeric **`Ast`** binop ids for tests). **`is_assign_binop_tok`** is **`> 0`**.
-
-## `parser/expr_rhs_stub_core.sv0`
-
-Post-**`=`** / compound-assign **RHS** stub (not full **`parseExpr`**): **`int` lit (40)**, **`ident` (73)**, or **`lit + lit`** with **`lexer/token_op_core`** **`tag_op_plus` = 20**, each form ending with **`;` (15)**. **`rhs_stub_atom_count`** returns **1** or **3** atoms (excluding **`;`**). **`parser/try_assign_stmt_core.sv0`** duplicates **`rhs_stub_ok_with_semi`** for a single bootstrap program.
-
-## `parser/expr_pratt_stub_core.sv0`
-
-Two-level numeric model for assignment **RHS** (not full **`parseExpr`**): **`*` (22)** binds tighter than the **add tier** **`+` (20)** / **`-` (21)** (**`pratt_is_add_binop`**, same as **`parseAddExpr`** **PLUS** / **MINUS**); atoms **40** / **73**; optional unary **`-` (21)** at **`semi7`** **t0** only. **`pratt_from_atom`** allows **`a-b ;`**, **`a-b*c ;`**, **`a*b-c ;`** (still one add-tier op after the leading **term** in six slots). **`pratt_rhs_ok_with_semi7`** and **`stub7`** assign helpers as before.
-
-## `parser/expr_prec_ladder_core.sv0`
-
-**`parseAddExpr`** / **`parseMulExpr`** / **`parseLeftAssoc`** in **`parser.sml`**: documents the full **`parseExpr`** chain down to those layers; encodes **add** tier **20–21** vs **mul** tier **22**/**23**/**29** (**STAR**/**SLASH**/**PERCENT** in **`token_op_core`**), with **`prec_binary_rank`**, **`is_add_layer_binop`**, **`is_mul_layer_binop`**, and **`mul_tier_binds_tighter_than_add_tier`**. **`tag_op_eqeq` (24)** is **not** in either tier here (cmp layer in SML). Bridges the numeric Pratt stub to the real precedence ladder without parsing token streams.
-
-## `parser/expr_cast_core.sv0`
-
-**`parseCastExpr`** in **`parser.sml`**: after unary / postfix, repeated **`as`** + **`parseType`**. This seed uses **`parse_cast_stub_ok_with_semi6`**: **base `;`**, **base `as` ty `;`**, or **base `as` ty `as` ty `;`** (atom **40** or **73**; **`as`** **61**; each **ty** is **IDENT** **73**, standing in for any single-segment primitive name). Rejects **mul**-shaped tail, **int lit** as type, missing **`;`**, **`as`** first, bad second type, third **`as`** in-window. Full **`parseType`** not modeled.
-
-## `parser/type_parse_core.sv0`
-
-**`parseType`** in **`parser.sml`**, first productions only: **`()`** as **LPAREN** **10** + **RPAREN** **11** (**`lexer/token_delim_core`**), and a one-token **IDENT** **73** type (primitive or path head). Rejects unclosed **`(`**, **`(`** before **IDENT**, **int lit** as type. Does not model tuples with contents, references, arrays, **Self**, or dotted paths.
-
-## `parser/expr_unary_stub_core.sv0`
-
-**`parseUnaryExpr`** in **`parser.sml`**: fixed **five-token** window for unary prefixes (**minus**, **bang**, **star** as deref, **amp**, **amp + `mut`**) then a primary atom (**int lit** **40** or **ident** **73**). Exercises the same stand-in tags as the lexer seeds (**`token_op_core`**, **`token_keyword_core`**). Use this file when extending unary handling before wiring into **`expr_entry_core`**.
-
-## `lib/lower_unop_core.sv0`
-
-**`unopToC`** / **`ExprUnop`** in **`lowering.sml`**: numeric discriminant map **1–6** (**Neg**, **Not**, **BitNot**, **Deref**, **Borrow**, **BorrowMut**) with predicates **`lowers_to_generic_ir_unop`**, **`is_addr_borrow_unop`**, and **`unop_to_c_raises_default`** (matches the SML split between generic IR unary ops and address/borrow forms). First **IR/lowering** seed under **`lib/`**; see **`LAYOUT.md`** §10.
-
-## `lib/lower_lit_core.sv0`
-
-**`lowerLit`** in **`lowering.sml`**: literal kind tags **1–4** (**IntLit**, **BoolLit**, **UnitLit**, **StringLit**) supported; any other tag maps to unsupported (SML raises **Fail**). **`main`** asserts each case with **`if`** / **`return`**. See **`LAYOUT.md`** §10.
-
-## `lib/link_strip_core.sv0`
-
-**`stripLinkDirectives`** in **`link.sml`**: top-level item kind tags **1** (**ItemFn**), **2** (**ItemUse**, removed), **3** (**ItemModule**, removed), **4** (**ItemStruct**); **`strip_link_keep_item`** is **1** iff the item survives the filter. **`main`** asserts each tag with **`if`** / **`return`**. See **`LAYOUT.md`** §11.
-
-## `parser/try_assign_stmt_core.sv0`
-
-**tryAssignStmt** in **`parser.sml`**: after **`tryParseAssignLHS`**, **`assign_op_follows_lhs`** (**`isAssignTok`**), then **`rhs_stub_ok_with_semi`** for RHS + **`;`**. Covers atom, **`ident`**, **`1 + 2`**-style RHS (via **`try_assign_id_op_rhs_stub`**), **`*x = …`** with atom RHS and **`try_assign_deref_op_rhs_stub`** for **`*x = 1 + 2`**, **field** atom RHS plus **`try_assign_field_op_rhs_stub`** for **`a.b = 1 + 2`**, **index** (**`ident [ int_lit ]`**, tags **16** / **17**) via **`try_assign_index_op_rhs_stub`** for **`a[i] = 1 + 2`**, **`+=`** with binop RHS, **`try_assign_*_op_pratt_rhs_stub`** (**six** RHS tokens, **`pratt_rhs_ok_with_semi`**), **`try_assign_*_op_pratt_rhs_stub7`** for unary **`- lit+lit*lit ;`** on ident / deref / field / index LHS, and rejects **missing `;`**, **`==` (24)**, truncated **`+`**, wrong LHS tokens, truncated Pratt. Extend when real **`parseExpr`** is transliterated.
+## the lists & goldens
+
+| file | role |
+|---|---|
+| `bootstrap-sources.list` | modules CI compiles + runs (one path per line, relative to `sv0c/`) |
+| `self-host-sv0-loop.list` | modules the self-host loop compiles with the native compiler |
+| `golden/stage0/<stem>.c` | checked-in reference C; `./scripts/sv0 test` diffs the SML delegate's fresh emit against it (an SML byte-guard) |
+
+When you edit a module, both its `golden/stage0/<stem>.c` and its
+`test/vm-parity/golden/sml/<stem>.sv0b` shift — refresh both before committing
+(see [`../doc/self-host-sv0-loop.md`](../doc/self-host-sv0-loop.md)). Read
+[`../doc/bootstrap-compiler-workarounds.md`](../doc/bootstrap-compiler-workarounds.md)
+for the sv0-language constraints these sources work within.
+
+> Historical: the milestone-3 transliteration plan and directory/seed layout are
+> archived at [`../doc/archive/lib-LAYOUT.md`](../doc/archive/lib-LAYOUT.md) and
+> [`../doc/archive/transliteration-plan.md`](../doc/archive/transliteration-plan.md).

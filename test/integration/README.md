@@ -30,5 +30,5 @@ When you add a row here, add the corresponding **`run_exit_case`** (or project b
 ## Related
 
 - **`sv0c/test/vm-parity/README.md`** — bytecode golden tier (different harness).
-- **`sv0c/doc/transliteration-plan.md`** — milestone 3 transliteration map.
+- **`sv0c/doc/archive/transliteration-plan.md`** — milestone 3 transliteration map.
 - **`task/sv0-toolchain-milestone-3-self-host.Rmd`** — M3 definition of done.

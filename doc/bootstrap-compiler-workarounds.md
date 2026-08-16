@@ -105,7 +105,7 @@ fn test_small() -> i32 {
 Each `.sv0` file is compiled independently by the bootstrap compiler. Functions from one file are not visible to another at compile time. This means:
 
 - **Large modules can be split across files.** If a file grows too large or complex, move loosely-coupled functions to a new `.sv0` file. Both files compile independently and can be linked at the C level.
-- **Shared helpers must be duplicated** (or placed in a shared `include` file — see `doc/transliteration-include.md`). If `checker.sv0` and `lowering.sv0` both need `expr_references_result`, each must have its own copy or both must `include` a shared fragment.
+- **Shared helpers must be duplicated** (or placed in a shared `include` file — see `doc/archive/transliteration-include.md`). If `checker.sv0` and `lowering.sv0` both need `expr_references_result`, each must have its own copy or both must `include` a shared fragment.
 - **When to split:** Consider splitting when a file exceeds ~120 functions or when adding new functions triggers bootstrap compiler issues despite following the flat-expression pattern.
 
 ### Current split points
@@ -140,6 +140,6 @@ while done != true {
 ## Related
 
 - `.cursor/rules/41-sml-process-and-vm-hang-prevention.mdc` — agent-facing hang prevention rules
-- `doc/transliteration-include.md` — textual include mechanism
-- `doc/transliteration-plan.md` — overall transliteration roadmap
+- `doc/archive/transliteration-include.md` — textual include mechanism
+- `doc/archive/transliteration-plan.md` — overall transliteration roadmap
 - `doc/compiler-passes.md` — SML compiler phase structure

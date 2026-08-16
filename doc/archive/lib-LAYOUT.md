@@ -1,14 +1,14 @@
 # Self-hosting compiler layout (milestone 3, phase 1)
 
-All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the working plan for directories and **transliteration order** (bootstrap SML → sv0). It is not normative for the language (see **sv0doc**). For a **milestone-3-wide** inventory and sequencing narrative, see **`doc/transliteration-plan.md`**.
+All **compiler-in-sv0** sources live in the **sv0c** repo. This document is the working plan for directories and **transliteration order** (bootstrap SML → sv0). It is not normative for the language (see **sv0doc**). For a **milestone-3-wide** inventory and sequencing narrative, see **`doc/archive/transliteration-plan.md`**.
 
-**`PROGRESS.md` C-4:** keep this file and **`doc/transliteration-plan.md`** **aligned** when seeds change (directory table + §2 order here; §2 inventory table there). **`task/sv0-toolchain-milestone-3-checklist.Rmd`** owns row-level phase tracking.
+**`PROGRESS.md` C-4:** keep this file and **`doc/archive/transliteration-plan.md`** **aligned** when seeds change (directory table + §2 order here; §2 inventory table there). **`task/sv0-toolchain-milestone-3-checklist.Rmd`** owns row-level phase tracking.
 
 ## Lowering match environment (milestone 3)
 
-Match-time tables (**callee `fn_names` / `fn_ret`**, future **per-fn param name/type pairs**, scrut-local stacks, import-alias mirrors) are threaded through **`lib/lowering.sv0`** as a **packed, versioned `Vec<i32>`** (**`lower_match_env`**) rather than growing the **`lower_expr_to_value`** parallel-parameter tail for every new slice. **Normative layout + migration steps:** **`doc/transliteration-plan.md`** → section **Lowering match environment (design — option B)**. **Regression tests** in **`lib/lowering.sv0`** include **`test_lower_match_env_clone_scrut_roundtrip`** (per-arm clone must not alias the parent scrut tail). **End-to-end VM probes** for language features live under **`test/integration/`** — see **`test/integration/README.md`** and the meta-repo **`task/sv0vm-milestone-2/02-integration-test.sh`** driver.
+Match-time tables (**callee `fn_names` / `fn_ret`**, future **per-fn param name/type pairs**, scrut-local stacks, import-alias mirrors) are threaded through **`lib/lowering.sv0`** as a **packed, versioned `Vec<i32>`** (**`lower_match_env`**) rather than growing the **`lower_expr_to_value`** parallel-parameter tail for every new slice. **Normative layout + migration steps:** **`doc/archive/transliteration-plan.md`** → section **Lowering match environment (design — option B)**. **Regression tests** in **`lib/lowering.sv0`** include **`test_lower_match_env_clone_scrut_roundtrip`** (per-arm clone must not alias the parent scrut tail). **End-to-end VM probes** for language features live under **`test/integration/`** — see **`test/integration/README.md`** and the meta-repo **`task/sv0vm-milestone-2/02-integration-test.sh`** driver.
 
-**Parser item arena + sidecars (M3 G3 / G4):** **`parse_program`** threads **`enum_variant_name_toks`**, **`struct_field_name_toks`**, **`struct_field_ty_root`** (indices into the **program** **`pty_tt`** type arena), and **`fn_param_name_toks`** ( **`ItemFn.id5`** base) alongside item rows — see **`doc/transliteration-plan.md`** § **M3 G3** and **G4**.
+**Parser item arena + sidecars (M3 G3 / G4):** **`parse_program`** threads **`enum_variant_name_toks`**, **`struct_field_name_toks`**, **`struct_field_ty_root`** (indices into the **program** **`pty_tt`** type arena), and **`fn_param_name_toks`** ( **`ItemFn.id5`** base) alongside item rows — see **`doc/archive/transliteration-plan.md`** § **M3 G3** and **G4**.
 
 ## Directories (current + planned)
 

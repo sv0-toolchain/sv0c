@@ -21,4 +21,4 @@ integration harness (`task/sv0c-milestone-1/02-integration-test.sh`).
   originally exposed four missing sites (checker `E0406` fn-signature type, checker
   `E0400` struct-literal result type, lowering unknown-struct field lookup, and the
   lowering struct-construction temp C type); all four now apply `canonTyImport` /
-  `canonTyName`. See `doc/pc3b-linkprojectdir-scoping.md` §5i.
+  `canonTyName`. See `doc/archive/pc3b-linkprojectdir-scoping.md` §5i.

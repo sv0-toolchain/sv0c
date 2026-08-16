@@ -1,6 +1,6 @@
 # modules_enum_match — cross-module enum `match` (PC-2a failing fixture)
 
-**Epic 2 / PC-2a** (post-M3 Phase C; `sv0c/doc/post-m3-phase-c-plan.md`,
+**Epic 2 / PC-2a** (post-M3 Phase C; `sv0c/doc/archive/post-m3-phase-c-plan.md`,
 `task/sv0-toolchain-milestone-3-checklist.Rmd` § Post-M3 Phase C slice backlog).
 
 **What it exercises.** Module `lib` defines `enum Signal { On(i32), Off() }` and

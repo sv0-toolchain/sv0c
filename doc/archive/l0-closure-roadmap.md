@@ -40,7 +40,7 @@ Work streams can overlap once upstream interfaces exist; order reflects **hard d
 **A1. Choose composition model** (decide before coding; record here + task Rmd):
 
 - **(A) `include` mega-TU** — `lib/main.sv0` gains `include "lexer.sv0"` … `include "vm_codegen.sv0"` at the top; `IncludeExpand.expandFile` expands them before lexing (SML `main.sml` does this on every file). Expanded TU is large (~15k lines) but the compiler handles it. *Pro:* works with today's `include_expand.sv0`; single-file path to Done. *Con:* all-or-nothing expansion.
-- **(B) multi-unit native C link** — each `lib/*.sv0` compiles to `.c` independently (already done by `bootstrap-build`); a new link step combines them + the C runtime. *Pro:* modules stay small, aligns with `lib/LAYOUT.md` / `sources.cm`. *Con:* new packaging rules — each emitted unit today has a full program shape, so naïve linking **duplicates** runtime/init assumptions. See **`doc/driver-pipeline-composition.md`** § Native closure.
+- **(B) multi-unit native C link** — each `lib/*.sv0` compiles to `.c` independently (already done by `bootstrap-build`); a new link step combines them + the C runtime. *Pro:* modules stay small, aligns with `doc/archive/lib-LAYOUT.md` / `sources.cm`. *Con:* new packaging rules — each emitted unit today has a full program shape, so naïve linking **duplicates** runtime/init assumptions. See **`doc/driver-pipeline-composition.md`** § Native closure.
 
 **Engineering default:** prefer **(B)** for the durable artifact; an **(A)** spike is acceptable only to unblock an early third-leg `diff`, then refactor toward (B).
 
@@ -76,7 +76,7 @@ Inter-phase data (all already defined in their modules): lexer → `source: stri
 
 Each item closes a gap between the sv0 pipeline and SML `compileProjectDir`. For each: **write a failing test first, then fix.**
 
-- **C1. `linkProjectDir` AST merge** — SML `link.sml :: linkProjectDir` parses each file, runs `mapProgramUnit`, and concatenates the `Ast.program` lists. Building blocks exist in `lib/link.sv0` (`link_apply_map_link_pass_program_source`, `link_merge_parallel_token_streams_reloc_b`, `link_program_item_vecs_append`, `link_project_concat_sources_offsets_from_listing`); **missing** is the orchestration loop. Write `link_project_dir_from_listing(listing, offsets, merged_source, merged_starts, merged_ends, out_item_*, out_body_*, out_pty_*) -> i32` that, per file, calls `parse_program` on the source slice, relocates arena indices by the per-file offset (`link_reloc_i32_vec_inplace`), runs the mangle pass, and appends into the output arenas. *Test:* two-file project (A defines `fn Foo()`, B calls it) → merged item arena has `link__Foo` and the call site references it. Refs: **`doc/link-g6-blockers.md`** (M3-S-040), **`doc/transliteration-plan.md`** Link row.
+- **C1. `linkProjectDir` AST merge** — SML `link.sml :: linkProjectDir` parses each file, runs `mapProgramUnit`, and concatenates the `Ast.program` lists. Building blocks exist in `lib/link.sv0` (`link_apply_map_link_pass_program_source`, `link_merge_parallel_token_streams_reloc_b`, `link_program_item_vecs_append`, `link_project_concat_sources_offsets_from_listing`); **missing** is the orchestration loop. Write `link_project_dir_from_listing(listing, offsets, merged_source, merged_starts, merged_ends, out_item_*, out_body_*, out_pty_*) -> i32` that, per file, calls `parse_program` on the source slice, relocates arena indices by the per-file offset (`link_reloc_i32_vec_inplace`), runs the mangle pass, and appends into the output arenas. *Test:* two-file project (A defines `fn Foo()`, B calls it) → merged item arena has `link__Foo` and the call site references it. Refs: **`doc/link-g6-blockers.md`** (M3-S-040), **`doc/archive/transliteration-plan.md`** Link row.
 - **C2. Resolver gaps** (`lib/resolver.sv0`) — `TyArray` size-expr resolution (tag 5); enum variant-constructor alias plumbing for payload variants; impl method bodies resolved independently (cross-check SML `NameResolution.resolveTopItem` `ItemEnum` / impl).
 - **C3. Multi-module `check_program`** (`lib/checker.sv0`) — single-unit today; after C1 merges arenas it should work, provided C2 populated the name env. *Test:* A defines struct `Foo`, B uses it in a signature → checker resolves `Foo` to `link__Foo` via the merged name env.
 - **C4. Lowering tail cases** (`lib/lowering.sv0`) — `PatStruct` binds with nested field patterns (vs SML `Lower.lowerPat`); `match_scrut_cty` resolving 1-segment local/param scrutinees to the precise enum typedef instead of coarse "pointer" (thread the fn/param type table into `lower_tag_match`).
@@ -86,7 +86,7 @@ Each item closes a gap between the sv0 pipeline and SML `compileProjectDir`. For
 
 **Coverage + known cross-module gaps (via SML `--project`):** cross-module **fn calls** work — `test/integration/modules`, `import_use_match`, and (2026-07-23) `test/integration/modules_types` (cross-module fns wrapping intra-module struct construction + field access + enum construction + match; `linkProjectDir` mangles `lib__Point`/`lib__Color`/`lib__*`; exit 42). Two concrete cross-module **user-type** gaps in the reference pipeline remain (fixtures reproduce them): (1) a `let p: T = …` where `T` is a **use-imported** struct emits `int p = …` instead of `lib__T p = …` — the local's C type loses the cross-module alias (codegen/lowering local-type resolution); (2) a cross-module enum in a `match` fails type-check with `E0400`. These pin C2/C3/C4 acceptance: they must compile+run once the alias/type-table threading matches SML's within-module behavior.
 
-**Acceptance:** `./scripts/sv0 test` green **without** `SV0_SKIP_SELF_HOST_COMPILER_DIFF` when claiming semantic closure (unless a documented intermediate — `milestone-orientation.json` `pre_merge_validation`); **`doc/transliteration-plan.md`** § Feature + diagnostic parity rows flip to **Done** only when the milestone says so.
+**Acceptance:** `./scripts/sv0 test` green **without** `SV0_SKIP_SELF_HOST_COMPILER_DIFF` when claiming semantic closure (unless a documented intermediate — `milestone-orientation.json` `pre_merge_validation`); **`doc/archive/transliteration-plan.md`** § Feature + diagnostic parity rows flip to **Done** only when the milestone says so.
 
 ### Phase D — VM parity tier-2 native (P4)
 
@@ -190,7 +190,7 @@ Narrow → wide (see **`.cursor/rules/40-validation-and-proof.mdc`**):
 ## Related
 
 - **`doc/native-self-host-compiler-recipe.md`** — interface contract + bootstrap vs forward path
-- **`doc/native-compose-tradeoffs.md`** — (A) mega-TU vs (B) multi-unit link, evidence + recommendation (2026-07-23)
+- **`doc/archive/native-compose-tradeoffs.md`** — (A) mega-TU vs (B) multi-unit link, evidence + recommendation (2026-07-23)
 - **`doc/driver-pipeline-composition.md`** — (A)/(B), staging vs native
 - **`doc/self-host-sv0-loop.md`** — pilot loop semantics
 - **`task/sv0-toolchain-milestone-3-self-host.Rmd`** — **L0** prerequisites table + ordered execution steps

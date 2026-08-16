@@ -826,7 +826,7 @@ existing runtime behavior; all three backends now agree.
   native `--project` (pc3b6), SML `one` mode, sv0vm integration.
 
 ### #8 — Native checker under-diagnoses (P1, milestone) — 🔨 IN PROGRESS
-Full plan: **`doc/bh8-native-diagnostics-plan.md`** (sink threading, slice order,
+Full plan: **`doc/archive/bh8-native-diagnostics-plan.md`** (sink threading, slice order,
 risk). Key discovery: the diagnostic layer (`lib/diagnostic.sv0`) and type
 inference (`synth_expr`/`expect`) already exist — this is wiring a *diagnostic
 sink* into the checker + adding the missing checks, not building from scratch.
