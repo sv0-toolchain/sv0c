@@ -1,0 +1,4 @@
+/* nested match with function calls — exits 6. */
+enum E { A(i32), B(i32) }
+fn pick(e: E) -> i32 { return match e { E::A(n) => n + 1, E::B(n) => n * 2 }; }
+fn main() -> i32 { return pick(E::A(2)) + pick(E::B(1)) + 1; }

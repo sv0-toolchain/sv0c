@@ -1,0 +1,2 @@
+/* find max in a Vec — exits 9. */
+fn main() -> i32 { let v: Vec<i32> = vec_new(); vec_push(v, 3); vec_push(v, 9); vec_push(v, 5); let mut m: i32 = 0; let mut i: i32 = 0; while i < vec_len(v) { if vec_get(v, i) > m { m = vec_get(v, i); } i = i + 1; } return m; }

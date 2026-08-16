@@ -1,0 +1,2 @@
+/* trunc-toward-zero then mask: (0-1000)/3 — exits 253. */
+fn main() -> i32 { let q: i32 = (0 - 1000) / 3; return q + 586; }

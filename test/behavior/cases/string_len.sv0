@@ -1,0 +1,2 @@
+/* string_len of a literal — exits 5. */
+fn main() -> i32 { return string_len("hello"); }

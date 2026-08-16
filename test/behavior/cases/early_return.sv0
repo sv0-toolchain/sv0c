@@ -1,0 +1,2 @@
+/* early return inside loop — exits 9. */
+fn main() -> i32 { let mut i: i32 = 0; while i < 100 { if i == 9 { return i; } i = i + 1; } return 0; }

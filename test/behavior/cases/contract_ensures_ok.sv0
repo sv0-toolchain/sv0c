@@ -1,0 +1,3 @@
+/* ensures satisfied — exits 8. */
+fn dbl(x: i32) -> i32 ensures(true) { return x * 2; }
+fn main() -> i32 { return dbl(4); }

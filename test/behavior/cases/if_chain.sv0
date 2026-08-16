@@ -1,0 +1,2 @@
+/* if/else-if chain — exits 3. */
+fn main() -> i32 { let x: i32 = 7; if x < 3 { return 1; } else { if x < 6 { return 2; } else { return 3; } } }

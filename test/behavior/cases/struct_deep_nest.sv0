@@ -1,0 +1,5 @@
+/* triple-nested struct — exits 10. */
+struct A { v: i32 }
+struct B { a: A }
+struct C { b: B }
+fn main() -> i32 { let c: C = C { b: B { a: A { v: 10 } } }; return c.b.a.v; }

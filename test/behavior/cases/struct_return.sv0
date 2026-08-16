@@ -1,0 +1,4 @@
+/* function returning a struct — exits 12. */
+struct P { x: i32, y: i32 }
+fn mk(v: i32) -> P { return P { x: v, y: v + 2 }; }
+fn main() -> i32 { let p: P = mk(5); return p.x + p.y; }

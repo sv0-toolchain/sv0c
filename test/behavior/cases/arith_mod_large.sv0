@@ -1,0 +1,2 @@
+/* modulo with larger operands — exits 7. */
+fn main() -> i32 { return 1007 % 100; }

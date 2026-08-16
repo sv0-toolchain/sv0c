@@ -1,0 +1,3 @@
+/* five-parameter function — exits 15. */
+fn add5(a: i32, b: i32, c: i32, d: i32, e: i32) -> i32 { return a + b + c + d + e; }
+fn main() -> i32 { return add5(1, 2, 3, 4, 5); }

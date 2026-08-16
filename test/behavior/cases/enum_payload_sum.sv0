@@ -1,0 +1,4 @@
+/* two enum values matched + added — exits 30. */
+enum E { V(i32), N }
+fn val(e: E) -> i32 { return match e { E::V(n) => n, E::N => 0 }; }
+fn main() -> i32 { return val(E::V(10)) + val(E::V(20)); }

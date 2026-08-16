@@ -1,0 +1,4 @@
+/* match in a recursive walk — exits 3. */
+enum L { Cons(i32), Nil }
+fn f(x: i32) -> i32 { if x == 0 { return 0; } let e: L = L::Cons(x); return match e { L::Cons(n) => 1 + f(n - 1), L::Nil => 0 }; }
+fn main() -> i32 { return f(3); }

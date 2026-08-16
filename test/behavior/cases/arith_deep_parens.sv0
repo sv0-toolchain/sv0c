@@ -1,0 +1,2 @@
+/* nested parentheses — exits 30. */
+fn main() -> i32 { return ((1 + 2) * (3 + 4)) + 9; }

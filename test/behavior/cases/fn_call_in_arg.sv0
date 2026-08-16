@@ -1,0 +1,4 @@
+/* function result as argument — exits 25. */
+fn sq(x: i32) -> i32 { return x * x; }
+fn add(a: i32, b: i32) -> i32 { return a + b; }
+fn main() -> i32 { return add(sq(3), sq(4)); }

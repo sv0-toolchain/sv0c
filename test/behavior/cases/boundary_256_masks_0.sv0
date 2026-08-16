@@ -1,0 +1,2 @@
+/* 256 masks to 0 exit — exits 0. */
+fn main() -> i32 { return 256; }
