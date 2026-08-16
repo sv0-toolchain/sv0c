@@ -480,13 +480,18 @@ not native.
   single-file); `megaTU-main.sv0` is not in the golden sets so no golden churn.
   (`?`/tuple/nested-struct below remain open.)
 
-- **Tuple type annotation → silent checker reject (re-measured 2026-08-15).**
-  `let t: (i32, i32) = (40, 2);` → native **exit 4** (check phase) with **no
-  diagnostic** (empty stdout, empty stderr). So it is not an empty *emit* but a
-  silent *rejection*: check_program returns nonzero without pushing to the
-  diagnostic sink. Fix class = BH-8-style: push an E-code (e.g. "tuple types not
-  supported in this slice") at the checker's tuple-reject site so the exit-4 is
-  honest. Bounded checker change (bootstrap module → golden refresh).
+- **Tuple type annotation → ✅ FIXED (native emits E0446, 2026-08-15).** A
+  multi-element tuple value made `synth_expr` return -1 with no message, so
+  `check_program` failed at **exit 4 silently** (empty stderr). SML rejects the
+  same input with `E0446: multi-element tuples are not supported in this slice`.
+  Fix: when a fn body fails to check and no check pushed a diagnostic,
+  `check_program` scans the (flat) body arena for a multi-element `ExprTuple`
+  (`find_multi_element_tuple`, tag 25 / d2 > 1) and pushes **E0446** — now native
+  prints `error[E0446]: multi-element tuples are not supported in this slice`,
+  matching SML's code + message. Bootstrap never uses multi-element tuples, so the
+  scan never fires there → corpus-parity 98/98, only `checker.c`/`checker.sv0b`
+  goldens shift. Case `tuple_unsupported.sv0`, dual-gated SML + native. (Tuple
+  *support* remains a documented limitation; this makes the rejection honest.)
 
 - **Nested struct literal → ✅ FIXED (native compiles + runs, 2026-08-15).** The
   crash below was a **parser** bug in `parse_struct_fields` (`lib/parser.sv0`):
