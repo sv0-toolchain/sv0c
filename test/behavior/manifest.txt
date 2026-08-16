@@ -32,7 +32,7 @@ test/behavior/cases/let_shadow.sv0|2
 test/behavior/cases/match_arith.sv0|20
 test/behavior/cases/question_op.sv0|42
 test/behavior/cases/struct_field.sv0|42
-test/behavior/cases/struct_nested.sv0|42
+test/behavior/cases/struct_nested.sv0|42|native
 test/behavior/cases/struct_param.sv0|12
 test/behavior/cases/vec_len.sv0|3
 test/behavior/cases/vec_ops.sv0|42
@@ -60,7 +60,7 @@ test/behavior/cases/fn_ackermann_small.sv0|5
 test/behavior/cases/fn_call_in_arg.sv0|25
 test/behavior/cases/struct_three_fields.sv0|6
 test/behavior/cases/struct_return.sv0|12
-test/behavior/cases/struct_deep_nest.sv0|10
+test/behavior/cases/struct_deep_nest.sv0|10|native
 test/behavior/cases/struct_field_in_cond.sv0|1
 test/behavior/cases/enum_three_variants.sv0|2
 test/behavior/cases/enum_payload_sum.sv0|30
@@ -76,7 +76,7 @@ test/behavior/cases/string_eq_false.sv0|0
 test/behavior/cases/string_empty_len.sv0|0
 test/behavior/cases/contract_ensures_ok.sv0|8
 test/behavior/cases/contract_requires_loop.sv0|10
-test/behavior/cases/combo_struct_enum.sv0|40
+test/behavior/cases/combo_struct_enum.sv0|40|native
 test/behavior/cases/combo_nested_match_call.sv0|6
 # --- wave 3: methods, for/range, multi-payload enums, string/Vec ops, algorithms ---
 test/behavior/cases/algo_collatz.sv0|8
@@ -113,4 +113,4 @@ test/behavior/cases/multi_return.sv0|2
 test/behavior/cases/accumulate_struct.sv0|60
 test/behavior/cases/enum_in_loop.sv0|10
 test/behavior/cases/recursion_deep.sv0|100
-test/behavior/cases/mixed_features.sv0|20
+test/behavior/cases/mixed_features.sv0|20|native
