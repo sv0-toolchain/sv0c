@@ -142,6 +142,9 @@ static int struct_field_status(int sdef_names, int sdef_field_offsets, int sdef_
 static const char* param_struct_name_of(int obj_tok, int param_name_toks, int param_tyname_toks, const char* source, int starts, int ends);
 static int scan_param_tyname_toks(int fn_param_ty_root, int pbase, int param_count, int pty_tt, int pty_td1, int pty_td3, int pp, int out);
 static int field_access_check_node(int fnode, int bet, int bed1, int bed2, int bpp, int param_name_toks, int param_tyname_toks, int sdef_names, int sdef_field_offsets, int sdef_field_counts, int sdef_fnames_flat, const char* source, int starts, int ends, int diag_sink);
+static int name_in_tok_list(int toks, const char* nm, const char* source, int starts, int ends);
+static int type_name_is_known(const char* name, int struct_names, int enum_names, int type_params, int tp_limit, const char* source, int starts, int ends);
+static int check_body_let_unknown_type(int bet, int bed1, int bed2, int bed4, int bpp, int body_root, int struct_names, int enum_names, int type_params, int tp_limit, int tok_tags, const char* source, int starts, int ends, int diag_sink);
 static int check_body_field_access(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int param_name_toks, int param_tyname_toks, int sdef_names, int sdef_field_offsets, int sdef_field_counts, int sdef_fnames_flat, const char* source, int starts, int ends, int diag_sink);
 static int find_multi_element_tuple(int bet, int bed2);
 static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit, int diag_sink);
@@ -3643,7 +3646,89 @@ static int field_access_check_node(int fnode, int bet, int bed1, int bed2, int b
   return 0;
 }
 
-static int check_body_field_access(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int param_name_toks, int param_tyname_toks, int sdef_names, int sdef_field_offsets, int sdef_field_counts, int sdef_fnames_flat, const char* source, int starts, int ends, int diag_sink) {
+static int name_in_tok_list(int toks, const char* nm, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_len(toks);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(toks, i);
+    int t = _sv0t1;
+    if ((t >= 0)) {
+      int _sv0t2 = sv0_vec_len(starts);
+      if ((t < _sv0t2)) {
+        int _sv0t3 = sv0_vec_get(starts, t);
+        int s = _sv0t3;
+        int _sv0t4 = sv0_vec_get(ends, t);
+        int e = _sv0t4;
+        if ((e > s)) {
+          int _sv0t5 = (e - s);
+          const char* _sv0t6 = sv0_string_substr(source, s, _sv0t5);
+          int _sv0t7 = sv0_string_eq(_sv0t6, nm);
+          if (_sv0t7) {
+            return 1;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int type_name_is_known(const char* name, int struct_names, int enum_names, int type_params, int tp_limit, const char* source, int starts, int ends) {
+  int _sv0t0 = ast_type_name_to_tag(name);
+  if ((_sv0t0 >= 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = sv0_string_eq(name, "Vec");
+  if (_sv0t1) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = sv0_string_eq(name, "Box");
+  if (_sv0t2) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_string_eq(name, "Option");
+  if (_sv0t3) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(name, "Result");
+  if (_sv0t4) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_string_eq(name, "Self");
+  if (_sv0t5) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = type_param_lookup_str(type_params, tp_limit, source, starts, ends, name);
+  if ((_sv0t6 >= 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = name_in_tok_list(struct_names, name, source, starts, ends);
+  if (_sv0t7) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = name_in_tok_list(enum_names, name, source, starts, ends);
+  if (_sv0t8) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int check_body_let_unknown_type(int bet, int bed1, int bed2, int bed4, int bpp, int body_root, int struct_names, int enum_names, int type_params, int tp_limit, int tok_tags, const char* source, int starts, int ends, int diag_sink) {
   if ((body_root < 0)) {
     return 0;
   } else {
@@ -3669,21 +3754,129 @@ static int check_body_field_access(int bet, int bed1, int bed2, int bed3, int be
     int _sv0t5 = block_stmt_index(bpp, sfirst, sidecar, si);
     int st = _sv0t5;
     int _sv0t6 = sv0_vec_get(bet, st);
-    int stag = _sv0t6;
+    if ((_sv0t6 == 27)) {
+      int _sv0t7 = sv0_vec_get(bed2, st);
+      int lannot = _sv0t7;
+      if ((lannot >= 0)) {
+        int _sv0t8 = sv0_vec_len(tok_tags);
+        if ((lannot < _sv0t8)) {
+          int _sv0t9 = sv0_vec_get(tok_tags, lannot);
+          if ((_sv0t9 == 5)) {
+            int _sv0t10 = sv0_vec_len(starts);
+            if ((lannot < _sv0t10)) {
+              int _sv0t11 = sv0_vec_get(starts, lannot);
+              int as2 = _sv0t11;
+              int _sv0t12 = sv0_vec_get(ends, lannot);
+              int ae = _sv0t12;
+              if ((ae > as2)) {
+                int _sv0t13 = (ae - as2);
+                const char* _sv0t14 = sv0_string_substr(source, as2, _sv0t13);
+                const char* aname;
+                aname = _sv0t14;
+                int _sv0t15 = type_name_is_known(aname, struct_names, enum_names, type_params, tp_limit, source, starts, ends);
+                if ((_sv0t15 != 1)) {
+                  sv0_vec_push(diag_sink, 301);
+                  sv0_vec_push(diag_sink, lannot);
+                } else {
+                }
+              } else {
+              }
+            } else {
+            }
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    si = (si + 1);
+  }
+  return 0;
+}
+
+static int check_body_field_access(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int param_name_toks, int param_tyname_toks, int sdef_names, int sdef_field_offsets, int sdef_field_counts, int sdef_fnames_flat, const char* source, int starts, int ends, int diag_sink) {
+  if ((body_root < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(bet);
+  if ((body_root >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(bet, body_root);
+  if ((_sv0t1 != 9)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(bed1, body_root);
+  int sfirst = _sv0t2;
+  int _sv0t3 = sv0_vec_get(bed2, body_root);
+  int scount = _sv0t3;
+  int _sv0t4 = sv0_vec_get(bed4, body_root);
+  int sidecar = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int name_toks = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tyname_toks = _sv0t6;
+  int pk = 0;
+  while (1) {
+    int _sv0t7 = sv0_vec_len(param_name_toks);
+    int _sv0t10 = (pk < _sv0t7);
+    if ((!_sv0t10)) {
+      break;
+    } else {
+    }
+    int _sv0t8 = sv0_vec_get(param_name_toks, pk);
+    sv0_vec_push(name_toks, _sv0t8);
+    int _sv0t9 = sv0_vec_get(param_tyname_toks, pk);
+    sv0_vec_push(tyname_toks, _sv0t9);
+    pk = (pk + 1);
+  }
+  int lp = 0;
+  while ((lp < scount)) {
+    int _sv0t11 = block_stmt_index(bpp, sfirst, sidecar, lp);
+    int lst = _sv0t11;
+    int _sv0t12 = sv0_vec_get(bet, lst);
+    if ((_sv0t12 == 27)) {
+      int _sv0t13 = sv0_vec_get(bed1, lst);
+      int lname = _sv0t13;
+      int _sv0t14 = sv0_vec_get(bed2, lst);
+      int lannot = _sv0t14;
+      if ((lname >= 0)) {
+        if ((lannot >= 0)) {
+          sv0_vec_push(name_toks, lname);
+          sv0_vec_push(tyname_toks, lannot);
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    lp = (lp + 1);
+  }
+  int si = 0;
+  while ((si < scount)) {
+    int _sv0t15 = block_stmt_index(bpp, sfirst, sidecar, si);
+    int st = _sv0t15;
+    int _sv0t16 = sv0_vec_get(bet, st);
+    int stag = _sv0t16;
     int fnode = (0 - 1);
     if ((stag == 15)) {
-      int _sv0t7 = sv0_vec_get(bed1, st);
-      fnode = _sv0t7;
+      int _sv0t17 = sv0_vec_get(bed1, st);
+      fnode = _sv0t17;
     } else {
     }
     if ((stag == 28)) {
-      int _sv0t8 = sv0_vec_get(bed1, st);
-      int inner = _sv0t8;
+      int _sv0t18 = sv0_vec_get(bed1, st);
+      int inner = _sv0t18;
       if ((inner >= 0)) {
-        int _sv0t9 = sv0_vec_get(bet, inner);
-        if ((_sv0t9 == 15)) {
-          int _sv0t10 = sv0_vec_get(bed1, inner);
-          fnode = _sv0t10;
+        int _sv0t19 = sv0_vec_get(bet, inner);
+        if ((_sv0t19 == 15)) {
+          int _sv0t20 = sv0_vec_get(bed1, inner);
+          fnode = _sv0t20;
         } else {
         }
       } else {
@@ -3691,12 +3884,12 @@ static int check_body_field_access(int bet, int bed1, int bed2, int bed3, int be
     } else {
     }
     if ((stag == 27)) {
-      int _sv0t11 = sv0_vec_get(bed3, st);
-      fnode = _sv0t11;
+      int _sv0t21 = sv0_vec_get(bed3, st);
+      fnode = _sv0t21;
     } else {
     }
-    int _sv0t12 = field_access_check_node(fnode, bet, bed1, bed2, bpp, param_name_toks, param_tyname_toks, sdef_names, sdef_field_offsets, sdef_field_counts, sdef_fnames_flat, source, starts, ends, diag_sink);
-    int _r = _sv0t12;
+    int _sv0t22 = field_access_check_node(fnode, bet, bed1, bed2, bpp, name_toks, tyname_toks, sdef_names, sdef_field_offsets, sdef_field_counts, sdef_fnames_flat, source, starts, ends, diag_sink);
+    int _r = _sv0t22;
     si = (si + 1);
   }
   return 0;
@@ -3874,31 +4067,33 @@ static int check_program(int tok_tags, const char* source, int starts, int ends,
       int _ptn = _sv0t56;
       int _sv0t57 = check_body_field_access(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, body_root_idx, param_name_pos, param_tyname_toks, sdef_names, sdef_field_offsets, sdef_field_counts, sdef_fnames_flat, source, starts, ends, diag_sink);
       int _rfa = _sv0t57;
+      int _sv0t58 = check_body_let_unknown_type(body_et, body_ed1, body_ed2, body_ed4, bpp, body_root_idx, struct_names, enum_names, type_params, tp_limit, tok_tags, source, starts, ends, diag_sink);
+      int _rut = _sv0t58;
       if ((chk != 0)) {
-        int _sv0t58 = sv0_vec_len(diag_sink);
-        if ((_sv0t58 == 0)) {
-          int _sv0t59 = find_multi_element_tuple(body_et, body_ed2);
-          int tup_i = _sv0t59;
+        int _sv0t59 = sv0_vec_len(diag_sink);
+        if ((_sv0t59 == 0)) {
+          int _sv0t60 = find_multi_element_tuple(body_et, body_ed2);
+          int tup_i = _sv0t60;
           if ((tup_i >= 0)) {
             sv0_vec_push(diag_sink, 446);
-            int _sv0t60 = expr_span_tok(body_et, body_ed1, bpp, tup_i);
-            sv0_vec_push(diag_sink, _sv0t60);
+            int _sv0t61 = expr_span_tok(body_et, body_ed1, bpp, tup_i);
+            sv0_vec_push(diag_sink, _sv0t61);
           } else {
           }
         } else {
         }
-        int _sv0t61 = (0 - 1);
-        return _sv0t61;
+        int _sv0t62 = (0 - 1);
+        return _sv0t62;
       } else {
       }
     } else {
     }
     ii = (ii + 1);
   }
-  int _sv0t62 = sv0_vec_len(diag_sink);
-  if ((_sv0t62 > 0)) {
-    int _sv0t63 = (0 - 1);
-    return _sv0t63;
+  int _sv0t63 = sv0_vec_len(diag_sink);
+  if ((_sv0t63 > 0)) {
+    int _sv0t64 = (0 - 1);
+    return _sv0t64;
   } else {
   }
   return 0;

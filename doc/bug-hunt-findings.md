@@ -27,7 +27,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 | 5 | Cross-module method calls fail SML `--project` (E0401) | P2 | SML |
 | 6 | Checker doesn't scope block-local bindings | P3 | native |
 | 7 | Literal `2147483648` (2³¹) handled 3 different ways | P2/P3 | all | ✅ **FIXED** (wrap to INT_MIN, all 3) |
-| 8 | Native checker accepts type errors + emits no diagnostics | P1 | native |
+| 8 | Native checker accepts type errors + emits no diagnostics | P1 | native | ✅ **FIXED** — all 6 cases now emit the SML code (E0300/E0301/E0307/E0400/E0429), gated on native + SML |
 | 9 | `include` unwired on native (works on SML) | P2 | native | ✅ **FIXED** (native build + fixture) |
 | 10 | All runtime contracts dropped on native; VM aborts ungracefully | P1 / P3 | native / VM |
 | 11 | `?` / enum-return / tuple / nested-struct silently mis-emit | P1/P2 | native | ✅ `?` **FIXED** (BH-11a), enum-return **FIXED** (BH-11b), nested-struct **FIXED** (BH-11); tuple now a loud **E0446** diagnostic |
@@ -319,9 +319,23 @@ C and happen to coincide across backends here only by luck (low-byte masking /
 
 ---
 
-## 8. Native checker under-diagnoses: silently accepts several type errors + emits no diagnostics — **P1 for native-default promotion**
+## 8. Native checker under-diagnoses: silently accepts several type errors + emits no diagnostics — **P1 for native-default promotion** — ✅ FIXED
 
 **Files:** `lib/checker.sv0` (the native type-checker).
+
+> **Resolution (2026-08-15, BH-8 slices 1–5).** All six rows below now emit the
+> same `Exxxx` code as SML. The last two gaps closed here: **E0301** for an
+> unknown type in a **local** `let x: T` annotation (`check_body_let_unknown_type`
+> + `type_name_is_known`, which allowlists primitives, the generic heads
+> Vec/Box/Option/Result/Self, bound type parameters, and declared structs/enums;
+> restricted to identifier-headed annotations so a tuple type still routes to
+> E0446), and **E0429** for field access on a **local** struct binding
+> (`check_body_field_access` now merges the block's `let x: T` bindings into the
+> name/type maps, not just parameters — safe because `struct_field_status`
+> returns −1 for a non-struct type). The earlier slices already landed
+> E0400/E0300/E0307 and the param-level E0301/E0429. All are gated on **both**
+> backends via `test/diagnostics/` (native + SML behavioral corpora), now 10
+> cases each. Native no longer accepts ill-typed input silently.
 
 The native checker was built to run *after* the SML reference has already
 validated the program (cf. finding #6: "acceptable for well-formed programs that
