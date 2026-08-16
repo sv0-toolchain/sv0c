@@ -25,7 +25,7 @@ breakdown in [Remediation tasks](#remediation-tasks-bite-sized) at the end.
 | 3 | Stale pty type-tag scheme in checker type-resolvers (2/3/7) | P2/P3 | native (dead) | ✅ **FIXED** (sv0c) |
 | 4 | Void fn + contract, no `-> T`: native fails silently vs SML E0409 | P3 | native |
 | 5 | Cross-module method calls fail SML `--project` (E0401) | P2 | SML |
-| 6 | Checker doesn't scope block-local bindings | P3 | native |
+| 6 | Checker doesn't scope block-local bindings | P3 | native | ✅ **FIXED** — block-locals scoped in resolver + checker; out-of-scope use → E0300 (matches SML), gated |
 | 7 | Literal `2147483648` (2³¹) handled 3 different ways | P2/P3 | all | ✅ **FIXED** (wrap to INT_MIN, all 3) |
 | 8 | Native checker accepts type errors + emits no diagnostics | P1 | native | ✅ **FIXED** — all 6 cases now emit the SML code (E0300/E0301/E0307/E0400/E0429), gated on native + SML |
 | 9 | `include` unwired on native (works on SML) | P2 | native | ✅ **FIXED** (native build + fixture) |
@@ -282,19 +282,28 @@ future default) already works, so this was deliberately deferred.
 
 ---
 
-## 6. Block-local bindings leak out of their block in the checker — P3 (documented design limitation, self-host risk)
+## 6. Block-local bindings leak out of their block in the checker — P3 (documented design limitation, self-host risk) — ✅ FIXED
 
-**Files:** `lib/checker.sv0` `check_stmt_in_block` (~L3018).
+**Files:** `lib/resolver.sv0` (`res_exit_scope`, `res_lookup_in_frames_str`, block case), `lib/checker.sv0` (`env_scope_restore`, `env_lookup_str`, block synth).
 
-The checker's env extensions are **not scoped** — a `let` inside a block stays
-visible after the block (comment: "bindings leak out of the block. This is
-acceptable for well-formed programs that have already been validated by the SML
-compiler"). This is a deliberate simplification, safe for the current use where
-the SML reference has already validated inputs. But as the native compiler is
-promoted to the default (and eventually the only) front end, it will accept
-programs that *should* be rejected (a variable used after its block scope ends),
-i.e. it under-diagnoses. Not a miscompile, but a correctness gap in the
-type-checker's scope enforcement that the promotion plan should close.
+Both the resolver's `frames` stack and the checker's `env` extensions were **not
+scoped** — a `let` inside a block stayed visible after the block, so native
+accepted programs that should be rejected (a variable used after its block scope
+ends). Safe under SML pre-validation, but a soundness gap once native is the
+default front end.
+
+> **Resolution (2026-08-16, BH-6).** Both scopes now restore on block exit. sv0's
+> `Vec` has no pop, so each side **tombstones** the bindings introduced in a block
+> when it ends (overwrites the bound name-token with −1); the by-name lookups
+> (`res_lookup_in_frames_str`, `env_lookup_str`) skip −1 entries, so a block-local
+> is unbound after its block. The resolver already had a `frames` stack (fresh per
+> fn) that entered a scope per block but never popped it — added `res_exit_scope`
+> and called it on every block-exit path. The checker's block synth (tag 9) now
+> records the env length on entry and restores on exit (`env_scope_restore`). The
+> **resolver** side produces the user-facing diagnostic: an out-of-scope use is
+> now **E0300** (unbound), matching SML exactly (bare/`if`/nested-block leaks →
+> E0300; valid in-scope, `if`-internal, `while`-internal, and match-arm uses all
+> still accepted). Gated on both backends via `test/diagnostics/block_scope_leak.sv0`.
 
 ---
 

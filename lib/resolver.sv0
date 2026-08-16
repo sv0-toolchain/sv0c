@@ -721,6 +721,24 @@ fn res_bind_local(frames: Vec<i32>, name_pos: i32) -> i32 {
     return 0;
 }
 
+/* BH-6: leave a block scope. sv0's frames Vec has no pop, so tombstone the top
+   frame's entries (set each bound name-token to -1). res_lookup_in_frames_str
+   skips -1 entries, so a block-local is no longer found after its block ends
+   (→ E0300), matching SML's scoping. The empty frame is left in place (frames is
+   fresh per fn — resolve_top_item L1454 — so residual frames are harmless). */
+fn res_exit_scope(frames: Vec<i32>) -> i32 {
+    let len: i32 = vec_len(frames);
+    if len == 0 { return 0; }
+    let top: Vec<i32> = vec_get(frames, len - 1);
+    let tl: i32 = vec_len(top);
+    let mut j: i32 = 0;
+    while j < tl {
+        vec_set(top, j, 0 - 1);
+        j = j + 1;
+    }
+    return 0;
+}
+
 fn res_lookup_in_frames_str(frames: Vec<i32>, name_str: string,
                             source: string, starts: Vec<i32>,
                             ends: Vec<i32>) -> bool {
@@ -732,8 +750,12 @@ fn res_lookup_in_frames_str(frames: Vec<i32>, name_str: string,
         let mut j: i32 = 0;
         while j < fv_len {
             let pos: i32 = vec_get(frame, j);
-            let nm: string = tok_str(source, starts, ends, pos);
-            if string_eq(nm, name_str) { return true; }
+            /* BH-6: skip tombstoned (out-of-scope) block-locals — res_exit_scope
+               sets their name to -1, not a valid token index. */
+            if pos >= 0 {
+                let nm: string = tok_str(source, starts, ends, pos);
+                if string_eq(nm, name_str) { return true; }
+            }
             j = j + 1;
         }
         fi = fi - 1;
@@ -983,14 +1005,20 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         source, starts, ends,
                                         mod_vals, mod_tys,
                                         fn_arities, frames, pp);
-            if rs != 0 { return rs; }
+            if rs != 0 {
+                res_exit_scope(frames);
+                return rs;
+            }
             si = si + 1;
         }
         if tail >= 0 {
-            return resolve_expr(et, ed1, ed2, ed3, ed4, tail,
+            let rt: i32 = resolve_expr(et, ed1, ed2, ed3, ed4, tail,
                                  source, starts, ends,
                                  mod_vals, mod_tys, fn_arities, frames, pp);
+            res_exit_scope(frames);
+            return rt;
         }
+        res_exit_scope(frames);
         return 0;
     }
     if tag == 10 {

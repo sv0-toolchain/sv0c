@@ -10,3 +10,4 @@ test/diagnostics/cases/field_missing.sv0|E0429
 test/diagnostics/cases/field_missing_local.sv0|E0429
 test/diagnostics/cases/void_contract.sv0|E0409
 test/diagnostics/cases/tuple_unsupported.sv0|E0446
+test/diagnostics/cases/block_scope_leak.sv0|E0300

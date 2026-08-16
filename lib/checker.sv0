@@ -395,6 +395,20 @@ fn env_extend(env_names: Vec<i32>, env_types: Vec<i32>, env_muts: Vec<i32>,
     return vec_len(env_names) - 1;
 }
 
+/* BH-6: leave a block scope. sv0's env Vec has no pop, so tombstone every binding
+   added since `mark` by overwriting its NAME with -1. env_lookup/env_entry_index
+   compare against real token indices (always >= 0), so a -1 entry never matches —
+   a block-local used after its block is then unbound (E0300), matching SML. The
+   physical length is unchanged (later pushes append past the dead slots). */
+fn env_scope_restore(env_names: Vec<i32>, mark: i32) -> i32 {
+    let mut j: i32 = vec_len(env_names) - 1;
+    while j >= mark {
+        vec_set(env_names, j, 0 - 1);
+        j = j - 1;
+    }
+    return 0;
+}
+
 fn env_is_mut(env_muts: Vec<i32>, idx: i32) -> bool {
     if idx < 0 { return false; }
     return vec_get(env_muts, idx) != 0;
@@ -3495,11 +3509,15 @@ fn env_lookup_str(env_names: Vec<i32>, env_types: Vec<i32>,
     let mut i: i32 = n - 1;
     while i >= 0 {
         let np: i32 = vec_get(env_names, i);
-        let s: i32 = vec_get(starts, np);
-        let e: i32 = vec_get(ends, np);
-        let nm: string = string_substr(source, s, e - s);
-        if string_eq(nm, target_str) {
-            return vec_get(env_types, i);
+        /* BH-6: skip tombstoned (out-of-scope) block-locals — env_scope_restore
+           sets their name to -1, which is not a valid token index. */
+        if np >= 0 {
+            let s: i32 = vec_get(starts, np);
+            let e: i32 = vec_get(ends, np);
+            let nm: string = string_substr(source, s, e - s);
+            if string_eq(nm, target_str) {
+                return vec_get(env_types, i);
+            }
         }
         i = i - 1;
     }
@@ -4220,6 +4238,12 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
         let stmts_count: i32 = vec_get(ed2, idx);
         let tail_idx: i32 = vec_get(ed3, idx);
         let sidecar: i32 = vec_get(ed4, idx);
+        /* BH-6: a block introduces a scope — `let` bindings inside it must not
+           leak past its end. Record the env length on entry and restore (tombstone
+           the block-locals) on every exit path, so a use after the block is
+           unbound (E0300), matching SML's scoping. The tail is synthesised WITH the
+           block-locals still visible; the restore happens after. */
+        let env_mark: i32 = vec_len(env_names);
         let mut si: i32 = 0;
         while si < stmts_count {
             let rc: i32 = check_stmt_in_block(
@@ -4232,11 +4256,14 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                 fn_names, fn_ret_types,
                 ret_ty, loop_depth,
                 block_stmt_index(pp, stmts_first, sidecar, si));
-            if rc < 0 { return 0 - 1; }
+            if rc < 0 {
+                let _r0: i32 = env_scope_restore(env_names, env_mark);
+                return 0 - 1;
+            }
             si = si + 1;
         }
         if tail_idx >= 0 {
-            return synth_expr(et, ed1, ed2, ed3, ed4, pp,
+            let tv: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
                               source, starts, ends,
                               env_names, env_types, env_muts,
                               edef_names, edef_variant_offsets,
@@ -4245,6 +4272,8 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                               fn_names, fn_ret_types,
                               ret_ty, loop_depth,
                               tail_idx);
+            let _r1: i32 = env_scope_restore(env_names, env_mark);
+            return tv;
         }
         /* Tailless block whose last statement is a `return` diverges — its value
            type is polymorphic (SML synth: freshVar), so it satisfies any ret_ty.
@@ -4253,9 +4282,11 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
             let last_idx: i32 = block_stmt_index(pp, stmts_first, sidecar,
                                                  stmts_count - 1);
             if stmt_returns_arena(et, ed1, last_idx) {
+                let _r2: i32 = env_scope_restore(env_names, env_mark);
                 return TY_VAR();
             }
         }
+        let _r3: i32 = env_scope_restore(env_names, env_mark);
         return TY_UNIT();
     }
     if tag == 30 {
