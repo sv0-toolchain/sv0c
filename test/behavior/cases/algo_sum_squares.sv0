@@ -1,0 +1,2 @@
+/* sum of squares 1..4 — exits 30. */
+fn main() -> i32 { let mut s: i32 = 0; let mut i: i32 = 1; while i <= 4 { s = s + i * i; i = i + 1; } return s; }

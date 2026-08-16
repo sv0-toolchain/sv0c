@@ -1,0 +1,5 @@
+/* struct + fn + loop + match together — exits 20. */
+struct Box { v: i32 }
+enum Sel { First, Second }
+fn get(b: Box, s: Sel) -> i32 { return match s { Sel::First => b.v, Sel::Second => b.v * 2 }; }
+fn main() -> i32 { let b: Box = Box { v: 10 }; return get(b, Sel::First) + get(b, Sel::First); }

@@ -1,0 +1,2 @@
+/* for loop iteration count — exits 5. */
+fn main() -> i32 { let mut c: i32 = 0; for i in 0..5 { c = c + 1; } return c; }

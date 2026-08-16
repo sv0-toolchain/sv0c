@@ -1,0 +1,3 @@
+/* deeper recursion (count down from 100) — exits 100. */
+fn cd(n: i32) -> i32 { if n == 0 { return 0; } return 1 + cd(n - 1); }
+fn main() -> i32 { return cd(100); }

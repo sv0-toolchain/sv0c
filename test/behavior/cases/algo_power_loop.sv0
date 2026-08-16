@@ -1,0 +1,2 @@
+/* 2^6 via loop — exits 64. */
+fn main() -> i32 { let mut r: i32 = 1; let mut i: i32 = 0; while i < 6 { r = r * 2; i = i + 1; } return r; }

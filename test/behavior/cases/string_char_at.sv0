@@ -1,0 +1,2 @@
+/* char code at index 0 of "A" — exits 65. */
+fn main() -> i32 { return string_char_at("A", 0); }

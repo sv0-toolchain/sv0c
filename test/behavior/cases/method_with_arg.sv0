@@ -1,0 +1,4 @@
+/* method taking an argument — exits 15. */
+struct Counter { n: i32 }
+impl Counter { fn plus(self: Counter, k: i32) -> i32 { return self.n + k; } }
+fn main() -> i32 { let c: Counter = Counter { n: 5 }; return c.plus(10); }

@@ -1,0 +1,2 @@
+/* vec_set overwrites an element — exits 99. */
+fn main() -> i32 { let v: Vec<i32> = vec_new(); vec_push(v, 1); vec_push(v, 2); vec_set(v, 1, 99); return vec_get(v, 1); }

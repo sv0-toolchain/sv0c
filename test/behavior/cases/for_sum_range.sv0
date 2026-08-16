@@ -1,0 +1,2 @@
+/* for i in 0..5 sum — exits 10. */
+fn main() -> i32 { let mut s: i32 = 0; for i in 0..5 { s = s + i; } return s; }
