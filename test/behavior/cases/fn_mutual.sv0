@@ -1,0 +1,4 @@
+/* mutual recursion is-even/odd — exits 1. */
+fn iseven(n: i32) -> i32 { if n == 0 { return 1; } return isodd(n - 1); }
+fn isodd(n: i32) -> i32 { if n == 0 { return 0; } return iseven(n - 1); }
+fn main() -> i32 { return iseven(10); }

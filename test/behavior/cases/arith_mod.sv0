@@ -1,0 +1,2 @@
+/* modulo: 17 % 5 — exits 2. */
+fn main() -> i32 { return 17 % 5; }

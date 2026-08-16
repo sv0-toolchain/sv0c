@@ -1,0 +1,2 @@
+/* unary negation cancels — exits 7. */
+fn main() -> i32 { let x: i32 = 0 - 7; return 0 - x; }

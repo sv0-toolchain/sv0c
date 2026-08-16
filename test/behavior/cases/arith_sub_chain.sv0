@@ -1,0 +1,2 @@
+/* left-assoc subtraction: 10-3-3 — exits 4. */
+fn main() -> i32 { return 10 - 3 - 3; }

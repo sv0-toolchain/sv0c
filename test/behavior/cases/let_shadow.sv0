@@ -1,0 +1,2 @@
+/* block-scoped shadowing keeps outer — exits 2. */
+fn main() -> i32 { let x: i32 = 1; { let x: i32 = 99; } let y: i32 = x + 1; return y; }

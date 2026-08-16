@@ -1,0 +1,3 @@
+/* match arm result used in arithmetic — exits 20. */
+enum Op { Double(i32), Zero }
+fn main() -> i32 { let o: Op = Op::Double(10); return match o { Op::Double(n) => n * 2, Op::Zero => 0 }; }

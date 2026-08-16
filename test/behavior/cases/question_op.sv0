@@ -1,0 +1,5 @@
+/* the ? operator unwraps + propagates — exits 42. */
+enum Opt { Some(i32), None }
+fn g() -> Opt { return Opt::Some(41); }
+fn f() -> Opt { let v: i32 = g()?; return Opt::Some(v + 1); }
+fn main() -> i32 { let r: Opt = f(); return match r { Opt::Some(x) => x, Opt::None => 0 }; }

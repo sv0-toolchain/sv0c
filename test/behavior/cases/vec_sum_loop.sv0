@@ -1,0 +1,2 @@
+/* sum a Vec in a loop — exits 10. */
+fn main() -> i32 { let v: Vec<i32> = vec_new(); vec_push(v, 2); vec_push(v, 3); vec_push(v, 5); let mut s: i32 = 0; let mut i: i32 = 0; while i < vec_len(v) { s = s + vec_get(v, i); i = i + 1; } return s; }

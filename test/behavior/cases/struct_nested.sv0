@@ -1,0 +1,4 @@
+/* nested struct field access — exits 42. */
+struct Inner { v: i32 }
+struct Outer { inner: Inner, k: i32 }
+fn main() -> i32 { let o: Outer = Outer { inner: Inner { v: 40 }, k: 2 }; return o.inner.v + o.k; }

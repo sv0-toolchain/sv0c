@@ -1,0 +1,2 @@
+/* Vec new/push/get — exits 42. */
+fn main() -> i32 { let v: Vec<i32> = vec_new(); vec_push(v, 40); vec_push(v, 2); return vec_get(v, 0) + vec_get(v, 1); }
