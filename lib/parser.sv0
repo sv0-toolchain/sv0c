@@ -1260,71 +1260,99 @@ fn parse_arg_list(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     return p;
 }
 
+/* Parse `{ field: value, ... }` struct-literal fields. Buffers each field's
+   (name_tok, value_root) locally and flushes them CONTIGUOUSLY to sf_names after
+   all fields parse, then reports the flush start + count via out_meta = [sf_start,
+   field_count]. A field value that is itself a struct literal recursively pushes
+   ITS fields to sf_names during parsing; buffering keeps this struct's own field
+   pairs adjacent (and its count exact) instead of interleaving the nested pairs —
+   which previously misaligned the stride-2 pool and made `fc` over-count, crashing
+   lowering with a `vec` OOB on nested struct literals (bug-hunt #11). Identical for
+   non-nested structs (their values push nothing to sf_names), so no golden change. */
 fn parse_struct_fields(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                        source: string, pos: i32,
                        et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                        ed3: Vec<i32>, ed4: Vec<i32>,
-                       pp: Vec<i32>, sf_names: Vec<i32>) -> i32 {
-    if ps_peek(tags, pos) == 9 { return pos + 1; }
+                       pp: Vec<i32>, sf_names: Vec<i32>,
+                       out_meta: Vec<i32>) -> i32 {
+    let names: Vec<i32> = vec_new();
+    let vals: Vec<i32> = vec_new();
     let mut p: i32 = pos;
-    let mut done: bool = false;
-    while done != true {
-        let t: i32 = ps_peek(tags, p);
-        if t == 9 {
-            done = true;
-            p = p + 1;
-        } else {
-            if t == 17 {
-                let nt: i32 = ps_peek(tags, p + 1);
-                if nt == 5 {
-                    let n2: i32 = ps_peek(tags, p + 2);
-                    if n2 == 14 {
-                        vec_push(sf_names, p + 1);
-                        let pv: i32 = parse_expr_sf(tags, starts, ends, source, p + 3,
-                                                  et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-                        if pv < 0 { return 0 - 1; }
-                        vec_push(sf_names, vec_len(et) - 1);
-                        p = pv;
+    if ps_peek(tags, pos) != 9 {
+        let mut done: bool = false;
+        while done != true {
+            let t: i32 = ps_peek(tags, p);
+            if t == 9 {
+                done = true;
+                p = p + 1;
+            } else {
+                if t == 17 {
+                    let nt: i32 = ps_peek(tags, p + 1);
+                    if nt == 5 {
+                        let n2: i32 = ps_peek(tags, p + 2);
+                        if n2 == 14 {
+                            let nm: i32 = p + 1;
+                            let pv: i32 = parse_expr_sf(tags, starts, ends, source, p + 3,
+                                                      et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+                            if pv < 0 { return 0 - 1; }
+                            vec_push(names, nm);
+                            vec_push(vals, vec_len(et) - 1);
+                            p = pv;
+                        } else {
+                            return 0 - 1;
+                        }
                     } else {
                         return 0 - 1;
                     }
                 } else {
-                    return 0 - 1;
-                }
-            } else {
-                if t == 5 {
-                    let nt: i32 = ps_peek(tags, p + 1);
-                    if nt == 14 {
-                        vec_push(sf_names, p);
-                        let pv: i32 = parse_expr_sf(tags, starts, ends, source, p + 2,
-                                                  et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
-                        if pv < 0 { return 0 - 1; }
-                        vec_push(sf_names, vec_len(et) - 1);
-                        p = pv;
+                    if t == 5 {
+                        let nt: i32 = ps_peek(tags, p + 1);
+                        if nt == 14 {
+                            let nm: i32 = p;
+                            let pv: i32 = parse_expr_sf(tags, starts, ends, source, p + 2,
+                                                      et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
+                            if pv < 0 { return 0 - 1; }
+                            vec_push(names, nm);
+                            vec_push(vals, vec_len(et) - 1);
+                            p = pv;
+                        } else {
+                            let nm: i32 = p;
+                            let pps: i32 = vec_len(pp);
+                            vec_push(pp, p);
+                            vec_push(et, 1);
+                            vec_push(ed1, pps);
+                            vec_push(ed2, 1);
+                            vec_push(ed3, 0);
+                            vec_push(ed4, 0);
+                            vec_push(names, nm);
+                            vec_push(vals, vec_len(et) - 1);
+                            p = p + 1;
+                        }
                     } else {
-                        vec_push(sf_names, p);
-                        let pps: i32 = vec_len(pp);
-                        vec_push(pp, p);
-                        vec_push(et, 1);
-                        vec_push(ed1, pps);
-                        vec_push(ed2, 1);
-                        vec_push(ed3, 0);
-                        vec_push(ed4, 0);
-                        vec_push(sf_names, vec_len(et) - 1);
-                        p = p + 1;
+                        return 0 - 1;
                     }
-                } else {
-                    return 0 - 1;
                 }
-            }
-            let ct: i32 = ps_peek(tags, p);
-            if ct == 12 {
-                p = p + 1;
-            } else {
-                if ct != 9 { return 0 - 1; }
+                let ct: i32 = ps_peek(tags, p);
+                if ct == 12 {
+                    p = p + 1;
+                } else {
+                    if ct != 9 { return 0 - 1; }
+                }
             }
         }
+    } else {
+        p = pos + 1;
     }
+    let sf_start: i32 = vec_len(sf_names);
+    let fc: i32 = vec_len(names);
+    let mut fi: i32 = 0;
+    while fi < fc {
+        vec_push(sf_names, vec_get(names, fi));
+        vec_push(sf_names, vec_get(vals, fi));
+        fi = fi + 1;
+    }
+    vec_push(out_meta, sf_start);
+    vec_push(out_meta, fc);
     return p;
 }
 
@@ -1376,22 +1404,25 @@ fn parse_primary_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         let ppc: i32 = vec_len(pp) - pps;
         if allow_struct == 1 {
             if ps_peek(tags, p1) == 8 {
-                let fc_before: i32 = vec_len(sf_names);
-                let first_val: i32 = vec_len(et);
-                let pf: i32 = parse_struct_fields(tags, starts, ends, source,
-                                                   p1 + 1, et, ed1, ed2, ed3,
-                                                   ed4, pp, sf_names);
-                if pf < 0 { return 0 - 1; }
                 /* sf_names is stride-2 per field: [name_tok, value_root]. The
                    value root lets lowering read each field's value expression
                    directly (they are non-contiguous in the arena when values are
-                   field accesses / calls), instead of guessing contiguity. */
-                let fc: i32 = (vec_len(sf_names) - fc_before) / 2;
+                   field accesses / calls / nested struct literals), instead of
+                   guessing contiguity. parse_struct_fields flushes THIS struct's
+                   own pairs contiguously and reports their start + count in meta
+                   (nested-literal fields land in their own contiguous block). */
+                let meta: Vec<i32> = vec_new();
+                let pf: i32 = parse_struct_fields(tags, starts, ends, source,
+                                                   p1 + 1, et, ed1, ed2, ed3,
+                                                   ed4, pp, sf_names, meta);
+                if pf < 0 { return 0 - 1; }
+                let sf_start: i32 = vec_get(meta, 0);
+                let fc: i32 = vec_get(meta, 1);
                 vec_push(et, 24);
                 vec_push(ed1, pps);
                 vec_push(ed2, ppc);
                 vec_push(ed3, fc);
-                vec_push(ed4, fc_before);
+                vec_push(ed4, sf_start);
                 return pf;
             }
         }

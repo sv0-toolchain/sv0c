@@ -480,21 +480,48 @@ not native.
   single-file); `megaTU-main.sv0` is not in the golden sets so no golden churn.
   (`?`/tuple/nested-struct below remain open.)
 
-- **Tuple type annotation → empty emit.** `let t: (i32, i32) = (40, 2);` makes the
-  native compiler emit **nothing at all** (0 lines / empty output), exit non-clean.
-  (Tuples are a documented limitation, but the failure mode — empty output — is
-  worse than a diagnostic.)
+- **Tuple type annotation → silent checker reject (re-measured 2026-08-15).**
+  `let t: (i32, i32) = (40, 2);` → native **exit 4** (check phase) with **no
+  diagnostic** (empty stdout, empty stderr). So it is not an empty *emit* but a
+  silent *rejection*: check_program returns nonzero without pushing to the
+  diagnostic sink. Fix class = BH-8-style: push an E-code (e.g. "tuple types not
+  supported in this slice") at the checker's tuple-reject site so the exit-4 is
+  honest. Bounded checker change (bootstrap module → golden refresh).
 
-- **Nested struct (struct-typed field) → empty emit on native.**
+- **Nested struct literal → ✅ FIXED (native compiles + runs, 2026-08-15).** The
+  crash below was a **parser** bug in `parse_struct_fields` (`lib/parser.sv0`):
+  it pushed each field's `[name, value]` pair to the stride-2 `sf_names` pool
+  around the value parse, so a struct-typed field value (a nested literal)
+  recursively pushed the inner struct's pairs **between** the outer field's name
+  and value — misaligning the pool and over-counting `fc` (which included the
+  inner's fields) → the tag-24 lowering read past the pool (`vec` OOB). Fix:
+  buffer this struct's own field pairs locally and flush them contiguously after
+  parsing, reporting the exact start + count via `out_meta`; nested-literal fields
+  land in their own contiguous block. Identical for non-nested structs (their
+  values push nothing) → no behavioral change, corpus-parity 98/98; only
+  `parser.c`/`parser.sv0b` goldens shifted (source edit). Native now compiles
+  `Outer { inner: Inner { v: 40 }, k: 2 }` → **42**, including 3-level and
+  multi-nested-field cases. Fixture `test/integration/nested_struct/`, gated on
+  native `--project` + SML `one` mode. (VM still drops multi-slot sub-structs — a
+  separate VmCodegen limitation.) *Historical description of the crash:*
+
+- **Nested struct literal — original PANIC report (superseded by the fix above).**
   ```sv0
   struct Inner { v: i32 }
   struct Outer { inner: Inner, k: i32 }
-  fn main() -> i32 { let o: Outer = Outer { inner: Inner { v: 40 }, k: 2 }; return o.inner.v + o.k; }
+  fn main() -> i32 { let o: Outer = Outer { inner: Inner { v: 40 }, k: 2 }; return 42; }
   ```
-  **C backend → 42** (handles nested structs); **native → empty emit (0 lines)**;
-  **VM → fails** (consistent with `lib/span.sv0`'s note that "codegen does not yet
-  support multi-slot sub-struct fields"). So a struct containing another struct is
-  a C-only capability — native and VM both drop it, native silently.
+  **native → `sv0 panic: vec: index out of bounds`, exit 1** — a compiler CRASH on
+  valid input (SML→C = 42). Narrowed: the crash is at the **struct-literal
+  lowering** (the `let o = Outer { inner: Inner {...}, .. }` above already panics;
+  the `o.inner.v` field access is not required). The OOB is a `vec_get` on
+  `lit_sf_names` (the parser's struct-literal field pool, `body_sf`) — the parser
+  does not correctly populate/offset field entries for a **nested** struct literal
+  (an inner `Inner { v: 40 }` used as a field value), so lowering
+  (`lower_expr_to_value` tag-24 @ lib/lowering.sv0:1609 and the let-init path
+  @ ~563) reads past the pool. Fix = parser `body_sf` nesting (+ lowering
+  consumption); a crash-guard alone would only convert it to silent-wrong. Deep
+  parser+lowering change (documented multi-slot limitation).
 
 Common thread with #1/#8/#10: the native compiler produces **silently wrong or
 empty output** for constructs outside its self-host/fixture diet, rather than a
