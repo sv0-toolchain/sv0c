@@ -1,0 +1,3 @@
+/* use of a nonexistent module path — expects E0309 (both). */
+use nonexistent::thing;
+fn main() -> i32 { return 0; }

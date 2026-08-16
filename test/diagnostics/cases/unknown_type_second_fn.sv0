@@ -1,0 +1,4 @@
+/* unknown type in a non-first function — expects E0301 (both). */
+fn a() -> i32 { return 1; }
+fn b(p: Gadget) -> i32 { return 0; }
+fn main() -> i32 { return 0; }

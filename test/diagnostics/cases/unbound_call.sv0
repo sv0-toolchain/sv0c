@@ -1,0 +1,2 @@
+/* call to an undefined function — expects E0300 (both). */
+fn main() -> i32 { return nope(); }

@@ -1,0 +1,2 @@
+/* println called with a non-string argument — expects E0444 (sml). */
+fn main() -> i32 { println(42); return 0; }

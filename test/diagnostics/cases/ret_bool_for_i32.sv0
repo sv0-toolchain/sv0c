@@ -1,0 +1,2 @@
+/* return bool where i32 is declared — expects E0400 (both). */
+fn main() -> i32 { return true; }

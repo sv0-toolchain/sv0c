@@ -1,0 +1,2 @@
+/* unbound var in a let initializer — expects E0300 (both). */
+fn main() -> i32 { let x: i32 = q; return x; }
