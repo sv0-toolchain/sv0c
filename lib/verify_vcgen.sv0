@@ -1,0 +1,383 @@
+/* Milestone 4, Epic A — contract verification.
+   M4-S-001: the contract-expression IR — the boolean/arithmetic sub-language that
+   `requires` / `ensures` / `loop_invariant` clauses use. A strict subset chosen
+   to map cleanly onto SMT-LIB2 (M4-S-010) and to be evaluable for unit testing.
+
+   Representation: a flat arena of parallel Vec<i32> (`ct`/`cd1`/`cd2`/`cd3`), the
+   same idiom as the parser's body-expr arena — child references are node indices
+   into the same arrays, so recursion is over i32 indices (the compiler does not
+   support recursive Box<enum> traversal). Build with the `cx_*` helpers; each
+   returns the new node's index.
+
+   node tag | cd1              | cd2         | cd3
+   ---------|------------------|-------------|-----------
+   0 CInt   | value            | -           | -
+   1 CBool  | 0/1              | -           | -
+   2 CVar   | name handle      | -           | -
+   3 CResult| -                | -           | -
+   4 COld   | -                | operand idx | -
+   5 CUnop  | op (0 neg,1 not) | operand idx | -
+   6 CBinop | op (see below)   | left idx    | right idx
+
+   Binop op:  0 +  1 -  2 *  3 /  4 %   5 ==  6 !=  7 <  8 <=  9 >  10 >=  11 && 12 ||
+
+   Standalone + self-tested for now; M4-S-002 wires it to the parsed contract
+   clauses and M4-S-010/011 add the z3 SMT backend. */
+
+/* ── arena builders ─────────────────────────────────────────── */
+
+fn cx_push(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>,
+           tag: i32, d1: i32, d2: i32, d3: i32) -> i32 {
+    vec_push(ct, tag);
+    vec_push(cd1, d1);
+    vec_push(cd2, d2);
+    vec_push(cd3, d3);
+    return vec_len(ct) - 1;
+}
+
+fn cx_int(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>, n: i32) -> i32 {
+    return cx_push(ct, cd1, cd2, cd3, 0, n, 0, 0);
+}
+
+fn cx_bool(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>, b: i32) -> i32 {
+    return cx_push(ct, cd1, cd2, cd3, 1, b, 0, 0);
+}
+
+fn cx_var(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>, h: i32) -> i32 {
+    return cx_push(ct, cd1, cd2, cd3, 2, h, 0, 0);
+}
+
+fn cx_result(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>) -> i32 {
+    return cx_push(ct, cd1, cd2, cd3, 3, 0, 0, 0);
+}
+
+fn cx_old(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>, child: i32) -> i32 {
+    return cx_push(ct, cd1, cd2, cd3, 4, 0, child, 0);
+}
+
+fn cx_unop(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>, op: i32, child: i32) -> i32 {
+    return cx_push(ct, cd1, cd2, cd3, 5, op, child, 0);
+}
+
+fn cx_binop(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>, op: i32, l: i32, r: i32) -> i32 {
+    return cx_push(ct, cd1, cd2, cd3, 6, op, l, r);
+}
+
+/* ── small int→string (SMT literals + synthetic var names) ──── */
+
+fn vc_digit_char(d: i32) -> string {
+    if d == 0 { return "0"; }
+    if d == 1 { return "1"; }
+    if d == 2 { return "2"; }
+    if d == 3 { return "3"; }
+    if d == 4 { return "4"; }
+    if d == 5 { return "5"; }
+    if d == 6 { return "6"; }
+    if d == 7 { return "7"; }
+    if d == 8 { return "8"; }
+    return "9";
+}
+
+fn vc_int_to_str(n: i32) -> string {
+    if n < 0 { return string_concat("-", vc_int_to_str(0 - n)); }
+    if n < 10 { return vc_digit_char(n); }
+    let rest: string = vc_int_to_str(n / 10);
+    let last: string = vc_digit_char(n - (n / 10) * 10);
+    return string_concat(rest, last);
+}
+
+/* ── evaluator (booleans as 1/0) — for unit tests only ──────── */
+
+fn vc_lookup(names: Vec<i32>, vals: Vec<i32>, h: i32) -> i32 {
+    let n: i32 = vec_len(names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(names, i) == h { return vec_get(vals, i); }
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn vc_binop_eval(op: i32, a: i32, b: i32) -> i32 {
+    if op == 0 { return a + b; }
+    if op == 1 { return a - b; }
+    if op == 2 { return a * b; }
+    if op == 3 { return a / b; }
+    if op == 4 { return a - (a / b) * b; }
+    if op == 5 { if a == b { return 1; } return 0; }
+    if op == 6 { if a != b { return 1; } return 0; }
+    if op == 7 { if a < b { return 1; } return 0; }
+    if op == 8 { if a <= b { return 1; } return 0; }
+    if op == 9 { if a > b { return 1; } return 0; }
+    if op == 10 { if a >= b { return 1; } return 0; }
+    if op == 11 { if a != 0 { if b != 0 { return 1; } } return 0; }
+    if op == 12 { if a != 0 { return 1; } if b != 0 { return 1; } return 0; }
+    return 0;
+}
+
+/* `old(e)` evaluates as `e` here — the pre-state distinction is introduced during
+   extraction (M4-S-006), not at the IR level. */
+fn cexpr_eval(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>,
+              idx: i32, names: Vec<i32>, vals: Vec<i32>, result_val: i32) -> i32 {
+    let tag: i32 = vec_get(ct, idx);
+    if tag == 0 { return vec_get(cd1, idx); }
+    if tag == 1 { return vec_get(cd1, idx); }
+    if tag == 2 { return vc_lookup(names, vals, vec_get(cd1, idx)); }
+    if tag == 3 { return result_val; }
+    if tag == 4 {
+        return cexpr_eval(ct, cd1, cd2, cd3, vec_get(cd2, idx), names, vals, result_val);
+    }
+    if tag == 5 {
+        let v: i32 = cexpr_eval(ct, cd1, cd2, cd3, vec_get(cd2, idx), names, vals, result_val);
+        let op: i32 = vec_get(cd1, idx);
+        if op == 0 { return 0 - v; }
+        if v != 0 { return 0; }
+        return 1;
+    }
+    let a: i32 = cexpr_eval(ct, cd1, cd2, cd3, vec_get(cd2, idx), names, vals, result_val);
+    let b: i32 = cexpr_eval(ct, cd1, cd2, cd3, vec_get(cd3, idx), names, vals, result_val);
+    return vc_binop_eval(vec_get(cd1, idx), a, b);
+}
+
+/* ── SMT-LIB2 emitter (M4-S-010 start) ──────────────────────────
+   Renders a node as an SMT-LIB2 s-expression over the QF_LIA + bool fragment.
+   Variables render as synthetic `v<handle>`; extraction (M4-S-002) maps real
+   names. `!=` uses `distinct`; `%` uses `mod`; `/` uses `div`. `old` is rendered
+   as its inner expression (a snapshot variable is substituted at extraction). */
+
+fn vc_binop_smt(op: i32) -> string {
+    if op == 0 { return "+"; }
+    if op == 1 { return "-"; }
+    if op == 2 { return "*"; }
+    if op == 3 { return "div"; }
+    if op == 4 { return "mod"; }
+    if op == 5 { return "="; }
+    if op == 6 { return "distinct"; }
+    if op == 7 { return "<"; }
+    if op == 8 { return "<="; }
+    if op == 9 { return ">"; }
+    if op == 10 { return ">="; }
+    if op == 11 { return "and"; }
+    return "or";
+}
+
+fn vc_unop_smt(op: i32) -> string {
+    if op == 0 { return "-"; }
+    return "not";
+}
+
+fn vc_smt_int(n: i32) -> string {
+    if n < 0 { return string_concat(string_concat("(- ", vc_int_to_str(0 - n)), ")"); }
+    return vc_int_to_str(n);
+}
+
+fn cexpr_to_smt(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>, idx: i32) -> string {
+    let tag: i32 = vec_get(ct, idx);
+    if tag == 0 { return vc_smt_int(vec_get(cd1, idx)); }
+    if tag == 1 {
+        if vec_get(cd1, idx) != 0 { return "true"; }
+        return "false";
+    }
+    if tag == 2 { return string_concat("v", vc_int_to_str(vec_get(cd1, idx))); }
+    if tag == 3 { return "result"; }
+    if tag == 4 { return cexpr_to_smt(ct, cd1, cd2, cd3, vec_get(cd2, idx)); }
+    if tag == 5 {
+        let inner: string = cexpr_to_smt(ct, cd1, cd2, cd3, vec_get(cd2, idx));
+        let h1: string = string_concat("(", vc_unop_smt(vec_get(cd1, idx)));
+        let h2: string = string_concat(h1, " ");
+        let h3: string = string_concat(h2, inner);
+        return string_concat(h3, ")");
+    }
+    let ls: string = cexpr_to_smt(ct, cd1, cd2, cd3, vec_get(cd2, idx));
+    let rs: string = cexpr_to_smt(ct, cd1, cd2, cd3, vec_get(cd3, idx));
+    let h1: string = string_concat("(", vc_binop_smt(vec_get(cd1, idx)));
+    let h2: string = string_concat(h1, " ");
+    let h3: string = string_concat(h2, ls);
+    let h4: string = string_concat(h3, " ");
+    let h5: string = string_concat(h4, rs);
+    return string_concat(h5, ")");
+}
+
+/* ── tests ──────────────────────────────────────────────────── */
+
+fn test_cx_tags() -> i32 {
+    let ct: Vec<i32> = vec_new();
+    let cd1: Vec<i32> = vec_new();
+    let cd2: Vec<i32> = vec_new();
+    let cd3: Vec<i32> = vec_new();
+    let a: i32 = cx_int(ct, cd1, cd2, cd3, 5);
+    if vec_get(ct, a) != 0 { return 1; }
+    if vec_get(cd1, a) != 5 { return 2; }
+    let b: i32 = cx_bool(ct, cd1, cd2, cd3, 1);
+    if vec_get(ct, b) != 1 { return 3; }
+    let v: i32 = cx_var(ct, cd1, cd2, cd3, 3);
+    if vec_get(ct, v) != 2 { return 4; }
+    let r: i32 = cx_result(ct, cd1, cd2, cd3);
+    if vec_get(ct, r) != 3 { return 5; }
+    let o: i32 = cx_old(ct, cd1, cd2, cd3, v);
+    if vec_get(ct, o) != 4 { return 6; }
+    if vec_get(cd2, o) != v { return 7; }
+    let u: i32 = cx_unop(ct, cd1, cd2, cd3, 1, b);
+    if vec_get(ct, u) != 5 { return 8; }
+    let bin: i32 = cx_binop(ct, cd1, cd2, cd3, 0, a, v);
+    if vec_get(ct, bin) != 6 { return 9; }
+    if vec_get(cd2, bin) != a { return 10; }
+    if vec_get(cd3, bin) != v { return 11; }
+    return 0;
+}
+
+fn test_eval_arith() -> i32 {
+    let ct: Vec<i32> = vec_new();
+    let cd1: Vec<i32> = vec_new();
+    let cd2: Vec<i32> = vec_new();
+    let cd3: Vec<i32> = vec_new();
+    let names: Vec<i32> = vec_new();
+    let vals: Vec<i32> = vec_new();
+    /* 2 + 3 * 4 = 14 */
+    let i2: i32 = cx_int(ct, cd1, cd2, cd3, 2);
+    let i3: i32 = cx_int(ct, cd1, cd2, cd3, 3);
+    let i4: i32 = cx_int(ct, cd1, cd2, cd3, 4);
+    let mul: i32 = cx_binop(ct, cd1, cd2, cd3, 2, i3, i4);
+    let add: i32 = cx_binop(ct, cd1, cd2, cd3, 0, i2, mul);
+    if cexpr_eval(ct, cd1, cd2, cd3, add, names, vals, 0) != 14 { return 1; }
+    /* 20 / 4 = 5 */
+    let i20: i32 = cx_int(ct, cd1, cd2, cd3, 20);
+    let i4b: i32 = cx_int(ct, cd1, cd2, cd3, 4);
+    let dv: i32 = cx_binop(ct, cd1, cd2, cd3, 3, i20, i4b);
+    if cexpr_eval(ct, cd1, cd2, cd3, dv, names, vals, 0) != 5 { return 2; }
+    /* 17 % 5 = 2 */
+    let i17: i32 = cx_int(ct, cd1, cd2, cd3, 17);
+    let i5: i32 = cx_int(ct, cd1, cd2, cd3, 5);
+    let md: i32 = cx_binop(ct, cd1, cd2, cd3, 4, i17, i5);
+    if cexpr_eval(ct, cd1, cd2, cd3, md, names, vals, 0) != 2 { return 3; }
+    /* -(7) = -7 */
+    let i7: i32 = cx_int(ct, cd1, cd2, cd3, 7);
+    let ng: i32 = cx_unop(ct, cd1, cd2, cd3, 0, i7);
+    if cexpr_eval(ct, cd1, cd2, cd3, ng, names, vals, 0) != 0 - 7 { return 4; }
+    return 0;
+}
+
+fn test_eval_compare() -> i32 {
+    let ct: Vec<i32> = vec_new();
+    let cd1: Vec<i32> = vec_new();
+    let cd2: Vec<i32> = vec_new();
+    let cd3: Vec<i32> = vec_new();
+    /* x > 0, x handle = 1 */
+    let vx: i32 = cx_var(ct, cd1, cd2, cd3, 1);
+    let z: i32 = cx_int(ct, cd1, cd2, cd3, 0);
+    let gt: i32 = cx_binop(ct, cd1, cd2, cd3, 9, vx, z);
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 1);
+    let vpos: Vec<i32> = vec_new();
+    vec_push(vpos, 5);
+    if cexpr_eval(ct, cd1, cd2, cd3, gt, names, vpos, 0) != 1 { return 1; }
+    let vneg: Vec<i32> = vec_new();
+    vec_push(vneg, 0 - 2);
+    if cexpr_eval(ct, cd1, cd2, cd3, gt, names, vneg, 0) != 0 { return 2; }
+    /* 5 == 5, 5 != 6, 5 <= 5 */
+    let a5: i32 = cx_int(ct, cd1, cd2, cd3, 5);
+    let b5: i32 = cx_int(ct, cd1, cd2, cd3, 5);
+    let eq: i32 = cx_binop(ct, cd1, cd2, cd3, 5, a5, b5);
+    if cexpr_eval(ct, cd1, cd2, cd3, eq, names, vpos, 0) != 1 { return 3; }
+    let c6: i32 = cx_int(ct, cd1, cd2, cd3, 6);
+    let ne: i32 = cx_binop(ct, cd1, cd2, cd3, 6, a5, c6);
+    if cexpr_eval(ct, cd1, cd2, cd3, ne, names, vpos, 0) != 1 { return 4; }
+    let le: i32 = cx_binop(ct, cd1, cd2, cd3, 8, a5, b5);
+    if cexpr_eval(ct, cd1, cd2, cd3, le, names, vpos, 0) != 1 { return 5; }
+    return 0;
+}
+
+fn test_eval_bool() -> i32 {
+    let ct: Vec<i32> = vec_new();
+    let cd1: Vec<i32> = vec_new();
+    let cd2: Vec<i32> = vec_new();
+    let cd3: Vec<i32> = vec_new();
+    let names: Vec<i32> = vec_new();
+    let vals: Vec<i32> = vec_new();
+    let bt: i32 = cx_bool(ct, cd1, cd2, cd3, 1);
+    let bf: i32 = cx_bool(ct, cd1, cd2, cd3, 0);
+    let an: i32 = cx_binop(ct, cd1, cd2, cd3, 11, bt, bf);
+    if cexpr_eval(ct, cd1, cd2, cd3, an, names, vals, 0) != 0 { return 1; }
+    let orr: i32 = cx_binop(ct, cd1, cd2, cd3, 12, bt, bf);
+    if cexpr_eval(ct, cd1, cd2, cd3, orr, names, vals, 0) != 1 { return 2; }
+    let nt: i32 = cx_unop(ct, cd1, cd2, cd3, 1, bf);
+    if cexpr_eval(ct, cd1, cd2, cd3, nt, names, vals, 0) != 1 { return 3; }
+    return 0;
+}
+
+fn test_eval_result_old() -> i32 {
+    let ct: Vec<i32> = vec_new();
+    let cd1: Vec<i32> = vec_new();
+    let cd2: Vec<i32> = vec_new();
+    let cd3: Vec<i32> = vec_new();
+    let names: Vec<i32> = vec_new();
+    vec_push(names, 1);
+    let vals: Vec<i32> = vec_new();
+    vec_push(vals, 7);
+    /* result == x, result = 7, x = 7 */
+    let r: i32 = cx_result(ct, cd1, cd2, cd3);
+    let vx: i32 = cx_var(ct, cd1, cd2, cd3, 1);
+    let eq: i32 = cx_binop(ct, cd1, cd2, cd3, 5, r, vx);
+    if cexpr_eval(ct, cd1, cd2, cd3, eq, names, vals, 7) != 1 { return 1; }
+    /* result > old(x), result = 9, x = 7 */
+    let r2: i32 = cx_result(ct, cd1, cd2, cd3);
+    let vx2: i32 = cx_var(ct, cd1, cd2, cd3, 1);
+    let ol: i32 = cx_old(ct, cd1, cd2, cd3, vx2);
+    let gt: i32 = cx_binop(ct, cd1, cd2, cd3, 9, r2, ol);
+    if cexpr_eval(ct, cd1, cd2, cd3, gt, names, vals, 9) != 1 { return 2; }
+    return 0;
+}
+
+fn test_smt_emit() -> i32 {
+    let ct: Vec<i32> = vec_new();
+    let cd1: Vec<i32> = vec_new();
+    let cd2: Vec<i32> = vec_new();
+    let cd3: Vec<i32> = vec_new();
+    /* (> v1 0) */
+    let vx: i32 = cx_var(ct, cd1, cd2, cd3, 1);
+    let z: i32 = cx_int(ct, cd1, cd2, cd3, 0);
+    let gt: i32 = cx_binop(ct, cd1, cd2, cd3, 9, vx, z);
+    if string_eq(cexpr_to_smt(ct, cd1, cd2, cd3, gt), "(> v1 0)") != true { return 1; }
+    /* (distinct v2 v3) */
+    let v2: i32 = cx_var(ct, cd1, cd2, cd3, 2);
+    let v3: i32 = cx_var(ct, cd1, cd2, cd3, 3);
+    let ne: i32 = cx_binop(ct, cd1, cd2, cd3, 6, v2, v3);
+    if string_eq(cexpr_to_smt(ct, cd1, cd2, cd3, ne), "(distinct v2 v3)") != true { return 2; }
+    /* (= result 5) */
+    let r: i32 = cx_result(ct, cd1, cd2, cd3);
+    let i5: i32 = cx_int(ct, cd1, cd2, cd3, 5);
+    let eq: i32 = cx_binop(ct, cd1, cd2, cd3, 5, r, i5);
+    if string_eq(cexpr_to_smt(ct, cd1, cd2, cd3, eq), "(= result 5)") != true { return 3; }
+    /* (and (> v1 0) (< v1 10)) */
+    let vx2: i32 = cx_var(ct, cd1, cd2, cd3, 1);
+    let z2: i32 = cx_int(ct, cd1, cd2, cd3, 0);
+    let lo: i32 = cx_binop(ct, cd1, cd2, cd3, 9, vx2, z2);
+    let vx3: i32 = cx_var(ct, cd1, cd2, cd3, 1);
+    let t10: i32 = cx_int(ct, cd1, cd2, cd3, 10);
+    let hi: i32 = cx_binop(ct, cd1, cd2, cd3, 7, vx3, t10);
+    let both: i32 = cx_binop(ct, cd1, cd2, cd3, 11, lo, hi);
+    if string_eq(cexpr_to_smt(ct, cd1, cd2, cd3, both), "(and (> v1 0) (< v1 10))") != true { return 4; }
+    /* (- 3) negative literal, (not true) */
+    let nn: i32 = cx_int(ct, cd1, cd2, cd3, 0 - 3);
+    if string_eq(cexpr_to_smt(ct, cd1, cd2, cd3, nn), "(- 3)") != true { return 5; }
+    let bt: i32 = cx_bool(ct, cd1, cd2, cd3, 1);
+    let nb: i32 = cx_unop(ct, cd1, cd2, cd3, 1, bt);
+    if string_eq(cexpr_to_smt(ct, cd1, cd2, cd3, nb), "(not true)") != true { return 6; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let r1: i32 = test_cx_tags();
+    if r1 != 0 { return r1; }
+    let r2: i32 = test_eval_arith();
+    if r2 != 0 { return 10 + r2; }
+    let r3: i32 = test_eval_compare();
+    if r3 != 0 { return 20 + r3; }
+    let r4: i32 = test_eval_bool();
+    if r4 != 0 { return 30 + r4; }
+    let r5: i32 = test_eval_result_old();
+    if r5 != 0 { return 40 + r5; }
+    let r6: i32 = test_smt_emit();
+    if r6 != 0 { return 50 + r6; }
+    return 0;
+}
