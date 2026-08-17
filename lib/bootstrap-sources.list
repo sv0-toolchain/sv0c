@@ -92,6 +92,7 @@ lib/ast.sv0
 lexer/token.sv0
 lib/contract_analyzer.sv0
 lib/unify.sv0
+lib/verify_vcgen.sv0
 lib/diagnostic.sv0
 lib/env.sv0
 lib/include_expand.sv0
