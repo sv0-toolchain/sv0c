@@ -472,19 +472,87 @@ fn vc_leftmost_leaf_tok(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
     return 0 - 1;
 }
 
-/* Contract keyword tag (83 requires / 61 ensures / 73 loop_invariant) for the
-   clause whose expression's leftmost leaf is `leaf`, or -1 if not found. */
-fn vc_contract_kind(tok_tags: Vec<i32>, leaf: i32) -> i32 {
+/* Token index of the contract keyword (83 requires / 61 ensures / 73
+   loop_invariant) for the clause whose expression's leftmost leaf is `leaf`, or
+   -1 if not found. Back-scans because the parser stores the clause expr but not
+   its keyword, and a clause is always `KEYWORD ( expr )`. */
+fn vc_contract_kind_tok(tok_tags: Vec<i32>, leaf: i32) -> i32 {
     if leaf < 0 { return 0 - 1; }
     let mut j: i32 = leaf - 1;
     while j >= 0 {
         let t: i32 = vec_get(tok_tags, j);
-        if t == 83 { return 83; }
-        if t == 61 { return 61; }
-        if t == 73 { return 73; }
+        if t == 83 { return j; }
+        if t == 61 { return j; }
+        if t == 73 { return j; }
         j = j - 1;
     }
     return 0 - 1;
+}
+
+/* Contract keyword TAG (83/61/73) for the clause, or -1. */
+fn vc_contract_kind(tok_tags: Vec<i32>, leaf: i32) -> i32 {
+    let k: i32 = vc_contract_kind_tok(tok_tags, leaf);
+    if k < 0 { return 0 - 1; }
+    return vec_get(tok_tags, k);
+}
+
+/* Human name for a contract keyword tag. */
+fn vc_kind_name(tag: i32) -> string {
+    if tag == 83 { return "requires"; }
+    if tag == 61 { return "ensures"; }
+    if tag == 73 { return "loop_invariant"; }
+    return "contract";
+}
+
+/* Forward paren-match from a `(` token (tag 6): index of the matching `)` (tag
+   7) at the same depth, or -1. */
+fn vc_match_rparen(tok_tags: Vec<i32>, lparen: i32) -> i32 {
+    let n: i32 = vec_len(tok_tags);
+    if lparen < 0 { return 0 - 1; }
+    let mut depth: i32 = 0;
+    let mut j: i32 = lparen;
+    while j < n {
+        let t: i32 = vec_get(tok_tags, j);
+        if t == 6 { depth = depth + 1; }
+        if t == 7 {
+            depth = depth - 1;
+            if depth == 0 { return j; }
+        }
+        j = j + 1;
+    }
+    return 0 - 1;
+}
+
+/* Source text of the clause spanning tokens [kw_tok .. rparen_tok], with runs of
+   whitespace collapsed to single spaces so a clause is always one field on one
+   line (e.g. `ensures(result >= 1)`). */
+fn vc_clause_text(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                  kw_tok: i32, rparen_tok: i32) -> string {
+    if kw_tok < 0 { return ""; }
+    if rparen_tok < 0 { return ""; }
+    let s: i32 = vec_get(starts, kw_tok);
+    let e: i32 = vec_get(ends, rparen_tok);
+    if e <= s { return ""; }
+    let mut out: string = "";
+    let mut i: i32 = s;
+    let mut prev_ws: bool = false;
+    while i < e {
+        let c: i32 = string_char_at(source, i);
+        let mut is_ws: bool = false;
+        if c == 32 { is_ws = true; }
+        if c == 9 { is_ws = true; }
+        if c == 10 { is_ws = true; }
+        if c == 13 { is_ws = true; }
+        if is_ws {
+            if prev_ws != true { out = string_concat(out, " "); }
+            prev_ws = true;
+        } else {
+            out = string_concat(out, string_substr(source, i, 1));
+            prev_ws = false;
+        }
+        i = i + 1;
+    }
+    return out;
 }
 
 /* 1-based source line of a byte position (newline = char 10). */
@@ -537,6 +605,13 @@ fn vc_find_return_value(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
     return 0 - 1;
 }
 
+/* One obligation record per contract clause, in source order:
+   `VC\t<line>\t<kind>\t<clause-text>\t<payload>` where payload is
+     - `PRECOND`  for a `requires` (assumed locally — a runtime entry check; the
+       caller discharges it under modular verification, M4-S-032),
+     - the SMT-LIB2 query for an `ensures` (or `RESIDUAL` if outside the fragment),
+     - `RESIDUAL` for a `loop_invariant` (loops are M4-S-005).
+   The shell driver turns each into a [verified]/[runtime] line + reason (§3.2). */
 fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
                   fcb: Vec<i32>, fcr: Vec<i32>,
                   bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
@@ -547,70 +622,87 @@ fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4
     let mut ii: i32 = 0;
     while ii < ni {
         if vec_get(it, ii) == 0 {
-            let fname: string = vc_tok_text(source, starts, ends, vec_get(id1, ii));
             let base: i32 = vec_get(fcb, ii);
             let count: i32 = vec_get(id2, ii) / 2;
             let body_root: i32 = vec_get(id4, ii);
-            /* classify contracts into requires roots + ensures roots (body-expr idx) */
+            /* pass 1: gather requires body-roots (hypotheses for every ensures) */
             let req_roots: Vec<i32> = vec_new();
-            let ens_roots: Vec<i32> = vec_new();
-            let ens_leaf: Vec<i32> = vec_new();
             let mut ci: i32 = 0;
             while ci < count {
                 let croot: i32 = vec_get(fcr, base + ci);
                 let leaf: i32 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, croot);
-                let kind: i32 = vc_contract_kind(tok_tags, leaf);
-                if kind == 83 { vec_push(req_roots, croot); }
-                if kind == 61 { vec_push(ens_roots, croot); vec_push(ens_leaf, leaf); }
+                if vc_contract_kind(tok_tags, leaf) == 83 { vec_push(req_roots, croot); }
                 ci = ci + 1;
             }
-            let mut ei: i32 = 0;
-            while ei < vec_len(ens_roots) {
-                let eroot: i32 = vec_get(ens_roots, ei);
-                let eleaf: i32 = vec_get(ens_leaf, ei);
+            /* pass 2: emit one record per clause, in source order */
+            let mut cj: i32 = 0;
+            while cj < count {
+                let croot: i32 = vec_get(fcr, base + cj);
+                let leaf: i32 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, croot);
+                let kwtok: i32 = vc_contract_kind_tok(tok_tags, leaf);
+                let mut kindtag: i32 = 0 - 1;
+                if kwtok >= 0 { kindtag = vec_get(tok_tags, kwtok); }
+                let rparen: i32 = vc_match_rparen(tok_tags, kwtok + 1);
                 let mut line: i32 = 1;
-                if eleaf >= 0 { line = vc_line_of_pos(source, vec_get(starts, eleaf)); }
+                if kwtok >= 0 { line = vc_line_of_pos(source, vec_get(starts, kwtok)); }
                 out = string_concat(out, "VC\t");
-                out = string_concat(out, fname);
-                out = string_concat(out, "\t");
                 out = string_concat(out, vc_int_to_str(line));
                 out = string_concat(out, "\t");
-                /* fresh CExpr arena + var scope per obligation */
-                let ct: Vec<i32> = vec_new();
-                let c1: Vec<i32> = vec_new();
-                let c2: Vec<i32> = vec_new();
-                let c3: Vec<i32> = vec_new();
-                let vn: Vec<i32> = vec_new();
-                /* extract requires (assumed) — drop any outside the fragment
-                   (proving from a subset of hypotheses is sound) */
-                let reqs: Vec<i32> = vec_new();
-                let mut ri: i32 = 0;
-                while ri < vec_len(req_roots) {
-                    let rc: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(req_roots, ri),
-                                                source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-                    if rc >= 0 { vec_push(reqs, rc); }
-                    ri = ri + 1;
-                }
-                let ec: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, eroot,
-                                            source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-                if ec < 0 {
-                    out = string_concat(out, "RESIDUAL");
+                out = string_concat(out, vc_kind_name(kindtag));
+                out = string_concat(out, "\t");
+                out = string_concat(out, vc_clause_text(source, starts, ends, kwtok, rparen));
+                out = string_concat(out, "\t");
+                if kindtag == 83 {
+                    out = string_concat(out, "PRECOND");
                 } else {
-                    let mut ret_ce: i32 = 0 - 1;
-                    let retv: i32 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
-                    if retv >= 0 {
-                        ret_ce = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv,
-                                               source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                    if kindtag == 61 {
+                        out = string_concat(out, verify_ensures_payload(bet, bed1, bed2, bed3, bed4, bpp,
+                                                                        req_roots, croot, body_root,
+                                                                        tok_tags, source, starts, ends));
+                    } else {
+                        out = string_concat(out, "RESIDUAL");
                     }
-                    out = string_concat(out, vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn));
                 }
                 out = string_concat(out, "\n");
-                ei = ei + 1;
+                cj = cj + 1;
             }
         }
         ii = ii + 1;
     }
     return out;
+}
+
+/* SMT-LIB2 query for one `ensures` (assuming `req_roots`, binding result to the
+   straight-line return value), or "RESIDUAL" if the ensures is outside the
+   supported fragment. */
+fn verify_ensures_payload(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                          bpp: Vec<i32>, req_roots: Vec<i32>, ens_root: i32, body_root: i32,
+                          tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let ct: Vec<i32> = vec_new();
+    let c1: Vec<i32> = vec_new();
+    let c2: Vec<i32> = vec_new();
+    let c3: Vec<i32> = vec_new();
+    let vn: Vec<i32> = vec_new();
+    /* extract requires (assumed) — drop any outside the fragment (proving from a
+       subset of hypotheses is sound) */
+    let reqs: Vec<i32> = vec_new();
+    let mut ri: i32 = 0;
+    while ri < vec_len(req_roots) {
+        let rc: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(req_roots, ri),
+                                    source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+        if rc >= 0 { vec_push(reqs, rc); }
+        ri = ri + 1;
+    }
+    let ec: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ens_root,
+                                source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    if ec < 0 { return "RESIDUAL"; }
+    let mut ret_ce: i32 = 0 - 1;
+    let retv: i32 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
+    if retv >= 0 {
+        ret_ce = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv,
+                               source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    }
+    return vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn);
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -994,25 +1086,25 @@ fn test_vc_gen_ensures() -> i32 {
    kind classification, requires/ensures extraction, return-value binding, query
    generation, and record formatting in one shot. */
 fn test_verify_all_fns() -> i32 {
-    /* token stream: requires ( x > 0 ) ensures ( result >= 1 )  — operators use a
-       neutral tag (0) so the kind back-scan only stops at 83/61. source text is
-       laid out so IDENT/INT token spans read "x", "result", "0", "1". */
-    let src: string = "xresult01";
+    /* token stream over a real source string so clause-text extraction is
+       exercised: `requires(x>0)ensures(result>=1)`. Operators use a neutral tag
+       (0) so the kind back-scan only stops at 83/61. */
+    let src: string = "requires(x>0)ensures(result>=1)";
     let starts: Vec<i32> = vec_new();
     let ends: Vec<i32> = vec_new();
     let tt: Vec<i32> = vec_new();
-    /* 0 requires */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 83);
-    /* 1 (       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 6);
-    /* 2 x       */ vec_push(starts, 0); vec_push(ends, 1); vec_push(tt, 5);
-    /* 3 >       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 0);
-    /* 4 0       */ vec_push(starts, 7); vec_push(ends, 8); vec_push(tt, 40);
-    /* 5 )       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 7);
-    /* 6 ensures */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 61);
-    /* 7 (       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 6);
-    /* 8 result  */ vec_push(starts, 1); vec_push(ends, 7); vec_push(tt, 84);
-    /* 9 >=      */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 0);
-    /* 10 1      */ vec_push(starts, 8); vec_push(ends, 9); vec_push(tt, 40);
-    /* 11 )      */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 7);
+    /* 0 requires */ vec_push(starts, 0); vec_push(ends, 8); vec_push(tt, 83);
+    /* 1 (       */ vec_push(starts, 8); vec_push(ends, 9); vec_push(tt, 6);
+    /* 2 x       */ vec_push(starts, 9); vec_push(ends, 10); vec_push(tt, 5);
+    /* 3 >       */ vec_push(starts, 10); vec_push(ends, 11); vec_push(tt, 0);
+    /* 4 0       */ vec_push(starts, 11); vec_push(ends, 12); vec_push(tt, 40);
+    /* 5 )       */ vec_push(starts, 12); vec_push(ends, 13); vec_push(tt, 7);
+    /* 6 ensures */ vec_push(starts, 13); vec_push(ends, 20); vec_push(tt, 61);
+    /* 7 (       */ vec_push(starts, 20); vec_push(ends, 21); vec_push(tt, 6);
+    /* 8 result  */ vec_push(starts, 21); vec_push(ends, 27); vec_push(tt, 84);
+    /* 9 >=      */ vec_push(starts, 27); vec_push(ends, 29); vec_push(tt, 0);
+    /* 10 1      */ vec_push(starts, 29); vec_push(ends, 30); vec_push(tt, 40);
+    /* 11 )      */ vec_push(starts, 30); vec_push(ends, 31); vec_push(tt, 7);
 
     let bet: Vec<i32> = vec_new();
     let b1: Vec<i32> = vec_new();
@@ -1056,7 +1148,9 @@ fn test_verify_all_fns() -> i32 {
 
     let got: string = verify_all_fns(it, id1, id2, id3, id4, fcb, fcr,
                                      bet, b1, b2, b3, b4, bpp, tt, src, starts, ends);
-    let want: string = "VC\tx\t1\t(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)\n";
+    let want: string = string_concat(
+        "VC\t1\trequires\trequires(x>0)\tPRECOND\n",
+        "VC\t1\tensures\tensures(result>=1)\t(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)\n");
     if string_eq(got, want) != true { return 1; }
     return 0;
 }

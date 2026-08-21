@@ -29,10 +29,15 @@ static int vc_uses_result(int ct);
 static const char* vc_build_query(int ct, int cd1, int cd2, int cd3, int hyps, int goal, int var_names);
 static const char* vc_gen_ensures_query(int ct, int cd1, int cd2, int cd3, int requires_list, int ensures_root, int return_expr, int var_names);
 static int vc_leftmost_leaf_tok(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx);
+static int vc_contract_kind_tok(int tok_tags, int leaf);
 static int vc_contract_kind(int tok_tags, int leaf);
+static const char* vc_kind_name(int tag);
+static int vc_match_rparen(int tok_tags, int lparen);
+static const char* vc_clause_text(const char* source, int starts, int ends, int kw_tok, int rparen_tok);
 static int vc_line_of_pos(const char* source, int pos);
 static int vc_find_return_value(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root);
 static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends);
+static const char* verify_ensures_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int req_roots, int ens_root, int body_root, int tok_tags, const char* source, int starts, int ends);
 static int test_cx_tags(void);
 static int test_eval_arith(void);
 static int test_eval_compare(void);
@@ -975,7 +980,7 @@ static int vc_leftmost_leaf_tok(int bet, int bed1, int bed2, int bed3, int bed4,
   return _sv0t13;
 }
 
-static int vc_contract_kind(int tok_tags, int leaf) {
+static int vc_contract_kind_tok(int tok_tags, int leaf) {
   if ((leaf < 0)) {
     int _sv0t0 = (0 - 1);
     return _sv0t0;
@@ -986,21 +991,139 @@ static int vc_contract_kind(int tok_tags, int leaf) {
     int _sv0t1 = sv0_vec_get(tok_tags, j);
     int t = _sv0t1;
     if ((t == 83)) {
-      return 83;
+      return j;
     } else {
     }
     if ((t == 61)) {
-      return 61;
+      return j;
     } else {
     }
     if ((t == 73)) {
-      return 73;
+      return j;
     } else {
     }
     j = (j - 1);
   }
   int _sv0t2 = (0 - 1);
   return _sv0t2;
+}
+
+static int vc_contract_kind(int tok_tags, int leaf) {
+  int _sv0t0 = vc_contract_kind_tok(tok_tags, leaf);
+  int k = _sv0t0;
+  if ((k < 0)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(tok_tags, k);
+  return _sv0t2;
+}
+
+static const char* vc_kind_name(int tag) {
+  if ((tag == 83)) {
+    return "requires";
+  } else {
+  }
+  if ((tag == 61)) {
+    return "ensures";
+  } else {
+  }
+  if ((tag == 73)) {
+    return "loop_invariant";
+  } else {
+  }
+  return "contract";
+}
+
+static int vc_match_rparen(int tok_tags, int lparen) {
+  int _sv0t0 = sv0_vec_len(tok_tags);
+  int n = _sv0t0;
+  if ((lparen < 0)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int depth = 0;
+  int j = lparen;
+  while ((j < n)) {
+    int _sv0t2 = sv0_vec_get(tok_tags, j);
+    int t = _sv0t2;
+    if ((t == 6)) {
+      depth = (depth + 1);
+    } else {
+    }
+    if ((t == 7)) {
+      depth = (depth - 1);
+      if ((depth == 0)) {
+        return j;
+      } else {
+      }
+    } else {
+    }
+    j = (j + 1);
+  }
+  int _sv0t3 = (0 - 1);
+  return _sv0t3;
+}
+
+static const char* vc_clause_text(const char* source, int starts, int ends, int kw_tok, int rparen_tok) {
+  if ((kw_tok < 0)) {
+    return "";
+  } else {
+  }
+  if ((rparen_tok < 0)) {
+    return "";
+  } else {
+  }
+  int _sv0t0 = sv0_vec_get(starts, kw_tok);
+  int s = _sv0t0;
+  int _sv0t1 = sv0_vec_get(ends, rparen_tok);
+  int e = _sv0t1;
+  if ((e <= s)) {
+    return "";
+  } else {
+  }
+  const char* out;
+  out = "";
+  int i = s;
+  int prev_ws = 0;
+  while ((i < e)) {
+    int _sv0t2 = sv0_string_char_at(source, i);
+    int c = _sv0t2;
+    int is_ws = 0;
+    if ((c == 32)) {
+      is_ws = 1;
+    } else {
+    }
+    if ((c == 9)) {
+      is_ws = 1;
+    } else {
+    }
+    if ((c == 10)) {
+      is_ws = 1;
+    } else {
+    }
+    if ((c == 13)) {
+      is_ws = 1;
+    } else {
+    }
+    if (is_ws) {
+      if ((prev_ws != 1)) {
+        const char* _sv0t3 = sv0_string_concat(out, " ");
+        out = _sv0t3;
+      } else {
+      }
+      prev_ws = 1;
+    } else {
+      const char* _sv0t4 = sv0_string_substr(source, i, 1);
+      const char* _sv0t5 = sv0_string_concat(out, _sv0t4);
+      out = _sv0t5;
+      prev_ws = 0;
+    }
+    i = (i + 1);
+  }
+  return out;
 }
 
 static int vc_line_of_pos(const char* source, int pos) {
@@ -1099,128 +1222,140 @@ static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, in
   while ((ii < ni)) {
     int _sv0t1 = sv0_vec_get(it, ii);
     if ((_sv0t1 == 0)) {
-      int _sv0t2 = sv0_vec_get(id1, ii);
-      const char* _sv0t3 = vc_tok_text(source, starts, ends, _sv0t2);
-      const char* fname;
-      fname = _sv0t3;
-      int _sv0t4 = sv0_vec_get(fcb, ii);
-      int base = _sv0t4;
-      int _sv0t5 = sv0_vec_get(id2, ii);
-      int count = (_sv0t5 / 2);
-      int _sv0t6 = sv0_vec_get(id4, ii);
-      int body_root = _sv0t6;
-      int _sv0t7 = sv0_vec_new();
-      int req_roots = _sv0t7;
-      int _sv0t8 = sv0_vec_new();
-      int ens_roots = _sv0t8;
-      int _sv0t9 = sv0_vec_new();
-      int ens_leaf = _sv0t9;
+      int _sv0t2 = sv0_vec_get(fcb, ii);
+      int base = _sv0t2;
+      int _sv0t3 = sv0_vec_get(id2, ii);
+      int count = (_sv0t3 / 2);
+      int _sv0t4 = sv0_vec_get(id4, ii);
+      int body_root = _sv0t4;
+      int _sv0t5 = sv0_vec_new();
+      int req_roots = _sv0t5;
       int ci = 0;
       while ((ci < count)) {
-        int _sv0t10 = (base + ci);
-        int _sv0t11 = sv0_vec_get(fcr, _sv0t10);
-        int croot = _sv0t11;
-        int _sv0t12 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, croot);
-        int leaf = _sv0t12;
-        int _sv0t13 = vc_contract_kind(tok_tags, leaf);
-        int kind = _sv0t13;
-        if ((kind == 83)) {
+        int _sv0t6 = (base + ci);
+        int _sv0t7 = sv0_vec_get(fcr, _sv0t6);
+        int croot = _sv0t7;
+        int _sv0t8 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, croot);
+        int leaf = _sv0t8;
+        int _sv0t9 = vc_contract_kind(tok_tags, leaf);
+        if ((_sv0t9 == 83)) {
           sv0_vec_push(req_roots, croot);
-        } else {
-        }
-        if ((kind == 61)) {
-          sv0_vec_push(ens_roots, croot);
-          sv0_vec_push(ens_leaf, leaf);
         } else {
         }
         ci = (ci + 1);
       }
-      int ei = 0;
-      while (1) {
-        int _sv0t14 = sv0_vec_len(ens_roots);
-        int _sv0t42 = (ei < _sv0t14);
-        if ((!_sv0t42)) {
-          break;
+      int cj = 0;
+      while ((cj < count)) {
+        int _sv0t10 = (base + cj);
+        int _sv0t11 = sv0_vec_get(fcr, _sv0t10);
+        int croot = _sv0t11;
+        int _sv0t12 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, croot);
+        int leaf = _sv0t12;
+        int _sv0t13 = vc_contract_kind_tok(tok_tags, leaf);
+        int kwtok = _sv0t13;
+        int kindtag = (0 - 1);
+        if ((kwtok >= 0)) {
+          int _sv0t14 = sv0_vec_get(tok_tags, kwtok);
+          kindtag = _sv0t14;
         } else {
         }
-        int _sv0t15 = sv0_vec_get(ens_roots, ei);
-        int eroot = _sv0t15;
-        int _sv0t16 = sv0_vec_get(ens_leaf, ei);
-        int eleaf = _sv0t16;
+        int _sv0t15 = (kwtok + 1);
+        int _sv0t16 = vc_match_rparen(tok_tags, _sv0t15);
+        int rparen = _sv0t16;
         int line = 1;
-        if ((eleaf >= 0)) {
-          int _sv0t17 = sv0_vec_get(starts, eleaf);
+        if ((kwtok >= 0)) {
+          int _sv0t17 = sv0_vec_get(starts, kwtok);
           int _sv0t18 = vc_line_of_pos(source, _sv0t17);
           line = _sv0t18;
         } else {
         }
         const char* _sv0t19 = sv0_string_concat(out, "VC\t");
         out = _sv0t19;
-        const char* _sv0t20 = sv0_string_concat(out, fname);
-        out = _sv0t20;
-        const char* _sv0t21 = sv0_string_concat(out, "\t");
+        const char* _sv0t20 = vc_int_to_str(line);
+        const char* _sv0t21 = sv0_string_concat(out, _sv0t20);
         out = _sv0t21;
-        const char* _sv0t22 = vc_int_to_str(line);
-        const char* _sv0t23 = sv0_string_concat(out, _sv0t22);
-        out = _sv0t23;
-        const char* _sv0t24 = sv0_string_concat(out, "\t");
+        const char* _sv0t22 = sv0_string_concat(out, "\t");
+        out = _sv0t22;
+        const char* _sv0t23 = vc_kind_name(kindtag);
+        const char* _sv0t24 = sv0_string_concat(out, _sv0t23);
         out = _sv0t24;
-        int _sv0t25 = sv0_vec_new();
-        int ct = _sv0t25;
-        int _sv0t26 = sv0_vec_new();
-        int c1 = _sv0t26;
-        int _sv0t27 = sv0_vec_new();
-        int c2 = _sv0t27;
-        int _sv0t28 = sv0_vec_new();
-        int c3 = _sv0t28;
-        int _sv0t29 = sv0_vec_new();
-        int vn = _sv0t29;
-        int _sv0t30 = sv0_vec_new();
-        int reqs = _sv0t30;
-        int ri = 0;
-        while (1) {
-          int _sv0t31 = sv0_vec_len(req_roots);
-          int _sv0t34 = (ri < _sv0t31);
-          if ((!_sv0t34)) {
-            break;
-          } else {
-          }
-          int _sv0t32 = sv0_vec_get(req_roots, ri);
-          int _sv0t33 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t32, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-          int rc = _sv0t33;
-          if ((rc >= 0)) {
-            sv0_vec_push(reqs, rc);
-          } else {
-          }
-          ri = (ri + 1);
-        }
-        int _sv0t35 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, eroot, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-        int ec = _sv0t35;
-        if ((ec < 0)) {
-          const char* _sv0t36 = sv0_string_concat(out, "RESIDUAL");
-          out = _sv0t36;
+        const char* _sv0t25 = sv0_string_concat(out, "\t");
+        out = _sv0t25;
+        const char* _sv0t26 = vc_clause_text(source, starts, ends, kwtok, rparen);
+        const char* _sv0t27 = sv0_string_concat(out, _sv0t26);
+        out = _sv0t27;
+        const char* _sv0t28 = sv0_string_concat(out, "\t");
+        out = _sv0t28;
+        if ((kindtag == 83)) {
+          const char* _sv0t29 = sv0_string_concat(out, "PRECOND");
+          out = _sv0t29;
         } else {
-          int ret_ce = (0 - 1);
-          int _sv0t37 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
-          int retv = _sv0t37;
-          if ((retv >= 0)) {
-            int _sv0t38 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-            ret_ce = _sv0t38;
+          if ((kindtag == 61)) {
+            const char* _sv0t30 = verify_ensures_payload(bet, bed1, bed2, bed3, bed4, bpp, req_roots, croot, body_root, tok_tags, source, starts, ends);
+            const char* _sv0t31 = sv0_string_concat(out, _sv0t30);
+            out = _sv0t31;
           } else {
+            const char* _sv0t32 = sv0_string_concat(out, "RESIDUAL");
+            out = _sv0t32;
           }
-          const char* _sv0t39 = vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn);
-          const char* _sv0t40 = sv0_string_concat(out, _sv0t39);
-          out = _sv0t40;
         }
-        const char* _sv0t41 = sv0_string_concat(out, "\n");
-        out = _sv0t41;
-        ei = (ei + 1);
+        const char* _sv0t33 = sv0_string_concat(out, "\n");
+        out = _sv0t33;
+        cj = (cj + 1);
       }
     } else {
     }
     ii = (ii + 1);
   }
   return out;
+}
+
+static const char* verify_ensures_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int req_roots, int ens_root, int body_root, int tok_tags, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_new();
+  int ct = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int c1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int c2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int c3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int vn = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int reqs = _sv0t5;
+  int ri = 0;
+  while (1) {
+    int _sv0t6 = sv0_vec_len(req_roots);
+    int _sv0t9 = (ri < _sv0t6);
+    if ((!_sv0t9)) {
+      break;
+    } else {
+    }
+    int _sv0t7 = sv0_vec_get(req_roots, ri);
+    int _sv0t8 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t7, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int rc = _sv0t8;
+    if ((rc >= 0)) {
+      sv0_vec_push(reqs, rc);
+    } else {
+    }
+    ri = (ri + 1);
+  }
+  int _sv0t10 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ens_root, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+  int ec = _sv0t10;
+  if ((ec < 0)) {
+    return "RESIDUAL";
+  } else {
+  }
+  int ret_ce = (0 - 1);
+  int _sv0t11 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
+  int retv = _sv0t11;
+  if ((retv >= 0)) {
+    int _sv0t12 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    ret_ce = _sv0t12;
+  } else {
+  }
+  const char* _sv0t13 = vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn);
+  return _sv0t13;
 }
 
 static int test_cx_tags(void) {
@@ -1995,7 +2130,7 @@ static int test_vc_gen_ensures(void) {
 
 static int test_verify_all_fns(void) {
   const char* src;
-  src = "xresult01";
+  src = "requires(x>0)ensures(result>=1)";
   int _sv0t0 = sv0_vec_new();
   int starts = _sv0t0;
   int _sv0t1 = sv0_vec_new();
@@ -2003,40 +2138,40 @@ static int test_verify_all_fns(void) {
   int _sv0t2 = sv0_vec_new();
   int tt = _sv0t2;
   sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
-  sv0_vec_push(tt, 83);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
-  sv0_vec_push(tt, 6);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 1);
-  sv0_vec_push(tt, 5);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
-  sv0_vec_push(tt, 0);
-  sv0_vec_push(starts, 7);
   sv0_vec_push(ends, 8);
-  sv0_vec_push(tt, 40);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
-  sv0_vec_push(tt, 7);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
-  sv0_vec_push(tt, 61);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
-  sv0_vec_push(tt, 6);
-  sv0_vec_push(starts, 1);
-  sv0_vec_push(ends, 7);
-  sv0_vec_push(tt, 84);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
-  sv0_vec_push(tt, 0);
+  sv0_vec_push(tt, 83);
   sv0_vec_push(starts, 8);
   sv0_vec_push(ends, 9);
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(starts, 10);
+  sv0_vec_push(ends, 11);
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 12);
   sv0_vec_push(tt, 40);
-  sv0_vec_push(starts, 0);
-  sv0_vec_push(ends, 0);
+  sv0_vec_push(starts, 12);
+  sv0_vec_push(ends, 13);
+  sv0_vec_push(tt, 7);
+  sv0_vec_push(starts, 13);
+  sv0_vec_push(ends, 20);
+  sv0_vec_push(tt, 61);
+  sv0_vec_push(starts, 20);
+  sv0_vec_push(ends, 21);
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(starts, 21);
+  sv0_vec_push(ends, 27);
+  sv0_vec_push(tt, 84);
+  sv0_vec_push(starts, 27);
+  sv0_vec_push(ends, 29);
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(starts, 29);
+  sv0_vec_push(ends, 30);
+  sv0_vec_push(tt, 40);
+  sv0_vec_push(starts, 30);
+  sv0_vec_push(ends, 31);
   sv0_vec_push(tt, 7);
   int _sv0t3 = sv0_vec_new();
   int bet = _sv0t3;
@@ -2100,10 +2235,11 @@ static int test_verify_all_fns(void) {
   const char* _sv0t27 = verify_all_fns(it, id1, id2, id3, id4, fcb, fcr, bet, b1, b2, b3, b4, bpp, tt, src, starts, ends);
   const char* got;
   got = _sv0t27;
+  const char* _sv0t28 = sv0_string_concat("VC\t1\trequires\trequires(x>0)\tPRECOND\n", "VC\t1\tensures\tensures(result>=1)\t(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)\n");
   const char* want;
-  want = "VC\tx\t1\t(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)\n";
-  int _sv0t28 = sv0_string_eq(got, want);
-  if ((_sv0t28 != 1)) {
+  want = _sv0t28;
+  int _sv0t29 = sv0_string_eq(got, want);
+  if ((_sv0t29 != 1)) {
     return 1;
   } else {
   }
