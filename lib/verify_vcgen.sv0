@@ -356,6 +356,90 @@ fn extract_cexpr(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, 
     return 0 - 1;
 }
 
+/* ── VC query wrapping (M4-S-010) ───────────────────────────────
+   Wrap a goal CExpr + hypothesis CExprs into a complete SMT-LIB2 query. Proven
+   ⇔ z3 returns `unsat` for `(assert hyps) ∧ (assert (not goal))`. All variables
+   are Int (contracts are over i32). Logic is QF_LIA unless the tree contains
+   `*`/`/`/`%` (→ QF_NIA). One-line, whitespace-separated (z3 accepts it). The
+   query uses synthetic `v<h>` names for interned vars + `result`; the caller maps
+   `v<h>` → var_names[h] for the human report. */
+
+fn vc_query_logic(ct: Vec<i32>, cd1: Vec<i32>) -> string {
+    let n: i32 = vec_len(ct);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(ct, i) == 6 {
+            let op: i32 = vec_get(cd1, i);
+            if op == 2 { return "QF_NIA"; }
+            if op == 3 { return "QF_NIA"; }
+            if op == 4 { return "QF_NIA"; }
+        }
+        i = i + 1;
+    }
+    return "QF_LIA";
+}
+
+fn vc_uses_result(ct: Vec<i32>) -> bool {
+    let n: i32 = vec_len(ct);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(ct, i) == 3 { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn vc_build_query(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>,
+                  hyps: Vec<i32>, goal: i32, var_names: Vec<i32>) -> string {
+    let mut q: string = string_concat(string_concat("(set-logic ", vc_query_logic(ct, cd1)), ")");
+    let nv: i32 = vec_len(var_names);
+    let mut i: i32 = 0;
+    while i < nv {
+        q = string_concat(q, string_concat(string_concat(" (declare-const v", vc_int_to_str(i)), " Int)"));
+        i = i + 1;
+    }
+    if vc_uses_result(ct) {
+        q = string_concat(q, " (declare-const result Int)");
+    }
+    let nh: i32 = vec_len(hyps);
+    let mut j: i32 = 0;
+    while j < nh {
+        let hs: string = cexpr_to_smt(ct, cd1, cd2, cd3, vec_get(hyps, j));
+        q = string_concat(q, string_concat(string_concat(" (assert ", hs), ")"));
+        j = j + 1;
+    }
+    let gs: string = cexpr_to_smt(ct, cd1, cd2, cd3, goal);
+    q = string_concat(q, string_concat(string_concat(" (assert (not ", gs), "))"));
+    q = string_concat(q, " (check-sat)");
+    return q;
+}
+
+/* ── straight-line VC generation (M4-S-003) ─────────────────────
+   For a function `f(params) requires(R…) ensures(E) { … return <ret>; }` with a
+   straight-line body, the obligation for an ensures E is:
+       R₁ ∧ … ∧ Rₙ ∧ (result == ret) ⟹ E
+   `requires` are ASSUMED (they are the caller's obligation — modular verification
+   proves them at call sites, M4-S-032); this generates the query that PROVES one
+   ensures. `return_expr` is the CExpr of the returned value (-1 to skip the
+   `result == ret` binding). Returns the SMT-LIB2 query for z3. */
+
+fn vc_gen_ensures_query(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>,
+                        requires_list: Vec<i32>, ensures_root: i32, return_expr: i32,
+                        var_names: Vec<i32>) -> string {
+    let hyps: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < vec_len(requires_list) {
+        vec_push(hyps, vec_get(requires_list, i));
+        i = i + 1;
+    }
+    if return_expr >= 0 {
+        let rn: i32 = cx_result(ct, cd1, cd2, cd3);
+        let eqn: i32 = cx_binop(ct, cd1, cd2, cd3, 5, rn, return_expr);
+        vec_push(hyps, eqn);
+    }
+    return vc_build_query(ct, cd1, cd2, cd3, hyps, ensures_root, var_names);
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_cx_tags() -> i32 {
@@ -675,6 +759,62 @@ fn test_extract_unsupported() -> i32 {
     return 0;
 }
 
+fn test_vc_query() -> i32 {
+    /* goal x > 0, no hyps -> negate and check-sat */
+    let ct: Vec<i32> = vec_new();
+    let c1: Vec<i32> = vec_new();
+    let c2: Vec<i32> = vec_new();
+    let c3: Vec<i32> = vec_new();
+    let vn: Vec<i32> = vec_new();
+    vec_push(vn, 0);
+    let vx: i32 = cx_var(ct, c1, c2, c3, 0);
+    let z: i32 = cx_int(ct, c1, c2, c3, 0);
+    let gt: i32 = cx_binop(ct, c1, c2, c3, 9, vx, z);
+    let hyps: Vec<i32> = vec_new();
+    let q: string = vc_build_query(ct, c1, c2, c3, hyps, gt, vn);
+    if string_eq(q, "(set-logic QF_LIA) (declare-const v0 Int) (assert (not (> v0 0))) (check-sat)") != true { return 1; }
+    /* nonlinear goal (x * y) -> QF_NIA */
+    let ct2: Vec<i32> = vec_new();
+    let d1: Vec<i32> = vec_new();
+    let d2: Vec<i32> = vec_new();
+    let d3: Vec<i32> = vec_new();
+    let vn2: Vec<i32> = vec_new();
+    vec_push(vn2, 0);
+    vec_push(vn2, 1);
+    let ax: i32 = cx_var(ct2, d1, d2, d3, 0);
+    let ay: i32 = cx_var(ct2, d1, d2, d3, 1);
+    let mul: i32 = cx_binop(ct2, d1, d2, d3, 2, ax, ay);
+    let zz: i32 = cx_int(ct2, d1, d2, d3, 0);
+    let g2: i32 = cx_binop(ct2, d1, d2, d3, 9, mul, zz);
+    let h2: Vec<i32> = vec_new();
+    let q2: string = vc_build_query(ct2, d1, d2, d3, h2, g2, vn2);
+    if string_eq(q2, "(set-logic QF_NIA) (declare-const v0 Int) (declare-const v1 Int) (assert (not (> (* v0 v1) 0))) (check-sat)") != true { return 2; }
+    return 0;
+}
+
+fn test_vc_gen_ensures() -> i32 {
+    /* f(x) requires(x > 0) ensures(result >= 1) { return x; }
+       obligation: x>0 ∧ result==x ⟹ result>=1  (z3: unsat = proven) */
+    let ct: Vec<i32> = vec_new();
+    let c1: Vec<i32> = vec_new();
+    let c2: Vec<i32> = vec_new();
+    let c3: Vec<i32> = vec_new();
+    let vn: Vec<i32> = vec_new();
+    vec_push(vn, 0);
+    let vx: i32 = cx_var(ct, c1, c2, c3, 0);
+    let z: i32 = cx_int(ct, c1, c2, c3, 0);
+    let req: i32 = cx_binop(ct, c1, c2, c3, 9, vx, z);
+    let reqs: Vec<i32> = vec_new();
+    vec_push(reqs, req);
+    let r: i32 = cx_result(ct, c1, c2, c3);
+    let one: i32 = cx_int(ct, c1, c2, c3, 1);
+    let ens: i32 = cx_binop(ct, c1, c2, c3, 10, r, one);
+    let retx: i32 = cx_var(ct, c1, c2, c3, 0);
+    let q: string = vc_gen_ensures_query(ct, c1, c2, c3, reqs, ens, retx, vn);
+    if string_eq(q, "(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)") != true { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_cx_tags();
     if r1 != 0 { return r1; }
@@ -696,5 +836,9 @@ fn main() -> i32 {
     if r9 != 0 { return 80 + r9; }
     let r10: i32 = test_extract_unsupported();
     if r10 != 0 { return 90 + r10; }
+    let r11: i32 = test_vc_query();
+    if r11 != 0 { return 100 + r11; }
+    let r12: i32 = test_vc_gen_ensures();
+    if r12 != 0 { return 110 + r12; }
     return 0;
 }

@@ -24,6 +24,10 @@ static int vc_intern_var(int var_names, const char* source, int starts, int ends
 static int vc_block_idx(int pp, int first, int sidecar, int i);
 static int ast_binop_to_cexpr(int tag);
 static int extract_cexpr(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx, const char* source, int starts, int ends, int tok_tags, int ct, int cd1, int cd2, int cd3, int var_names);
+static const char* vc_query_logic(int ct, int cd1);
+static int vc_uses_result(int ct);
+static const char* vc_build_query(int ct, int cd1, int cd2, int cd3, int hyps, int goal, int var_names);
+static const char* vc_gen_ensures_query(int ct, int cd1, int cd2, int cd3, int requires_list, int ensures_root, int return_expr, int var_names);
 static int test_cx_tags(void);
 static int test_eval_arith(void);
 static int test_eval_compare(void);
@@ -36,6 +40,8 @@ static int test_extract_compare(void);
 static int test_extract_result_arith(void);
 static int test_extract_old(void);
 static int test_extract_unsupported(void);
+static int test_vc_query(void);
+static int test_vc_gen_ensures(void);
 
 static int cx_push(int ct, int cd1, int cd2, int cd3, int tag, int d1, int d2, int d3) {
   sv0_vec_push(ct, tag);
@@ -797,6 +803,125 @@ static int extract_cexpr(int bet, int bed1, int bed2, int bed3, int bed4, int bp
   return _sv0t56;
 }
 
+static const char* vc_query_logic(int ct, int cd1) {
+  int _sv0t0 = sv0_vec_len(ct);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(ct, i);
+    if ((_sv0t1 == 6)) {
+      int _sv0t2 = sv0_vec_get(cd1, i);
+      int op = _sv0t2;
+      if ((op == 2)) {
+        return "QF_NIA";
+      } else {
+      }
+      if ((op == 3)) {
+        return "QF_NIA";
+      } else {
+      }
+      if ((op == 4)) {
+        return "QF_NIA";
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return "QF_LIA";
+}
+
+static int vc_uses_result(int ct) {
+  int _sv0t0 = sv0_vec_len(ct);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(ct, i);
+    if ((_sv0t1 == 3)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static const char* vc_build_query(int ct, int cd1, int cd2, int cd3, int hyps, int goal, int var_names) {
+  const char* _sv0t0 = vc_query_logic(ct, cd1);
+  const char* _sv0t1 = sv0_string_concat("(set-logic ", _sv0t0);
+  const char* _sv0t2 = sv0_string_concat(_sv0t1, ")");
+  const char* q;
+  q = _sv0t2;
+  int _sv0t3 = sv0_vec_len(var_names);
+  int nv = _sv0t3;
+  int i = 0;
+  while ((i < nv)) {
+    const char* _sv0t4 = vc_int_to_str(i);
+    const char* _sv0t5 = sv0_string_concat(" (declare-const v", _sv0t4);
+    const char* _sv0t6 = sv0_string_concat(_sv0t5, " Int)");
+    const char* _sv0t7 = sv0_string_concat(q, _sv0t6);
+    q = _sv0t7;
+    i = (i + 1);
+  }
+  int _sv0t8 = vc_uses_result(ct);
+  if (_sv0t8) {
+    const char* _sv0t9 = sv0_string_concat(q, " (declare-const result Int)");
+    q = _sv0t9;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_len(hyps);
+  int nh = _sv0t10;
+  int j = 0;
+  while ((j < nh)) {
+    int _sv0t11 = sv0_vec_get(hyps, j);
+    const char* _sv0t12 = cexpr_to_smt(ct, cd1, cd2, cd3, _sv0t11);
+    const char* hs;
+    hs = _sv0t12;
+    const char* _sv0t13 = sv0_string_concat(" (assert ", hs);
+    const char* _sv0t14 = sv0_string_concat(_sv0t13, ")");
+    const char* _sv0t15 = sv0_string_concat(q, _sv0t14);
+    q = _sv0t15;
+    j = (j + 1);
+  }
+  const char* _sv0t16 = cexpr_to_smt(ct, cd1, cd2, cd3, goal);
+  const char* gs;
+  gs = _sv0t16;
+  const char* _sv0t17 = sv0_string_concat(" (assert (not ", gs);
+  const char* _sv0t18 = sv0_string_concat(_sv0t17, "))");
+  const char* _sv0t19 = sv0_string_concat(q, _sv0t18);
+  q = _sv0t19;
+  const char* _sv0t20 = sv0_string_concat(q, " (check-sat)");
+  q = _sv0t20;
+  return q;
+}
+
+static const char* vc_gen_ensures_query(int ct, int cd1, int cd2, int cd3, int requires_list, int ensures_root, int return_expr, int var_names) {
+  int _sv0t0 = sv0_vec_new();
+  int hyps = _sv0t0;
+  int i = 0;
+  while (1) {
+    int _sv0t1 = sv0_vec_len(requires_list);
+    int _sv0t3 = (i < _sv0t1);
+    if ((!_sv0t3)) {
+      break;
+    } else {
+    }
+    int _sv0t2 = sv0_vec_get(requires_list, i);
+    sv0_vec_push(hyps, _sv0t2);
+    i = (i + 1);
+  }
+  if ((return_expr >= 0)) {
+    int _sv0t4 = cx_result(ct, cd1, cd2, cd3);
+    int rn = _sv0t4;
+    int _sv0t5 = cx_binop(ct, cd1, cd2, cd3, 5, rn, return_expr);
+    int eqn = _sv0t5;
+    sv0_vec_push(hyps, eqn);
+  } else {
+  }
+  const char* _sv0t6 = vc_build_query(ct, cd1, cd2, cd3, hyps, ensures_root, var_names);
+  return _sv0t6;
+}
+
 static int test_cx_tags(void) {
   int _sv0t0 = sv0_vec_new();
   int ct = _sv0t0;
@@ -1464,6 +1589,109 @@ static int test_extract_unsupported(void) {
   return 0;
 }
 
+static int test_vc_query(void) {
+  int _sv0t0 = sv0_vec_new();
+  int ct = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int c1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int c2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int c3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int vn = _sv0t4;
+  sv0_vec_push(vn, 0);
+  int _sv0t5 = cx_var(ct, c1, c2, c3, 0);
+  int vx = _sv0t5;
+  int _sv0t6 = cx_int(ct, c1, c2, c3, 0);
+  int z = _sv0t6;
+  int _sv0t7 = cx_binop(ct, c1, c2, c3, 9, vx, z);
+  int gt = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int hyps = _sv0t8;
+  const char* _sv0t9 = vc_build_query(ct, c1, c2, c3, hyps, gt, vn);
+  const char* q;
+  q = _sv0t9;
+  int _sv0t10 = sv0_string_eq(q, "(set-logic QF_LIA) (declare-const v0 Int) (assert (not (> v0 0))) (check-sat)");
+  if ((_sv0t10 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int ct2 = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int d1 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int d2 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int d3 = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int vn2 = _sv0t15;
+  sv0_vec_push(vn2, 0);
+  sv0_vec_push(vn2, 1);
+  int _sv0t16 = cx_var(ct2, d1, d2, d3, 0);
+  int ax = _sv0t16;
+  int _sv0t17 = cx_var(ct2, d1, d2, d3, 1);
+  int ay = _sv0t17;
+  int _sv0t18 = cx_binop(ct2, d1, d2, d3, 2, ax, ay);
+  int mul = _sv0t18;
+  int _sv0t19 = cx_int(ct2, d1, d2, d3, 0);
+  int zz = _sv0t19;
+  int _sv0t20 = cx_binop(ct2, d1, d2, d3, 9, mul, zz);
+  int g2 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int h2 = _sv0t21;
+  const char* _sv0t22 = vc_build_query(ct2, d1, d2, d3, h2, g2, vn2);
+  const char* q2;
+  q2 = _sv0t22;
+  int _sv0t23 = sv0_string_eq(q2, "(set-logic QF_NIA) (declare-const v0 Int) (declare-const v1 Int) (assert (not (> (* v0 v1) 0))) (check-sat)");
+  if ((_sv0t23 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_vc_gen_ensures(void) {
+  int _sv0t0 = sv0_vec_new();
+  int ct = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int c1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int c2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int c3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int vn = _sv0t4;
+  sv0_vec_push(vn, 0);
+  int _sv0t5 = cx_var(ct, c1, c2, c3, 0);
+  int vx = _sv0t5;
+  int _sv0t6 = cx_int(ct, c1, c2, c3, 0);
+  int z = _sv0t6;
+  int _sv0t7 = cx_binop(ct, c1, c2, c3, 9, vx, z);
+  int req = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int reqs = _sv0t8;
+  sv0_vec_push(reqs, req);
+  int _sv0t9 = cx_result(ct, c1, c2, c3);
+  int r = _sv0t9;
+  int _sv0t10 = cx_int(ct, c1, c2, c3, 1);
+  int one = _sv0t10;
+  int _sv0t11 = cx_binop(ct, c1, c2, c3, 10, r, one);
+  int ens = _sv0t11;
+  int _sv0t12 = cx_var(ct, c1, c2, c3, 0);
+  int retx = _sv0t12;
+  const char* _sv0t13 = vc_gen_ensures_query(ct, c1, c2, c3, reqs, ens, retx, vn);
+  const char* q;
+  q = _sv0t13;
+  int _sv0t14 = sv0_string_eq(q, "(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)");
+  if ((_sv0t14 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_cx_tags();
   int r1 = _sv0t0;
@@ -1532,6 +1760,20 @@ int main(void) {
   if ((r10 != 0)) {
     int _sv0t18 = (90 + r10);
     return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = test_vc_query();
+  int r11 = _sv0t19;
+  if ((r11 != 0)) {
+    int _sv0t20 = (100 + r11);
+    return _sv0t20;
+  } else {
+  }
+  int _sv0t21 = test_vc_gen_ensures();
+  int r12 = _sv0t21;
+  if ((r12 != 0)) {
+    int _sv0t22 = (110 + r12);
+    return _sv0t22;
   } else {
   }
   return 0;
