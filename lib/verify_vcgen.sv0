@@ -440,6 +440,179 @@ fn vc_gen_ensures_query(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32
     return vc_build_query(ct, cd1, cd2, cd3, hyps, ensures_root, var_names);
 }
 
+/* ── whole-program verify emit (M4-S-020) ───────────────────────
+   `verify_all_fns` walks the parser's item + body-expr arenas and, for every
+   `ensures` clause of every function, emits one obligation record for the shell
+   driver (`./scripts/sv0 verify`) to run through z3. It is fully self-contained —
+   it uses only verify_vcgen-local helpers over the arenas passed in — so it runs
+   both standalone (unit test on a hand-built arena) and inside the assembled
+   verify mega-TU (real parser output). Output is tab-separated, one record per
+   line:  `VC\t<fn>\t<line>\t<smt2-query>`  (or `…\tRESIDUAL` when the obligation
+   falls outside the supported fragment — reported [runtime], never [verified],
+   preserving soundness).
+
+   Kind (requires/ensures/loop_invariant) is recovered from the token stream: the
+   parser stores each contract clause's expression root but not its keyword, and a
+   clause is always `KEYWORD ( expr )` with nothing but `(`/unary-ops between the
+   keyword and the expression's leftmost leaf — so scanning back from that leaf to
+   the nearest 83/61/73 token yields the keyword. */
+
+/* Leftmost-leaf token index of a body-expr subtree (recurse into the first
+   child: lhs of a binop, operand of a unop, callee of a call). -1 if none. */
+fn vc_leftmost_leaf_tok(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                        bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>, idx: i32) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    if idx >= vec_len(bet) { return 0 - 1; }
+    let tag: i32 = vec_get(bet, idx);
+    if tag == 0 { return vec_get(bed2, idx); }
+    if tag == 1 { return vec_get(bpp, vec_get(bed1, idx)); }
+    if tag == 2 { return vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx)); }
+    if tag == 3 { return vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx)); }
+    if tag == 4 { return vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    return 0 - 1;
+}
+
+/* Contract keyword tag (83 requires / 61 ensures / 73 loop_invariant) for the
+   clause whose expression's leftmost leaf is `leaf`, or -1 if not found. */
+fn vc_contract_kind(tok_tags: Vec<i32>, leaf: i32) -> i32 {
+    if leaf < 0 { return 0 - 1; }
+    let mut j: i32 = leaf - 1;
+    while j >= 0 {
+        let t: i32 = vec_get(tok_tags, j);
+        if t == 83 { return 83; }
+        if t == 61 { return 61; }
+        if t == 73 { return 73; }
+        j = j - 1;
+    }
+    return 0 - 1;
+}
+
+/* 1-based source line of a byte position (newline = char 10). */
+fn vc_line_of_pos(source: string, pos: i32) -> i32 {
+    let n: i32 = string_len(source);
+    let mut line: i32 = 1;
+    let mut i: i32 = 0;
+    while i < pos {
+        if i >= n { return line; }
+        if string_char_at(source, i) == 10 { line = line + 1; }
+        i = i + 1;
+    }
+    return line;
+}
+
+/* The returned-value expression of a straight-line function body (block tag 9):
+   its tail expression, else the value of a top-level `return` (tag 15) statement.
+   A non-block body is itself the value. -1 when none / a bare `return;`. Nested
+   returns (inside if/match/loop) are not walked — those functions' result-using
+   ensures fall back to RESIDUAL (branches/loops are M4-S-004/005). */
+fn vc_find_return_value(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                        bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>, body_root: i32) -> i32 {
+    if body_root < 0 { return 0 - 1; }
+    if body_root >= vec_len(bet) { return 0 - 1; }
+    let tag: i32 = vec_get(bet, body_root);
+    if tag != 9 { return body_root; }
+    let tail: i32 = vec_get(bed3, body_root);
+    if tail >= 0 { return tail; }
+    let first: i32 = vec_get(bed1, body_root);
+    let count: i32 = vec_get(bed2, body_root);
+    let sidecar: i32 = vec_get(bed4, body_root);
+    let mut si: i32 = 0;
+    while si < count {
+        let s: i32 = vc_block_idx(bpp, first, sidecar, si);
+        if s >= 0 {
+            if s < vec_len(bet) {
+                /* a `return x;` statement is an ExprStmt wrapper (tag 28) whose d1
+                   is the ExprReturn (tag 15); unwrap it. */
+                let mut e: i32 = s;
+                if vec_get(bet, s) == 28 { e = vec_get(bed1, s); }
+                if e >= 0 {
+                    if e < vec_len(bet) {
+                        if vec_get(bet, e) == 15 { return vec_get(bed1, e); }
+                    }
+                }
+            }
+        }
+        si = si + 1;
+    }
+    return 0 - 1;
+}
+
+fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
+                  fcb: Vec<i32>, fcr: Vec<i32>,
+                  bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                  bpp: Vec<i32>, tok_tags: Vec<i32>,
+                  source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let mut out: string = "";
+    let ni: i32 = vec_len(it);
+    let mut ii: i32 = 0;
+    while ii < ni {
+        if vec_get(it, ii) == 0 {
+            let fname: string = vc_tok_text(source, starts, ends, vec_get(id1, ii));
+            let base: i32 = vec_get(fcb, ii);
+            let count: i32 = vec_get(id2, ii) / 2;
+            let body_root: i32 = vec_get(id4, ii);
+            /* classify contracts into requires roots + ensures roots (body-expr idx) */
+            let req_roots: Vec<i32> = vec_new();
+            let ens_roots: Vec<i32> = vec_new();
+            let ens_leaf: Vec<i32> = vec_new();
+            let mut ci: i32 = 0;
+            while ci < count {
+                let croot: i32 = vec_get(fcr, base + ci);
+                let leaf: i32 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, croot);
+                let kind: i32 = vc_contract_kind(tok_tags, leaf);
+                if kind == 83 { vec_push(req_roots, croot); }
+                if kind == 61 { vec_push(ens_roots, croot); vec_push(ens_leaf, leaf); }
+                ci = ci + 1;
+            }
+            let mut ei: i32 = 0;
+            while ei < vec_len(ens_roots) {
+                let eroot: i32 = vec_get(ens_roots, ei);
+                let eleaf: i32 = vec_get(ens_leaf, ei);
+                let mut line: i32 = 1;
+                if eleaf >= 0 { line = vc_line_of_pos(source, vec_get(starts, eleaf)); }
+                out = string_concat(out, "VC\t");
+                out = string_concat(out, fname);
+                out = string_concat(out, "\t");
+                out = string_concat(out, vc_int_to_str(line));
+                out = string_concat(out, "\t");
+                /* fresh CExpr arena + var scope per obligation */
+                let ct: Vec<i32> = vec_new();
+                let c1: Vec<i32> = vec_new();
+                let c2: Vec<i32> = vec_new();
+                let c3: Vec<i32> = vec_new();
+                let vn: Vec<i32> = vec_new();
+                /* extract requires (assumed) — drop any outside the fragment
+                   (proving from a subset of hypotheses is sound) */
+                let reqs: Vec<i32> = vec_new();
+                let mut ri: i32 = 0;
+                while ri < vec_len(req_roots) {
+                    let rc: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(req_roots, ri),
+                                                source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                    if rc >= 0 { vec_push(reqs, rc); }
+                    ri = ri + 1;
+                }
+                let ec: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, eroot,
+                                            source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                if ec < 0 {
+                    out = string_concat(out, "RESIDUAL");
+                } else {
+                    let mut ret_ce: i32 = 0 - 1;
+                    let retv: i32 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
+                    if retv >= 0 {
+                        ret_ce = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv,
+                                               source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                    }
+                    out = string_concat(out, vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn));
+                }
+                out = string_concat(out, "\n");
+                ei = ei + 1;
+            }
+        }
+        ii = ii + 1;
+    }
+    return out;
+}
+
 /* ── tests ──────────────────────────────────────────────────── */
 
 fn test_cx_tags() -> i32 {
@@ -815,6 +988,79 @@ fn test_vc_gen_ensures() -> i32 {
     return 0;
 }
 
+/* End-to-end (standalone): hand-build the item + body-expr arenas the parser
+   would produce for `f(x) requires(x > 0) ensures(result >= 1) { return x; }` and
+   check verify_all_fns emits exactly the expected obligation record. Exercises
+   kind classification, requires/ensures extraction, return-value binding, query
+   generation, and record formatting in one shot. */
+fn test_verify_all_fns() -> i32 {
+    /* token stream: requires ( x > 0 ) ensures ( result >= 1 )  — operators use a
+       neutral tag (0) so the kind back-scan only stops at 83/61. source text is
+       laid out so IDENT/INT token spans read "x", "result", "0", "1". */
+    let src: string = "xresult01";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    let tt: Vec<i32> = vec_new();
+    /* 0 requires */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 83);
+    /* 1 (       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 6);
+    /* 2 x       */ vec_push(starts, 0); vec_push(ends, 1); vec_push(tt, 5);
+    /* 3 >       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 0);
+    /* 4 0       */ vec_push(starts, 7); vec_push(ends, 8); vec_push(tt, 40);
+    /* 5 )       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 7);
+    /* 6 ensures */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 61);
+    /* 7 (       */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 6);
+    /* 8 result  */ vec_push(starts, 1); vec_push(ends, 7); vec_push(tt, 84);
+    /* 9 >=      */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 0);
+    /* 10 1      */ vec_push(starts, 8); vec_push(ends, 9); vec_push(tt, 40);
+    /* 11 )      */ vec_push(starts, 0); vec_push(ends, 0); vec_push(tt, 7);
+
+    let bet: Vec<i32> = vec_new();
+    let b1: Vec<i32> = vec_new();
+    let b2: Vec<i32> = vec_new();
+    let b3: Vec<i32> = vec_new();
+    let b4: Vec<i32> = vec_new();
+    let bpp: Vec<i32> = vec_new();
+    /* requires x > 0 */
+    vec_push(bpp, 2);                                             /* pp[0] = x tok */
+    let nx: i32 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);    /* ExprPath x */
+    let nz: i32 = be_push(bet, b1, b2, b3, b4, 0, 0, 4, 0, 0);    /* ExprLit 0 */
+    let req: i32 = be_push(bet, b1, b2, b3, b4, 3, 8, nx, nz, 0); /* x > 0 (Ast > = 8) */
+    /* ensures result >= 1 */
+    vec_push(bpp, 8);                                             /* pp[1] = result tok */
+    let nr: i32 = be_push(bet, b1, b2, b3, b4, 1, 1, 1, 0, 0);    /* ExprPath result */
+    let n1: i32 = be_push(bet, b1, b2, b3, b4, 0, 0, 10, 0, 0);   /* ExprLit 1 */
+    let ens: i32 = be_push(bet, b1, b2, b3, b4, 3, 10, nr, n1, 0);/* result >= 1 (Ast >= = 10) */
+    /* body { return x } */
+    vec_push(bpp, 2);                                             /* pp[2] = x tok (return value) */
+    let nrx: i32 = be_push(bet, b1, b2, b3, b4, 1, 2, 1, 0, 0);   /* ExprPath x */
+    let nret: i32 = be_push(bet, b1, b2, b3, b4, 15, nrx, 0, 0, 0); /* ExprReturn x */
+    let nstmt: i32 = be_push(bet, b1, b2, b3, b4, 28, nret, 0, 0, 0); /* ExprStmt: return x; */
+    vec_push(bpp, nstmt);                                        /* pp[3] = return stmt (tag 28) */
+    let nblk: i32 = be_push(bet, b1, b2, b3, b4, 9, 0, 1, 0 - 1, 4); /* block: 1 stmt via sidecar pp[3] */
+
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let fcb: Vec<i32> = vec_new();
+    let fcr: Vec<i32> = vec_new();
+    vec_push(it, 0);            /* ItemFn */
+    vec_push(id1, 2);          /* name tok -> "x" (label only) */
+    vec_push(id2, 4);          /* packed: has_ret 0 + contract_count 2 * 2 */
+    vec_push(id3, 1);          /* param_count */
+    vec_push(id4, nblk);       /* body root */
+    vec_push(fcb, 0);          /* contract base */
+    vec_push(fcr, req);        /* contract root 0 (requires) */
+    vec_push(fcr, ens);        /* contract root 1 (ensures) */
+
+    let got: string = verify_all_fns(it, id1, id2, id3, id4, fcb, fcr,
+                                     bet, b1, b2, b3, b4, bpp, tt, src, starts, ends);
+    let want: string = "VC\tx\t1\t(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)\n";
+    if string_eq(got, want) != true { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_cx_tags();
     if r1 != 0 { return r1; }
@@ -840,5 +1086,7 @@ fn main() -> i32 {
     if r11 != 0 { return 100 + r11; }
     let r12: i32 = test_vc_gen_ensures();
     if r12 != 0 { return 110 + r12; }
+    let r13: i32 = test_verify_all_fns();
+    if r13 != 0 { return 120 + r13; }
     return 0;
 }

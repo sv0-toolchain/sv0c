@@ -1,0 +1,26 @@
+/* M4-S-020 verify e2e fixture. Each fn's `ensures` is either provable from its
+   `requires` + return value (→ [verified]) or deliberately not (→ [runtime],
+   a sound residual). Kept straight-line (single return) — branches/loops are
+   later slices (M4-S-004/005). */
+
+fn f_pos_ge1(x: i32) -> i32
+    requires(x > 0)
+    ensures(result >= 1)
+{
+    return x;
+}
+
+fn g_not_ge100(x: i32) -> i32
+    requires(x > 0)
+    ensures(result >= 100)
+{
+    return x;
+}
+
+fn h_sum_pos(a: i32, b: i32) -> i32
+    requires(a > 0)
+    requires(b > 0)
+    ensures(result > 0)
+{
+    return a + b;
+}
