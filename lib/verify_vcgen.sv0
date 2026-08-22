@@ -469,6 +469,7 @@ fn vc_leftmost_leaf_tok(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
     if tag == 2 { return vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx)); }
     if tag == 3 { return vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx)); }
     if tag == 4 { return vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    if tag == 20 { return vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
     return 0 - 1;
 }
 
@@ -997,53 +998,48 @@ fn extract_call_req(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32
 /* Append every ExprCall (tag 4) node in the subtree to `out`. Partial traversal
    (covers the common straight-line shapes) — missing a nested call just means it
    is not modularly checked, which is sound (its requires stay runtime). */
-fn vc_collect_calls(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
-                    bpp: Vec<i32>, idx: i32, out: Vec<i32>) -> i32 {
+fn vc_collect_nodes(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                    bpp: Vec<i32>, idx: i32, want: i32, out: Vec<i32>) -> i32 {
     if idx < 0 { return 0; }
     if idx >= vec_len(bet) { return 0; }
     let tag: i32 = vec_get(bet, idx);
+    if tag == want { vec_push(out, idx); }
     if tag == 4 {
-        vec_push(out, idx);
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out);
         let first: i32 = vec_get(bed2, idx);
         let cnt: i32 = vec_get(bed3, idx);
         let sc: i32 = vec_get(bed4, idx);
         let mut i: i32 = 0;
         while i < cnt {
-            vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i), out);
+            vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i), want, out);
             i = i + 1;
         }
-        return 0;
     }
-    if tag == 2 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out); return 0; }
-    if tag == 6 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
-    if tag == 20 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
-    if tag == 15 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
-    if tag == 28 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
+    if tag == 2 { vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), want, out); }
+    if tag == 6 { vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out); }
+    if tag == 20 { vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out); }
+    if tag == 15 { vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out); }
+    if tag == 28 { vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out); }
     if tag == 27 {
         let init: i32 = vec_get(bed3, idx);
-        if init >= 0 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, init, out); }
-        return 0;
+        if init >= 0 { vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, init, want, out); }
     }
     if tag == 3 {
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx), out);
-        return 0;
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), want, out);
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx), want, out);
     }
     if tag == 8 {
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out);
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
-        return 0;
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out);
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), want, out);
     }
     if tag == 10 {
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out);
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx), out);
-        return 0;
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out);
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), want, out);
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx), want, out);
     }
     if tag == 12 {
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out);
-        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
-        return 0;
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), want, out);
+        vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), want, out);
     }
     if tag == 9 {
         let first: i32 = vec_get(bed1, idx);
@@ -1051,12 +1047,11 @@ fn vc_collect_calls(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32
         let sc: i32 = vec_get(bed4, idx);
         let mut i: i32 = 0;
         while i < cnt {
-            vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i), out);
+            vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i), want, out);
             i = i + 1;
         }
         let tail: i32 = vec_get(bed3, idx);
-        if tail >= 0 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, tail, out); }
-        return 0;
+        if tail >= 0 { vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, tail, want, out); }
     }
     return 0;
 }
@@ -1111,7 +1106,7 @@ fn verify_fn_calls(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id
                    tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
     let mut out: string = "";
     let calls: Vec<i32> = vec_new();
-    vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, body_root, calls);
+    vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, body_root, 4, calls);
     let mut ci: i32 = 0;
     while ci < vec_len(calls) {
         let c: i32 = vec_get(calls, ci);
@@ -1332,6 +1327,93 @@ fn verify_trait_contracts(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i
     return out;
 }
 
+/* ── narrowing-cast contracts (M4-S-034, sv0doc §6) ──────────────────────────
+   `v as T` for a narrow integer target T implicitly requires that v fits in T's
+   range. We only handle targets whose bounds fit an i32 (u8/u16/i8/i16); other
+   casts are left alone. Provable (from requires) ⇒ safe, no runtime check; else a
+   runtime check is kept. ──────────────────────────────────────────────────── */
+fn vc_type_is_narrow(nm: string) -> bool {
+    if string_eq(nm, "u8") { return true; }
+    if string_eq(nm, "u16") { return true; }
+    if string_eq(nm, "i8") { return true; }
+    if string_eq(nm, "i16") { return true; }
+    return false;
+}
+fn vc_type_lo(nm: string) -> i32 {
+    if string_eq(nm, "i8") { return 0 - 128; }
+    if string_eq(nm, "i16") { return 0 - 32768; }
+    return 0;
+}
+fn vc_type_hi(nm: string) -> i32 {
+    if string_eq(nm, "u8") { return 255; }
+    if string_eq(nm, "i8") { return 127; }
+    if string_eq(nm, "i16") { return 32767; }
+    return 65535;
+}
+
+/* One obligation per narrowing cast: `lo <= v <= hi` for the target's range,
+   assuming the function's requires. */
+fn verify_fn_casts(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                   bpp: Vec<i32>, body_root: i32, req_roots: Vec<i32>,
+                   tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let mut out: string = "";
+    let casts: Vec<i32> = vec_new();
+    vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, body_root, 20, casts);
+    let mut i: i32 = 0;
+    while i < vec_len(casts) {
+        let c: i32 = vec_get(casts, i);
+        let ntok: i32 = vec_get(bed3, c);   /* target type name token (parser M4-S-034) */
+        if ntok >= 0 {
+            {
+                {
+                    {
+                        let tyname: string = vc_tok_text(source, starts, ends, ntok);
+                        if vc_type_is_narrow(tyname) {
+                            let lo: i32 = vc_type_lo(tyname);
+                            let hi: i32 = vc_type_hi(tyname);
+                            let leaf: i32 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, c);
+                            let mut line: i32 = 1;
+                            if leaf >= 0 { line = vc_line_of_pos(source, vec_get(starts, leaf)); }
+                            out = string_concat(out, "VC\t");
+                            out = string_concat(out, vc_int_to_str(line));
+                            out = string_concat(out, "\tcast\t");
+                            out = string_concat(out, string_concat("as ", tyname));
+                            out = string_concat(out, "\t");
+                            /* build the fits-in-range obligation */
+                            let ct: Vec<i32> = vec_new();
+                            let c1: Vec<i32> = vec_new();
+                            let c2: Vec<i32> = vec_new();
+                            let c3: Vec<i32> = vec_new();
+                            let vn: Vec<i32> = vec_new();
+                            let hyps: Vec<i32> = vec_new();
+                            let mut ri: i32 = 0;
+                            while ri < vec_len(req_roots) {
+                                let hc: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(req_roots, ri),
+                                                            source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                                if hc >= 0 { vec_push(hyps, hc); }
+                                ri = ri + 1;
+                            }
+                            let v: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, c),
+                                                       source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                            if v < 0 {
+                                out = string_concat(out, "RESIDUAL");
+                            } else {
+                                let ge: i32 = cx_binop(ct, c1, c2, c3, 10, v, cx_int(ct, c1, c2, c3, lo));
+                                let le: i32 = cx_binop(ct, c1, c2, c3, 8, v, cx_int(ct, c1, c2, c3, hi));
+                                let goal: i32 = cx_binop(ct, c1, c2, c3, 11, ge, le);
+                                out = string_concat(out, vc_build_query(ct, c1, c2, c3, hyps, goal, vn));
+                            }
+                            out = string_concat(out, "\n");
+                        }
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
 fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
                   id5: Vec<i32>, fpn: Vec<i32>,
                   fcb: Vec<i32>, fcr: Vec<i32>,
@@ -1393,6 +1475,9 @@ fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4
             /* modular verification: each call's args vs the callee's requires */
             out = string_concat(out, verify_fn_calls(it, id1, id2, id3, id5, fpn, fcb, fcr,
                                                      bet, bed1, bed2, bed3, bed4, bpp, body_root,
+                                                     req_roots, tok_tags, source, starts, ends));
+            /* narrowing-cast contracts: each `v as T` fits the target range */
+            out = string_concat(out, verify_fn_casts(bet, bed1, bed2, bed3, bed4, bpp, body_root,
                                                      req_roots, tok_tags, source, starts, ends));
         }
         ii = ii + 1;

@@ -1,0 +1,18 @@
+/* M4-S-034 narrowing-cast contracts: `v as T` inserts an implicit obligation that
+   v fits in T's range. Provable from `requires` => safe (no runtime check emitted);
+   otherwise the runtime check is kept. */
+
+fn to_u8_safe(x: i32) -> i32
+    requires(x >= 0)             //@ runtime
+    requires(x <= 200)           //@ runtime
+{
+    let b: i32 = x as u8;        //@ verified
+    return b;
+}
+
+fn to_u8_unsafe(x: i32) -> i32
+    requires(x >= 0)             //@ runtime
+{
+    let b: i32 = x as u8;        //@ runtime
+    return b;
+}
