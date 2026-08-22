@@ -72,7 +72,9 @@ static int contract_kw_pos_of_root(int et, int ed1, int ed2, int ed3, int pp, in
 static int contract_is_advanced(int tok_tags, int kw_pos);
 static int lower_tok_str_eq(const char* source, int starts, int ends, int a, int b);
 static int lower_name_is_enum(int enum_names, int tok, const char* source, int starts, int ends);
-static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int body_sf, int body_pp, int tok_tags, int out_blocks, int import_aliases, int fn_contract_root, int fn_contract_base, int fn_ret_ty_root, int pty_tt, int pty_td1);
+static int lower_line_of_pos(const char* source, int pos);
+static int lower_proven_has(int proven_lines, int line);
+static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int body_sf, int body_pp, int tok_tags, int out_blocks, int import_aliases, int fn_contract_root, int fn_contract_base, int fn_ret_ty_root, int pty_tt, int pty_td1, int contract_mode, int proven_lines);
 static int lower_temp_base(void);
 static int lower_string_cty(void);
 static int lower_tok_in_bounds(int h, int starts, int ends);
@@ -6895,7 +6897,42 @@ static int lower_name_is_enum(int enum_names, int tok, const char* source, int s
   return 0;
 }
 
-static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int body_sf, int body_pp, int tok_tags, int out_blocks, int import_aliases, int fn_contract_root, int fn_contract_base, int fn_ret_ty_root, int pty_tt, int pty_td1) {
+static int lower_line_of_pos(const char* source, int pos) {
+  int _sv0t0 = sv0_string_len(source);
+  int n = _sv0t0;
+  int line = 1;
+  int i = 0;
+  while ((i < pos)) {
+    if ((i >= n)) {
+      return line;
+    } else {
+    }
+    int _sv0t1 = sv0_string_char_at(source, i);
+    if ((_sv0t1 == 10)) {
+      line = (line + 1);
+    } else {
+    }
+    i = (i + 1);
+  }
+  return line;
+}
+
+static int lower_proven_has(int proven_lines, int line) {
+  int _sv0t0 = sv0_vec_len(proven_lines);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(proven_lines, i);
+    if ((_sv0t1 == line)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static const char* lower(int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int item_vmax, int struct_fnames_flat, int enum_vnames_flat, int sf_names, int sf_types, const char* source, int starts, int ends, int out_block_labels, int out_struct_names, int out_struct_offsets, int out_struct_counts, int out_struct_flat, int out_enum_names, int out_enum_tag_offsets, int out_enum_tag_counts, int out_enum_tag_flat, int out_enum_max, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int body_sf, int body_pp, int tok_tags, int out_blocks, int import_aliases, int fn_contract_root, int fn_contract_base, int fn_ret_ty_root, int pty_tt, int pty_td1, int contract_mode, int proven_lines) {
   int _sv0t0 = lower_fill_import_aliases_from_use_items(import_aliases, item_tags, item_names, item_d2, item_d3, body_pp, source, starts, ends);
   int discard_fill_alias = _sv0t0;
   int _sv0t1 = build_struct_order(item_tags, item_names, item_field_counts, struct_fnames_flat, out_struct_names, out_struct_offsets, out_struct_counts, out_struct_flat);
@@ -7026,10 +7063,32 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
                 int _sv0t41 = sv0_vec_get(tok_tags, kwpos);
                 int ckind = _sv0t41;
                 if ((ckind == 83)) {
-                  sv0_vec_push(req_roots, croot);
+                  if ((contract_mode != 2)) {
+                    sv0_vec_push(req_roots, croot);
+                  } else {
+                  }
                 } else {
                   if ((ckind == 61)) {
-                    sv0_vec_push(ens_roots, croot);
+                    int keep_ens = 1;
+                    if ((contract_mode == 2)) {
+                      keep_ens = 0;
+                    } else {
+                    }
+                    if ((contract_mode == 1)) {
+                      int _sv0t42 = sv0_vec_get(starts, kwpos);
+                      int _sv0t43 = lower_line_of_pos(source, _sv0t42);
+                      int eline = _sv0t43;
+                      int _sv0t44 = lower_proven_has(proven_lines, eline);
+                      if (_sv0t44) {
+                        keep_ens = 0;
+                      } else {
+                      }
+                    } else {
+                    }
+                    if (keep_ens) {
+                      sv0_vec_push(ens_roots, croot);
+                    } else {
+                    }
                   } else {
                   }
                 }
@@ -7045,24 +7104,24 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
       }
       if ((has_body_arenas > 0)) {
         if ((body_root >= 0)) {
-          int _sv0t42 = sv0_vec_new();
-          int _sv0t43 = lower_fn(body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_pp, tok_tags, body_root, label_h, req_roots, ens_roots, instrs, out_enum_names, out_enum_tag_offsets, out_enum_tag_counts, out_enum_tag_flat, fn_ctx, builtin_map, body_sf, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, out_enum_max, i, _sv0t42, import_aliases);
-          int discard_lf = _sv0t43;
+          int _sv0t45 = sv0_vec_new();
+          int _sv0t46 = lower_fn(body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_pp, tok_tags, body_root, label_h, req_roots, ens_roots, instrs, out_enum_names, out_enum_tag_offsets, out_enum_tag_counts, out_enum_tag_flat, fn_ctx, builtin_map, body_sf, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, out_enum_max, i, _sv0t45, import_aliases);
+          int discard_lf = _sv0t46;
         } else {
         }
       } else {
       }
-      int _sv0t44 = sv0_vec_new();
-      int params = _sv0t44;
+      int _sv0t47 = sv0_vec_new();
+      int params = _sv0t47;
       int ret_h = 9;
       sv0_vec_push(out_blocks, label_h);
       sv0_vec_push(out_blocks, ret_h);
-      int _sv0t45 = sv0_box_alloc(1);
-      sv0_box_store(_sv0t45, 0, params);
-      sv0_vec_push(out_blocks, _sv0t45);
-      int _sv0t46 = sv0_box_alloc(1);
-      sv0_box_store(_sv0t46, 0, instrs);
-      sv0_vec_push(out_blocks, _sv0t46);
+      int _sv0t48 = sv0_box_alloc(1);
+      sv0_box_store(_sv0t48, 0, params);
+      sv0_vec_push(out_blocks, _sv0t48);
+      int _sv0t49 = sv0_box_alloc(1);
+      sv0_box_store(_sv0t49, 0, instrs);
+      sv0_vec_push(out_blocks, _sv0t49);
     } else {
     }
     i = (i + 1);
@@ -16088,36 +16147,37 @@ static int test_lower_program_fn(void) {
   int _sv0t36 = sv0_vec_new();
   int _sv0t37 = sv0_vec_new();
   int _sv0t38 = sv0_vec_new();
-  const char* _sv0t39 = lower(it, id1, id2, id3, id4, ifc, ivm, sfn, evn, sfnames, sftypes, src, strt, endi, ob, osn, oso, osc, osf, oen, oeto, oetc, oetf, oem, bet, be1, be2, be3, be4, bsf, bpp, ttags, oblks, _sv0t33, _sv0t34, _sv0t35, _sv0t36, _sv0t37, _sv0t38);
+  int _sv0t39 = sv0_vec_new();
+  const char* _sv0t40 = lower(it, id1, id2, id3, id4, ifc, ivm, sfn, evn, sfnames, sftypes, src, strt, endi, ob, osn, oso, osc, osf, oen, oeto, oetc, oetf, oem, bet, be1, be2, be3, be4, bsf, bpp, ttags, oblks, _sv0t33, _sv0t34, _sv0t35, _sv0t36, _sv0t37, _sv0t38, 0, _sv0t39);
   const char* td;
-  td = _sv0t39;
-  int _sv0t40 = sv0_vec_len(ob);
-  if ((_sv0t40 != 1)) {
+  td = _sv0t40;
+  int _sv0t41 = sv0_vec_len(ob);
+  if ((_sv0t41 != 1)) {
     return 1;
   } else {
   }
-  int _sv0t41 = sv0_vec_get(ob, 0);
-  if ((_sv0t41 != 3)) {
+  int _sv0t42 = sv0_vec_get(ob, 0);
+  if ((_sv0t42 != 3)) {
     return 2;
   } else {
   }
-  int _sv0t42 = sv0_vec_len(osn);
-  if ((_sv0t42 != 1)) {
+  int _sv0t43 = sv0_vec_len(osn);
+  if ((_sv0t43 != 1)) {
     return 3;
   } else {
   }
-  int _sv0t43 = sv0_vec_len(oen);
-  if ((_sv0t43 != 1)) {
+  int _sv0t44 = sv0_vec_len(oen);
+  if ((_sv0t44 != 1)) {
     return 4;
   } else {
   }
-  int _sv0t44 = sv0_vec_len(oblks);
-  if ((_sv0t44 != 4)) {
+  int _sv0t45 = sv0_vec_len(oblks);
+  if ((_sv0t45 != 4)) {
     return 5;
   } else {
   }
-  int _sv0t45 = sv0_vec_get(oblks, 0);
-  if ((_sv0t45 != 3)) {
+  int _sv0t46 = sv0_vec_get(oblks, 0);
+  if ((_sv0t46 != 3)) {
     return 6;
   } else {
   }

@@ -103,8 +103,51 @@ fn megatu_emit_diagnostics(diag_sink: Vec<i32>, source: string,
     return 0;
 }
 
+/* M4-S-024: parse whitespace/newline-separated non-negative integers (the proven
+   ensures source lines the shell driver writes to the proof-results file). */
+fn megatu_parse_ints(s: string) -> Vec<i32> {
+    let out: Vec<i32> = vec_new();
+    let n: i32 = string_len(s);
+    let mut i: i32 = 0;
+    let mut cur: i32 = 0;
+    let mut have: bool = false;
+    while i < n {
+        let c: i32 = string_char_at(s, i);
+        if c >= 48 {
+            if c <= 57 {
+                cur = cur * 10 + (c - 48);
+                have = true;
+            } else {
+                if have { vec_push(out, cur); cur = 0; have = false; }
+            }
+        } else {
+            if have { vec_push(out, cur); cur = 0; have = false; }
+        }
+        i = i + 1;
+    }
+    if have { vec_push(out, cur); }
+    return out;
+}
+
+/* Index of char code `ch` in `s` at or after `from`, or -1. */
+fn megatu_index_of(s: string, ch: i32, from: i32) -> i32 {
+    let n: i32 = string_len(s);
+    let mut i: i32 = from;
+    while i < n {
+        if string_char_at(s, i) == ch { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 fn main() -> i32 {
+    /* M4-S-023/024: the next three lines (smoke source + contract-mode defaults)
+       are replaced atomically by the native build's CLI patch
+       (build-sv0-megatu-native.sh) to derive them from a `--verified <proof> <src>`
+       control file; the committed defaults are runtime mode over the smoke source. */
     let source: string = "enum Opt { None, Some(i32) } fn main() -> i32 { let o: Opt = Opt::Some(5); return match o { Opt::None => 0, Opt::Some(x) => x }; }";
+    let _contract_mode: i32 = 0;
+    let proven_lines: Vec<i32> = vec_new();
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -249,7 +292,8 @@ fn main() -> i32 {
         ob, osn, oso, osc, osf,
         oen, oeto, oetc, oetf, oem,
         bet, bed1, bed2, bed3, bed4, bsf,
-        pp, tags, out_blocks, imp, fcr, fcb, frt, ptt, ptd1);
+        pp, tags, out_blocks, imp, fcr, fcb, frt, ptt, ptd1,
+        _contract_mode, proven_lines);
 
     /* Phase 6: emit C. codegen's emit_program AND its body emit (emit_instrs)
        use hardcoded test stubs — name_of (token-index -> fabricated names,
