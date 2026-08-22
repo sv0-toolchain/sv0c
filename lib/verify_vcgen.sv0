@@ -698,6 +698,211 @@ fn vc_body_has_effect(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i
     return true;
 }
 
+/* Loop-invariant obligation (M4-S-005): a `loop_invariant(I)` on `while C { body }`
+   is valid iff (entry) it holds on first reaching the loop and (preservation) it is
+   maintained by one iteration. Both are packed into ONE query:
+     unsat( (entry-hyps ∧ ¬I)  ∨  (I ∧ C ∧ ¬I') )
+   where I' = I with each variable the body assigns replaced by its new value
+   (sequential straight-line assignments modelled as substitution). entry-hyps =
+   the fn `requires` + the pre-loop `let v = e` bindings (as v == e). Returns the
+   query, or "RESIDUAL" for any loop outside the supported shape (non-block body,
+   control flow / calls / re-assignment in the body, or an unsupported
+   guard/invariant/rhs). */
+fn verify_loop_payload(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                       bpp: Vec<i32>, cond_be: i32, wbody: i32,
+                       inv_sidecar: i32, inv_count: i32, target_k: i32,
+                       let_vars: Vec<i32>, let_inits: Vec<i32>, req_roots: Vec<i32>,
+                       tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let ct: Vec<i32> = vec_new();
+    let c1: Vec<i32> = vec_new();
+    let c2: Vec<i32> = vec_new();
+    let c3: Vec<i32> = vec_new();
+    let vn: Vec<i32> = vec_new();
+    /* entry hypotheses: requires (dropping any outside the fragment is sound) */
+    let mut entry: i32 = 0 - 1;
+    let mut ri: i32 = 0;
+    while ri < vec_len(req_roots) {
+        let rc: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(req_roots, ri),
+                                    source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+        if rc >= 0 { entry = vc_and(ct, c1, c2, c3, entry, rc); }
+        ri = ri + 1;
+    }
+    /* ... plus the pre-loop `let v = e` bindings as `v == e` */
+    let mut li: i32 = 0;
+    while li < vec_len(let_vars) {
+        let init: i32 = vec_get(let_inits, li);
+        if init >= 0 {
+            let ie: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, init,
+                                        source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+            if ie >= 0 {
+                let vh: i32 = vc_intern_var(vn, source, starts, ends, vec_get(let_vars, li));
+                let vnode: i32 = cx_var(ct, c1, c2, c3, vh);
+                entry = vc_and(ct, c1, c2, c3, entry, cx_binop(ct, c1, c2, c3, 5, vnode, ie));
+            }
+        }
+        li = li + 1;
+    }
+    /* the target invariant (must extract) + the conjunction of ALL invariants
+       (assumed for preservation; a sibling outside the fragment is dropped from
+       the assumption, which is sound — it only weakens the hypothesis) */
+    let mut inv: i32 = 0 - 1;
+    let mut inv_all: i32 = 0 - 1;
+    let mut ki: i32 = 0;
+    while ki < inv_count {
+        let ir: i32 = vc_block_idx(bpp, 0, inv_sidecar, ki);
+        let ice: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ir,
+                                     source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+        if ki == target_k {
+            if ice < 0 { return "RESIDUAL"; }
+            inv = ice;
+        }
+        if ice >= 0 { inv_all = vc_and(ct, c1, c2, c3, inv_all, ice); }
+        ki = ki + 1;
+    }
+    if inv < 0 { return "RESIDUAL"; }
+    let cond: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, cond_be,
+                                  source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    if cond < 0 { return "RESIDUAL"; }
+    /* transition: the loop body must be straight-line assignments (no re-assignment) */
+    if wbody < 0 { return "RESIDUAL"; }
+    if vec_get(bet, wbody) != 9 { return "RESIDUAL"; }
+    let sub_from: Vec<i32> = vec_new();
+    let sub_to: Vec<i32> = vec_new();
+    let bfirst: i32 = vec_get(bed1, wbody);
+    let bcount: i32 = vec_get(bed2, wbody);
+    let bsc: i32 = vec_get(bed4, wbody);
+    let mut si: i32 = 0;
+    while si < bcount {
+        let s: i32 = vc_block_idx(bpp, bfirst, bsc, si);
+        let stag: i32 = vec_get(bet, s);
+        let mut inner: i32 = s;
+        if stag == 28 { inner = vec_get(bed1, s); }
+        let itag: i32 = vec_get(bet, inner);
+        if stag == 27 {
+            /* let inside the loop: a fresh local (unconstrained) — skip */
+            si = si + 1;
+        } else {
+            if itag == 18 {
+                let lhs: i32 = vec_get(bed1, inner);
+                let rhs: i32 = vec_get(bed2, inner);
+                if vec_get(bet, lhs) != 1 { return "RESIDUAL"; }
+                if vec_get(bed2, lhs) != 1 { return "RESIDUAL"; }
+                let lh: i32 = vc_intern_var(vn, source, starts, ends, vec_get(bpp, vec_get(bed1, lhs)));
+                if vc_map_has(sub_from, lh) { return "RESIDUAL"; }
+                let re: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, rhs,
+                                            source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                if re < 0 { return "RESIDUAL"; }
+                /* substitute prior assignments into the RHS (sequential), then record */
+                let rv2: i32 = vc_subst(ct, c1, c2, c3, re, sub_from, sub_to);
+                vec_push(sub_from, lh);
+                vec_push(sub_to, rv2);
+                si = si + 1;
+            } else {
+                if itag == 19 {
+                    let binop: i32 = vec_get(bed1, inner);
+                    let lhs: i32 = vec_get(bed2, inner);
+                    let rhs: i32 = vec_get(bed3, inner);
+                    if vec_get(bet, lhs) != 1 { return "RESIDUAL"; }
+                    if vec_get(bed2, lhs) != 1 { return "RESIDUAL"; }
+                    let op: i32 = ast_binop_to_cexpr(binop);
+                    if op < 0 { return "RESIDUAL"; }
+                    let lh: i32 = vc_intern_var(vn, source, starts, ends, vec_get(bpp, vec_get(bed1, lhs)));
+                    if vc_map_has(sub_from, lh) { return "RESIDUAL"; }
+                    let re: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, rhs,
+                                                source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                    if re < 0 { return "RESIDUAL"; }
+                    let cur: i32 = cx_var(ct, c1, c2, c3, lh);
+                    let newv: i32 = cx_binop(ct, c1, c2, c3, op, cur, vc_subst(ct, c1, c2, c3, re, sub_from, sub_to));
+                    vec_push(sub_from, lh);
+                    vec_push(sub_to, newv);
+                    si = si + 1;
+                } else {
+                    return "RESIDUAL";
+                }
+            }
+        }
+    }
+    /* I' = target invariant after one iteration. Entry proves the target from the
+       pre-loop state; preservation assumes ALL invariants (inv_all) + the loop
+       condition and re-establishes the target. */
+    let inv_prime: i32 = vc_subst(ct, c1, c2, c3, inv, sub_from, sub_to);
+    let not_inv: i32 = cx_unop(ct, c1, c2, c3, 1, inv);
+    let entry_viol: i32 = vc_and(ct, c1, c2, c3, entry, not_inv);
+    let not_invp: i32 = cx_unop(ct, c1, c2, c3, 1, inv_prime);
+    let pres_viol: i32 = vc_and(ct, c1, c2, c3, vc_and(ct, c1, c2, c3, inv_all, cond), not_invp);
+    let combined: i32 = vc_or(ct, c1, c2, c3, entry_viol, pres_viol);
+    return vc_build_check(ct, c1, c2, c3, combined, vn);
+}
+
+fn vc_map_has(sub_from: Vec<i32>, h: i32) -> bool {
+    let n: i32 = vec_len(sub_from);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(sub_from, i) == h { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* Walk a function body block for `while … loop_invariant(…)` loops and emit one
+   `VC` record per invariant (M4-S-005). Pre-loop top-level `let v = e` bindings
+   are gathered as entry hypotheses. Only whiles at the body's top level are
+   handled (nested loops → not emitted; their invariants stay unverified). */
+fn verify_fn_loops(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                   bpp: Vec<i32>, body_root: i32, req_roots: Vec<i32>,
+                   tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let mut out: string = "";
+    if body_root < 0 { return out; }
+    if body_root >= vec_len(bet) { return out; }
+    if vec_get(bet, body_root) != 9 { return out; }
+    let let_vars: Vec<i32> = vec_new();
+    let let_inits: Vec<i32> = vec_new();
+    let first: i32 = vec_get(bed1, body_root);
+    let count: i32 = vec_get(bed2, body_root);
+    let sc: i32 = vec_get(bed4, body_root);
+    let mut si: i32 = 0;
+    while si < count {
+        let s: i32 = vc_block_idx(bpp, first, sc, si);
+        let stag: i32 = vec_get(bet, s);
+        let mut inner: i32 = s;
+        if stag == 28 { inner = vec_get(bed1, s); }
+        let itag: i32 = vec_get(bet, inner);
+        if stag == 27 {
+            vec_push(let_vars, vec_get(bed1, s));
+            vec_push(let_inits, vec_get(bed3, s));
+        } else {
+            if itag == 12 {
+                let inv_sidecar: i32 = vec_get(bed3, inner);
+                let inv_count: i32 = vec_get(bed4, inner);
+                let cond_be: i32 = vec_get(bed1, inner);
+                let wbody: i32 = vec_get(bed2, inner);
+                let mut k: i32 = 0;
+                while k < inv_count {
+                    let inv_root: i32 = vc_block_idx(bpp, 0, inv_sidecar, k);
+                    let leaf: i32 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, inv_root);
+                    let kwtok: i32 = vc_contract_kind_tok(tok_tags, leaf);
+                    let rparen: i32 = vc_match_rparen(tok_tags, kwtok + 1);
+                    let mut line: i32 = 1;
+                    if kwtok >= 0 { line = vc_line_of_pos(source, vec_get(starts, kwtok)); }
+                    out = string_concat(out, "VC\t");
+                    out = string_concat(out, vc_int_to_str(line));
+                    out = string_concat(out, "\tloop_invariant\t");
+                    out = string_concat(out, vc_clause_text(source, starts, ends, kwtok, rparen));
+                    out = string_concat(out, "\t");
+                    out = string_concat(out, verify_loop_payload(bet, bed1, bed2, bed3, bed4, bpp,
+                                                                 cond_be, wbody, inv_sidecar, inv_count, k,
+                                                                 let_vars, let_inits, req_roots,
+                                                                 tok_tags, source, starts, ends));
+                    out = string_concat(out, "\n");
+                    k = k + 1;
+                }
+            }
+        }
+        si = si + 1;
+    }
+    return out;
+}
+
 fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
                   fcb: Vec<i32>, fcr: Vec<i32>,
                   bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
@@ -752,10 +957,67 @@ fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4
                 out = string_concat(out, "\n");
                 cj = cj + 1;
             }
+            /* loop_invariant clauses (attached to `while` nodes in the body) */
+            out = string_concat(out, verify_fn_loops(bet, bed1, bed2, bed3, bed4, bpp, body_root,
+                                                     req_roots, tok_tags, source, starts, ends));
         }
         ii = ii + 1;
     }
     return out;
+}
+
+/* Rebuild a CExpr replacing each CVar whose handle is in `sub_from[i]` with the
+   CExpr root `sub_to[i]` (first match). Used to compute the loop invariant AFTER
+   one iteration: I' = I[assigned-var := its new value]. Leaves are shared. */
+fn vc_subst(ct: Vec<i32>, c1: Vec<i32>, c2: Vec<i32>, c3: Vec<i32>,
+            root: i32, sub_from: Vec<i32>, sub_to: Vec<i32>) -> i32 {
+    if root < 0 { return root; }
+    let tag: i32 = vec_get(ct, root);
+    if tag == 2 {
+        let h: i32 = vec_get(c1, root);
+        let n: i32 = vec_len(sub_from);
+        let mut i: i32 = 0;
+        while i < n {
+            if vec_get(sub_from, i) == h { return vec_get(sub_to, i); }
+            i = i + 1;
+        }
+        return root;
+    }
+    if tag == 4 {
+        return cx_old(ct, c1, c2, c3, vc_subst(ct, c1, c2, c3, vec_get(c2, root), sub_from, sub_to));
+    }
+    if tag == 5 {
+        return cx_unop(ct, c1, c2, c3, vec_get(c1, root),
+                       vc_subst(ct, c1, c2, c3, vec_get(c2, root), sub_from, sub_to));
+    }
+    if tag == 6 {
+        let l: i32 = vc_subst(ct, c1, c2, c3, vec_get(c2, root), sub_from, sub_to);
+        let r: i32 = vc_subst(ct, c1, c2, c3, vec_get(c3, root), sub_from, sub_to);
+        return cx_binop(ct, c1, c2, c3, vec_get(c1, root), l, r);
+    }
+    return root;
+}
+
+/* Full SMT-LIB2 query that asserts a single boolean CExpr directly (rather than
+   hyps + ¬goal): `(set-logic …) (declare-const …)… (assert <formula>) (check-sat)`.
+   `unsat` ⇔ the formula is unsatisfiable. Used for loop-invariant obligations
+   where the formula is `entry-violation ∨ preservation-violation`. */
+fn vc_build_check(ct: Vec<i32>, cd1: Vec<i32>, cd2: Vec<i32>, cd3: Vec<i32>,
+                  assert_root: i32, var_names: Vec<i32>) -> string {
+    let mut q: string = string_concat(string_concat("(set-logic ", vc_query_logic(ct, cd1)), ")");
+    let nv: i32 = vec_len(var_names);
+    let mut i: i32 = 0;
+    while i < nv {
+        q = string_concat(q, string_concat(string_concat(" (declare-const v", vc_int_to_str(i)), " Int)"));
+        i = i + 1;
+    }
+    if vc_uses_result(ct) {
+        q = string_concat(q, " (declare-const result Int)");
+    }
+    let fs: string = cexpr_to_smt(ct, cd1, cd2, cd3, assert_root);
+    q = string_concat(q, string_concat(string_concat(" (assert ", fs), ")"));
+    q = string_concat(q, " (check-sat)");
+    return q;
 }
 
 /* CExpr conjunction/disjunction with -1 acting as the identity (true for AND,
@@ -1491,6 +1753,32 @@ fn test_vc_paths_ifelse() -> i32 {
     return 0;
 }
 
+/* vc_subst drives loop preservation: I' = I[var := new value]. For `i >= 0` with
+   the transition i := i + 1, the substituted invariant renders `(>= (+ v0 1) 0)`. */
+fn test_vc_subst() -> i32 {
+    let ct: Vec<i32> = vec_new();
+    let c1: Vec<i32> = vec_new();
+    let c2: Vec<i32> = vec_new();
+    let c3: Vec<i32> = vec_new();
+    /* invariant i >= 0  (i = handle 0) */
+    let vi: i32 = cx_var(ct, c1, c2, c3, 0);
+    let z: i32 = cx_int(ct, c1, c2, c3, 0);
+    let inv: i32 = cx_binop(ct, c1, c2, c3, 10, vi, z);
+    /* transition i := i + 1 */
+    let vi2: i32 = cx_var(ct, c1, c2, c3, 0);
+    let one: i32 = cx_int(ct, c1, c2, c3, 1);
+    let newv: i32 = cx_binop(ct, c1, c2, c3, 0, vi2, one);
+    let sf: Vec<i32> = vec_new();
+    vec_push(sf, 0);
+    let st: Vec<i32> = vec_new();
+    vec_push(st, newv);
+    let inv_p: i32 = vc_subst(ct, c1, c2, c3, inv, sf, st);
+    if string_eq(cexpr_to_smt(ct, c1, c2, c3, inv_p), "(>= (+ v0 1) 0)") != true { return 1; }
+    /* original invariant is unchanged (subst returns a new tree) */
+    if string_eq(cexpr_to_smt(ct, c1, c2, c3, inv), "(>= v0 0)") != true { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_cx_tags();
     if r1 != 0 { return r1; }
@@ -1522,5 +1810,7 @@ fn main() -> i32 {
     if r14 != 0 { return 130 + r14; }
     let r15: i32 = test_vc_paths_ifelse();
     if r15 != 0 { return 140 + r15; }
+    let r16: i32 = test_vc_subst();
+    if r16 != 0 { return 150 + r16; }
     return 0;
 }

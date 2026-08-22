@@ -1,0 +1,53 @@
+/* M4-S-005 verify corpus — loop_invariant via entry + preservation. A while's
+   invariant is [verified] iff it holds on entry AND is preserved by one
+   iteration (the body's assignments modelled as a state transition); sibling
+   invariants are assumed together for each preservation check. */
+
+fn count_up(n: i32) -> i32
+    requires(n >= 0)              //@ runtime
+{
+    let i: i32 = 0;
+    while i < n
+        loop_invariant(i >= 0)   //@ verified
+    {
+        i = i + 1;
+    }
+    return i;
+}
+
+fn accumulate(n: i32) -> i32
+    requires(n >= 0)              //@ runtime
+{
+    let i: i32 = 0;
+    let s: i32 = 0;
+    while i < n
+        loop_invariant(i >= 0)   //@ verified
+        loop_invariant(s >= 0)   //@ verified
+    {
+        s = s + i;
+        i = i + 1;
+    }
+    return s;
+}
+
+fn entry_fails(n: i32) -> i32
+{
+    let i: i32 = 0;
+    while i < n
+        loop_invariant(i > 0)    //@ runtime
+    {
+        i = i + 1;
+    }
+    return i;
+}
+
+fn preservation_fails(n: i32) -> i32
+{
+    let i: i32 = 0;
+    while i < n
+        loop_invariant(i <= 5)   //@ runtime
+    {
+        i = i + 1;
+    }
+    return i;
+}
