@@ -1414,6 +1414,138 @@ fn verify_fn_casts(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>
     return out;
 }
 
+/* ── refinement-type binding checks (M4-S-031, sv0doc §2.8) ──────────────────
+   `let p: T = e` where `T = <base> where <pred over self>` obliges `e` to satisfy
+   the predicate: pred[self := e], proven from the function's requires. ──────── */
+
+/* Extract a refinement predicate into CExpr, replacing `self` with the bound
+   value's CExpr `self_ce`. Only `self`, literals, unops and binops are supported;
+   any other reference / form → -1 (the binding stays a runtime check). */
+fn extract_refine(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                  bpp: Vec<i32>, idx: i32, source: string, starts: Vec<i32>, ends: Vec<i32>, tok_tags: Vec<i32>,
+                  ct: Vec<i32>, c1: Vec<i32>, c2: Vec<i32>, c3: Vec<i32>, self_ce: i32) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    if idx >= vec_len(bet) { return 0 - 1; }
+    let tag: i32 = vec_get(bet, idx);
+    if tag == 0 {
+        let lit_tag: i32 = vec_get(bed1, idx);
+        let tok: i32 = vec_get(bed2, idx);
+        if lit_tag == 0 { return cx_int(ct, c1, c2, c3, vc_parse_dec(source, starts, ends, tok)); }
+        if lit_tag == 5 {
+            if tok >= 0 { if tok < vec_len(tok_tags) { if vec_get(tok_tags, tok) == 91 { return cx_bool(ct, c1, c2, c3, 1); } } }
+            return cx_bool(ct, c1, c2, c3, 0);
+        }
+        return 0 - 1;
+    }
+    if tag == 1 {
+        if vec_get(bed2, idx) != 1 { return 0 - 1; }
+        if string_eq(vc_tok_text(source, starts, ends, vec_get(bpp, vec_get(bed1, idx))), "self") { return self_ce; }
+        return 0 - 1;
+    }
+    if tag == 2 {
+        let uop: i32 = vec_get(bed1, idx);
+        if uop == 0 {
+            let ch: i32 = extract_refine(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), source, starts, ends, tok_tags, ct, c1, c2, c3, self_ce);
+            if ch < 0 { return 0 - 1; }
+            return cx_unop(ct, c1, c2, c3, 0, ch);
+        }
+        if uop == 1 {
+            let ch: i32 = extract_refine(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), source, starts, ends, tok_tags, ct, c1, c2, c3, self_ce);
+            if ch < 0 { return 0 - 1; }
+            return cx_unop(ct, c1, c2, c3, 1, ch);
+        }
+        return 0 - 1;
+    }
+    if tag == 3 {
+        let cop: i32 = ast_binop_to_cexpr(vec_get(bed1, idx));
+        if cop < 0 { return 0 - 1; }
+        let l: i32 = extract_refine(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), source, starts, ends, tok_tags, ct, c1, c2, c3, self_ce);
+        if l < 0 { return 0 - 1; }
+        let r: i32 = extract_refine(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx), source, starts, ends, tok_tags, ct, c1, c2, c3, self_ce);
+        if r < 0 { return 0 - 1; }
+        return cx_binop(ct, c1, c2, c3, cop, l, r);
+    }
+    return 0 - 1;
+}
+
+/* Refinement predicate root of the type-alias named like `nametok`, or -1 if no
+   such alias or it has no `where` predicate. */
+fn vc_find_refined_alias(it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
+                         source: string, starts: Vec<i32>, ends: Vec<i32>, nametok: i32) -> i32 {
+    let nm: string = vc_tok_text(source, starts, ends, nametok);
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(it, i) == 7 {
+            write_file("/dev/stderr", "\n");
+            if vec_get(id3, i) >= 0 {
+                if string_eq(vc_tok_text(source, starts, ends, vec_get(id1, i)), nm) { return vec_get(id3, i); }
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* One obligation per `let p: T = e` whose T is a refined alias: pred[self := e]. */
+fn verify_fn_refinements(it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
+                         bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                         bpp: Vec<i32>, body_root: i32, req_roots: Vec<i32>,
+                         tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let mut out: string = "";
+    let lets: Vec<i32> = vec_new();
+    vc_collect_nodes(bet, bed1, bed2, bed3, bed4, bpp, body_root, 27, lets);
+    let mut i: i32 = 0;
+    while i < vec_len(lets) {
+        let l: i32 = vec_get(lets, i);
+        let anntok: i32 = vec_get(bed2, l);
+        if anntok >= 0 {
+            let pred_root: i32 = vc_find_refined_alias(it, id1, id3, source, starts, ends, anntok);
+            if pred_root >= 0 {
+                let init: i32 = vec_get(bed3, l);
+                if init >= 0 {
+                    let line: i32 = vc_line_of_pos(source, vec_get(starts, vec_get(bed1, l)));
+                    out = string_concat(out, "VC\t");
+                    out = string_concat(out, vc_int_to_str(line));
+                    out = string_concat(out, "\trefine\t");
+                    out = string_concat(out, string_concat(vc_tok_text(source, starts, ends, vec_get(bed1, l)),
+                                                           string_concat(": ", vc_tok_text(source, starts, ends, anntok))));
+                    out = string_concat(out, "\t");
+                    let ct: Vec<i32> = vec_new();
+                    let c1: Vec<i32> = vec_new();
+                    let c2: Vec<i32> = vec_new();
+                    let c3: Vec<i32> = vec_new();
+                    let vn: Vec<i32> = vec_new();
+                    let hyps: Vec<i32> = vec_new();
+                    let mut ri: i32 = 0;
+                    while ri < vec_len(req_roots) {
+                        let hc: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(req_roots, ri),
+                                                    source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                        if hc >= 0 { vec_push(hyps, hc); }
+                        ri = ri + 1;
+                    }
+                    let init_ce: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, init,
+                                                     source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                    if init_ce < 0 {
+                        out = string_concat(out, "RESIDUAL");
+                    } else {
+                        let ps: i32 = extract_refine(bet, bed1, bed2, bed3, bed4, bpp, pred_root,
+                                                     source, starts, ends, tok_tags, ct, c1, c2, c3, init_ce);
+                        if ps < 0 {
+                            out = string_concat(out, "RESIDUAL");
+                        } else {
+                            out = string_concat(out, vc_build_query(ct, c1, c2, c3, hyps, ps, vn));
+                        }
+                    }
+                    out = string_concat(out, "\n");
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
 fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
                   id5: Vec<i32>, fpn: Vec<i32>,
                   fcb: Vec<i32>, fcr: Vec<i32>,
@@ -1479,6 +1611,9 @@ fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4
             /* narrowing-cast contracts: each `v as T` fits the target range */
             out = string_concat(out, verify_fn_casts(bet, bed1, bed2, bed3, bed4, bpp, body_root,
                                                      req_roots, tok_tags, source, starts, ends));
+            /* refinement-type bindings: each `let p: T = e` satisfies T's predicate */
+            out = string_concat(out, verify_fn_refinements(it, id1, id3, bet, bed1, bed2, bed3, bed4, bpp,
+                                                          body_root, req_roots, tok_tags, source, starts, ends));
         }
         ii = ii + 1;
     }
