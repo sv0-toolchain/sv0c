@@ -1,0 +1,20 @@
+/* M4-S-032 modular verification: a call's arguments are proven against the
+   callee's `requires` (contracts as summaries). A call obligation is [verified]
+   when the caller's context implies the callee's precondition. */
+
+fn checked(x: i32) -> i32
+    requires(x > 0)                  //@ runtime
+{
+    return x;
+}
+
+fn good_caller(y: i32) -> i32
+    requires(y > 5)                  //@ runtime
+{
+    return checked(y);               //@ verified
+}
+
+fn bad_caller(y: i32) -> i32
+{
+    return checked(y);               //@ runtime
+}
