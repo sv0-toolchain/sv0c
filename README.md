@@ -115,3 +115,8 @@ cutover before the criteria in `task/sv0-toolchain-milestone-3-self-host.Rmd`.
 Requires SML/NJ (110.99.9). `make -C sv0c heap` builds `build/sv0c` (the SML
 reference emitter used by the byte-guards); `make -C sv0c test` runs the SML unit
 suite. The native path above is the default and needs no SML at runtime.
+
+## license
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
+[MIT license](LICENSE-MIT) at your option.
