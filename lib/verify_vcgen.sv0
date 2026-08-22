@@ -903,7 +903,273 @@ fn verify_fn_loops(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>
     return out;
 }
 
+/* ── modular verification (M4-S-032): prove each call's args satisfy the callee's
+   requires (contracts as summaries). ───────────────────────────────────────── */
+
+/* Item index of the top-level `fn` named like token `nametok`, or -1. */
+fn vc_find_fn_item(it: Vec<i32>, id1: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>,
+                   nametok: i32) -> i32 {
+    let nm: string = vc_tok_text(source, starts, ends, nametok);
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(it, i) == 0 {
+            if string_eq(vc_tok_text(source, starts, ends, vec_get(id1, i)), nm) { return i; }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* Index k such that param_toks[k] names the same identifier as `nametok`, or -1. */
+fn vc_param_index(param_toks: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>,
+                  nametok: i32) -> i32 {
+    let nm: string = vc_tok_text(source, starts, ends, nametok);
+    let n: i32 = vec_len(param_toks);
+    let mut i: i32 = 0;
+    while i < n {
+        if string_eq(vc_tok_text(source, starts, ends, vec_get(param_toks, i)), nm) { return i; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* Extract a callee `requires` clause into CExpr, substituting each parameter with
+   the corresponding call-site argument CExpr (`arg_ces[k]` for `param_toks[k]`).
+   Callee params map to args (already extracted in the caller's var namespace); any
+   other variable, or a form outside the fragment, → -1 (the caller cannot discharge
+   it here, so it stays a runtime precondition). Avoids the alpha-collision of
+   interning callee param names alongside caller variables. */
+fn extract_call_req(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                    bpp: Vec<i32>, idx: i32,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>, tok_tags: Vec<i32>,
+                    ct: Vec<i32>, c1: Vec<i32>, c2: Vec<i32>, c3: Vec<i32>,
+                    param_toks: Vec<i32>, arg_ces: Vec<i32>) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    if idx >= vec_len(bet) { return 0 - 1; }
+    let tag: i32 = vec_get(bet, idx);
+    if tag == 0 {
+        let lit_tag: i32 = vec_get(bed1, idx);
+        let tok: i32 = vec_get(bed2, idx);
+        if lit_tag == 0 { return cx_int(ct, c1, c2, c3, vc_parse_dec(source, starts, ends, tok)); }
+        if lit_tag == 5 {
+            if tok >= 0 { if tok < vec_len(tok_tags) { if vec_get(tok_tags, tok) == 91 { return cx_bool(ct, c1, c2, c3, 1); } } }
+            return cx_bool(ct, c1, c2, c3, 0);
+        }
+        return 0 - 1;
+    }
+    if tag == 1 {
+        if vec_get(bed2, idx) != 1 { return 0 - 1; }
+        let k: i32 = vc_param_index(param_toks, source, starts, ends, vec_get(bpp, vec_get(bed1, idx)));
+        if k >= 0 { return vec_get(arg_ces, k); }
+        return 0 - 1;
+    }
+    if tag == 2 {
+        let uop: i32 = vec_get(bed1, idx);
+        if uop == 0 {
+            let ch: i32 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx),
+                                           source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+            if ch < 0 { return 0 - 1; }
+            return cx_unop(ct, c1, c2, c3, 0, ch);
+        }
+        if uop == 1 {
+            let ch: i32 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx),
+                                           source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+            if ch < 0 { return 0 - 1; }
+            return cx_unop(ct, c1, c2, c3, 1, ch);
+        }
+        return 0 - 1;
+    }
+    if tag == 3 {
+        let cop: i32 = ast_binop_to_cexpr(vec_get(bed1, idx));
+        if cop < 0 { return 0 - 1; }
+        let l: i32 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx),
+                                      source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+        if l < 0 { return 0 - 1; }
+        let r: i32 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx),
+                                      source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+        if r < 0 { return 0 - 1; }
+        return cx_binop(ct, c1, c2, c3, cop, l, r);
+    }
+    return 0 - 1;
+}
+
+/* Append every ExprCall (tag 4) node in the subtree to `out`. Partial traversal
+   (covers the common straight-line shapes) — missing a nested call just means it
+   is not modularly checked, which is sound (its requires stay runtime). */
+fn vc_collect_calls(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                    bpp: Vec<i32>, idx: i32, out: Vec<i32>) -> i32 {
+    if idx < 0 { return 0; }
+    if idx >= vec_len(bet) { return 0; }
+    let tag: i32 = vec_get(bet, idx);
+    if tag == 4 {
+        vec_push(out, idx);
+        let first: i32 = vec_get(bed2, idx);
+        let cnt: i32 = vec_get(bed3, idx);
+        let sc: i32 = vec_get(bed4, idx);
+        let mut i: i32 = 0;
+        while i < cnt {
+            vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i), out);
+            i = i + 1;
+        }
+        return 0;
+    }
+    if tag == 2 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out); return 0; }
+    if tag == 6 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
+    if tag == 20 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
+    if tag == 15 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
+    if tag == 28 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out); return 0; }
+    if tag == 27 {
+        let init: i32 = vec_get(bed3, idx);
+        if init >= 0 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, init, out); }
+        return 0;
+    }
+    if tag == 3 {
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx), out);
+        return 0;
+    }
+    if tag == 8 {
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out);
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
+        return 0;
+    }
+    if tag == 10 {
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out);
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx), out);
+        return 0;
+    }
+    if tag == 12 {
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx), out);
+        vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx), out);
+        return 0;
+    }
+    if tag == 9 {
+        let first: i32 = vec_get(bed1, idx);
+        let cnt: i32 = vec_get(bed2, idx);
+        let sc: i32 = vec_get(bed4, idx);
+        let mut i: i32 = 0;
+        while i < cnt {
+            vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i), out);
+            i = i + 1;
+        }
+        let tail: i32 = vec_get(bed3, idx);
+        if tail >= 0 { vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, tail, out); }
+        return 0;
+    }
+    return 0;
+}
+
+/* SMT query for one call-site precondition: assume the caller's `requires`, assert
+   the callee's `requires` with parameters replaced by the call arguments negated.
+   unsat ⇒ the caller discharges the callee precondition. "RESIDUAL" if an arg or
+   the callee requires is outside the fragment. */
+fn verify_call_req_payload(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                           bpp: Vec<i32>, call_node: i32, r: i32, pcount: i32,
+                           param_toks: Vec<i32>, caller_req_roots: Vec<i32>,
+                           tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let ct: Vec<i32> = vec_new();
+    let c1: Vec<i32> = vec_new();
+    let c2: Vec<i32> = vec_new();
+    let c3: Vec<i32> = vec_new();
+    let vn: Vec<i32> = vec_new();
+    /* caller requires = the context (assumed) */
+    let hyps: Vec<i32> = vec_new();
+    let mut ri: i32 = 0;
+    while ri < vec_len(caller_req_roots) {
+        let frc: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(caller_req_roots, ri),
+                                     source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+        if frc >= 0 { vec_push(hyps, frc); }
+        ri = ri + 1;
+    }
+    /* extract the call arguments in the caller namespace */
+    let arg_ces: Vec<i32> = vec_new();
+    let first: i32 = vec_get(bed2, call_node);
+    let sc: i32 = vec_get(bed4, call_node);
+    let mut k: i32 = 0;
+    while k < pcount {
+        let ak: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, k),
+                                    source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+        if ak < 0 { return "RESIDUAL"; }
+        vec_push(arg_ces, ak);
+        k = k + 1;
+    }
+    /* callee requires with params substituted by args */
+    let rsub: i32 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, r,
+                                     source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+    if rsub < 0 { return "RESIDUAL"; }
+    return vc_build_query(ct, c1, c2, c3, hyps, rsub, vn);
+}
+
+/* Emit one record per (call site, callee requires): the caller's obligation to
+   satisfy the callee's precondition (M4-S-032). */
+fn verify_fn_calls(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id5: Vec<i32>, fpn: Vec<i32>,
+                   fcb: Vec<i32>, fcr: Vec<i32>,
+                   bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>,
+                   body_root: i32, caller_req_roots: Vec<i32>,
+                   tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let mut out: string = "";
+    let calls: Vec<i32> = vec_new();
+    vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, body_root, calls);
+    let mut ci: i32 = 0;
+    while ci < vec_len(calls) {
+        let c: i32 = vec_get(calls, ci);
+        let callee_node: i32 = vec_get(bed1, c);
+        if callee_node >= 0 {
+            if vec_get(bet, callee_node) == 1 {
+                if vec_get(bed2, callee_node) == 1 {
+                    let cname_tok: i32 = vec_get(bpp, vec_get(bed1, callee_node));
+                    let gi: i32 = vc_find_fn_item(it, id1, source, starts, ends, cname_tok);
+                    if gi >= 0 {
+                        let pcount: i32 = vec_get(id3, gi);
+                        if vec_get(bed3, c) == pcount {
+                            /* callee param name tokens */
+                            let param_toks: Vec<i32> = vec_new();
+                            let pbase: i32 = vec_get(id5, gi);
+                            let mut pk: i32 = 0;
+                            while pk < pcount {
+                                vec_push(param_toks, vec_get(fpn, pbase + pk));
+                                pk = pk + 1;
+                            }
+                            let gname: string = vc_tok_text(source, starts, ends, vec_get(id1, gi));
+                            let cbase: i32 = vec_get(fcb, gi);
+                            let ccount: i32 = vec_get(id2, gi) / 2;
+                            let mut cj: i32 = 0;
+                            while cj < ccount {
+                                let r: i32 = vec_get(fcr, cbase + cj);
+                                let rleaf: i32 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, r);
+                                if vc_contract_kind(tok_tags, rleaf) == 83 {
+                                    let calltok: i32 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, c);
+                                    let mut line: i32 = 1;
+                                    if calltok >= 0 { line = vc_line_of_pos(source, vec_get(starts, calltok)); }
+                                    let rkw: i32 = vc_contract_kind_tok(tok_tags, rleaf);
+                                    let rrp: i32 = vc_match_rparen(tok_tags, rkw + 1);
+                                    out = string_concat(out, "VC\t");
+                                    out = string_concat(out, vc_int_to_str(line));
+                                    out = string_concat(out, "\tcall\t");
+                                    out = string_concat(out, string_concat(gname, " "));
+                                    out = string_concat(out, vc_clause_text(source, starts, ends, rkw, rrp));
+                                    out = string_concat(out, "\t");
+                                    out = string_concat(out, verify_call_req_payload(bet, bed1, bed2, bed3, bed4, bpp,
+                                                                                     c, r, pcount, param_toks, caller_req_roots,
+                                                                                     tok_tags, source, starts, ends));
+                                    out = string_concat(out, "\n");
+                                }
+                                cj = cj + 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ci = ci + 1;
+    }
+    return out;
+}
+
 fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
+                  id5: Vec<i32>, fpn: Vec<i32>,
                   fcb: Vec<i32>, fcr: Vec<i32>,
                   bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
                   bpp: Vec<i32>, tok_tags: Vec<i32>,
@@ -959,6 +1225,10 @@ fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4
             }
             /* loop_invariant clauses (attached to `while` nodes in the body) */
             out = string_concat(out, verify_fn_loops(bet, bed1, bed2, bed3, bed4, bpp, body_root,
+                                                     req_roots, tok_tags, source, starts, ends));
+            /* modular verification: each call's args vs the callee's requires */
+            out = string_concat(out, verify_fn_calls(it, id1, id2, id3, id5, fpn, fcb, fcr,
+                                                     bet, bed1, bed2, bed3, bed4, bpp, body_root,
                                                      req_roots, tok_tags, source, starts, ends));
         }
         ii = ii + 1;
@@ -1646,6 +1916,8 @@ fn test_verify_all_fns() -> i32 {
     let id2: Vec<i32> = vec_new();
     let id3: Vec<i32> = vec_new();
     let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let fpn: Vec<i32> = vec_new();
     let fcb: Vec<i32> = vec_new();
     let fcr: Vec<i32> = vec_new();
     vec_push(it, 0);            /* ItemFn */
@@ -1653,11 +1925,12 @@ fn test_verify_all_fns() -> i32 {
     vec_push(id2, 4);          /* packed: has_ret 0 + contract_count 2 * 2 */
     vec_push(id3, 1);          /* param_count */
     vec_push(id4, nblk);       /* body root */
+    vec_push(id5, 0 - 1);      /* param name base (no params tracked in this test) */
     vec_push(fcb, 0);          /* contract base */
     vec_push(fcr, req);        /* contract root 0 (requires) */
     vec_push(fcr, ens);        /* contract root 1 (ensures) */
 
-    let got: string = verify_all_fns(it, id1, id2, id3, id4, fcb, fcr,
+    let got: string = verify_all_fns(it, id1, id2, id3, id4, id5, fpn, fcb, fcr,
                                      bet, b1, b2, b3, b4, bpp, tt, src, starts, ends);
     let want: string = string_concat(
         "VC\t1\trequires\trequires(x>0)\tPRECOND\n",

@@ -40,7 +40,13 @@ static int vc_body_has_effect(int bet, int bed1, int bed2, int bed3, int bed4, i
 static const char* verify_loop_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int cond_be, int wbody, int inv_sidecar, int inv_count, int target_k, int let_vars, int let_inits, int req_roots, int tok_tags, const char* source, int starts, int ends);
 static int vc_map_has(int sub_from, int h);
 static const char* verify_fn_loops(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int req_roots, int tok_tags, const char* source, int starts, int ends);
-static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends);
+static int vc_find_fn_item(int it, int id1, const char* source, int starts, int ends, int nametok);
+static int vc_param_index(int param_toks, const char* source, int starts, int ends, int nametok);
+static int extract_call_req(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx, const char* source, int starts, int ends, int tok_tags, int ct, int c1, int c2, int c3, int param_toks, int arg_ces);
+static int vc_collect_calls(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx, int out);
+static const char* verify_call_req_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int call_node, int r, int pcount, int param_toks, int caller_req_roots, int tok_tags, const char* source, int starts, int ends);
+static const char* verify_fn_calls(int it, int id1, int id2, int id3, int id5, int fpn, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int caller_req_roots, int tok_tags, const char* source, int starts, int ends);
+static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int id5, int fpn, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends);
 static int vc_subst(int ct, int c1, int c2, int c3, int root, int sub_from, int sub_to);
 static const char* vc_build_check(int ct, int cd1, int cd2, int cd3, int assert_root, int var_names);
 static int vc_and(int ct, int c1, int c2, int c3, int g, int x);
@@ -1773,7 +1779,486 @@ static const char* verify_fn_loops(int bet, int bed1, int bed2, int bed3, int be
   return out;
 }
 
-static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends) {
+static int vc_find_fn_item(int it, int id1, const char* source, int starts, int ends, int nametok) {
+  const char* _sv0t0 = vc_tok_text(source, starts, ends, nametok);
+  const char* nm;
+  nm = _sv0t0;
+  int _sv0t1 = sv0_vec_len(it);
+  int n = _sv0t1;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t2 = sv0_vec_get(it, i);
+    if ((_sv0t2 == 0)) {
+      int _sv0t3 = sv0_vec_get(id1, i);
+      const char* _sv0t4 = vc_tok_text(source, starts, ends, _sv0t3);
+      int _sv0t5 = sv0_string_eq(_sv0t4, nm);
+      if (_sv0t5) {
+        return i;
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t6 = (0 - 1);
+  return _sv0t6;
+}
+
+static int vc_param_index(int param_toks, const char* source, int starts, int ends, int nametok) {
+  const char* _sv0t0 = vc_tok_text(source, starts, ends, nametok);
+  const char* nm;
+  nm = _sv0t0;
+  int _sv0t1 = sv0_vec_len(param_toks);
+  int n = _sv0t1;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t2 = sv0_vec_get(param_toks, i);
+    const char* _sv0t3 = vc_tok_text(source, starts, ends, _sv0t2);
+    int _sv0t4 = sv0_string_eq(_sv0t3, nm);
+    if (_sv0t4) {
+      return i;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t5 = (0 - 1);
+  return _sv0t5;
+}
+
+static int extract_call_req(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx, const char* source, int starts, int ends, int tok_tags, int ct, int c1, int c2, int c3, int param_toks, int arg_ces) {
+  if ((idx < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(bet);
+  if ((idx >= _sv0t1)) {
+    int _sv0t2 = (0 - 1);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(bet, idx);
+  int tag = _sv0t3;
+  if ((tag == 0)) {
+    int _sv0t4 = sv0_vec_get(bed1, idx);
+    int lit_tag = _sv0t4;
+    int _sv0t5 = sv0_vec_get(bed2, idx);
+    int tok = _sv0t5;
+    if ((lit_tag == 0)) {
+      int _sv0t6 = vc_parse_dec(source, starts, ends, tok);
+      int _sv0t7 = cx_int(ct, c1, c2, c3, _sv0t6);
+      return _sv0t7;
+    } else {
+    }
+    if ((lit_tag == 5)) {
+      if ((tok >= 0)) {
+        int _sv0t8 = sv0_vec_len(tok_tags);
+        if ((tok < _sv0t8)) {
+          int _sv0t9 = sv0_vec_get(tok_tags, tok);
+          if ((_sv0t9 == 91)) {
+            int _sv0t10 = cx_bool(ct, c1, c2, c3, 1);
+            return _sv0t10;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+      int _sv0t11 = cx_bool(ct, c1, c2, c3, 0);
+      return _sv0t11;
+    } else {
+    }
+    int _sv0t12 = (0 - 1);
+    return _sv0t12;
+  } else {
+  }
+  if ((tag == 1)) {
+    int _sv0t13 = sv0_vec_get(bed2, idx);
+    if ((_sv0t13 != 1)) {
+      int _sv0t14 = (0 - 1);
+      return _sv0t14;
+    } else {
+    }
+    int _sv0t15 = sv0_vec_get(bed1, idx);
+    int _sv0t16 = sv0_vec_get(bpp, _sv0t15);
+    int _sv0t17 = vc_param_index(param_toks, source, starts, ends, _sv0t16);
+    int k = _sv0t17;
+    if ((k >= 0)) {
+      int _sv0t18 = sv0_vec_get(arg_ces, k);
+      return _sv0t18;
+    } else {
+    }
+    int _sv0t19 = (0 - 1);
+    return _sv0t19;
+  } else {
+  }
+  if ((tag == 2)) {
+    int _sv0t20 = sv0_vec_get(bed1, idx);
+    int uop = _sv0t20;
+    if ((uop == 0)) {
+      int _sv0t21 = sv0_vec_get(bed2, idx);
+      int _sv0t22 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, _sv0t21, source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+      int ch = _sv0t22;
+      if ((ch < 0)) {
+        int _sv0t23 = (0 - 1);
+        return _sv0t23;
+      } else {
+      }
+      int _sv0t24 = cx_unop(ct, c1, c2, c3, 0, ch);
+      return _sv0t24;
+    } else {
+    }
+    if ((uop == 1)) {
+      int _sv0t25 = sv0_vec_get(bed2, idx);
+      int _sv0t26 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, _sv0t25, source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+      int ch = _sv0t26;
+      if ((ch < 0)) {
+        int _sv0t27 = (0 - 1);
+        return _sv0t27;
+      } else {
+      }
+      int _sv0t28 = cx_unop(ct, c1, c2, c3, 1, ch);
+      return _sv0t28;
+    } else {
+    }
+    int _sv0t29 = (0 - 1);
+    return _sv0t29;
+  } else {
+  }
+  if ((tag == 3)) {
+    int _sv0t30 = sv0_vec_get(bed1, idx);
+    int _sv0t31 = ast_binop_to_cexpr(_sv0t30);
+    int cop = _sv0t31;
+    if ((cop < 0)) {
+      int _sv0t32 = (0 - 1);
+      return _sv0t32;
+    } else {
+    }
+    int _sv0t33 = sv0_vec_get(bed2, idx);
+    int _sv0t34 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, _sv0t33, source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+    int l = _sv0t34;
+    if ((l < 0)) {
+      int _sv0t35 = (0 - 1);
+      return _sv0t35;
+    } else {
+    }
+    int _sv0t36 = sv0_vec_get(bed3, idx);
+    int _sv0t37 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, _sv0t36, source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+    int r = _sv0t37;
+    if ((r < 0)) {
+      int _sv0t38 = (0 - 1);
+      return _sv0t38;
+    } else {
+    }
+    int _sv0t39 = cx_binop(ct, c1, c2, c3, cop, l, r);
+    return _sv0t39;
+  } else {
+  }
+  int _sv0t40 = (0 - 1);
+  return _sv0t40;
+}
+
+static int vc_collect_calls(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx, int out) {
+  if ((idx < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(bet);
+  if ((idx >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(bet, idx);
+  int tag = _sv0t1;
+  if ((tag == 4)) {
+    sv0_vec_push(out, idx);
+    int _sv0t2 = sv0_vec_get(bed2, idx);
+    int first = _sv0t2;
+    int _sv0t3 = sv0_vec_get(bed3, idx);
+    int cnt = _sv0t3;
+    int _sv0t4 = sv0_vec_get(bed4, idx);
+    int sc = _sv0t4;
+    int i = 0;
+    while ((i < cnt)) {
+      int _sv0t5 = vc_block_idx(bpp, first, sc, i);
+      int _sv0t6 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t5, out);
+      i = (i + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((tag == 2)) {
+    int _sv0t7 = sv0_vec_get(bed2, idx);
+    int _sv0t8 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t7, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 6)) {
+    int _sv0t9 = sv0_vec_get(bed1, idx);
+    int _sv0t10 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t9, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 20)) {
+    int _sv0t11 = sv0_vec_get(bed1, idx);
+    int _sv0t12 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t11, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 15)) {
+    int _sv0t13 = sv0_vec_get(bed1, idx);
+    int _sv0t14 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t13, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 28)) {
+    int _sv0t15 = sv0_vec_get(bed1, idx);
+    int _sv0t16 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t15, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 27)) {
+    int _sv0t17 = sv0_vec_get(bed3, idx);
+    int init = _sv0t17;
+    if ((init >= 0)) {
+      int _sv0t18 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, init, out);
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  if ((tag == 3)) {
+    int _sv0t19 = sv0_vec_get(bed2, idx);
+    int _sv0t20 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t19, out);
+    int _sv0t21 = sv0_vec_get(bed3, idx);
+    int _sv0t22 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t21, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 8)) {
+    int _sv0t23 = sv0_vec_get(bed1, idx);
+    int _sv0t24 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t23, out);
+    int _sv0t25 = sv0_vec_get(bed2, idx);
+    int _sv0t26 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t25, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 10)) {
+    int _sv0t27 = sv0_vec_get(bed1, idx);
+    int _sv0t28 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t27, out);
+    int _sv0t29 = sv0_vec_get(bed2, idx);
+    int _sv0t30 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t29, out);
+    int _sv0t31 = sv0_vec_get(bed3, idx);
+    int _sv0t32 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t31, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 12)) {
+    int _sv0t33 = sv0_vec_get(bed1, idx);
+    int _sv0t34 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t33, out);
+    int _sv0t35 = sv0_vec_get(bed2, idx);
+    int _sv0t36 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t35, out);
+    return 0;
+  } else {
+  }
+  if ((tag == 9)) {
+    int _sv0t37 = sv0_vec_get(bed1, idx);
+    int first = _sv0t37;
+    int _sv0t38 = sv0_vec_get(bed2, idx);
+    int cnt = _sv0t38;
+    int _sv0t39 = sv0_vec_get(bed4, idx);
+    int sc = _sv0t39;
+    int i = 0;
+    while ((i < cnt)) {
+      int _sv0t40 = vc_block_idx(bpp, first, sc, i);
+      int _sv0t41 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, _sv0t40, out);
+      i = (i + 1);
+    }
+    int _sv0t42 = sv0_vec_get(bed3, idx);
+    int tail = _sv0t42;
+    if ((tail >= 0)) {
+      int _sv0t43 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, tail, out);
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  return 0;
+}
+
+static const char* verify_call_req_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int call_node, int r, int pcount, int param_toks, int caller_req_roots, int tok_tags, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_new();
+  int ct = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int c1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int c2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int c3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int vn = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int hyps = _sv0t5;
+  int ri = 0;
+  while (1) {
+    int _sv0t6 = sv0_vec_len(caller_req_roots);
+    int _sv0t9 = (ri < _sv0t6);
+    if ((!_sv0t9)) {
+      break;
+    } else {
+    }
+    int _sv0t7 = sv0_vec_get(caller_req_roots, ri);
+    int _sv0t8 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t7, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int frc = _sv0t8;
+    if ((frc >= 0)) {
+      sv0_vec_push(hyps, frc);
+    } else {
+    }
+    ri = (ri + 1);
+  }
+  int _sv0t10 = sv0_vec_new();
+  int arg_ces = _sv0t10;
+  int _sv0t11 = sv0_vec_get(bed2, call_node);
+  int first = _sv0t11;
+  int _sv0t12 = sv0_vec_get(bed4, call_node);
+  int sc = _sv0t12;
+  int k = 0;
+  while ((k < pcount)) {
+    int _sv0t13 = vc_block_idx(bpp, first, sc, k);
+    int _sv0t14 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t13, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int ak = _sv0t14;
+    if ((ak < 0)) {
+      return "RESIDUAL";
+    } else {
+    }
+    sv0_vec_push(arg_ces, ak);
+    k = (k + 1);
+  }
+  int _sv0t15 = extract_call_req(bet, bed1, bed2, bed3, bed4, bpp, r, source, starts, ends, tok_tags, ct, c1, c2, c3, param_toks, arg_ces);
+  int rsub = _sv0t15;
+  if ((rsub < 0)) {
+    return "RESIDUAL";
+  } else {
+  }
+  const char* _sv0t16 = vc_build_query(ct, c1, c2, c3, hyps, rsub, vn);
+  return _sv0t16;
+}
+
+static const char* verify_fn_calls(int it, int id1, int id2, int id3, int id5, int fpn, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int caller_req_roots, int tok_tags, const char* source, int starts, int ends) {
+  const char* out;
+  out = "";
+  int _sv0t0 = sv0_vec_new();
+  int calls = _sv0t0;
+  int _sv0t1 = vc_collect_calls(bet, bed1, bed2, bed3, bed4, bpp, body_root, calls);
+  int ci = 0;
+  while (1) {
+    int _sv0t2 = sv0_vec_len(calls);
+    int _sv0t42 = (ci < _sv0t2);
+    if ((!_sv0t42)) {
+      break;
+    } else {
+    }
+    int _sv0t3 = sv0_vec_get(calls, ci);
+    int c = _sv0t3;
+    int _sv0t4 = sv0_vec_get(bed1, c);
+    int callee_node = _sv0t4;
+    if ((callee_node >= 0)) {
+      int _sv0t5 = sv0_vec_get(bet, callee_node);
+      if ((_sv0t5 == 1)) {
+        int _sv0t6 = sv0_vec_get(bed2, callee_node);
+        if ((_sv0t6 == 1)) {
+          int _sv0t7 = sv0_vec_get(bed1, callee_node);
+          int _sv0t8 = sv0_vec_get(bpp, _sv0t7);
+          int cname_tok = _sv0t8;
+          int _sv0t9 = vc_find_fn_item(it, id1, source, starts, ends, cname_tok);
+          int gi = _sv0t9;
+          if ((gi >= 0)) {
+            int _sv0t10 = sv0_vec_get(id3, gi);
+            int pcount = _sv0t10;
+            int _sv0t11 = sv0_vec_get(bed3, c);
+            if ((_sv0t11 == pcount)) {
+              int _sv0t12 = sv0_vec_new();
+              int param_toks = _sv0t12;
+              int _sv0t13 = sv0_vec_get(id5, gi);
+              int pbase = _sv0t13;
+              int pk = 0;
+              while ((pk < pcount)) {
+                int _sv0t14 = (pbase + pk);
+                int _sv0t15 = sv0_vec_get(fpn, _sv0t14);
+                sv0_vec_push(param_toks, _sv0t15);
+                pk = (pk + 1);
+              }
+              int _sv0t16 = sv0_vec_get(id1, gi);
+              const char* _sv0t17 = vc_tok_text(source, starts, ends, _sv0t16);
+              const char* gname;
+              gname = _sv0t17;
+              int _sv0t18 = sv0_vec_get(fcb, gi);
+              int cbase = _sv0t18;
+              int _sv0t19 = sv0_vec_get(id2, gi);
+              int ccount = (_sv0t19 / 2);
+              int cj = 0;
+              while ((cj < ccount)) {
+                int _sv0t20 = (cbase + cj);
+                int _sv0t21 = sv0_vec_get(fcr, _sv0t20);
+                int r = _sv0t21;
+                int _sv0t22 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, r);
+                int rleaf = _sv0t22;
+                int _sv0t23 = vc_contract_kind(tok_tags, rleaf);
+                if ((_sv0t23 == 83)) {
+                  int _sv0t24 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, c);
+                  int calltok = _sv0t24;
+                  int line = 1;
+                  if ((calltok >= 0)) {
+                    int _sv0t25 = sv0_vec_get(starts, calltok);
+                    int _sv0t26 = vc_line_of_pos(source, _sv0t25);
+                    line = _sv0t26;
+                  } else {
+                  }
+                  int _sv0t27 = vc_contract_kind_tok(tok_tags, rleaf);
+                  int rkw = _sv0t27;
+                  int _sv0t28 = (rkw + 1);
+                  int _sv0t29 = vc_match_rparen(tok_tags, _sv0t28);
+                  int rrp = _sv0t29;
+                  const char* _sv0t30 = sv0_string_concat(out, "VC\t");
+                  out = _sv0t30;
+                  const char* _sv0t31 = vc_int_to_str(line);
+                  const char* _sv0t32 = sv0_string_concat(out, _sv0t31);
+                  out = _sv0t32;
+                  const char* _sv0t33 = sv0_string_concat(out, "\tcall\t");
+                  out = _sv0t33;
+                  const char* _sv0t34 = sv0_string_concat(gname, " ");
+                  const char* _sv0t35 = sv0_string_concat(out, _sv0t34);
+                  out = _sv0t35;
+                  const char* _sv0t36 = vc_clause_text(source, starts, ends, rkw, rrp);
+                  const char* _sv0t37 = sv0_string_concat(out, _sv0t36);
+                  out = _sv0t37;
+                  const char* _sv0t38 = sv0_string_concat(out, "\t");
+                  out = _sv0t38;
+                  const char* _sv0t39 = verify_call_req_payload(bet, bed1, bed2, bed3, bed4, bpp, c, r, pcount, param_toks, caller_req_roots, tok_tags, source, starts, ends);
+                  const char* _sv0t40 = sv0_string_concat(out, _sv0t39);
+                  out = _sv0t40;
+                  const char* _sv0t41 = sv0_string_concat(out, "\n");
+                  out = _sv0t41;
+                } else {
+                }
+                cj = (cj + 1);
+              }
+            } else {
+            }
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    ci = (ci + 1);
+  }
+  return out;
+}
+
+static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int id5, int fpn, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends) {
   const char* out;
   out = "";
   int _sv0t0 = sv0_vec_len(it);
@@ -1866,6 +2351,9 @@ static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, in
       const char* _sv0t34 = verify_fn_loops(bet, bed1, bed2, bed3, bed4, bpp, body_root, req_roots, tok_tags, source, starts, ends);
       const char* _sv0t35 = sv0_string_concat(out, _sv0t34);
       out = _sv0t35;
+      const char* _sv0t36 = verify_fn_calls(it, id1, id2, id3, id5, fpn, fcb, fcr, bet, bed1, bed2, bed3, bed4, bpp, body_root, req_roots, tok_tags, source, starts, ends);
+      const char* _sv0t37 = sv0_string_concat(out, _sv0t36);
+      out = _sv0t37;
     } else {
     }
     ii = (ii + 1);
@@ -3190,25 +3678,31 @@ static int test_verify_all_fns(void) {
   int _sv0t24 = sv0_vec_new();
   int id4 = _sv0t24;
   int _sv0t25 = sv0_vec_new();
-  int fcb = _sv0t25;
+  int id5 = _sv0t25;
   int _sv0t26 = sv0_vec_new();
-  int fcr = _sv0t26;
+  int fpn = _sv0t26;
+  int _sv0t27 = sv0_vec_new();
+  int fcb = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int fcr = _sv0t28;
   sv0_vec_push(it, 0);
   sv0_vec_push(id1, 2);
   sv0_vec_push(id2, 4);
   sv0_vec_push(id3, 1);
   sv0_vec_push(id4, nblk);
+  int _sv0t29 = (0 - 1);
+  sv0_vec_push(id5, _sv0t29);
   sv0_vec_push(fcb, 0);
   sv0_vec_push(fcr, req);
   sv0_vec_push(fcr, ens);
-  const char* _sv0t27 = verify_all_fns(it, id1, id2, id3, id4, fcb, fcr, bet, b1, b2, b3, b4, bpp, tt, src, starts, ends);
+  const char* _sv0t30 = verify_all_fns(it, id1, id2, id3, id4, id5, fpn, fcb, fcr, bet, b1, b2, b3, b4, bpp, tt, src, starts, ends);
   const char* got;
-  got = _sv0t27;
-  const char* _sv0t28 = sv0_string_concat("VC\t1\trequires\trequires(x>0)\tPRECOND\n", "VC\t1\tensures\tensures(result>=1)\t(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)\n");
+  got = _sv0t30;
+  const char* _sv0t31 = sv0_string_concat("VC\t1\trequires\trequires(x>0)\tPRECOND\n", "VC\t1\tensures\tensures(result>=1)\t(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (> v0 0)) (assert (= result v0)) (assert (not (>= result 1))) (check-sat)\n");
   const char* want;
-  want = _sv0t28;
-  int _sv0t29 = sv0_string_eq(got, want);
-  if ((_sv0t29 != 1)) {
+  want = _sv0t31;
+  int _sv0t32 = sv0_string_eq(got, want);
+  if ((_sv0t32 != 1)) {
     return 1;
   } else {
   }
