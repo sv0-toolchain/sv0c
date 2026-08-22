@@ -5180,27 +5180,35 @@ static int parse_fn_body(int tags, int starts, int ends, const char* source, int
   }
   int _sv0t29 = sv0_vec_get(cc, 0);
   int contract_count = _sv0t29;
-  int _sv0t30 = parse_block(tags, starts, ends, source, p5, body_et, body_ed1, body_ed2, body_ed3, body_ed4, pp, body_sf);
-  int p6 = _sv0t30;
-  if ((p6 < 0)) {
-    int _sv0t31 = (0 - 1);
-    return _sv0t31;
+  int p6 = p5;
+  int body_root = (0 - 1);
+  int _sv0t30 = ps_peek(tags, p5);
+  if ((_sv0t30 == 13)) {
+    p6 = (p5 + 1);
   } else {
+    int _sv0t31 = parse_block(tags, starts, ends, source, p5, body_et, body_ed1, body_ed2, body_ed3, body_ed4, pp, body_sf);
+    int pb = _sv0t31;
+    if ((pb < 0)) {
+      int _sv0t32 = (0 - 1);
+      return _sv0t32;
+    } else {
+    }
+    p6 = pb;
+    int _sv0t33 = sv0_vec_len(body_et);
+    body_root = (_sv0t33 - 1);
   }
-  int _sv0t32 = sv0_vec_len(body_et);
-  int body_root = (_sv0t32 - 1);
   sv0_vec_push(it, 0);
   sv0_vec_push(id1, name_pos);
-  int _sv0t33 = (contract_count * 2);
-  int _sv0t34 = (has_ret + _sv0t33);
-  sv0_vec_push(id2, _sv0t34);
+  int _sv0t34 = (contract_count * 2);
+  int _sv0t35 = (has_ret + _sv0t34);
+  sv0_vec_push(id2, _sv0t35);
   sv0_vec_push(id3, param_count);
   sv0_vec_push(id4, body_root);
   sv0_vec_push(id5, pbase);
   sv0_vec_push(fn_ret_ty_root_by_item, ret_ty_root);
   sv0_vec_push(fn_contract_base_by_item, contract_base);
-  int _sv0t35 = (0 - 1);
-  sv0_vec_push(enum_variant_payload_base_by_item, _sv0t35);
+  int _sv0t36 = (0 - 1);
+  sv0_vec_push(enum_variant_payload_base_by_item, _sv0t36);
   sv0_vec_push(enum_variant_payload_count_by_item, 0);
   sv0_vec_push(enum_variant_payload_max_by_item, 0);
   return p6;
@@ -5732,21 +5740,26 @@ static int parse_impl_item(int tags, int starts, int ends, const char* source, i
   sv0_vec_push(it, 4);
   sv0_vec_push(id1, has_trait);
   sv0_vec_push(id2, items_count);
-  sv0_vec_push(id3, 0);
-  int _sv0t24 = (0 - 1);
-  sv0_vec_push(id4, _sv0t24);
+  if ((has_trait == 1)) {
+    sv0_vec_push(id3, p0);
+  } else {
+    int _sv0t24 = (0 - 1);
+    sv0_vec_push(id3, _sv0t24);
+  }
   int _sv0t25 = (0 - 1);
-  sv0_vec_push(id5, _sv0t25);
+  sv0_vec_push(id4, _sv0t25);
   int _sv0t26 = (0 - 1);
-  sv0_vec_push(fn_ret_ty_root_by_item, _sv0t26);
+  sv0_vec_push(id5, _sv0t26);
   int _sv0t27 = (0 - 1);
-  sv0_vec_push(fn_contract_base_by_item, _sv0t27);
+  sv0_vec_push(fn_ret_ty_root_by_item, _sv0t27);
   int _sv0t28 = (0 - 1);
-  sv0_vec_push(enum_variant_payload_base_by_item, _sv0t28);
+  sv0_vec_push(fn_contract_base_by_item, _sv0t28);
+  int _sv0t29 = (0 - 1);
+  sv0_vec_push(enum_variant_payload_base_by_item, _sv0t29);
   sv0_vec_push(enum_variant_payload_count_by_item, 0);
   sv0_vec_push(enum_variant_payload_max_by_item, 0);
-  int _sv0t29 = (p + 1);
-  return _sv0t29;
+  int _sv0t30 = (p + 1);
+  return _sv0t30;
 }
 
 static int parse_item(int tags, int starts, int ends, const char* source, int pos, int it, int id1, int id2, int id3, int id4, int id5, int pp, int enum_variant_name_toks, int struct_field_name_toks, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int fn_contract_base_by_item, int fn_contract_root, int enum_variant_payload_ty_root, int enum_variant_payload_base_by_item, int enum_variant_payload_count_by_item, int enum_variant_payload_max_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int body_sf) {

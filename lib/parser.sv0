@@ -3327,11 +3327,21 @@ fn parse_fn_body(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                   fn_contract_root, cc);
     if p5 < 0 { return 0 - 1; }
     let contract_count: i32 = vec_get(cc, 0);
-    let p6: i32 = parse_block(tags, starts, ends, source, p5,
-                               body_et, body_ed1, body_ed2, body_ed3,
-                               body_ed4, pp, body_sf);
-    if p6 < 0 { return 0 - 1; }
-    let body_root: i32 = vec_len(body_et) - 1;
+    /* M4-S-033: a trait method DECLARATION ends in `;` (no body) — parse it as a
+       bodyless ItemFn (body_root -1, not lowered) so its signature + contracts are
+       recorded. A normal fn / impl method has a `{ … }` block. */
+    let mut p6: i32 = p5;
+    let mut body_root: i32 = 0 - 1;
+    if ps_peek(tags, p5) == 13 {
+        p6 = p5 + 1;
+    } else {
+        let pb: i32 = parse_block(tags, starts, ends, source, p5,
+                                  body_et, body_ed1, body_ed2, body_ed3,
+                                  body_ed4, pp, body_sf);
+        if pb < 0 { return 0 - 1; }
+        p6 = pb;
+        body_root = vec_len(body_et) - 1;
+    }
     vec_push(it, 0);
     vec_push(id1, name_pos);
     vec_push(id2, has_ret + contract_count * 2);
@@ -3704,7 +3714,10 @@ fn parse_impl_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(it, 4);
     vec_push(id1, has_trait);
     vec_push(id2, items_count);
-    vec_push(id3, 0);
+    /* M4-S-033: for `impl Trait for Type`, record the trait name token (p0, the
+       first token of the trait type) in id3 so contravariance checking can match
+       this impl to its trait declaration; -1 for an inherent impl. */
+    if has_trait == 1 { vec_push(id3, p0); } else { vec_push(id3, 0 - 1); }
     vec_push(id4, 0 - 1);
     vec_push(id5, 0 - 1);
     vec_push(fn_ret_ty_root_by_item, 0 - 1);

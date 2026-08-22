@@ -1,0 +1,20 @@
+/* M4-S-033 trait-contract contravariance (LSP): an impl method must weaken the
+   trait's `requires` and strengthen its `ensures`. The `override` records check
+   that; per-method contracts are reported as usual. */
+
+trait Bound {
+    fn clamp(x: i32) -> i32
+        requires(x > 10)             //@ runtime
+        ensures(result > 0);         //@ runtime
+}
+
+struct C {}
+
+impl Bound for C {
+    fn clamp(x: i32) -> i32          //@ verified
+        requires(x > 0)              //@ runtime
+        ensures(result > 5)          //@ runtime
+    {
+        return x;
+    }
+}
