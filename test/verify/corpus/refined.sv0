@@ -1,0 +1,12 @@
+/* M4-S-030: refined-type syntax parses — `type T = <base> where <predicate over
+   self>`. The predicate is stored (id3) for M4-S-031 to check at every binding;
+   here it just needs to parse. The function's contracts still verify normally. */
+
+type Positive = i32 where self > 0;
+
+fn inc(x: i32) -> i32
+    requires(x >= 0)          //@ runtime
+    ensures(result >= 1)      //@ verified
+{
+    return x + 1;
+}
