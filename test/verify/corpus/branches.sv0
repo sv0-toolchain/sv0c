@@ -1,0 +1,32 @@
+/* M4-S-004 verify corpus — if/else path-sensitive VC generation. The result is
+   modelled as a disjunction over branch paths, so an ensures must hold on every
+   path to be [verified]. */
+
+fn myabs(x: i32) -> i32
+    ensures(result >= 0)      //@ verified
+{
+    if x >= 0 {
+        return x;
+    } else {
+        return 0 - x;
+    }
+}
+
+fn clamp_low(x: i32) -> i32
+    ensures(result >= 0)      //@ verified
+{
+    if x > 0 {
+        return x;
+    }
+    return 0;
+}
+
+fn sign_pos(x: i32) -> i32
+    ensures(result > 0)       //@ runtime
+{
+    if x > 0 {
+        return 1;
+    } else {
+        return 0;
+    }
+}

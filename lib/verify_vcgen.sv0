@@ -758,16 +758,172 @@ fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4
     return out;
 }
 
-/* SMT-LIB2 query for one `ensures` (assuming `req_roots`, binding result to the
-   straight-line return value), or "RESIDUAL" if the ensures is outside the
-   supported fragment. */
+/* CExpr conjunction/disjunction with -1 acting as the identity (true for AND,
+   empty for OR). */
+fn vc_and(ct: Vec<i32>, c1: Vec<i32>, c2: Vec<i32>, c3: Vec<i32>, g: i32, x: i32) -> i32 {
+    if g < 0 { return x; }
+    if x < 0 { return g; }
+    return cx_binop(ct, c1, c2, c3, 11, g, x);
+}
+fn vc_or(ct: Vec<i32>, c1: Vec<i32>, c2: Vec<i32>, c3: Vec<i32>, acc: i32, x: i32) -> i32 {
+    if x < 0 { return acc; }
+    if acc < 0 { return x; }
+    return cx_binop(ct, c1, c2, c3, 12, acc, x);
+}
+
+/* Path-sensitive result model (M4-S-004): walk a body block/branch and build the
+   CExpr `⋁ path (guard ∧ result == returned-value)` over every return / tail. For
+   a straight-line body this is just `result == ret`; for `if c { return a } else
+   { return b }` it is `(c ∧ result==a) ∨ (¬c ∧ result==b)`. Guards accumulate the
+   branch conditions (negated on the else side); a fall-through after an
+   always-returning `if` continues under the negated condition. Returns the
+   disjunction root (>=0), -1 for a path that produces no value, or -2 = FAILURE
+   (assignment, loop, match, unsupported guard/return — caller keeps the ensures
+   RESIDUAL). Pushes a "returns-on-every-path" flag (1/0) to `ra` before returning
+   (read as ra's last element). ct/vn are shared with the caller's requires+ensures
+   extraction so variables line up. */
+fn vc_collect_paths(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                    bpp: Vec<i32>, node: i32, guard: i32,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>, tok_tags: Vec<i32>,
+                    ct: Vec<i32>, c1: Vec<i32>, c2: Vec<i32>, c3: Vec<i32>, vn: Vec<i32>,
+                    ra: Vec<i32>) -> i32 {
+    if node < 0 { vec_push(ra, 0); return 0 - 2; }
+    if node >= vec_len(bet) { vec_push(ra, 0); return 0 - 2; }
+    let ntag: i32 = vec_get(bet, node);
+    /* an `if` used directly as a branch body (else-if chain) */
+    if ntag == 10 {
+        let c: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, node),
+                                   source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+        if c < 0 { vec_push(ra, 0); return 0 - 2; }
+        let notc: i32 = cx_unop(ct, c1, c2, c3, 1, c);
+        let tb: i32 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, node),
+                                       vc_and(ct, c1, c2, c3, guard, c),
+                                       source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+        if tb == 0 - 2 { vec_push(ra, 0); return 0 - 2; }
+        let then_ra: i32 = vec_get(ra, vec_len(ra) - 1);
+        let mut disj: i32 = tb;
+        let else_node: i32 = vec_get(bed3, node);
+        let mut all_ret: i32 = 0;
+        if else_node >= 0 {
+            let eb: i32 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, else_node,
+                                           vc_and(ct, c1, c2, c3, guard, notc),
+                                           source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+            if eb == 0 - 2 { vec_push(ra, 0); return 0 - 2; }
+            let else_ra: i32 = vec_get(ra, vec_len(ra) - 1);
+            disj = vc_or(ct, c1, c2, c3, disj, eb);
+            if then_ra == 1 { if else_ra == 1 { all_ret = 1; } }
+        }
+        vec_push(ra, all_ret);
+        return disj;
+    }
+    /* a non-block branch body: a tail-value expression */
+    if ntag != 9 {
+        let rv: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, node,
+                                    source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+        if rv < 0 { vec_push(ra, 0); return 0 - 2; }
+        let eqn: i32 = cx_binop(ct, c1, c2, c3, 5, cx_result(ct, c1, c2, c3), rv);
+        vec_push(ra, 1);
+        return vc_and(ct, c1, c2, c3, guard, eqn);
+    }
+    /* a block: statements in order, then an optional tail */
+    let first: i32 = vec_get(bed1, node);
+    let count: i32 = vec_get(bed2, node);
+    let tail: i32 = vec_get(bed3, node);
+    let sc: i32 = vec_get(bed4, node);
+    let mut disj: i32 = 0 - 1;
+    let mut cur_g: i32 = guard;
+    let mut reachable: bool = true;
+    let mut si: i32 = 0;
+    while si < count {
+        if reachable != true { si = count; }
+        else {
+            let s: i32 = vc_block_idx(bpp, first, sc, si);
+            let stag: i32 = vec_get(bet, s);
+            let mut inner: i32 = s;
+            if stag == 28 { inner = vec_get(bed1, s); }
+            let itag: i32 = vec_get(bet, inner);
+            if stag == 27 {
+                /* let: skip (unconstrained local); but a mutation in its init is unsound */
+                let init: i32 = vec_get(bed3, s);
+                if init >= 0 {
+                    if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, init) { vec_push(ra, 0); return 0 - 2; }
+                }
+                si = si + 1;
+            } else {
+                if itag == 15 {
+                    let rvi: i32 = vec_get(bed1, inner);
+                    if rvi < 0 { vec_push(ra, 0); return 0 - 2; }
+                    let rv: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, rvi,
+                                                source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                    if rv < 0 { vec_push(ra, 0); return 0 - 2; }
+                    let eqn: i32 = cx_binop(ct, c1, c2, c3, 5, cx_result(ct, c1, c2, c3), rv);
+                    disj = vc_or(ct, c1, c2, c3, disj, vc_and(ct, c1, c2, c3, cur_g, eqn));
+                    reachable = false;
+                    si = si + 1;
+                } else {
+                    if itag == 10 {
+                        let c: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, inner),
+                                                   source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+                        if c < 0 { vec_push(ra, 0); return 0 - 2; }
+                        let notc: i32 = cx_unop(ct, c1, c2, c3, 1, c);
+                        let tb: i32 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, inner),
+                                                       vc_and(ct, c1, c2, c3, cur_g, c),
+                                                       source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+                        if tb == 0 - 2 { vec_push(ra, 0); return 0 - 2; }
+                        let then_ra: i32 = vec_get(ra, vec_len(ra) - 1);
+                        disj = vc_or(ct, c1, c2, c3, disj, tb);
+                        let else_node: i32 = vec_get(bed3, inner);
+                        if else_node >= 0 {
+                            let eb: i32 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, else_node,
+                                                           vc_and(ct, c1, c2, c3, cur_g, notc),
+                                                           source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+                            if eb == 0 - 2 { vec_push(ra, 0); return 0 - 2; }
+                            let else_ra: i32 = vec_get(ra, vec_len(ra) - 1);
+                            disj = vc_or(ct, c1, c2, c3, disj, eb);
+                            if then_ra == 1 {
+                                if else_ra == 1 { reachable = false; }
+                                else { cur_g = vc_and(ct, c1, c2, c3, cur_g, notc); }
+                            } else {
+                                if else_ra == 1 { cur_g = vc_and(ct, c1, c2, c3, cur_g, c); }
+                            }
+                        } else {
+                            if then_ra == 1 { cur_g = vc_and(ct, c1, c2, c3, cur_g, notc); }
+                        }
+                        si = si + 1;
+                    } else {
+                        /* assignment / loop / match / bare-effect statement */
+                        vec_push(ra, 0);
+                        return 0 - 2;
+                    }
+                }
+            }
+        }
+    }
+    if reachable == true {
+        if tail >= 0 {
+            /* the tail is a value expression — recurse so an `if` tail becomes a
+               path disjunction rather than being (wrongly) flattened. */
+            let sub: i32 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, tail, cur_g,
+                                            source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+            if sub == 0 - 2 { vec_push(ra, 0); return 0 - 2; }
+            let sub_ra: i32 = vec_get(ra, vec_len(ra) - 1);
+            disj = vc_or(ct, c1, c2, c3, disj, sub);
+            if sub_ra == 1 { reachable = false; }
+        }
+    }
+    let mut allret: i32 = 1;
+    if reachable == true { allret = 0; }
+    vec_push(ra, allret);
+    return disj;
+}
+
+/* SMT-LIB2 query for one `ensures`: assume `req_roots`, model `result` with the
+   path-sensitive binding (M4-S-004: straight-line + if/else), assert the negated
+   ensures. "RESIDUAL" if the ensures or the body's result model is outside the
+   supported fragment (assignment, loop, match, non-exhaustive/void paths). */
 fn verify_ensures_payload(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
                           bpp: Vec<i32>, req_roots: Vec<i32>, ens_root: i32, body_root: i32,
                           tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
-    /* soundness: only prove ensures for a truly straight-line body (no
-       reassignment / control flow) — otherwise result-binding + old(x)==x are
-       invalid, so keep the check at runtime. */
-    if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, body_root) { return "RESIDUAL"; }
     let ct: Vec<i32> = vec_new();
     let c1: Vec<i32> = vec_new();
     let c2: Vec<i32> = vec_new();
@@ -786,13 +942,16 @@ fn verify_ensures_payload(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: V
     let ec: i32 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ens_root,
                                 source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
     if ec < 0 { return "RESIDUAL"; }
-    let mut ret_ce: i32 = 0 - 1;
-    let retv: i32 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
-    if retv >= 0 {
-        ret_ce = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv,
-                               source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-    }
-    return vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn);
+    /* path-sensitive result model over the body */
+    let ra: Vec<i32> = vec_new();
+    let binding: i32 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, body_root, 0 - 1,
+                                        source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+    if binding < 0 { return "RESIDUAL"; }
+    /* every path must produce a value, else the model is incomplete (unsound) */
+    if vec_len(ra) < 1 { return "RESIDUAL"; }
+    if vec_get(ra, vec_len(ra) - 1) != 1 { return "RESIDUAL"; }
+    vec_push(reqs, binding);
+    return vc_build_query(ct, c1, c2, c3, reqs, ec, vn);
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -1275,6 +1434,63 @@ fn test_body_effect_guard() -> i32 {
     return 0;
 }
 
+/* Path-sensitive VC (M4-S-004): for `{ if x >= 0 { return x; } else { return 0 - x; } }`
+   with `ensures(result >= 0)`, verify_ensures_payload models result as a disjunction
+   over both branches. Deterministic (no z3). */
+fn test_vc_paths_ifelse() -> i32 {
+    let src: string = "xresult0";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    let tt: Vec<i32> = vec_new();
+    /* 0 x */ vec_push(starts, 0); vec_push(ends, 1); vec_push(tt, 5);
+    /* 1 result */ vec_push(starts, 1); vec_push(ends, 7); vec_push(tt, 84);
+    /* 2 "0" */ vec_push(starts, 7); vec_push(ends, 8); vec_push(tt, 40);
+
+    let bet: Vec<i32> = vec_new();
+    let b1: Vec<i32> = vec_new();
+    let b2: Vec<i32> = vec_new();
+    let b3: Vec<i32> = vec_new();
+    let b4: Vec<i32> = vec_new();
+    let bpp: Vec<i32> = vec_new();
+    /* ensures: result >= 0  (Ast >= = 10) */
+    vec_push(bpp, 1);                                              /* pp[0] = result tok */
+    let er: i32 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);     /* path result */
+    let e0: i32 = be_push(bet, b1, b2, b3, b4, 0, 0, 2, 0, 0);     /* lit 0 */
+    let ens: i32 = be_push(bet, b1, b2, b3, b4, 3, 10, er, e0, 0); /* result >= 0 */
+    /* cond: x >= 0 */
+    vec_push(bpp, 0);                                              /* pp[1] = x tok */
+    let cx0: i32 = be_push(bet, b1, b2, b3, b4, 1, 1, 1, 0, 0);    /* path x */
+    let cz: i32 = be_push(bet, b1, b2, b3, b4, 0, 0, 2, 0, 0);     /* lit 0 */
+    let cond: i32 = be_push(bet, b1, b2, b3, b4, 3, 10, cx0, cz, 0); /* x >= 0 */
+    /* then: { return x; } */
+    vec_push(bpp, 0);                                              /* pp[2] = x tok */
+    let tx: i32 = be_push(bet, b1, b2, b3, b4, 1, 2, 1, 0, 0);     /* path x */
+    let tret: i32 = be_push(bet, b1, b2, b3, b4, 15, tx, 0, 0, 0); /* return x */
+    let tsemi: i32 = be_push(bet, b1, b2, b3, b4, 28, tret, 0, 0, 0);
+    vec_push(bpp, tsemi);                                          /* pp[3] */
+    let tblk: i32 = be_push(bet, b1, b2, b3, b4, 9, 0, 1, 0 - 1, 4); /* block sidecar pp[3] */
+    /* else: { return 0 - x; }  (Ast - = 1) */
+    let ez: i32 = be_push(bet, b1, b2, b3, b4, 0, 0, 2, 0, 0);     /* lit 0 */
+    vec_push(bpp, 0);                                              /* pp[4] = x tok */
+    let ex: i32 = be_push(bet, b1, b2, b3, b4, 1, 4, 1, 0, 0);     /* path x */
+    let esub: i32 = be_push(bet, b1, b2, b3, b4, 3, 1, ez, ex, 0); /* 0 - x */
+    let eret: i32 = be_push(bet, b1, b2, b3, b4, 15, esub, 0, 0, 0);
+    let esemi: i32 = be_push(bet, b1, b2, b3, b4, 28, eret, 0, 0, 0);
+    vec_push(bpp, esemi);                                          /* pp[5] */
+    let eblk: i32 = be_push(bet, b1, b2, b3, b4, 9, 0, 1, 0 - 1, 6); /* block sidecar pp[5] */
+    /* if cond { then } else { else } */
+    let iff: i32 = be_push(bet, b1, b2, b3, b4, 10, cond, tblk, eblk, 0);
+    /* body block: no stmts, tail = if */
+    let body: i32 = be_push(bet, b1, b2, b3, b4, 9, 0, 0, iff, 0);
+
+    let reqs: Vec<i32> = vec_new();
+    let got: string = verify_ensures_payload(bet, b1, b2, b3, b4, bpp, reqs, ens, body,
+                                             tt, src, starts, ends);
+    let want: string = "(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (or (and (>= v0 0) (= result v0)) (and (not (>= v0 0)) (= result (- 0 v0))))) (assert (not (>= result 0))) (check-sat)";
+    if string_eq(got, want) != true { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_cx_tags();
     if r1 != 0 { return r1; }
@@ -1304,5 +1520,7 @@ fn main() -> i32 {
     if r13 != 0 { return 120 + r13; }
     let r14: i32 = test_body_effect_guard();
     if r14 != 0 { return 130 + r14; }
+    let r15: i32 = test_vc_paths_ifelse();
+    if r15 != 0 { return 140 + r15; }
     return 0;
 }

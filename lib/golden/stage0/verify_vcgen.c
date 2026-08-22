@@ -38,6 +38,9 @@ static int vc_line_of_pos(const char* source, int pos);
 static int vc_find_return_value(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root);
 static int vc_body_has_effect(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx);
 static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends);
+static int vc_and(int ct, int c1, int c2, int c3, int g, int x);
+static int vc_or(int ct, int c1, int c2, int c3, int acc, int x);
+static int vc_collect_paths(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int node, int guard, const char* source, int starts, int ends, int tok_tags, int ct, int c1, int c2, int c3, int vn, int ra);
 static const char* verify_ensures_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int req_roots, int ens_root, int body_root, int tok_tags, const char* source, int starts, int ends);
 static int test_cx_tags(void);
 static int test_eval_arith(void);
@@ -55,6 +58,7 @@ static int test_vc_query(void);
 static int test_vc_gen_ensures(void);
 static int test_verify_all_fns(void);
 static int test_body_effect_guard(void);
+static int test_vc_paths_ifelse(void);
 
 static int cx_push(int ct, int cd1, int cd2, int cd3, int tag, int d1, int d2, int d3) {
   sv0_vec_push(ct, tag);
@@ -1512,57 +1516,368 @@ static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, in
   return out;
 }
 
-static const char* verify_ensures_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int req_roots, int ens_root, int body_root, int tok_tags, const char* source, int starts, int ends) {
-  int _sv0t0 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, body_root);
-  if (_sv0t0) {
-    return "RESIDUAL";
+static int vc_and(int ct, int c1, int c2, int c3, int g, int x) {
+  if ((g < 0)) {
+    return x;
   } else {
   }
+  if ((x < 0)) {
+    return g;
+  } else {
+  }
+  int _sv0t0 = cx_binop(ct, c1, c2, c3, 11, g, x);
+  return _sv0t0;
+}
+
+static int vc_or(int ct, int c1, int c2, int c3, int acc, int x) {
+  if ((x < 0)) {
+    return acc;
+  } else {
+  }
+  if ((acc < 0)) {
+    return x;
+  } else {
+  }
+  int _sv0t0 = cx_binop(ct, c1, c2, c3, 12, acc, x);
+  return _sv0t0;
+}
+
+static int vc_collect_paths(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int node, int guard, const char* source, int starts, int ends, int tok_tags, int ct, int c1, int c2, int c3, int vn, int ra) {
+  if ((node < 0)) {
+    sv0_vec_push(ra, 0);
+    int _sv0t0 = (0 - 2);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(bet);
+  if ((node >= _sv0t1)) {
+    sv0_vec_push(ra, 0);
+    int _sv0t2 = (0 - 2);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(bet, node);
+  int ntag = _sv0t3;
+  if ((ntag == 10)) {
+    int _sv0t4 = sv0_vec_get(bed1, node);
+    int _sv0t5 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t4, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int c = _sv0t5;
+    if ((c < 0)) {
+      sv0_vec_push(ra, 0);
+      int _sv0t6 = (0 - 2);
+      return _sv0t6;
+    } else {
+    }
+    int _sv0t7 = cx_unop(ct, c1, c2, c3, 1, c);
+    int notc = _sv0t7;
+    int _sv0t8 = sv0_vec_get(bed2, node);
+    int _sv0t9 = vc_and(ct, c1, c2, c3, guard, c);
+    int _sv0t10 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, _sv0t8, _sv0t9, source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+    int tb = _sv0t10;
+    int _sv0t11 = (0 - 2);
+    if ((tb == _sv0t11)) {
+      sv0_vec_push(ra, 0);
+      int _sv0t12 = (0 - 2);
+      return _sv0t12;
+    } else {
+    }
+    int _sv0t13 = sv0_vec_len(ra);
+    int _sv0t14 = (_sv0t13 - 1);
+    int _sv0t15 = sv0_vec_get(ra, _sv0t14);
+    int then_ra = _sv0t15;
+    int disj = tb;
+    int _sv0t16 = sv0_vec_get(bed3, node);
+    int else_node = _sv0t16;
+    int all_ret = 0;
+    if ((else_node >= 0)) {
+      int _sv0t17 = vc_and(ct, c1, c2, c3, guard, notc);
+      int _sv0t18 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, else_node, _sv0t17, source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+      int eb = _sv0t18;
+      int _sv0t19 = (0 - 2);
+      if ((eb == _sv0t19)) {
+        sv0_vec_push(ra, 0);
+        int _sv0t20 = (0 - 2);
+        return _sv0t20;
+      } else {
+      }
+      int _sv0t21 = sv0_vec_len(ra);
+      int _sv0t22 = (_sv0t21 - 1);
+      int _sv0t23 = sv0_vec_get(ra, _sv0t22);
+      int else_ra = _sv0t23;
+      int _sv0t24 = vc_or(ct, c1, c2, c3, disj, eb);
+      disj = _sv0t24;
+      if ((then_ra == 1)) {
+        if ((else_ra == 1)) {
+          all_ret = 1;
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    sv0_vec_push(ra, all_ret);
+    return disj;
+  } else {
+  }
+  if ((ntag != 9)) {
+    int _sv0t25 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, node, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int rv = _sv0t25;
+    if ((rv < 0)) {
+      sv0_vec_push(ra, 0);
+      int _sv0t26 = (0 - 2);
+      return _sv0t26;
+    } else {
+    }
+    int _sv0t27 = cx_result(ct, c1, c2, c3);
+    int _sv0t28 = cx_binop(ct, c1, c2, c3, 5, _sv0t27, rv);
+    int eqn = _sv0t28;
+    sv0_vec_push(ra, 1);
+    int _sv0t29 = vc_and(ct, c1, c2, c3, guard, eqn);
+    return _sv0t29;
+  } else {
+  }
+  int _sv0t30 = sv0_vec_get(bed1, node);
+  int first = _sv0t30;
+  int _sv0t31 = sv0_vec_get(bed2, node);
+  int count = _sv0t31;
+  int _sv0t32 = sv0_vec_get(bed3, node);
+  int tail = _sv0t32;
+  int _sv0t33 = sv0_vec_get(bed4, node);
+  int sc = _sv0t33;
+  int disj = (0 - 1);
+  int cur_g = guard;
+  int reachable = 1;
+  int si = 0;
+  while ((si < count)) {
+    if ((reachable != 1)) {
+      si = count;
+    } else {
+      int _sv0t34 = vc_block_idx(bpp, first, sc, si);
+      int s = _sv0t34;
+      int _sv0t35 = sv0_vec_get(bet, s);
+      int stag = _sv0t35;
+      int inner = s;
+      if ((stag == 28)) {
+        int _sv0t36 = sv0_vec_get(bed1, s);
+        inner = _sv0t36;
+      } else {
+      }
+      int _sv0t37 = sv0_vec_get(bet, inner);
+      int itag = _sv0t37;
+      if ((stag == 27)) {
+        int _sv0t38 = sv0_vec_get(bed3, s);
+        int init = _sv0t38;
+        if ((init >= 0)) {
+          int _sv0t39 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, init);
+          if (_sv0t39) {
+            sv0_vec_push(ra, 0);
+            int _sv0t40 = (0 - 2);
+            return _sv0t40;
+          } else {
+          }
+        } else {
+        }
+        si = (si + 1);
+      } else {
+        if ((itag == 15)) {
+          int _sv0t41 = sv0_vec_get(bed1, inner);
+          int rvi = _sv0t41;
+          if ((rvi < 0)) {
+            sv0_vec_push(ra, 0);
+            int _sv0t42 = (0 - 2);
+            return _sv0t42;
+          } else {
+          }
+          int _sv0t43 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, rvi, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+          int rv = _sv0t43;
+          if ((rv < 0)) {
+            sv0_vec_push(ra, 0);
+            int _sv0t44 = (0 - 2);
+            return _sv0t44;
+          } else {
+          }
+          int _sv0t45 = cx_result(ct, c1, c2, c3);
+          int _sv0t46 = cx_binop(ct, c1, c2, c3, 5, _sv0t45, rv);
+          int eqn = _sv0t46;
+          int _sv0t47 = vc_and(ct, c1, c2, c3, cur_g, eqn);
+          int _sv0t48 = vc_or(ct, c1, c2, c3, disj, _sv0t47);
+          disj = _sv0t48;
+          reachable = 0;
+          si = (si + 1);
+        } else {
+          if ((itag == 10)) {
+            int _sv0t49 = sv0_vec_get(bed1, inner);
+            int _sv0t50 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t49, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+            int c = _sv0t50;
+            if ((c < 0)) {
+              sv0_vec_push(ra, 0);
+              int _sv0t51 = (0 - 2);
+              return _sv0t51;
+            } else {
+            }
+            int _sv0t52 = cx_unop(ct, c1, c2, c3, 1, c);
+            int notc = _sv0t52;
+            int _sv0t53 = sv0_vec_get(bed2, inner);
+            int _sv0t54 = vc_and(ct, c1, c2, c3, cur_g, c);
+            int _sv0t55 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, _sv0t53, _sv0t54, source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+            int tb = _sv0t55;
+            int _sv0t56 = (0 - 2);
+            if ((tb == _sv0t56)) {
+              sv0_vec_push(ra, 0);
+              int _sv0t57 = (0 - 2);
+              return _sv0t57;
+            } else {
+            }
+            int _sv0t58 = sv0_vec_len(ra);
+            int _sv0t59 = (_sv0t58 - 1);
+            int _sv0t60 = sv0_vec_get(ra, _sv0t59);
+            int then_ra = _sv0t60;
+            int _sv0t61 = vc_or(ct, c1, c2, c3, disj, tb);
+            disj = _sv0t61;
+            int _sv0t62 = sv0_vec_get(bed3, inner);
+            int else_node = _sv0t62;
+            if ((else_node >= 0)) {
+              int _sv0t63 = vc_and(ct, c1, c2, c3, cur_g, notc);
+              int _sv0t64 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, else_node, _sv0t63, source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+              int eb = _sv0t64;
+              int _sv0t65 = (0 - 2);
+              if ((eb == _sv0t65)) {
+                sv0_vec_push(ra, 0);
+                int _sv0t66 = (0 - 2);
+                return _sv0t66;
+              } else {
+              }
+              int _sv0t67 = sv0_vec_len(ra);
+              int _sv0t68 = (_sv0t67 - 1);
+              int _sv0t69 = sv0_vec_get(ra, _sv0t68);
+              int else_ra = _sv0t69;
+              int _sv0t70 = vc_or(ct, c1, c2, c3, disj, eb);
+              disj = _sv0t70;
+              if ((then_ra == 1)) {
+                if ((else_ra == 1)) {
+                  reachable = 0;
+                } else {
+                  int _sv0t71 = vc_and(ct, c1, c2, c3, cur_g, notc);
+                  cur_g = _sv0t71;
+                }
+              } else {
+                if ((else_ra == 1)) {
+                  int _sv0t72 = vc_and(ct, c1, c2, c3, cur_g, c);
+                  cur_g = _sv0t72;
+                } else {
+                }
+              }
+            } else {
+              if ((then_ra == 1)) {
+                int _sv0t73 = vc_and(ct, c1, c2, c3, cur_g, notc);
+                cur_g = _sv0t73;
+              } else {
+              }
+            }
+            si = (si + 1);
+          } else {
+            sv0_vec_push(ra, 0);
+            int _sv0t74 = (0 - 2);
+            return _sv0t74;
+          }
+        }
+      }
+    }
+  }
+  if ((reachable == 1)) {
+    if ((tail >= 0)) {
+      int _sv0t75 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, tail, cur_g, source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+      int sub = _sv0t75;
+      int _sv0t76 = (0 - 2);
+      if ((sub == _sv0t76)) {
+        sv0_vec_push(ra, 0);
+        int _sv0t77 = (0 - 2);
+        return _sv0t77;
+      } else {
+      }
+      int _sv0t78 = sv0_vec_len(ra);
+      int _sv0t79 = (_sv0t78 - 1);
+      int _sv0t80 = sv0_vec_get(ra, _sv0t79);
+      int sub_ra = _sv0t80;
+      int _sv0t81 = vc_or(ct, c1, c2, c3, disj, sub);
+      disj = _sv0t81;
+      if ((sub_ra == 1)) {
+        reachable = 0;
+      } else {
+      }
+    } else {
+    }
+  } else {
+  }
+  int allret = 1;
+  if ((reachable == 1)) {
+    allret = 0;
+  } else {
+  }
+  sv0_vec_push(ra, allret);
+  return disj;
+}
+
+static const char* verify_ensures_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int req_roots, int ens_root, int body_root, int tok_tags, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_new();
+  int ct = _sv0t0;
   int _sv0t1 = sv0_vec_new();
-  int ct = _sv0t1;
+  int c1 = _sv0t1;
   int _sv0t2 = sv0_vec_new();
-  int c1 = _sv0t2;
+  int c2 = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int c2 = _sv0t3;
+  int c3 = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int c3 = _sv0t4;
+  int vn = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int vn = _sv0t5;
-  int _sv0t6 = sv0_vec_new();
-  int reqs = _sv0t6;
+  int reqs = _sv0t5;
   int ri = 0;
   while (1) {
-    int _sv0t7 = sv0_vec_len(req_roots);
-    int _sv0t10 = (ri < _sv0t7);
-    if ((!_sv0t10)) {
+    int _sv0t6 = sv0_vec_len(req_roots);
+    int _sv0t9 = (ri < _sv0t6);
+    if ((!_sv0t9)) {
       break;
     } else {
     }
-    int _sv0t8 = sv0_vec_get(req_roots, ri);
-    int _sv0t9 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t8, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-    int rc = _sv0t9;
+    int _sv0t7 = sv0_vec_get(req_roots, ri);
+    int _sv0t8 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t7, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int rc = _sv0t8;
     if ((rc >= 0)) {
       sv0_vec_push(reqs, rc);
     } else {
     }
     ri = (ri + 1);
   }
-  int _sv0t11 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ens_root, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-  int ec = _sv0t11;
+  int _sv0t10 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ens_root, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+  int ec = _sv0t10;
   if ((ec < 0)) {
     return "RESIDUAL";
   } else {
   }
-  int ret_ce = (0 - 1);
-  int _sv0t12 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
-  int retv = _sv0t12;
-  if ((retv >= 0)) {
-    int _sv0t13 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-    ret_ce = _sv0t13;
+  int _sv0t11 = sv0_vec_new();
+  int ra = _sv0t11;
+  int _sv0t12 = (0 - 1);
+  int _sv0t13 = vc_collect_paths(bet, bed1, bed2, bed3, bed4, bpp, body_root, _sv0t12, source, starts, ends, tok_tags, ct, c1, c2, c3, vn, ra);
+  int binding = _sv0t13;
+  if ((binding < 0)) {
+    return "RESIDUAL";
   } else {
   }
-  const char* _sv0t14 = vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn);
-  return _sv0t14;
+  int _sv0t14 = sv0_vec_len(ra);
+  if ((_sv0t14 < 1)) {
+    return "RESIDUAL";
+  } else {
+  }
+  int _sv0t15 = sv0_vec_len(ra);
+  int _sv0t16 = (_sv0t15 - 1);
+  int _sv0t17 = sv0_vec_get(ra, _sv0t16);
+  if ((_sv0t17 != 1)) {
+    return "RESIDUAL";
+  } else {
+  }
+  sv0_vec_push(reqs, binding);
+  const char* _sv0t18 = vc_build_query(ct, c1, c2, c3, reqs, ec, vn);
+  return _sv0t18;
 }
 
 static int test_cx_tags(void) {
@@ -2506,6 +2821,95 @@ static int test_body_effect_guard(void) {
   return 0;
 }
 
+static int test_vc_paths_ifelse(void) {
+  const char* src;
+  src = "xresult0";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int tt = _sv0t2;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 1);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(starts, 1);
+  sv0_vec_push(ends, 7);
+  sv0_vec_push(tt, 84);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(tt, 40);
+  int _sv0t3 = sv0_vec_new();
+  int bet = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int b1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int b2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int b3 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int b4 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int bpp = _sv0t8;
+  sv0_vec_push(bpp, 1);
+  int _sv0t9 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);
+  int er = _sv0t9;
+  int _sv0t10 = be_push(bet, b1, b2, b3, b4, 0, 0, 2, 0, 0);
+  int e0 = _sv0t10;
+  int _sv0t11 = be_push(bet, b1, b2, b3, b4, 3, 10, er, e0, 0);
+  int ens = _sv0t11;
+  sv0_vec_push(bpp, 0);
+  int _sv0t12 = be_push(bet, b1, b2, b3, b4, 1, 1, 1, 0, 0);
+  int cx0 = _sv0t12;
+  int _sv0t13 = be_push(bet, b1, b2, b3, b4, 0, 0, 2, 0, 0);
+  int cz = _sv0t13;
+  int _sv0t14 = be_push(bet, b1, b2, b3, b4, 3, 10, cx0, cz, 0);
+  int cond = _sv0t14;
+  sv0_vec_push(bpp, 0);
+  int _sv0t15 = be_push(bet, b1, b2, b3, b4, 1, 2, 1, 0, 0);
+  int tx = _sv0t15;
+  int _sv0t16 = be_push(bet, b1, b2, b3, b4, 15, tx, 0, 0, 0);
+  int tret = _sv0t16;
+  int _sv0t17 = be_push(bet, b1, b2, b3, b4, 28, tret, 0, 0, 0);
+  int tsemi = _sv0t17;
+  sv0_vec_push(bpp, tsemi);
+  int _sv0t18 = (0 - 1);
+  int _sv0t19 = be_push(bet, b1, b2, b3, b4, 9, 0, 1, _sv0t18, 4);
+  int tblk = _sv0t19;
+  int _sv0t20 = be_push(bet, b1, b2, b3, b4, 0, 0, 2, 0, 0);
+  int ez = _sv0t20;
+  sv0_vec_push(bpp, 0);
+  int _sv0t21 = be_push(bet, b1, b2, b3, b4, 1, 4, 1, 0, 0);
+  int ex = _sv0t21;
+  int _sv0t22 = be_push(bet, b1, b2, b3, b4, 3, 1, ez, ex, 0);
+  int esub = _sv0t22;
+  int _sv0t23 = be_push(bet, b1, b2, b3, b4, 15, esub, 0, 0, 0);
+  int eret = _sv0t23;
+  int _sv0t24 = be_push(bet, b1, b2, b3, b4, 28, eret, 0, 0, 0);
+  int esemi = _sv0t24;
+  sv0_vec_push(bpp, esemi);
+  int _sv0t25 = (0 - 1);
+  int _sv0t26 = be_push(bet, b1, b2, b3, b4, 9, 0, 1, _sv0t25, 6);
+  int eblk = _sv0t26;
+  int _sv0t27 = be_push(bet, b1, b2, b3, b4, 10, cond, tblk, eblk, 0);
+  int iff = _sv0t27;
+  int _sv0t28 = be_push(bet, b1, b2, b3, b4, 9, 0, 0, iff, 0);
+  int body = _sv0t28;
+  int _sv0t29 = sv0_vec_new();
+  int reqs = _sv0t29;
+  const char* _sv0t30 = verify_ensures_payload(bet, b1, b2, b3, b4, bpp, reqs, ens, body, tt, src, starts, ends);
+  const char* got;
+  got = _sv0t30;
+  const char* want;
+  want = "(set-logic QF_LIA) (declare-const v0 Int) (declare-const result Int) (assert (or (and (>= v0 0) (= result v0)) (and (not (>= v0 0)) (= result (- 0 v0))))) (assert (not (>= result 0))) (check-sat)";
+  int _sv0t31 = sv0_string_eq(got, want);
+  if ((_sv0t31 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_cx_tags();
   int r1 = _sv0t0;
@@ -2602,6 +3006,13 @@ int main(void) {
   if ((r14 != 0)) {
     int _sv0t26 = (130 + r14);
     return _sv0t26;
+  } else {
+  }
+  int _sv0t27 = test_vc_paths_ifelse();
+  int r15 = _sv0t27;
+  if ((r15 != 0)) {
+    int _sv0t28 = (140 + r15);
+    return _sv0t28;
   } else {
   }
   return 0;
