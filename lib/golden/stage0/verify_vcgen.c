@@ -36,6 +36,7 @@ static int vc_match_rparen(int tok_tags, int lparen);
 static const char* vc_clause_text(const char* source, int starts, int ends, int kw_tok, int rparen_tok);
 static int vc_line_of_pos(const char* source, int pos);
 static int vc_find_return_value(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root);
+static int vc_body_has_effect(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx);
 static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends);
 static const char* verify_ensures_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int req_roots, int ens_root, int body_root, int tok_tags, const char* source, int starts, int ends);
 static int test_cx_tags(void);
@@ -53,6 +54,7 @@ static int test_extract_unsupported(void);
 static int test_vc_query(void);
 static int test_vc_gen_ensures(void);
 static int test_verify_all_fns(void);
+static int test_body_effect_guard(void);
 
 static int cx_push(int ct, int cd1, int cd2, int cd3, int tag, int d1, int d2, int d3) {
   sv0_vec_push(ct, tag);
@@ -1213,6 +1215,206 @@ static int vc_find_return_value(int bet, int bed1, int bed2, int bed3, int bed4,
   return _sv0t15;
 }
 
+static int vc_body_has_effect(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx) {
+  if ((idx < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(bet);
+  if ((idx >= _sv0t0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(bet, idx);
+  int t = _sv0t1;
+  if ((t == 0)) {
+    return 0;
+  } else {
+  }
+  if ((t == 1)) {
+    return 0;
+  } else {
+  }
+  if ((t == 17)) {
+    return 0;
+  } else {
+  }
+  if ((t == 2)) {
+    int _sv0t2 = sv0_vec_get(bed2, idx);
+    int _sv0t3 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t2);
+    return _sv0t3;
+  } else {
+  }
+  if ((t == 6)) {
+    int _sv0t4 = sv0_vec_get(bed1, idx);
+    int _sv0t5 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t4);
+    return _sv0t5;
+  } else {
+  }
+  if ((t == 7)) {
+    int _sv0t6 = sv0_vec_get(bed1, idx);
+    int _sv0t7 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t6);
+    return _sv0t7;
+  } else {
+  }
+  if ((t == 20)) {
+    int _sv0t8 = sv0_vec_get(bed1, idx);
+    int _sv0t9 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t8);
+    return _sv0t9;
+  } else {
+  }
+  if ((t == 22)) {
+    int _sv0t10 = sv0_vec_get(bed1, idx);
+    int _sv0t11 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t10);
+    return _sv0t11;
+  } else {
+  }
+  if ((t == 23)) {
+    int _sv0t12 = sv0_vec_get(bed1, idx);
+    int _sv0t13 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t12);
+    return _sv0t13;
+  } else {
+  }
+  if ((t == 28)) {
+    int _sv0t14 = sv0_vec_get(bed1, idx);
+    int _sv0t15 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t14);
+    return _sv0t15;
+  } else {
+  }
+  if ((t == 3)) {
+    int _sv0t16 = sv0_vec_get(bed2, idx);
+    int _sv0t17 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t16);
+    if (_sv0t17) {
+      return 1;
+    } else {
+    }
+    int _sv0t18 = sv0_vec_get(bed3, idx);
+    int _sv0t19 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t18);
+    return _sv0t19;
+  } else {
+  }
+  if ((t == 8)) {
+    int _sv0t20 = sv0_vec_get(bed1, idx);
+    int _sv0t21 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t20);
+    if (_sv0t21) {
+      return 1;
+    } else {
+    }
+    int _sv0t22 = sv0_vec_get(bed2, idx);
+    int _sv0t23 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t22);
+    return _sv0t23;
+  } else {
+  }
+  if ((t == 21)) {
+    int _sv0t24 = sv0_vec_get(bed1, idx);
+    int lo = _sv0t24;
+    if ((lo >= 0)) {
+      int _sv0t25 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, lo);
+      if (_sv0t25) {
+        return 1;
+      } else {
+      }
+    } else {
+    }
+    int _sv0t26 = sv0_vec_get(bed2, idx);
+    int hi = _sv0t26;
+    if ((hi >= 0)) {
+      int _sv0t27 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, hi);
+      return _sv0t27;
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 15)) {
+    int _sv0t28 = sv0_vec_get(bed1, idx);
+    int v = _sv0t28;
+    if ((v >= 0)) {
+      int _sv0t29 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, v);
+      return _sv0t29;
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 16)) {
+    int _sv0t30 = sv0_vec_get(bed1, idx);
+    int v = _sv0t30;
+    if ((v >= 0)) {
+      int _sv0t31 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, v);
+      return _sv0t31;
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 27)) {
+    int _sv0t32 = sv0_vec_get(bed3, idx);
+    int init = _sv0t32;
+    if ((init >= 0)) {
+      int _sv0t33 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, init);
+      return _sv0t33;
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 4)) {
+    int _sv0t34 = sv0_vec_get(bed1, idx);
+    int _sv0t35 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t34);
+    if (_sv0t35) {
+      return 1;
+    } else {
+    }
+    int _sv0t36 = sv0_vec_get(bed2, idx);
+    int first = _sv0t36;
+    int _sv0t37 = sv0_vec_get(bed3, idx);
+    int cnt = _sv0t37;
+    int _sv0t38 = sv0_vec_get(bed4, idx);
+    int sc = _sv0t38;
+    int i = 0;
+    while ((i < cnt)) {
+      int _sv0t39 = vc_block_idx(bpp, first, sc, i);
+      int _sv0t40 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t39);
+      if (_sv0t40) {
+        return 1;
+      } else {
+      }
+      i = (i + 1);
+    }
+    return 0;
+  } else {
+  }
+  if ((t == 9)) {
+    int _sv0t41 = sv0_vec_get(bed1, idx);
+    int first = _sv0t41;
+    int _sv0t42 = sv0_vec_get(bed2, idx);
+    int cnt = _sv0t42;
+    int _sv0t43 = sv0_vec_get(bed4, idx);
+    int sc = _sv0t43;
+    int i = 0;
+    while ((i < cnt)) {
+      int _sv0t44 = vc_block_idx(bpp, first, sc, i);
+      int _sv0t45 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, _sv0t44);
+      if (_sv0t45) {
+        return 1;
+      } else {
+      }
+      i = (i + 1);
+    }
+    int _sv0t46 = sv0_vec_get(bed3, idx);
+    int tail = _sv0t46;
+    if ((tail >= 0)) {
+      int _sv0t47 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, tail);
+      return _sv0t47;
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  return 1;
+}
+
 static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends) {
   const char* out;
   out = "";
@@ -1311,51 +1513,56 @@ static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, in
 }
 
 static const char* verify_ensures_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int req_roots, int ens_root, int body_root, int tok_tags, const char* source, int starts, int ends) {
-  int _sv0t0 = sv0_vec_new();
-  int ct = _sv0t0;
+  int _sv0t0 = vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, body_root);
+  if (_sv0t0) {
+    return "RESIDUAL";
+  } else {
+  }
   int _sv0t1 = sv0_vec_new();
-  int c1 = _sv0t1;
+  int ct = _sv0t1;
   int _sv0t2 = sv0_vec_new();
-  int c2 = _sv0t2;
+  int c1 = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int c3 = _sv0t3;
+  int c2 = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int vn = _sv0t4;
+  int c3 = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int reqs = _sv0t5;
+  int vn = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int reqs = _sv0t6;
   int ri = 0;
   while (1) {
-    int _sv0t6 = sv0_vec_len(req_roots);
-    int _sv0t9 = (ri < _sv0t6);
-    if ((!_sv0t9)) {
+    int _sv0t7 = sv0_vec_len(req_roots);
+    int _sv0t10 = (ri < _sv0t7);
+    if ((!_sv0t10)) {
       break;
     } else {
     }
-    int _sv0t7 = sv0_vec_get(req_roots, ri);
-    int _sv0t8 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t7, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-    int rc = _sv0t8;
+    int _sv0t8 = sv0_vec_get(req_roots, ri);
+    int _sv0t9 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t8, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int rc = _sv0t9;
     if ((rc >= 0)) {
       sv0_vec_push(reqs, rc);
     } else {
     }
     ri = (ri + 1);
   }
-  int _sv0t10 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ens_root, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-  int ec = _sv0t10;
+  int _sv0t11 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, ens_root, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+  int ec = _sv0t11;
   if ((ec < 0)) {
     return "RESIDUAL";
   } else {
   }
   int ret_ce = (0 - 1);
-  int _sv0t11 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
-  int retv = _sv0t11;
+  int _sv0t12 = vc_find_return_value(bet, bed1, bed2, bed3, bed4, bpp, body_root);
+  int retv = _sv0t12;
   if ((retv >= 0)) {
-    int _sv0t12 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
-    ret_ce = _sv0t12;
+    int _sv0t13 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, retv, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    ret_ce = _sv0t13;
   } else {
   }
-  const char* _sv0t13 = vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn);
-  return _sv0t13;
+  const char* _sv0t14 = vc_gen_ensures_query(ct, c1, c2, c3, reqs, ec, ret_ce, vn);
+  return _sv0t14;
 }
 
 static int test_cx_tags(void) {
@@ -2246,6 +2453,59 @@ static int test_verify_all_fns(void) {
   return 0;
 }
 
+static int test_body_effect_guard(void) {
+  int _sv0t0 = sv0_vec_new();
+  int bet = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int b1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int b2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int b3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int b4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int bpp = _sv0t5;
+  int _sv0t6 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);
+  int px = _sv0t6;
+  int _sv0t7 = be_push(bet, b1, b2, b3, b4, 15, px, 0, 0, 0);
+  int ret = _sv0t7;
+  int _sv0t8 = be_push(bet, b1, b2, b3, b4, 28, ret, 0, 0, 0);
+  int semi = _sv0t8;
+  sv0_vec_push(bpp, semi);
+  int _sv0t9 = (0 - 1);
+  int _sv0t10 = be_push(bet, b1, b2, b3, b4, 9, 0, 1, _sv0t9, 1);
+  int blk = _sv0t10;
+  int _sv0t11 = vc_body_has_effect(bet, b1, b2, b3, b4, bpp, blk);
+  if ((_sv0t11 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t12 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);
+  int ax = _sv0t12;
+  int _sv0t13 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);
+  int ax2 = _sv0t13;
+  int _sv0t14 = be_push(bet, b1, b2, b3, b4, 0, 0, 0, 0, 0);
+  int one = _sv0t14;
+  int _sv0t15 = be_push(bet, b1, b2, b3, b4, 3, 0, ax2, one, 0);
+  int add = _sv0t15;
+  int _sv0t16 = be_push(bet, b1, b2, b3, b4, 18, ax, add, 0, 0);
+  int asn = _sv0t16;
+  int _sv0t17 = be_push(bet, b1, b2, b3, b4, 28, asn, 0, 0, 0);
+  int asemi = _sv0t17;
+  sv0_vec_push(bpp, asemi);
+  sv0_vec_push(bpp, semi);
+  int _sv0t18 = (0 - 1);
+  int _sv0t19 = be_push(bet, b1, b2, b3, b4, 9, 0, 2, _sv0t18, 2);
+  int blk2 = _sv0t19;
+  int _sv0t20 = vc_body_has_effect(bet, b1, b2, b3, b4, bpp, blk2);
+  if ((_sv0t20 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_cx_tags();
   int r1 = _sv0t0;
@@ -2335,6 +2595,13 @@ int main(void) {
   if ((r13 != 0)) {
     int _sv0t24 = (120 + r13);
     return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = test_body_effect_guard();
+  int r14 = _sv0t25;
+  if ((r14 != 0)) {
+    int _sv0t26 = (130 + r14);
+    return _sv0t26;
   } else {
   }
   return 0;

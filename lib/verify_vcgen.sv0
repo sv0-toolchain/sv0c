@@ -612,6 +612,92 @@ fn vc_find_return_value(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
      - the SMT-LIB2 query for an `ensures` (or `RESIDUAL` if outside the fragment),
      - `RESIDUAL` for a `loop_invariant` (loops are M4-S-005).
    The shell driver turns each into a [verified]/[runtime] line + reason (§3.2). */
+/* SOUNDNESS GUARD (M4-S-006): the straight-line VC binds `result` to the
+   syntactic return expression and treats every parameter as an immutable SMT
+   constant (so `old(x)` == `x`). That is only valid for a truly straight-line
+   body — no reassignment (ExprAssign 18 / ExprAssignOp 19, which would make a
+   parameter's post-state differ from its SMT constant) and no control flow
+   (ExprIf 10 / ExprMatch 11 / ExprWhile 12 / ExprFor 13 / ExprLoop 14, whose
+   branch returns `vc_find_return_value` does not see). Returns true if the body
+   subtree contains any such node — the caller then keeps every ensures RESIDUAL
+   rather than emitting an unsound proof. Method calls and aggregate literals
+   (24-26) and any unrecognized node are treated conservatively as effectful.
+   (Branches/loops get real VC generation in M4-S-004/005.) */
+fn vc_body_has_effect(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
+                      bpp: Vec<i32>, idx: i32) -> bool {
+    if idx < 0 { return false; }
+    if idx >= vec_len(bet) { return true; }
+    let t: i32 = vec_get(bet, idx);
+    if t == 0 { return false; }
+    if t == 1 { return false; }
+    if t == 17 { return false; }
+    if t == 2 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx)); }
+    if t == 6 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    if t == 7 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    if t == 20 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    if t == 22 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    if t == 23 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    if t == 28 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)); }
+    if t == 3 {
+        if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx)) { return true; }
+        return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed3, idx));
+    }
+    if t == 8 {
+        if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)) { return true; }
+        return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed2, idx));
+    }
+    if t == 21 {
+        let lo: i32 = vec_get(bed1, idx);
+        if lo >= 0 { if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, lo) { return true; } }
+        let hi: i32 = vec_get(bed2, idx);
+        if hi >= 0 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, hi); }
+        return false;
+    }
+    if t == 15 {
+        let v: i32 = vec_get(bed1, idx);
+        if v >= 0 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, v); }
+        return false;
+    }
+    if t == 16 {
+        let v: i32 = vec_get(bed1, idx);
+        if v >= 0 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, v); }
+        return false;
+    }
+    if t == 27 {
+        let init: i32 = vec_get(bed3, idx);
+        if init >= 0 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, init); }
+        return false;
+    }
+    if t == 4 {
+        if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vec_get(bed1, idx)) { return true; }
+        let first: i32 = vec_get(bed2, idx);
+        let cnt: i32 = vec_get(bed3, idx);
+        let sc: i32 = vec_get(bed4, idx);
+        let mut i: i32 = 0;
+        while i < cnt {
+            if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i)) { return true; }
+            i = i + 1;
+        }
+        return false;
+    }
+    if t == 9 {
+        let first: i32 = vec_get(bed1, idx);
+        let cnt: i32 = vec_get(bed2, idx);
+        let sc: i32 = vec_get(bed4, idx);
+        let mut i: i32 = 0;
+        while i < cnt {
+            if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, vc_block_idx(bpp, first, sc, i)) { return true; }
+            i = i + 1;
+        }
+        let tail: i32 = vec_get(bed3, idx);
+        if tail >= 0 { return vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, tail); }
+        return false;
+    }
+    /* control flow (10-14), assignment (18/19), method call (5), aggregates
+       (24-26), and anything else → treat as effectful (sound: keep residual). */
+    return true;
+}
+
 fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4: Vec<i32>,
                   fcb: Vec<i32>, fcr: Vec<i32>,
                   bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
@@ -678,6 +764,10 @@ fn verify_all_fns(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i32>, id4
 fn verify_ensures_payload(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>, bed4: Vec<i32>,
                           bpp: Vec<i32>, req_roots: Vec<i32>, ens_root: i32, body_root: i32,
                           tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    /* soundness: only prove ensures for a truly straight-line body (no
+       reassignment / control flow) — otherwise result-binding + old(x)==x are
+       invalid, so keep the check at runtime. */
+    if vc_body_has_effect(bet, bed1, bed2, bed3, bed4, bpp, body_root) { return "RESIDUAL"; }
     let ct: Vec<i32> = vec_new();
     let c1: Vec<i32> = vec_new();
     let c2: Vec<i32> = vec_new();
@@ -1155,6 +1245,36 @@ fn test_verify_all_fns() -> i32 {
     return 0;
 }
 
+/* The soundness guard: a plain `{ return x; }` body has no effect (provable),
+   but a body with an assignment (`x = …`) does (→ keep ensures residual). */
+fn test_body_effect_guard() -> i32 {
+    let bet: Vec<i32> = vec_new();
+    let b1: Vec<i32> = vec_new();
+    let b2: Vec<i32> = vec_new();
+    let b3: Vec<i32> = vec_new();
+    let b4: Vec<i32> = vec_new();
+    let bpp: Vec<i32> = vec_new();
+    /* straight-line: { return x; } */
+    let px: i32 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);      /* ExprPath x */
+    let ret: i32 = be_push(bet, b1, b2, b3, b4, 15, px, 0, 0, 0);   /* ExprReturn */
+    let semi: i32 = be_push(bet, b1, b2, b3, b4, 28, ret, 0, 0, 0); /* SemiStmt */
+    vec_push(bpp, semi);                                            /* pp[0] = stmt */
+    let blk: i32 = be_push(bet, b1, b2, b3, b4, 9, 0, 1, 0 - 1, 1); /* block, sidecar pp[0] */
+    if vc_body_has_effect(bet, b1, b2, b3, b4, bpp, blk) != false { return 1; }
+    /* with assignment: { x = x + 1; return x; } */
+    let ax: i32 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);      /* ExprPath x (lhs) */
+    let ax2: i32 = be_push(bet, b1, b2, b3, b4, 1, 0, 1, 0, 0);     /* ExprPath x (rhs) */
+    let one: i32 = be_push(bet, b1, b2, b3, b4, 0, 0, 0, 0, 0);     /* ExprLit */
+    let add: i32 = be_push(bet, b1, b2, b3, b4, 3, 0, ax2, one, 0); /* x + 1 */
+    let asn: i32 = be_push(bet, b1, b2, b3, b4, 18, ax, add, 0, 0); /* ExprAssign x = x+1 */
+    let asemi: i32 = be_push(bet, b1, b2, b3, b4, 28, asn, 0, 0, 0);/* SemiStmt */
+    vec_push(bpp, asemi);                                           /* pp[1] */
+    vec_push(bpp, semi);                                            /* pp[2] = the return stmt */
+    let blk2: i32 = be_push(bet, b1, b2, b3, b4, 9, 0, 2, 0 - 1, 2); /* block: 2 stmts, sidecar pp[1..2] */
+    if vc_body_has_effect(bet, b1, b2, b3, b4, bpp, blk2) != true { return 2; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_cx_tags();
     if r1 != 0 { return r1; }
@@ -1182,5 +1302,7 @@ fn main() -> i32 {
     if r12 != 0 { return 110 + r12; }
     let r13: i32 = test_verify_all_fns();
     if r13 != 0 { return 120 + r13; }
+    let r14: i32 = test_body_effect_guard();
+    if r14 != 0 { return 130 + r14; }
     return 0;
 }
