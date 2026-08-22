@@ -1,0 +1,23 @@
+/* M4-S-006 verify corpus — old(expr) in ensures (pre-state) + result binding,
+   and the straight-line soundness guard: a body that reassigns a parameter
+   cannot be soundly proven, so its ensures stays [runtime]. */
+
+fn bump(x: i32) -> i32
+    ensures(result == old(x) + 1)   //@ verified
+{
+    return x + 1;
+}
+
+fn grow(x: i32) -> i32
+    requires(x > 0)                 //@ runtime
+    ensures(result > old(x))        //@ verified
+{
+    return x + x;
+}
+
+fn mutate(mut x: i32) -> i32
+    ensures(result == old(x))       //@ runtime
+{
+    x = x + 1;
+    return x;
+}
