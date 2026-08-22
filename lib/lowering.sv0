@@ -3828,6 +3828,30 @@ fn lower_name_is_enum(enum_names: Vec<i32>, tok: i32,
     return false;
 }
 
+/* 1-based source line of a byte position (M4-S-024 verified-mode contract id). */
+fn lower_line_of_pos(source: string, pos: i32) -> i32 {
+    let n: i32 = string_len(source);
+    let mut line: i32 = 1;
+    let mut i: i32 = 0;
+    while i < pos {
+        if i >= n { return line; }
+        if string_char_at(source, i) == 10 { line = line + 1; }
+        i = i + 1;
+    }
+    return line;
+}
+
+/* Is `line` in the proven-ensures set (verified mode)? */
+fn lower_proven_has(proven_lines: Vec<i32>, line: i32) -> bool {
+    let n: i32 = vec_len(proven_lines);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(proven_lines, i) == line { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
 fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
          item_field_counts: Vec<i32>, item_vmax: Vec<i32>,
@@ -3854,7 +3878,12 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          fn_contract_root: Vec<i32>,
          fn_contract_base: Vec<i32>,
          fn_ret_ty_root: Vec<i32>,
-         pty_tt: Vec<i32>, pty_td1: Vec<i32>) -> string {
+         pty_tt: Vec<i32>, pty_td1: Vec<i32>,
+         contract_mode: i32, proven_lines: Vec<i32>) -> string {
+    /* contract_mode (M4-S-023/024): 0 = runtime (emit all contract checks — the
+       default), 1 = verified (drop `ensures` whose source line is in proven_lines,
+       keep everything else), 2 = disabled (drop all requires + ensures runtime
+       checks). */
     /* Merge ItemUse value imports into any caller-provided alias table
        (SML lowering sees resolver importAliases ∪ synthetic use rows). */
     let discard_fill_alias: i32 = lower_fill_import_aliases_from_use_items(
@@ -3963,9 +3992,23 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
                         if kwpos >= 0 {
                             if contract_is_advanced(tok_tags, kwpos) != true {
                                 let ckind: i32 = vec_get(tok_tags, kwpos);
-                                if ckind == 83 { vec_push(req_roots, croot); }
-                                else {
-                                    if ckind == 61 { vec_push(ens_roots, croot); }
+                                if ckind == 83 {
+                                    /* requires: dropped only in disabled mode (they
+                                       are preconditions, never "proven" locally). */
+                                    if contract_mode != 2 { vec_push(req_roots, croot); }
+                                } else {
+                                    if ckind == 61 {
+                                        /* ensures: dropped in disabled mode, or in
+                                           verified mode when this clause's line was
+                                           proven (M4-S-024). */
+                                        let mut keep_ens: bool = true;
+                                        if contract_mode == 2 { keep_ens = false; }
+                                        if contract_mode == 1 {
+                                            let eline: i32 = lower_line_of_pos(source, vec_get(starts, kwpos));
+                                            if lower_proven_has(proven_lines, eline) { keep_ens = false; }
+                                        }
+                                        if keep_ens { vec_push(ens_roots, croot); }
+                                    }
                                 }
                             }
                         }
@@ -8758,7 +8801,7 @@ fn test_lower_program_fn() -> i32 {
                              bet, be1, be2, be3, be4, bsf,
                              bpp, ttags, oblks,
                              vec_new(), vec_new(), vec_new(),
-                             vec_new(), vec_new(), vec_new());
+                             vec_new(), vec_new(), vec_new(), 0, vec_new());
     if vec_len(ob) != 1 { return 1; }
     if vec_get(ob, 0) != 3 { return 2; }
     if vec_len(osn) != 1 { return 3; }

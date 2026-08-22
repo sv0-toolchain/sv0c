@@ -1,0 +1,21 @@
+/* M4-S-023/024 verified contract-mode demo. `proven`'s ensures is provable
+   (x>0 => result>=1) so verified mode strips its runtime check; `unproven`'s
+   ensures is not, so its check is kept. requires (preconditions) are always kept. */
+
+fn proven(x: i32) -> i32
+    requires(x > 0)
+    ensures(result >= 1)
+{
+    return x;
+}
+
+fn unproven(x: i32) -> i32
+    requires(x > 0)
+    ensures(result >= 100)
+{
+    return x;
+}
+
+fn main() -> i32 {
+    return proven(5) + unproven(5);
+}
