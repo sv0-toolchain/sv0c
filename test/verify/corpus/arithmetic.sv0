@@ -1,0 +1,33 @@
+/* M4-S-040 verify corpus — straight-line arithmetic obligations.
+   `//@ <status>` on a contract's line is its expected verification status
+   (verified | runtime). requires are input preconditions (always runtime);
+   ensures are proven or left as sound residuals. */
+
+fn inc(x: i32) -> i32
+    requires(x >= 0)          //@ runtime
+    ensures(result >= 1)      //@ verified
+{
+    return x + 1;
+}
+
+fn double_gt(x: i32) -> i32
+    requires(x > 0)           //@ runtime
+    ensures(result > x)       //@ verified
+{
+    return x + x;
+}
+
+fn sum_pos(a: i32, b: i32) -> i32
+    requires(a > 0)           //@ runtime
+    requires(b > 0)           //@ runtime
+    ensures(result > 0)       //@ verified
+{
+    return a + b;
+}
+
+fn maybe_big(x: i32) -> i32
+    requires(x > 0)           //@ runtime
+    ensures(result >= 1000)   //@ runtime
+{
+    return x + 1;
+}

@@ -1,0 +1,15 @@
+/* M4-S-040 verify corpus — sound residuals: obligations the current fragment
+   cannot prove stay [runtime], never [verified]. */
+
+fn mask(x: i32) -> i32
+    ensures(result >= 0)      //@ runtime
+{
+    return x & 1;
+}
+
+fn passthru(x: i32) -> i32
+    requires(x > 5)           //@ runtime
+    ensures(result > 5)       //@ verified
+{
+    return x;
+}
