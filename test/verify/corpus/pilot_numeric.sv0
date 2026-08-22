@@ -1,0 +1,67 @@
+/* M4-S-041 pilot — a non-trivial numeric-utility module verified end-to-end.
+   Exercises the whole verifier (requires as assumptions, ensures proven via
+   branch path conditions and a loop invariant, multiple ensures per function).
+   Every //@ annotation is the expected verification status. */
+
+fn abs_i32(x: i32) -> i32
+    ensures(result >= 0)          //@ verified
+{
+    if x >= 0 {
+        return x;
+    } else {
+        return 0 - x;
+    }
+}
+
+fn max2(a: i32, b: i32) -> i32
+    ensures(result >= a)          //@ verified
+    ensures(result >= b)          //@ verified
+{
+    if a >= b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+fn min2(a: i32, b: i32) -> i32
+    ensures(result <= a)          //@ verified
+    ensures(result <= b)          //@ verified
+{
+    if a <= b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+fn clamp(x: i32, lo: i32, hi: i32) -> i32
+    requires(lo <= hi)            //@ runtime
+    ensures(result >= lo)         //@ verified
+    ensures(result <= hi)         //@ verified
+{
+    if x < lo {
+        return lo;
+    } else {
+        if x > hi {
+            return hi;
+        } else {
+            return x;
+        }
+    }
+}
+
+fn sum_to(n: i32) -> i32
+    requires(n >= 0)              //@ runtime
+{
+    let i: i32 = 0;
+    let s: i32 = 0;
+    while i < n
+        loop_invariant(i >= 0)   //@ verified
+        loop_invariant(s >= 0)   //@ verified
+    {
+        s = s + i;
+        i = i + 1;
+    }
+    return s;
+}
