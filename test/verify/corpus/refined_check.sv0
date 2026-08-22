@@ -1,0 +1,18 @@
+/* M4-S-031 refinement checking at bindings: `let p: T = e` where
+   `T = <base> where <pred over self>` obliges e to satisfy the predicate
+   (self := e), proven from the function's requires. */
+
+type Positive = i32 where self > 0;
+
+fn from_bounded(a: i32) -> i32
+    requires(a > 5)              //@ runtime
+{
+    let p: Positive = a;         //@ verified
+    return p;
+}
+
+fn from_unbounded(a: i32) -> i32
+{
+    let p: Positive = a;         //@ runtime
+    return p;
+}
