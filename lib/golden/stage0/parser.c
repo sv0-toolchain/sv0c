@@ -4396,9 +4396,9 @@ static int parse_while_expr(int tags, int starts, int ends, const char* source, 
   }
   int _sv0t7 = sv0_vec_len(et);
   int cond_idx = (_sv0t7 - 1);
-  int _sv0t8 = sv0_vec_len(et);
-  int inv_mark = _sv0t8;
   int inv_count = 0;
+  int _sv0t8 = sv0_vec_new();
+  int inv_roots = _sv0t8;
   int pi = p1;
   int inv_done = 0;
   while ((inv_done != 1)) {
@@ -4427,28 +4427,32 @@ static int parse_while_expr(int tags, int starts, int ends, const char* source, 
         return _sv0t17;
       } else {
       }
+      int _sv0t18 = sv0_vec_len(et);
+      int _sv0t19 = (_sv0t18 - 1);
+      sv0_vec_push(inv_roots, _sv0t19);
       inv_count = (inv_count + 1);
       pi = (pe + 1);
     }
   }
-  int _sv0t18 = parse_block(tags, starts, ends, source, pi, et, ed1, ed2, ed3, ed4, pp, sf_names);
-  int p2 = _sv0t18;
+  int _sv0t20 = parse_block(tags, starts, ends, source, pi, et, ed1, ed2, ed3, ed4, pp, sf_names);
+  int p2 = _sv0t20;
   if ((p2 < 0)) {
-    int _sv0t19 = (0 - 1);
-    return _sv0t19;
+    int _sv0t21 = (0 - 1);
+    return _sv0t21;
   } else {
   }
-  int _sv0t20 = sv0_vec_len(et);
-  int body_idx = (_sv0t20 - 1);
-  int inv_first = (0 - 1);
+  int _sv0t22 = sv0_vec_len(et);
+  int body_idx = (_sv0t22 - 1);
+  int inv_sidecar = (0 - 1);
   if ((inv_count > 0)) {
-    inv_first = inv_mark;
+    int _sv0t23 = block_stmt_sidecar_push(pp, inv_roots);
+    inv_sidecar = _sv0t23;
   } else {
   }
   sv0_vec_push(et, 12);
   sv0_vec_push(ed1, cond_idx);
   sv0_vec_push(ed2, body_idx);
-  sv0_vec_push(ed3, inv_first);
+  sv0_vec_push(ed3, inv_sidecar);
   sv0_vec_push(ed4, inv_count);
   return p2;
 }

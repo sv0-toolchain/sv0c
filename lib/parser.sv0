@@ -2762,8 +2762,14 @@ fn parse_while_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                     tt, td1, td2, td3, 0);
     if p1 < 0 { return 0 - 1; }
     let cond_idx: i32 = vec_len(et) - 1;
-    let inv_mark: i32 = vec_len(et);
     let mut inv_count: i32 = 0;
+    /* Collect each loop_invariant clause's expression ROOT so consumers (M4-S-005
+       static verification) can retrieve them: the roots are interspersed with
+       their sub-node subtrees in `et`, so a plain start-index is not enough.
+       Stored via the pp sidecar (like block statements); d3 = sidecar handle,
+       d4 = count. d3/d4 were previously (inv_first, inv_count) and are read by no
+       downstream pass — lowering of a while (tag 12) uses only d1/d2. */
+    let inv_roots: Vec<i32> = vec_new();
     let mut pi: i32 = p1;
     let mut inv_done: bool = false;
     while inv_done != true {
@@ -2775,6 +2781,7 @@ fn parse_while_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                       et, ed1, ed2, ed3, ed4, pp, sf_names, 1);
             if pe < 0 { return 0 - 1; }
             if ps_peek(tags, pe) != 7 { return 0 - 1; }
+            vec_push(inv_roots, vec_len(et) - 1);
             inv_count = inv_count + 1;
             pi = pe + 1;
         }
@@ -2783,12 +2790,12 @@ fn parse_while_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                et, ed1, ed2, ed3, ed4, pp, sf_names);
     if p2 < 0 { return 0 - 1; }
     let body_idx: i32 = vec_len(et) - 1;
-    let mut inv_first: i32 = 0 - 1;
-    if inv_count > 0 { inv_first = inv_mark; }
+    let mut inv_sidecar: i32 = 0 - 1;
+    if inv_count > 0 { inv_sidecar = block_stmt_sidecar_push(pp, inv_roots); }
     vec_push(et, 12);
     vec_push(ed1, cond_idx);
     vec_push(ed2, body_idx);
-    vec_push(ed3, inv_first);
+    vec_push(ed3, inv_sidecar);
     vec_push(ed4, inv_count);
     return p2;
 }
