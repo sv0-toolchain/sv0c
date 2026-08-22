@@ -46,6 +46,12 @@ static int extract_call_req(int bet, int bed1, int bed2, int bed3, int bed4, int
 static int vc_collect_calls(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int idx, int out);
 static const char* verify_call_req_payload(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int call_node, int r, int pcount, int param_toks, int caller_req_roots, int tok_tags, const char* source, int starts, int ends);
 static const char* verify_fn_calls(int it, int id1, int id2, int id3, int id5, int fpn, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int caller_req_roots, int tok_tags, const char* source, int starts, int ends);
+static int vc_gather_method_contracts(int mi, int id2, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, int req_out, int ens_out);
+static int vc_conj_goal(int roots, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, const char* source, int starts, int ends, int tok_tags, int ct, int c1, int c2, int c3, int vn);
+static const char* vc_implication_query(int hyp_roots, int goal_roots, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, const char* source, int starts, int ends, int tok_tags);
+static int vc_find_trait_item(int it, int id1, const char* source, int starts, int ends, int nametok);
+static int vc_find_method_in_range(int it, int id1, const char* source, int starts, int ends, int lo, int hi, int nametok);
+static const char* verify_trait_contracts(int it, int id1, int id2, int id3, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends);
 static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int id5, int fpn, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends);
 static int vc_subst(int ct, int c1, int c2, int c3, int root, int sub_from, int sub_to);
 static const char* vc_build_check(int ct, int cd1, int cd2, int cd3, int assert_root, int var_names);
@@ -2258,6 +2264,275 @@ static const char* verify_fn_calls(int it, int id1, int id2, int id3, int id5, i
   return out;
 }
 
+static int vc_gather_method_contracts(int mi, int id2, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, int req_out, int ens_out) {
+  int _sv0t0 = sv0_vec_get(fcb, mi);
+  int base = _sv0t0;
+  if ((base < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(id2, mi);
+  int count = (_sv0t1 / 2);
+  int ci = 0;
+  while ((ci < count)) {
+    int _sv0t2 = (base + ci);
+    int _sv0t3 = sv0_vec_get(fcr, _sv0t2);
+    int r = _sv0t3;
+    int _sv0t4 = vc_leftmost_leaf_tok(bet, bed1, bed2, bed3, bed4, bpp, r);
+    int leaf = _sv0t4;
+    int _sv0t5 = vc_contract_kind(tok_tags, leaf);
+    int k = _sv0t5;
+    if ((k == 83)) {
+      sv0_vec_push(req_out, r);
+    } else {
+    }
+    if ((k == 61)) {
+      sv0_vec_push(ens_out, r);
+    } else {
+    }
+    ci = (ci + 1);
+  }
+  return 0;
+}
+
+static int vc_conj_goal(int roots, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, const char* source, int starts, int ends, int tok_tags, int ct, int c1, int c2, int c3, int vn) {
+  int _sv0t0 = sv0_vec_len(roots);
+  if ((_sv0t0 == 0)) {
+    int _sv0t1 = cx_bool(ct, c1, c2, c3, 1);
+    return _sv0t1;
+  } else {
+  }
+  int acc = (0 - 1);
+  int i = 0;
+  while (1) {
+    int _sv0t2 = sv0_vec_len(roots);
+    int _sv0t7 = (i < _sv0t2);
+    if ((!_sv0t7)) {
+      break;
+    } else {
+    }
+    int _sv0t3 = sv0_vec_get(roots, i);
+    int _sv0t4 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t3, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int e = _sv0t4;
+    if ((e < 0)) {
+      int _sv0t5 = (0 - 2);
+      return _sv0t5;
+    } else {
+    }
+    if ((acc < 0)) {
+      acc = e;
+    } else {
+      int _sv0t6 = cx_binop(ct, c1, c2, c3, 11, acc, e);
+      acc = _sv0t6;
+    }
+    i = (i + 1);
+  }
+  return acc;
+}
+
+static const char* vc_implication_query(int hyp_roots, int goal_roots, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, const char* source, int starts, int ends, int tok_tags) {
+  int _sv0t0 = sv0_vec_new();
+  int ct = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int c1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int c2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int c3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int vn = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int hyps = _sv0t5;
+  int i = 0;
+  while (1) {
+    int _sv0t6 = sv0_vec_len(hyp_roots);
+    int _sv0t9 = (i < _sv0t6);
+    if ((!_sv0t9)) {
+      break;
+    } else {
+    }
+    int _sv0t7 = sv0_vec_get(hyp_roots, i);
+    int _sv0t8 = extract_cexpr(bet, bed1, bed2, bed3, bed4, bpp, _sv0t7, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+    int h = _sv0t8;
+    if ((h >= 0)) {
+      sv0_vec_push(hyps, h);
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t10 = vc_conj_goal(goal_roots, bet, bed1, bed2, bed3, bed4, bpp, source, starts, ends, tok_tags, ct, c1, c2, c3, vn);
+  int goal = _sv0t10;
+  int _sv0t11 = (0 - 2);
+  if ((goal == _sv0t11)) {
+    return "RESIDUAL";
+  } else {
+  }
+  const char* _sv0t12 = vc_build_query(ct, c1, c2, c3, hyps, goal, vn);
+  return _sv0t12;
+}
+
+static int vc_find_trait_item(int it, int id1, const char* source, int starts, int ends, int nametok) {
+  const char* _sv0t0 = vc_tok_text(source, starts, ends, nametok);
+  const char* nm;
+  nm = _sv0t0;
+  int _sv0t1 = sv0_vec_len(it);
+  int n = _sv0t1;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t2 = sv0_vec_get(it, i);
+    if ((_sv0t2 == 3)) {
+      int _sv0t3 = sv0_vec_get(id1, i);
+      const char* _sv0t4 = vc_tok_text(source, starts, ends, _sv0t3);
+      int _sv0t5 = sv0_string_eq(_sv0t4, nm);
+      if (_sv0t5) {
+        return i;
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t6 = (0 - 1);
+  return _sv0t6;
+}
+
+static int vc_find_method_in_range(int it, int id1, const char* source, int starts, int ends, int lo, int hi, int nametok) {
+  const char* _sv0t0 = vc_tok_text(source, starts, ends, nametok);
+  const char* nm;
+  nm = _sv0t0;
+  int i = lo;
+  while ((i <= hi)) {
+    if ((i >= 0)) {
+      int _sv0t1 = sv0_vec_len(it);
+      if ((i < _sv0t1)) {
+        int _sv0t2 = sv0_vec_get(it, i);
+        if ((_sv0t2 == 0)) {
+          int _sv0t3 = sv0_vec_get(id1, i);
+          const char* _sv0t4 = vc_tok_text(source, starts, ends, _sv0t3);
+          int _sv0t5 = sv0_string_eq(_sv0t4, nm);
+          if (_sv0t5) {
+            return i;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t6 = (0 - 1);
+  return _sv0t6;
+}
+
+static const char* verify_trait_contracts(int it, int id1, int id2, int id3, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends) {
+  const char* out;
+  out = "";
+  int _sv0t0 = sv0_vec_len(it);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(it, i);
+    if ((_sv0t1 == 4)) {
+      int _sv0t2 = sv0_vec_get(id1, i);
+      if ((_sv0t2 == 1)) {
+        int _sv0t3 = sv0_vec_get(id3, i);
+        int _sv0t4 = vc_find_trait_item(it, id1, source, starts, ends, _sv0t3);
+        int ti = _sv0t4;
+        if ((ti >= 0)) {
+          int _sv0t5 = sv0_vec_get(id2, i);
+          int imc = _sv0t5;
+          int _sv0t6 = sv0_vec_get(id2, ti);
+          int tmc = _sv0t6;
+          int mj = 0;
+          while ((mj < imc)) {
+            int _sv0t7 = (i - imc);
+            int im = (_sv0t7 + mj);
+            if ((im >= 0)) {
+              int _sv0t8 = sv0_vec_get(it, im);
+              if ((_sv0t8 == 0)) {
+                int _sv0t9 = (ti - tmc);
+                int _sv0t10 = (ti - 1);
+                int _sv0t11 = sv0_vec_get(id1, im);
+                int _sv0t12 = vc_find_method_in_range(it, id1, source, starts, ends, _sv0t9, _sv0t10, _sv0t11);
+                int tm = _sv0t12;
+                if ((tm >= 0)) {
+                  int _sv0t13 = sv0_vec_new();
+                  int tm_req = _sv0t13;
+                  int _sv0t14 = sv0_vec_new();
+                  int tm_ens = _sv0t14;
+                  int _sv0t15 = vc_gather_method_contracts(tm, id2, fcb, fcr, bet, bed1, bed2, bed3, bed4, bpp, tok_tags, tm_req, tm_ens);
+                  int _sv0t16 = sv0_vec_new();
+                  int im_req = _sv0t16;
+                  int _sv0t17 = sv0_vec_new();
+                  int im_ens = _sv0t17;
+                  int _sv0t18 = vc_gather_method_contracts(im, id2, fcb, fcr, bet, bed1, bed2, bed3, bed4, bpp, tok_tags, im_req, im_ens);
+                  int _sv0t19 = sv0_vec_get(id1, im);
+                  int _sv0t20 = sv0_vec_get(starts, _sv0t19);
+                  int _sv0t21 = vc_line_of_pos(source, _sv0t20);
+                  int line = _sv0t21;
+                  int _sv0t22 = sv0_vec_get(id1, ti);
+                  const char* _sv0t23 = vc_tok_text(source, starts, ends, _sv0t22);
+                  int _sv0t24 = sv0_vec_get(id1, im);
+                  const char* _sv0t25 = vc_tok_text(source, starts, ends, _sv0t24);
+                  const char* _sv0t26 = sv0_string_concat("::", _sv0t25);
+                  const char* _sv0t27 = sv0_string_concat(_sv0t23, _sv0t26);
+                  const char* label;
+                  label = _sv0t27;
+                  const char* _sv0t28 = sv0_string_concat(out, "VC\t");
+                  out = _sv0t28;
+                  const char* _sv0t29 = vc_int_to_str(line);
+                  const char* _sv0t30 = sv0_string_concat(out, _sv0t29);
+                  out = _sv0t30;
+                  const char* _sv0t31 = sv0_string_concat(out, "\toverride\t");
+                  out = _sv0t31;
+                  const char* _sv0t32 = sv0_string_concat(label, " requires-weaker");
+                  const char* _sv0t33 = sv0_string_concat(out, _sv0t32);
+                  out = _sv0t33;
+                  const char* _sv0t34 = sv0_string_concat(out, "\t");
+                  out = _sv0t34;
+                  const char* _sv0t35 = vc_implication_query(tm_req, im_req, bet, bed1, bed2, bed3, bed4, bpp, source, starts, ends, tok_tags);
+                  const char* _sv0t36 = sv0_string_concat(out, _sv0t35);
+                  out = _sv0t36;
+                  const char* _sv0t37 = sv0_string_concat(out, "\n");
+                  out = _sv0t37;
+                  const char* _sv0t38 = sv0_string_concat(out, "VC\t");
+                  out = _sv0t38;
+                  const char* _sv0t39 = vc_int_to_str(line);
+                  const char* _sv0t40 = sv0_string_concat(out, _sv0t39);
+                  out = _sv0t40;
+                  const char* _sv0t41 = sv0_string_concat(out, "\toverride\t");
+                  out = _sv0t41;
+                  const char* _sv0t42 = sv0_string_concat(label, " ensures-stronger");
+                  const char* _sv0t43 = sv0_string_concat(out, _sv0t42);
+                  out = _sv0t43;
+                  const char* _sv0t44 = sv0_string_concat(out, "\t");
+                  out = _sv0t44;
+                  const char* _sv0t45 = vc_implication_query(im_ens, tm_ens, bet, bed1, bed2, bed3, bed4, bpp, source, starts, ends, tok_tags);
+                  const char* _sv0t46 = sv0_string_concat(out, _sv0t45);
+                  out = _sv0t46;
+                  const char* _sv0t47 = sv0_string_concat(out, "\n");
+                  out = _sv0t47;
+                } else {
+                }
+              } else {
+              }
+            } else {
+            }
+            mj = (mj + 1);
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return out;
+}
+
 static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, int id5, int fpn, int fcb, int fcr, int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int tok_tags, const char* source, int starts, int ends) {
   const char* out;
   out = "";
@@ -2358,6 +2633,9 @@ static const char* verify_all_fns(int it, int id1, int id2, int id3, int id4, in
     }
     ii = (ii + 1);
   }
+  const char* _sv0t38 = verify_trait_contracts(it, id1, id2, id3, fcb, fcr, bet, bed1, bed2, bed3, bed4, bpp, tok_tags, source, starts, ends);
+  const char* _sv0t39 = sv0_string_concat(out, _sv0t38);
+  out = _sv0t39;
   return out;
 }
 
