@@ -1872,10 +1872,20 @@ fn parse_cast_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
             let pt: i32 = parse_type(tags, starts, ends, source, p + 1,
                                       ty_tags, ty_d1, ty_d2, ty_d3, pp);
             if pt < 0 { return 0 - 1; }
+            /* M4-S-034: the cast target type is parsed into a transient local type
+               arena (discarded after the expression), so record the target type's
+               NAME TOKEN directly in ed3 (-1 if not a simple TyName) — the only
+               thing static cast-contract verification needs. */
+            let ty_root: i32 = vec_len(ty_tags) - 1;
+            let mut tyname_tok: i32 = 0 - 1;
+            if vec_get(ty_tags, ty_root) == 0 {
+                let tsegc: i32 = vec_get(ty_d2, ty_root);
+                if tsegc > 0 { tyname_tok = vec_get(pp, vec_get(ty_d1, ty_root) + tsegc - 1); }
+            }
             vec_push(et, 20);
             vec_push(ed1, cur);
             vec_push(ed2, ty_idx);
-            vec_push(ed3, 0);
+            vec_push(ed3, tyname_tok);
             vec_push(ed4, 0);
             cur = vec_len(et) - 1;
             p = pt;

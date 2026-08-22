@@ -3272,13 +3272,30 @@ static int parse_cast_expr(int tags, int starts, int ends, const char* source, i
         return _sv0t7;
       } else {
       }
+      int _sv0t8 = sv0_vec_len(ty_tags);
+      int ty_root = (_sv0t8 - 1);
+      int tyname_tok = (0 - 1);
+      int _sv0t9 = sv0_vec_get(ty_tags, ty_root);
+      if ((_sv0t9 == 0)) {
+        int _sv0t10 = sv0_vec_get(ty_d2, ty_root);
+        int tsegc = _sv0t10;
+        if ((tsegc > 0)) {
+          int _sv0t11 = sv0_vec_get(ty_d1, ty_root);
+          int _sv0t12 = (_sv0t11 + tsegc);
+          int _sv0t13 = (_sv0t12 - 1);
+          int _sv0t14 = sv0_vec_get(pp, _sv0t13);
+          tyname_tok = _sv0t14;
+        } else {
+        }
+      } else {
+      }
       sv0_vec_push(et, 20);
       sv0_vec_push(ed1, cur);
       sv0_vec_push(ed2, ty_idx);
-      sv0_vec_push(ed3, 0);
+      sv0_vec_push(ed3, tyname_tok);
       sv0_vec_push(ed4, 0);
-      int _sv0t8 = sv0_vec_len(et);
-      cur = (_sv0t8 - 1);
+      int _sv0t15 = sv0_vec_len(et);
+      cur = (_sv0t15 - 1);
       p = pt;
     } else {
       done = 1;
