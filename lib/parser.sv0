@@ -3533,7 +3533,9 @@ fn parse_type_alias_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                          enum_variant_payload_count_by_item: Vec<i32>,
                          enum_variant_payload_max_by_item: Vec<i32>,
                          pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
-                         pty_td3: Vec<i32>) -> i32 {
+                         pty_td3: Vec<i32>,
+                         body_et: Vec<i32>, body_ed1: Vec<i32>, body_ed2: Vec<i32>,
+                         body_ed3: Vec<i32>, body_ed4: Vec<i32>, body_sf: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 92 { return 0 - 1; }
     if ps_peek(tags, pos + 1) != 5 { return 0 - 1; }
     let name_pos: i32 = pos + 1;
@@ -3542,12 +3544,26 @@ fn parse_type_alias_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     let pt: i32 = parse_type(tags, starts, ends, source, p1 + 1,
                               pty_tt, pty_td1, pty_td2, pty_td3, pp);
     if pt < 0 { return 0 - 1; }
-    if ps_peek(tags, pt) != 13 { return 0 - 1; }
     let alias_ty_root: i32 = vec_len(pty_tt) - 1;
+    /* M4-S-030 refined type: `type T = <base> where <predicate over self>;`.
+       The predicate is a contract expression, parsed into the body-expr arena;
+       its root goes in id3 (-1 = plain alias, no refinement). Checked at every
+       binding in M4-S-031. */
+    let mut refine_root: i32 = 0 - 1;
+    let mut pw: i32 = pt;
+    if ps_peek(tags, pt) == 95 {
+        let pe: i32 = parse_expr_sf(tags, starts, ends, source, pt + 1,
+                                    body_et, body_ed1, body_ed2, body_ed3, body_ed4,
+                                    pp, body_sf, 1);
+        if pe < 0 { return 0 - 1; }
+        refine_root = vec_len(body_et) - 1;
+        pw = pe;
+    }
+    if ps_peek(tags, pw) != 13 { return 0 - 1; }
     vec_push(it, 7);
     vec_push(id1, name_pos);
     vec_push(id2, alias_ty_root);
-    vec_push(id3, 0);
+    vec_push(id3, refine_root);
     vec_push(id4, 0);
     vec_push(id5, 0 - 1);
     vec_push(fn_ret_ty_root_by_item, 0 - 1);
@@ -3555,7 +3571,7 @@ fn parse_type_alias_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     vec_push(enum_variant_payload_base_by_item, 0 - 1);
     vec_push(enum_variant_payload_count_by_item, 0);
     vec_push(enum_variant_payload_max_by_item, 0);
-    return pt + 1;
+    return pw + 1;
 }
 
 fn parse_trait_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
@@ -3850,7 +3866,9 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                      enum_variant_payload_base_by_item,
                                      enum_variant_payload_count_by_item,
                                      enum_variant_payload_max_by_item,
-                                     pty_tt, pty_td1, pty_td2, pty_td3);
+                                     pty_tt, pty_td1, pty_td2, pty_td3,
+                                     body_et, body_ed1, body_ed2,
+                                     body_ed3, body_ed4, body_sf);
     }
     return 0 - 1;
 }
