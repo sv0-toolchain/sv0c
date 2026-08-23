@@ -517,8 +517,7 @@ fn megatu_seed_param_tyenv(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i3
         let cty: string = megatu_cty_of_root(vec_get(fpt, base + k),
                                              ptt, ptd1, ptd2, pp,
                                              source, starts, ends, it, id1);
-        let is_f: bool = string_eq(cty, "double") || string_eq(cty, "float");
-        megatu_tyenv_push(tyenv_h, tyenv_f, nt, is_f);
+        megatu_tyenv_push(tyenv_h, tyenv_f, nt, megatu_cty_category(cty));
         k = k + 1;
     }
     return 0;
@@ -1007,88 +1006,153 @@ fn megatu_unop_c(t: i32) -> string {
     return "?";
 }
 
-/* ── temp/local float-typing (BUGS.md #5 residual, sv0-mathlib) ──────────────
+/* ── temp/local width-typing (BUGS.md #5/#1 residuals, sv0-mathlib) ─────────
    codegen_Instr::Assign hardcoded "int " for every synthesized temp,
    regardless of the assigned expression's real type, so `double` arithmetic
-   silently truncated the moment it landed in a temp. codegen_Value/Expr/Instr
-   carry no type info at all, so this tracks a minimal (handle -> is_float)
-   environment alongside emission: seeded from each function's parameter
-   types in megatu_emit_program, and grown as DeclNamed/Assign instructions
-   are walked (a DeclNamed already carries its real C type via `ct`; an
-   Assign's temp gets whatever megatu_expr_is_float infers for its RHS).
-   Handle lookup is last-write-wins (scans from the end) so shadowing/re-use
-   resolves to the most recent binding. This only distinguishes float vs.
-   non-float — struct/enum-valued locals go through DeclNamed with their own
-   real type string and never hit the generic "int"/"double" Assign path. */
+   (bug #5) and int64-magnitude arithmetic (bug #1's VIntWide literals, or
+   plain arithmetic over an i64/u64 param) both silently truncated the
+   moment they landed in a temp. codegen_Value/Expr/Instr carry no type info
+   at all, so this tracks a minimal (handle -> category) environment
+   alongside emission: seeded from each function's parameter types in
+   megatu_emit_program, and grown as DeclNamed/Assign/Call instructions are
+   walked. category: 0 = int (default/fallback), 1 = double/float,
+   2 = int64_t/uint64_t (both map to the same C temp type; this doesn't
+   distinguish signedness for temps — a documented, narrower version of the
+   same residual bug #1's fix leaves for u64's top half). Handle lookup is
+   last-write-wins (scans from the end) so shadowing/re-use resolves to the
+   most recent binding. Struct/enum-valued locals go through DeclNamed with
+   their own real type string and never hit the generic Assign path, so
+   they're unaffected by this 3-way category being narrower than the full
+   C type space. */
 
-fn megatu_tyenv_push(tyenv_h: Vec<i32>, tyenv_f: Vec<i32>, h: i32, is_float: bool) -> i32 {
+fn megatu_cty_category(cty: string) -> i32 {
+    if string_eq(cty, "double") { return 1; }
+    if string_eq(cty, "float") { return 1; }
+    if string_eq(cty, "int64_t") { return 2; }
+    if string_eq(cty, "uint64_t") { return 2; }
+    return 0;
+}
+
+fn megatu_tyenv_push(tyenv_h: Vec<i32>, tyenv_c: Vec<i32>, h: i32, category: i32) -> i32 {
     vec_push(tyenv_h, h);
-    if is_float {
-        vec_push(tyenv_f, 1);
-    } else {
-        vec_push(tyenv_f, 0);
+    vec_push(tyenv_c, category);
+    return 0;
+}
+
+/* Handle-equality lookup first (temps — `_sv0tN` handles are a global
+   counter, identical at every occurrence, per lower_temp_base — this is the
+   fast, common case and also the ONLY correct path for temps, which have
+   no stable "name text" of their own beyond the synthesized `_sv0tN`).
+   Falls back to a source-TEXT comparison for everything else: a real
+   variable (param or `let` local) gets a fresh, distinct token position at
+   every occurrence in the body (the declaration site and each use site are
+   different positions in source), so raw handle equality never matches
+   there — mirrors why megatu_fn_ret_cty resolves call targets by text
+   rather than by megatu_find_item_by_label's index equality. Without this,
+   `fn abs_i64(x: i64) -> i64 { ... 0 - x ... }` looked up x's category at
+   the use site, found no handle match, and silently fell back to category
+   0 (int) — truncating int64 arithmetic right back down (BUGS.md #1
+   residual, sv0-mathlib). */
+fn megatu_tyenv_lookup_cty(h: i32, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
+                          source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let mut i: i32 = vec_len(tyenv_h) - 1;
+    while i >= 0 {
+        if vec_get(tyenv_h, i) == h {
+            return vec_get(tyenv_c, i);
+        }
+        i = i - 1;
+    }
+    if h >= lower_temp_base() { return 0; }
+    if h < 0 { return 0; }
+    let name: string = handle_to_str(h, source, starts, ends);
+    let mut j: i32 = vec_len(tyenv_h) - 1;
+    while j >= 0 {
+        let oh: i32 = vec_get(tyenv_h, j);
+        if oh >= 0 {
+            if oh < lower_temp_base() {
+                if string_eq(handle_to_str(oh, source, starts, ends), name) {
+                    return vec_get(tyenv_c, j);
+                }
+            }
+        }
+        j = j - 1;
     }
     return 0;
 }
 
-fn megatu_tyenv_lookup_is_float(h: i32, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>) -> bool {
-    let mut i: i32 = vec_len(tyenv_h) - 1;
-    while i >= 0 {
-        if vec_get(tyenv_h, i) == h {
-            return vec_get(tyenv_f, i) == 1;
-        }
-        i = i - 1;
-    }
-    return false;
-}
-
-fn megatu_value_is_float(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>) -> bool {
+fn megatu_value_cty(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     match v {
-        codegen_Value::VFloat(_) => { return true; },
-        codegen_Value::VVar(h) => { return megatu_tyenv_lookup_is_float(h, tyenv_h, tyenv_f); },
-        codegen_Value::VAddrOf(h) => { return megatu_tyenv_lookup_is_float(h, tyenv_h, tyenv_f); },
-        codegen_Value::VInt(_) => { return false; },
-        codegen_Value::VBoolTrue => { return false; },
-        codegen_Value::VBoolFalse => { return false; },
-        codegen_Value::VUnit => { return false; },
-        codegen_Value::VString(_) => { return false; },
-        /* Struct-field-typed float members are future work — safe default. */
-        codegen_Value::VMember(_, _) => { return false; },
+        codegen_Value::VFloat(_) => { return 1; },
+        codegen_Value::VIntWide(_) => { return 2; },
+        codegen_Value::VVar(h) => {
+            return megatu_tyenv_lookup_cty(h, tyenv_h, tyenv_c, source, starts, ends);
+        },
+        codegen_Value::VAddrOf(h) => {
+            return megatu_tyenv_lookup_cty(h, tyenv_h, tyenv_c, source, starts, ends);
+        },
+        codegen_Value::VInt(_) => { return 0; },
+        codegen_Value::VBoolTrue => { return 0; },
+        codegen_Value::VBoolFalse => { return 0; },
+        codegen_Value::VUnit => { return 0; },
+        codegen_Value::VString(_) => { return 0; },
+        /* Struct-field-typed members are future work — safe default. */
+        codegen_Value::VMember(_, _) => { return 0; },
     }
 }
 
-fn megatu_expr_is_float(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>) -> bool {
+/* Combine two operand categories for a binop/unop result: double beats
+   int64_t beats int (the ordinary C usual-arithmetic-conversions ranking,
+   restricted to the three categories tracked here). */
+fn megatu_cty_max(a: i32, b: i32) -> i32 {
+    if a == 1 { return 1; }
+    if b == 1 { return 1; }
+    if a == 2 { return 2; }
+    if b == 2 { return 2; }
+    return 0;
+}
+
+fn megatu_expr_cty(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
+                   source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     match e {
         codegen_Expr::Literal(bv) => {
             let v: codegen_Value = box_deref(bv);
-            return megatu_value_is_float(v, tyenv_h, tyenv_f);
+            return megatu_value_cty(v, tyenv_h, tyenv_c, source, starts, ends);
         },
-        codegen_Expr::Load(h) => { return megatu_tyenv_lookup_is_float(h, tyenv_h, tyenv_f); },
+        codegen_Expr::Load(h) => {
+            return megatu_tyenv_lookup_cty(h, tyenv_h, tyenv_c, source, starts, ends);
+        },
         codegen_Expr::Binop(op_h, bv1, bv2) => {
             /* Comparison (5..10)/logical (11..12)/bitwise (13..17) ops always
                produce an int-flavored (0/1) result regardless of operand
                type — only arithmetic (0..4: + - * / %) propagates the
-               operand's float-ness (matches checker.sv0's is_arith_binop
-               fix for the same reason). Without this, `a == b` on two f64
+               operand's category (matches checker.sv0's is_arith_binop fix
+               for the same reason). Without this, `a == b` on two f64
                operands got typed "double" — harmless in C (an int-valued
                double still works in `if`/`||`), but not what it should be. */
-            if op_h < 0 { return false; }
-            if op_h > 4 { return false; }
+            if op_h < 0 { return 0; }
+            if op_h > 4 { return 0; }
             let v1: codegen_Value = box_deref(bv1);
-            if megatu_value_is_float(v1, tyenv_h, tyenv_f) { return true; }
             let v2: codegen_Value = box_deref(bv2);
-            return megatu_value_is_float(v2, tyenv_h, tyenv_f);
+            return megatu_cty_max(megatu_value_cty(v1, tyenv_h, tyenv_c, source, starts, ends),
+                                  megatu_value_cty(v2, tyenv_h, tyenv_c, source, starts, ends));
         },
         codegen_Expr::Unop(op_h, bv) => {
-            /* Only Neg (0) propagates operand float-ness; Not/BitNot/Deref/
-               Borrow don't preserve "is this a float value" in the same
-               sense (mirrors the Binop restriction above). */
-            if op_h != 0 { return false; }
+            /* Only Neg (0) propagates operand category; Not/BitNot/Deref/
+               Borrow don't preserve it in the same sense (mirrors the Binop
+               restriction above). */
+            if op_h != 0 { return 0; }
             let v: codegen_Value = box_deref(bv);
-            return megatu_value_is_float(v, tyenv_h, tyenv_f);
+            return megatu_value_cty(v, tyenv_h, tyenv_c, source, starts, ends);
         },
-        codegen_Expr::FieldAccess(_, _) => { return false; },
+        codegen_Expr::FieldAccess(_, _) => { return 0; },
     }
+}
+
+fn megatu_cty_of_category(category: i32) -> string {
+    if category == 1 { return "double"; }
+    if category == 2 { return "int64_t"; }
+    return "int";
 }
 
 /* Resolve a Call instruction's callee handle (a name-token OCCURRENCE at the
@@ -1182,6 +1246,15 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
                emitted verbatim — BUGS.md #5 in sv0-mathlib. */
             return handle_to_str(h, source, starts, ends);
         },
+        codegen_Value::VIntWide(h) => {
+            /* Same strategy as VFloat: h is the literal's own source token;
+               a bare decimal integer literal is already valid C, and the C
+               compiler infers the right width — no need to have parsed it
+               into a bounded sv0 integer at compile time. Fixes literals
+               wider than i32 silently truncating mod 2^32 (BUGS.md #1,
+               sv0-mathlib). */
+            return handle_to_str(h, source, starts, ends);
+        },
     }
     return "";
 }
@@ -1264,14 +1337,12 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, cty);
             let a2: string = string_concat(a, " ");
             let b: string = string_concat(a2, nm);
-            megatu_tyenv_push(tyenv_h, tyenv_f, h,
-                              string_eq(cty, "double") || string_eq(cty, "float"));
+            megatu_tyenv_push(tyenv_h, tyenv_f, h, megatu_cty_category(cty));
             return string_concat(b, ";\n");
         },
         codegen_Instr::DeclNamed(ct, h) => {
             let cty: string = megatu_ty_name(ct, source, starts, ends);
-            let is_f: bool = string_eq(cty, "double") || string_eq(cty, "float");
-            megatu_tyenv_push(tyenv_h, tyenv_f, h, is_f);
+            megatu_tyenv_push(tyenv_h, tyenv_f, h, megatu_cty_category(cty));
             let a: string = string_concat(indent, cty);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(h, source, starts, ends, sidx));
@@ -1279,10 +1350,9 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
         },
         codegen_Instr::Assign(h, be) => {
             let e: codegen_Expr = box_deref(be);
-            let is_f: bool = megatu_expr_is_float(e, tyenv_h, tyenv_f);
-            megatu_tyenv_push(tyenv_h, tyenv_f, h, is_f);
-            let mut cty: string = "int";
-            if is_f { cty = "double"; }
+            let category: i32 = megatu_expr_cty(e, tyenv_h, tyenv_f, source, starts, ends);
+            megatu_tyenv_push(tyenv_h, tyenv_f, h, category);
+            let cty: string = megatu_cty_of_category(category);
             let a: string = string_concat(indent, cty);
             let a2: string = string_concat(a, " ");
             let b: string = string_concat(a2, megatu_val_name(h, source, starts, ends, sidx));
@@ -1401,8 +1471,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                                                  source, starts, ends);
                 }
             }
-            megatu_tyenv_push(tyenv_h, tyenv_f, dst_h,
-                              string_eq(ret_name, "double") || string_eq(ret_name, "float"));
+            megatu_tyenv_push(tyenv_h, tyenv_f, dst_h, megatu_cty_category(ret_name));
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends, sidx));

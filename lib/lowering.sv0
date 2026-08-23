@@ -70,6 +70,15 @@ enum Value {
        which megaTU-main.sv0's emit path reinterprets these boxes as via
        box_deref — see BUGS.md #5 in sv0-mathlib for the original repro. */
     VFloat(i32),
+    /* Integer literal too wide for VInt's i32 payload (e.g. an i64::MAX-
+       magnitude literal): h is the source token handle, same "print the
+       source text verbatim" strategy as VFloat — a bare decimal integer
+       literal is already valid C and the C compiler infers the right width,
+       so there's no need to parse it into any bounded sv0 integer at
+       compile time. Previously VInt's parse (parse_decimal_i32_from_tok)
+       silently wrapped mod 2^32 for any such literal, regardless of the
+       declared type context (BUGS.md #1 in sv0-mathlib). */
+    VIntWide(i32),
 }
 
 enum Expr {
@@ -110,6 +119,7 @@ fn ir_value_tag(v: Value) -> i32 {
         Value::VMember(_, _) => { return 6; },
         Value::VAddrOf(_) => { return 7; },
         Value::VFloat(_) => { return 8; },
+        Value::VIntWide(_) => { return 9; },
     }
 }
 
@@ -156,7 +166,10 @@ fn lower_lit_to_ir_value(lit_tag: i32, tok_pos: i32,
        holds the value). Previously stored tok_pos, so codegen emitted the token
        index instead of the number. */
     if lit_tag == 0 {
-        return Value::VInt(parse_decimal_i32_from_tok(source, starts, ends, tok_pos));
+        if decimal_lit_fits_i32(source, starts, ends, tok_pos) {
+            return Value::VInt(parse_decimal_i32_from_tok(source, starts, ends, tok_pos));
+        }
+        return Value::VIntWide(tok_pos);
     }
     if lit_tag == 5 {
         let tt: i32 = vec_get(tok_tags, tok_pos);
@@ -170,6 +183,41 @@ fn lower_lit_to_ir_value(lit_tag: i32, tok_pos: i32,
        literal (BUGS.md #5 in sv0-mathlib). */
     if lit_tag == 1 { return Value::VFloat(tok_pos); }
     return Value::VUnit;
+}
+
+/* Does the decimal digit run at this token fit in an i32 (0..=2147483647 —
+   literal tokens are always a bare non-negative digit run; a source-level
+   negative like `-5` is unary-neg applied to the literal `5`, so i32::MIN's
+   magnitude 2147483648 is correctly treated as NOT fitting here)? Pure
+   string comparison, no arithmetic — sidesteps needing overflow-safe i32
+   accumulation just to detect overflow. i32::MAX has exactly 10 digits, so
+   anything shorter always fits and anything longer never does; a 10-digit
+   run needs a lexicographic compare against "2147483647" (safe for
+   equal-length non-negative decimal strings). Used by
+   lower_lit_to_ir_value to route to VInt vs. VIntWide (BUGS.md #1,
+   sv0-mathlib). */
+fn decimal_lit_fits_i32(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                        tok_pos: i32) -> bool {
+    if tok_pos < 0 { return true; }
+    if tok_pos >= vec_len(starts) { return true; }
+    if tok_pos >= vec_len(ends) { return true; }
+    let s: i32 = vec_get(starts, tok_pos);
+    let e: i32 = vec_get(ends, tok_pos);
+    if s < 0 { return true; }
+    if e <= s { return true; }
+    let len: i32 = e - s;
+    if len < 10 { return true; }
+    if len > 10 { return false; }
+    let i32_max: string = "2147483647";
+    let mut i: i32 = 0;
+    while i < 10 {
+        let c: i32 = string_char_at(source, s + i);
+        let m: i32 = string_char_at(i32_max, i);
+        if c < m { return true; }
+        if c > m { return false; }
+        i = i + 1;
+    }
+    return true;
 }
 
 /* Parse decimal digits from `source[starts[tok_pos]..ends[tok_pos])`.
