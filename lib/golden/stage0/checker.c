@@ -1753,43 +1753,44 @@ static int expr_references_result(int et, int ed1, int ed2, int ed3, int ed4, in
     int inv_c = _sv0t37;
     int ii = 0;
     while ((ii < inv_c)) {
-      int _sv0t38 = (inv_f + ii);
-      int _sv0t39 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t38, source, starts, ends, pp);
-      if (_sv0t39) {
+      int _sv0t38 = (0 - 1);
+      int _sv0t39 = block_stmt_index(pp, _sv0t38, inv_f, ii);
+      int _sv0t40 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t39, source, starts, ends, pp);
+      if (_sv0t40) {
         return 1;
       } else {
       }
       ii = (ii + 1);
     }
-    int _sv0t40 = sv0_vec_get(ed2, idx);
-    int _sv0t41 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t40, source, starts, ends, pp);
-    return _sv0t41;
+    int _sv0t41 = sv0_vec_get(ed2, idx);
+    int _sv0t42 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t41, source, starts, ends, pp);
+    return _sv0t42;
   } else {
   }
   if ((tag == 13)) {
-    int _sv0t42 = sv0_vec_get(ed2, idx);
-    int _sv0t43 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t42, source, starts, ends, pp);
-    if (_sv0t43) {
+    int _sv0t43 = sv0_vec_get(ed2, idx);
+    int _sv0t44 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t43, source, starts, ends, pp);
+    if (_sv0t44) {
       return 1;
     } else {
     }
-    int _sv0t44 = sv0_vec_get(ed3, idx);
-    int _sv0t45 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t44, source, starts, ends, pp);
-    return _sv0t45;
+    int _sv0t45 = sv0_vec_get(ed3, idx);
+    int _sv0t46 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t45, source, starts, ends, pp);
+    return _sv0t46;
   } else {
   }
   if ((tag == 14)) {
-    int _sv0t46 = sv0_vec_get(ed1, idx);
-    int _sv0t47 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t46, source, starts, ends, pp);
-    return _sv0t47;
+    int _sv0t47 = sv0_vec_get(ed1, idx);
+    int _sv0t48 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t47, source, starts, ends, pp);
+    return _sv0t48;
   } else {
   }
   if ((tag == 16)) {
-    int _sv0t48 = sv0_vec_get(ed1, idx);
-    int bv = _sv0t48;
+    int _sv0t49 = sv0_vec_get(ed1, idx);
+    int bv = _sv0t49;
     if ((bv >= 0)) {
-      int _sv0t49 = expr_references_result(et, ed1, ed2, ed3, ed4, bv, source, starts, ends, pp);
-      return _sv0t49;
+      int _sv0t50 = expr_references_result(et, ed1, ed2, ed3, ed4, bv, source, starts, ends, pp);
+      return _sv0t50;
     } else {
     }
     return 0;
@@ -1800,50 +1801,50 @@ static int expr_references_result(int et, int ed1, int ed2, int ed3, int ed4, in
   } else {
   }
   if ((tag == 18)) {
-    int _sv0t50 = sv0_vec_get(ed1, idx);
-    int _sv0t51 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t50, source, starts, ends, pp);
-    if (_sv0t51) {
+    int _sv0t51 = sv0_vec_get(ed1, idx);
+    int _sv0t52 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t51, source, starts, ends, pp);
+    if (_sv0t52) {
       return 1;
     } else {
     }
-    int _sv0t52 = sv0_vec_get(ed2, idx);
-    int _sv0t53 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t52, source, starts, ends, pp);
-    return _sv0t53;
+    int _sv0t53 = sv0_vec_get(ed2, idx);
+    int _sv0t54 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t53, source, starts, ends, pp);
+    return _sv0t54;
   } else {
   }
   if ((tag == 19)) {
-    int _sv0t54 = sv0_vec_get(ed2, idx);
-    int _sv0t55 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t54, source, starts, ends, pp);
-    if (_sv0t55) {
+    int _sv0t55 = sv0_vec_get(ed2, idx);
+    int _sv0t56 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t55, source, starts, ends, pp);
+    if (_sv0t56) {
       return 1;
     } else {
     }
-    int _sv0t56 = sv0_vec_get(ed3, idx);
-    int _sv0t57 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t56, source, starts, ends, pp);
-    return _sv0t57;
+    int _sv0t57 = sv0_vec_get(ed3, idx);
+    int _sv0t58 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t57, source, starts, ends, pp);
+    return _sv0t58;
   } else {
   }
   if ((tag == 20)) {
-    int _sv0t58 = sv0_vec_get(ed1, idx);
-    int _sv0t59 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t58, source, starts, ends, pp);
-    return _sv0t59;
+    int _sv0t59 = sv0_vec_get(ed1, idx);
+    int _sv0t60 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t59, source, starts, ends, pp);
+    return _sv0t60;
   } else {
   }
   if ((tag == 22)) {
-    int _sv0t60 = sv0_vec_get(ed1, idx);
-    int _sv0t61 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t60, source, starts, ends, pp);
-    return _sv0t61;
+    int _sv0t61 = sv0_vec_get(ed1, idx);
+    int _sv0t62 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t61, source, starts, ends, pp);
+    return _sv0t62;
   } else {
   }
   if ((tag == 24)) {
-    int _sv0t62 = sv0_vec_get(ed3, idx);
-    int sfc = _sv0t62;
+    int _sv0t63 = sv0_vec_get(ed3, idx);
+    int sfc = _sv0t63;
     int sfi = 0;
     while ((sfi < sfc)) {
-      int _sv0t63 = (idx - sfc);
-      int _sv0t64 = (_sv0t63 + sfi);
-      int _sv0t65 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t64, source, starts, ends, pp);
-      if (_sv0t65) {
+      int _sv0t64 = (idx - sfc);
+      int _sv0t65 = (_sv0t64 + sfi);
+      int _sv0t66 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t65, source, starts, ends, pp);
+      if (_sv0t66) {
         return 1;
       } else {
       }
@@ -1853,15 +1854,15 @@ static int expr_references_result(int et, int ed1, int ed2, int ed3, int ed4, in
   } else {
   }
   if ((tag == 25)) {
-    int _sv0t66 = sv0_vec_get(ed1, idx);
-    int tf = _sv0t66;
-    int _sv0t67 = sv0_vec_get(ed2, idx);
-    int tc = _sv0t67;
+    int _sv0t67 = sv0_vec_get(ed1, idx);
+    int tf = _sv0t67;
+    int _sv0t68 = sv0_vec_get(ed2, idx);
+    int tc = _sv0t68;
     int ti = 0;
     while ((ti < tc)) {
-      int _sv0t68 = (tf + ti);
-      int _sv0t69 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t68, source, starts, ends, pp);
-      if (_sv0t69) {
+      int _sv0t69 = (tf + ti);
+      int _sv0t70 = expr_references_result(et, ed1, ed2, ed3, ed4, _sv0t69, source, starts, ends, pp);
+      if (_sv0t70) {
         return 1;
       } else {
       }
