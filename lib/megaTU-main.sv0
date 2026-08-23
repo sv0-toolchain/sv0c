@@ -1676,7 +1676,17 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                                                  source, starts, ends);
                 }
             }
-            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, dst_h, megatu_cty_category(ret_name), 0 - 1);
+            /* BUGS.md #8 residual (sv0-mathlib R0.1): a match scrutinee
+               that's a DIRECT call result (`match f() { ... }`, no
+               intermediate `let`) never got its enum item registered
+               here — only DeclNamed did — so megatu_value_cty's VMember
+               case had no enum to look slot categories up against for
+               this handle, silently falling back to `int` for the
+               payload binding even though the enum's own struct field
+               was correctly typed. Compute it the same way DeclNamed
+               does, from the call's own resolved return type name. */
+            let call_eidx: i32 = megatu_enum_idx_of_cty(ret_name, eit_nt, source, starts, ends);
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, dst_h, megatu_cty_category(ret_name), call_eidx);
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends, sidx));
