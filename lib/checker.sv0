@@ -962,7 +962,12 @@ fn expr_references_result(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let inv_c: i32 = vec_get(ed4, idx);
         let mut ii: i32 = 0;
         while ii < inv_c {
-            if expr_references_result(et, ed1, ed2, ed3, ed4, inv_f + ii,
+            /* inv_f is a pp-sidecar handle, not a direct et index — see
+               resolver.sv0's identical fix (same bug, found first there:
+               BUGS.md, sv0-mathlib R0.1). Must decode via
+               block_stmt_index, not used as inv_f + ii directly. */
+            if expr_references_result(et, ed1, ed2, ed3, ed4,
+                                       block_stmt_index(pp, 0 - 1, inv_f, ii),
                                        source, starts, ends, pp) { return true; }
             ii = ii + 1;
         }

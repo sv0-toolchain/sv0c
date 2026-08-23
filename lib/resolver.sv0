@@ -1166,8 +1166,26 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if rwc != 0 { return rwc; }
         let mut ii: i32 = 0;
         while ii < inv_c {
+            /* inv_f is a `pp`-sidecar HANDLE (from parser.sv0's
+               block_stmt_sidecar_push: `off + 1` into the shared pp
+               pool), not a direct et-arena index — the same sidecar
+               indirection block_stmt_index already exists to decode for
+               block statements and match arms. Using `inv_f + ii`
+               directly as an et index (as this did before) reads
+               whatever unrelated et node happens to sit at that much
+               smaller pp-pool-derived position — landing on some
+               EARLIER, unrelated function's expression node and
+               reporting a bogus "unbound name" there instead of
+               resolving the real loop_invariant clause. Found while
+               adding sv0-mathlib's first loop_invariant in a
+               multi-function file (R0.1, frac_floor_of_nonneg): any
+               `while ... loop_invariant(...) { ... }` anywhere in a file
+               broke name resolution for an unrelated, EARLIER function
+               (e.g. `clamp_i32`'s own `requires(lo <= hi)`), confirmed
+               via the identical bare `loop_invariant(true)` (content
+               doesn't matter, only presence). */
             let ri: i32 = resolve_expr(et, ed1, ed2, ed3, ed4,
-                                        inv_f + ii,
+                                        block_stmt_index(pp, 0 - 1, inv_f, ii),
                                         source, starts, ends,
                                         mod_vals, mod_tys,
                                         fn_arities, frames, pp);
