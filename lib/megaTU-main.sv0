@@ -18,6 +18,7 @@
    SML-parity formatters into one stderr write. */
 
 fn megatu_diag_code_str(code: i32) -> string {
+    if code == 100 { return "E0100"; }
     if code == 400 { return "E0400"; }
     if code == 300 { return "E0300"; }
     if code == 301 { return "E0301"; }
@@ -31,6 +32,7 @@ fn megatu_diag_code_str(code: i32) -> string {
 }
 
 fn megatu_diag_code_msg(code: i32) -> string {
+    if code == 100 { return "syntax error"; }
     if code == 400 { return "type mismatch"; }
     if code == 300 { return "unbound name"; }
     if code == 301 { return "unknown type"; }
@@ -206,6 +208,23 @@ fn main() -> i32 {
         ptt, ptd1, ptd2, ptd3, sft,
         bet, bed1, bed2, bed3, bed4, bsf, tparam_names,
         evpv, evptn);
+
+    /* A genuine parse failure previously exited nonzero with ZERO
+       diagnostic text (BUGS.md #6, sv0-mathlib) — parse_program (parser.sv0)
+       returns `0 - p0 - 2` on failure, encoding the failing top-level
+       item's own start token (an approximate location: whatever failed
+       deeper inside that item's own parse isn't separately pinpointed,
+       since the parser has no diagnostic-packing machinery of its own —
+       still far better than total silence). Surface it the same way
+       resolve/check failures already are. */
+    if pr < 0 {
+        let approx_tok: i32 = 0 - pr - 2;
+        let pdiag: Vec<i32> = vec_new();
+        vec_push(pdiag, 100);
+        vec_push(pdiag, approx_tok);
+        megatu_emit_diagnostics(pdiag, source, starts);
+        return 6;
+    }
 
     /* At least one top-level item must have parsed (multi-fn programs are now
        supported — the mega-TU threads all items through lower + emit). */

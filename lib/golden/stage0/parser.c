@@ -5941,8 +5941,9 @@ static int parse_program(int tags, int starts, int ends, const char* source, int
       int _sv0t2 = parse_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, enum_variant_name_toks, struct_field_name_toks, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_ty_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf, tparam_names_out, enum_variant_payload_count_by_variant, enum_variant_payload_ty_name_tok);
       int pi = _sv0t2;
       if ((pi < 0)) {
-        int _sv0t3 = (0 - 1);
-        return _sv0t3;
+        int _sv0t3 = (0 - p0);
+        int _sv0t4 = (_sv0t3 - 2);
+        return _sv0t4;
       } else {
       }
       p = pi;
