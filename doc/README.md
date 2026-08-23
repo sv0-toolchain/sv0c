@@ -10,6 +10,7 @@ implementations, the pipeline, quickstart). This index covers the deeper notes.
 | [`compiler-passes.md`](compiler-passes.md) | pass-by-pass walkthrough — lexer → parser → resolver → checker → contracts → lowering → codegen, including structs/enums/`match` |
 | [`driver-pipeline-composition.md`](driver-pipeline-composition.md) | how the single-file driver and the multi-module (`--project`) path compose the passes |
 | [`bootstrap-compiler-workarounds.md`](bootstrap-compiler-workarounds.md) | sv0-language gotchas the compiler sources work around (reserved words, missing `Vec` ops, etc.) — read before editing `lib/*.sv0` |
+| `lib/verify_vcgen.sv0` (+ `../scripts/sv0 verify`) | M4 contract **static verification** — contract→VC→SMT-LIB2→z3; see `sv0doc/contracts/semantics.md` §3–6 and `task/` |
 
 ## build, self-host, and operate
 
