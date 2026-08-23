@@ -131,6 +131,16 @@ static int value_tag(Value v) {
                   return 7;
                   _sv0t0 = 0;
                 } else {
+                  if ((v.tag == 8)) {
+                    return 8;
+                    _sv0t0 = 0;
+                  } else {
+                    if ((v.tag == 9)) {
+                      return 9;
+                      _sv0t0 = 0;
+                    } else {
+                    }
+                  }
                 }
               }
             }
@@ -417,8 +427,8 @@ static const char* emit_value(Value v) {
   int _sv0t0;
   if ((v.tag == 0)) {
     int i = v.p0;
-    const char* _sv0t22 = int_to_string(i);
-    return _sv0t22;
+    const char* _sv0t24 = int_to_string(i);
+    return _sv0t24;
     _sv0t0 = 0;
   } else {
     if ((v.tag == 1)) {
@@ -431,8 +441,8 @@ static const char* emit_value(Value v) {
       } else {
         if ((v.tag == 3)) {
           int h = v.p0;
-          const char* _sv0t21 = name_of(h);
-          return _sv0t21;
+          const char* _sv0t23 = name_of(h);
+          return _sv0t23;
           _sv0t0 = 0;
         } else {
           if ((v.tag == 4)) {
@@ -441,64 +451,78 @@ static const char* emit_value(Value v) {
           } else {
             if ((v.tag == 5)) {
               int h = v.p0;
-              const char* _sv0t17 = name_of(h);
+              const char* _sv0t19 = name_of(h);
               const char* raw;
-              raw = _sv0t17;
-              const char* _sv0t18 = c_escape_string(raw);
+              raw = _sv0t19;
+              const char* _sv0t20 = c_escape_string(raw);
               const char* escaped;
-              escaped = _sv0t18;
-              const char* _sv0t19 = sv0_string_concat("\"", escaped);
+              escaped = _sv0t20;
+              const char* _sv0t21 = sv0_string_concat("\"", escaped);
               const char* a;
-              a = _sv0t19;
-              const char* _sv0t20 = sv0_string_concat(a, "\"");
-              return _sv0t20;
+              a = _sv0t21;
+              const char* _sv0t22 = sv0_string_concat(a, "\"");
+              return _sv0t22;
               _sv0t0 = 0;
             } else {
               if ((v.tag == 6)) {
                 int bv = v.p0;
                 int fh = v.p1;
-                Value _sv0t4;
-                int _sv0t5 = sv0_box_load(bv, 0);
-                _sv0t4.tag = _sv0t5;
-                int _sv0t6 = sv0_box_load(bv, 1);
-                _sv0t4.p0 = _sv0t6;
-                int _sv0t7 = sv0_box_load(bv, 2);
-                _sv0t4.p1 = _sv0t7;
+                Value _sv0t6;
+                int _sv0t7 = sv0_box_load(bv, 0);
+                _sv0t6.tag = _sv0t7;
+                int _sv0t8 = sv0_box_load(bv, 1);
+                _sv0t6.p0 = _sv0t8;
+                int _sv0t9 = sv0_box_load(bv, 2);
+                _sv0t6.p1 = _sv0t9;
                 Value inner;
-                inner.tag = (_sv0t4).tag;
-                inner.p0 = (_sv0t4).p0;
-                inner.p1 = (_sv0t4).p1;
-                const char* _sv0t8 = name_of(fh);
+                inner.tag = (_sv0t6).tag;
+                inner.p0 = (_sv0t6).p0;
+                inner.p1 = (_sv0t6).p1;
+                const char* _sv0t10 = name_of(fh);
                 const char* field;
-                field = _sv0t8;
-                int _sv0t9 = value_tag(inner);
-                int tag = _sv0t9;
+                field = _sv0t10;
+                int _sv0t11 = value_tag(inner);
+                int tag = _sv0t11;
                 if ((tag == 3)) {
-                  const char* _sv0t10 = emit_value(inner);
+                  const char* _sv0t12 = emit_value(inner);
                   const char* prefix;
-                  prefix = _sv0t10;
-                  const char* _sv0t11 = sv0_string_concat(prefix, ".");
-                  const char* _sv0t12 = sv0_string_concat(_sv0t11, field);
-                  return _sv0t12;
+                  prefix = _sv0t12;
+                  const char* _sv0t13 = sv0_string_concat(prefix, ".");
+                  const char* _sv0t14 = sv0_string_concat(_sv0t13, field);
+                  return _sv0t14;
                 } else {
                 }
-                const char* _sv0t13 = emit_value(inner);
-                const char* _sv0t14 = sv0_string_concat("(", _sv0t13);
+                const char* _sv0t15 = emit_value(inner);
+                const char* _sv0t16 = sv0_string_concat("(", _sv0t15);
                 const char* prefix;
-                prefix = _sv0t14;
-                const char* _sv0t15 = sv0_string_concat(prefix, ").");
-                const char* _sv0t16 = sv0_string_concat(_sv0t15, field);
-                return _sv0t16;
+                prefix = _sv0t16;
+                const char* _sv0t17 = sv0_string_concat(prefix, ").");
+                const char* _sv0t18 = sv0_string_concat(_sv0t17, field);
+                return _sv0t18;
                 _sv0t0 = 0;
               } else {
                 if ((v.tag == 7)) {
                   int h = v.p0;
-                  const char* _sv0t1 = name_of(h);
-                  const char* _sv0t2 = sv0_string_concat("(&", _sv0t1);
-                  const char* _sv0t3 = sv0_string_concat(_sv0t2, ")");
-                  return _sv0t3;
+                  const char* _sv0t3 = name_of(h);
+                  const char* _sv0t4 = sv0_string_concat("(&", _sv0t3);
+                  const char* _sv0t5 = sv0_string_concat(_sv0t4, ")");
+                  return _sv0t5;
                   _sv0t0 = 0;
                 } else {
+                  if ((v.tag == 8)) {
+                    int h = v.p0;
+                    const char* _sv0t2 = name_of(h);
+                    return _sv0t2;
+                    _sv0t0 = 0;
+                  } else {
+                    if ((v.tag == 9)) {
+                      int h = v.p0;
+                      const char* _sv0t1 = name_of(h);
+                      return _sv0t1;
+                      _sv0t0 = 0;
+                    } else {
+                    }
+                  }
                 }
               }
             }

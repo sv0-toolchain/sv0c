@@ -3976,7 +3976,9 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          fn_contract_base: Vec<i32>,
          fn_ret_ty_root: Vec<i32>,
          pty_tt: Vec<i32>, pty_td1: Vec<i32>,
-         contract_mode: i32, proven_lines: Vec<i32>) -> string {
+         contract_mode: i32, proven_lines: Vec<i32>,
+         enum_variant_payload_count_by_variant: Vec<i32>,
+         enum_variant_payload_ty_name_tok: Vec<i32>) -> string {
     /* contract_mode (M4-S-023/024): 0 = runtime (emit all contract checks — the
        default), 1 = verified (drop `ensures` whose source line is in proven_lines,
        keep everything else), 2 = disabled (drop all requires + ensures runtime
@@ -4008,7 +4010,10 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
                                                  sf_names, sf_types,
                                                  source, starts, ends,
                                                  out_struct_names,
-                                                 out_enum_names);
+                                                 out_enum_names,
+                                                 item_d3,
+                                                 enum_variant_payload_count_by_variant,
+                                                 enum_variant_payload_ty_name_tok);
     let has_body_arenas: i32 = vec_len(body_et);
     let mut builtin_map: Vec<i32> = vec_new();
     if has_body_arenas > 0 {
@@ -5774,13 +5779,30 @@ fn emit_struct_td(name_h: i32,
 
 /* ── emit_enum_td (SML emitEnumTd) ──────────────────────────── */
 
-fn emit_enum_td(name_h: i32, max_payload: i32,
+/* Payload-slot category codes (enum_slot_ctys_for_item's output; kept as
+   i32 codes rather than a Vec<string> — Vec<T> is used i32-handle-style
+   throughout this codebase, never with string elements). */
+fn enum_slot_category_to_cty(cat: i32) -> string {
+    if cat == 1 { return "double"; }
+    if cat == 2 { return "int64_t"; }
+    if cat == 3 { return "uint64_t"; }
+    if cat == 4 { return "uint32_t"; }
+    return "int";
+}
+
+/* `slot_cats[i]` (length `max_payload`) is that payload slot's category,
+   already resolved by the caller (enum_slot_ctys_for_item) — see that
+   function's doc comment for why every variant SHARES these numbered
+   slots (BUGS.md #8, sv0-mathlib) and how a slot's type gets picked. */
+fn emit_enum_td(name_h: i32, max_payload: i32, slot_cats: Vec<i32>,
                 source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
     let name: string = handle_to_str(name_h, source, starts, ends);
     let mut r: string = "typedef struct {\n  int tag;\n";
     let mut i: i32 = 0;
     while i < max_payload {
-        r = string_concat(r, "  int p");
+        r = string_concat(r, "  ");
+        r = string_concat(r, enum_slot_category_to_cty(vec_get(slot_cats, i)));
+        r = string_concat(r, " p");
         r = string_concat(r, lower_int_to_str(i));
         r = string_concat(r, ";\n");
         i = i + 1;
@@ -5857,6 +5879,92 @@ fn build_enum_variants_data(item_tags: Vec<i32>, item_names: Vec<i32>,
     return vec_len(out_names);
 }
 
+/* i64/u64/u32/f32/f64 payload category (2/2/4/1/1 — u32 gets its own
+   category, 4, since it needs `uint32_t` specifically, not `int64_t`);
+   0 (the safe "just use int" default) for i8/u8/i16/u16/i32/bool/isize/
+   usize/unrecognized. Deliberately narrower than
+   is_wide_primitive_ty_name/megatu_cty_category (bugs #1/#5/#7): those
+   only ever needed 3 buckets (int/double/int64_t) because a temp variable
+   is never *shared* the way an enum payload slot is; here u32 needs its
+   own bucket because a slot can't silently widen an unsigned value into a
+   signed 64-bit type across variant boundaries without risking a real
+   mismatch. i8/u8/i16/u16/isize/usize stay in the "int" bucket: sv0's own
+   ast_ty_to_c_string maps most of those to distinct C types too, but none
+   of them come up in a payload today and int is a safe (if not maximally
+   precise) default for a first version of this fix. */
+fn enum_payload_ty_name_to_category(name: string) -> i32 {
+    if string_eq(name, "i64") { return 2; }
+    if string_eq(name, "u64") { return 2; }
+    if string_eq(name, "u32") { return 4; }
+    if string_eq(name, "f32") { return 1; }
+    if string_eq(name, "f64") { return 1; }
+    return 0;
+}
+
+/* Every variant of an sv0 enum shares the SAME numbered payload slots in
+   the emitted C struct (a flat tagged struct, not a real C union) — slot 0
+   might be `Some(T)`'s `T`, or a completely different type from a
+   different variant's slot 0. Resolve each slot's category by scanning
+   every variant of this item: if every variant that actually HAS a
+   payload there agrees on a non-default category, use it; if none do
+   (all default/mixed/no payload), fall back to category 0 ("int", the
+   pre-existing, always-safe behavior — never a regression, only ever an
+   improvement when there's real agreement to use). BUGS.md #8,
+   sv0-mathlib: this is what makes `enum Option<T> { Some(T), None }`
+   instantiated with `T = i64` or `T = f64` (this library's own concrete,
+   non-generic per-type Option shapes) declare a correctly-typed payload
+   instead of always `int`.
+   payload_offset_by_variant[v] locates variant v's own payload run inside
+   the flat evptn/enum_variant_payload_ty_name_tok array — precomputed
+   once by the caller as a running sum of enum_variant_payload_count_by_variant,
+   since slot 0 resets per-variant but the flat array doesn't. */
+fn enum_slot_ctys_for_item(vbase: i32, vcount: i32, max_payload: i32,
+                           evpv: Vec<i32>, evptn: Vec<i32>,
+                           payload_offset_by_variant: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>) -> Vec<i32> {
+    let slot_cats: Vec<i32> = vec_new();
+    let mut s: i32 = 0;
+    while s < max_payload {
+        let mut agreed_cat: i32 = 0 - 1;
+        let mut conflict: bool = false;
+        let mut v: i32 = vbase;
+        while v < vbase + vcount {
+            let vpc: i32 = vec_get(evpv, v);
+            if s < vpc {
+                let ptok: i32 = vec_get(evptn, vec_get(payload_offset_by_variant, v) + s);
+                let mut cat: i32 = 0;
+                if ptok >= 0 {
+                    if lower_tok_in_bounds(ptok, starts, ends) {
+                        cat = enum_payload_ty_name_to_category(
+                            handle_to_str(ptok, source, starts, ends));
+                    }
+                }
+                if cat != 0 {
+                    if agreed_cat < 0 {
+                        agreed_cat = cat;
+                    } else {
+                        if agreed_cat != cat {
+                            conflict = true;
+                        }
+                    }
+                }
+            }
+            v = v + 1;
+        }
+        if conflict {
+            vec_push(slot_cats, 0);
+        } else {
+            if agreed_cat < 0 {
+                vec_push(slot_cats, 0);
+            } else {
+                vec_push(slot_cats, agreed_cat);
+            }
+        }
+        s = s + 1;
+    }
+    return slot_cats;
+}
+
 /* ── collect_typedefs_str (SML collectTypedefs) ──────────────── */
 
 fn collect_typedefs_str(item_tags: Vec<i32>, item_names: Vec<i32>,
@@ -5864,7 +5972,8 @@ fn collect_typedefs_str(item_tags: Vec<i32>, item_names: Vec<i32>,
                         item_vmax: Vec<i32>,
                         sf_names: Vec<i32>, sf_types: Vec<i32>,
                         source: string, starts: Vec<i32>, ends: Vec<i32>,
-                        sn: Vec<i32>, en: Vec<i32>) -> string {
+                        sn: Vec<i32>, en: Vec<i32>,
+                        item_d3: Vec<i32>, evpv: Vec<i32>, evptn: Vec<i32>) -> string {
     let n: i32 = vec_len(item_tags);
     let mut r: string = "";
     let mut i: i32 = 0;
@@ -5883,11 +5992,31 @@ fn collect_typedefs_str(item_tags: Vec<i32>, item_names: Vec<i32>,
         }
         i = i + 1;
     }
+    /* payload_offset_by_variant[v] = running sum of evpv[0..v) — locates
+       variant v's own payload run inside the flat evptn array (slot 0
+       resets per-variant; evptn does not). Computed once, up front, over
+       ALL variants of ALL enum items (evpv/evptn are program-wide flat
+       arrays), then indexed per-item below via item_d3 (= each enum
+       item's own variant-range base into this same variant ordering). */
+    let payload_offset_by_variant: Vec<i32> = vec_new();
+    let vn: i32 = vec_len(evpv);
+    let mut running: i32 = 0;
+    let mut vi: i32 = 0;
+    while vi < vn {
+        vec_push(payload_offset_by_variant, running);
+        running = running + vec_get(evpv, vi);
+        vi = vi + 1;
+    }
     i = 0;
     while i < n {
         if vec_get(item_tags, i) == 2 {
+            let mp: i32 = vec_get(item_vmax, i);
+            let slot_cats: Vec<i32> = enum_slot_ctys_for_item(
+                vec_get(item_d3, i), vec_get(item_field_counts, i), mp,
+                evpv, evptn, payload_offset_by_variant,
+                source, starts, ends);
             let td2: string = emit_enum_td(vec_get(item_names, i),
-                                            vec_get(item_vmax, i),
+                                            mp, slot_cats,
                                             source, starts, ends);
             r = string_concat(r, td2);
         }
@@ -7238,7 +7367,9 @@ fn test_typedef_builders() -> i32 {
     vec_push(tv, 2); vec_push(tv, 4);
     let td: string = emit_struct_td(0, fv, tv, 0, 2, src, st, nd, sn, en);
     if string_eq(td, "typedef struct {\n  int x;\n  int y;\n} P;\n") != true { return 2; }
-    let td2: string = emit_enum_td(5, 1, src, st, nd);
+    let slot_cats0: Vec<i32> = vec_new();
+    vec_push(slot_cats0, 0);
+    let td2: string = emit_enum_td(5, 1, slot_cats0, src, st, nd);
     if string_eq(td2, "typedef struct {\n  int tag;\n  int p0;\n} E;\n") != true { return 3; }
     let tags: Vec<i32> = vec_new();
     let nms: Vec<i32> = vec_new();
@@ -8929,7 +9060,8 @@ fn test_lower_program_fn() -> i32 {
                              bet, be1, be2, be3, be4, bsf,
                              bpp, ttags, oblks,
                              vec_new(), vec_new(), vec_new(),
-                             vec_new(), vec_new(), vec_new(), 0, vec_new());
+                             vec_new(), vec_new(), vec_new(), 0, vec_new(),
+                             vec_new(), vec_new());
     if vec_len(ob) != 1 { return 1; }
     if vec_get(ob, 0) != 3 { return 2; }
     if vec_len(osn) != 1 { return 3; }
