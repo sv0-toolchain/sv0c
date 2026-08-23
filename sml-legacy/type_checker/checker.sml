@@ -187,6 +187,9 @@ structure Checker :> CHECKER = struct
     | Types.TyUsize => true
     | _ => false
 
+  fun isNumericTy (t : Types.ty) : bool =
+    isIntegralTy t orelse (case t of Types.TyFloat _ => true | _ => false)
+
   (* `?` on TyEnum en: detect Ok/Err (Result) or Some/None (Option). *)
   fun trySuccessPayloadTy (en : string) : Types.ty =
     let
@@ -582,6 +585,17 @@ structure Checker :> CHECKER = struct
     | Ast.ExprLit (Ast.BoolLit _, _) => Types.TyBool
     | Ast.ExprLit (Ast.UnitLit, _) => Types.TyUnit
     | Ast.ExprLit (Ast.StringLit _, _) => Types.TyString
+    (* A float literal had NO synth case at all (not merely defaulted wrong,
+       like the int-literal-always-i32 case above) — it fell through to the
+       catch-all "E0402: expression form not supported in type checker
+       slice", so `x < 0.0` on an f64 param failed outright. BUGS.md #2,
+       sv0-mathlib. Defaults to TyFloat 64 (f64, the spec's own default
+       float width, CONV-002) — same documented simplification as the
+       int-literal-always-TyInt-32 case just above: a bare literal doesn't
+       carry enough information to pick f32 vs f64 here, and the Arith
+       binop fix below already propagates whichever side is a real,
+       concrete-typed value rather than the literal. *)
+    | Ast.ExprLit (Ast.FloatLit _, _) => Types.TyFloat 64
     | Ast.ExprTuple ([e1], _) => synth retTy env e1
     | Ast.ExprTuple _ =>
         raise Fail "E0446: multi-element tuples are not supported in this slice"
@@ -612,11 +626,19 @@ structure Checker :> CHECKER = struct
               if lastStmtReturns stmts then Types.freshVar () else Types.TyUnit
         end
     | Ast.ExprUnop (Ast.Neg, e1, _) =>
-        (expect (synth retTy env e1, Types.TyInt 32); Types.TyInt 32)
+        let val t1 = synth retTy env e1
+        in
+          if isNumericTy t1 then t1
+          else (expect (t1, Types.TyInt 32); Types.TyInt 32)
+        end
     | Ast.ExprUnop (Ast.Not, e1, _) =>
         (expect (synth retTy env e1, Types.TyBool); Types.TyBool)
     | Ast.ExprUnop (Ast.BitNot, e1, _) =>
-        (expect (synth retTy env e1, Types.TyInt 32); Types.TyInt 32)
+        let val t1 = synth retTy env e1
+        in
+          if isIntegralTy t1 then t1
+          else (expect (t1, Types.TyInt 32); Types.TyInt 32)
+        end
     | Ast.ExprUnop (Ast.Borrow, e1, _) =>
         if not (!inContractExpr) then
           raise Fail
@@ -648,26 +670,55 @@ structure Checker :> CHECKER = struct
     | Ast.ExprBinop (b, l, r, _) =>
         (case binopClass b of
            Arith =>
-             (expect (synth retTy env l, Types.TyInt 32);
-              expect (synth retTy env r, Types.TyInt 32);
-              Types.TyInt 32)
+             let
+               val tl = synth retTy env l
+               val tr = synth retTy env r
+               (* Contract and non-contract arithmetic both used to
+                  hardcode TyInt 32 for every operand, regardless of its
+                  real declared type — an i64/u32/f64 binop (e.g.
+                  `requires(x > 0)` on an i64 param, or ordinary `x + 1`
+                  body arithmetic under the VM path) failed E0400
+                  outright. BUGS.md #2, sv0-mathlib. Every integer/float
+                  literal synthesizes as a fixed default (TyInt 32 /
+                  TyFloat 64 above — same documented "literal defaults,
+                  doesn't unify" limitation the native checker carries,
+                  sv0c/lib/checker.sv0's synth_expr, BUGS.md #5), so a
+                  naive "trust the left operand" rule (what the native
+                  side does) breaks the idiomatic `0 - x` negation pattern
+                  used throughout this codebase: the literal `0` is on the
+                  LEFT and would win over `x`'s real (non-default) type.
+                  Instead: prefer whichever side is numeric AND not the
+                  bare literal default, so a real, concretely-typed
+                  operand always wins over a literal on either side; only
+                  fall back to a literal's own default type when BOTH
+                  operands are that default (e.g. `1 + 2`), preserving the
+                  old i32-only result there exactly. Deliberately not a
+                  full operand-compatibility check — same tradeoff the
+                  native side documents. *)
+               fun isLiteralDefault t =
+                 t = Types.TyInt 32 orelse t = Types.TyFloat 64
+               fun pick (a, b) =
+                 if isNumericTy a andalso not (isLiteralDefault a) then a
+                 else if isNumericTy b andalso not (isLiteralDefault b) then b
+                 else if isNumericTy a then a
+                 else if isNumericTy b then b
+                 else (expect (a, Types.TyInt 32); expect (b, Types.TyInt 32);
+                       Types.TyInt 32)
+             in
+               pick (tl, tr)
+             end
          | Logic =>
              (expect (synth retTy env l, Types.TyBool);
               expect (synth retTy env r, Types.TyBool);
               Types.TyBool)
          | Cmp =>
-             let
-               val t1 = synth retTy env l
-               val t2 = synth retTy env r
-             in
-               if
-                 (Unify.unify (t1, Types.TyInt 32) andalso Unify.unify (t2, Types.TyInt 32))
-                 orelse (Unify.unify (t1, Types.TyBool) andalso Unify.unify (t2, Types.TyBool))
-               then
-                 Types.TyBool
-               else
-                 raise Fail "E0400: type mismatch"
-             end)
+             (* Same relaxation as Arith above: synthesize both operands
+                (for their own nested side effects/diagnostics) but don't
+                require a strict unify between them — comparisons always
+                produce TyBool regardless of the concrete numeric widths
+                involved, matching the native checker's unconditional
+                TY_BOOL result for Cmp-class binops. *)
+             (synth retTy env l; synth retTy env r; Types.TyBool))
     | Ast.ExprIf (c, th, NONE, _) =>
         let
           val () = expect (synth retTy env c, Types.TyBool)

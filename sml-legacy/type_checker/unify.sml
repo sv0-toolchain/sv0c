@@ -14,9 +14,26 @@ structure Unify :> UNIFY = struct
     | (Types.TyStruct a, Types.TyStruct b) => a = b
     | (Types.TyEnum a, Types.TyEnum b) => a = b
     | (Types.TyChar, Types.TyChar) => true
-    | (Types.TyInt w1, Types.TyInt w2) => w1 = w2
-    | (Types.TyUint w1, Types.TyUint w2) => w1 = w2
-    | (Types.TyFloat w1, Types.TyFloat w2) => w1 = w2
+    (* Width-blind for same-category numeric types (BUGS.md #2,
+       sv0-mathlib): checker.sml's own literal synthesis always picks a
+       single default width per category (TyInt 32 for every int literal,
+       TyFloat 64 for every float literal — see synth's ExprLit cases) with
+       no bidirectional "check against the expected type" pass anywhere,
+       so a strict per-width equality here made a perfectly legal
+       `fn f(x: i64) -> i64 { ... return 0 - 1; ... }` (no i64-typed value
+       anywhere in that specific expression to infer the width from) fail
+       E0400 even though the literal value is exactly representable at
+       every width. Mirrors the native checker (sv0c/lib/checker.sv0),
+       which never tracked integer/float width at the type-checker level
+       at all (TY_INT/TY_FLOAT are single categories there, with the real
+       C width resolved later, downstream, in lowering/emission) — the
+       strict per-width check here was actually stricter than the backend
+       this SML checker's own VM target is meant to parity-match, not a
+       real extra safety margin. Signed vs. unsigned and int vs. float
+       still don't unify (those categories stay distinct above/below). *)
+    | (Types.TyInt _, Types.TyInt _) => true
+    | (Types.TyUint _, Types.TyUint _) => true
+    | (Types.TyFloat _, Types.TyFloat _) => true
     | (Types.TyIsize, Types.TyIsize) => true
     | (Types.TyUsize, Types.TyUsize) => true
     | (Types.TyString, Types.TyString) => true
