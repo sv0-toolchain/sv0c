@@ -62,6 +62,14 @@ enum Value {
     VString(i32),
     VMember(Box<Value>, i32),
     VAddrOf(i32),
+    /* Float literal: h is the source token handle (not a parsed value — sv0
+       has no way to carry an f64 payload through this i32-slotted enum), so
+       emission re-derives the literal text from source and prints it
+       verbatim (already valid C double syntax). Appended last to keep this
+       enum's layout a prefix-compatible match with codegen.sv0's copy,
+       which megaTU-main.sv0's emit path reinterprets these boxes as via
+       box_deref — see BUGS.md #5 in sv0-mathlib for the original repro. */
+    VFloat(i32),
 }
 
 enum Expr {
@@ -101,6 +109,7 @@ fn ir_value_tag(v: Value) -> i32 {
         Value::VString(_) => { return 5; },
         Value::VMember(_, _) => { return 6; },
         Value::VAddrOf(_) => { return 7; },
+        Value::VFloat(_) => { return 8; },
     }
 }
 
@@ -155,6 +164,11 @@ fn lower_lit_to_ir_value(lit_tag: i32, tok_pos: i32,
         return Value::VBoolFalse;
     }
     if lit_tag == 3 { return Value::VString(tok_pos); }
+    /* Float literal: no eager numeric parse (see VFloat's doc comment) —
+       carry the token handle and let emission print the source text
+       verbatim. Previously fell through to VUnit, silently discarding the
+       literal (BUGS.md #5 in sv0-mathlib). */
+    if lit_tag == 1 { return Value::VFloat(tok_pos); }
     return Value::VUnit;
 }
 
@@ -4878,6 +4892,9 @@ fn ast_ty_to_c_string(name: string) -> string {
     if string_eq(name, "u16") { return "uint16_t"; }
     if string_eq(name, "i64") { return "int64_t"; }
     if string_eq(name, "u64") { return "uint64_t"; }
+    if string_eq(name, "u32") { return "uint32_t"; }
+    if string_eq(name, "f32") { return "float"; }
+    if string_eq(name, "f64") { return "double"; }
     if string_eq(name, "isize") { return "intptr_t"; }
     if string_eq(name, "usize") { return "uintptr_t"; }
     if string_eq(name, "string") { return "const char*"; }

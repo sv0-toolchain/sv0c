@@ -495,6 +495,30 @@ fn megatu_param_list(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
     return out;
 }
 
+/* Seed a fresh (handle -> is_float) tyenv from a function's own parameters,
+   mirroring megatu_param_list's iteration — see the tyenv doc comment near
+   megatu_tyenv_push. Call once per function before emitting its body. */
+fn megatu_seed_param_tyenv(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
+                           id5: Vec<i32>, fpn: Vec<i32>,
+                           fpt: Vec<i32>, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                           pp: Vec<i32>, source: string, starts: Vec<i32>,
+                           ends: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>) -> i32 {
+    if item_i < 0 { return 0; }
+    let pc: i32 = vec_get(id3, item_i);
+    let base: i32 = vec_get(id5, item_i);
+    let mut k: i32 = 0;
+    while k < pc {
+        let nt: i32 = vec_get(fpn, base + k);
+        let cty: string = megatu_cty_of_root(vec_get(fpt, base + k),
+                                             ptt, ptd1, ptd2, pp,
+                                             source, starts, ends, it, id1);
+        let is_f: bool = string_eq(cty, "double") || string_eq(cty, "float");
+        megatu_tyenv_push(tyenv_h, tyenv_f, nt, is_f);
+        k = k + 1;
+    }
+    return 0;
+}
+
 /* Source-aware C emit (native-compose A de-stub). Same shape as codegen.sv0's
    emit_program, but resolves each block's fn name via lowering's handle_to_str
    (real source names) instead of the stub name_of, detects main by name, builds
@@ -553,8 +577,15 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
         /* Body via the source-aware emitter (not codegen's emit_instrs, whose
            name_of/op_of are test stubs): resolves var/temp names and operators
            against the real source. This is the body-level de-stub. */
+        let tyenv_h: Vec<i32> = vec_new();
+        let tyenv_f: Vec<i32> = vec_new();
+        megatu_seed_param_tyenv(item_i, it, id1, id3, id5, fpn, fpt,
+                                ptt, ptd1, ptd2, pp, source, starts, ends,
+                                tyenv_h, tyenv_f);
         let body: string = megatu_emit_instrs(instrs, "  ", ret_name,
-                                              source, starts, ends, sidx);
+                                              source, starts, ends, sidx,
+                                              tyenv_h, tyenv_f,
+                                              it, id1, id2, frt, ptt, ptd1, ptd2, pp);
         if string_eq(fn_name, "main") {
             let proto: string = string_concat(ret_name, string_concat(" ", sig));
             main_part = emit_block_defn(proto, body);
@@ -971,6 +1002,133 @@ fn megatu_unop_c(t: i32) -> string {
     return "?";
 }
 
+/* ── temp/local float-typing (BUGS.md #5 residual, sv0-mathlib) ──────────────
+   codegen_Instr::Assign hardcoded "int " for every synthesized temp,
+   regardless of the assigned expression's real type, so `double` arithmetic
+   silently truncated the moment it landed in a temp. codegen_Value/Expr/Instr
+   carry no type info at all, so this tracks a minimal (handle -> is_float)
+   environment alongside emission: seeded from each function's parameter
+   types in megatu_emit_program, and grown as DeclNamed/Assign instructions
+   are walked (a DeclNamed already carries its real C type via `ct`; an
+   Assign's temp gets whatever megatu_expr_is_float infers for its RHS).
+   Handle lookup is last-write-wins (scans from the end) so shadowing/re-use
+   resolves to the most recent binding. This only distinguishes float vs.
+   non-float — struct/enum-valued locals go through DeclNamed with their own
+   real type string and never hit the generic "int"/"double" Assign path. */
+
+fn megatu_tyenv_push(tyenv_h: Vec<i32>, tyenv_f: Vec<i32>, h: i32, is_float: bool) -> i32 {
+    vec_push(tyenv_h, h);
+    if is_float {
+        vec_push(tyenv_f, 1);
+    } else {
+        vec_push(tyenv_f, 0);
+    }
+    return 0;
+}
+
+fn megatu_tyenv_lookup_is_float(h: i32, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>) -> bool {
+    let mut i: i32 = vec_len(tyenv_h) - 1;
+    while i >= 0 {
+        if vec_get(tyenv_h, i) == h {
+            return vec_get(tyenv_f, i) == 1;
+        }
+        i = i - 1;
+    }
+    return false;
+}
+
+fn megatu_value_is_float(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>) -> bool {
+    match v {
+        codegen_Value::VFloat(_) => { return true; },
+        codegen_Value::VVar(h) => { return megatu_tyenv_lookup_is_float(h, tyenv_h, tyenv_f); },
+        codegen_Value::VAddrOf(h) => { return megatu_tyenv_lookup_is_float(h, tyenv_h, tyenv_f); },
+        codegen_Value::VInt(_) => { return false; },
+        codegen_Value::VBoolTrue => { return false; },
+        codegen_Value::VBoolFalse => { return false; },
+        codegen_Value::VUnit => { return false; },
+        codegen_Value::VString(_) => { return false; },
+        /* Struct-field-typed float members are future work — safe default. */
+        codegen_Value::VMember(_, _) => { return false; },
+    }
+}
+
+fn megatu_expr_is_float(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>) -> bool {
+    match e {
+        codegen_Expr::Literal(bv) => {
+            let v: codegen_Value = box_deref(bv);
+            return megatu_value_is_float(v, tyenv_h, tyenv_f);
+        },
+        codegen_Expr::Load(h) => { return megatu_tyenv_lookup_is_float(h, tyenv_h, tyenv_f); },
+        codegen_Expr::Binop(op_h, bv1, bv2) => {
+            /* Comparison (5..10)/logical (11..12)/bitwise (13..17) ops always
+               produce an int-flavored (0/1) result regardless of operand
+               type — only arithmetic (0..4: + - * / %) propagates the
+               operand's float-ness (matches checker.sv0's is_arith_binop
+               fix for the same reason). Without this, `a == b` on two f64
+               operands got typed "double" — harmless in C (an int-valued
+               double still works in `if`/`||`), but not what it should be. */
+            if op_h < 0 { return false; }
+            if op_h > 4 { return false; }
+            let v1: codegen_Value = box_deref(bv1);
+            if megatu_value_is_float(v1, tyenv_h, tyenv_f) { return true; }
+            let v2: codegen_Value = box_deref(bv2);
+            return megatu_value_is_float(v2, tyenv_h, tyenv_f);
+        },
+        codegen_Expr::Unop(op_h, bv) => {
+            /* Only Neg (0) propagates operand float-ness; Not/BitNot/Deref/
+               Borrow don't preserve "is this a float value" in the same
+               sense (mirrors the Binop restriction above). */
+            if op_h != 0 { return false; }
+            let v: codegen_Value = box_deref(bv);
+            return megatu_value_is_float(v, tyenv_h, tyenv_f);
+        },
+        codegen_Expr::FieldAccess(_, _) => { return false; },
+    }
+}
+
+/* Resolve a Call instruction's callee handle (a name-token OCCURRENCE at the
+   call site, not the declaration site) to its declaring item's index, by
+   source-text match — mirrors lowering.sv0's lower_find_item_fn_name_by_text,
+   but returns the item index (needed for frt/id2 lookups here) rather than
+   the declaration's own name handle. megatu_find_item_by_label (used for a
+   block's OWN label) compares raw token indices and is not usable across
+   call-site vs. decl-site token positions. */
+fn megatu_find_fn_item_by_name_text(it: Vec<i32>, id1: Vec<i32>, source: string,
+                                    starts: Vec<i32>, ends: Vec<i32>, fn_h: i32) -> i32 {
+    let target: string = handle_to_str(fn_h, source, starts, ends);
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(it, i) == 0 {
+            let name_h: i32 = vec_get(id1, i);
+            if string_eq(handle_to_str(name_h, source, starts, ends), target) {
+                return i;
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* A called function's real C return type — mirrors megatu_emit_program's own
+   return-type resolution (has_ret bit of id2, else megatu_cty_of_root(frt)).
+   Falls back to "int" when the callee isn't found by name (e.g. a builtin
+   handled separately by the negative-fn_h path, or genuinely unresolvable) —
+   preserves prior behavior for anything this can't resolve. Fixes: a Call's
+   result temp defaulted to "int" for every user function, truncating any
+   f64-returning call (BUGS.md #5 residual, sv0-mathlib). */
+fn megatu_fn_ret_cty(fn_h: i32, it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
+                     frt: Vec<i32>, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                     pp: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
+    let item_i: i32 = megatu_find_fn_item_by_name_text(it, id1, source, starts, ends, fn_h);
+    if item_i < 0 { return "int"; }
+    let idv: i32 = vec_get(id2, item_i);
+    let has_ret: i32 = idv - (idv / 2) * 2;
+    if has_ret == 0 { return "void"; }
+    return megatu_cty_of_root(vec_get(frt, item_i), ptt, ptd1, ptd2, pp,
+                              source, starts, ends, it, id1);
+}
+
 fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>) -> string {
     match v {
         codegen_Value::VInt(i) => { return int_to_string(i); },
@@ -1009,6 +1167,15 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
         },
         codegen_Value::VAddrOf(h) => {
             return string_concat(string_concat("(&", megatu_val_name(h, source, starts, ends, sidx)), ")");
+        },
+        codegen_Value::VFloat(h) => {
+            /* h is the literal's own source token (see lowering.sv0's
+               Value::VFloat doc comment) — not a temp/var, so go straight to
+               handle_to_str rather than megatu_val_name (which adds
+               shadow-index suffixing meant for identifiers). The source text
+               (e.g. "0.0", "3.14") is already valid C double-literal syntax,
+               emitted verbatim — BUGS.md #5 in sv0-mathlib. */
+            return handle_to_str(h, source, starts, ends);
         },
     }
     return "";
@@ -1071,24 +1238,49 @@ fn megatu_emit_call_args(args: Vec<i32>, source: string, starts: Vec<i32>, ends:
 
 fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                      source: string, starts: Vec<i32>, ends: Vec<i32>,
-                     sidx: Vec<i32>) -> string {
+                     sidx: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>,
+                     it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
+                     ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>) -> string {
     match ins {
         codegen_Instr::Nop => { return ""; },
         codegen_Instr::DeclVar(h) => {
-            let a: string = string_concat(indent, "int ");
-            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends, sidx));
+            /* DeclVar carries no type of its own (unlike DeclNamed's `ct`),
+               and most uses (arithmetic-widening/tuple-projection helper
+               slots) genuinely are int on today's i32-first surface — so
+               keep "int" as the default. The one case that isn't: the
+               contract `result` slot lowering allocates for a fn with an
+               `ensures` clause (see lower's ret_slot, sv0c/lib/lowering.sv0)
+               is the function's own return type, not always int (BUGS.md #5
+               residual, sv0-mathlib). Detect it by name rather than adding a
+               new Instr variant (a bigger, riskier change for this fix). */
+            let nm: string = megatu_val_name(h, source, starts, ends, sidx);
+            let mut cty: string = "int";
+            if string_eq(nm, "result") { cty = ret_ty; }
+            let a: string = string_concat(indent, cty);
+            let a2: string = string_concat(a, " ");
+            let b: string = string_concat(a2, nm);
+            megatu_tyenv_push(tyenv_h, tyenv_f, h,
+                              string_eq(cty, "double") || string_eq(cty, "float"));
             return string_concat(b, ";\n");
         },
         codegen_Instr::DeclNamed(ct, h) => {
-            let a: string = string_concat(indent, megatu_ty_name(ct, source, starts, ends));
+            let cty: string = megatu_ty_name(ct, source, starts, ends);
+            let is_f: bool = string_eq(cty, "double") || string_eq(cty, "float");
+            megatu_tyenv_push(tyenv_h, tyenv_f, h, is_f);
+            let a: string = string_concat(indent, cty);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(h, source, starts, ends, sidx));
             return string_concat(c, ";\n");
         },
         codegen_Instr::Assign(h, be) => {
             let e: codegen_Expr = box_deref(be);
-            let a: string = string_concat(indent, "int ");
-            let b: string = string_concat(a, megatu_val_name(h, source, starts, ends, sidx));
+            let is_f: bool = megatu_expr_is_float(e, tyenv_h, tyenv_f);
+            megatu_tyenv_push(tyenv_h, tyenv_f, h, is_f);
+            let mut cty: string = "int";
+            if is_f { cty = "double"; }
+            let a: string = string_concat(indent, cty);
+            let a2: string = string_concat(a, " ");
+            let b: string = string_concat(a2, megatu_val_name(h, source, starts, ends, sidx));
             let c: string = string_concat(b, " = ");
             let d: string = string_concat(c, megatu_emit_expr(e, source, starts, ends, sidx));
             return string_concat(d, ";\n");
@@ -1115,10 +1307,10 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "if (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx));
+            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let f: string = string_concat(d, indent);
             let g: string = string_concat(f, "} else {\n");
-            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx));
+            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let j: string = string_concat(h, indent);
             return string_concat(j, "}\n");
         },
@@ -1128,14 +1320,14 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "while (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx));
+            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let f: string = string_concat(d, indent);
             return string_concat(f, "}\n");
         },
         codegen_Instr::BlockInstr(body) => {
             let deeper: string = string_concat(indent, "  ");
             let a: string = string_concat(indent, "{\n");
-            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx));
+            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let c: string = string_concat(b, indent);
             return string_concat(c, "}\n");
         },
@@ -1193,8 +1385,19 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             } else {
                 if rt_h != 0 {
                     ret_name = megatu_ty_name(rt_h, source, starts, ends);
+                } else {
+                    /* Untyped user-fn call: resolve the callee's real return
+                       type instead of defaulting to "int" — BUGS.md #5
+                       residual (sv0-mathlib): a call to an f64-returning
+                       function truncated its result the same way a bare
+                       arithmetic temp did. */
+                    ret_name = megatu_fn_ret_cty(fn_h, it, id1, id2, frt,
+                                                 ptt, ptd1, ptd2, pp,
+                                                 source, starts, ends);
                 }
             }
+            megatu_tyenv_push(tyenv_h, tyenv_f, dst_h,
+                              string_eq(ret_name, "double") || string_eq(ret_name, "float"));
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends, sidx));
@@ -1238,7 +1441,9 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
 
 fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
                       source: string, starts: Vec<i32>, ends: Vec<i32>,
-                      sidx: Vec<i32>) -> string {
+                      sidx: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>,
+                      it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
+                      ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>) -> string {
     let count: i32 = vec_len(instrs);
     if count == 0 { return ""; }
     let mut out: string = "";
@@ -1246,7 +1451,7 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
     while idx < count {
         let bh: Box<codegen_Instr> = vec_get(instrs, idx);
         let ins: codegen_Instr = box_deref(bh);
-        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx));
+        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
         idx = idx + 1;
     }
     return out;
