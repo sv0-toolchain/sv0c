@@ -682,22 +682,24 @@ fn struct_field_ty(field_names: Vec<i32>, field_types: Vec<i32>,
 }
 
 /* ── literal type inference (SML synth ExprLit arms) ─────────
-   Maps literal tag to type tag.  Tags from ast.sv0:
-     0 = IntLit  → TyInt(32) = type tag 0
-     1 = BoolLit → TyBool    = type tag 2
-     2 = UnitLit → TyUnit    = type tag 4
-     3 = StringLit → TyString = type tag 5
-     4 = FloatLit → TyFloat  = type tag 1 (if supported)
+   Maps literal tag to type tag. Real parser lit tags (lowering.sv0's own
+   comment, authoritative): 0=IntLit, 1=FloatLit, 3=StringLit, 5=BoolLit.
+   2 and 4 are not emitted by the real parser for any literal form; kept
+   below only as a defensive fallback, not because they're reachable.
    Returns -1 for unknown literal tag. */
 fn infer_lit(lit_tag: i32) -> i32 {
     if lit_tag == 0 { return TY_INT(); }
-    if lit_tag == 1 { return TY_BOOL(); }
+    /* BUGS.md #5 (sv0-mathlib): this used to return TY_BOOL() here — a
+       leftover from before bool literals were correctly moved to tag 5
+       below (see that fix's own comment) — silently typing every float
+       literal as a bool and forcing every f64 expression through E0400 or
+       (worse) an accidental int/bool coercion downstream. */
+    if lit_tag == 1 { return TY_FLOAT(); }
     if lit_tag == 2 { return TY_UNIT(); }
     if lit_tag == 3 { return TY_STRING(); }
     if lit_tag == 4 { return TY_CHAR(); }
     /* The parser/lowering encode bool literals (true/false) as lit_tag 5
-       (lit_from_tok / lower_lit_to_ir_value); the stale 1 above was never emitted
-       for bool by the real parser. */
+       (lit_from_tok / lower_lit_to_ir_value); this is the real bool tag. */
     if lit_tag == 5 { return TY_BOOL(); }
     return 0 - 1;
 }
@@ -3707,6 +3709,12 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                      ret_ty, loop_depth,
                                      operand_idx);
         if op_ty < 0 { return 0 - 1; }
+        /* Same fix as ExprBinop above (BUGS.md #5): Neg (0) and BitNot (2)
+           are not boolean ops, so propagate the actual operand type (e.g.
+           TY_FLOAT for `-x` on an f64) instead of unop_result_ty_tag's
+           hardcoded TY_INT. Not (1) still resolves to TY_BOOL. */
+        if unop_tag == 0 { return op_ty; }
+        if unop_tag == 2 { return op_ty; }
         return unop_result_ty_tag(unop_tag);
     }
     if tag == 3 {
@@ -3733,6 +3741,17 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                       ret_ty, loop_depth,
                                       rhs_idx);
         if rhs_ty < 0 { return 0 - 1; }
+        /* BUGS.md #5 (sv0-mathlib): binop_result_ty_tag(op_tag) alone can't
+           know the operand type (it only sees the operator), so it always
+           returned TY_INT() for any arithmetic op — meaning `a - b` on two
+           f64 operands synthesized as TY_INT, silently losing float-ness
+           one level up (e.g. in a `let y: f64 = a - b;`'s RHS type). For
+           Arith-class ops, propagate the actual (already-synthesized)
+           operand type instead; Cmp/Logic still resolve through the
+           original helper (always TY_BOOL). This does not yet check
+           lhs_ty == rhs_ty — real operand-compatibility checking here is a
+           separate, larger fix. */
+        if is_arith_binop(binop_tag) { return lhs_ty; }
         return binop_result_ty_tag(binop_tag);
     }
     if tag == 4 {
