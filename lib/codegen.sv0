@@ -22,6 +22,9 @@ enum Value {
        lowering.sv0's copy (megaTU-main.sv0's emit path box_deref-reinterprets
        lowering's boxes as this type). */
     VFloat(i32),
+    /* Integer literal too wide for VInt(i32) — see lowering.sv0's
+       Value::VIntWide doc comment. Same layout-matching rule as VFloat. */
+    VIntWide(i32),
 }
 
 enum Expr {
@@ -43,6 +46,7 @@ fn value_tag(v: Value) -> i32 {
         Value::VMember(_, _) => { return 6; },
         Value::VAddrOf(_) => { return 7; },
         Value::VFloat(_) => { return 8; },
+        Value::VIntWide(_) => { return 9; },
     }
 }
 
@@ -184,6 +188,10 @@ fn emit_value(v: Value) -> string {
                role here), not real source-token resolution — the real
                VFloat emission lives in megaTU-main.sv0's megatu_emit_value,
                which does have source access. */
+            return name_of(h);
+        },
+        Value::VIntWide(h) => {
+            /* See VFloat above — real emission is in megatu_emit_value. */
             return name_of(h);
         },
     }
