@@ -3424,6 +3424,23 @@ fn parse_struct_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
     return p + 1;
 }
 
+/* A payload's type root, IF it's a plain single-segment name (`i64`, `T`,
+   `MyStruct`, ...) — not `[T; N]`, not a multi-segment path, not a ref —
+   resolved to that name's own token, so the caller can look up its C type
+   later without needing the full type arena threaded any further (BUGS.md
+   #8, sv0-mathlib: resolving this once, here, where the type arena is
+   already in scope, avoids threading pty_td2/pty_td3/pp through lowering's
+   already-enormous `lower`/`collect_typedefs_str` call chain just for
+   this). Returns -1 for anything else — callers treat that as "don't know,
+   keep the current `int` default", never as a wrong guess. */
+fn enum_payload_root_simple_name_tok(root: i32, pty_tt: Vec<i32>,
+                                     pty_td1: Vec<i32>, pty_td2: Vec<i32>,
+                                     pp: Vec<i32>) -> i32 {
+    if vec_get(pty_tt, root) != 0 { return 0 - 1; }
+    if vec_get(pty_td2, root) != 1 { return 0 - 1; }
+    return vec_get(pp, vec_get(pty_td1, root));
+}
+
 fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    source: string, pos: i32,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
@@ -3437,7 +3454,9 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    enum_variant_payload_count_by_item: Vec<i32>,
                    enum_variant_payload_max_by_item: Vec<i32>,
                    pty_tt: Vec<i32>, pty_td1: Vec<i32>, pty_td2: Vec<i32>,
-                   pty_td3: Vec<i32>, tparam_names_out: Vec<i32>) -> i32 {
+                   pty_td3: Vec<i32>, tparam_names_out: Vec<i32>,
+                   enum_variant_payload_count_by_variant: Vec<i32>,
+                   enum_variant_payload_ty_name_tok: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 62 { return 0 - 1; }
     if ps_peek(tags, pos + 1) != 5 { return 0 - 1; }
     let name_pos: i32 = pos + 1;
@@ -3484,6 +3503,9 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                                   pty_tt, pty_td1, pty_td2, pty_td3, pp);
                         if pt < 0 { return 0 - 1; }
                         vec_push(enum_variant_payload_ty_root, vec_len(pty_tt) - 1);
+                        vec_push(enum_variant_payload_ty_name_tok,
+                                enum_payload_root_simple_name_tok(vec_len(pty_tt) - 1,
+                                                                  pty_tt, pty_td1, pty_td2, pp));
                         payload_count = payload_count + 1;
                         if ps_peek(tags, pt) == 12 { tp = pt + 1; }
                         else {
@@ -3494,6 +3516,7 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 }
                 let vpc: i32 = payload_count - pc_before;
                 if vpc > payload_max { payload_max = vpc; }
+                vec_push(enum_variant_payload_count_by_variant, vpc);
                 variant_count = variant_count + 1;
                 if ps_peek(tags, tp) == 12 { p = tp + 1; }
                 else {
@@ -3513,6 +3536,9 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                                       pty_tt, pty_td1, pty_td2, pty_td3, pp);
                             if pt < 0 { return 0 - 1; }
                             vec_push(enum_variant_payload_ty_root, vec_len(pty_tt) - 1);
+                            vec_push(enum_variant_payload_ty_name_tok,
+                                    enum_payload_root_simple_name_tok(vec_len(pty_tt) - 1,
+                                                                      pty_tt, pty_td1, pty_td2, pp));
                             payload_count = payload_count + 1;
                             if ps_peek(tags, pt) == 12 { sp = pt + 1; }
                             else {
@@ -3523,6 +3549,7 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                     }
                     let vpc: i32 = payload_count - pc_before;
                     if vpc > payload_max { payload_max = vpc; }
+                    vec_push(enum_variant_payload_count_by_variant, vpc);
                     variant_count = variant_count + 1;
                     if ps_peek(tags, sp) == 12 { p = sp + 1; }
                     else {
@@ -3532,6 +3559,7 @@ fn parse_enum_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 } else {
                     let vpc: i32 = payload_count - pc_before;
                     if vpc > payload_max { payload_max = vpc; }
+                    vec_push(enum_variant_payload_count_by_variant, vpc);
                     variant_count = variant_count + 1;
                     if ps_peek(tags, vp) == 12 { p = vp + 1; }
                     else {
@@ -3773,7 +3801,9 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
               body_et: Vec<i32>, body_ed1: Vec<i32>,
               body_ed2: Vec<i32>, body_ed3: Vec<i32>,
               body_ed4: Vec<i32>, body_sf: Vec<i32>,
-              tparam_names_out: Vec<i32>) -> i32 {
+              tparam_names_out: Vec<i32>,
+              enum_variant_payload_count_by_variant: Vec<i32>,
+              enum_variant_payload_ty_name_tok: Vec<i32>) -> i32 {
     let p0: i32 = ps_skip_optional_pub(tags, ps_skip_attributes(tags, pos));
     let t: i32 = ps_peek(tags, p0);
     if t == 75 {
@@ -3865,7 +3895,9 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                enum_variant_payload_count_by_item,
                                enum_variant_payload_max_by_item,
                                pty_tt, pty_td1, pty_td2, pty_td3,
-                               tparam_names_out);
+                               tparam_names_out,
+                               enum_variant_payload_count_by_variant,
+                               enum_variant_payload_ty_name_tok);
     }
     if t == 90 {
         return parse_trait_item(tags, starts, ends, source, p0,
@@ -3933,7 +3965,9 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                  body_et: Vec<i32>, body_ed1: Vec<i32>,
                  body_ed2: Vec<i32>, body_ed3: Vec<i32>,
                  body_ed4: Vec<i32>, body_sf: Vec<i32>,
-                 tparam_names_out: Vec<i32>) -> i32 {
+                 tparam_names_out: Vec<i32>,
+                 enum_variant_payload_count_by_variant: Vec<i32>,
+                 enum_variant_payload_ty_name_tok: Vec<i32>) -> i32 {
     let mut p: i32 = pos;
     let mut done: bool = false;
     while done != true {
@@ -3957,7 +3991,9 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                       struct_field_ty_root,
                                       body_et, body_ed1, body_ed2,
                                       body_ed3, body_ed4, body_sf,
-                                      tparam_names_out);
+                                      tparam_names_out,
+                                      enum_variant_payload_count_by_variant,
+                                      enum_variant_payload_ty_name_tok);
             if pi < 0 { return 0 - 1; }
             p = pi;
         }
@@ -5914,7 +5950,8 @@ fn test_parse_fn_simple() -> i32 {
                              vec_new(),
                              vec_new(),
                              pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
-                             bet, be1, be2, be3, be4, bsf, vec_new());
+                             bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
     if r != 6 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
@@ -5974,7 +6011,8 @@ fn test_parse_fn_ret() -> i32 {
                              vec_new(),
                              vec_new(),
                              pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
-                             bet, be1, be2, be3, be4, bsf, vec_new());
+                             bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
     if r != 12 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
@@ -6034,7 +6072,8 @@ fn test_parse_struct() -> i32 {
                              vec_new(),
                              vec_new(),
                              pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
-                             bet, be1, be2, be3, be4, bsf, vec_new());
+                             bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
     if r != 11 { return 1; }
     if vec_get(it, 0) != 1 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
@@ -6094,7 +6133,8 @@ fn test_parse_enum_mixed() -> i32 {
                              vec_new(),
                              vec_new(),
                              pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
-                             bet, be1, be2, be3, be4, bsf, vec_new());
+                             bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
     if r != 10 { return 1; }
     if vec_get(it, 0) != 2 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
@@ -6153,7 +6193,8 @@ fn test_parse_impl() -> i32 {
                              vec_new(),
                              vec_new(),
                              pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
-                             bet, be1, be2, be3, be4, bsf, vec_new());
+                             bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
     if r != 10 { return 1; }
     if vec_len(it) != 2 { return 2; }
     if vec_get(it, 0) != 0 { return 3; }
@@ -6210,7 +6251,8 @@ fn test_parse_fn_contract() -> i32 {
                              vec_new(),
                              vec_new(),
                              pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
-                             bet, be1, be2, be3, be4, bsf, vec_new());
+                             bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
     if r != 10 { return 1; }
     if vec_get(it, 0) != 0 { return 2; }
     if vec_get(id1, 0) != 1 { return 3; }
@@ -6267,7 +6309,8 @@ fn test_parse_program() -> i32 {
                                 vec_new(),
                                 vec_new(),
                                 pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
-                                bet, be1, be2, be3, be4, bsf, vec_new());
+                                bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
     if r != 12 { return 1; }
     if vec_len(it) != 2 { return 2; }
     if vec_get(it, 0) != 0 { return 3; }
