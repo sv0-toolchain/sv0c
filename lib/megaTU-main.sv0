@@ -187,11 +187,16 @@ fn main() -> i32 {
     let bed4: Vec<i32> = vec_new();
     let bsf: Vec<i32> = vec_new();
 
+    /* File-scoped set of every enum's own <T, ...> parameter name tokens,
+       collected across the whole program by parse_program/parse_enum_item.
+       Not per-item scoped — see resolve_ty's tparam_names doc comment
+       (BUGS.md #3, sv0-mathlib). */
+    let tparam_names: Vec<i32> = vec_new();
     let pr: i32 = parse_program(tags, starts, ends, source, 0,
         it, id1, id2, id3, id4, id5, pp,
         evn, sfn, fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc, evpm,
         ptt, ptd1, ptd2, ptd3, sft,
-        bet, bed1, bed2, bed3, bed4, bsf);
+        bet, bed1, bed2, bed3, bed4, bsf, tparam_names);
 
     /* At least one top-level item must have parsed (multi-fn programs are now
        supported — the mega-TU threads all items through lower + emit). */
@@ -206,7 +211,7 @@ fn main() -> i32 {
         it, id1, id2, id3, id4, id5,
         fpn, fpt, frt, fcb, fcr, evpt, evpb, evpc,
         ptt, ptd1, ptd2, ptd3, sft,
-        source, starts, ends, mv, mt, fa, pp);
+        source, starts, ends, mv, mt, fa, pp, tparam_names);
     if rr != 0 {
         /* resolve_program returns the specific error CODE (300 unbound / 301
            unknown type / 306 unsupported pat / 307 arity / 309 use clause) with
