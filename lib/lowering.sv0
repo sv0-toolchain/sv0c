@@ -776,6 +776,25 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         init_handled = 1;
                     }
                 }
+                /* `let x: <i64/u64/u32/f32/f64/...> = <anything not already
+                   special-cased above>;` — use the explicit annotation's own
+                   C type instead of falling through to a bare DeclVar (a
+                   plain "int"). i32/bool/no-annotation lets are deliberately
+                   excluded (is_wide_primitive_ty_name) and keep using the
+                   existing DeclVar path unchanged — that default is already
+                   correct for them. BUGS.md #7, sv0-mathlib. */
+                if let_declared == 0 {
+                    let ann_tok_lb: i32 = vec_get(ed2, s_idx);
+                    if ann_tok_lb >= 0 {
+                        if lower_tok_in_bounds(ann_tok_lb, starts, ends) {
+                            let ann_name_lb: string = handle_to_str(ann_tok_lb, source, starts, ends);
+                            if is_wide_primitive_ty_name(ann_name_lb) {
+                                deferred_ty = ann_tok_lb;
+                                has_deferred_decl = 1;
+                            }
+                        }
+                    }
+                }
             }
             /* SML lowerStmt StmtLet (general case): `instrs @ [Store(x, rhs)]` —
                the initializer is lowered FIRST, then the let variable is declared.
@@ -3462,6 +3481,22 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     init_handled = 1;
                 }
             }
+            /* `let x: <i64/u64/u32/f32/f64/...> = <anything not already
+               special-cased above>;` — mirrors the identical fix in
+               lower_tag_block (nested blocks); see that copy's comment and
+               BUGS.md #7, sv0-mathlib, for the full rationale. */
+            if let_declared == 0 {
+                let ann_tok_ls: i32 = vec_get(ed2, s_idx);
+                if ann_tok_ls >= 0 {
+                    if lower_tok_in_bounds(ann_tok_ls, starts, ends) {
+                        let ann_name_ls: string = handle_to_str(ann_tok_ls, source, starts, ends);
+                        if is_wide_primitive_ty_name(ann_name_ls) {
+                            deferred_ty = ann_tok_ls;
+                            has_deferred_decl = 1;
+                        }
+                    }
+                }
+            }
         }
         if str_let == 1 {
             vec_push(str_locals, name_tok);
@@ -4951,6 +4986,34 @@ fn ast_ty_to_c_string(name: string) -> string {
     if string_eq(name, "Vec") { return "int"; }
     if string_eq(name, "Box") { return "int"; }
     return "int";
+}
+
+/* True for the primitive type names whose real C type is NOT "int"/`bool`'s
+   default (i8/u8/i16/u16/i64/u64/u32/f32/f64/isize/usize) — deliberately
+   excludes i32/bool, whose already-correct fallback ("int") a caller
+   should keep using unchanged. Used by lower_tag_block's LetStmt lowering
+   to decide whether an explicit `let x: T = <expr>;` annotation needs to
+   override the plain-DeclVar default (BUGS.md #7, sv0-mathlib): without
+   this, `let nan: f64 = 0.0 / 0.0;` silently declared C `int nan;` —
+   worse than truncation, undefined behavior (double-to-int conversion of
+   a NaN) — because the annotation was parsed and stored (LetStmt's own
+   `d2`) but no lowering path ever consulted it; the `let`'s init-
+   expression *shape* was the only thing ever used to pick a declared
+   type, and a plain arithmetic RHS matches none of the special-cased
+   shapes (struct literal, enum ctor, string, user-type-returning call). */
+fn is_wide_primitive_ty_name(name: string) -> bool {
+    if string_eq(name, "i8") { return true; }
+    if string_eq(name, "u8") { return true; }
+    if string_eq(name, "i16") { return true; }
+    if string_eq(name, "u16") { return true; }
+    if string_eq(name, "i64") { return true; }
+    if string_eq(name, "u64") { return true; }
+    if string_eq(name, "u32") { return true; }
+    if string_eq(name, "f32") { return true; }
+    if string_eq(name, "f64") { return true; }
+    if string_eq(name, "isize") { return true; }
+    if string_eq(name, "usize") { return true; }
+    return false;
 }
 
 /* ── ast_ty_to_c_string_with_user (SML astTyToCString struct/enum branch)

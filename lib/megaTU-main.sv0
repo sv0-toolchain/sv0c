@@ -950,6 +950,37 @@ fn megatu_builtin_ret_cty(bid: i32) -> string {
     return "int";
 }
 
+/* If `name` is one of the primitive type names ast_ty_to_c_string knows
+   about, return its real C type; otherwise return `name` unchanged (a
+   struct/enum/Vec/Box name IS its own correct C output, per
+   megatu_ty_name's existing raw-passthrough behavior — this only adds a
+   translation step for the primitives that need one, it never changes
+   what a user-type name resolves to). Mirrors ast_ty_to_c_string
+   (lowering.sv0) rather than calling it directly: that function's "no
+   match" fallback is itself "int", which would be ambiguous here — an
+   input of "i32" and an input of an unrecognized struct name both need
+   `ast_ty_to_c_string`'s "int" result to mean two DIFFERENT things
+   (i32 really is `int`; an unrecognized name should pass through as
+   itself, not become the word "int"). BUGS.md #7, sv0-mathlib: a `let x:
+   f64 = <arithmetic-expr>;` local's DeclNamed carried the raw token
+   "f64" — valid *sv0* syntax, not valid C — straight into the C output. */
+fn megatu_primitive_cty_or_raw(name: string) -> string {
+    if string_eq(name, "i32") { return "int"; }
+    if string_eq(name, "bool") { return "int"; }
+    if string_eq(name, "i8") { return "int8_t"; }
+    if string_eq(name, "u8") { return "uint8_t"; }
+    if string_eq(name, "i16") { return "int16_t"; }
+    if string_eq(name, "u16") { return "uint16_t"; }
+    if string_eq(name, "i64") { return "int64_t"; }
+    if string_eq(name, "u64") { return "uint64_t"; }
+    if string_eq(name, "u32") { return "uint32_t"; }
+    if string_eq(name, "f32") { return "float"; }
+    if string_eq(name, "f64") { return "double"; }
+    if string_eq(name, "isize") { return "intptr_t"; }
+    if string_eq(name, "usize") { return "uintptr_t"; }
+    return name;
+}
+
 fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
     /* String-primitive sentinel from lowering (lower_string_cty): a string-typed
        `let` gets this as its DeclNamed ctype. Must be handled before handle_to_str,
@@ -966,7 +997,7 @@ fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> s
        Lowering only ever passes a real token here (or the string sentinel above),
        never an int(9)/void(10) sentinel (rt==0 → "int" is handled by the caller),
        so handle_to_str is always correct. */
-    return handle_to_str(h, source, starts, ends);
+    return megatu_primitive_cty_or_raw(handle_to_str(h, source, starts, ends));
 }
 
 /* AST binop tag (ast.sml: Add=0 … Shr=17) -> C operator (astBinopToC). */
