@@ -1682,6 +1682,36 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let st2: Instr = Instr::Store(var_tok2, box_new(be));
             vec_push(out_instrs, box_new(st2));
         }
+        /* A compound-assign target that is a struct FIELD (`q.x += 3;`,
+           cls2 == 1) fell straight through this function with NO case at
+           all — silently dropping the whole statement (no instruction
+           ever pushed to out_instrs), unlike the same-shaped plain
+           `Instr::Assign` (tag 18) just above, which already has this
+           obj_tok/fld_tok case. Found immediately after fixing
+           parse_assign_target_op_pos's DOT/COLONCOLON tag mixup
+           (parser.sv0) let a bare field-assignment statement parse at
+           all: `q.x = 5;` then round-tripped correctly, but `q.x += 3;`
+           still silently vanished — traced here, one layer downstream.
+           BUGS.md #6 residual, sv0-mathlib (surfaced by the same
+           field_assign.sv0 fixture the DOT/COLONCOLON fix uncovered).
+           Mirrors tag 18's cls == 1 branch: load the field's current
+           value (VMember), binop it against the RHS, StoreField the
+           result — the same "load + binop + store" shape this function's
+           own doc comment already describes for the plain-variable case. */
+        if cls2 == 1 {
+            let obj_tok2: i32 = vec_get(aout2, 0);
+            let fld_tok2: i32 = vec_get(aout2, 1);
+            let cur2: Value = Value::VMember(box_new(Value::VVar(obj_tok2)), fld_tok2);
+            let rv2b: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                   tok_tags, rhs_idx2, ctr,
+                                                   out_instrs, enum_names,
+                                                   enum_tag_offsets,
+                                                   enum_tag_counts,
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let be2: Expr = Expr::Binop(op_tag, box_new(cur2), box_new(rv2b));
+            let sf2: Instr = Instr::StoreField(obj_tok2, fld_tok2, box_new(be2));
+            vec_push(out_instrs, box_new(sf2));
+        }
         return Value::VUnit;
     }
     if tag == 20 {

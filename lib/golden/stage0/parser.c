@@ -3910,7 +3910,7 @@ static int parse_assign_target_op_pos(int tags, int pos, int out) {
   int op_pos = (pos + 1);
   int _sv0t2 = (pos + 1);
   int _sv0t3 = ps_peek(tags, _sv0t2);
-  if ((_sv0t3 == 15)) {
+  if ((_sv0t3 == 16)) {
     int _sv0t4 = (pos + 2);
     int _sv0t5 = ps_peek(tags, _sv0t4);
     if ((_sv0t5 != 5)) {

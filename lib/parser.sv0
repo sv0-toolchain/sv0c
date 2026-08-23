@@ -2421,7 +2421,21 @@ fn parse_assign_target_op_pos(tags: Vec<i32>, pos: i32, out: Vec<i32>) -> i32 {
     if ps_peek(tags, pos) != 5 { return 0 - 2; }
     let mut field_tok: i32 = 0 - 1;
     let mut op_pos: i32 = pos + 1;
-    if ps_peek(tags, pos + 1) == 15 {
+    /* Token tag 16 = DOT (lexer/token.sv0's token_tag); tag 15 is COLONCOLON
+       (`::`, a path separator, not field access). This checked 15, so a bare
+       field-assignment statement (`q.x = 7;`, no preceding `let`) never
+       matched the `.field` shape here at all — field_tok stayed -1 and
+       op_pos was left pointing at the `.` itself, which then failed both
+       the `=`-assign and compound-assign branches in try_assign_stmt,
+       falling through to the block's generic-expression fallback (which
+       can't parse `q.x = 7` either, since `=` isn't valid after a plain
+       expression) and finally to a bare, unlocated parse failure. Found via
+       BUGS.md #6's diagnostic fix (sv0-mathlib) surfacing what had
+       previously been an entirely silent one — `q.x = 7;` had been
+       compiling to a no-op (`int main(void) { return 0; }`) with exit 0 and
+       zero output, confirmed pre-existing (unrelated to that fix itself)
+       by bisecting to sv0c commit d669398, well before this bug was found. */
+    if ps_peek(tags, pos + 1) == 16 {
         if ps_peek(tags, pos + 2) != 5 { return 0 - 2; }
         field_tok = pos + 2;
         op_pos = pos + 3;
