@@ -3994,7 +3994,17 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                                       tparam_names_out,
                                       enum_variant_payload_count_by_variant,
                                       enum_variant_payload_ty_name_tok);
-            if pi < 0 { return 0 - 1; }
+            /* Failure: encode the ITEM'S OWN start token (p0) into the
+               return value so the caller can point a diagnostic at roughly
+               where parsing gave up, instead of a bare unlocated -1 — a
+               real (if approximate: whatever failed deeper inside this
+               item's own parse isn't pinpointed, only the item's start) is
+               far better than the previous total silence (BUGS.md #6,
+               sv0-mathlib: a parse failure exited nonzero with zero
+               diagnostic text). `0 - p0 - 2` is always < 0 for p0 >= 0
+               (avoids a -0 collision at p0 == 0) and is losslessly
+               recoverable via `0 - result - 2`. */
+            if pi < 0 { return 0 - p0 - 2; }
             p = pi;
         }
     }
