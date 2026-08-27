@@ -1,0 +1,6 @@
+{
+  "entry_abi_version": 1,
+  "reserved_symbols_sha256": "bb9d78c8ff59c818b753464a59c175310a9f781f4a0bc5a14b8eb3e6b437ca0f",
+  "adapter_i32_return_sha256": "9c8f45b8350bb5eca9cadeb48190339ad3a8cf0dc02228b3dbc87f4f6b5e9bb1",
+  "adapter_unit_return_sha256": "2ef291e155fddd6f426118356ac64720c4f536f06f874d693514da46fb6ce43d"
+}
