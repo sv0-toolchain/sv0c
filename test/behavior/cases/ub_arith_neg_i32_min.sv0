@@ -1,0 +1,16 @@
+/* NEX-048b sanitizer fixture, NOT in test/behavior/manifest.txt: negating
+   i32::MIN overflows (audit Site 4, native-executable-ub-audit.md) --
+   expected UBSan verdict: "signed integer overflow" at the final
+   negation. `min` itself is constructed without triggering any overflow
+   (0 - 2147483647, then - 1, both representable at each step) so the
+   deliberate UB is isolated to exactly the return expression. Observed
+   (unsanitized, arm64/Apple Clang, -O0): silently wraps to INT32_MIN
+   unchanged, exits 0 (INT32_MIN's low byte is 0) -- no crash on this
+   platform; ARM's negate instruction doesn't trap on overflow, unlike
+   x86, so this is exactly the kind of platform-dependent UB the audit
+   flags rather than a cross-platform-safe assumption. Inert until
+   NEX-050 wires a sanitizer job to run this file. */
+fn main() -> i32 {
+    let min: i32 = 0 - 2147483647 - 1;
+    return 0 - min;
+}

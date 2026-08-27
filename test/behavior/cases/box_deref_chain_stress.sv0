@@ -1,0 +1,28 @@
+/* NEX-048b sanitizer stress fixture: 20 levels of recursive Box<Expr>
+   allocation + box_deref, stressing sv0__box_deref_raw's pointer-cast
+   punning site (audit Site 1) under ASan/UBSan without triggering any
+   actual UB itself -- fully-defined behavior, sum 1..20 = 210. */
+enum Expr { Lit(i32), Add(Box<Expr>, Box<Expr>) }
+
+fn eval(e: Expr) -> i32 {
+    match e {
+        Expr::Lit(n) => n,
+        Expr::Add(l, r) => {
+            let le: Expr = box_deref(l);
+            let re: Expr = box_deref(r);
+            return eval(le) + eval(re);
+        },
+    }
+}
+
+fn main() -> i32 {
+    let mut acc: Expr = Expr::Lit(0);
+    let mut i: i32 = 1;
+    while i <= 20 {
+        let bacc: Box<Expr> = box_new(acc);
+        let blit: Box<Expr> = box_new(Expr::Lit(i));
+        acc = Expr::Add(bacc, blit);
+        i = i + 1;
+    }
+    return eval(acc);
+}

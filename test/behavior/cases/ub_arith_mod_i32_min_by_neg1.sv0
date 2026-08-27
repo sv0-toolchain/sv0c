@@ -1,0 +1,12 @@
+/* NEX-048b sanitizer fixture, NOT in test/behavior/manifest.txt: i32::MIN
+   % -1 overflows (audit Site 4) -- same underlying IDIV-overflow cause as
+   ub_arith_div_i32_min_by_neg1.sv0 (x86's IDIV computes quotient and
+   remainder together, so both crash on x86); observed (unsanitized,
+   arm64/Apple Clang, -O0) on this dev machine: no crash, exits 0, matching
+   the division fixture's platform-dependent finding. Expected UBSan
+   verdict: "signed integer overflow". Inert until NEX-050. */
+fn main() -> i32 {
+    let min: i32 = 0 - 2147483647 - 1;
+    let neg1: i32 = 0 - 1;
+    return min % neg1;
+}
