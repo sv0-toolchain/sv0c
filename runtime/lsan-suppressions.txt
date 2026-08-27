@@ -1,0 +1,31 @@
+# LeakSanitizer suppressions for the sv0 native-executable runtime (NEX-050b).
+#
+# Implements TEST-007 (~/Documents/project-specs/sv0c-runtime-executable/SPEC.md
+# section 26.7): "intentional process-lifetime allocation SHALL be documented
+# or suppressed narrowly."
+#
+# The sv0 runtime's Vec<T> handle table (sv0_vec_new/push, sv0_runtime.h)
+# allocates its backing array with malloc/realloc and never frees it -- boxes
+# and vectors are arena-style for the process's lifetime by design (see
+# sv0_runtime.h's own SV0_BOX_POOL_SIZE comment: "Boxes are never freed
+# (arena-style)"). Every such allocation is reachable from
+# sv0_vec_table (a file-scope static array), so it is a deliberate,
+# intentional "leak" at process exit, not a bug -- LeakSanitizer would
+# otherwise flag it on every single Vec-using program.
+#
+# leak:sv0_vec_new
+#
+# NOTE (observed while writing this, not assumed): LeakSanitizer is not
+# supported on macOS at all -- Apple's ASan runtime does not implement leak
+# detection, so `-fsanitize=address` alone never reports a leak on this dev
+# machine regardless of this suppression file's presence. This file is
+# real and load-bearing on Linux (NEX-050c's CI job), where LSan does run
+# by default under ASan; it is inert-but-present here. Confirmed directly:
+# running box_deref_chain_stress.sv0 and vec_growth_stress.sv0 under
+# `-fsanitize=address,undefined` at both -O0 and -O2 on this arm64/macOS
+# machine produces zero leak output either way, with or without this file.
+#
+# The box pool (sv0_box_pool, sv0_runtime.h) is a file-scope STATIC array,
+# not a heap allocation at all -- box_new/box_alloc never call malloc, so
+# there is nothing for LeakSanitizer to report there in the first place;
+# no suppression entry is needed for it.
