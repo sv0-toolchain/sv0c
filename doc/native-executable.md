@@ -132,36 +132,30 @@ Spec §20.1 requires evidence on at least:
 | Ubuntu pinned image | x86_64 | a supported Clang | dev |
 | macOS pinned image | arm64 | Apple Clang | dev |
 
-**Current CI reality** (`.github/workflows/ci.yml`): one job, Ubuntu 22.04,
-default `cc`, with `z3` installed via `apt-get` for contract verification —
-no Clang leg, no macOS job at all. The macOS Apple Clang arm64 leg above is
-continuously exercised only on developer machines (this doc, and the whole
+**Current CI reality** (`.github/workflows/ci.yml`, updated by NEX-051d):
+two jobs on Ubuntu 22.04 — `verify` (default `cc`, the full
+`./scripts/sv0 test` suite plus the sanitizer/release-parity native-exe
+checks) and `native-exe-clang` (`CC=clang`, scoped to the native-exe
+checks specifically: behavior corpus, dev-vs-release parity, sanitizer
+sweep — not the full test suite, to keep this leg's own SML/NJ
+re-bootstrap cost proportionate to what it actually adds). Verified
+locally before landing by running the exact three `native_exe_*.py`
+commands with `CC=clang` set: 114/114 behavior-corpus programs, 114/114
+dev-vs-release-parity programs (1 known-divergent), 114/114 sanitizer-sweep
+programs (1 known/expected finding) — all passing. That local run is on
+this dev machine's own Apple Clang (its `cc` and `clang` are the same
+binary), so it proves the *mechanism* (the `CC` env var is honored end to
+end) but not an actual GCC-vs-Clang behavioral difference; the CI job
+itself, on a Linux runner where `cc` defaults to GCC, is the first place
+this leg exercises a genuinely different compiler family.
+
+**Still not applied**: the macOS Apple Clang arm64 leg. It's continuously
+exercised only on developer machines (this doc, and the whole
 `native_exe_*` test suite, was authored and verified on macOS arm64 with
-Apple Clang), not in the hosted CI matrix. Closing PORT-001 in CI (rather
-than relying on developer-machine evidence) means adding jobs to
-`.github/workflows/ci.yml` along these lines, matching the existing
-z3-install pattern:
+Apple Clang) — not in the hosted CI matrix. Adding it means a job along
+these lines:
 
 ```yaml
-jobs:
-  native-exe-linux-gcc:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with: { submodules: recursive }
-      - run: sudo apt-get update && sudo apt-get install -y z3
-      - run: ./scripts/sv0 test-guards
-
-  native-exe-linux-clang:
-    runs-on: ubuntu-22.04
-    env:
-      CC: clang
-    steps:
-      - uses: actions/checkout@v4
-        with: { submodules: recursive }
-      - run: sudo apt-get update && sudo apt-get install -y z3 clang
-      - run: ./scripts/sv0 test-guards
-
   native-exe-macos-arm64:
     runs-on: macos-14  # arm64 runner
     steps:
@@ -171,9 +165,11 @@ jobs:
       - run: ./scripts/sv0 test-guards
 ```
 
-Adding these jobs is a CI-configuration change with its own review (it
-changes billed CI minutes and the supported-platform claim), so it's
-recorded here as the documented requirement rather than applied directly in
-this doc-only slice. macOS x86_64 is not required for R0 (spec §20.1: "MAY
-be added when runner access exists"); R1 either certifies it or documents
-arm64-only macOS support with rationale (spec §20.2).
+Deliberately deferred rather than applied speculatively: it needs its own
+full SML/NJ bootstrap on a runner type this project has never used in CI
+before (unverified `ci-install-smlnj.sh` compatibility, unverified billed
+minutes), and — unlike the Clang leg — nothing about it could be dry-run
+locally in a way that adds real evidence beyond what developer-machine use
+already provides. macOS x86_64 is not required for R0 (spec §20.1: "MAY be
+added when runner access exists"); R1 either certifies arm64 in CI or
+documents arm64-only macOS support with rationale (spec §20.2).
