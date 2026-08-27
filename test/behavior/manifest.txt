@@ -114,3 +114,5 @@ test/behavior/cases/accumulate_struct.sv0|60
 test/behavior/cases/enum_in_loop.sv0|10
 test/behavior/cases/recursion_deep.sv0|100
 test/behavior/cases/mixed_features.sv0|20|native
+test/behavior/cases/box_deref_chain_stress.sv0|210
+test/behavior/cases/vec_growth_stress.sv0|188

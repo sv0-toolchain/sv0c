@@ -1,0 +1,15 @@
+/* NEX-048b sanitizer fixture, NOT in test/behavior/manifest.txt: i32::MIN
+   / -1 overflows (audit Site 4) -- expected UBSan verdict: "signed
+   integer overflow" (division overflow). On x86, this specific pattern
+   is documented to additionally raise SIGFPE at the hardware IDIV
+   instruction; observed (unsanitized, arm64/Apple Clang, -O0) on this
+   dev machine: no crash, silently produces INT32_MIN and exits 0 --
+   ARM's SDIV doesn't trap on overflow the way x86's IDIV does. Confirms
+   this fixture's outcome is genuinely platform-dependent, which is
+   exactly why NEX-051d's release-profile CI matrix needs both host
+   families represented. Inert until NEX-050. */
+fn main() -> i32 {
+    let min: i32 = 0 - 2147483647 - 1;
+    let neg1: i32 = 0 - 1;
+    return min / neg1;
+}
