@@ -669,8 +669,33 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                                               eit_nt, eit_base, eit_cnt, eit_cats,
                                               it, id1, id2, frt, ptt, ptd1, ptd2, pp);
         if string_eq(fn_name, "main") {
-            let proto: string = string_concat(ret_name, string_concat(" ", sig));
-            main_part = emit_block_defn(proto, body);
+            /* NEX-016 (~/Documents/project-specs/sv0c-runtime-executable/SPEC.md
+               S14.3): a recognized zero-param, i32/unit-returning main gets
+               wrapped in `static <ret> sv0_user_main(void)` plus a real hosted
+               `int main(int argc, char **argv)` that calls sv0_runtime_init
+               before invoking it. Any other shape (params present, or a return
+               type this adapter doesn't recognize) keeps the pre-existing plain
+               `main` emission unchanged -- ENTRY-002/003 rejection for those
+               shapes is the Python driver's job (NEX-015), not this compiler's;
+               this is defense-in-depth for direct/unvalidated invocations. */
+            let mut hosted: string = "";
+            if string_eq(pstr, "void") {
+                if string_eq(ret_name, "int") {
+                    hosted = "int main(int argc, char **argv) {\n  sv0_runtime_init(argc, argv);\n  return (int)sv0_user_main();\n}\n\n";
+                }
+                if string_eq(ret_name, "void") {
+                    hosted = "int main(int argc, char **argv) {\n  sv0_runtime_init(argc, argv);\n  sv0_user_main();\n  return 0;\n}\n\n";
+                }
+            }
+            if string_eq(hosted, "") {
+                let proto: string = string_concat(ret_name, string_concat(" ", sig));
+                main_part = emit_block_defn(proto, body);
+            } else {
+                let user_proto: string = string_concat("static ",
+                    string_concat(ret_name, " sv0_user_main(void)"));
+                let user_fn: string = emit_block_defn(user_proto, body);
+                main_part = string_concat(user_fn, hosted);
+            }
         } else {
             let proto: string = string_concat("static ",
                 string_concat(ret_name, string_concat(" ", sig)));

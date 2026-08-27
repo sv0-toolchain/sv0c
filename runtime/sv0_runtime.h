@@ -13,6 +13,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* hosted entry-point initialization (native executable ABI; NEX-016 of
+   ~/Documents/project-specs/sv0c-runtime-executable/SPEC.md).
+   Currently a no-op -- its slot is reserved so future runtime
+   initialization does not require changing every executable entry
+   contract (spec S14.3, S15.5). */
+static inline void sv0_runtime_init(int argc, char **argv) {
+  (void)argc;
+  (void)argv;
+}
+
 /* panic and assertion */
 static inline void sv0_panic(const char *msg) {
   fprintf(stderr, "sv0 panic: %s\n", msg);
