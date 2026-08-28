@@ -133,23 +133,69 @@ rather than left as a stale forward-looking plan):
    `native_exe_build.py`/`native_exe_emit_c.py` selftests unmodified;
    `./scripts/sv0 test`/`test-guards --active-release R1` show only the
    same pre-existing failures, no new ones.
-4. Re-run the full self-host loop and SML byte-guards to confirm the
-   compiler still compiles itself correctly through the new channel —
-   this is the step where a mistake would be most consequential (breaking
-   the compiler's own ability to compile itself), so it gates every
-   subsequent step. (Step 3 is a pure Python-driver change — it never
-   touches sv0c compiler internals or the compiled binary itself, only
-   how the binary is invoked — so this step's own risk is unaffected by
-   step 3 landing; `./scripts/sv0 test` was still re-run after step 3 as
-   a sanity check, per this project's standing discipline, and shows the
-   same two pre-existing failures.)
-5. Migrate the remaining direct `/tmp/.sv0_drv_path` writers
-   (`scripts/sv0`'s several call sites) one at a time, keeping the legacy
-   path live until every caller has moved.
-6. Only then remove the legacy control-file path entirely and add a
-   static guard (a `test-guards` check) confirming
-   `/tmp/.sv0_drv_path`/`DEFAULT_CONTROL_FILE` no longer appears anywhere
-   in the stable executable path — closing REL-004 for real.
+4. **Done** — explicit self-host-loop + SML byte-guard re-verification.
+   Formalized as its own checked step rather than left as an informal
+   side effect of step 3's own verification: `./scripts/sv0 test` re-run
+   fresh both immediately before and after step 5's changes, each time
+   showing only the same two pre-existing failures (`checker rejects
+   int/bool binop`; `self-host-sv0-loop: native run exit 232 for
+   lib/checker.sv0`, both root-caused and recorded under `KC-001`
+   earlier in this same body of work) — no new failures introduced by
+   steps 3 or 5. This is the step where a mistake would be most
+   consequential (breaking the compiler's own ability to compile
+   itself); steps 3 and 5 are both pure driver-layer changes (Python and
+   `scripts/sv0` respectively) that never touch sv0c compiler internals
+   or the compiled binaries themselves, only how those binaries are
+   invoked, so this step's own risk was never actually in play for
+   either — confirmed empirically rather than assumed.
+5. **Done** — `scripts/sv0`'s own remaining direct `/tmp/.sv0_drv_path`
+   *request* writers (`run_compile`, `run_emit_verified`) migrated to
+   `SV0_DRV_REQUEST`, following the same pattern as step 3's Python
+   migration: an env var set per-invocation on the compiler subprocess,
+   no file write, no reset-on-exit dance needed. Two harmless *reset-only*
+   lines (in `run_verify` and `run_emit_verified`'s pass-1, both clearing
+   the file to empty before invoking the *separate*
+   `build/sv0-megatu-verify` binary, which reads its own distinct
+   `/tmp/.sv0_verify_path` and was never affected by these resets) were
+   removed as dead code in the same pass, verified behaviorally
+   unchanged. `scripts/sv0`'s `ensure_sv0_self_host_compiler`/
+   `ensure_sv0_megatu_native` file-existence guarantees were
+   deliberately left in place — they are NOT request writers (they only
+   guarantee the file exists so `driver.sv0`'s legacy fallback
+   `read_file` doesn't panic), and every other still-unmigrated legacy
+   caller (see step 6) still depends on that guarantee. Verified: real
+   invocations of `sv0 verify`/`sv0 compile`/`sv0 compile
+   --contract-mode=disabled`/`sv0 emit-verified` against real fixtures,
+   each confirmed to leave the legacy file untouched throughout; the
+   emitted C from `sv0 compile` compiled and ran correctly.
+6. **Partially done, stated honestly** — NOT "remove the legacy
+   control-file path entirely" as originally written above; a full-repo
+   scan (done while implementing this step) found the legacy file still
+   load-bearing in at least eleven more places beyond what steps 3/5
+   migrated: `scripts/build-sv0-megatu-native.sh`,
+   `build-sv0-megatu-verify-native.sh`, `build-sv0-megatu-vm-native.sh`
+   (a **separate** injected compose-main for the VM-bytecode emitter
+   target that step 2's `SV0_DRV_REQUEST` wiring never touched at all —
+   it still reads the file unconditionally), `build-sv0-self-host-compiler.sh`,
+   `sv0-megatu-corpus-parity.sh`, `sv0-megatu-native-parity.sh`,
+   `sv0-native-behavioral-parity.sh`, `sv0-vm-tier2-native-emitter.sh`,
+   `verify_behavior_corpus_native.py`, `assemble-sv0-megaTU.py`, plus
+   `scripts/sv0`'s own file-existence guarantees from step 5.  Removing
+   `driver.sv0`/`megaTU-main.sv0`'s legacy read path today would break
+   every one of them — a real, separate, much larger migration than any
+   single step in this sequence, left as an explicit, tracked follow-up
+   rather than attempted or silently dropped. What WAS done: the other
+   half of step 6 that is safe today — a static guard
+   (`scripts/native_exe_no_new_legacy_control_file.py`, mirroring
+   NEX-058's own `native_exe_no_duplicate_cc_recipe.py` precedent
+   exactly) that fails closed if any file *not* on its exhaustive,
+   documented allowlist references the legacy control file, stopping the
+   channel from growing any further while its existing callers' real
+   migration stays a tracked, separate future effort. Verified
+   load-bearing by mutation (a synthetic new legacy-writing script is
+   caught immediately). **REL-004 itself remains open** — closed only
+   once the eleven-plus files above are migrated and the allowlist (and
+   this guard) can be deleted entirely.
 
 ## Why this is deferred rather than attempted now
 
