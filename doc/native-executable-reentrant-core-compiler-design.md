@@ -113,18 +113,36 @@ established migration discipline (e.g. the PC-6c native-default
 promotion kept `SV0_SELF_HOST_COMPILER`/`SV0_SELF_HOST_LOOP_MODE` escape
 hatches rather than a hard cutover).
 
-Sequencing for the actual future implementation session:
+Sequencing for the actual implementation (updated in place as steps land,
+rather than left as a stale forward-looking plan):
 
-1. Add the `getenv` builtin end-to-end, with its own tests.
-2. Add the env-var read path to `driver.sv0`/`megaTU-main.sv0`, alongside
-   (not replacing) the legacy control-file path.
-3. Migrate `CoreCompilerClient` to set the new env var per invocation
-   instead of writing+locking the shared file; drop the `flock`.
+1. **Done** — the `getenv` builtin, end-to-end (sv0c commits `fc19be9`,
+   `62baf46`).
+2. **Done** — the env-var read path in `driver.sv0`/`megaTU-main.sv0`,
+   alongside (not replacing) the legacy control-file path (sv0c commit
+   `647d2a0`, parent commit `4474e53`).
+3. **Done** — `CoreCompilerClient` migrated to set `SV0_DRV_REQUEST` per
+   invocation instead of writing+locking the shared file; the `flock` and
+   the control-file write/reset are both gone from
+   `scripts/native_exe_core_compiler.py` entirely (parent commit pending,
+   see checklist). Verified: the module's own selftest (real thread
+   concurrency against a fake compiler, plus a deterministic aliasing
+   check); a real end-to-end build through `./scripts/sv0 native-compile`
+   confirming the legacy control file is never touched; 4 genuinely
+   concurrent real OS-process builds, each correctly isolated;
+   `native_exe_build.py`/`native_exe_emit_c.py` selftests unmodified;
+   `./scripts/sv0 test`/`test-guards --active-release R1` show only the
+   same pre-existing failures, no new ones.
 4. Re-run the full self-host loop and SML byte-guards to confirm the
    compiler still compiles itself correctly through the new channel —
    this is the step where a mistake would be most consequential (breaking
    the compiler's own ability to compile itself), so it gates every
-   subsequent step.
+   subsequent step. (Step 3 is a pure Python-driver change — it never
+   touches sv0c compiler internals or the compiled binary itself, only
+   how the binary is invoked — so this step's own risk is unaffected by
+   step 3 landing; `./scripts/sv0 test` was still re-run after step 3 as
+   a sanity check, per this project's standing discipline, and shows the
+   same two pre-existing failures.)
 5. Migrate the remaining direct `/tmp/.sv0_drv_path` writers
    (`scripts/sv0`'s several call sites) one at a time, keeping the legacy
    path live until every caller has moved.
