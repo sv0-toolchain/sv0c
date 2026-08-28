@@ -4623,8 +4623,21 @@ fn main() -> i32 {
     /* CLI mode: if /tmp/.sv0_drv_path contains a non-empty path, compile it.
        The build/sv0-self-host-compiler wrapper writes the input path here before
        invoking this binary; build-sv0-self-host-compiler.sh creates it empty so
-       that test-mode invocations (which do NOT use the wrapper) fall through. */
-    let cli: string = read_file("/tmp/.sv0_drv_path");
+       that test-mode invocations (which do NOT use the wrapper) fall through.
+
+       NEX-055c/REL-004: SV0_DRV_REQUEST, when set to a non-empty value, is a
+       reentrant, per-invocation private request channel (a real host env
+       var, unshared between processes) preferred over the legacy shared
+       control file -- eliminates the cross-process race entirely for a
+       caller that sets it. This is an ADDITIONAL read path, not a
+       replacement: an existing caller that only ever writes the control
+       file (SV0_DRV_REQUEST unset) is completely unaffected. */
+    let env_req: string = getenv("SV0_DRV_REQUEST");
+    let cli: string = if string_len(env_req) > 0 {
+        env_req
+    } else {
+        read_file("/tmp/.sv0_drv_path")
+    };
     if string_len(cli) > 0 {
         let n: i32 = string_len(cli);
         let path: string = if string_char_at(cli, n - 1) == 10 {
