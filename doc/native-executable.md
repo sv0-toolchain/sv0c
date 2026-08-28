@@ -97,6 +97,30 @@ $ echo $?
 42
 ```
 
+## Diagnosing a host compile failure
+
+A `host-compile`/`host-link` failure (exit 6) means the C emitted from your
+`.sv0` source didn't compile or link — not that your `.sv0` source itself
+is wrong (that would fail earlier, at `frontend`/`emit-c`, exit 4/5). The
+error message includes the host compiler's own stderr verbatim, but to
+inspect the actual generated C, re-run with `--keep-c`:
+
+```console
+$ sv0c --emit=exe --keep-c hello.sv0
+error: host-compile: <the host compiler's stderr, verbatim>
+$ cat build/native/hello.c
+```
+
+`--keep-c` retains the exact staged C **whether the build succeeds or
+fails** — it's written right after C emission, before the host compiler
+ever runs, so a build that fails at `host-compile`/`host-link` still
+leaves the C behind for inspection (`--keep-c=<path>` picks the location;
+the bare form defaults to `<output path>.c`). This is the primary tool for
+diagnosing a host compile failure that isn't self-explanatory from the
+compiler's stderr alone — e.g. a genuine driver/runtime bug producing
+malformed C, versus a real error in your own `.sv0` source that the
+compiler's own diagnostics didn't catch.
+
 ## `.sv0b` is never converted to an executable
 
 This feature builds an executable **from C emitted by the C backend only**.
