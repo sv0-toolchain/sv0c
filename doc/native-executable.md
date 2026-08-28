@@ -163,12 +163,27 @@ rather than a guessed path. `--keep-c`, `--build-record`, and
 identity to report) — use `--emit=exe --keep-c` if you want the emitted
 C retained *alongside* a real build.
 
-**Still genuinely unwired, stated honestly rather than silently left for
-a reader to discover**: the `SV0_CC` environment-variable compiler tier
-(`native_exe_cc_select.py`'s own docstring names it as the one remaining
-R0.1 precedence tier — `--cc` → `sv0.toml` → `SV0_CC` → `CC` → `PATH` —
-`sv0.toml`'s tier is wired, `SV0_CC` is not). This is a real, scoped
-follow-up task, not an aspirational claim.
+## Compiler selection
+
+The host C compiler is chosen by a real 5-tier precedence, each tier
+tried only when the one above it is entirely absent (not merely
+invalid — a tier that IS set but resolves to nothing is a hard error,
+never a silent fall-through to the next tier):
+
+1. `--cc <path>` (explicit, CLI)
+2. `sv0.toml`'s `[build] c-compiler` (§17.2)
+3. `SV0_CC` environment variable
+4. `CC` environment variable
+5. `cc` resolved from `PATH`
+
+```console
+$ SV0_CC=/opt/llvm/bin/clang sv0c --emit=exe hello.sv0
+```
+
+Tiers 1–2 are unified before compiler resolution even runs (CLI wins
+over config, per §11.4) and are both treated as fully explicit: no
+fallback to any lower tier on failure. Tiers 3–5 are the *implicit*
+tiers and do fall through to each other, but only when unset.
 
 Filesystem host I/O (`read_file`/`write_file`/`read_dir`) has no
 dedicated fixture yet in the runtime-feature test suite — nothing in the
