@@ -72,6 +72,16 @@ actually passed.
 
 ## Implementation shape, following existing precedent exactly
 
+**Update**: this section's sketch is superseded by a deeper, line-anchored
+scoping pass — see
+[`native-executable-getenv-builtin-scoping.md`](native-executable-getenv-builtin-scoping.md).
+It corrects two things stated here: `write_bytes` (the most recently added
+host builtin, not `read_file`/`write_file`/`read_dir`) is the more
+current, more trustworthy template to follow; and `getenv` must return
+`""` on an unset variable, never panic — `read_file`'s actual behavior
+(re-read directly) is to panic on absence, the opposite of the
+"returns empty/sentinel on absence" contract assumed just below.
+
 Adding `getenv` is the same shape of change as adding `read_file`/
 `write_file`/`read_dir` originally was (T0-8/M3 G2,
 `sv0doc/compiler/bootstrap-host-io.md`), touching:
