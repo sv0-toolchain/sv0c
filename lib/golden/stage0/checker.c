@@ -6747,7 +6747,7 @@ static int test_infer_lit(void) {
   } else {
   }
   int _sv0t2 = infer_lit(1);
-  int _sv0t3 = TY_BOOL();
+  int _sv0t3 = TY_FLOAT();
   if ((_sv0t2 != _sv0t3)) {
     return 2;
   } else {
@@ -6770,10 +6770,16 @@ static int test_infer_lit(void) {
     return 5;
   } else {
   }
-  int _sv0t10 = infer_lit(99);
-  int _sv0t11 = (0 - 1);
+  int _sv0t10 = infer_lit(5);
+  int _sv0t11 = TY_BOOL();
   if ((_sv0t10 != _sv0t11)) {
     return 6;
+  } else {
+  }
+  int _sv0t12 = infer_lit(99);
+  int _sv0t13 = (0 - 1);
+  if ((_sv0t12 != _sv0t13)) {
+    return 7;
   } else {
   }
   return 0;
@@ -9811,7 +9817,7 @@ static int test_synth_expr(void) {
   } else {
   }
   sv0_vec_push(et, 0);
-  sv0_vec_push(ed1, 1);
+  sv0_vec_push(ed1, 5);
   sv0_vec_push(ed2, 0);
   sv0_vec_push(ed3, 0);
   sv0_vec_push(ed4v, 0);
