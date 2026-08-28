@@ -4578,8 +4578,13 @@ static int builtin_fn_lookup(const char* name_str) {
     return 16;
   } else {
   }
-  int _sv0t17 = (0 - 1);
-  return _sv0t17;
+  int _sv0t17 = sv0_string_eq(name_str, "getenv");
+  if (_sv0t17) {
+    return 17;
+  } else {
+  }
+  int _sv0t18 = (0 - 1);
+  return _sv0t18;
 }
 
 static int builtin_fn_ret_type(int bid) {
@@ -4668,8 +4673,13 @@ static int builtin_fn_ret_type(int bid) {
     return _sv0t16;
   } else {
   }
-  int _sv0t17 = (0 - 1);
-  return _sv0t17;
+  if ((bid == 17)) {
+    int _sv0t17 = TY_STRING();
+    return _sv0t17;
+  } else {
+  }
+  int _sv0t18 = (0 - 1);
+  return _sv0t18;
 }
 
 static int builtin_fn_param_count(int bid) {
@@ -4739,6 +4749,10 @@ static int builtin_fn_param_count(int bid) {
   }
   if ((bid == 16)) {
     return 2;
+  } else {
+  }
+  if ((bid == 17)) {
+    return 1;
   } else {
   }
   int _sv0t0 = (0 - 1);
@@ -4866,8 +4880,13 @@ static int builtin_fn_param_type(int bid, int idx) {
     return _sv0t23;
   } else {
   }
-  int _sv0t24 = (0 - 1);
-  return _sv0t24;
+  if ((bid == 17)) {
+    int _sv0t24 = TY_STRING();
+    return _sv0t24;
+  } else {
+  }
+  int _sv0t25 = (0 - 1);
+  return _sv0t25;
 }
 
 static int resolve_fn_call(int fn_names, const char* source, int starts, int ends, const char* name_str, int is_builtin_out) {
@@ -9504,6 +9523,28 @@ static int test_builtin_fn_lookup(void) {
   int _sv0t29 = TY_INT();
   if ((_sv0t28 != _sv0t29)) {
     return 19;
+  } else {
+  }
+  int _sv0t30 = builtin_fn_lookup("getenv");
+  if ((_sv0t30 != 17)) {
+    return 20;
+  } else {
+  }
+  int _sv0t31 = builtin_fn_ret_type(17);
+  int _sv0t32 = TY_STRING();
+  if ((_sv0t31 != _sv0t32)) {
+    return 21;
+  } else {
+  }
+  int _sv0t33 = builtin_fn_param_count(17);
+  if ((_sv0t33 != 1)) {
+    return 22;
+  } else {
+  }
+  int _sv0t34 = builtin_fn_param_type(17, 0);
+  int _sv0t35 = TY_STRING();
+  if ((_sv0t34 != _sv0t35)) {
+    return 23;
   } else {
   }
   return 0;

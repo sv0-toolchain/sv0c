@@ -3174,7 +3174,11 @@ fn enum_def_variant_shape_str(edef_names: Vec<i32>,
      0=println 1=string_len 2=string_eq 3=string_concat
      4=string_char_at 5=string_substr 6=vec_new 7=vec_push
      8=vec_len 9=vec_get 10=vec_set 11=box_new 12=box_deref
-     13=read_file 14=write_file 15=read_dir
+     13=read_file 14=write_file 15=read_dir 16=write_bytes
+     17=getenv (NEX-055c: host environment-variable read, "" when
+     unset, never panics -- a deliberate divergence from read_file's
+     panic-on-absence shape, since a caller needs to distinguish
+     "channel not present" from an actual I/O failure)
 
    For generic builtins (vec/box), return/param types use
    TY_VAR to signal polymorphism.                             */
@@ -3199,6 +3203,7 @@ fn builtin_fn_lookup(name_str: string) -> i32 {
     if string_eq(name_str, "write_file") { return 14; }
     if string_eq(name_str, "read_dir") { return 15; }
     if string_eq(name_str, "write_bytes") { return 16; }
+    if string_eq(name_str, "getenv") { return 17; }
     return 0 - 1;
 }
 
@@ -3220,6 +3225,7 @@ fn builtin_fn_ret_type(bid: i32) -> i32 {
     if bid == 14 { return TY_UNIT(); }
     if bid == 15 { return TY_STRING(); }
     if bid == 16 { return TY_UNIT(); }
+    if bid == 17 { return TY_STRING(); }
     return 0 - 1;
 }
 
@@ -3241,6 +3247,7 @@ fn builtin_fn_param_count(bid: i32) -> i32 {
     if bid == 14 { return 2; }
     if bid == 15 { return 1; }
     if bid == 16 { return 2; }
+    if bid == 17 { return 1; }
     return 0 - 1;
 }
 
@@ -3283,6 +3290,7 @@ fn builtin_fn_param_type(bid: i32, idx: i32) -> i32 {
         if idx == 0 { return TY_STRING(); }
         return TY_NAMED();
     }
+    if bid == 17 { return TY_STRING(); }
     return 0 - 1;
 }
 
@@ -5856,6 +5864,11 @@ fn test_builtin_fn_lookup() -> i32 {
     if builtin_fn_param_type(4, 1) != TY_INT() { return 17; }
     if builtin_fn_param_type(9, 0) != TY_NAMED() { return 18; }
     if builtin_fn_param_type(9, 1) != TY_INT() { return 19; }
+    /* NEX-055c: getenv (bid 17) -- string in, string out, arity 1. */
+    if builtin_fn_lookup("getenv") != 17 { return 20; }
+    if builtin_fn_ret_type(17) != TY_STRING() { return 21; }
+    if builtin_fn_param_count(17) != 1 { return 22; }
+    if builtin_fn_param_type(17, 0) != TY_STRING() { return 23; }
     return 0;
 }
 

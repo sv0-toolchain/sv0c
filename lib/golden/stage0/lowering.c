@@ -6822,6 +6822,11 @@ static int build_builtin_map_classify(const char* s) {
     return 18;
   } else {
   }
+  int _sv0t18 = sv0_string_eq(s, "getenv");
+  if (_sv0t18) {
+    return 19;
+  } else {
+  }
   return 0;
 }
 
@@ -8471,6 +8476,11 @@ static int lower_init_is_string(int et, int ed1, int ed2, int pp, int init_idx, 
         }
         int _sv0t11 = sv0_string_eq(nm, "read_dir");
         if (_sv0t11) {
+          return 1;
+        } else {
+        }
+        int _sv0t12 = sv0_string_eq(nm, "getenv");
+        if (_sv0t12) {
           return 1;
         } else {
         }
@@ -17452,6 +17462,16 @@ static int test_build_builtin_map(void) {
   int _sv0t10 = sv0_vec_get(bm, 5);
   if ((_sv0t10 != 0)) {
     return 7;
+  } else {
+  }
+  int _sv0t11 = build_builtin_map_classify("getenv");
+  if ((_sv0t11 != 19)) {
+    return 8;
+  } else {
+  }
+  int _sv0t12 = build_builtin_map_classify("write_bytes");
+  if ((_sv0t12 != 18)) {
+    return 9;
   } else {
   }
   return 0;

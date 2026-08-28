@@ -3781,7 +3781,10 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    stores the 1-based builtin ID (checker_id + 1); 0 otherwise.
    IDs 1–13 mirror checker.sv0 builtin_fn_lookup (0–12) shifted
    by +1.  ID 14 = no_alias.     IDs 15–17 = read_file / write_file / read_dir (host I/O; VM
-   CALL_BUILTIN 15–17).
+   CALL_BUILTIN 15–17). ID 18 = write_bytes (C/native-only, no VM
+   CALL_BUILTIN case). ID 19 = getenv (NEX-055c; C/native-only, same as
+   write_bytes -- no VM CALL_BUILTIN case, since a host-env read has no
+   meaningful role in .sv0b/VM execution).
    `old` requires structural AST matching and is handled separately. */
 
 fn build_builtin_map_classify(s: string) -> i32 {
@@ -3803,6 +3806,7 @@ fn build_builtin_map_classify(s: string) -> i32 {
     if string_eq(s, "write_file") { return 16; }
     if string_eq(s, "read_dir") { return 17; }
     if string_eq(s, "write_bytes") { return 18; }
+    if string_eq(s, "getenv") { return 19; }
     return 0;
 }
 
@@ -4728,6 +4732,7 @@ fn lower_init_is_string(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>
                 if string_eq(nm, "string_substr") { return true; }
                 if string_eq(nm, "read_file") { return true; }
                 if string_eq(nm, "read_dir") { return true; }
+                if string_eq(nm, "getenv") { return true; }
             }
         }
     }
@@ -9538,6 +9543,9 @@ fn test_build_builtin_map() -> i32 {
     if vec_get(bm, 3) != 10 { return 5; }
     if vec_get(bm, 4) != 14 { return 6; }
     if vec_get(bm, 5) != 0 { return 7; }
+    /* NEX-055c: getenv classifies to the next id after write_bytes (18). */
+    if build_builtin_map_classify("getenv") != 19 { return 8; }
+    if build_builtin_map_classify("write_bytes") != 18 { return 9; }
     return 0;
 }
 

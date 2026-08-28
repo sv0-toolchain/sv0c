@@ -179,6 +179,16 @@ const char *sv0_read_file(const char *path);
 void sv0_write_file(const char *path, const char *contents);
 const char *sv0_read_dir(const char *dir);
 
+/* getenv (NEX-055c, REL-004's minimal fix): returns the named environment
+   variable's value, or "" if unset -- NEVER panics on absence, unlike
+   sv0_read_file's panic-on-missing-file contract, since a caller (the
+   reentrant core-compiler entry point) needs to distinguish "no
+   per-invocation channel present" from a real I/O failure. The returned
+   pointer is owned by the process environment block (libc getenv's own
+   contract), not malloc'd -- unlike every other string-returning host
+   builtin here, this one is never freed by the caller. */
+const char *sv0_getenv(const char *name);
+
 /* write_bytes: raw binary write of a Vec<i32>'s byte values (low 8 bits each),
    NUL-safe (writes the vec length, not strlen) — for .sv0b bytecode emission.
    MUST be static inline in this header (not a .c function): the vec table is
