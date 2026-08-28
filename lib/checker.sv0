@@ -4611,11 +4611,20 @@ fn test_struct_field_ty() -> i32 {
 
 fn test_infer_lit() -> i32 {
     if infer_lit(0) != TY_INT() { return 1; }
-    if infer_lit(1) != TY_BOOL() { return 2; }
+    /* KC-001 fix: this assertion was stale against infer_lit's own body --
+       lit_tag 1 is TY_FLOAT() (see the BUGS.md #5 comment on infer_lit
+       itself: bool literals moved to lit_tag 5 once float literals
+       correctly claimed tag 1), not TY_BOOL(). The test was never updated
+       when that reassignment landed, so it asserted the OLD, wrong mapping
+       and had been failing ever since -- root-caused precisely (offset 232
+       = 230 + this function's own return 2) while closing out NEX-055c's
+       REL-004 work; fixed here as its own, separate, honestly-scoped fix. */
+    if infer_lit(1) != TY_FLOAT() { return 2; }
     if infer_lit(2) != TY_UNIT() { return 3; }
     if infer_lit(3) != TY_STRING() { return 4; }
     if infer_lit(4) != TY_CHAR() { return 5; }
-    if infer_lit(99) != 0 - 1 { return 6; }
+    if infer_lit(5) != TY_BOOL() { return 6; }
+    if infer_lit(99) != 0 - 1 { return 7; }
     return 0;
 }
 
@@ -6019,7 +6028,14 @@ fn test_synth_expr() -> i32 {
                               tfn, tfrt,
                               TY_INT(), 0, 0);
     if r0 != TY_INT() { return 1; }
-    vec_push(et, 0); vec_push(ed1, 1); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4v, 0);
+    /* KC-001 fix: lit_tag 5 is the real bool tag (see infer_lit's own
+       BUGS.md #5 comment) -- this pushed `1` before the same lit_tag
+       reassignment that broke test_infer_lit, and was never updated
+       either. synth_expr's ExprLit case (tag==0) passes ed1[idx] straight
+       to infer_lit(), so this was asserting a literal-tag-1 expr
+       (correctly TY_FLOAT() now) synthesizes to TY_BOOL() -- always wrong
+       post-reassignment, root-caused alongside test_infer_lit's own fix. */
+    vec_push(et, 0); vec_push(ed1, 5); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4v, 0);
     let r1: i32 = synth_expr(et, ed1, ed2, ed3, ed4v, ppool,
                               source, starts, ends, en, ety, em,
                               edn, edvo, edvc, edvn, edvs,
