@@ -1152,12 +1152,14 @@ structure Checker :> CHECKER = struct
         extend acc1n "write_bytes"
           (Types.TyFn ([Types.TyString, Types.TyNamed ("Vec", [Types.TyInt 32])], Types.TyUnit)) false
       val acc1o = extend acc1n2 "read_dir" (Types.TyFn ([Types.TyString], Types.TyString)) false
+      val acc1p =
+        extend acc1o "getenv" (Types.TyFn ([Types.TyString], Types.TyString)) false
       val acc2 =
         List.foldl
           (fn ((en, vars), acc) =>
              List.foldl
                (fn ((vn, sh), a) =>
-                  extend a (pathKey [en, vn]) (ctorTy en sh) false) acc vars) acc1o
+                  extend a (pathKey [en, vn]) (ctorTy en sh) false) acc vars) acc1p
           (!enumDefs)
       fun oneUse (it : Ast.item, acc : venv) : venv =
         case it of

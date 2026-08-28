@@ -163,6 +163,7 @@ structure Lowering :> LOWERING = struct
       | "string_substr" => "const char*"
       | "read_file"     => "const char*"
       | "read_dir"      => "const char*"
+      | "getenv"        => "const char*"
       | _ =>
           (case
             List.find
@@ -190,6 +191,10 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprLit (Ast.StringLit _, _) => "const char*"
     | Ast.ExprBlock (_, SOME e2, _) => exprInitCty e2
     | Ast.ExprIf (_, th, _, _) => exprInitCty th
+    | Ast.ExprPath ([x], _) =>
+        (case List.find (fn (v, _) => v = x) (!scrutLocals) of
+           SOME (_, cty) => cty
+         | NONE => "int")
     | _ => "int"
 
   fun matchScrutCty (e : Ast.expr) : string =
@@ -755,6 +760,10 @@ structure Lowering :> LOWERING = struct
         let val (is, v) = lowerExprToValue arg
             val t = freshTmp ()
         in (is @ [Ir.Call (SOME t, "sv0_read_dir", [v], "const char*")], Ir.VVar t) end
+    | Ast.ExprCall (Ast.ExprPath (["getenv"], _), [arg], _) =>
+        let val (is, v) = lowerExprToValue arg
+            val t = freshTmp ()
+        in (is @ [Ir.Call (SOME t, "sv0_getenv", [v], "const char*")], Ir.VVar t) end
     | Ast.ExprCall (Ast.ExprPath (["vec_new"], _), [], _) =>
         let val t = freshTmp ()
         in ([Ir.Call (SOME t, "sv0_vec_new", [], "int")], Ir.VVar t) end
