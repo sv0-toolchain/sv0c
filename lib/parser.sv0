@@ -5578,7 +5578,15 @@ fn test_parse_assign() -> i32 {
     let ends2: Vec<i32> = vec_new();
     vec_push(tags2, 8); vec_push(starts2, 0); vec_push(ends2, 1);
     vec_push(tags2, 5); vec_push(starts2, 2); vec_push(ends2, 3);
-    vec_push(tags2, 15); vec_push(starts2, 3); vec_push(ends2, 4);
+    /* KC-002 fix: tag 16 is TK_DOT ("."); tag 15 is COLONCOLON ("::", a path
+       separator). This pushed 15 for the "." in "x.y = 1;", which parse_expr
+       correctly rejects as invalid syntax (returns -1) since "x::y = 1;"
+       isn't a valid assignment target -- root-caused via a temporary debug
+       build that printed parse_expr's own return value. The dot-tag fix that
+       landed in parse_assign_target_op_pos (see its own comment, from
+       BUGS.md #6 / sv0-mathlib) checking `== 16` instead of `== 15` was never
+       propagated to this hand-rolled test fixture. */
+    vec_push(tags2, 16); vec_push(starts2, 3); vec_push(ends2, 4);
     vec_push(tags2, 5); vec_push(starts2, 4); vec_push(ends2, 5);
     vec_push(tags2, 35); vec_push(starts2, 6); vec_push(ends2, 7);
     vec_push(tags2, 0); vec_push(starts2, 8); vec_push(ends2, 9);
@@ -5602,7 +5610,9 @@ fn test_parse_assign() -> i32 {
     let ends3: Vec<i32> = vec_new();
     vec_push(tags3, 8); vec_push(starts3, 0); vec_push(ends3, 1);
     vec_push(tags3, 5); vec_push(starts3, 2); vec_push(ends3, 3);
-    vec_push(tags3, 15); vec_push(starts3, 3); vec_push(ends3, 4);
+    /* KC-002 fix: same stale dot-tag issue as tags2 above ("x.y += 1;" needs
+       tag 16 = TK_DOT, not 15 = COLONCOLON). */
+    vec_push(tags3, 16); vec_push(starts3, 3); vec_push(ends3, 4);
     vec_push(tags3, 5); vec_push(starts3, 4); vec_push(ends3, 5);
     vec_push(tags3, 44); vec_push(starts3, 6); vec_push(ends3, 8);
     vec_push(tags3, 0); vec_push(starts3, 8); vec_push(ends3, 9);
