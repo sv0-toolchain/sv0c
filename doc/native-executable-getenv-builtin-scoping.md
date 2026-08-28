@@ -3,12 +3,25 @@
 Deepens `native-executable-reentrant-core-compiler-design.md`'s
 high-level identification of a `getenv(name: string) -> string` builtin
 as REL-004's minimal real fix, into a full, file-by-file, line-anchored
-implementation plan. **Status: scoped, not implemented** — this is the
-builtin's own scoping only, not the wider REL-004 migration (adding the
-env-var read path to `driver.sv0`/`megaTU-main.sv0`, migrating
-`CoreCompilerClient`, retiring `/tmp/.sv0_drv_path`), which stays the
-reentrant-core-compiler design doc's own steps 2–6, a separate, later
-effort once this builtin exists and is proven self-host-safe.
+implementation plan. **Status: implemented** (the builtin itself — not
+the wider REL-004 migration: adding the env-var read path to
+`driver.sv0`/`megaTU-main.sv0`, migrating `CoreCompilerClient`, retiring
+`/tmp/.sv0_drv_path` stays the reentrant-core-compiler design doc's own
+steps 2–6, a separate, later effort).
+
+**A real sixth touch point, found only by building and running a
+fixture, not by static reading**: `lowering.sv0`'s `lower_init_is_string`
+— a THIRD, independent, hardcoded name list (distinct from both
+`checker.sv0`'s `builtin_fn_ret_type` and `megaTU-main.sv0`'s
+`megatu_builtin_ret_cty`) decides whether a `let x = <call>;` binding
+gets typed `const char*`. Missing this made `let x = getenv(...);`
+compile to a real C type error, even though `println(getenv(...))`
+(no `let` at all) worked correctly from the first pass. `read_file`/
+`read_dir` already have this exact same triplicated-knowledge shape — a
+real, pre-existing design fragility (three places must independently
+agree a builtin returns a string) this implementation had to extend
+correctly, not something introduced here. See the "Verification" section
+below for how this was found and confirmed.
 
 Every claim below comes from directly reading the current source, not
 from the prior design doc's own assumptions — one of them turned out to
@@ -48,7 +61,7 @@ unset one — acceptable for this builtin's actual use case (the
 core-compiler wrapper always sets a non-empty value), stated honestly
 rather than silently glossed over.
 
-## The five real touch points, in dependency order
+## The six real touch points, in dependency order
 
 1. **`sv0c/lib/checker.sv0`** (~line 3182–3243). `BUILTIN_COUNT()` — a
    pre-existing, already-stale constant (returns `16` even though IDs run
@@ -103,32 +116,56 @@ rather than silently glossed over.
    `free`, a real difference in ownership shape from every other
    string-returning host builtin so far, worth noting rather than
    assuming symmetry.
+6. **`sv0c/lib/lowering.sv0`**'s `lower_init_is_string` (the real,
+   scoping-pass-missed sixth touch point mentioned above). Added
+   `if string_eq(nm, "getenv") { return true; }` to its hardcoded
+   builtin-name list, alongside `read_file`/`read_dir`.
 
-## Verification (for the future implementation session)
+## Verification (done, real, not hypothetical)
 
-Same discipline as every other slice in this project:
+Same discipline as every other slice in this project — all of the
+following were actually run, not just planned:
 
-- A real sv0 fixture exercising `getenv` end to end: set/unset an
-  environment variable, compile+run via the real native pipeline
-  (`build_native_executable`, reusing the existing `.sv0` fixture
-  convention this project already has dozens of), assert the observed
-  stdout/exit code reflects the variable's value or its absence.
-- `sv0c`'s own `make test` (checker/resolver/lowering unit tests +
-  `test_builtin_fn_lookup`/`test_build_builtin_map`'s new cases) stays
-  green.
-- The **existing 114-program native behavior corpus**
-  (`verify_behavior_corpus_native.py`) must still pass unmodified — the
-  same "stronger evidence than adding synthetic fixtures" standard
-  NEX-016 used, proving the new builtin id didn't disturb any existing
-  dispatch.
-- The self-host loop (`./scripts/sv0 test`) must still pass — the step
-  the original design doc correctly flagged as highest-consequence, since
-  a mistake here risks the compiler's own ability to compile itself. A
-  `getenv` addition changes 5 files' builtin-dispatch tables; the
-  self-host loop is what actually proves the compiler can still compile
-  *itself* through those same tables, unchanged.
+- Rebuilt the native mega-TU compiler from these exact source changes
+  (`scripts/build-sv0-megatu-native.sh`) — compiled clean through the
+  full SML bootstrap + C compile pipeline.
+- 4 real `.sv0` fixtures compiled and **run** via the real native
+  pipeline: an explicit `: string` annotation, an inferred `let`, a
+  direct call-as-argument with no `let` at all, and `read_file`'s own
+  `let`-binding as a sanity check that the third-touch-point bug wasn't
+  `getenv`-specific. All confirmed correct **at runtime**: `getenv` reads
+  a real environment variable's value, and returns `""` (never panics)
+  when unset.
+- `sv0c`'s own `make test`: 307/308 SML-side unit tests pass; the one
+  failure (`checker rejects int/bool binop`) is the same pre-existing,
+  already-known failure, confirmed unrelated via a `git stash` clean-tree
+  reproduction.
+- The existing 114-program native behavior corpus
+  (`verify_behavior_corpus_native.py`) passes unmodified.
+- 3 stage0 C goldens (`checker.c`/`resolver.c`/`lowering.c`) and 5
+  vm-parity SML bytecode goldens (those three plus `codegen`/`parser`,
+  which transitively depend on the same shared compiled unit) refreshed
+  — each diff inspected and confirmed to contain exactly the expected
+  `getenv`-related additions, nothing else; captured twice to confirm
+  determinism.
+- The self-host loop's own "exit 232 for `lib/checker.sv0`" (and the
+  stale `main.sv0b` vm-parity mismatch it causes downstream, by aborting
+  the bootstrap-build loop early before reaching `main.sv0`) is the SAME
+  pre-existing, already-tracked issue (`KC-001` in
+  `native_exe_known_conflicts.py`) — confirmed by reproducing it
+  byte-identically on a `git stash`'d clean tree. Root-caused precisely:
+  it's `test_infer_lit` (an entirely unrelated literal-type-inference
+  test) failing inside `checker.sv0`'s own internal test aggregator at
+  offset `230+2=232`, far from where the new `getenv` test cases
+  (`test_builtin_fn_lookup`, offset `580`) live — this pre-existing
+  failure blocks the aggregator from ever reaching the new assertions via
+  that specific path. The assertions themselves were verified correct
+  directly: by inspecting the stage0 C diff (each produces exactly the
+  expected emitted comparison) and by the real end-to-end fixture runs
+  above, which exercise the identical logic through the actual compiled
+  pipeline.
 
-Explicitly **not** part of this scoping or its future implementation:
+Explicitly **not** done here, per this scoping's own stated boundary:
 wiring `getenv` into `driver.sv0`/`megaTU-main.sv0`'s own entry-reading
 logic, migrating `CoreCompilerClient`, or touching any existing
 `/tmp/.sv0_drv_path` caller — those remain
