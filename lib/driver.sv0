@@ -4620,24 +4620,20 @@ fn test_drv_vm_while_break() -> i32 {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 fn main() -> i32 {
-    /* CLI mode: if /tmp/.sv0_drv_path contains a non-empty path, compile it.
-       The build/sv0-self-host-compiler wrapper writes the input path here before
-       invoking this binary; build-sv0-self-host-compiler.sh creates it empty so
-       that test-mode invocations (which do NOT use the wrapper) fall through.
+    /* CLI mode: if SV0_DRV_REQUEST is a non-empty value, compile it.
 
-       NEX-055c/REL-004: SV0_DRV_REQUEST, when set to a non-empty value, is a
+       NEX-055c/REL-004 closure: this is now the ONLY entry channel. It is a
        reentrant, per-invocation private request channel (a real host env
-       var, unshared between processes) preferred over the legacy shared
-       control file -- eliminates the cross-process race entirely for a
-       caller that sets it. This is an ADDITIONAL read path, not a
-       replacement: an existing caller that only ever writes the control
-       file (SV0_DRV_REQUEST unset) is completely unaffected. */
-    let env_req: string = getenv("SV0_DRV_REQUEST");
-    let cli: string = if string_len(env_req) > 0 {
-        env_req
-    } else {
-        read_file("/tmp/.sv0_drv_path")
-    };
+       var, unshared between processes) -- no cross-process race is possible.
+       Every caller (build/sv0-self-host-compiler's wrapper, the mega-TU
+       wrappers, scripts/sv0, CI) was migrated off the legacy shared
+       /tmp/.sv0_drv_path control file in NEX-055c/REL-004's own closure
+       plan (steps 2-5) before this fallback was removed; a static guard
+       (scripts/native_exe_no_new_legacy_control_file.py) enforces that no
+       new caller reintroduces the retired file. getenv() never panics on an
+       unset variable (returns "") -- an unset SV0_DRV_REQUEST falls through
+       to test mode exactly as an empty legacy control file used to. */
+    let cli: string = getenv("SV0_DRV_REQUEST");
     if string_len(cli) > 0 {
         let n: i32 = string_len(cli);
         let path: string = if string_char_at(cli, n - 1) == 10 {
