@@ -138,23 +138,24 @@ Windows support (the runtime and driver depend on POSIX APIs). WSL runs the
 Linux build and produces a Linux executable, not a Windows-native one.
 
 `--profile=release` (NEX-051), `--message-format=json` (NEX-041/059),
-build records via `--build-record` (NEX-042/059), and `--keep-c`
-(NEX-040/059) are all implemented and wired through both CLI surfaces —
-see [`native-executable-stable.md`](native-executable-stable.md) for the
-R1 stable-surface detail (profiles table, build-record schema,
-reproducibility/sanitizer/performance gates).
+build records via `--build-record` (NEX-042/059), `--keep-c`
+(NEX-040/059), and `sv0.toml` project configuration (Section 17,
+`native_exe_config.py`, NEX-043) are all implemented and wired through
+both CLI surfaces — see [`native-executable-stable.md`](native-executable-stable.md)
+for the R1 stable-surface detail (profiles table, build-record schema,
+reproducibility/sanitizer/performance gates). `sv0.toml`'s discovered
+path is surfaced in `--verbose` output and in build records, per §17.3.
 
 **Still genuinely unwired, stated honestly rather than silently left for
-a reader to discover**: `sv0.toml` project-configuration discovery
-(`native_exe_config.py`, NEX-043) is fully built and tested in isolation,
-but `native_exe_request.NativeBuildRequest.config_path` is hardcoded to
-`None` in `normalize_request` — no CLI flag or auto-discovery path feeds
-a real `sv0.toml` into an actual build yet. `--emit=c`
+a reader to discover**: the `SV0_CC` environment-variable compiler tier
+(`native_exe_cc_select.py`'s own docstring names it as the one remaining
+R0.1 precedence tier — `--cc` → `sv0.toml` → `SV0_CC` → `CC` → `PATH` —
+`sv0.toml`'s tier is wired, `SV0_CC` is not). `--emit=c`
 (`native_exe_emit_c.emit_c_only`, NEX-039 — write C atomically, never
-invoke the host compiler) is similarly fully built but unreachable from
-either CLI surface: `native_exe_cli.py`'s grammar explicitly rejects
-`--emit=c` today (`"only --emit=exe is accepted here"`). Both are real,
-scoped follow-up tasks, not aspirational claims.
+invoke the host compiler) is fully built but unreachable from either CLI
+surface: `native_exe_cli.py`'s grammar explicitly rejects `--emit=c`
+today (`"only --emit=exe is accepted here"`). Both are real, scoped
+follow-up tasks, not aspirational claims.
 
 Filesystem host I/O (`read_file`/`write_file`/`read_dir`) has no
 dedicated fixture yet in the runtime-feature test suite — nothing in the
