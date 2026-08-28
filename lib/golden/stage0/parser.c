@@ -10135,7 +10135,7 @@ static int test_parse_assign(void) {
   sv0_vec_push(tags2, 5);
   sv0_vec_push(starts2, 2);
   sv0_vec_push(ends2, 3);
-  sv0_vec_push(tags2, 15);
+  sv0_vec_push(tags2, 16);
   sv0_vec_push(starts2, 3);
   sv0_vec_push(ends2, 4);
   sv0_vec_push(tags2, 5);
@@ -10201,7 +10201,7 @@ static int test_parse_assign(void) {
   sv0_vec_push(tags3, 5);
   sv0_vec_push(starts3, 2);
   sv0_vec_push(ends3, 3);
-  sv0_vec_push(tags3, 15);
+  sv0_vec_push(tags3, 16);
   sv0_vec_push(starts3, 3);
   sv0_vec_push(ends3, 4);
   sv0_vec_push(tags3, 5);
