@@ -115,9 +115,12 @@ changes all follow versioned change control:
 - A build-record schema change requires bumping
   `native_exe_build_record.SCHEMA_VERSION` and updating this page's
   "Build-record schema" section.
-- Public CLI surface changes (once `sv0c --emit=exe` itself ships) follow
-  ordinary release review — this project has no separate CLI-versioning
-  scheme beyond the toolchain's own release process.
+- Public CLI surface changes follow ordinary release review — this
+  project has no separate CLI-versioning scheme beyond the toolchain's own
+  release process. `sv0c --emit=exe` (the installed spelling, NEX-060) and
+  `./scripts/sv0 native-compile` (the workspace adapter, NEX-059) share
+  one implementation end to end, so a CLI change lands once and applies to
+  both.
 - None of these are silent: every version-gated check in this codebase
   fails closed on an unrecognized/unsupported version rather than
   guessing compatibility.

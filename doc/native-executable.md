@@ -9,22 +9,24 @@ this writing).
 
 ## Current status
 
-**The engine is real and tested end to end; the public CLI command is not
-wired up yet.** Every phase described below — entry validation, runtime
+**The engine and both CLI command surfaces are real and tested end to
+end.** Every phase described below — entry validation, runtime
 resolution, host-compiler selection and probing, core-compiler invocation,
 staging, atomic publication — is implemented and covered by a real
-`--selftest` corpus (including all 112 rows of
+`--selftest` corpus (including all 114 rows of
 `sv0c/test/behavior/manifest.txt` compiled, linked, and run) in the parent
-repo's `scripts/native_exe_*.py`. What doesn't exist yet is the installed
-`sv0c --emit=exe` command surface itself, or the `./scripts/sv0
-native-compile` workspace adapter — that CLI-entry-point wiring is later
-work, once this band's reliability gates (this doc's own closure) land.
+repo's `scripts/native_exe_*.py`. Per spec §11.1/line 472 ("R1
+documentation SHALL lead with the installed `sv0c` spelling"), the
+examples below use the installed `sv0c --emit=exe` spelling directly —
+that command is real (NEX-059/060: `native_exe_cli.py` → `native_exe_request.py`
+→ `native_exe_main.py`, fronted by an installed `<install>/bin/sv0c`
+launcher, `scripts/native_exe_install_launcher.py`). During repository
+development, `./scripts/sv0 native-compile` is the exact same
+implementation under a workspace-adapter name (spec §25's own sanctioned
+substitution) — use it interchangeably with `sv0c --emit=exe` in any
+example below when working inside this repo's own checkout.
 
-The examples below describe the **target design** (spec §25's worked
-examples, using the spec's canonical spellings) alongside how to exercise
-the same behavior **today**, directly through the tested engine.
-
-## Single-file build (target CLI)
+## Single-file build
 
 ```console
 $ sv0c --emit=exe hello.sv0
@@ -35,21 +37,16 @@ $ echo $?
 0
 ```
 
-Today, the same build runs through the engine directly (from the parent
-`sv0-toolchain` repo root, so `scripts/` is import-visible):
+Equivalently, from inside this repo's own checkout (the workspace
+adapter — same implementation, same normalized request, per §11.1):
 
 ```console
-$ PYTHONPATH=scripts python3 -c "
-from native_exe_build import build_native_executable
-r = build_native_executable('file', '/abs/path/hello.sv0', None, '.')
-print(r.message)
-"
-sv0c: built ./build/native/hello (backend=c, profile=dev, contracts=runtime)
+$ ./scripts/sv0 native-compile hello.sv0
+sv0c: built build/native/hello (backend=c, profile=dev, contracts=runtime)
 ```
 
-(`output_path=None` triggers the same default-naming rule as omitting `-o`
-on the target CLI — `<cwd>/build/native/<stem>` — and creates the
-`build/native/` directory automatically.)
+(Omitting `-o` triggers the default-naming rule — `<cwd>/build/native/<stem>`
+— and creates the `build/native/` directory automatically.)
 
 
 ## Explicit output path
@@ -116,11 +113,29 @@ development-profile build. It does not claim strict C99 conformance —
 Windows support (the runtime and driver depend on POSIX APIs). WSL runs the
 Linux build and produces a Linux executable, not a Windows-native one.
 
-`--profile=release`, `sv0.toml` configuration, `--message-format=json`,
-build records, and `--keep-c` are not yet implemented (R0.1+). Filesystem
-host I/O (`read_file`/`write_file`/`read_dir`) has no dedicated fixture yet
-in the runtime-feature test suite — nothing in the current behavior corpus
-exercises it, so it isn't a proven part of this feature's tested surface.
+`--profile=release` (NEX-051), `--message-format=json` (NEX-041/059),
+build records via `--build-record` (NEX-042/059), and `--keep-c`
+(NEX-040/059) are all implemented and wired through both CLI surfaces —
+see [`native-executable-stable.md`](native-executable-stable.md) for the
+R1 stable-surface detail (profiles table, build-record schema,
+reproducibility/sanitizer/performance gates).
+
+**Still genuinely unwired, stated honestly rather than silently left for
+a reader to discover**: `sv0.toml` project-configuration discovery
+(`native_exe_config.py`, NEX-043) is fully built and tested in isolation,
+but `native_exe_request.NativeBuildRequest.config_path` is hardcoded to
+`None` in `normalize_request` — no CLI flag or auto-discovery path feeds
+a real `sv0.toml` into an actual build yet. `--emit=c`
+(`native_exe_emit_c.emit_c_only`, NEX-039 — write C atomically, never
+invoke the host compiler) is similarly fully built but unreachable from
+either CLI surface: `native_exe_cli.py`'s grammar explicitly rejects
+`--emit=c` today (`"only --emit=exe is accepted here"`). Both are real,
+scoped follow-up tasks, not aspirational claims.
+
+Filesystem host I/O (`read_file`/`write_file`/`read_dir`) has no
+dedicated fixture yet in the runtime-feature test suite — nothing in the
+current behavior corpus exercises it, so it isn't a proven part of this
+feature's tested surface.
 
 ## R0 host matrix and required CI jobs
 
