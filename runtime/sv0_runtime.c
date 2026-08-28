@@ -164,6 +164,11 @@ void sv0_write_file(const char *path, const char *contents) {
     sv0_panic("write_file: fclose failed");
 }
 
+const char *sv0_getenv(const char *name) {
+  const char *v = getenv(name);
+  return v != NULL ? v : "";
+}
+
 const char *sv0_read_dir(const char *dir) {
   sv0_path_list pl = {NULL, 0u, 0u};
   sv0_collect_sv0_r(dir, &pl);

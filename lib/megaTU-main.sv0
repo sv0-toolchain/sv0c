@@ -1009,8 +1009,9 @@ fn megatu_field_name(fh: i32, source: string, starts: Vec<i32>,
     return handle_to_str(fh, source, starts, ends);
 }
 
-/* Builtin id (lowering build_builtin_map: println=1 … read_dir=17) -> runtime C
-   function name. Builtin calls lower to Call(dst, 0 - id, args, rt), so the emit
+/* Builtin id (lowering build_builtin_map: println=1 … read_dir=17,
+   write_bytes=18, getenv=19) -> runtime C function name. Builtin calls
+   lower to Call(dst, 0 - id, args, rt), so the emit
    maps the negated sentinel back here. Value-returning string builtins
    (string_concat/substr) still get an `int` dest today — non-int call returns are
    a separate gap — so string_api is not yet fully supported. */
@@ -1038,18 +1039,21 @@ fn megatu_builtin_name(bid: i32) -> string {
     if bid == 16 { return "sv0_write_file"; }
     if bid == 17 { return "sv0_read_dir"; }
     if bid == 18 { return "sv0_write_bytes"; }
+    if bid == 19 { return "sv0_getenv"; }
     return "sv0_unknown_builtin";
 }
 
 /* C return type of a builtin call's result (dst) by builtin id. String-returning
-   builtins (string_concat=4, string_substr=6, read_file=15, read_dir=17) yield
-   const char*; everything else that returns a value (string_len, string_eq,
-   char_at, vec_*, box_*) is int. Used to type the call-result temp. */
+   builtins (string_concat=4, string_substr=6, read_file=15, read_dir=17,
+   getenv=19) yield const char*; everything else that returns a value
+   (string_len, string_eq, char_at, vec_*, box_*) is int. Used to type the
+   call-result temp. */
 fn megatu_builtin_ret_cty(bid: i32) -> string {
     if bid == 4 { return "const char*"; }
     if bid == 6 { return "const char*"; }
     if bid == 15 { return "const char*"; }
     if bid == 17 { return "const char*"; }
+    if bid == 19 { return "const char*"; }
     return "int";
 }
 
