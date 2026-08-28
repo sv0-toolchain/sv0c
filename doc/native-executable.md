@@ -146,16 +146,29 @@ for the R1 stable-surface detail (profiles table, build-record schema,
 reproducibility/sanitizer/performance gates). `sv0.toml`'s discovered
 path is surfaced in `--verbose` output and in build records, per §17.3.
 
+`--emit=c` (CLI-014) is also wired through both CLI surfaces: it writes
+the emitted C atomically to an explicit `-o` path and never invokes the
+host compiler at all.
+
+```console
+$ sv0c --emit=c -o hello.c hello.sv0
+sv0c: wrote C to hello.c
+```
+
+`-o` is required — `--emit=c` has no default-naming rule of its own in
+the spec, so a bare `sv0c --emit=c hello.sv0` is a usage error (exit 2)
+rather than a guessed path. `--keep-c`, `--build-record`, and
+`--message-format=json` are all rejected in combination with `--emit=c`
+(each is meaningless without an executable artifact or a compiler
+identity to report) — use `--emit=exe --keep-c` if you want the emitted
+C retained *alongside* a real build.
+
 **Still genuinely unwired, stated honestly rather than silently left for
 a reader to discover**: the `SV0_CC` environment-variable compiler tier
 (`native_exe_cc_select.py`'s own docstring names it as the one remaining
 R0.1 precedence tier — `--cc` → `sv0.toml` → `SV0_CC` → `CC` → `PATH` —
-`sv0.toml`'s tier is wired, `SV0_CC` is not). `--emit=c`
-(`native_exe_emit_c.emit_c_only`, NEX-039 — write C atomically, never
-invoke the host compiler) is fully built but unreachable from either CLI
-surface: `native_exe_cli.py`'s grammar explicitly rejects `--emit=c`
-today (`"only --emit=exe is accepted here"`). Both are real, scoped
-follow-up tasks, not aspirational claims.
+`sv0.toml`'s tier is wired, `SV0_CC` is not). This is a real, scoped
+follow-up task, not an aspirational claim.
 
 Filesystem host I/O (`read_file`/`write_file`/`read_dir`) has no
 dedicated fixture yet in the runtime-feature test suite — nothing in the
