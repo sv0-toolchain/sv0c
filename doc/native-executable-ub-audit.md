@@ -49,14 +49,20 @@ alias-analysis conservatism for this specific pattern in practice, but the
 spec (correctly) treats "hasn't misbehaved yet" as insufficient evidence
 for a stable release.
 
-**Classification: needs `-fno-strict-aliasing`.** A full representation
-change (e.g., making every read also go through `memcpy` into a local of
-type `T`, which *is* well-defined regardless of strict-aliasing) is
-possible and would be strictly stronger, but changes the box-deref macro's
-codegen shape used pervasively across the bootstrap compiler's own
-generated C — deferred as a documented, lower-priority follow-up rather
-than blocking R1, per §16.5's explicit allowance for `-fno-strict-aliasing`
-as an accepted mitigation "if the current raw box representation remains."
+**Classification: FIXED (post-R1 cleanup pass, KC-004).** Originally
+classified "needs `-fno-strict-aliasing`", deferred as a documented,
+lower-priority follow-up rather than blocking R1. Since fixed for real:
+confirmed by direct reading of every emission site (`megaTU-main.sv0`'s
+`Call` codegen) that `sv0__box_deref_raw`'s expansion is used strictly as
+an rvalue — `T dst = sv0__box_deref_raw(h, T);`, never an assignment
+target — so the macro was rewritten as a statement expression that
+`memcpy`s the pool bytes into a same-typed local (well-defined regardless
+of strict-aliasing, mirroring `sv0__box_new_raw`'s existing pattern)
+instead of a pointer-cast-and-deref. Verified: sv0c's 308/308 unit tests
+pass; the full 114-program native behavior corpus passes unmodified; the
+same corpus recompiled at `-O2 -Wstrict-aliasing=2` with **no**
+`-fno-strict-aliasing` produces zero aliasing diagnostics and identical
+exit codes to the mitigated build.
 
 ## Site 2 — cross-struct reinterpretation between `lowering.sv0::Value` and `codegen.sv0::Value`
 
@@ -75,13 +81,25 @@ between `intptr_t` and a payload type — a stronger, more fragile instance
 of the same risk, embedded directly in the bootstrap compiler's own
 generated C rather than in a generic runtime primitive.
 
-**Classification: needs `-fno-strict-aliasing`.** A representation change
-here (e.g., a real shared type between the two files, or an explicit
-memcpy-based reinterpretation helper) would require touching the bootstrap
-compiler's own cross-module type-sharing story — out of scope for R1;
-`-fno-strict-aliasing` is the same accepted mitigation as Site 1, and both
-sites share one root cause (the box-pool representation), so one flag
-covers both.
+**Classification: FIXED as a side effect of the Site 1 fix (KC-004).**
+Originally classified "needs `-fno-strict-aliasing`", with a real
+representation change (a shared type between the two files, or an explicit
+reinterpretation helper) deferred as out of scope for R1. Since this site
+is realized through the exact same `sv0__box_deref_raw` macro Site 1 uses
+(confirmed above: "the same underlying pattern... through
+`sv0__box_deref_raw`"), Site 1's fix — rewriting the macro to `memcpy` the
+pool bytes into a same-typed local instead of a pointer-cast deref —
+applies here too with no separate change needed: a `memcpy`-based read
+into a local of the *requested* type `T` is well-defined regardless of
+what type originally wrote those bytes, provided the byte pattern is a
+valid representation of `T` (true here, by the "layout-compatible by
+convention" property both files' matching comments already document).
+Verified directly, not just inferred: the mega-TU compiler binary itself
+(where this cross-struct reinterpretation actually executes, at compile
+time, translating other `.sv0` sources) was rebuilt at `-O2` with **no**
+`-fno-strict-aliasing` and used to recompile every `enum_*`/`struct_*`/
+`combo_*` fixture in the behavior corpus — output byte-for-byte identical
+(same exit codes) to the previously-mitigated build for every one.
 
 ## Site 3 — enum payload "flat tagged struct" field reuse (related, already mitigated)
 
@@ -162,8 +180,8 @@ casts to an unrelated pointer type, no punning).
 
 | Site | Location | Classification |
 |---|---|---|
-| 1 | `sv0__box_deref_raw` (`sv0_runtime.h`) | needs `-fno-strict-aliasing` |
-| 2 | `lowering.sv0`/`codegen.sv0` `Value` cross-reinterpretation | needs `-fno-strict-aliasing` (same root cause as Site 1) |
+| 1 | `sv0__box_deref_raw` (`sv0_runtime.h`) | FIXED (KC-004: memcpy-based read, no `-fno-strict-aliasing` needed) |
+| 2 | `lowering.sv0`/`codegen.sv0` `Value` cross-reinterpretation | FIXED (KC-004: same fix as Site 1, same macro) |
 | 3 | flat tagged-struct payload slot reuse | already mitigated (BUGS.md #8); no action |
 | 4 | signed arithmetic overflow (negation, div/mod by -1 at type-min) | needs a decision + fixture coverage (NEX-048b) |
 | 5 | box pool/vec table unchecked box indexing | safe under `-O2` (documented design, not UB) |
@@ -172,10 +190,23 @@ casts to an unrelated pointer type, no punning).
 
 ## Conclusion for NEX-051 (release profile)
 
-`native_exe_argv_builder.build_release_profile_argv` (NEX-051a) SHALL
-include `-fno-strict-aliasing` alongside `-O2`, covering Sites 1 and 2 —
-the only sites this audit classifies as needing a compiler-flag mitigation
+Originally: `native_exe_argv_builder.build_release_profile_argv` (NEX-051a)
+included `-fno-strict-aliasing` alongside `-O2`, covering Sites 1 and 2 —
+the only sites this audit classified as needing a compiler-flag mitigation
 rather than being already safe or needing further fixture-driven decision
-work. Site 4's arithmetic-overflow question is NEX-048b/050's job to
-resolve with sanitizer evidence before NEX-051's behavioral-parity gate
-(051b) can honestly claim dev/release equivalence on the full corpus.
+work.
+
+**Post-R1 update (KC-004 cleanup pass):** both Sites 1 and 2 are now fixed
+at the representation level (see above) — no remaining site in this audit
+needs `-fno-strict-aliasing`. `build_release_profile_argv` has had the flag
+removed accordingly; the release profile now runs under full strict-aliasing
+optimization with no known live violation, re-verified via the full
+114-program behavior corpus (byte-identical exit codes with and without the
+flag) plus the mega-TU compiler binary itself (where Site 2's cross-struct
+reinterpretation actually executes) recompiling the enum/struct/combo
+fixture set at `-O2` with no aliasing mitigation, output unchanged.
+
+Site 4's arithmetic-overflow question is NEX-048b/050's job to resolve with
+sanitizer evidence before NEX-051's behavioral-parity gate (051b) can
+honestly claim dev/release equivalence on the full corpus — unrelated to
+strict-aliasing and not affected by this update.

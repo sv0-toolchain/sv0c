@@ -172,7 +172,23 @@ static inline int32_t sv0__box_new_raw_impl(const void* data, int nbytes) {
   __typeof__(val) _sv0_box_tmp = (val); \
   sv0__box_new_raw_impl(&_sv0_box_tmp, (int)sizeof(_sv0_box_tmp)); \
 })
-#define sv0__box_deref_raw(h, T) (*(T *)(void *)&sv0_box_pool[(h)])
+/* KC-004 (native-executable-ub-audit.md, Site 1): the original definition
+ * `(*(T *)(void *)&sv0_box_pool[(h)])` reads through a pointer whose
+ * pointed-to type (T) generally differs from the pool's declared element
+ * type (intptr_t) — a real strict-aliasing violation under C's effective-type
+ * rules, previously mitigated only by building with `-fno-strict-aliasing`.
+ * Fixed for real here: every emission site (megaTU-main.sv0's Call codegen,
+ * confirmed by direct reading) uses this macro's expansion strictly as an
+ * rvalue -- `T dst = sv0__box_deref_raw(h, T);` -- never as an assignment
+ * target, so rewriting it as a statement expression that `memcpy`s the bytes
+ * into a same-typed local (well-defined regardless of strict-aliasing, per
+ * the same reasoning already used for sv0__box_new_raw above) is a drop-in,
+ * behavior-preserving replacement that needs no `-fno-strict-aliasing`. */
+#define sv0__box_deref_raw(h, T) __extension__({ \
+  T _sv0_box_deref_tmp; \
+  memcpy(&_sv0_box_deref_tmp, &sv0_box_pool[(h)], sizeof(T)); \
+  _sv0_box_deref_tmp; \
+})
 
 /* Host filesystem (T0-8 / M3 G2): see sv0doc/compiler/bootstrap-host-io.md */
 const char *sv0_read_file(const char *path);
