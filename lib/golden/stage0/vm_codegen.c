@@ -85,18 +85,18 @@ static int index_of_fn(int fn_h, int fn_names, const char* source, int starts, i
 static int member_offset_from_field(int width, int field_h);
 static int emit_member_load_from_var(int x, int field_h, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends, int out);
 static int emit_value(Value v, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
-static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
+static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
 static int vec_append(int dst, int src);
 static int flat_byte_size(int instrs);
 static int emit_ret_width(Value v, int env_names, int env_bases, int env_widths, const char* source, int starts, int ends);
 static int emit_box_new(int dst_h, int args, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
-static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out);
-static int emit_instrs(int instrs, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out);
-static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names);
-static int ensure_var_int(int name, int env_names, int env_bases, int env_widths, int env_field_starts, int next_slot, const char* source, int starts, int ends);
-static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_widths, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends);
-static int scan_instrs_env(int instrs, int env_names, int env_bases, int env_widths, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends);
-static int local_count_and_env(int param_names, int param_ctys, int instrs, int env_names, int env_bases, int env_widths, int env_field_starts, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends);
+static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out);
+static int emit_instrs(int instrs, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out);
+static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names);
+static int ensure_var_int(int name, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int next_slot, const char* source, int starts, int ends);
+static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends);
+static int scan_instrs_env(int instrs, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends);
+static int local_count_and_env(int param_names, int param_ctys, int instrs, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends);
 static int compute_arity(int param_ctys, int structs_names, int structs_field_counts, int enums_names, int enums_widths, const char* source, int starts, int ends);
 static int emit_fn(int label, int param_names, int param_ctys, int instrs, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int pool, const char* source, int starts, int ends, int fn_names, int ft_entries);
 static int is_main_label(int label, const char* source, int starts, int ends);
@@ -1707,7 +1707,7 @@ static int emit_value(Value v, int env_names, int env_bases, int env_widths, int
   return _sv0t29;
 }
 
-static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out) {
+static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out) {
   int _sv0t0;
   if ((e.tag == 0)) {
     int bv = e.p0;
@@ -2168,7 +2168,7 @@ static int emit_box_new(int dst_h, int args, int env_names, int env_bases, int e
   return total;
 }
 
-static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out) {
+static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out) {
   int _sv0t0;
   if ((ins.tag == 0)) {
     return 0;
@@ -2202,7 +2202,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
           e.p0 = (_sv0t151).p0;
           e.p1 = (_sv0t151).p1;
           e.p2 = (_sv0t151).p2;
-          int _sv0t156 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+          int _sv0t156 = emit_expr(e, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
           int n = _sv0t156;
           if ((n < 0)) {
             int _sv0t157 = (0 - 1);
@@ -2251,7 +2251,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
             e.p0 = (_sv0t135).p0;
             e.p1 = (_sv0t135).p1;
             e.p2 = (_sv0t135).p2;
-            int _sv0t140 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+            int _sv0t140 = emit_expr(e, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             int n = _sv0t140;
             if ((n < 0)) {
               int _sv0t141 = (0 - 1);
@@ -2301,7 +2301,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
               e.p0 = (_sv0t117).p0;
               e.p1 = (_sv0t117).p1;
               e.p2 = (_sv0t117).p2;
-              int _sv0t122 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+              int _sv0t122 = emit_expr(e, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
               int ne = _sv0t122;
               if ((ne < 0)) {
                 int _sv0t123 = (0 - 1);
@@ -2362,7 +2362,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                 cond.p0 = (_sv0t95).p0;
                 cond.p1 = (_sv0t95).p1;
                 cond.p2 = (_sv0t95).p2;
-                int _sv0t100 = emit_expr(cond, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+                int _sv0t100 = emit_expr(cond, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
                 int nc = _sv0t100;
                 if ((nc < 0)) {
                   int _sv0t101 = (0 - 1);
@@ -2371,7 +2371,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                 }
                 int _sv0t102 = sv0_vec_new();
                 int then_out = _sv0t102;
-                int _sv0t103 = emit_instrs(th, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, then_out);
+                int _sv0t103 = emit_instrs(th, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, then_out);
                 int nt = _sv0t103;
                 if ((nt < 0)) {
                   int _sv0t104 = (0 - 1);
@@ -2380,7 +2380,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                 }
                 int _sv0t105 = sv0_vec_new();
                 int else_out = _sv0t105;
-                int _sv0t106 = emit_instrs(el, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, else_out);
+                int _sv0t106 = emit_instrs(el, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, else_out);
                 int ne = _sv0t106;
                 if ((ne < 0)) {
                   int _sv0t107 = (0 - 1);
@@ -2426,17 +2426,17 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                   cond.p2 = (_sv0t69).p2;
                   int _sv0t74 = sv0_vec_new();
                   int cond_out = _sv0t74;
-                  int _sv0t75 = emit_expr(cond, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, cond_out);
+                  int _sv0t75 = emit_expr(cond, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, cond_out);
                   int nc = _sv0t75;
                   if ((nc < 0)) {
                     int _sv0t76 = (0 - 1);
                     return _sv0t76;
                   } else {
                   }
-                  int _sv0t77 = prepool_loop_seq(body, 0, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+                  int _sv0t77 = prepool_loop_seq(body, 0, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
                   int _sv0t78 = sv0_vec_new();
                   int body_out = _sv0t78;
-                  int _sv0t79 = emit_instrs(body, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, body_out);
+                  int _sv0t79 = emit_instrs(body, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, body_out);
                   int nb = _sv0t79;
                   if ((nb < 0)) {
                     int _sv0t80 = (0 - 1);
@@ -2474,7 +2474,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                 } else {
                   if ((ins.tag == 8)) {
                     int body = ins.p0;
-                    int _sv0t68 = emit_instrs(body, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, out);
+                    int _sv0t68 = emit_instrs(body, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, out);
                     return _sv0t68;
                     _sv0t0 = 0;
                   } else {
@@ -2669,7 +2669,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                             e.p0 = (_sv0t19).p0;
                             e.p1 = (_sv0t19).p1;
                             e.p2 = (_sv0t19).p2;
-                            int _sv0t24 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+                            int _sv0t24 = emit_expr(e, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
                             int ne = _sv0t24;
                             if ((ne < 0)) {
                               int _sv0t25 = (0 - 1);
@@ -2703,7 +2703,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                               e.p0 = (_sv0t9).p0;
                               e.p1 = (_sv0t9).p1;
                               e.p2 = (_sv0t9).p2;
-                              int _sv0t14 = emit_expr(e, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+                              int _sv0t14 = emit_expr(e, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
                               int ne = _sv0t14;
                               if ((ne < 0)) {
                                 int _sv0t15 = (0 - 1);
@@ -2774,7 +2774,7 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
   return _sv0t167;
 }
 
-static int emit_instrs(int instrs, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out) {
+static int emit_instrs(int instrs, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names, int out) {
   int _sv0t0 = sv0_vec_len(instrs);
   int count = _sv0t0;
   int total = 0;
@@ -2799,7 +2799,7 @@ static int emit_instrs(int instrs, int env_names, int env_bases, int env_widths,
     ins.p1 = (_sv0t2).p1;
     ins.p2 = (_sv0t2).p2;
     ins.p3 = (_sv0t2).p3;
-    int _sv0t8 = emit_instr(ins, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, out);
+    int _sv0t8 = emit_instr(ins, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, out);
     int n = _sv0t8;
     if ((n < 0)) {
       int _sv0t9 = (0 - 1);
@@ -2812,7 +2812,7 @@ static int emit_instrs(int instrs, int env_names, int env_bases, int env_widths,
   return total;
 }
 
-static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names) {
+static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int fn_names) {
   int _sv0t0 = sv0_vec_len(instrs);
   if ((i0 >= _sv0t0)) {
     return 0;
@@ -2843,9 +2843,9 @@ static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, in
     int th = ins.p1;
     int el = ins.p2;
     int _sv0t26 = (i0 + 1);
-    int _sv0t27 = prepool_loop_seq(instrs, _sv0t26, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
-    int _sv0t28 = prepool_loop_seq(el, 0, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
-    int _sv0t29 = prepool_loop_seq(th, 0, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+    int _sv0t27 = prepool_loop_seq(instrs, _sv0t26, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+    int _sv0t28 = prepool_loop_seq(el, 0, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+    int _sv0t29 = prepool_loop_seq(th, 0, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
     Expr _sv0t30;
     int _sv0t31 = sv0_box_load(be, 0);
     _sv0t30.tag = _sv0t31;
@@ -2862,7 +2862,7 @@ static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, in
     ce_if.p2 = (_sv0t30).p2;
     int _sv0t35 = sv0_vec_new();
     int cscratch = _sv0t35;
-    int _sv0t36 = emit_expr(ce_if, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, cscratch);
+    int _sv0t36 = emit_expr(ce_if, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, cscratch);
     return 0;
     _sv0t8 = 0;
   } else {
@@ -2885,18 +2885,18 @@ static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, in
       ce_wh.p2 = (_sv0t16).p2;
       int _sv0t21 = sv0_vec_new();
       int cscratch = _sv0t21;
-      int _sv0t22 = emit_expr(ce_wh, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, cscratch);
-      int _sv0t23 = prepool_loop_seq(body, 0, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+      int _sv0t22 = emit_expr(ce_wh, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, cscratch);
+      int _sv0t23 = prepool_loop_seq(body, 0, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
       int _sv0t24 = (i0 + 1);
-      int _sv0t25 = prepool_loop_seq(instrs, _sv0t24, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+      int _sv0t25 = prepool_loop_seq(instrs, _sv0t24, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
       return 0;
       _sv0t8 = 0;
     } else {
       if ((ins.tag == 8)) {
         int body = ins.p0;
-        int _sv0t13 = prepool_loop_seq(body, 0, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+        int _sv0t13 = prepool_loop_seq(body, 0, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
         int _sv0t14 = (i0 + 1);
-        int _sv0t15 = prepool_loop_seq(instrs, _sv0t14, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+        int _sv0t15 = prepool_loop_seq(instrs, _sv0t14, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
         return 0;
         _sv0t8 = 0;
       } else {
@@ -2907,9 +2907,9 @@ static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, in
           if (1) {
             int _sv0t9 = sv0_vec_new();
             int scratch = _sv0t9;
-            int _sv0t10 = emit_instr(ins, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, scratch);
+            int _sv0t10 = emit_instr(ins, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names, scratch);
             int _sv0t11 = (i0 + 1);
-            int _sv0t12 = prepool_loop_seq(instrs, _sv0t11, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
+            int _sv0t12 = prepool_loop_seq(instrs, _sv0t11, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, pool, source, starts, ends, fn_names);
             return 0;
             _sv0t8 = 0;
           } else {
@@ -2921,7 +2921,7 @@ static int prepool_loop_seq(int instrs, int i0, int env_names, int env_bases, in
   return 0;
 }
 
-static int ensure_var_int(int name, int env_names, int env_bases, int env_widths, int env_field_starts, int next_slot, const char* source, int starts, int ends) {
+static int ensure_var_int(int name, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int next_slot, const char* source, int starts, int ends) {
   int _sv0t0 = lookup_slot(env_names, env_bases, env_widths, name, source, starts, ends);
   int si = _sv0t0;
   if ((si >= 0)) {
@@ -2931,16 +2931,17 @@ static int ensure_var_int(int name, int env_names, int env_bases, int env_widths
   sv0_vec_push(env_names, name);
   sv0_vec_push(env_bases, next_slot);
   sv0_vec_push(env_widths, 1);
+  sv0_vec_push(env_cats, 0);
   sv0_vec_push(env_field_starts, 0);
   int _sv0t1 = (next_slot + 1);
   return _sv0t1;
 }
 
-static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_widths, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
+static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
   int _sv0t0;
   if ((ins.tag == 1)) {
     int x = ins.p0;
-    int _sv0t14 = ensure_var_int(x, env_names, env_bases, env_widths, env_field_starts, next_slot, source, starts, ends);
+    int _sv0t14 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
     return _sv0t14;
     _sv0t0 = 0;
   } else {
@@ -2952,6 +2953,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
       sv0_vec_push(env_names, x);
       sv0_vec_push(env_bases, next_slot);
       sv0_vec_push(env_widths, w);
+      sv0_vec_push(env_cats, 0);
       int _sv0t12 = record_field_layout(cty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
       sv0_vec_push(env_field_starts, _sv0t12);
       int _sv0t13 = (next_slot + w);
@@ -2961,7 +2963,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
       if ((ins.tag == 3)) {
         int x = ins.p0;
         int be = ins.p1;
-        int _sv0t10 = ensure_var_int(x, env_names, env_bases, env_widths, env_field_starts, next_slot, source, starts, ends);
+        int _sv0t10 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
         return _sv0t10;
         _sv0t0 = 0;
       } else {
@@ -2988,6 +2990,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
           sv0_vec_push(env_names, dst);
           sv0_vec_push(env_bases, next_slot);
           sv0_vec_push(env_widths, w);
+          sv0_vec_push(env_cats, 0);
           int _sv0t8 = record_field_layout(rty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
           sv0_vec_push(env_field_starts, _sv0t8);
           int _sv0t9 = (next_slot + w);
@@ -2998,22 +3001,22 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
             int be = ins.p0;
             int th = ins.p1;
             int el = ins.p2;
-            int _sv0t3 = scan_instrs_env(th, env_names, env_bases, env_widths, env_field_starts, next_slot, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
+            int _sv0t3 = scan_instrs_env(th, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
             int ns1 = _sv0t3;
-            int _sv0t4 = scan_instrs_env(el, env_names, env_bases, env_widths, env_field_starts, ns1, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
+            int _sv0t4 = scan_instrs_env(el, env_names, env_bases, env_widths, env_cats, env_field_starts, ns1, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
             return _sv0t4;
             _sv0t0 = 0;
           } else {
             if ((ins.tag == 7)) {
               int be = ins.p0;
               int body = ins.p1;
-              int _sv0t2 = scan_instrs_env(body, env_names, env_bases, env_widths, env_field_starts, next_slot, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
+              int _sv0t2 = scan_instrs_env(body, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
               return _sv0t2;
               _sv0t0 = 0;
             } else {
               if ((ins.tag == 8)) {
                 int body = ins.p0;
-                int _sv0t1 = scan_instrs_env(body, env_names, env_bases, env_widths, env_field_starts, next_slot, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
+                int _sv0t1 = scan_instrs_env(body, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
                 return _sv0t1;
                 _sv0t0 = 0;
               } else {
@@ -3082,7 +3085,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
   return next_slot;
 }
 
-static int scan_instrs_env(int instrs, int env_names, int env_bases, int env_widths, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
+static int scan_instrs_env(int instrs, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int next_slot, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
   int _sv0t0 = sv0_vec_len(instrs);
   int n = _sv0t0;
   int ns = next_slot;
@@ -3107,14 +3110,14 @@ static int scan_instrs_env(int instrs, int env_names, int env_bases, int env_wid
     ins.p1 = (_sv0t2).p1;
     ins.p2 = (_sv0t2).p2;
     ins.p3 = (_sv0t2).p3;
-    int _sv0t8 = scan_instr_env(ins, env_names, env_bases, env_widths, env_field_starts, ns, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
+    int _sv0t8 = scan_instr_env(ins, env_names, env_bases, env_widths, env_cats, env_field_starts, ns, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
     ns = _sv0t8;
     i = (i + 1);
   }
   return ns;
 }
 
-static int local_count_and_env(int param_names, int param_ctys, int instrs, int env_names, int env_bases, int env_widths, int env_field_starts, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
+static int local_count_and_env(int param_names, int param_ctys, int instrs, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
   int _sv0t0 = sv0_vec_len(param_names);
   int np = _sv0t0;
   int ns = 0;
@@ -3129,12 +3132,13 @@ static int local_count_and_env(int param_names, int param_ctys, int instrs, int 
     sv0_vec_push(env_names, pn);
     sv0_vec_push(env_bases, ns);
     sv0_vec_push(env_widths, w);
+    sv0_vec_push(env_cats, 0);
     int _sv0t4 = record_field_layout(pc, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
     sv0_vec_push(env_field_starts, _sv0t4);
     ns = (ns + w);
     pi = (pi + 1);
   }
-  int _sv0t5 = scan_instrs_env(instrs, env_names, env_bases, env_widths, env_field_starts, ns, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
+  int _sv0t5 = scan_instrs_env(instrs, env_names, env_bases, env_widths, env_cats, env_field_starts, ns, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
   return _sv0t5;
 }
 
@@ -3160,24 +3164,26 @@ static int emit_fn(int label, int param_names, int param_ctys, int instrs, int s
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
-  int _sv0t5 = local_count_and_env(param_names, param_ctys, instrs, en, eb, ew, efs, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, eff, source, starts, ends);
-  int lc = _sv0t5;
-  int _sv0t6 = sv0_vec_new();
-  int code = _sv0t6;
-  int _sv0t7 = emit_instrs(instrs, en, eb, ew, efs, eff, pool, source, starts, ends, fn_names, code);
-  int n = _sv0t7;
+  int efs = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int eff = _sv0t5;
+  int _sv0t6 = local_count_and_env(param_names, param_ctys, instrs, en, eb, ew, ec, efs, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, eff, source, starts, ends);
+  int lc = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int code = _sv0t7;
+  int _sv0t8 = emit_instrs(instrs, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fn_names, code);
+  int n = _sv0t8;
   if ((n < 0)) {
-    int _sv0t8 = (0 - 1);
-    return _sv0t8;
+    int _sv0t9 = (0 - 1);
+    return _sv0t9;
   } else {
   }
-  int _sv0t9 = compute_arity(param_ctys, structs_names, structs_field_counts, enums_names, enums_widths, source, starts, ends);
-  int arity = _sv0t9;
-  int _sv0t10 = pool_add(pool, label, source, starts, ends);
-  int name_idx = _sv0t10;
+  int _sv0t10 = compute_arity(param_ctys, structs_names, structs_field_counts, enums_names, enums_widths, source, starts, ends);
+  int arity = _sv0t10;
+  int _sv0t11 = pool_add(pool, label, source, starts, ends);
+  int name_idx = _sv0t11;
   sv0_vec_push(ft_entries, name_idx);
   sv0_vec_push(ft_entries, arity);
   sv0_vec_push(ft_entries, lc);
@@ -3358,37 +3364,39 @@ static int test_width_of_cty(void) {
   int en = _sv0t2;
   int _sv0t3 = sv0_vec_new();
   int ew = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ec = _sv0t4;
   sv0_vec_push(sn, 100);
   sv0_vec_push(sf, 3);
   sv0_vec_push(sn, 200);
   sv0_vec_push(sf, 5);
   sv0_vec_push(en, 300);
   sv0_vec_push(ew, 4);
-  int _sv0t4 = sv0_vec_new();
   int _sv0t5 = sv0_vec_new();
-  int _sv0t6 = width_of_cty(100, sn, sf, en, ew, "", _sv0t4, _sv0t5);
-  if ((_sv0t6 != 3)) {
+  int _sv0t6 = sv0_vec_new();
+  int _sv0t7 = width_of_cty(100, sn, sf, en, ew, "", _sv0t5, _sv0t6);
+  if ((_sv0t7 != 3)) {
     return 1;
   } else {
   }
-  int _sv0t7 = sv0_vec_new();
   int _sv0t8 = sv0_vec_new();
-  int _sv0t9 = width_of_cty(200, sn, sf, en, ew, "", _sv0t7, _sv0t8);
-  if ((_sv0t9 != 5)) {
+  int _sv0t9 = sv0_vec_new();
+  int _sv0t10 = width_of_cty(200, sn, sf, en, ew, "", _sv0t8, _sv0t9);
+  if ((_sv0t10 != 5)) {
     return 2;
   } else {
   }
-  int _sv0t10 = sv0_vec_new();
   int _sv0t11 = sv0_vec_new();
-  int _sv0t12 = width_of_cty(300, sn, sf, en, ew, "", _sv0t10, _sv0t11);
-  if ((_sv0t12 != 4)) {
+  int _sv0t12 = sv0_vec_new();
+  int _sv0t13 = width_of_cty(300, sn, sf, en, ew, "", _sv0t11, _sv0t12);
+  if ((_sv0t13 != 4)) {
     return 3;
   } else {
   }
-  int _sv0t13 = sv0_vec_new();
   int _sv0t14 = sv0_vec_new();
-  int _sv0t15 = width_of_cty(999, sn, sf, en, ew, "", _sv0t13, _sv0t14);
-  if ((_sv0t15 != 1)) {
+  int _sv0t15 = sv0_vec_new();
+  int _sv0t16 = width_of_cty(999, sn, sf, en, ew, "", _sv0t14, _sv0t15);
+  if ((_sv0t16 != 1)) {
     return 4;
   } else {
   }
@@ -3971,54 +3979,56 @@ static int test_bind_param(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int ef = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int sn = _sv0t4;
+  int ef = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int sf = _sv0t5;
+  int sn = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int enn = _sv0t6;
+  int sf = _sv0t6;
   int _sv0t7 = sv0_vec_new();
-  int enw = _sv0t7;
+  int enn = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int enw = _sv0t8;
   sv0_vec_push(sn, 100);
   sv0_vec_push(sf, 3);
   sv0_vec_push(enn, 200);
   sv0_vec_push(enw, 4);
-  int _sv0t8 = bind_param(10, 100, 0, en, eb, ew, ef, sn, sf, enn, enw);
-  int s1 = _sv0t8;
+  int _sv0t9 = bind_param(10, 100, 0, en, eb, ew, ef, sn, sf, enn, enw);
+  int s1 = _sv0t9;
   if ((s1 != 3)) {
     return 1;
   } else {
   }
-  int _sv0t9 = bind_param(20, 200, 3, en, eb, ew, ef, sn, sf, enn, enw);
-  int s2 = _sv0t9;
+  int _sv0t10 = bind_param(20, 200, 3, en, eb, ew, ef, sn, sf, enn, enw);
+  int s2 = _sv0t10;
   if ((s2 != 7)) {
     return 2;
   } else {
   }
-  int _sv0t10 = bind_param(30, 999, 7, en, eb, ew, ef, sn, sf, enn, enw);
-  int s3 = _sv0t10;
+  int _sv0t11 = bind_param(30, 999, 7, en, eb, ew, ef, sn, sf, enn, enw);
+  int s3 = _sv0t11;
   if ((s3 != 8)) {
     return 3;
   } else {
   }
-  int _sv0t11 = sv0_vec_len(en);
-  if ((_sv0t11 != 3)) {
+  int _sv0t12 = sv0_vec_len(en);
+  if ((_sv0t12 != 3)) {
     return 4;
   } else {
   }
-  int _sv0t12 = sv0_vec_get(ew, 0);
-  if ((_sv0t12 != 3)) {
+  int _sv0t13 = sv0_vec_get(ew, 0);
+  if ((_sv0t13 != 3)) {
     return 5;
   } else {
   }
-  int _sv0t13 = sv0_vec_get(ew, 1);
-  if ((_sv0t13 != 4)) {
+  int _sv0t14 = sv0_vec_get(ew, 1);
+  if ((_sv0t14 != 4)) {
     return 6;
   } else {
   }
-  int _sv0t14 = sv0_vec_get(ew, 2);
-  if ((_sv0t14 != 1)) {
+  int _sv0t15 = sv0_vec_get(ew, 2);
+  if ((_sv0t15 != 1)) {
     return 7;
   } else {
   }
@@ -4203,308 +4213,310 @@ static int test_emit_value(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int pool = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int out = _sv0t4;
+  int pool = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int out = _sv0t5;
   Value vi;
   vi.tag = 0;
   vi.p0 = 42;
-  int _sv0t5 = sv0_vec_new();
   int _sv0t6 = sv0_vec_new();
   int _sv0t7 = sv0_vec_new();
   int _sv0t8 = sv0_vec_new();
-  int _sv0t9 = emit_value(vi, en, eb, ew, _sv0t5, _sv0t6, pool, "", _sv0t7, _sv0t8, out);
-  int r1 = _sv0t9;
+  int _sv0t9 = sv0_vec_new();
+  int _sv0t10 = emit_value(vi, en, eb, ew, _sv0t6, _sv0t7, pool, "", _sv0t8, _sv0t9, out);
+  int r1 = _sv0t10;
   if ((r1 != 2)) {
     return 1;
   } else {
   }
-  int _sv0t10 = sv0_vec_get(out, 0);
-  if ((_sv0t10 != 4)) {
+  int _sv0t11 = sv0_vec_get(out, 0);
+  if ((_sv0t11 != 4)) {
     return 2;
   } else {
   }
-  int _sv0t11 = sv0_vec_get(out, 1);
-  if ((_sv0t11 != 42)) {
+  int _sv0t12 = sv0_vec_get(out, 1);
+  if ((_sv0t12 != 42)) {
     return 3;
   } else {
   }
-  int _sv0t12 = sv0_vec_new();
-  int out2 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int out2 = _sv0t13;
   Value vb;
   vb.tag = 1;
-  int _sv0t13 = sv0_vec_new();
   int _sv0t14 = sv0_vec_new();
   int _sv0t15 = sv0_vec_new();
   int _sv0t16 = sv0_vec_new();
-  int _sv0t17 = emit_value(vb, en, eb, ew, _sv0t13, _sv0t14, pool, "", _sv0t15, _sv0t16, out2);
-  int r2 = _sv0t17;
+  int _sv0t17 = sv0_vec_new();
+  int _sv0t18 = emit_value(vb, en, eb, ew, _sv0t14, _sv0t15, pool, "", _sv0t16, _sv0t17, out2);
+  int r2 = _sv0t18;
   if ((r2 != 2)) {
     return 4;
   } else {
   }
-  int _sv0t18 = sv0_vec_get(out2, 0);
-  if ((_sv0t18 != 7)) {
+  int _sv0t19 = sv0_vec_get(out2, 0);
+  if ((_sv0t19 != 7)) {
     return 5;
   } else {
   }
-  int _sv0t19 = sv0_vec_get(out2, 1);
-  if ((_sv0t19 != 1)) {
+  int _sv0t20 = sv0_vec_get(out2, 1);
+  if ((_sv0t20 != 1)) {
     return 6;
   } else {
   }
-  int _sv0t20 = sv0_vec_new();
-  int out3 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int out3 = _sv0t21;
   Value vbf;
   vbf.tag = 2;
-  int _sv0t21 = sv0_vec_new();
   int _sv0t22 = sv0_vec_new();
   int _sv0t23 = sv0_vec_new();
   int _sv0t24 = sv0_vec_new();
-  int _sv0t25 = emit_value(vbf, en, eb, ew, _sv0t21, _sv0t22, pool, "", _sv0t23, _sv0t24, out3);
-  int r2b = _sv0t25;
+  int _sv0t25 = sv0_vec_new();
+  int _sv0t26 = emit_value(vbf, en, eb, ew, _sv0t22, _sv0t23, pool, "", _sv0t24, _sv0t25, out3);
+  int r2b = _sv0t26;
   if ((r2b != 2)) {
     return 7;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out3, 1);
-  if ((_sv0t26 != 0)) {
+  int _sv0t27 = sv0_vec_get(out3, 1);
+  if ((_sv0t27 != 0)) {
     return 8;
   } else {
   }
-  int _sv0t27 = sv0_vec_new();
-  int out4 = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int out4 = _sv0t28;
   Value vu;
   vu.tag = 4;
-  int _sv0t28 = sv0_vec_new();
   int _sv0t29 = sv0_vec_new();
   int _sv0t30 = sv0_vec_new();
   int _sv0t31 = sv0_vec_new();
-  int _sv0t32 = emit_value(vu, en, eb, ew, _sv0t28, _sv0t29, pool, "", _sv0t30, _sv0t31, out4);
-  int r3 = _sv0t32;
+  int _sv0t32 = sv0_vec_new();
+  int _sv0t33 = emit_value(vu, en, eb, ew, _sv0t29, _sv0t30, pool, "", _sv0t31, _sv0t32, out4);
+  int r3 = _sv0t33;
   if ((r3 != 1)) {
     return 9;
   } else {
   }
-  int _sv0t33 = sv0_vec_get(out4, 0);
-  if ((_sv0t33 != 3)) {
+  int _sv0t34 = sv0_vec_get(out4, 0);
+  if ((_sv0t34 != 3)) {
     return 10;
   } else {
   }
-  int _sv0t34 = sv0_vec_new();
-  int out5 = _sv0t34;
+  int _sv0t35 = sv0_vec_new();
+  int out5 = _sv0t35;
   Value vs;
   vs.tag = 5;
   vs.p0 = 99;
-  int _sv0t35 = sv0_vec_new();
   int _sv0t36 = sv0_vec_new();
   int _sv0t37 = sv0_vec_new();
   int _sv0t38 = sv0_vec_new();
-  int _sv0t39 = emit_value(vs, en, eb, ew, _sv0t35, _sv0t36, pool, "", _sv0t37, _sv0t38, out5);
-  int r4 = _sv0t39;
+  int _sv0t39 = sv0_vec_new();
+  int _sv0t40 = emit_value(vs, en, eb, ew, _sv0t36, _sv0t37, pool, "", _sv0t38, _sv0t39, out5);
+  int r4 = _sv0t40;
   if ((r4 != 2)) {
     return 11;
   } else {
   }
-  int _sv0t40 = sv0_vec_get(out5, 0);
-  if ((_sv0t40 != 8)) {
+  int _sv0t41 = sv0_vec_get(out5, 0);
+  if ((_sv0t41 != 8)) {
     return 12;
   } else {
   }
-  int _sv0t41 = sv0_vec_get(out5, 1);
-  if ((_sv0t41 != 0)) {
+  int _sv0t42 = sv0_vec_get(out5, 1);
+  if ((_sv0t42 != 0)) {
     return 13;
   } else {
   }
   sv0_vec_push(en, 50);
   sv0_vec_push(eb, 2);
   sv0_vec_push(ew, 1);
-  int _sv0t42 = sv0_vec_new();
-  int out6 = _sv0t42;
+  int _sv0t43 = sv0_vec_new();
+  int out6 = _sv0t43;
   Value vv;
   vv.tag = 3;
   vv.p0 = 50;
-  int _sv0t43 = sv0_vec_new();
   int _sv0t44 = sv0_vec_new();
   int _sv0t45 = sv0_vec_new();
   int _sv0t46 = sv0_vec_new();
-  int _sv0t47 = emit_value(vv, en, eb, ew, _sv0t43, _sv0t44, pool, "", _sv0t45, _sv0t46, out6);
-  int r5 = _sv0t47;
+  int _sv0t47 = sv0_vec_new();
+  int _sv0t48 = emit_value(vv, en, eb, ew, _sv0t44, _sv0t45, pool, "", _sv0t46, _sv0t47, out6);
+  int r5 = _sv0t48;
   if ((r5 != 2)) {
     return 14;
   } else {
   }
-  int _sv0t48 = sv0_vec_get(out6, 0);
-  if ((_sv0t48 != 96)) {
+  int _sv0t49 = sv0_vec_get(out6, 0);
+  if ((_sv0t49 != 96)) {
     return 15;
   } else {
   }
-  int _sv0t49 = sv0_vec_get(out6, 1);
-  if ((_sv0t49 != 2)) {
+  int _sv0t50 = sv0_vec_get(out6, 1);
+  if ((_sv0t50 != 2)) {
     return 16;
   } else {
   }
   sv0_vec_push(en, 60);
   sv0_vec_push(eb, 5);
   sv0_vec_push(ew, 3);
-  int _sv0t50 = sv0_vec_new();
-  int out7 = _sv0t50;
+  int _sv0t51 = sv0_vec_new();
+  int out7 = _sv0t51;
   Value vv2;
   vv2.tag = 3;
   vv2.p0 = 60;
-  int _sv0t51 = sv0_vec_new();
   int _sv0t52 = sv0_vec_new();
   int _sv0t53 = sv0_vec_new();
   int _sv0t54 = sv0_vec_new();
-  int _sv0t55 = emit_value(vv2, en, eb, ew, _sv0t51, _sv0t52, pool, "", _sv0t53, _sv0t54, out7);
-  int r6 = _sv0t55;
+  int _sv0t55 = sv0_vec_new();
+  int _sv0t56 = emit_value(vv2, en, eb, ew, _sv0t52, _sv0t53, pool, "", _sv0t54, _sv0t55, out7);
+  int r6 = _sv0t56;
   if ((r6 != 6)) {
     return 17;
   } else {
   }
-  int _sv0t56 = sv0_vec_get(out7, 0);
-  if ((_sv0t56 != 96)) {
+  int _sv0t57 = sv0_vec_get(out7, 0);
+  if ((_sv0t57 != 96)) {
     return 18;
   } else {
   }
-  int _sv0t57 = sv0_vec_get(out7, 1);
-  if ((_sv0t57 != 5)) {
+  int _sv0t58 = sv0_vec_get(out7, 1);
+  if ((_sv0t58 != 5)) {
     return 19;
   } else {
   }
-  int _sv0t58 = sv0_vec_get(out7, 2);
-  if ((_sv0t58 != 96)) {
+  int _sv0t59 = sv0_vec_get(out7, 2);
+  if ((_sv0t59 != 96)) {
     return 20;
   } else {
   }
-  int _sv0t59 = sv0_vec_get(out7, 3);
-  if ((_sv0t59 != 6)) {
+  int _sv0t60 = sv0_vec_get(out7, 3);
+  if ((_sv0t60 != 6)) {
     return 21;
   } else {
   }
-  int _sv0t60 = sv0_vec_get(out7, 4);
-  if ((_sv0t60 != 96)) {
+  int _sv0t61 = sv0_vec_get(out7, 4);
+  if ((_sv0t61 != 96)) {
     return 22;
   } else {
   }
-  int _sv0t61 = sv0_vec_get(out7, 5);
-  if ((_sv0t61 != 7)) {
+  int _sv0t62 = sv0_vec_get(out7, 5);
+  if ((_sv0t62 != 7)) {
     return 23;
   } else {
   }
-  int _sv0t62 = sv0_vec_new();
-  int out8 = _sv0t62;
+  int _sv0t63 = sv0_vec_new();
+  int out8 = _sv0t63;
   Value va;
   va.tag = 7;
   va.p0 = 50;
-  int _sv0t63 = sv0_vec_new();
   int _sv0t64 = sv0_vec_new();
   int _sv0t65 = sv0_vec_new();
   int _sv0t66 = sv0_vec_new();
-  int _sv0t67 = emit_value(va, en, eb, ew, _sv0t63, _sv0t64, pool, "", _sv0t65, _sv0t66, out8);
-  int r7 = _sv0t67;
+  int _sv0t67 = sv0_vec_new();
+  int _sv0t68 = emit_value(va, en, eb, ew, _sv0t64, _sv0t65, pool, "", _sv0t66, _sv0t67, out8);
+  int r7 = _sv0t68;
   if ((r7 != 2)) {
     return 24;
   } else {
   }
-  int _sv0t68 = sv0_vec_get(out8, 0);
-  if ((_sv0t68 != 4)) {
+  int _sv0t69 = sv0_vec_get(out8, 0);
+  if ((_sv0t69 != 4)) {
     return 25;
   } else {
   }
-  int _sv0t69 = sv0_vec_get(out8, 1);
-  if ((_sv0t69 != 2)) {
+  int _sv0t70 = sv0_vec_get(out8, 1);
+  if ((_sv0t70 != 2)) {
     return 26;
   } else {
   }
-  int _sv0t70 = sv0_vec_new();
-  int out9 = _sv0t70;
+  int _sv0t71 = sv0_vec_new();
+  int out9 = _sv0t71;
   Value vm0;
-  Value _sv0t71;
-  _sv0t71.tag = 3;
-  _sv0t71.p0 = 60;
-  int _sv0t72 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t72, 0, _sv0t71.tag);
-  sv0_box_store(_sv0t72, 1, _sv0t71.p0);
-  sv0_box_store(_sv0t72, 2, _sv0t71.p1);
+  Value _sv0t72;
+  _sv0t72.tag = 3;
+  _sv0t72.p0 = 60;
+  int _sv0t73 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t73, 0, _sv0t72.tag);
+  sv0_box_store(_sv0t73, 1, _sv0t72.p0);
+  sv0_box_store(_sv0t73, 2, _sv0t72.p1);
   vm0.tag = 6;
-  vm0.p0 = _sv0t72;
+  vm0.p0 = _sv0t73;
   vm0.p1 = 0;
-  int _sv0t73 = sv0_vec_new();
   int _sv0t74 = sv0_vec_new();
   int _sv0t75 = sv0_vec_new();
   int _sv0t76 = sv0_vec_new();
-  int _sv0t77 = emit_value(vm0, en, eb, ew, _sv0t73, _sv0t74, pool, "", _sv0t75, _sv0t76, out9);
-  int r8 = _sv0t77;
+  int _sv0t77 = sv0_vec_new();
+  int _sv0t78 = emit_value(vm0, en, eb, ew, _sv0t74, _sv0t75, pool, "", _sv0t76, _sv0t77, out9);
+  int r8 = _sv0t78;
   if ((r8 != 2)) {
     return 27;
   } else {
   }
-  int _sv0t78 = sv0_vec_get(out9, 0);
-  if ((_sv0t78 != 96)) {
+  int _sv0t79 = sv0_vec_get(out9, 0);
+  if ((_sv0t79 != 96)) {
     return 28;
   } else {
   }
-  int _sv0t79 = sv0_vec_get(out9, 1);
-  if ((_sv0t79 != 5)) {
+  int _sv0t80 = sv0_vec_get(out9, 1);
+  if ((_sv0t80 != 5)) {
     return 29;
   } else {
   }
-  int _sv0t80 = sv0_vec_new();
-  int out10 = _sv0t80;
+  int _sv0t81 = sv0_vec_new();
+  int out10 = _sv0t81;
   Value vm_tag;
-  Value _sv0t81;
-  _sv0t81.tag = 3;
-  _sv0t81.p0 = 60;
-  int _sv0t82 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t82, 0, _sv0t81.tag);
-  sv0_box_store(_sv0t82, 1, _sv0t81.p0);
-  sv0_box_store(_sv0t82, 2, _sv0t81.p1);
-  int _sv0t83 = (0 - 1);
+  Value _sv0t82;
+  _sv0t82.tag = 3;
+  _sv0t82.p0 = 60;
+  int _sv0t83 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t83, 0, _sv0t82.tag);
+  sv0_box_store(_sv0t83, 1, _sv0t82.p0);
+  sv0_box_store(_sv0t83, 2, _sv0t82.p1);
+  int _sv0t84 = (0 - 1);
   vm_tag.tag = 6;
-  vm_tag.p0 = _sv0t82;
-  vm_tag.p1 = _sv0t83;
-  int _sv0t84 = sv0_vec_new();
+  vm_tag.p0 = _sv0t83;
+  vm_tag.p1 = _sv0t84;
   int _sv0t85 = sv0_vec_new();
   int _sv0t86 = sv0_vec_new();
   int _sv0t87 = sv0_vec_new();
-  int _sv0t88 = emit_value(vm_tag, en, eb, ew, _sv0t84, _sv0t85, pool, "", _sv0t86, _sv0t87, out10);
-  int r9 = _sv0t88;
+  int _sv0t88 = sv0_vec_new();
+  int _sv0t89 = emit_value(vm_tag, en, eb, ew, _sv0t85, _sv0t86, pool, "", _sv0t87, _sv0t88, out10);
+  int r9 = _sv0t89;
   if ((r9 != 2)) {
     return 30;
   } else {
   }
-  int _sv0t89 = sv0_vec_get(out10, 0);
-  if ((_sv0t89 != 96)) {
+  int _sv0t90 = sv0_vec_get(out10, 0);
+  if ((_sv0t90 != 96)) {
     return 31;
   } else {
   }
-  int _sv0t90 = sv0_vec_get(out10, 1);
-  if ((_sv0t90 != 5)) {
+  int _sv0t91 = sv0_vec_get(out10, 1);
+  if ((_sv0t91 != 5)) {
     return 32;
   } else {
   }
-  int _sv0t91 = sv0_vec_new();
-  int out11 = _sv0t91;
+  int _sv0t92 = sv0_vec_new();
+  int out11 = _sv0t92;
   Value vm_oob;
-  Value _sv0t92;
-  _sv0t92.tag = 3;
-  _sv0t92.p0 = 60;
-  int _sv0t93 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t93, 0, _sv0t92.tag);
-  sv0_box_store(_sv0t93, 1, _sv0t92.p0);
-  sv0_box_store(_sv0t93, 2, _sv0t92.p1);
+  Value _sv0t93;
+  _sv0t93.tag = 3;
+  _sv0t93.p0 = 60;
+  int _sv0t94 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t94, 0, _sv0t93.tag);
+  sv0_box_store(_sv0t94, 1, _sv0t93.p0);
+  sv0_box_store(_sv0t94, 2, _sv0t93.p1);
   vm_oob.tag = 6;
-  vm_oob.p0 = _sv0t93;
+  vm_oob.p0 = _sv0t94;
   vm_oob.p1 = 3;
-  int _sv0t94 = sv0_vec_new();
   int _sv0t95 = sv0_vec_new();
   int _sv0t96 = sv0_vec_new();
   int _sv0t97 = sv0_vec_new();
-  int _sv0t98 = emit_value(vm_oob, en, eb, ew, _sv0t94, _sv0t95, pool, "", _sv0t96, _sv0t97, out11);
-  int r10 = _sv0t98;
-  int _sv0t99 = (0 - 1);
-  if ((r10 != _sv0t99)) {
+  int _sv0t98 = sv0_vec_new();
+  int _sv0t99 = emit_value(vm_oob, en, eb, ew, _sv0t95, _sv0t96, pool, "", _sv0t97, _sv0t98, out11);
+  int r10 = _sv0t99;
+  int _sv0t100 = (0 - 1);
+  if ((r10 != _sv0t100)) {
     return 33;
   } else {
   }
@@ -4519,13 +4531,15 @@ static int test_emit_expr(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int pool = _sv0t3;
+  int ec = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int pool = _sv0t4;
   const char* source;
   source = "+-!i32";
-  int _sv0t4 = sv0_vec_new();
-  int starts = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int ends = _sv0t5;
+  int starts = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int ends = _sv0t6;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 1);
   sv0_vec_push(starts, 1);
@@ -4534,303 +4548,303 @@ static int test_emit_expr(void) {
   sv0_vec_push(ends, 3);
   sv0_vec_push(starts, 3);
   sv0_vec_push(ends, 6);
-  int _sv0t6 = sv0_vec_new();
-  int out1 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int out1 = _sv0t7;
   Expr lit;
-  Value _sv0t7;
-  _sv0t7.tag = 0;
-  _sv0t7.p0 = 7;
-  int _sv0t8 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t8, 0, _sv0t7.tag);
-  sv0_box_store(_sv0t8, 1, _sv0t7.p0);
-  sv0_box_store(_sv0t8, 2, _sv0t7.p1);
+  Value _sv0t8;
+  _sv0t8.tag = 0;
+  _sv0t8.p0 = 7;
+  int _sv0t9 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t9, 0, _sv0t8.tag);
+  sv0_box_store(_sv0t9, 1, _sv0t8.p0);
+  sv0_box_store(_sv0t9, 2, _sv0t8.p1);
   lit.tag = 0;
-  lit.p0 = _sv0t8;
-  int _sv0t9 = sv0_vec_new();
+  lit.p0 = _sv0t9;
   int _sv0t10 = sv0_vec_new();
-  int _sv0t11 = emit_expr(lit, en, eb, ew, _sv0t9, _sv0t10, pool, source, starts, ends, out1);
-  int r1 = _sv0t11;
+  int _sv0t11 = sv0_vec_new();
+  int _sv0t12 = emit_expr(lit, en, eb, ew, ec, _sv0t10, _sv0t11, pool, source, starts, ends, out1);
+  int r1 = _sv0t12;
   if ((r1 != 2)) {
     return 1;
   } else {
   }
-  int _sv0t12 = sv0_vec_get(out1, 0);
-  if ((_sv0t12 != 4)) {
+  int _sv0t13 = sv0_vec_get(out1, 0);
+  if ((_sv0t13 != 4)) {
     return 2;
   } else {
   }
-  int _sv0t13 = sv0_vec_get(out1, 1);
-  if ((_sv0t13 != 7)) {
+  int _sv0t14 = sv0_vec_get(out1, 1);
+  if ((_sv0t14 != 7)) {
     return 3;
   } else {
   }
-  int _sv0t14 = sv0_vec_new();
-  int out2 = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int out2 = _sv0t15;
   Expr binop;
-  Value _sv0t15;
-  _sv0t15.tag = 0;
-  _sv0t15.p0 = 3;
-  int _sv0t16 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t16, 0, _sv0t15.tag);
-  sv0_box_store(_sv0t16, 1, _sv0t15.p0);
-  sv0_box_store(_sv0t16, 2, _sv0t15.p1);
-  Value _sv0t17;
-  _sv0t17.tag = 0;
-  _sv0t17.p0 = 4;
-  int _sv0t18 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t18, 0, _sv0t17.tag);
-  sv0_box_store(_sv0t18, 1, _sv0t17.p0);
-  sv0_box_store(_sv0t18, 2, _sv0t17.p1);
+  Value _sv0t16;
+  _sv0t16.tag = 0;
+  _sv0t16.p0 = 3;
+  int _sv0t17 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t17, 0, _sv0t16.tag);
+  sv0_box_store(_sv0t17, 1, _sv0t16.p0);
+  sv0_box_store(_sv0t17, 2, _sv0t16.p1);
+  Value _sv0t18;
+  _sv0t18.tag = 0;
+  _sv0t18.p0 = 4;
+  int _sv0t19 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t19, 0, _sv0t18.tag);
+  sv0_box_store(_sv0t19, 1, _sv0t18.p0);
+  sv0_box_store(_sv0t19, 2, _sv0t18.p1);
   binop.tag = 2;
   binop.p0 = 0;
-  binop.p1 = _sv0t16;
-  binop.p2 = _sv0t18;
-  int _sv0t19 = sv0_vec_new();
+  binop.p1 = _sv0t17;
+  binop.p2 = _sv0t19;
   int _sv0t20 = sv0_vec_new();
-  int _sv0t21 = emit_expr(binop, en, eb, ew, _sv0t19, _sv0t20, pool, source, starts, ends, out2);
-  int r2 = _sv0t21;
+  int _sv0t21 = sv0_vec_new();
+  int _sv0t22 = emit_expr(binop, en, eb, ew, ec, _sv0t20, _sv0t21, pool, source, starts, ends, out2);
+  int r2 = _sv0t22;
   if ((r2 != 5)) {
     return 4;
   } else {
   }
-  int _sv0t22 = sv0_vec_get(out2, 0);
-  if ((_sv0t22 != 4)) {
+  int _sv0t23 = sv0_vec_get(out2, 0);
+  if ((_sv0t23 != 4)) {
     return 5;
   } else {
   }
-  int _sv0t23 = sv0_vec_get(out2, 1);
-  if ((_sv0t23 != 3)) {
+  int _sv0t24 = sv0_vec_get(out2, 1);
+  if ((_sv0t24 != 3)) {
     return 6;
   } else {
   }
-  int _sv0t24 = sv0_vec_get(out2, 2);
-  if ((_sv0t24 != 4)) {
+  int _sv0t25 = sv0_vec_get(out2, 2);
+  if ((_sv0t25 != 4)) {
     return 7;
   } else {
   }
-  int _sv0t25 = sv0_vec_get(out2, 3);
-  if ((_sv0t25 != 4)) {
+  int _sv0t26 = sv0_vec_get(out2, 3);
+  if ((_sv0t26 != 4)) {
     return 8;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out2, 4);
-  if ((_sv0t26 != 16)) {
+  int _sv0t27 = sv0_vec_get(out2, 4);
+  if ((_sv0t27 != 16)) {
     return 9;
   } else {
   }
-  int _sv0t27 = sv0_vec_new();
-  int out3 = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int out3 = _sv0t28;
   Expr unop_not;
-  Value _sv0t28;
-  _sv0t28.tag = 1;
-  int _sv0t29 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t29, 0, _sv0t28.tag);
-  sv0_box_store(_sv0t29, 1, _sv0t28.p0);
-  sv0_box_store(_sv0t29, 2, _sv0t28.p1);
+  Value _sv0t29;
+  _sv0t29.tag = 1;
+  int _sv0t30 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t30, 0, _sv0t29.tag);
+  sv0_box_store(_sv0t30, 1, _sv0t29.p0);
+  sv0_box_store(_sv0t30, 2, _sv0t29.p1);
   unop_not.tag = 3;
   unop_not.p0 = 1;
-  unop_not.p1 = _sv0t29;
-  int _sv0t30 = sv0_vec_new();
+  unop_not.p1 = _sv0t30;
   int _sv0t31 = sv0_vec_new();
-  int _sv0t32 = emit_expr(unop_not, en, eb, ew, _sv0t30, _sv0t31, pool, source, starts, ends, out3);
-  int r3 = _sv0t32;
+  int _sv0t32 = sv0_vec_new();
+  int _sv0t33 = emit_expr(unop_not, en, eb, ew, ec, _sv0t31, _sv0t32, pool, source, starts, ends, out3);
+  int r3 = _sv0t33;
   if ((r3 != 3)) {
     return 10;
   } else {
   }
-  int _sv0t33 = sv0_vec_get(out3, 0);
-  if ((_sv0t33 != 7)) {
+  int _sv0t34 = sv0_vec_get(out3, 0);
+  if ((_sv0t34 != 7)) {
     return 11;
   } else {
   }
-  int _sv0t34 = sv0_vec_get(out3, 1);
-  if ((_sv0t34 != 1)) {
+  int _sv0t35 = sv0_vec_get(out3, 1);
+  if ((_sv0t35 != 1)) {
     return 12;
   } else {
   }
-  int _sv0t35 = sv0_vec_get(out3, 2);
-  if ((_sv0t35 != 82)) {
+  int _sv0t36 = sv0_vec_get(out3, 2);
+  if ((_sv0t36 != 82)) {
     return 13;
   } else {
   }
-  int _sv0t36 = sv0_vec_new();
-  int out4 = _sv0t36;
+  int _sv0t37 = sv0_vec_new();
+  int out4 = _sv0t37;
   Expr unop_neg;
-  Value _sv0t37;
-  _sv0t37.tag = 0;
-  _sv0t37.p0 = 5;
-  int _sv0t38 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t38, 0, _sv0t37.tag);
-  sv0_box_store(_sv0t38, 1, _sv0t37.p0);
-  sv0_box_store(_sv0t38, 2, _sv0t37.p1);
+  Value _sv0t38;
+  _sv0t38.tag = 0;
+  _sv0t38.p0 = 5;
+  int _sv0t39 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t39, 0, _sv0t38.tag);
+  sv0_box_store(_sv0t39, 1, _sv0t38.p0);
+  sv0_box_store(_sv0t39, 2, _sv0t38.p1);
   unop_neg.tag = 3;
   unop_neg.p0 = 0;
-  unop_neg.p1 = _sv0t38;
-  int _sv0t39 = sv0_vec_new();
+  unop_neg.p1 = _sv0t39;
   int _sv0t40 = sv0_vec_new();
-  int _sv0t41 = emit_expr(unop_neg, en, eb, ew, _sv0t39, _sv0t40, pool, source, starts, ends, out4);
-  int r4 = _sv0t41;
+  int _sv0t41 = sv0_vec_new();
+  int _sv0t42 = emit_expr(unop_neg, en, eb, ew, ec, _sv0t40, _sv0t41, pool, source, starts, ends, out4);
+  int r4 = _sv0t42;
   if ((r4 != 3)) {
     return 14;
   } else {
   }
-  int _sv0t42 = sv0_vec_get(out4, 0);
-  if ((_sv0t42 != 4)) {
+  int _sv0t43 = sv0_vec_get(out4, 0);
+  if ((_sv0t43 != 4)) {
     return 15;
   } else {
   }
-  int _sv0t43 = sv0_vec_get(out4, 1);
-  if ((_sv0t43 != 5)) {
+  int _sv0t44 = sv0_vec_get(out4, 1);
+  if ((_sv0t44 != 5)) {
     return 16;
   } else {
   }
-  int _sv0t44 = sv0_vec_get(out4, 2);
-  if ((_sv0t44 != 21)) {
+  int _sv0t45 = sv0_vec_get(out4, 2);
+  if ((_sv0t45 != 21)) {
     return 17;
   } else {
   }
   sv0_vec_push(en, 70);
   sv0_vec_push(eb, 0);
   sv0_vec_push(ew, 1);
-  int _sv0t45 = sv0_vec_new();
-  int out5 = _sv0t45;
+  int _sv0t46 = sv0_vec_new();
+  int out5 = _sv0t46;
   Expr load;
   load.tag = 1;
   load.p0 = 70;
-  int _sv0t46 = sv0_vec_new();
   int _sv0t47 = sv0_vec_new();
-  int _sv0t48 = emit_expr(load, en, eb, ew, _sv0t46, _sv0t47, pool, source, starts, ends, out5);
-  int r5 = _sv0t48;
+  int _sv0t48 = sv0_vec_new();
+  int _sv0t49 = emit_expr(load, en, eb, ew, ec, _sv0t47, _sv0t48, pool, source, starts, ends, out5);
+  int r5 = _sv0t49;
   if ((r5 != 2)) {
     return 18;
   } else {
   }
-  int _sv0t49 = sv0_vec_get(out5, 0);
-  if ((_sv0t49 != 96)) {
+  int _sv0t50 = sv0_vec_get(out5, 0);
+  if ((_sv0t50 != 96)) {
     return 19;
   } else {
   }
-  int _sv0t50 = sv0_vec_get(out5, 1);
-  if ((_sv0t50 != 0)) {
+  int _sv0t51 = sv0_vec_get(out5, 1);
+  if ((_sv0t51 != 0)) {
     return 20;
   } else {
   }
-  int _sv0t51 = sv0_vec_new();
-  int out6 = _sv0t51;
+  int _sv0t52 = sv0_vec_new();
+  int out6 = _sv0t52;
   Expr unop_cast;
-  Value _sv0t52;
-  _sv0t52.tag = 0;
-  _sv0t52.p0 = 9;
-  int _sv0t53 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t53, 0, _sv0t52.tag);
-  sv0_box_store(_sv0t53, 1, _sv0t52.p0);
-  sv0_box_store(_sv0t53, 2, _sv0t52.p1);
+  Value _sv0t53;
+  _sv0t53.tag = 0;
+  _sv0t53.p0 = 9;
+  int _sv0t54 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t54, 0, _sv0t53.tag);
+  sv0_box_store(_sv0t54, 1, _sv0t53.p0);
+  sv0_box_store(_sv0t54, 2, _sv0t53.p1);
   unop_cast.tag = 3;
   unop_cast.p0 = 99;
-  unop_cast.p1 = _sv0t53;
-  int _sv0t54 = sv0_vec_new();
+  unop_cast.p1 = _sv0t54;
   int _sv0t55 = sv0_vec_new();
-  int _sv0t56 = emit_expr(unop_cast, en, eb, ew, _sv0t54, _sv0t55, pool, source, starts, ends, out6);
-  int r6 = _sv0t56;
+  int _sv0t56 = sv0_vec_new();
+  int _sv0t57 = emit_expr(unop_cast, en, eb, ew, ec, _sv0t55, _sv0t56, pool, source, starts, ends, out6);
+  int r6 = _sv0t57;
   if ((r6 != 2)) {
     return 21;
   } else {
   }
-  int _sv0t57 = sv0_vec_get(out6, 0);
-  if ((_sv0t57 != 4)) {
+  int _sv0t58 = sv0_vec_get(out6, 0);
+  if ((_sv0t58 != 4)) {
     return 22;
   } else {
   }
-  int _sv0t58 = sv0_vec_get(out6, 1);
-  if ((_sv0t58 != 9)) {
+  int _sv0t59 = sv0_vec_get(out6, 1);
+  if ((_sv0t59 != 9)) {
     return 23;
   } else {
   }
   sv0_vec_push(en, 80);
   sv0_vec_push(eb, 4);
   sv0_vec_push(ew, 3);
-  int _sv0t59 = sv0_vec_new();
-  int out7 = _sv0t59;
+  int _sv0t60 = sv0_vec_new();
+  int out7 = _sv0t60;
   Expr f0;
-  Value _sv0t60;
-  _sv0t60.tag = 3;
-  _sv0t60.p0 = 80;
-  int _sv0t61 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t61, 0, _sv0t60.tag);
-  sv0_box_store(_sv0t61, 1, _sv0t60.p0);
-  sv0_box_store(_sv0t61, 2, _sv0t60.p1);
+  Value _sv0t61;
+  _sv0t61.tag = 3;
+  _sv0t61.p0 = 80;
+  int _sv0t62 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t62, 0, _sv0t61.tag);
+  sv0_box_store(_sv0t62, 1, _sv0t61.p0);
+  sv0_box_store(_sv0t62, 2, _sv0t61.p1);
   f0.tag = 4;
-  f0.p0 = _sv0t61;
+  f0.p0 = _sv0t62;
   f0.p1 = 0;
-  int _sv0t62 = sv0_vec_new();
   int _sv0t63 = sv0_vec_new();
-  int _sv0t64 = emit_expr(f0, en, eb, ew, _sv0t62, _sv0t63, pool, source, starts, ends, out7);
-  int r7 = _sv0t64;
+  int _sv0t64 = sv0_vec_new();
+  int _sv0t65 = emit_expr(f0, en, eb, ew, ec, _sv0t63, _sv0t64, pool, source, starts, ends, out7);
+  int r7 = _sv0t65;
   if ((r7 != 2)) {
     return 24;
   } else {
   }
-  int _sv0t65 = sv0_vec_get(out7, 0);
-  if ((_sv0t65 != 96)) {
+  int _sv0t66 = sv0_vec_get(out7, 0);
+  if ((_sv0t66 != 96)) {
     return 25;
   } else {
   }
-  int _sv0t66 = sv0_vec_get(out7, 1);
-  if ((_sv0t66 != 4)) {
+  int _sv0t67 = sv0_vec_get(out7, 1);
+  if ((_sv0t67 != 4)) {
     return 26;
   } else {
   }
-  int _sv0t67 = sv0_vec_new();
-  int out8 = _sv0t67;
+  int _sv0t68 = sv0_vec_new();
+  int out8 = _sv0t68;
   Expr ftag;
-  Value _sv0t68;
-  _sv0t68.tag = 3;
-  _sv0t68.p0 = 80;
-  int _sv0t69 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t69, 0, _sv0t68.tag);
-  sv0_box_store(_sv0t69, 1, _sv0t68.p0);
-  sv0_box_store(_sv0t69, 2, _sv0t68.p1);
-  int _sv0t70 = (0 - 1);
+  Value _sv0t69;
+  _sv0t69.tag = 3;
+  _sv0t69.p0 = 80;
+  int _sv0t70 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t70, 0, _sv0t69.tag);
+  sv0_box_store(_sv0t70, 1, _sv0t69.p0);
+  sv0_box_store(_sv0t70, 2, _sv0t69.p1);
+  int _sv0t71 = (0 - 1);
   ftag.tag = 4;
-  ftag.p0 = _sv0t69;
-  ftag.p1 = _sv0t70;
-  int _sv0t71 = sv0_vec_new();
+  ftag.p0 = _sv0t70;
+  ftag.p1 = _sv0t71;
   int _sv0t72 = sv0_vec_new();
-  int _sv0t73 = emit_expr(ftag, en, eb, ew, _sv0t71, _sv0t72, pool, source, starts, ends, out8);
-  int r8 = _sv0t73;
+  int _sv0t73 = sv0_vec_new();
+  int _sv0t74 = emit_expr(ftag, en, eb, ew, ec, _sv0t72, _sv0t73, pool, source, starts, ends, out8);
+  int r8 = _sv0t74;
   if ((r8 != 2)) {
     return 27;
   } else {
   }
-  int _sv0t74 = sv0_vec_get(out8, 0);
-  if ((_sv0t74 != 96)) {
+  int _sv0t75 = sv0_vec_get(out8, 0);
+  if ((_sv0t75 != 96)) {
     return 28;
   } else {
   }
-  int _sv0t75 = sv0_vec_get(out8, 1);
-  if ((_sv0t75 != 4)) {
+  int _sv0t76 = sv0_vec_get(out8, 1);
+  if ((_sv0t76 != 4)) {
     return 29;
   } else {
   }
-  int _sv0t76 = sv0_vec_new();
-  int out9 = _sv0t76;
+  int _sv0t77 = sv0_vec_new();
+  int out9 = _sv0t77;
   Expr foob;
-  Value _sv0t77;
-  _sv0t77.tag = 3;
-  _sv0t77.p0 = 80;
-  int _sv0t78 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t78, 0, _sv0t77.tag);
-  sv0_box_store(_sv0t78, 1, _sv0t77.p0);
-  sv0_box_store(_sv0t78, 2, _sv0t77.p1);
+  Value _sv0t78;
+  _sv0t78.tag = 3;
+  _sv0t78.p0 = 80;
+  int _sv0t79 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t79, 0, _sv0t78.tag);
+  sv0_box_store(_sv0t79, 1, _sv0t78.p0);
+  sv0_box_store(_sv0t79, 2, _sv0t78.p1);
   foob.tag = 4;
-  foob.p0 = _sv0t78;
+  foob.p0 = _sv0t79;
   foob.p1 = 3;
-  int _sv0t79 = sv0_vec_new();
   int _sv0t80 = sv0_vec_new();
-  int _sv0t81 = emit_expr(foob, en, eb, ew, _sv0t79, _sv0t80, pool, source, starts, ends, out9);
-  int r9 = _sv0t81;
-  int _sv0t82 = (0 - 1);
-  if ((r9 != _sv0t82)) {
+  int _sv0t81 = sv0_vec_new();
+  int _sv0t82 = emit_expr(foob, en, eb, ew, ec, _sv0t80, _sv0t81, pool, source, starts, ends, out9);
+  int r9 = _sv0t82;
+  int _sv0t83 = (0 - 1);
+  if ((r9 != _sv0t83)) {
     return 30;
   } else {
   }
@@ -4845,19 +4859,21 @@ static int test_emit_instr(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
+  int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int pool = _sv0t5;
+  int eff = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int fns = _sv0t6;
+  int pool = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int fns = _sv0t7;
   const char* source;
   source = "+-!";
-  int _sv0t7 = sv0_vec_new();
-  int starts = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int ends = _sv0t8;
+  int starts = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ends = _sv0t9;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 1);
   sv0_vec_push(starts, 1);
@@ -4868,235 +4884,235 @@ static int test_emit_instr(void) {
   sv0_vec_push(eb, 0);
   sv0_vec_push(ew, 1);
   sv0_vec_push(efs, 0);
-  int _sv0t9 = sv0_vec_new();
-  int out1 = _sv0t9;
-  Instr _sv0t10;
-  _sv0t10.tag = 0;
-  int _sv0t11 = emit_instr(_sv0t10, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out1);
-  int r1 = _sv0t11;
+  int _sv0t10 = sv0_vec_new();
+  int out1 = _sv0t10;
+  Instr _sv0t11;
+  _sv0t11.tag = 0;
+  int _sv0t12 = emit_instr(_sv0t11, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out1);
+  int r1 = _sv0t12;
   if ((r1 != 0)) {
     return 1;
   } else {
   }
-  int _sv0t12 = sv0_vec_len(out1);
-  if ((_sv0t12 != 0)) {
+  int _sv0t13 = sv0_vec_len(out1);
+  if ((_sv0t13 != 0)) {
     return 2;
   } else {
   }
-  int _sv0t13 = sv0_vec_new();
-  int out2 = _sv0t13;
-  Instr _sv0t14;
-  _sv0t14.tag = 1;
-  _sv0t14.p0 = 99;
-  int _sv0t15 = emit_instr(_sv0t14, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out2);
-  int r2 = _sv0t15;
+  int _sv0t14 = sv0_vec_new();
+  int out2 = _sv0t14;
+  Instr _sv0t15;
+  _sv0t15.tag = 1;
+  _sv0t15.p0 = 99;
+  int _sv0t16 = emit_instr(_sv0t15, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out2);
+  int r2 = _sv0t16;
   if ((r2 != 0)) {
     return 3;
   } else {
   }
-  int _sv0t16 = sv0_vec_len(out2);
-  if ((_sv0t16 != 0)) {
+  int _sv0t17 = sv0_vec_len(out2);
+  if ((_sv0t17 != 0)) {
     return 4;
   } else {
   }
-  int _sv0t17 = sv0_vec_new();
-  int out3 = _sv0t17;
-  Instr _sv0t18;
-  _sv0t18.tag = 2;
-  _sv0t18.p0 = 1;
-  _sv0t18.p1 = 2;
-  int _sv0t19 = emit_instr(_sv0t18, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out3);
-  int r3 = _sv0t19;
+  int _sv0t18 = sv0_vec_new();
+  int out3 = _sv0t18;
+  Instr _sv0t19;
+  _sv0t19.tag = 2;
+  _sv0t19.p0 = 1;
+  _sv0t19.p1 = 2;
+  int _sv0t20 = emit_instr(_sv0t19, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out3);
+  int r3 = _sv0t20;
   if ((r3 != 0)) {
     return 5;
   } else {
   }
-  int _sv0t20 = sv0_vec_new();
-  int out4 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int out4 = _sv0t21;
   Expr asgn_e;
-  Value _sv0t21;
-  _sv0t21.tag = 0;
-  _sv0t21.p0 = 42;
-  int _sv0t22 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t22, 0, _sv0t21.tag);
-  sv0_box_store(_sv0t22, 1, _sv0t21.p0);
-  sv0_box_store(_sv0t22, 2, _sv0t21.p1);
+  Value _sv0t22;
+  _sv0t22.tag = 0;
+  _sv0t22.p0 = 42;
+  int _sv0t23 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t23, 0, _sv0t22.tag);
+  sv0_box_store(_sv0t23, 1, _sv0t22.p0);
+  sv0_box_store(_sv0t23, 2, _sv0t22.p1);
   asgn_e.tag = 0;
-  asgn_e.p0 = _sv0t22;
-  Instr _sv0t23;
-  int _sv0t24 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t24, 0, asgn_e.tag);
-  sv0_box_store(_sv0t24, 1, asgn_e.p0);
-  sv0_box_store(_sv0t24, 2, asgn_e.p1);
-  sv0_box_store(_sv0t24, 3, asgn_e.p2);
-  _sv0t23.tag = 3;
-  _sv0t23.p0 = 50;
-  _sv0t23.p1 = _sv0t24;
-  int _sv0t25 = emit_instr(_sv0t23, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out4);
-  int r4 = _sv0t25;
+  asgn_e.p0 = _sv0t23;
+  Instr _sv0t24;
+  int _sv0t25 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t25, 0, asgn_e.tag);
+  sv0_box_store(_sv0t25, 1, asgn_e.p0);
+  sv0_box_store(_sv0t25, 2, asgn_e.p1);
+  sv0_box_store(_sv0t25, 3, asgn_e.p2);
+  _sv0t24.tag = 3;
+  _sv0t24.p0 = 50;
+  _sv0t24.p1 = _sv0t25;
+  int _sv0t26 = emit_instr(_sv0t24, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out4);
+  int r4 = _sv0t26;
   if ((r4 != 4)) {
     return 6;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out4, 0);
-  if ((_sv0t26 != 4)) {
+  int _sv0t27 = sv0_vec_get(out4, 0);
+  if ((_sv0t27 != 4)) {
     return 7;
   } else {
   }
-  int _sv0t27 = sv0_vec_get(out4, 1);
-  if ((_sv0t27 != 42)) {
+  int _sv0t28 = sv0_vec_get(out4, 1);
+  if ((_sv0t28 != 42)) {
     return 8;
   } else {
   }
-  int _sv0t28 = sv0_vec_get(out4, 2);
-  if ((_sv0t28 != 97)) {
+  int _sv0t29 = sv0_vec_get(out4, 2);
+  if ((_sv0t29 != 97)) {
     return 9;
   } else {
   }
-  int _sv0t29 = sv0_vec_get(out4, 3);
-  if ((_sv0t29 != 0)) {
+  int _sv0t30 = sv0_vec_get(out4, 3);
+  if ((_sv0t30 != 0)) {
     return 10;
   } else {
   }
-  int _sv0t30 = sv0_vec_new();
-  int out5 = _sv0t30;
+  int _sv0t31 = sv0_vec_new();
+  int out5 = _sv0t31;
   Expr store_e;
-  Value _sv0t31;
-  _sv0t31.tag = 1;
-  int _sv0t32 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t32, 0, _sv0t31.tag);
-  sv0_box_store(_sv0t32, 1, _sv0t31.p0);
-  sv0_box_store(_sv0t32, 2, _sv0t31.p1);
+  Value _sv0t32;
+  _sv0t32.tag = 1;
+  int _sv0t33 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t33, 0, _sv0t32.tag);
+  sv0_box_store(_sv0t33, 1, _sv0t32.p0);
+  sv0_box_store(_sv0t33, 2, _sv0t32.p1);
   store_e.tag = 0;
-  store_e.p0 = _sv0t32;
-  Instr _sv0t33;
-  int _sv0t34 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t34, 0, store_e.tag);
-  sv0_box_store(_sv0t34, 1, store_e.p0);
-  sv0_box_store(_sv0t34, 2, store_e.p1);
-  sv0_box_store(_sv0t34, 3, store_e.p2);
-  _sv0t33.tag = 4;
-  _sv0t33.p0 = 50;
-  _sv0t33.p1 = _sv0t34;
-  int _sv0t35 = emit_instr(_sv0t33, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out5);
-  int r5 = _sv0t35;
+  store_e.p0 = _sv0t33;
+  Instr _sv0t34;
+  int _sv0t35 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t35, 0, store_e.tag);
+  sv0_box_store(_sv0t35, 1, store_e.p0);
+  sv0_box_store(_sv0t35, 2, store_e.p1);
+  sv0_box_store(_sv0t35, 3, store_e.p2);
+  _sv0t34.tag = 4;
+  _sv0t34.p0 = 50;
+  _sv0t34.p1 = _sv0t35;
+  int _sv0t36 = emit_instr(_sv0t34, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out5);
+  int r5 = _sv0t36;
   if ((r5 != 4)) {
     return 11;
   } else {
   }
-  int _sv0t36 = sv0_vec_get(out5, 0);
-  if ((_sv0t36 != 7)) {
+  int _sv0t37 = sv0_vec_get(out5, 0);
+  if ((_sv0t37 != 7)) {
     return 12;
   } else {
   }
-  int _sv0t37 = sv0_vec_get(out5, 1);
-  if ((_sv0t37 != 1)) {
+  int _sv0t38 = sv0_vec_get(out5, 1);
+  if ((_sv0t38 != 1)) {
     return 13;
   } else {
   }
-  int _sv0t38 = sv0_vec_get(out5, 2);
-  if ((_sv0t38 != 97)) {
+  int _sv0t39 = sv0_vec_get(out5, 2);
+  if ((_sv0t39 != 97)) {
     return 14;
   } else {
   }
-  int _sv0t39 = sv0_vec_get(out5, 3);
-  if ((_sv0t39 != 0)) {
+  int _sv0t40 = sv0_vec_get(out5, 3);
+  if ((_sv0t40 != 0)) {
     return 15;
   } else {
   }
-  int _sv0t40 = sv0_vec_new();
-  int out6 = _sv0t40;
-  Instr _sv0t41;
-  _sv0t41.tag = 14;
-  int _sv0t42 = emit_instr(_sv0t41, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out6);
-  int r6 = _sv0t42;
+  int _sv0t41 = sv0_vec_new();
+  int out6 = _sv0t41;
+  Instr _sv0t42;
+  _sv0t42.tag = 14;
+  int _sv0t43 = emit_instr(_sv0t42, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out6);
+  int r6 = _sv0t43;
   if ((r6 != 2)) {
     return 16;
   } else {
   }
-  int _sv0t43 = sv0_vec_get(out6, 0);
-  if ((_sv0t43 != 118)) {
+  int _sv0t44 = sv0_vec_get(out6, 0);
+  if ((_sv0t44 != 118)) {
     return 17;
   } else {
   }
-  int _sv0t44 = sv0_vec_get(out6, 1);
-  if ((_sv0t44 != 0)) {
+  int _sv0t45 = sv0_vec_get(out6, 1);
+  if ((_sv0t45 != 0)) {
     return 18;
   } else {
   }
-  int _sv0t45 = sv0_vec_new();
-  int out7 = _sv0t45;
-  Instr _sv0t46;
-  Value _sv0t47;
-  _sv0t47.tag = 0;
-  _sv0t47.p0 = 7;
-  int _sv0t48 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t48, 0, _sv0t47.tag);
-  sv0_box_store(_sv0t48, 1, _sv0t47.p0);
-  sv0_box_store(_sv0t48, 2, _sv0t47.p1);
-  _sv0t46.tag = 15;
-  _sv0t46.p0 = _sv0t48;
-  int _sv0t49 = emit_instr(_sv0t46, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out7);
-  int r7 = _sv0t49;
+  int _sv0t46 = sv0_vec_new();
+  int out7 = _sv0t46;
+  Instr _sv0t47;
+  Value _sv0t48;
+  _sv0t48.tag = 0;
+  _sv0t48.p0 = 7;
+  int _sv0t49 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t49, 0, _sv0t48.tag);
+  sv0_box_store(_sv0t49, 1, _sv0t48.p0);
+  sv0_box_store(_sv0t49, 2, _sv0t48.p1);
+  _sv0t47.tag = 15;
+  _sv0t47.p0 = _sv0t49;
+  int _sv0t50 = emit_instr(_sv0t47, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out7);
+  int r7 = _sv0t50;
   if ((r7 != 4)) {
     return 19;
   } else {
   }
-  int _sv0t50 = sv0_vec_get(out7, 0);
-  if ((_sv0t50 != 4)) {
+  int _sv0t51 = sv0_vec_get(out7, 0);
+  if ((_sv0t51 != 4)) {
     return 20;
   } else {
   }
-  int _sv0t51 = sv0_vec_get(out7, 1);
-  if ((_sv0t51 != 7)) {
+  int _sv0t52 = sv0_vec_get(out7, 1);
+  if ((_sv0t52 != 7)) {
     return 21;
   } else {
   }
-  int _sv0t52 = sv0_vec_get(out7, 2);
-  if ((_sv0t52 != 118)) {
+  int _sv0t53 = sv0_vec_get(out7, 2);
+  if ((_sv0t53 != 118)) {
     return 22;
   } else {
   }
-  int _sv0t53 = sv0_vec_get(out7, 3);
-  if ((_sv0t53 != 1)) {
+  int _sv0t54 = sv0_vec_get(out7, 3);
+  if ((_sv0t54 != 1)) {
     return 23;
   } else {
   }
-  int _sv0t54 = sv0_vec_new();
-  int out8 = _sv0t54;
-  Instr _sv0t55;
-  Value _sv0t56;
-  _sv0t56.tag = 3;
-  _sv0t56.p0 = 50;
-  int _sv0t57 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t57, 0, _sv0t56.tag);
-  sv0_box_store(_sv0t57, 1, _sv0t56.p0);
-  sv0_box_store(_sv0t57, 2, _sv0t56.p1);
-  _sv0t55.tag = 15;
-  _sv0t55.p0 = _sv0t57;
-  int _sv0t58 = emit_instr(_sv0t55, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out8);
-  int r8 = _sv0t58;
+  int _sv0t55 = sv0_vec_new();
+  int out8 = _sv0t55;
+  Instr _sv0t56;
+  Value _sv0t57;
+  _sv0t57.tag = 3;
+  _sv0t57.p0 = 50;
+  int _sv0t58 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t58, 0, _sv0t57.tag);
+  sv0_box_store(_sv0t58, 1, _sv0t57.p0);
+  sv0_box_store(_sv0t58, 2, _sv0t57.p1);
+  _sv0t56.tag = 15;
+  _sv0t56.p0 = _sv0t58;
+  int _sv0t59 = emit_instr(_sv0t56, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out8);
+  int r8 = _sv0t59;
   if ((r8 != 4)) {
     return 24;
   } else {
   }
-  int _sv0t59 = sv0_vec_get(out8, 0);
-  if ((_sv0t59 != 96)) {
+  int _sv0t60 = sv0_vec_get(out8, 0);
+  if ((_sv0t60 != 96)) {
     return 25;
   } else {
   }
-  int _sv0t60 = sv0_vec_get(out8, 1);
-  if ((_sv0t60 != 0)) {
+  int _sv0t61 = sv0_vec_get(out8, 1);
+  if ((_sv0t61 != 0)) {
     return 26;
   } else {
   }
-  int _sv0t61 = sv0_vec_get(out8, 2);
-  if ((_sv0t61 != 118)) {
+  int _sv0t62 = sv0_vec_get(out8, 2);
+  if ((_sv0t62 != 118)) {
     return 27;
   } else {
   }
-  int _sv0t62 = sv0_vec_get(out8, 3);
-  if ((_sv0t62 != 1)) {
+  int _sv0t63 = sv0_vec_get(out8, 3);
+  if ((_sv0t63 != 1)) {
     return 28;
   } else {
   }
@@ -5104,111 +5120,111 @@ static int test_emit_instr(void) {
   sv0_vec_push(eb, 1);
   sv0_vec_push(ew, 3);
   sv0_vec_push(efs, 0);
-  int _sv0t63 = sv0_vec_new();
-  int out9 = _sv0t63;
+  int _sv0t64 = sv0_vec_new();
+  int out9 = _sv0t64;
   Expr asgn2_e;
   asgn2_e.tag = 1;
   asgn2_e.p0 = 60;
-  Instr _sv0t64;
-  int _sv0t65 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t65, 0, asgn2_e.tag);
-  sv0_box_store(_sv0t65, 1, asgn2_e.p0);
-  sv0_box_store(_sv0t65, 2, asgn2_e.p1);
-  sv0_box_store(_sv0t65, 3, asgn2_e.p2);
-  _sv0t64.tag = 3;
-  _sv0t64.p0 = 60;
-  _sv0t64.p1 = _sv0t65;
-  int _sv0t66 = emit_instr(_sv0t64, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out9);
-  int r9 = _sv0t66;
+  Instr _sv0t65;
+  int _sv0t66 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t66, 0, asgn2_e.tag);
+  sv0_box_store(_sv0t66, 1, asgn2_e.p0);
+  sv0_box_store(_sv0t66, 2, asgn2_e.p1);
+  sv0_box_store(_sv0t66, 3, asgn2_e.p2);
+  _sv0t65.tag = 3;
+  _sv0t65.p0 = 60;
+  _sv0t65.p1 = _sv0t66;
+  int _sv0t67 = emit_instr(_sv0t65, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out9);
+  int r9 = _sv0t67;
   if ((r9 != 12)) {
     return 29;
   } else {
   }
-  int _sv0t67 = sv0_vec_get(out9, 0);
-  if ((_sv0t67 != 96)) {
+  int _sv0t68 = sv0_vec_get(out9, 0);
+  if ((_sv0t68 != 96)) {
     return 30;
   } else {
   }
-  int _sv0t68 = sv0_vec_get(out9, 1);
-  if ((_sv0t68 != 1)) {
+  int _sv0t69 = sv0_vec_get(out9, 1);
+  if ((_sv0t69 != 1)) {
     return 31;
   } else {
   }
-  int _sv0t69 = sv0_vec_get(out9, 2);
-  if ((_sv0t69 != 96)) {
+  int _sv0t70 = sv0_vec_get(out9, 2);
+  if ((_sv0t70 != 96)) {
     return 32;
   } else {
   }
-  int _sv0t70 = sv0_vec_get(out9, 3);
-  if ((_sv0t70 != 2)) {
+  int _sv0t71 = sv0_vec_get(out9, 3);
+  if ((_sv0t71 != 2)) {
     return 33;
   } else {
   }
-  int _sv0t71 = sv0_vec_get(out9, 4);
-  if ((_sv0t71 != 96)) {
+  int _sv0t72 = sv0_vec_get(out9, 4);
+  if ((_sv0t72 != 96)) {
     return 34;
   } else {
   }
-  int _sv0t72 = sv0_vec_get(out9, 5);
-  if ((_sv0t72 != 3)) {
+  int _sv0t73 = sv0_vec_get(out9, 5);
+  if ((_sv0t73 != 3)) {
     return 35;
   } else {
   }
-  int _sv0t73 = sv0_vec_get(out9, 6);
-  if ((_sv0t73 != 97)) {
+  int _sv0t74 = sv0_vec_get(out9, 6);
+  if ((_sv0t74 != 97)) {
     return 36;
   } else {
   }
-  int _sv0t74 = sv0_vec_get(out9, 7);
-  if ((_sv0t74 != 3)) {
+  int _sv0t75 = sv0_vec_get(out9, 7);
+  if ((_sv0t75 != 3)) {
     return 37;
   } else {
   }
-  int _sv0t75 = sv0_vec_get(out9, 8);
-  if ((_sv0t75 != 97)) {
+  int _sv0t76 = sv0_vec_get(out9, 8);
+  if ((_sv0t76 != 97)) {
     return 38;
   } else {
   }
-  int _sv0t76 = sv0_vec_get(out9, 9);
-  if ((_sv0t76 != 2)) {
+  int _sv0t77 = sv0_vec_get(out9, 9);
+  if ((_sv0t77 != 2)) {
     return 39;
   } else {
   }
-  int _sv0t77 = sv0_vec_get(out9, 10);
-  if ((_sv0t77 != 97)) {
+  int _sv0t78 = sv0_vec_get(out9, 10);
+  if ((_sv0t78 != 97)) {
     return 40;
   } else {
   }
-  int _sv0t78 = sv0_vec_get(out9, 11);
-  if ((_sv0t78 != 1)) {
+  int _sv0t79 = sv0_vec_get(out9, 11);
+  if ((_sv0t79 != 1)) {
     return 41;
   } else {
   }
-  int _sv0t79 = sv0_vec_new();
-  int out10 = _sv0t79;
-  Instr _sv0t80;
-  Value _sv0t81;
-  _sv0t81.tag = 3;
-  _sv0t81.p0 = 60;
-  int _sv0t82 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t82, 0, _sv0t81.tag);
-  sv0_box_store(_sv0t82, 1, _sv0t81.p0);
-  sv0_box_store(_sv0t82, 2, _sv0t81.p1);
-  _sv0t80.tag = 15;
-  _sv0t80.p0 = _sv0t82;
-  int _sv0t83 = emit_instr(_sv0t80, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out10);
-  int r10 = _sv0t83;
+  int _sv0t80 = sv0_vec_new();
+  int out10 = _sv0t80;
+  Instr _sv0t81;
+  Value _sv0t82;
+  _sv0t82.tag = 3;
+  _sv0t82.p0 = 60;
+  int _sv0t83 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t83, 0, _sv0t82.tag);
+  sv0_box_store(_sv0t83, 1, _sv0t82.p0);
+  sv0_box_store(_sv0t83, 2, _sv0t82.p1);
+  _sv0t81.tag = 15;
+  _sv0t81.p0 = _sv0t83;
+  int _sv0t84 = emit_instr(_sv0t81, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out10);
+  int r10 = _sv0t84;
   if ((r10 != 8)) {
     return 42;
   } else {
   }
-  int _sv0t84 = sv0_vec_get(out10, 6);
-  if ((_sv0t84 != 118)) {
+  int _sv0t85 = sv0_vec_get(out10, 6);
+  if ((_sv0t85 != 118)) {
     return 43;
   } else {
   }
-  int _sv0t85 = sv0_vec_get(out10, 7);
-  if ((_sv0t85 != 3)) {
+  int _sv0t86 = sv0_vec_get(out10, 7);
+  if ((_sv0t86 != 3)) {
     return 44;
   } else {
   }
@@ -5223,76 +5239,78 @@ static int test_emit_instrs(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
+  int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int pool = _sv0t5;
+  int eff = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int fns = _sv0t6;
+  int pool = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int fns = _sv0t7;
   const char* source;
   source = "+";
-  int _sv0t7 = sv0_vec_new();
-  int starts = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int ends = _sv0t8;
+  int starts = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ends = _sv0t9;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 1);
-  int _sv0t9 = sv0_vec_new();
-  int empty = _sv0t9;
   int _sv0t10 = sv0_vec_new();
-  int out1 = _sv0t10;
-  int _sv0t11 = emit_instrs(empty, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out1);
-  int r1 = _sv0t11;
+  int empty = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int out1 = _sv0t11;
+  int _sv0t12 = emit_instrs(empty, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out1);
+  int r1 = _sv0t12;
   if ((r1 != 0)) {
     return 1;
   } else {
   }
-  int _sv0t12 = sv0_vec_len(out1);
-  if ((_sv0t12 != 0)) {
+  int _sv0t13 = sv0_vec_len(out1);
+  if ((_sv0t13 != 0)) {
     return 2;
   } else {
   }
-  int _sv0t13 = sv0_vec_new();
-  int instrs = _sv0t13;
-  Instr _sv0t14;
-  _sv0t14.tag = 0;
-  int _sv0t15 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t15, 0, _sv0t14.tag);
-  sv0_box_store(_sv0t15, 1, _sv0t14.p0);
-  sv0_box_store(_sv0t15, 2, _sv0t14.p1);
-  sv0_box_store(_sv0t15, 3, _sv0t14.p2);
-  sv0_box_store(_sv0t15, 4, _sv0t14.p3);
-  sv0_vec_push(instrs, _sv0t15);
-  Instr _sv0t16;
-  _sv0t16.tag = 14;
-  int _sv0t17 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t17, 0, _sv0t16.tag);
-  sv0_box_store(_sv0t17, 1, _sv0t16.p0);
-  sv0_box_store(_sv0t17, 2, _sv0t16.p1);
-  sv0_box_store(_sv0t17, 3, _sv0t16.p2);
-  sv0_box_store(_sv0t17, 4, _sv0t16.p3);
-  sv0_vec_push(instrs, _sv0t17);
-  int _sv0t18 = sv0_vec_new();
-  int out2 = _sv0t18;
-  int _sv0t19 = emit_instrs(instrs, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out2);
-  int r2 = _sv0t19;
+  int _sv0t14 = sv0_vec_new();
+  int instrs = _sv0t14;
+  Instr _sv0t15;
+  _sv0t15.tag = 0;
+  int _sv0t16 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t16, 0, _sv0t15.tag);
+  sv0_box_store(_sv0t16, 1, _sv0t15.p0);
+  sv0_box_store(_sv0t16, 2, _sv0t15.p1);
+  sv0_box_store(_sv0t16, 3, _sv0t15.p2);
+  sv0_box_store(_sv0t16, 4, _sv0t15.p3);
+  sv0_vec_push(instrs, _sv0t16);
+  Instr _sv0t17;
+  _sv0t17.tag = 14;
+  int _sv0t18 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t18, 0, _sv0t17.tag);
+  sv0_box_store(_sv0t18, 1, _sv0t17.p0);
+  sv0_box_store(_sv0t18, 2, _sv0t17.p1);
+  sv0_box_store(_sv0t18, 3, _sv0t17.p2);
+  sv0_box_store(_sv0t18, 4, _sv0t17.p3);
+  sv0_vec_push(instrs, _sv0t18);
+  int _sv0t19 = sv0_vec_new();
+  int out2 = _sv0t19;
+  int _sv0t20 = emit_instrs(instrs, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out2);
+  int r2 = _sv0t20;
   if ((r2 != 2)) {
     return 3;
   } else {
   }
-  int _sv0t20 = sv0_vec_len(out2);
-  if ((_sv0t20 != 2)) {
+  int _sv0t21 = sv0_vec_len(out2);
+  if ((_sv0t21 != 2)) {
     return 4;
   } else {
   }
-  int _sv0t21 = sv0_vec_get(out2, 0);
-  if ((_sv0t21 != 118)) {
+  int _sv0t22 = sv0_vec_get(out2, 0);
+  if ((_sv0t22 != 118)) {
     return 5;
   } else {
   }
-  int _sv0t22 = sv0_vec_get(out2, 1);
-  if ((_sv0t22 != 0)) {
+  int _sv0t23 = sv0_vec_get(out2, 1);
+  if ((_sv0t23 != 0)) {
     return 6;
   } else {
   }
@@ -5300,96 +5318,96 @@ static int test_emit_instrs(void) {
   sv0_vec_push(eb, 0);
   sv0_vec_push(ew, 1);
   sv0_vec_push(efs, 0);
-  int _sv0t23 = sv0_vec_new();
-  int instrs2 = _sv0t23;
+  int _sv0t24 = sv0_vec_new();
+  int instrs2 = _sv0t24;
   Expr a_e;
-  Value _sv0t24;
-  _sv0t24.tag = 0;
-  _sv0t24.p0 = 99;
-  int _sv0t25 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t25, 0, _sv0t24.tag);
-  sv0_box_store(_sv0t25, 1, _sv0t24.p0);
-  sv0_box_store(_sv0t25, 2, _sv0t24.p1);
+  Value _sv0t25;
+  _sv0t25.tag = 0;
+  _sv0t25.p0 = 99;
+  int _sv0t26 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t26, 0, _sv0t25.tag);
+  sv0_box_store(_sv0t26, 1, _sv0t25.p0);
+  sv0_box_store(_sv0t26, 2, _sv0t25.p1);
   a_e.tag = 0;
-  a_e.p0 = _sv0t25;
-  Instr _sv0t26;
-  int _sv0t27 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t27, 0, a_e.tag);
-  sv0_box_store(_sv0t27, 1, a_e.p0);
-  sv0_box_store(_sv0t27, 2, a_e.p1);
-  sv0_box_store(_sv0t27, 3, a_e.p2);
-  _sv0t26.tag = 3;
-  _sv0t26.p0 = 70;
-  _sv0t26.p1 = _sv0t27;
-  int _sv0t28 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t28, 0, _sv0t26.tag);
-  sv0_box_store(_sv0t28, 1, _sv0t26.p0);
-  sv0_box_store(_sv0t28, 2, _sv0t26.p1);
-  sv0_box_store(_sv0t28, 3, _sv0t26.p2);
-  sv0_box_store(_sv0t28, 4, _sv0t26.p3);
-  sv0_vec_push(instrs2, _sv0t28);
-  Instr _sv0t29;
-  Value _sv0t30;
-  _sv0t30.tag = 3;
-  _sv0t30.p0 = 70;
-  int _sv0t31 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t31, 0, _sv0t30.tag);
-  sv0_box_store(_sv0t31, 1, _sv0t30.p0);
-  sv0_box_store(_sv0t31, 2, _sv0t30.p1);
-  _sv0t29.tag = 15;
-  _sv0t29.p0 = _sv0t31;
-  int _sv0t32 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t32, 0, _sv0t29.tag);
-  sv0_box_store(_sv0t32, 1, _sv0t29.p0);
-  sv0_box_store(_sv0t32, 2, _sv0t29.p1);
-  sv0_box_store(_sv0t32, 3, _sv0t29.p2);
-  sv0_box_store(_sv0t32, 4, _sv0t29.p3);
-  sv0_vec_push(instrs2, _sv0t32);
-  int _sv0t33 = sv0_vec_new();
-  int out3 = _sv0t33;
-  int _sv0t34 = emit_instrs(instrs2, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out3);
-  int r3 = _sv0t34;
+  a_e.p0 = _sv0t26;
+  Instr _sv0t27;
+  int _sv0t28 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t28, 0, a_e.tag);
+  sv0_box_store(_sv0t28, 1, a_e.p0);
+  sv0_box_store(_sv0t28, 2, a_e.p1);
+  sv0_box_store(_sv0t28, 3, a_e.p2);
+  _sv0t27.tag = 3;
+  _sv0t27.p0 = 70;
+  _sv0t27.p1 = _sv0t28;
+  int _sv0t29 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t29, 0, _sv0t27.tag);
+  sv0_box_store(_sv0t29, 1, _sv0t27.p0);
+  sv0_box_store(_sv0t29, 2, _sv0t27.p1);
+  sv0_box_store(_sv0t29, 3, _sv0t27.p2);
+  sv0_box_store(_sv0t29, 4, _sv0t27.p3);
+  sv0_vec_push(instrs2, _sv0t29);
+  Instr _sv0t30;
+  Value _sv0t31;
+  _sv0t31.tag = 3;
+  _sv0t31.p0 = 70;
+  int _sv0t32 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t32, 0, _sv0t31.tag);
+  sv0_box_store(_sv0t32, 1, _sv0t31.p0);
+  sv0_box_store(_sv0t32, 2, _sv0t31.p1);
+  _sv0t30.tag = 15;
+  _sv0t30.p0 = _sv0t32;
+  int _sv0t33 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t33, 0, _sv0t30.tag);
+  sv0_box_store(_sv0t33, 1, _sv0t30.p0);
+  sv0_box_store(_sv0t33, 2, _sv0t30.p1);
+  sv0_box_store(_sv0t33, 3, _sv0t30.p2);
+  sv0_box_store(_sv0t33, 4, _sv0t30.p3);
+  sv0_vec_push(instrs2, _sv0t33);
+  int _sv0t34 = sv0_vec_new();
+  int out3 = _sv0t34;
+  int _sv0t35 = emit_instrs(instrs2, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out3);
+  int r3 = _sv0t35;
   if ((r3 != 8)) {
     return 7;
   } else {
   }
-  int _sv0t35 = sv0_vec_get(out3, 0);
-  if ((_sv0t35 != 4)) {
+  int _sv0t36 = sv0_vec_get(out3, 0);
+  if ((_sv0t36 != 4)) {
     return 8;
   } else {
   }
-  int _sv0t36 = sv0_vec_get(out3, 1);
-  if ((_sv0t36 != 99)) {
+  int _sv0t37 = sv0_vec_get(out3, 1);
+  if ((_sv0t37 != 99)) {
     return 9;
   } else {
   }
-  int _sv0t37 = sv0_vec_get(out3, 2);
-  if ((_sv0t37 != 97)) {
+  int _sv0t38 = sv0_vec_get(out3, 2);
+  if ((_sv0t38 != 97)) {
     return 10;
   } else {
   }
-  int _sv0t38 = sv0_vec_get(out3, 3);
-  if ((_sv0t38 != 0)) {
+  int _sv0t39 = sv0_vec_get(out3, 3);
+  if ((_sv0t39 != 0)) {
     return 11;
   } else {
   }
-  int _sv0t39 = sv0_vec_get(out3, 4);
-  if ((_sv0t39 != 96)) {
+  int _sv0t40 = sv0_vec_get(out3, 4);
+  if ((_sv0t40 != 96)) {
     return 12;
   } else {
   }
-  int _sv0t40 = sv0_vec_get(out3, 5);
-  if ((_sv0t40 != 0)) {
+  int _sv0t41 = sv0_vec_get(out3, 5);
+  if ((_sv0t41 != 0)) {
     return 13;
   } else {
   }
-  int _sv0t41 = sv0_vec_get(out3, 6);
-  if ((_sv0t41 != 118)) {
+  int _sv0t42 = sv0_vec_get(out3, 6);
+  if ((_sv0t42 != 118)) {
     return 14;
   } else {
   }
-  int _sv0t42 = sv0_vec_get(out3, 7);
-  if ((_sv0t42 != 1)) {
+  int _sv0t43 = sv0_vec_get(out3, 7);
+  if ((_sv0t43 != 1)) {
     return 15;
   } else {
   }
@@ -5513,338 +5531,340 @@ static int test_emit_ifelse_block(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
+  int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int pool = _sv0t5;
+  int eff = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int fns = _sv0t6;
+  int pool = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int fns = _sv0t7;
   const char* source;
   source = "+";
-  int _sv0t7 = sv0_vec_new();
-  int starts = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int ends = _sv0t8;
+  int starts = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ends = _sv0t9;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 1);
   sv0_vec_push(en, 50);
   sv0_vec_push(eb, 0);
   sv0_vec_push(ew, 1);
   sv0_vec_push(efs, 0);
-  Expr _sv0t9;
-  Value _sv0t10;
-  _sv0t10.tag = 1;
-  int _sv0t11 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t11, 0, _sv0t10.tag);
-  sv0_box_store(_sv0t11, 1, _sv0t10.p0);
-  sv0_box_store(_sv0t11, 2, _sv0t10.p1);
-  _sv0t9.tag = 0;
-  _sv0t9.p0 = _sv0t11;
-  int _sv0t12 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t12, 0, _sv0t9.tag);
-  sv0_box_store(_sv0t12, 1, _sv0t9.p0);
-  sv0_box_store(_sv0t12, 2, _sv0t9.p1);
-  sv0_box_store(_sv0t12, 3, _sv0t9.p2);
-  int cond1 = _sv0t12;
-  int _sv0t13 = sv0_vec_new();
-  int th1 = _sv0t13;
-  Instr _sv0t14;
-  _sv0t14.tag = 14;
-  int _sv0t15 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t15, 0, _sv0t14.tag);
-  sv0_box_store(_sv0t15, 1, _sv0t14.p0);
-  sv0_box_store(_sv0t15, 2, _sv0t14.p1);
-  sv0_box_store(_sv0t15, 3, _sv0t14.p2);
-  sv0_box_store(_sv0t15, 4, _sv0t14.p3);
-  sv0_vec_push(th1, _sv0t15);
-  int _sv0t16 = sv0_vec_new();
-  int el1 = _sv0t16;
-  Instr _sv0t17;
-  _sv0t17.tag = 14;
-  int _sv0t18 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t18, 0, _sv0t17.tag);
-  sv0_box_store(_sv0t18, 1, _sv0t17.p0);
-  sv0_box_store(_sv0t18, 2, _sv0t17.p1);
-  sv0_box_store(_sv0t18, 3, _sv0t17.p2);
-  sv0_box_store(_sv0t18, 4, _sv0t17.p3);
-  sv0_vec_push(el1, _sv0t18);
-  int _sv0t19 = sv0_vec_new();
-  int out1 = _sv0t19;
-  Instr _sv0t20;
-  _sv0t20.tag = 6;
-  _sv0t20.p0 = cond1;
-  _sv0t20.p1 = th1;
-  _sv0t20.p2 = el1;
-  int _sv0t21 = emit_instr(_sv0t20, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out1);
-  int r1 = _sv0t21;
+  Expr _sv0t10;
+  Value _sv0t11;
+  _sv0t11.tag = 1;
+  int _sv0t12 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t12, 0, _sv0t11.tag);
+  sv0_box_store(_sv0t12, 1, _sv0t11.p0);
+  sv0_box_store(_sv0t12, 2, _sv0t11.p1);
+  _sv0t10.tag = 0;
+  _sv0t10.p0 = _sv0t12;
+  int _sv0t13 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t13, 0, _sv0t10.tag);
+  sv0_box_store(_sv0t13, 1, _sv0t10.p0);
+  sv0_box_store(_sv0t13, 2, _sv0t10.p1);
+  sv0_box_store(_sv0t13, 3, _sv0t10.p2);
+  int cond1 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int th1 = _sv0t14;
+  Instr _sv0t15;
+  _sv0t15.tag = 14;
+  int _sv0t16 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t16, 0, _sv0t15.tag);
+  sv0_box_store(_sv0t16, 1, _sv0t15.p0);
+  sv0_box_store(_sv0t16, 2, _sv0t15.p1);
+  sv0_box_store(_sv0t16, 3, _sv0t15.p2);
+  sv0_box_store(_sv0t16, 4, _sv0t15.p3);
+  sv0_vec_push(th1, _sv0t16);
+  int _sv0t17 = sv0_vec_new();
+  int el1 = _sv0t17;
+  Instr _sv0t18;
+  _sv0t18.tag = 14;
+  int _sv0t19 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t19, 0, _sv0t18.tag);
+  sv0_box_store(_sv0t19, 1, _sv0t18.p0);
+  sv0_box_store(_sv0t19, 2, _sv0t18.p1);
+  sv0_box_store(_sv0t19, 3, _sv0t18.p2);
+  sv0_box_store(_sv0t19, 4, _sv0t18.p3);
+  sv0_vec_push(el1, _sv0t19);
+  int _sv0t20 = sv0_vec_new();
+  int out1 = _sv0t20;
+  Instr _sv0t21;
+  _sv0t21.tag = 6;
+  _sv0t21.p0 = cond1;
+  _sv0t21.p1 = th1;
+  _sv0t21.p2 = el1;
+  int _sv0t22 = emit_instr(_sv0t21, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out1);
+  int r1 = _sv0t22;
   if ((r1 < 0)) {
     return 1;
   } else {
   }
-  int _sv0t22 = sv0_vec_len(out1);
-  if ((_sv0t22 != 10)) {
+  int _sv0t23 = sv0_vec_len(out1);
+  if ((_sv0t23 != 10)) {
     return 2;
   } else {
   }
-  int _sv0t23 = sv0_vec_get(out1, 0);
-  if ((_sv0t23 != 7)) {
+  int _sv0t24 = sv0_vec_get(out1, 0);
+  if ((_sv0t24 != 7)) {
     return 3;
   } else {
   }
-  int _sv0t24 = sv0_vec_get(out1, 1);
-  if ((_sv0t24 != 1)) {
+  int _sv0t25 = sv0_vec_get(out1, 1);
+  if ((_sv0t25 != 1)) {
     return 4;
   } else {
   }
-  int _sv0t25 = sv0_vec_get(out1, 2);
-  if ((_sv0t25 != 114)) {
+  int _sv0t26 = sv0_vec_get(out1, 2);
+  if ((_sv0t26 != 114)) {
     return 5;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out1, 3);
-  if ((_sv0t26 != 7)) {
+  int _sv0t27 = sv0_vec_get(out1, 3);
+  if ((_sv0t27 != 7)) {
     return 6;
   } else {
   }
-  int _sv0t27 = sv0_vec_get(out1, 4);
-  if ((_sv0t27 != 118)) {
+  int _sv0t28 = sv0_vec_get(out1, 4);
+  if ((_sv0t28 != 118)) {
     return 7;
   } else {
   }
-  int _sv0t28 = sv0_vec_get(out1, 5);
-  if ((_sv0t28 != 0)) {
+  int _sv0t29 = sv0_vec_get(out1, 5);
+  if ((_sv0t29 != 0)) {
     return 8;
   } else {
   }
-  int _sv0t29 = sv0_vec_get(out1, 6);
-  if ((_sv0t29 != 112)) {
+  int _sv0t30 = sv0_vec_get(out1, 6);
+  if ((_sv0t30 != 112)) {
     return 9;
   } else {
   }
-  int _sv0t30 = sv0_vec_get(out1, 7);
-  if ((_sv0t30 != 2)) {
+  int _sv0t31 = sv0_vec_get(out1, 7);
+  if ((_sv0t31 != 2)) {
     return 10;
   } else {
   }
-  int _sv0t31 = sv0_vec_get(out1, 8);
-  if ((_sv0t31 != 118)) {
+  int _sv0t32 = sv0_vec_get(out1, 8);
+  if ((_sv0t32 != 118)) {
     return 11;
   } else {
   }
-  int _sv0t32 = sv0_vec_get(out1, 9);
-  if ((_sv0t32 != 0)) {
+  int _sv0t33 = sv0_vec_get(out1, 9);
+  if ((_sv0t33 != 0)) {
     return 12;
   } else {
   }
-  Expr _sv0t33;
-  Value _sv0t34;
+  Expr _sv0t34;
+  Value _sv0t35;
+  _sv0t35.tag = 0;
+  _sv0t35.p0 = 1;
+  int _sv0t36 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t36, 0, _sv0t35.tag);
+  sv0_box_store(_sv0t36, 1, _sv0t35.p0);
+  sv0_box_store(_sv0t36, 2, _sv0t35.p1);
   _sv0t34.tag = 0;
-  _sv0t34.p0 = 1;
-  int _sv0t35 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t35, 0, _sv0t34.tag);
-  sv0_box_store(_sv0t35, 1, _sv0t34.p0);
-  sv0_box_store(_sv0t35, 2, _sv0t34.p1);
-  _sv0t33.tag = 0;
-  _sv0t33.p0 = _sv0t35;
-  int _sv0t36 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t36, 0, _sv0t33.tag);
-  sv0_box_store(_sv0t36, 1, _sv0t33.p0);
-  sv0_box_store(_sv0t36, 2, _sv0t33.p1);
-  sv0_box_store(_sv0t36, 3, _sv0t33.p2);
-  int cond2 = _sv0t36;
-  int _sv0t37 = sv0_vec_new();
-  int th2 = _sv0t37;
+  _sv0t34.p0 = _sv0t36;
+  int _sv0t37 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t37, 0, _sv0t34.tag);
+  sv0_box_store(_sv0t37, 1, _sv0t34.p0);
+  sv0_box_store(_sv0t37, 2, _sv0t34.p1);
+  sv0_box_store(_sv0t37, 3, _sv0t34.p2);
+  int cond2 = _sv0t37;
+  int _sv0t38 = sv0_vec_new();
+  int th2 = _sv0t38;
   Expr asgn_e;
-  Value _sv0t38;
-  _sv0t38.tag = 0;
-  _sv0t38.p0 = 42;
-  int _sv0t39 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t39, 0, _sv0t38.tag);
-  sv0_box_store(_sv0t39, 1, _sv0t38.p0);
-  sv0_box_store(_sv0t39, 2, _sv0t38.p1);
+  Value _sv0t39;
+  _sv0t39.tag = 0;
+  _sv0t39.p0 = 42;
+  int _sv0t40 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t40, 0, _sv0t39.tag);
+  sv0_box_store(_sv0t40, 1, _sv0t39.p0);
+  sv0_box_store(_sv0t40, 2, _sv0t39.p1);
   asgn_e.tag = 0;
-  asgn_e.p0 = _sv0t39;
-  Instr _sv0t40;
-  int _sv0t41 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t41, 0, asgn_e.tag);
-  sv0_box_store(_sv0t41, 1, asgn_e.p0);
-  sv0_box_store(_sv0t41, 2, asgn_e.p1);
-  sv0_box_store(_sv0t41, 3, asgn_e.p2);
-  _sv0t40.tag = 3;
-  _sv0t40.p0 = 50;
-  _sv0t40.p1 = _sv0t41;
-  int _sv0t42 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t42, 0, _sv0t40.tag);
-  sv0_box_store(_sv0t42, 1, _sv0t40.p0);
-  sv0_box_store(_sv0t42, 2, _sv0t40.p1);
-  sv0_box_store(_sv0t42, 3, _sv0t40.p2);
-  sv0_box_store(_sv0t42, 4, _sv0t40.p3);
-  sv0_vec_push(th2, _sv0t42);
-  Instr _sv0t43;
-  _sv0t43.tag = 14;
-  int _sv0t44 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t44, 0, _sv0t43.tag);
-  sv0_box_store(_sv0t44, 1, _sv0t43.p0);
-  sv0_box_store(_sv0t44, 2, _sv0t43.p1);
-  sv0_box_store(_sv0t44, 3, _sv0t43.p2);
-  sv0_box_store(_sv0t44, 4, _sv0t43.p3);
-  sv0_vec_push(th2, _sv0t44);
-  int _sv0t45 = sv0_vec_new();
-  int el2 = _sv0t45;
-  Instr _sv0t46;
-  _sv0t46.tag = 14;
-  int _sv0t47 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t47, 0, _sv0t46.tag);
-  sv0_box_store(_sv0t47, 1, _sv0t46.p0);
-  sv0_box_store(_sv0t47, 2, _sv0t46.p1);
-  sv0_box_store(_sv0t47, 3, _sv0t46.p2);
-  sv0_box_store(_sv0t47, 4, _sv0t46.p3);
-  sv0_vec_push(el2, _sv0t47);
-  int _sv0t48 = sv0_vec_new();
-  int out2 = _sv0t48;
-  Instr _sv0t49;
-  _sv0t49.tag = 6;
-  _sv0t49.p0 = cond2;
-  _sv0t49.p1 = th2;
-  _sv0t49.p2 = el2;
-  int _sv0t50 = emit_instr(_sv0t49, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out2);
-  int r2 = _sv0t50;
+  asgn_e.p0 = _sv0t40;
+  Instr _sv0t41;
+  int _sv0t42 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t42, 0, asgn_e.tag);
+  sv0_box_store(_sv0t42, 1, asgn_e.p0);
+  sv0_box_store(_sv0t42, 2, asgn_e.p1);
+  sv0_box_store(_sv0t42, 3, asgn_e.p2);
+  _sv0t41.tag = 3;
+  _sv0t41.p0 = 50;
+  _sv0t41.p1 = _sv0t42;
+  int _sv0t43 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t43, 0, _sv0t41.tag);
+  sv0_box_store(_sv0t43, 1, _sv0t41.p0);
+  sv0_box_store(_sv0t43, 2, _sv0t41.p1);
+  sv0_box_store(_sv0t43, 3, _sv0t41.p2);
+  sv0_box_store(_sv0t43, 4, _sv0t41.p3);
+  sv0_vec_push(th2, _sv0t43);
+  Instr _sv0t44;
+  _sv0t44.tag = 14;
+  int _sv0t45 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t45, 0, _sv0t44.tag);
+  sv0_box_store(_sv0t45, 1, _sv0t44.p0);
+  sv0_box_store(_sv0t45, 2, _sv0t44.p1);
+  sv0_box_store(_sv0t45, 3, _sv0t44.p2);
+  sv0_box_store(_sv0t45, 4, _sv0t44.p3);
+  sv0_vec_push(th2, _sv0t45);
+  int _sv0t46 = sv0_vec_new();
+  int el2 = _sv0t46;
+  Instr _sv0t47;
+  _sv0t47.tag = 14;
+  int _sv0t48 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t48, 0, _sv0t47.tag);
+  sv0_box_store(_sv0t48, 1, _sv0t47.p0);
+  sv0_box_store(_sv0t48, 2, _sv0t47.p1);
+  sv0_box_store(_sv0t48, 3, _sv0t47.p2);
+  sv0_box_store(_sv0t48, 4, _sv0t47.p3);
+  sv0_vec_push(el2, _sv0t48);
+  int _sv0t49 = sv0_vec_new();
+  int out2 = _sv0t49;
+  Instr _sv0t50;
+  _sv0t50.tag = 6;
+  _sv0t50.p0 = cond2;
+  _sv0t50.p1 = th2;
+  _sv0t50.p2 = el2;
+  int _sv0t51 = emit_instr(_sv0t50, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out2);
+  int r2 = _sv0t51;
   if ((r2 < 0)) {
     return 13;
   } else {
   }
-  int _sv0t51 = sv0_vec_len(out2);
-  if ((_sv0t51 != 14)) {
+  int _sv0t52 = sv0_vec_len(out2);
+  if ((_sv0t52 != 14)) {
     return 14;
   } else {
   }
-  int _sv0t52 = sv0_vec_get(out2, 0);
-  if ((_sv0t52 != 4)) {
+  int _sv0t53 = sv0_vec_get(out2, 0);
+  if ((_sv0t53 != 4)) {
     return 15;
   } else {
   }
-  int _sv0t53 = sv0_vec_get(out2, 1);
-  if ((_sv0t53 != 1)) {
+  int _sv0t54 = sv0_vec_get(out2, 1);
+  if ((_sv0t54 != 1)) {
     return 16;
   } else {
   }
-  int _sv0t54 = sv0_vec_get(out2, 2);
-  if ((_sv0t54 != 114)) {
+  int _sv0t55 = sv0_vec_get(out2, 2);
+  if ((_sv0t55 != 114)) {
     return 17;
   } else {
   }
-  int _sv0t55 = sv0_vec_get(out2, 3);
-  if ((_sv0t55 != 17)) {
+  int _sv0t56 = sv0_vec_get(out2, 3);
+  if ((_sv0t56 != 17)) {
     return 18;
   } else {
   }
-  int _sv0t56 = sv0_vec_get(out2, 4);
-  if ((_sv0t56 != 4)) {
+  int _sv0t57 = sv0_vec_get(out2, 4);
+  if ((_sv0t57 != 4)) {
     return 19;
   } else {
   }
-  int _sv0t57 = sv0_vec_get(out2, 5);
-  if ((_sv0t57 != 42)) {
+  int _sv0t58 = sv0_vec_get(out2, 5);
+  if ((_sv0t58 != 42)) {
     return 20;
   } else {
   }
-  int _sv0t58 = sv0_vec_get(out2, 6);
-  if ((_sv0t58 != 97)) {
+  int _sv0t59 = sv0_vec_get(out2, 6);
+  if ((_sv0t59 != 97)) {
     return 21;
   } else {
   }
-  int _sv0t59 = sv0_vec_get(out2, 7);
-  if ((_sv0t59 != 0)) {
+  int _sv0t60 = sv0_vec_get(out2, 7);
+  if ((_sv0t60 != 0)) {
     return 22;
   } else {
   }
-  int _sv0t60 = sv0_vec_get(out2, 8);
-  if ((_sv0t60 != 118)) {
+  int _sv0t61 = sv0_vec_get(out2, 8);
+  if ((_sv0t61 != 118)) {
     return 23;
   } else {
   }
-  int _sv0t61 = sv0_vec_get(out2, 9);
-  if ((_sv0t61 != 0)) {
+  int _sv0t62 = sv0_vec_get(out2, 9);
+  if ((_sv0t62 != 0)) {
     return 24;
   } else {
   }
-  int _sv0t62 = sv0_vec_get(out2, 10);
-  if ((_sv0t62 != 112)) {
+  int _sv0t63 = sv0_vec_get(out2, 10);
+  if ((_sv0t63 != 112)) {
     return 25;
   } else {
   }
-  int _sv0t63 = sv0_vec_get(out2, 11);
-  if ((_sv0t63 != 2)) {
+  int _sv0t64 = sv0_vec_get(out2, 11);
+  if ((_sv0t64 != 2)) {
     return 26;
   } else {
   }
-  int _sv0t64 = sv0_vec_get(out2, 12);
-  if ((_sv0t64 != 118)) {
+  int _sv0t65 = sv0_vec_get(out2, 12);
+  if ((_sv0t65 != 118)) {
     return 27;
   } else {
   }
-  int _sv0t65 = sv0_vec_get(out2, 13);
-  if ((_sv0t65 != 0)) {
+  int _sv0t66 = sv0_vec_get(out2, 13);
+  if ((_sv0t66 != 0)) {
     return 28;
   } else {
   }
-  int _sv0t66 = sv0_vec_new();
-  int blk_body = _sv0t66;
-  Instr _sv0t67;
-  _sv0t67.tag = 0;
-  int _sv0t68 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t68, 0, _sv0t67.tag);
-  sv0_box_store(_sv0t68, 1, _sv0t67.p0);
-  sv0_box_store(_sv0t68, 2, _sv0t67.p1);
-  sv0_box_store(_sv0t68, 3, _sv0t67.p2);
-  sv0_box_store(_sv0t68, 4, _sv0t67.p3);
-  sv0_vec_push(blk_body, _sv0t68);
-  Instr _sv0t69;
-  _sv0t69.tag = 14;
-  int _sv0t70 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t70, 0, _sv0t69.tag);
-  sv0_box_store(_sv0t70, 1, _sv0t69.p0);
-  sv0_box_store(_sv0t70, 2, _sv0t69.p1);
-  sv0_box_store(_sv0t70, 3, _sv0t69.p2);
-  sv0_box_store(_sv0t70, 4, _sv0t69.p3);
-  sv0_vec_push(blk_body, _sv0t70);
-  int _sv0t71 = sv0_vec_new();
-  int out3 = _sv0t71;
-  Instr _sv0t72;
-  _sv0t72.tag = 8;
-  _sv0t72.p0 = blk_body;
-  int _sv0t73 = emit_instr(_sv0t72, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out3);
-  int r3 = _sv0t73;
+  int _sv0t67 = sv0_vec_new();
+  int blk_body = _sv0t67;
+  Instr _sv0t68;
+  _sv0t68.tag = 0;
+  int _sv0t69 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t69, 0, _sv0t68.tag);
+  sv0_box_store(_sv0t69, 1, _sv0t68.p0);
+  sv0_box_store(_sv0t69, 2, _sv0t68.p1);
+  sv0_box_store(_sv0t69, 3, _sv0t68.p2);
+  sv0_box_store(_sv0t69, 4, _sv0t68.p3);
+  sv0_vec_push(blk_body, _sv0t69);
+  Instr _sv0t70;
+  _sv0t70.tag = 14;
+  int _sv0t71 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t71, 0, _sv0t70.tag);
+  sv0_box_store(_sv0t71, 1, _sv0t70.p0);
+  sv0_box_store(_sv0t71, 2, _sv0t70.p1);
+  sv0_box_store(_sv0t71, 3, _sv0t70.p2);
+  sv0_box_store(_sv0t71, 4, _sv0t70.p3);
+  sv0_vec_push(blk_body, _sv0t71);
+  int _sv0t72 = sv0_vec_new();
+  int out3 = _sv0t72;
+  Instr _sv0t73;
+  _sv0t73.tag = 8;
+  _sv0t73.p0 = blk_body;
+  int _sv0t74 = emit_instr(_sv0t73, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out3);
+  int r3 = _sv0t74;
   if ((r3 != 2)) {
     return 29;
   } else {
   }
-  int _sv0t74 = sv0_vec_get(out3, 0);
-  if ((_sv0t74 != 118)) {
+  int _sv0t75 = sv0_vec_get(out3, 0);
+  if ((_sv0t75 != 118)) {
     return 30;
   } else {
   }
-  int _sv0t75 = sv0_vec_get(out3, 1);
-  if ((_sv0t75 != 0)) {
+  int _sv0t76 = sv0_vec_get(out3, 1);
+  if ((_sv0t76 != 0)) {
     return 31;
   } else {
   }
-  int _sv0t76 = sv0_vec_new();
-  int empty_blk = _sv0t76;
   int _sv0t77 = sv0_vec_new();
-  int out4 = _sv0t77;
-  Instr _sv0t78;
-  _sv0t78.tag = 8;
-  _sv0t78.p0 = empty_blk;
-  int _sv0t79 = emit_instr(_sv0t78, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out4);
-  int r4 = _sv0t79;
+  int empty_blk = _sv0t77;
+  int _sv0t78 = sv0_vec_new();
+  int out4 = _sv0t78;
+  Instr _sv0t79;
+  _sv0t79.tag = 8;
+  _sv0t79.p0 = empty_blk;
+  int _sv0t80 = emit_instr(_sv0t79, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out4);
+  int r4 = _sv0t80;
   if ((r4 != 0)) {
     return 32;
   } else {
   }
-  int _sv0t80 = sv0_vec_len(out4);
-  if ((_sv0t80 != 0)) {
+  int _sv0t81 = sv0_vec_len(out4);
+  if ((_sv0t81 != 0)) {
     return 33;
   } else {
   }
@@ -5859,400 +5879,402 @@ static int test_emit_while_loop(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
+  int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int pool = _sv0t5;
+  int eff = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int fns = _sv0t6;
+  int pool = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int fns = _sv0t7;
   const char* source;
   source = "+";
-  int _sv0t7 = sv0_vec_new();
-  int starts = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int ends = _sv0t8;
+  int starts = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ends = _sv0t9;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 1);
   sv0_vec_push(en, 50);
   sv0_vec_push(eb, 0);
   sv0_vec_push(ew, 1);
   sv0_vec_push(efs, 0);
-  Expr _sv0t9;
-  Value _sv0t10;
-  _sv0t10.tag = 1;
-  int _sv0t11 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t11, 0, _sv0t10.tag);
-  sv0_box_store(_sv0t11, 1, _sv0t10.p0);
-  sv0_box_store(_sv0t11, 2, _sv0t10.p1);
-  _sv0t9.tag = 0;
-  _sv0t9.p0 = _sv0t11;
-  int _sv0t12 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t12, 0, _sv0t9.tag);
-  sv0_box_store(_sv0t12, 1, _sv0t9.p0);
-  sv0_box_store(_sv0t12, 2, _sv0t9.p1);
-  sv0_box_store(_sv0t12, 3, _sv0t9.p2);
-  int cond1 = _sv0t12;
-  int _sv0t13 = sv0_vec_new();
-  int body1 = _sv0t13;
-  Instr _sv0t14;
-  _sv0t14.tag = 14;
-  int _sv0t15 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t15, 0, _sv0t14.tag);
-  sv0_box_store(_sv0t15, 1, _sv0t14.p0);
-  sv0_box_store(_sv0t15, 2, _sv0t14.p1);
-  sv0_box_store(_sv0t15, 3, _sv0t14.p2);
-  sv0_box_store(_sv0t15, 4, _sv0t14.p3);
-  sv0_vec_push(body1, _sv0t15);
-  int _sv0t16 = sv0_vec_new();
-  int out1 = _sv0t16;
-  Instr _sv0t17;
-  _sv0t17.tag = 7;
-  _sv0t17.p0 = cond1;
-  _sv0t17.p1 = body1;
-  int _sv0t18 = emit_instr(_sv0t17, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out1);
-  int r1 = _sv0t18;
+  Expr _sv0t10;
+  Value _sv0t11;
+  _sv0t11.tag = 1;
+  int _sv0t12 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t12, 0, _sv0t11.tag);
+  sv0_box_store(_sv0t12, 1, _sv0t11.p0);
+  sv0_box_store(_sv0t12, 2, _sv0t11.p1);
+  _sv0t10.tag = 0;
+  _sv0t10.p0 = _sv0t12;
+  int _sv0t13 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t13, 0, _sv0t10.tag);
+  sv0_box_store(_sv0t13, 1, _sv0t10.p0);
+  sv0_box_store(_sv0t13, 2, _sv0t10.p1);
+  sv0_box_store(_sv0t13, 3, _sv0t10.p2);
+  int cond1 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int body1 = _sv0t14;
+  Instr _sv0t15;
+  _sv0t15.tag = 14;
+  int _sv0t16 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t16, 0, _sv0t15.tag);
+  sv0_box_store(_sv0t16, 1, _sv0t15.p0);
+  sv0_box_store(_sv0t16, 2, _sv0t15.p1);
+  sv0_box_store(_sv0t16, 3, _sv0t15.p2);
+  sv0_box_store(_sv0t16, 4, _sv0t15.p3);
+  sv0_vec_push(body1, _sv0t16);
+  int _sv0t17 = sv0_vec_new();
+  int out1 = _sv0t17;
+  Instr _sv0t18;
+  _sv0t18.tag = 7;
+  _sv0t18.p0 = cond1;
+  _sv0t18.p1 = body1;
+  int _sv0t19 = emit_instr(_sv0t18, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out1);
+  int r1 = _sv0t19;
   if ((r1 < 0)) {
     return 1;
   } else {
   }
-  int _sv0t19 = sv0_vec_len(out1);
-  if ((_sv0t19 != 8)) {
+  int _sv0t20 = sv0_vec_len(out1);
+  if ((_sv0t20 != 8)) {
     return 2;
   } else {
   }
-  int _sv0t20 = sv0_vec_get(out1, 0);
-  if ((_sv0t20 != 7)) {
+  int _sv0t21 = sv0_vec_get(out1, 0);
+  if ((_sv0t21 != 7)) {
     return 3;
   } else {
   }
-  int _sv0t21 = sv0_vec_get(out1, 1);
-  if ((_sv0t21 != 1)) {
+  int _sv0t22 = sv0_vec_get(out1, 1);
+  if ((_sv0t22 != 1)) {
     return 4;
   } else {
   }
-  int _sv0t22 = sv0_vec_get(out1, 2);
-  if ((_sv0t22 != 114)) {
+  int _sv0t23 = sv0_vec_get(out1, 2);
+  if ((_sv0t23 != 114)) {
     return 5;
   } else {
   }
-  int _sv0t23 = sv0_vec_get(out1, 3);
-  if ((_sv0t23 != 7)) {
+  int _sv0t24 = sv0_vec_get(out1, 3);
+  if ((_sv0t24 != 7)) {
     return 6;
   } else {
   }
-  int _sv0t24 = sv0_vec_get(out1, 4);
-  if ((_sv0t24 != 118)) {
+  int _sv0t25 = sv0_vec_get(out1, 4);
+  if ((_sv0t25 != 118)) {
     return 7;
   } else {
   }
-  int _sv0t25 = sv0_vec_get(out1, 5);
-  if ((_sv0t25 != 0)) {
+  int _sv0t26 = sv0_vec_get(out1, 5);
+  if ((_sv0t26 != 0)) {
     return 8;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out1, 6);
-  if ((_sv0t26 != 112)) {
+  int _sv0t27 = sv0_vec_get(out1, 6);
+  if ((_sv0t27 != 112)) {
     return 9;
   } else {
   }
-  int _sv0t27 = sv0_vec_get(out1, 7);
-  int _sv0t28 = (0 - 14);
-  if ((_sv0t27 != _sv0t28)) {
+  int _sv0t28 = sv0_vec_get(out1, 7);
+  int _sv0t29 = (0 - 14);
+  if ((_sv0t28 != _sv0t29)) {
     return 10;
   } else {
   }
-  Expr _sv0t29;
-  Value _sv0t30;
-  _sv0t30.tag = 1;
-  int _sv0t31 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t31, 0, _sv0t30.tag);
-  sv0_box_store(_sv0t31, 1, _sv0t30.p0);
-  sv0_box_store(_sv0t31, 2, _sv0t30.p1);
-  _sv0t29.tag = 0;
-  _sv0t29.p0 = _sv0t31;
-  int _sv0t32 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t32, 0, _sv0t29.tag);
-  sv0_box_store(_sv0t32, 1, _sv0t29.p0);
-  sv0_box_store(_sv0t32, 2, _sv0t29.p1);
-  sv0_box_store(_sv0t32, 3, _sv0t29.p2);
-  int cond2 = _sv0t32;
-  int _sv0t33 = sv0_vec_new();
-  int body2 = _sv0t33;
+  Expr _sv0t30;
+  Value _sv0t31;
+  _sv0t31.tag = 1;
+  int _sv0t32 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t32, 0, _sv0t31.tag);
+  sv0_box_store(_sv0t32, 1, _sv0t31.p0);
+  sv0_box_store(_sv0t32, 2, _sv0t31.p1);
+  _sv0t30.tag = 0;
+  _sv0t30.p0 = _sv0t32;
+  int _sv0t33 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t33, 0, _sv0t30.tag);
+  sv0_box_store(_sv0t33, 1, _sv0t30.p0);
+  sv0_box_store(_sv0t33, 2, _sv0t30.p1);
+  sv0_box_store(_sv0t33, 3, _sv0t30.p2);
+  int cond2 = _sv0t33;
   int _sv0t34 = sv0_vec_new();
-  int out2 = _sv0t34;
-  Instr _sv0t35;
-  _sv0t35.tag = 7;
-  _sv0t35.p0 = cond2;
-  _sv0t35.p1 = body2;
-  int _sv0t36 = emit_instr(_sv0t35, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out2);
-  int r2 = _sv0t36;
+  int body2 = _sv0t34;
+  int _sv0t35 = sv0_vec_new();
+  int out2 = _sv0t35;
+  Instr _sv0t36;
+  _sv0t36.tag = 7;
+  _sv0t36.p0 = cond2;
+  _sv0t36.p1 = body2;
+  int _sv0t37 = emit_instr(_sv0t36, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out2);
+  int r2 = _sv0t37;
   if ((r2 < 0)) {
     return 11;
   } else {
   }
-  int _sv0t37 = sv0_vec_len(out2);
-  if ((_sv0t37 != 6)) {
+  int _sv0t38 = sv0_vec_len(out2);
+  if ((_sv0t38 != 6)) {
     return 12;
   } else {
   }
-  int _sv0t38 = sv0_vec_get(out2, 0);
-  if ((_sv0t38 != 7)) {
+  int _sv0t39 = sv0_vec_get(out2, 0);
+  if ((_sv0t39 != 7)) {
     return 13;
   } else {
   }
-  int _sv0t39 = sv0_vec_get(out2, 1);
-  if ((_sv0t39 != 1)) {
+  int _sv0t40 = sv0_vec_get(out2, 1);
+  if ((_sv0t40 != 1)) {
     return 14;
   } else {
   }
-  int _sv0t40 = sv0_vec_get(out2, 2);
-  if ((_sv0t40 != 114)) {
+  int _sv0t41 = sv0_vec_get(out2, 2);
+  if ((_sv0t41 != 114)) {
     return 15;
   } else {
   }
-  int _sv0t41 = sv0_vec_get(out2, 3);
-  if ((_sv0t41 != 5)) {
+  int _sv0t42 = sv0_vec_get(out2, 3);
+  if ((_sv0t42 != 5)) {
     return 16;
   } else {
   }
-  int _sv0t42 = sv0_vec_get(out2, 4);
-  if ((_sv0t42 != 112)) {
+  int _sv0t43 = sv0_vec_get(out2, 4);
+  if ((_sv0t43 != 112)) {
     return 17;
   } else {
   }
-  int _sv0t43 = sv0_vec_get(out2, 5);
-  int _sv0t44 = (0 - 12);
-  if ((_sv0t43 != _sv0t44)) {
+  int _sv0t44 = sv0_vec_get(out2, 5);
+  int _sv0t45 = (0 - 12);
+  if ((_sv0t44 != _sv0t45)) {
     return 18;
   } else {
   }
-  Expr _sv0t45;
-  Value _sv0t46;
-  _sv0t46.tag = 1;
-  int _sv0t47 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t47, 0, _sv0t46.tag);
-  sv0_box_store(_sv0t47, 1, _sv0t46.p0);
-  sv0_box_store(_sv0t47, 2, _sv0t46.p1);
-  _sv0t45.tag = 0;
-  _sv0t45.p0 = _sv0t47;
-  int _sv0t48 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t48, 0, _sv0t45.tag);
-  sv0_box_store(_sv0t48, 1, _sv0t45.p0);
-  sv0_box_store(_sv0t48, 2, _sv0t45.p1);
-  sv0_box_store(_sv0t48, 3, _sv0t45.p2);
-  int cond3 = _sv0t48;
-  int _sv0t49 = sv0_vec_new();
-  int body3 = _sv0t49;
-  Instr _sv0t50;
-  _sv0t50.tag = 9;
-  int _sv0t51 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t51, 0, _sv0t50.tag);
-  sv0_box_store(_sv0t51, 1, _sv0t50.p0);
-  sv0_box_store(_sv0t51, 2, _sv0t50.p1);
-  sv0_box_store(_sv0t51, 3, _sv0t50.p2);
-  sv0_box_store(_sv0t51, 4, _sv0t50.p3);
-  sv0_vec_push(body3, _sv0t51);
-  int _sv0t52 = sv0_vec_new();
-  int out3 = _sv0t52;
-  Instr _sv0t53;
-  _sv0t53.tag = 7;
-  _sv0t53.p0 = cond3;
-  _sv0t53.p1 = body3;
-  int _sv0t54 = emit_instr(_sv0t53, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out3);
-  int r3 = _sv0t54;
+  Expr _sv0t46;
+  Value _sv0t47;
+  _sv0t47.tag = 1;
+  int _sv0t48 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t48, 0, _sv0t47.tag);
+  sv0_box_store(_sv0t48, 1, _sv0t47.p0);
+  sv0_box_store(_sv0t48, 2, _sv0t47.p1);
+  _sv0t46.tag = 0;
+  _sv0t46.p0 = _sv0t48;
+  int _sv0t49 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t49, 0, _sv0t46.tag);
+  sv0_box_store(_sv0t49, 1, _sv0t46.p0);
+  sv0_box_store(_sv0t49, 2, _sv0t46.p1);
+  sv0_box_store(_sv0t49, 3, _sv0t46.p2);
+  int cond3 = _sv0t49;
+  int _sv0t50 = sv0_vec_new();
+  int body3 = _sv0t50;
+  Instr _sv0t51;
+  _sv0t51.tag = 9;
+  int _sv0t52 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t52, 0, _sv0t51.tag);
+  sv0_box_store(_sv0t52, 1, _sv0t51.p0);
+  sv0_box_store(_sv0t52, 2, _sv0t51.p1);
+  sv0_box_store(_sv0t52, 3, _sv0t51.p2);
+  sv0_box_store(_sv0t52, 4, _sv0t51.p3);
+  sv0_vec_push(body3, _sv0t52);
+  int _sv0t53 = sv0_vec_new();
+  int out3 = _sv0t53;
+  Instr _sv0t54;
+  _sv0t54.tag = 7;
+  _sv0t54.p0 = cond3;
+  _sv0t54.p1 = body3;
+  int _sv0t55 = emit_instr(_sv0t54, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out3);
+  int r3 = _sv0t55;
   if ((r3 < 0)) {
     return 19;
   } else {
   }
-  int _sv0t55 = sv0_vec_len(out3);
-  if ((_sv0t55 != 8)) {
+  int _sv0t56 = sv0_vec_len(out3);
+  if ((_sv0t56 != 8)) {
     return 20;
   } else {
   }
-  int _sv0t56 = sv0_vec_get(out3, 4);
-  if ((_sv0t56 != 112)) {
+  int _sv0t57 = sv0_vec_get(out3, 4);
+  if ((_sv0t57 != 112)) {
     return 21;
   } else {
   }
-  int _sv0t57 = sv0_vec_get(out3, 5);
-  if ((_sv0t57 != 5)) {
+  int _sv0t58 = sv0_vec_get(out3, 5);
+  if ((_sv0t58 != 5)) {
     return 22;
   } else {
   }
-  int _sv0t58 = sv0_vec_get(out3, 6);
-  if ((_sv0t58 != 112)) {
+  int _sv0t59 = sv0_vec_get(out3, 6);
+  if ((_sv0t59 != 112)) {
     return 23;
   } else {
   }
-  int _sv0t59 = sv0_vec_get(out3, 7);
-  int _sv0t60 = (0 - 17);
-  if ((_sv0t59 != _sv0t60)) {
+  int _sv0t60 = sv0_vec_get(out3, 7);
+  int _sv0t61 = (0 - 17);
+  if ((_sv0t60 != _sv0t61)) {
     return 24;
   } else {
   }
-  Expr _sv0t61;
-  Value _sv0t62;
-  _sv0t62.tag = 1;
-  int _sv0t63 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t63, 0, _sv0t62.tag);
-  sv0_box_store(_sv0t63, 1, _sv0t62.p0);
-  sv0_box_store(_sv0t63, 2, _sv0t62.p1);
-  _sv0t61.tag = 0;
-  _sv0t61.p0 = _sv0t63;
-  int _sv0t64 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t64, 0, _sv0t61.tag);
-  sv0_box_store(_sv0t64, 1, _sv0t61.p0);
-  sv0_box_store(_sv0t64, 2, _sv0t61.p1);
-  sv0_box_store(_sv0t64, 3, _sv0t61.p2);
-  int cond4 = _sv0t64;
-  int _sv0t65 = sv0_vec_new();
-  int body4 = _sv0t65;
-  Instr _sv0t66;
-  _sv0t66.tag = 10;
-  int _sv0t67 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t67, 0, _sv0t66.tag);
-  sv0_box_store(_sv0t67, 1, _sv0t66.p0);
-  sv0_box_store(_sv0t67, 2, _sv0t66.p1);
-  sv0_box_store(_sv0t67, 3, _sv0t66.p2);
-  sv0_box_store(_sv0t67, 4, _sv0t66.p3);
-  sv0_vec_push(body4, _sv0t67);
-  int _sv0t68 = sv0_vec_new();
-  int out4 = _sv0t68;
-  Instr _sv0t69;
-  _sv0t69.tag = 7;
-  _sv0t69.p0 = cond4;
-  _sv0t69.p1 = body4;
-  int _sv0t70 = emit_instr(_sv0t69, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out4);
-  int r4 = _sv0t70;
+  Expr _sv0t62;
+  Value _sv0t63;
+  _sv0t63.tag = 1;
+  int _sv0t64 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t64, 0, _sv0t63.tag);
+  sv0_box_store(_sv0t64, 1, _sv0t63.p0);
+  sv0_box_store(_sv0t64, 2, _sv0t63.p1);
+  _sv0t62.tag = 0;
+  _sv0t62.p0 = _sv0t64;
+  int _sv0t65 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t65, 0, _sv0t62.tag);
+  sv0_box_store(_sv0t65, 1, _sv0t62.p0);
+  sv0_box_store(_sv0t65, 2, _sv0t62.p1);
+  sv0_box_store(_sv0t65, 3, _sv0t62.p2);
+  int cond4 = _sv0t65;
+  int _sv0t66 = sv0_vec_new();
+  int body4 = _sv0t66;
+  Instr _sv0t67;
+  _sv0t67.tag = 10;
+  int _sv0t68 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t68, 0, _sv0t67.tag);
+  sv0_box_store(_sv0t68, 1, _sv0t67.p0);
+  sv0_box_store(_sv0t68, 2, _sv0t67.p1);
+  sv0_box_store(_sv0t68, 3, _sv0t67.p2);
+  sv0_box_store(_sv0t68, 4, _sv0t67.p3);
+  sv0_vec_push(body4, _sv0t68);
+  int _sv0t69 = sv0_vec_new();
+  int out4 = _sv0t69;
+  Instr _sv0t70;
+  _sv0t70.tag = 7;
+  _sv0t70.p0 = cond4;
+  _sv0t70.p1 = body4;
+  int _sv0t71 = emit_instr(_sv0t70, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out4);
+  int r4 = _sv0t71;
   if ((r4 < 0)) {
     return 25;
   } else {
   }
-  int _sv0t71 = sv0_vec_len(out4);
-  if ((_sv0t71 != 8)) {
+  int _sv0t72 = sv0_vec_len(out4);
+  if ((_sv0t72 != 8)) {
     return 26;
   } else {
   }
-  int _sv0t72 = sv0_vec_get(out4, 4);
-  if ((_sv0t72 != 112)) {
+  int _sv0t73 = sv0_vec_get(out4, 4);
+  if ((_sv0t73 != 112)) {
     return 27;
   } else {
   }
-  int _sv0t73 = sv0_vec_get(out4, 5);
-  int _sv0t74 = (0 - 12);
-  if ((_sv0t73 != _sv0t74)) {
+  int _sv0t74 = sv0_vec_get(out4, 5);
+  int _sv0t75 = (0 - 12);
+  if ((_sv0t74 != _sv0t75)) {
     return 28;
   } else {
   }
-  int _sv0t75 = sv0_vec_get(out4, 6);
-  if ((_sv0t75 != 112)) {
+  int _sv0t76 = sv0_vec_get(out4, 6);
+  if ((_sv0t76 != 112)) {
     return 29;
   } else {
   }
-  int _sv0t76 = sv0_vec_get(out4, 7);
-  int _sv0t77 = (0 - 17);
-  if ((_sv0t76 != _sv0t77)) {
+  int _sv0t77 = sv0_vec_get(out4, 7);
+  int _sv0t78 = (0 - 17);
+  if ((_sv0t77 != _sv0t78)) {
     return 30;
   } else {
   }
-  Expr _sv0t78;
-  Value _sv0t79;
-  _sv0t79.tag = 1;
-  int _sv0t80 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t80, 0, _sv0t79.tag);
-  sv0_box_store(_sv0t80, 1, _sv0t79.p0);
-  sv0_box_store(_sv0t80, 2, _sv0t79.p1);
-  _sv0t78.tag = 0;
-  _sv0t78.p0 = _sv0t80;
-  int _sv0t81 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t81, 0, _sv0t78.tag);
-  sv0_box_store(_sv0t81, 1, _sv0t78.p0);
-  sv0_box_store(_sv0t81, 2, _sv0t78.p1);
-  sv0_box_store(_sv0t81, 3, _sv0t78.p2);
-  int cond5 = _sv0t81;
-  int _sv0t82 = sv0_vec_new();
-  int body5 = _sv0t82;
+  Expr _sv0t79;
+  Value _sv0t80;
+  _sv0t80.tag = 1;
+  int _sv0t81 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t81, 0, _sv0t80.tag);
+  sv0_box_store(_sv0t81, 1, _sv0t80.p0);
+  sv0_box_store(_sv0t81, 2, _sv0t80.p1);
+  _sv0t79.tag = 0;
+  _sv0t79.p0 = _sv0t81;
+  int _sv0t82 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t82, 0, _sv0t79.tag);
+  sv0_box_store(_sv0t82, 1, _sv0t79.p0);
+  sv0_box_store(_sv0t82, 2, _sv0t79.p1);
+  sv0_box_store(_sv0t82, 3, _sv0t79.p2);
+  int cond5 = _sv0t82;
+  int _sv0t83 = sv0_vec_new();
+  int body5 = _sv0t83;
   Expr asgn_e;
-  Value _sv0t83;
-  _sv0t83.tag = 0;
-  _sv0t83.p0 = 42;
-  int _sv0t84 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t84, 0, _sv0t83.tag);
-  sv0_box_store(_sv0t84, 1, _sv0t83.p0);
-  sv0_box_store(_sv0t84, 2, _sv0t83.p1);
+  Value _sv0t84;
+  _sv0t84.tag = 0;
+  _sv0t84.p0 = 42;
+  int _sv0t85 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t85, 0, _sv0t84.tag);
+  sv0_box_store(_sv0t85, 1, _sv0t84.p0);
+  sv0_box_store(_sv0t85, 2, _sv0t84.p1);
   asgn_e.tag = 0;
-  asgn_e.p0 = _sv0t84;
-  Instr _sv0t85;
-  int _sv0t86 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t86, 0, asgn_e.tag);
-  sv0_box_store(_sv0t86, 1, asgn_e.p0);
-  sv0_box_store(_sv0t86, 2, asgn_e.p1);
-  sv0_box_store(_sv0t86, 3, asgn_e.p2);
-  _sv0t85.tag = 3;
-  _sv0t85.p0 = 50;
-  _sv0t85.p1 = _sv0t86;
-  int _sv0t87 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t87, 0, _sv0t85.tag);
-  sv0_box_store(_sv0t87, 1, _sv0t85.p0);
-  sv0_box_store(_sv0t87, 2, _sv0t85.p1);
-  sv0_box_store(_sv0t87, 3, _sv0t85.p2);
-  sv0_box_store(_sv0t87, 4, _sv0t85.p3);
-  sv0_vec_push(body5, _sv0t87);
-  Instr _sv0t88;
-  _sv0t88.tag = 14;
-  int _sv0t89 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t89, 0, _sv0t88.tag);
-  sv0_box_store(_sv0t89, 1, _sv0t88.p0);
-  sv0_box_store(_sv0t89, 2, _sv0t88.p1);
-  sv0_box_store(_sv0t89, 3, _sv0t88.p2);
-  sv0_box_store(_sv0t89, 4, _sv0t88.p3);
-  sv0_vec_push(body5, _sv0t89);
-  int _sv0t90 = sv0_vec_new();
-  int out5 = _sv0t90;
-  Instr _sv0t91;
-  _sv0t91.tag = 7;
-  _sv0t91.p0 = cond5;
-  _sv0t91.p1 = body5;
-  int _sv0t92 = emit_instr(_sv0t91, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out5);
-  int r5 = _sv0t92;
+  asgn_e.p0 = _sv0t85;
+  Instr _sv0t86;
+  int _sv0t87 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t87, 0, asgn_e.tag);
+  sv0_box_store(_sv0t87, 1, asgn_e.p0);
+  sv0_box_store(_sv0t87, 2, asgn_e.p1);
+  sv0_box_store(_sv0t87, 3, asgn_e.p2);
+  _sv0t86.tag = 3;
+  _sv0t86.p0 = 50;
+  _sv0t86.p1 = _sv0t87;
+  int _sv0t88 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t88, 0, _sv0t86.tag);
+  sv0_box_store(_sv0t88, 1, _sv0t86.p0);
+  sv0_box_store(_sv0t88, 2, _sv0t86.p1);
+  sv0_box_store(_sv0t88, 3, _sv0t86.p2);
+  sv0_box_store(_sv0t88, 4, _sv0t86.p3);
+  sv0_vec_push(body5, _sv0t88);
+  Instr _sv0t89;
+  _sv0t89.tag = 14;
+  int _sv0t90 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t90, 0, _sv0t89.tag);
+  sv0_box_store(_sv0t90, 1, _sv0t89.p0);
+  sv0_box_store(_sv0t90, 2, _sv0t89.p1);
+  sv0_box_store(_sv0t90, 3, _sv0t89.p2);
+  sv0_box_store(_sv0t90, 4, _sv0t89.p3);
+  sv0_vec_push(body5, _sv0t90);
+  int _sv0t91 = sv0_vec_new();
+  int out5 = _sv0t91;
+  Instr _sv0t92;
+  _sv0t92.tag = 7;
+  _sv0t92.p0 = cond5;
+  _sv0t92.p1 = body5;
+  int _sv0t93 = emit_instr(_sv0t92, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out5);
+  int r5 = _sv0t93;
   if ((r5 < 0)) {
     return 31;
   } else {
   }
-  int _sv0t93 = sv0_vec_len(out5);
-  if ((_sv0t93 != 12)) {
+  int _sv0t94 = sv0_vec_len(out5);
+  if ((_sv0t94 != 12)) {
     return 32;
   } else {
   }
-  int _sv0t94 = sv0_vec_get(out5, 2);
-  if ((_sv0t94 != 114)) {
+  int _sv0t95 = sv0_vec_get(out5, 2);
+  if ((_sv0t95 != 114)) {
     return 33;
   } else {
   }
-  int _sv0t95 = sv0_vec_get(out5, 3);
-  if ((_sv0t95 != 17)) {
+  int _sv0t96 = sv0_vec_get(out5, 3);
+  if ((_sv0t96 != 17)) {
     return 34;
   } else {
   }
-  int _sv0t96 = sv0_vec_get(out5, 4);
-  if ((_sv0t96 != 4)) {
+  int _sv0t97 = sv0_vec_get(out5, 4);
+  if ((_sv0t97 != 4)) {
     return 35;
   } else {
   }
-  int _sv0t97 = sv0_vec_get(out5, 5);
-  if ((_sv0t97 != 42)) {
+  int _sv0t98 = sv0_vec_get(out5, 5);
+  if ((_sv0t98 != 42)) {
     return 36;
   } else {
   }
-  int _sv0t98 = sv0_vec_get(out5, 10);
-  if ((_sv0t98 != 112)) {
+  int _sv0t99 = sv0_vec_get(out5, 10);
+  if ((_sv0t99 != 112)) {
     return 37;
   } else {
   }
-  int _sv0t99 = sv0_vec_get(out5, 11);
-  int _sv0t100 = (0 - 24);
-  if ((_sv0t99 != _sv0t100)) {
+  int _sv0t100 = sv0_vec_get(out5, 11);
+  int _sv0t101 = (0 - 24);
+  if ((_sv0t100 != _sv0t101)) {
     return 38;
   } else {
   }
@@ -6267,17 +6289,19 @@ static int test_emit_call(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
+  int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int pool = _sv0t5;
+  int eff = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int pool = _sv0t6;
   const char* source;
   source = "sv0_printlnsv0_vec_newsv0_vec_pushsv0_vec_lenmyfunc";
-  int _sv0t6 = sv0_vec_new();
-  int starts = _sv0t6;
   int _sv0t7 = sv0_vec_new();
-  int ends = _sv0t7;
+  int starts = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int ends = _sv0t8;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 11);
   sv0_vec_push(starts, 11);
@@ -6296,292 +6320,292 @@ static int test_emit_call(void) {
   sv0_vec_push(eb, 1);
   sv0_vec_push(ew, 1);
   sv0_vec_push(efs, 0);
-  int _sv0t8 = sv0_vec_new();
-  int fns = _sv0t8;
-  sv0_vec_push(fns, 4);
   int _sv0t9 = sv0_vec_new();
-  int args1 = _sv0t9;
-  Value _sv0t10;
-  _sv0t10.tag = 0;
-  _sv0t10.p0 = 42;
-  int _sv0t11 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t11, 0, _sv0t10.tag);
-  sv0_box_store(_sv0t11, 1, _sv0t10.p0);
-  sv0_box_store(_sv0t11, 2, _sv0t10.p1);
-  sv0_vec_push(args1, _sv0t11);
-  int _sv0t12 = sv0_vec_new();
-  int out1 = _sv0t12;
-  Instr _sv0t13;
-  _sv0t13.tag = 11;
-  _sv0t13.p0 = 0;
-  _sv0t13.p1 = 0;
-  _sv0t13.p2 = args1;
-  _sv0t13.p3 = 0;
-  int _sv0t14 = emit_instr(_sv0t13, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out1);
-  int r1 = _sv0t14;
+  int fns = _sv0t9;
+  sv0_vec_push(fns, 4);
+  int _sv0t10 = sv0_vec_new();
+  int args1 = _sv0t10;
+  Value _sv0t11;
+  _sv0t11.tag = 0;
+  _sv0t11.p0 = 42;
+  int _sv0t12 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t12, 0, _sv0t11.tag);
+  sv0_box_store(_sv0t12, 1, _sv0t11.p0);
+  sv0_box_store(_sv0t12, 2, _sv0t11.p1);
+  sv0_vec_push(args1, _sv0t12);
+  int _sv0t13 = sv0_vec_new();
+  int out1 = _sv0t13;
+  Instr _sv0t14;
+  _sv0t14.tag = 11;
+  _sv0t14.p0 = 0;
+  _sv0t14.p1 = 0;
+  _sv0t14.p2 = args1;
+  _sv0t14.p3 = 0;
+  int _sv0t15 = emit_instr(_sv0t14, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out1);
+  int r1 = _sv0t15;
   if ((r1 != 4)) {
     return 1;
   } else {
   }
-  int _sv0t15 = sv0_vec_get(out1, 0);
-  if ((_sv0t15 != 4)) {
+  int _sv0t16 = sv0_vec_get(out1, 0);
+  if ((_sv0t16 != 4)) {
     return 2;
   } else {
   }
-  int _sv0t16 = sv0_vec_get(out1, 1);
-  if ((_sv0t16 != 42)) {
+  int _sv0t17 = sv0_vec_get(out1, 1);
+  if ((_sv0t17 != 42)) {
     return 3;
   } else {
   }
-  int _sv0t17 = sv0_vec_get(out1, 2);
-  if ((_sv0t17 != 117)) {
+  int _sv0t18 = sv0_vec_get(out1, 2);
+  if ((_sv0t18 != 117)) {
     return 4;
   } else {
   }
-  int _sv0t18 = sv0_vec_get(out1, 3);
-  if ((_sv0t18 != 0)) {
+  int _sv0t19 = sv0_vec_get(out1, 3);
+  if ((_sv0t19 != 0)) {
     return 5;
   } else {
   }
-  int _sv0t19 = sv0_vec_new();
-  int args2 = _sv0t19;
   int _sv0t20 = sv0_vec_new();
-  int out2 = _sv0t20;
-  Instr _sv0t21;
-  _sv0t21.tag = 11;
-  _sv0t21.p0 = 10;
-  _sv0t21.p1 = 1;
-  _sv0t21.p2 = args2;
-  _sv0t21.p3 = 0;
-  int _sv0t22 = emit_instr(_sv0t21, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out2);
-  int r2 = _sv0t22;
+  int args2 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int out2 = _sv0t21;
+  Instr _sv0t22;
+  _sv0t22.tag = 11;
+  _sv0t22.p0 = 10;
+  _sv0t22.p1 = 1;
+  _sv0t22.p2 = args2;
+  _sv0t22.p3 = 0;
+  int _sv0t23 = emit_instr(_sv0t22, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out2);
+  int r2 = _sv0t23;
   if ((r2 != 4)) {
     return 6;
   } else {
   }
-  int _sv0t23 = sv0_vec_get(out2, 0);
-  if ((_sv0t23 != 117)) {
+  int _sv0t24 = sv0_vec_get(out2, 0);
+  if ((_sv0t24 != 117)) {
     return 7;
   } else {
   }
-  int _sv0t24 = sv0_vec_get(out2, 1);
-  if ((_sv0t24 != 7)) {
+  int _sv0t25 = sv0_vec_get(out2, 1);
+  if ((_sv0t25 != 7)) {
     return 8;
   } else {
   }
-  int _sv0t25 = sv0_vec_get(out2, 2);
-  if ((_sv0t25 != 97)) {
+  int _sv0t26 = sv0_vec_get(out2, 2);
+  if ((_sv0t26 != 97)) {
     return 9;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out2, 3);
-  if ((_sv0t26 != 0)) {
+  int _sv0t27 = sv0_vec_get(out2, 3);
+  if ((_sv0t27 != 0)) {
     return 10;
   } else {
   }
-  int _sv0t27 = sv0_vec_new();
-  int args3 = _sv0t27;
-  Value _sv0t28;
-  _sv0t28.tag = 3;
-  _sv0t28.p0 = 10;
-  int _sv0t29 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t29, 0, _sv0t28.tag);
-  sv0_box_store(_sv0t29, 1, _sv0t28.p0);
-  sv0_box_store(_sv0t29, 2, _sv0t28.p1);
-  sv0_vec_push(args3, _sv0t29);
-  Value _sv0t30;
-  _sv0t30.tag = 0;
-  _sv0t30.p0 = 5;
-  int _sv0t31 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t31, 0, _sv0t30.tag);
-  sv0_box_store(_sv0t31, 1, _sv0t30.p0);
-  sv0_box_store(_sv0t31, 2, _sv0t30.p1);
-  sv0_vec_push(args3, _sv0t31);
-  int _sv0t32 = sv0_vec_new();
-  int out3 = _sv0t32;
-  Instr _sv0t33;
-  _sv0t33.tag = 11;
-  _sv0t33.p0 = 0;
-  _sv0t33.p1 = 2;
-  _sv0t33.p2 = args3;
-  _sv0t33.p3 = 0;
-  int _sv0t34 = emit_instr(_sv0t33, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out3);
-  int r3 = _sv0t34;
+  int _sv0t28 = sv0_vec_new();
+  int args3 = _sv0t28;
+  Value _sv0t29;
+  _sv0t29.tag = 3;
+  _sv0t29.p0 = 10;
+  int _sv0t30 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t30, 0, _sv0t29.tag);
+  sv0_box_store(_sv0t30, 1, _sv0t29.p0);
+  sv0_box_store(_sv0t30, 2, _sv0t29.p1);
+  sv0_vec_push(args3, _sv0t30);
+  Value _sv0t31;
+  _sv0t31.tag = 0;
+  _sv0t31.p0 = 5;
+  int _sv0t32 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t32, 0, _sv0t31.tag);
+  sv0_box_store(_sv0t32, 1, _sv0t31.p0);
+  sv0_box_store(_sv0t32, 2, _sv0t31.p1);
+  sv0_vec_push(args3, _sv0t32);
+  int _sv0t33 = sv0_vec_new();
+  int out3 = _sv0t33;
+  Instr _sv0t34;
+  _sv0t34.tag = 11;
+  _sv0t34.p0 = 0;
+  _sv0t34.p1 = 2;
+  _sv0t34.p2 = args3;
+  _sv0t34.p3 = 0;
+  int _sv0t35 = emit_instr(_sv0t34, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out3);
+  int r3 = _sv0t35;
   if ((r3 != 6)) {
     return 11;
   } else {
   }
-  int _sv0t35 = sv0_vec_get(out3, 0);
-  if ((_sv0t35 != 96)) {
+  int _sv0t36 = sv0_vec_get(out3, 0);
+  if ((_sv0t36 != 96)) {
     return 12;
   } else {
   }
-  int _sv0t36 = sv0_vec_get(out3, 1);
-  if ((_sv0t36 != 0)) {
+  int _sv0t37 = sv0_vec_get(out3, 1);
+  if ((_sv0t37 != 0)) {
     return 13;
   } else {
   }
-  int _sv0t37 = sv0_vec_get(out3, 2);
-  if ((_sv0t37 != 4)) {
+  int _sv0t38 = sv0_vec_get(out3, 2);
+  if ((_sv0t38 != 4)) {
     return 14;
   } else {
   }
-  int _sv0t38 = sv0_vec_get(out3, 3);
-  if ((_sv0t38 != 5)) {
+  int _sv0t39 = sv0_vec_get(out3, 3);
+  if ((_sv0t39 != 5)) {
     return 15;
   } else {
   }
-  int _sv0t39 = sv0_vec_get(out3, 4);
-  if ((_sv0t39 != 117)) {
+  int _sv0t40 = sv0_vec_get(out3, 4);
+  if ((_sv0t40 != 117)) {
     return 16;
   } else {
   }
-  int _sv0t40 = sv0_vec_get(out3, 5);
-  if ((_sv0t40 != 8)) {
+  int _sv0t41 = sv0_vec_get(out3, 5);
+  if ((_sv0t41 != 8)) {
     return 17;
   } else {
   }
-  int _sv0t41 = sv0_vec_new();
-  int args4 = _sv0t41;
-  Value _sv0t42;
-  _sv0t42.tag = 3;
-  _sv0t42.p0 = 10;
-  int _sv0t43 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t43, 0, _sv0t42.tag);
-  sv0_box_store(_sv0t43, 1, _sv0t42.p0);
-  sv0_box_store(_sv0t43, 2, _sv0t42.p1);
-  sv0_vec_push(args4, _sv0t43);
-  int _sv0t44 = sv0_vec_new();
-  int out4 = _sv0t44;
-  Instr _sv0t45;
-  _sv0t45.tag = 11;
-  _sv0t45.p0 = 20;
-  _sv0t45.p1 = 3;
-  _sv0t45.p2 = args4;
-  _sv0t45.p3 = 0;
-  int _sv0t46 = emit_instr(_sv0t45, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out4);
-  int r4 = _sv0t46;
+  int _sv0t42 = sv0_vec_new();
+  int args4 = _sv0t42;
+  Value _sv0t43;
+  _sv0t43.tag = 3;
+  _sv0t43.p0 = 10;
+  int _sv0t44 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t44, 0, _sv0t43.tag);
+  sv0_box_store(_sv0t44, 1, _sv0t43.p0);
+  sv0_box_store(_sv0t44, 2, _sv0t43.p1);
+  sv0_vec_push(args4, _sv0t44);
+  int _sv0t45 = sv0_vec_new();
+  int out4 = _sv0t45;
+  Instr _sv0t46;
+  _sv0t46.tag = 11;
+  _sv0t46.p0 = 20;
+  _sv0t46.p1 = 3;
+  _sv0t46.p2 = args4;
+  _sv0t46.p3 = 0;
+  int _sv0t47 = emit_instr(_sv0t46, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out4);
+  int r4 = _sv0t47;
   if ((r4 != 6)) {
     return 18;
   } else {
   }
-  int _sv0t47 = sv0_vec_get(out4, 0);
-  if ((_sv0t47 != 96)) {
+  int _sv0t48 = sv0_vec_get(out4, 0);
+  if ((_sv0t48 != 96)) {
     return 19;
   } else {
   }
-  int _sv0t48 = sv0_vec_get(out4, 1);
-  if ((_sv0t48 != 0)) {
+  int _sv0t49 = sv0_vec_get(out4, 1);
+  if ((_sv0t49 != 0)) {
     return 20;
   } else {
   }
-  int _sv0t49 = sv0_vec_get(out4, 2);
-  if ((_sv0t49 != 117)) {
+  int _sv0t50 = sv0_vec_get(out4, 2);
+  if ((_sv0t50 != 117)) {
     return 21;
   } else {
   }
-  int _sv0t50 = sv0_vec_get(out4, 3);
-  if ((_sv0t50 != 9)) {
+  int _sv0t51 = sv0_vec_get(out4, 3);
+  if ((_sv0t51 != 9)) {
     return 22;
   } else {
   }
-  int _sv0t51 = sv0_vec_get(out4, 4);
-  if ((_sv0t51 != 97)) {
+  int _sv0t52 = sv0_vec_get(out4, 4);
+  if ((_sv0t52 != 97)) {
     return 23;
   } else {
   }
-  int _sv0t52 = sv0_vec_get(out4, 5);
-  if ((_sv0t52 != 1)) {
+  int _sv0t53 = sv0_vec_get(out4, 5);
+  if ((_sv0t53 != 1)) {
     return 24;
   } else {
   }
-  int _sv0t53 = sv0_vec_new();
-  int args5 = _sv0t53;
-  Value _sv0t54;
-  _sv0t54.tag = 0;
-  _sv0t54.p0 = 7;
-  int _sv0t55 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t55, 0, _sv0t54.tag);
-  sv0_box_store(_sv0t55, 1, _sv0t54.p0);
-  sv0_box_store(_sv0t55, 2, _sv0t54.p1);
-  sv0_vec_push(args5, _sv0t55);
-  int _sv0t56 = sv0_vec_new();
-  int out5 = _sv0t56;
-  Instr _sv0t57;
-  _sv0t57.tag = 11;
-  _sv0t57.p0 = 20;
-  _sv0t57.p1 = 4;
-  _sv0t57.p2 = args5;
-  _sv0t57.p3 = 0;
-  int _sv0t58 = emit_instr(_sv0t57, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out5);
-  int r5 = _sv0t58;
+  int _sv0t54 = sv0_vec_new();
+  int args5 = _sv0t54;
+  Value _sv0t55;
+  _sv0t55.tag = 0;
+  _sv0t55.p0 = 7;
+  int _sv0t56 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t56, 0, _sv0t55.tag);
+  sv0_box_store(_sv0t56, 1, _sv0t55.p0);
+  sv0_box_store(_sv0t56, 2, _sv0t55.p1);
+  sv0_vec_push(args5, _sv0t56);
+  int _sv0t57 = sv0_vec_new();
+  int out5 = _sv0t57;
+  Instr _sv0t58;
+  _sv0t58.tag = 11;
+  _sv0t58.p0 = 20;
+  _sv0t58.p1 = 4;
+  _sv0t58.p2 = args5;
+  _sv0t58.p3 = 0;
+  int _sv0t59 = emit_instr(_sv0t58, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out5);
+  int r5 = _sv0t59;
   if ((r5 != 7)) {
     return 25;
   } else {
   }
-  int _sv0t59 = sv0_vec_get(out5, 0);
-  if ((_sv0t59 != 4)) {
+  int _sv0t60 = sv0_vec_get(out5, 0);
+  if ((_sv0t60 != 4)) {
     return 26;
   } else {
   }
-  int _sv0t60 = sv0_vec_get(out5, 1);
-  if ((_sv0t60 != 7)) {
+  int _sv0t61 = sv0_vec_get(out5, 1);
+  if ((_sv0t61 != 7)) {
     return 27;
   } else {
   }
-  int _sv0t61 = sv0_vec_get(out5, 2);
-  if ((_sv0t61 != 115)) {
+  int _sv0t62 = sv0_vec_get(out5, 2);
+  if ((_sv0t62 != 115)) {
     return 28;
   } else {
   }
-  int _sv0t62 = sv0_vec_get(out5, 3);
-  if ((_sv0t62 != 0)) {
+  int _sv0t63 = sv0_vec_get(out5, 3);
+  if ((_sv0t63 != 0)) {
     return 29;
   } else {
   }
-  int _sv0t63 = sv0_vec_get(out5, 4);
-  if ((_sv0t63 != 1)) {
+  int _sv0t64 = sv0_vec_get(out5, 4);
+  if ((_sv0t64 != 1)) {
     return 30;
   } else {
   }
-  int _sv0t64 = sv0_vec_get(out5, 5);
-  if ((_sv0t64 != 97)) {
+  int _sv0t65 = sv0_vec_get(out5, 5);
+  if ((_sv0t65 != 97)) {
     return 31;
   } else {
   }
-  int _sv0t65 = sv0_vec_get(out5, 6);
-  if ((_sv0t65 != 1)) {
+  int _sv0t66 = sv0_vec_get(out5, 6);
+  if ((_sv0t66 != 1)) {
     return 32;
   } else {
   }
-  int _sv0t66 = sv0_vec_new();
-  int args6 = _sv0t66;
   int _sv0t67 = sv0_vec_new();
-  int out6 = _sv0t67;
-  Instr _sv0t68;
-  _sv0t68.tag = 11;
-  _sv0t68.p0 = 0;
-  _sv0t68.p1 = 4;
-  _sv0t68.p2 = args6;
-  _sv0t68.p3 = 0;
-  int _sv0t69 = emit_instr(_sv0t68, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out6);
-  int r6 = _sv0t69;
+  int args6 = _sv0t67;
+  int _sv0t68 = sv0_vec_new();
+  int out6 = _sv0t68;
+  Instr _sv0t69;
+  _sv0t69.tag = 11;
+  _sv0t69.p0 = 0;
+  _sv0t69.p1 = 4;
+  _sv0t69.p2 = args6;
+  _sv0t69.p3 = 0;
+  int _sv0t70 = emit_instr(_sv0t69, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out6);
+  int r6 = _sv0t70;
   if ((r6 != 3)) {
     return 33;
   } else {
   }
-  int _sv0t70 = sv0_vec_get(out6, 0);
-  if ((_sv0t70 != 115)) {
+  int _sv0t71 = sv0_vec_get(out6, 0);
+  if ((_sv0t71 != 115)) {
     return 34;
   } else {
   }
-  int _sv0t71 = sv0_vec_get(out6, 1);
-  if ((_sv0t71 != 0)) {
+  int _sv0t72 = sv0_vec_get(out6, 1);
+  if ((_sv0t72 != 0)) {
     return 35;
   } else {
   }
-  int _sv0t72 = sv0_vec_get(out6, 2);
-  if ((_sv0t72 != 0)) {
+  int _sv0t73 = sv0_vec_get(out6, 2);
+  if ((_sv0t73 != 0)) {
     return 36;
   } else {
   }
@@ -6596,19 +6620,21 @@ static int test_emit_store_field(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
+  int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int pool = _sv0t5;
+  int eff = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int fns = _sv0t6;
+  int pool = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int fns = _sv0t7;
   const char* source;
   source = "+";
-  int _sv0t7 = sv0_vec_new();
-  int starts = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int ends = _sv0t8;
+  int starts = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ends = _sv0t9;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 1);
   sv0_vec_push(en, 50);
@@ -6618,136 +6644,136 @@ static int test_emit_store_field(void) {
   sv0_vec_push(eff, 100);
   sv0_vec_push(eff, 200);
   sv0_vec_push(eff, 300);
-  int _sv0t9 = sv0_vec_new();
-  int out1 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int out1 = _sv0t10;
   Instr sf1;
-  Expr _sv0t10;
-  Value _sv0t11;
+  Expr _sv0t11;
+  Value _sv0t12;
+  _sv0t12.tag = 0;
+  _sv0t12.p0 = 7;
+  int _sv0t13 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t13, 0, _sv0t12.tag);
+  sv0_box_store(_sv0t13, 1, _sv0t12.p0);
+  sv0_box_store(_sv0t13, 2, _sv0t12.p1);
   _sv0t11.tag = 0;
-  _sv0t11.p0 = 7;
-  int _sv0t12 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t12, 0, _sv0t11.tag);
-  sv0_box_store(_sv0t12, 1, _sv0t11.p0);
-  sv0_box_store(_sv0t12, 2, _sv0t11.p1);
-  _sv0t10.tag = 0;
-  _sv0t10.p0 = _sv0t12;
-  int _sv0t13 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t13, 0, _sv0t10.tag);
-  sv0_box_store(_sv0t13, 1, _sv0t10.p0);
-  sv0_box_store(_sv0t13, 2, _sv0t10.p1);
-  sv0_box_store(_sv0t13, 3, _sv0t10.p2);
+  _sv0t11.p0 = _sv0t13;
+  int _sv0t14 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t14, 0, _sv0t11.tag);
+  sv0_box_store(_sv0t14, 1, _sv0t11.p0);
+  sv0_box_store(_sv0t14, 2, _sv0t11.p1);
+  sv0_box_store(_sv0t14, 3, _sv0t11.p2);
   sf1.tag = 5;
   sf1.p0 = 50;
   sf1.p1 = 100;
-  sf1.p2 = _sv0t13;
-  int _sv0t14 = emit_instr(sf1, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out1);
-  int r1 = _sv0t14;
+  sf1.p2 = _sv0t14;
+  int _sv0t15 = emit_instr(sf1, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out1);
+  int r1 = _sv0t15;
   if ((r1 != 4)) {
     return 1;
   } else {
   }
-  int _sv0t15 = sv0_vec_get(out1, 0);
-  if ((_sv0t15 != 4)) {
+  int _sv0t16 = sv0_vec_get(out1, 0);
+  if ((_sv0t16 != 4)) {
     return 2;
   } else {
   }
-  int _sv0t16 = sv0_vec_get(out1, 1);
-  if ((_sv0t16 != 7)) {
+  int _sv0t17 = sv0_vec_get(out1, 1);
+  if ((_sv0t17 != 7)) {
     return 3;
   } else {
   }
-  int _sv0t17 = sv0_vec_get(out1, 2);
-  if ((_sv0t17 != 97)) {
+  int _sv0t18 = sv0_vec_get(out1, 2);
+  if ((_sv0t18 != 97)) {
     return 4;
   } else {
   }
-  int _sv0t18 = sv0_vec_get(out1, 3);
-  if ((_sv0t18 != 0)) {
+  int _sv0t19 = sv0_vec_get(out1, 3);
+  if ((_sv0t19 != 0)) {
     return 5;
   } else {
   }
-  int _sv0t19 = sv0_vec_new();
-  int out2 = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int out2 = _sv0t20;
   Instr sf2;
-  Expr _sv0t20;
-  Value _sv0t21;
+  Expr _sv0t21;
+  Value _sv0t22;
+  _sv0t22.tag = 0;
+  _sv0t22.p0 = 99;
+  int _sv0t23 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t23, 0, _sv0t22.tag);
+  sv0_box_store(_sv0t23, 1, _sv0t22.p0);
+  sv0_box_store(_sv0t23, 2, _sv0t22.p1);
   _sv0t21.tag = 0;
-  _sv0t21.p0 = 99;
-  int _sv0t22 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t22, 0, _sv0t21.tag);
-  sv0_box_store(_sv0t22, 1, _sv0t21.p0);
-  sv0_box_store(_sv0t22, 2, _sv0t21.p1);
-  _sv0t20.tag = 0;
-  _sv0t20.p0 = _sv0t22;
-  int _sv0t23 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t23, 0, _sv0t20.tag);
-  sv0_box_store(_sv0t23, 1, _sv0t20.p0);
-  sv0_box_store(_sv0t23, 2, _sv0t20.p1);
-  sv0_box_store(_sv0t23, 3, _sv0t20.p2);
+  _sv0t21.p0 = _sv0t23;
+  int _sv0t24 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t24, 0, _sv0t21.tag);
+  sv0_box_store(_sv0t24, 1, _sv0t21.p0);
+  sv0_box_store(_sv0t24, 2, _sv0t21.p1);
+  sv0_box_store(_sv0t24, 3, _sv0t21.p2);
   sf2.tag = 5;
   sf2.p0 = 50;
   sf2.p1 = 200;
-  sf2.p2 = _sv0t23;
-  int _sv0t24 = emit_instr(sf2, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out2);
-  int r2 = _sv0t24;
+  sf2.p2 = _sv0t24;
+  int _sv0t25 = emit_instr(sf2, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out2);
+  int r2 = _sv0t25;
   if ((r2 != 4)) {
     return 6;
   } else {
   }
-  int _sv0t25 = sv0_vec_get(out2, 2);
-  if ((_sv0t25 != 97)) {
+  int _sv0t26 = sv0_vec_get(out2, 2);
+  if ((_sv0t26 != 97)) {
     return 7;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out2, 3);
-  if ((_sv0t26 != 1)) {
+  int _sv0t27 = sv0_vec_get(out2, 3);
+  if ((_sv0t27 != 1)) {
     return 8;
   } else {
   }
-  int _sv0t27 = sv0_vec_new();
-  int out3 = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int out3 = _sv0t28;
   Instr sf3;
-  Expr _sv0t28;
-  Value _sv0t29;
-  _sv0t29.tag = 1;
-  int _sv0t30 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t30, 0, _sv0t29.tag);
-  sv0_box_store(_sv0t30, 1, _sv0t29.p0);
-  sv0_box_store(_sv0t30, 2, _sv0t29.p1);
-  _sv0t28.tag = 0;
-  _sv0t28.p0 = _sv0t30;
-  int _sv0t31 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t31, 0, _sv0t28.tag);
-  sv0_box_store(_sv0t31, 1, _sv0t28.p0);
-  sv0_box_store(_sv0t31, 2, _sv0t28.p1);
-  sv0_box_store(_sv0t31, 3, _sv0t28.p2);
+  Expr _sv0t29;
+  Value _sv0t30;
+  _sv0t30.tag = 1;
+  int _sv0t31 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t31, 0, _sv0t30.tag);
+  sv0_box_store(_sv0t31, 1, _sv0t30.p0);
+  sv0_box_store(_sv0t31, 2, _sv0t30.p1);
+  _sv0t29.tag = 0;
+  _sv0t29.p0 = _sv0t31;
+  int _sv0t32 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t32, 0, _sv0t29.tag);
+  sv0_box_store(_sv0t32, 1, _sv0t29.p0);
+  sv0_box_store(_sv0t32, 2, _sv0t29.p1);
+  sv0_box_store(_sv0t32, 3, _sv0t29.p2);
   sf3.tag = 5;
   sf3.p0 = 50;
   sf3.p1 = 300;
-  sf3.p2 = _sv0t31;
-  int _sv0t32 = emit_instr(sf3, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out3);
-  int r3 = _sv0t32;
+  sf3.p2 = _sv0t32;
+  int _sv0t33 = emit_instr(sf3, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out3);
+  int r3 = _sv0t33;
   if ((r3 != 4)) {
     return 9;
   } else {
   }
-  int _sv0t33 = sv0_vec_get(out3, 0);
-  if ((_sv0t33 != 7)) {
+  int _sv0t34 = sv0_vec_get(out3, 0);
+  if ((_sv0t34 != 7)) {
     return 10;
   } else {
   }
-  int _sv0t34 = sv0_vec_get(out3, 1);
-  if ((_sv0t34 != 1)) {
+  int _sv0t35 = sv0_vec_get(out3, 1);
+  if ((_sv0t35 != 1)) {
     return 11;
   } else {
   }
-  int _sv0t35 = sv0_vec_get(out3, 2);
-  if ((_sv0t35 != 97)) {
+  int _sv0t36 = sv0_vec_get(out3, 2);
+  if ((_sv0t36 != 97)) {
     return 12;
   } else {
   }
-  int _sv0t36 = sv0_vec_get(out3, 3);
-  if ((_sv0t36 != 2)) {
+  int _sv0t37 = sv0_vec_get(out3, 3);
+  if ((_sv0t37 != 2)) {
     return 13;
   } else {
   }
@@ -6757,108 +6783,108 @@ static int test_emit_store_field(void) {
   sv0_vec_push(efs, 3);
   sv0_vec_push(eff, 400);
   sv0_vec_push(eff, 500);
-  int _sv0t37 = sv0_vec_new();
-  int out4 = _sv0t37;
+  int _sv0t38 = sv0_vec_new();
+  int out4 = _sv0t38;
   Instr sf4;
-  Expr _sv0t38;
-  Value _sv0t39;
+  Expr _sv0t39;
+  Value _sv0t40;
+  _sv0t40.tag = 0;
+  _sv0t40.p0 = 1;
+  int _sv0t41 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t41, 0, _sv0t40.tag);
+  sv0_box_store(_sv0t41, 1, _sv0t40.p0);
+  sv0_box_store(_sv0t41, 2, _sv0t40.p1);
   _sv0t39.tag = 0;
-  _sv0t39.p0 = 1;
-  int _sv0t40 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t40, 0, _sv0t39.tag);
-  sv0_box_store(_sv0t40, 1, _sv0t39.p0);
-  sv0_box_store(_sv0t40, 2, _sv0t39.p1);
-  _sv0t38.tag = 0;
-  _sv0t38.p0 = _sv0t40;
-  int _sv0t41 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t41, 0, _sv0t38.tag);
-  sv0_box_store(_sv0t41, 1, _sv0t38.p0);
-  sv0_box_store(_sv0t41, 2, _sv0t38.p1);
-  sv0_box_store(_sv0t41, 3, _sv0t38.p2);
+  _sv0t39.p0 = _sv0t41;
+  int _sv0t42 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t42, 0, _sv0t39.tag);
+  sv0_box_store(_sv0t42, 1, _sv0t39.p0);
+  sv0_box_store(_sv0t42, 2, _sv0t39.p1);
+  sv0_box_store(_sv0t42, 3, _sv0t39.p2);
   sf4.tag = 5;
   sf4.p0 = 60;
   sf4.p1 = 500;
-  sf4.p2 = _sv0t41;
-  int _sv0t42 = emit_instr(sf4, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out4);
-  int r4 = _sv0t42;
+  sf4.p2 = _sv0t42;
+  int _sv0t43 = emit_instr(sf4, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out4);
+  int r4 = _sv0t43;
   if ((r4 != 4)) {
     return 14;
   } else {
   }
-  int _sv0t43 = sv0_vec_get(out4, 2);
-  if ((_sv0t43 != 97)) {
+  int _sv0t44 = sv0_vec_get(out4, 2);
+  if ((_sv0t44 != 97)) {
     return 15;
   } else {
   }
-  int _sv0t44 = sv0_vec_get(out4, 3);
-  if ((_sv0t44 != 4)) {
+  int _sv0t45 = sv0_vec_get(out4, 3);
+  if ((_sv0t45 != 4)) {
     return 16;
   } else {
   }
-  int _sv0t45 = sv0_vec_new();
-  int out5 = _sv0t45;
+  int _sv0t46 = sv0_vec_new();
+  int out5 = _sv0t46;
   Instr sf5;
-  Expr _sv0t46;
-  Value _sv0t47;
+  Expr _sv0t47;
+  Value _sv0t48;
+  _sv0t48.tag = 0;
+  _sv0t48.p0 = 2;
+  int _sv0t49 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t49, 0, _sv0t48.tag);
+  sv0_box_store(_sv0t49, 1, _sv0t48.p0);
+  sv0_box_store(_sv0t49, 2, _sv0t48.p1);
   _sv0t47.tag = 0;
-  _sv0t47.p0 = 2;
-  int _sv0t48 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t48, 0, _sv0t47.tag);
-  sv0_box_store(_sv0t48, 1, _sv0t47.p0);
-  sv0_box_store(_sv0t48, 2, _sv0t47.p1);
-  _sv0t46.tag = 0;
-  _sv0t46.p0 = _sv0t48;
-  int _sv0t49 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t49, 0, _sv0t46.tag);
-  sv0_box_store(_sv0t49, 1, _sv0t46.p0);
-  sv0_box_store(_sv0t49, 2, _sv0t46.p1);
-  sv0_box_store(_sv0t49, 3, _sv0t46.p2);
+  _sv0t47.p0 = _sv0t49;
+  int _sv0t50 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t50, 0, _sv0t47.tag);
+  sv0_box_store(_sv0t50, 1, _sv0t47.p0);
+  sv0_box_store(_sv0t50, 2, _sv0t47.p1);
+  sv0_box_store(_sv0t50, 3, _sv0t47.p2);
   sf5.tag = 5;
   sf5.p0 = 60;
   sf5.p1 = 400;
-  sf5.p2 = _sv0t49;
-  int _sv0t50 = emit_instr(sf5, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out5);
-  int r5 = _sv0t50;
+  sf5.p2 = _sv0t50;
+  int _sv0t51 = emit_instr(sf5, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out5);
+  int r5 = _sv0t51;
   if ((r5 != 4)) {
     return 17;
   } else {
   }
-  int _sv0t51 = sv0_vec_get(out5, 2);
-  if ((_sv0t51 != 97)) {
+  int _sv0t52 = sv0_vec_get(out5, 2);
+  if ((_sv0t52 != 97)) {
     return 18;
   } else {
   }
-  int _sv0t52 = sv0_vec_get(out5, 3);
-  if ((_sv0t52 != 3)) {
+  int _sv0t53 = sv0_vec_get(out5, 3);
+  if ((_sv0t53 != 3)) {
     return 19;
   } else {
   }
-  int _sv0t53 = sv0_vec_new();
-  int out6 = _sv0t53;
+  int _sv0t54 = sv0_vec_new();
+  int out6 = _sv0t54;
   Instr sf6;
-  Expr _sv0t54;
-  Value _sv0t55;
+  Expr _sv0t55;
+  Value _sv0t56;
+  _sv0t56.tag = 0;
+  _sv0t56.p0 = 0;
+  int _sv0t57 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t57, 0, _sv0t56.tag);
+  sv0_box_store(_sv0t57, 1, _sv0t56.p0);
+  sv0_box_store(_sv0t57, 2, _sv0t56.p1);
   _sv0t55.tag = 0;
-  _sv0t55.p0 = 0;
-  int _sv0t56 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t56, 0, _sv0t55.tag);
-  sv0_box_store(_sv0t56, 1, _sv0t55.p0);
-  sv0_box_store(_sv0t56, 2, _sv0t55.p1);
-  _sv0t54.tag = 0;
-  _sv0t54.p0 = _sv0t56;
-  int _sv0t57 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t57, 0, _sv0t54.tag);
-  sv0_box_store(_sv0t57, 1, _sv0t54.p0);
-  sv0_box_store(_sv0t57, 2, _sv0t54.p1);
-  sv0_box_store(_sv0t57, 3, _sv0t54.p2);
+  _sv0t55.p0 = _sv0t57;
+  int _sv0t58 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t58, 0, _sv0t55.tag);
+  sv0_box_store(_sv0t58, 1, _sv0t55.p0);
+  sv0_box_store(_sv0t58, 2, _sv0t55.p1);
+  sv0_box_store(_sv0t58, 3, _sv0t55.p2);
   sf6.tag = 5;
   sf6.p0 = 50;
   sf6.p1 = 999;
-  sf6.p2 = _sv0t57;
-  int _sv0t58 = emit_instr(sf6, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out6);
-  int r6 = _sv0t58;
-  int _sv0t59 = (0 - 1);
-  if ((r6 != _sv0t59)) {
+  sf6.p2 = _sv0t58;
+  int _sv0t59 = emit_instr(sf6, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out6);
+  int r6 = _sv0t59;
+  int _sv0t60 = (0 - 1);
+  if ((r6 != _sv0t60)) {
     return 20;
   } else {
   }
@@ -6873,201 +6899,203 @@ static int test_emit_contract(void) {
   int _sv0t2 = sv0_vec_new();
   int ew = _sv0t2;
   int _sv0t3 = sv0_vec_new();
-  int efs = _sv0t3;
+  int ec = _sv0t3;
   int _sv0t4 = sv0_vec_new();
-  int eff = _sv0t4;
+  int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
-  int pool = _sv0t5;
+  int eff = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int fns = _sv0t6;
+  int pool = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int fns = _sv0t7;
   const char* source;
   source = "+";
-  int _sv0t7 = sv0_vec_new();
-  int starts = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int ends = _sv0t8;
+  int starts = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int ends = _sv0t9;
   sv0_vec_push(starts, 0);
   sv0_vec_push(ends, 1);
-  int _sv0t9 = sv0_vec_new();
-  int out1 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int out1 = _sv0t10;
   Instr req1;
-  Expr _sv0t10;
-  Value _sv0t11;
-  _sv0t11.tag = 1;
-  int _sv0t12 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t12, 0, _sv0t11.tag);
-  sv0_box_store(_sv0t12, 1, _sv0t11.p0);
-  sv0_box_store(_sv0t12, 2, _sv0t11.p1);
-  _sv0t10.tag = 0;
-  _sv0t10.p0 = _sv0t12;
-  int _sv0t13 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t13, 0, _sv0t10.tag);
-  sv0_box_store(_sv0t13, 1, _sv0t10.p0);
-  sv0_box_store(_sv0t13, 2, _sv0t10.p1);
-  sv0_box_store(_sv0t13, 3, _sv0t10.p2);
+  Expr _sv0t11;
+  Value _sv0t12;
+  _sv0t12.tag = 1;
+  int _sv0t13 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t13, 0, _sv0t12.tag);
+  sv0_box_store(_sv0t13, 1, _sv0t12.p0);
+  sv0_box_store(_sv0t13, 2, _sv0t12.p1);
+  _sv0t11.tag = 0;
+  _sv0t11.p0 = _sv0t13;
+  int _sv0t14 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t14, 0, _sv0t11.tag);
+  sv0_box_store(_sv0t14, 1, _sv0t11.p0);
+  sv0_box_store(_sv0t14, 2, _sv0t11.p1);
+  sv0_box_store(_sv0t14, 3, _sv0t11.p2);
   req1.tag = 12;
-  req1.p0 = _sv0t13;
+  req1.p0 = _sv0t14;
   req1.p1 = 42;
-  int _sv0t14 = emit_instr(req1, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out1);
-  int r1 = _sv0t14;
+  int _sv0t15 = emit_instr(req1, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out1);
+  int r1 = _sv0t15;
   if ((r1 != 4)) {
     return 1;
   } else {
   }
-  int _sv0t15 = sv0_vec_get(out1, 0);
-  if ((_sv0t15 != 7)) {
+  int _sv0t16 = sv0_vec_get(out1, 0);
+  if ((_sv0t16 != 7)) {
     return 2;
   } else {
   }
-  int _sv0t16 = sv0_vec_get(out1, 1);
-  if ((_sv0t16 != 1)) {
+  int _sv0t17 = sv0_vec_get(out1, 1);
+  if ((_sv0t17 != 1)) {
     return 3;
   } else {
   }
-  int _sv0t17 = sv0_vec_get(out1, 2);
-  if ((_sv0t17 != 160)) {
+  int _sv0t18 = sv0_vec_get(out1, 2);
+  if ((_sv0t18 != 160)) {
     return 4;
   } else {
   }
-  int _sv0t18 = sv0_vec_get(out1, 3);
-  if ((_sv0t18 != 0)) {
+  int _sv0t19 = sv0_vec_get(out1, 3);
+  if ((_sv0t19 != 0)) {
     return 5;
   } else {
   }
-  int _sv0t19 = pool_size(pool);
-  if ((_sv0t19 != 1)) {
+  int _sv0t20 = pool_size(pool);
+  if ((_sv0t20 != 1)) {
     return 6;
   } else {
   }
-  int _sv0t20 = sv0_vec_new();
-  int out2 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int out2 = _sv0t21;
   Instr ens1;
-  Expr _sv0t21;
-  Value _sv0t22;
-  _sv0t22.tag = 2;
-  int _sv0t23 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t23, 0, _sv0t22.tag);
-  sv0_box_store(_sv0t23, 1, _sv0t22.p0);
-  sv0_box_store(_sv0t23, 2, _sv0t22.p1);
-  _sv0t21.tag = 0;
-  _sv0t21.p0 = _sv0t23;
-  int _sv0t24 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t24, 0, _sv0t21.tag);
-  sv0_box_store(_sv0t24, 1, _sv0t21.p0);
-  sv0_box_store(_sv0t24, 2, _sv0t21.p1);
-  sv0_box_store(_sv0t24, 3, _sv0t21.p2);
+  Expr _sv0t22;
+  Value _sv0t23;
+  _sv0t23.tag = 2;
+  int _sv0t24 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t24, 0, _sv0t23.tag);
+  sv0_box_store(_sv0t24, 1, _sv0t23.p0);
+  sv0_box_store(_sv0t24, 2, _sv0t23.p1);
+  _sv0t22.tag = 0;
+  _sv0t22.p0 = _sv0t24;
+  int _sv0t25 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t25, 0, _sv0t22.tag);
+  sv0_box_store(_sv0t25, 1, _sv0t22.p0);
+  sv0_box_store(_sv0t25, 2, _sv0t22.p1);
+  sv0_box_store(_sv0t25, 3, _sv0t22.p2);
   ens1.tag = 13;
-  ens1.p0 = _sv0t24;
+  ens1.p0 = _sv0t25;
   ens1.p1 = 42;
-  int _sv0t25 = emit_instr(ens1, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out2);
-  int r2 = _sv0t25;
+  int _sv0t26 = emit_instr(ens1, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out2);
+  int r2 = _sv0t26;
   if ((r2 != 4)) {
     return 7;
   } else {
   }
-  int _sv0t26 = sv0_vec_get(out2, 0);
-  if ((_sv0t26 != 7)) {
+  int _sv0t27 = sv0_vec_get(out2, 0);
+  if ((_sv0t27 != 7)) {
     return 8;
   } else {
   }
-  int _sv0t27 = sv0_vec_get(out2, 1);
-  if ((_sv0t27 != 0)) {
+  int _sv0t28 = sv0_vec_get(out2, 1);
+  if ((_sv0t28 != 0)) {
     return 9;
   } else {
   }
-  int _sv0t28 = sv0_vec_get(out2, 2);
-  if ((_sv0t28 != 160)) {
+  int _sv0t29 = sv0_vec_get(out2, 2);
+  if ((_sv0t29 != 160)) {
     return 10;
   } else {
   }
-  int _sv0t29 = sv0_vec_get(out2, 3);
-  if ((_sv0t29 != 1)) {
+  int _sv0t30 = sv0_vec_get(out2, 3);
+  if ((_sv0t30 != 1)) {
     return 11;
   } else {
   }
-  int _sv0t30 = pool_size(pool);
-  if ((_sv0t30 != 2)) {
+  int _sv0t31 = pool_size(pool);
+  if ((_sv0t31 != 2)) {
     return 12;
   } else {
   }
-  int _sv0t31 = sv0_vec_new();
-  int out3 = _sv0t31;
+  int _sv0t32 = sv0_vec_new();
+  int out3 = _sv0t32;
   Instr req2;
-  Expr _sv0t32;
-  Value _sv0t33;
-  _sv0t33.tag = 1;
-  int _sv0t34 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t34, 0, _sv0t33.tag);
-  sv0_box_store(_sv0t34, 1, _sv0t33.p0);
-  sv0_box_store(_sv0t34, 2, _sv0t33.p1);
-  _sv0t32.tag = 0;
-  _sv0t32.p0 = _sv0t34;
-  int _sv0t35 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t35, 0, _sv0t32.tag);
-  sv0_box_store(_sv0t35, 1, _sv0t32.p0);
-  sv0_box_store(_sv0t35, 2, _sv0t32.p1);
-  sv0_box_store(_sv0t35, 3, _sv0t32.p2);
+  Expr _sv0t33;
+  Value _sv0t34;
+  _sv0t34.tag = 1;
+  int _sv0t35 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t35, 0, _sv0t34.tag);
+  sv0_box_store(_sv0t35, 1, _sv0t34.p0);
+  sv0_box_store(_sv0t35, 2, _sv0t34.p1);
+  _sv0t33.tag = 0;
+  _sv0t33.p0 = _sv0t35;
+  int _sv0t36 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t36, 0, _sv0t33.tag);
+  sv0_box_store(_sv0t36, 1, _sv0t33.p0);
+  sv0_box_store(_sv0t36, 2, _sv0t33.p1);
+  sv0_box_store(_sv0t36, 3, _sv0t33.p2);
   req2.tag = 12;
-  req2.p0 = _sv0t35;
+  req2.p0 = _sv0t36;
   req2.p1 = 42;
-  int _sv0t36 = emit_instr(req2, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out3);
-  int r3 = _sv0t36;
+  int _sv0t37 = emit_instr(req2, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out3);
+  int r3 = _sv0t37;
   if ((r3 != 4)) {
     return 13;
   } else {
   }
-  int _sv0t37 = sv0_vec_get(out3, 3);
-  if ((_sv0t37 != 0)) {
+  int _sv0t38 = sv0_vec_get(out3, 3);
+  if ((_sv0t38 != 0)) {
     return 14;
   } else {
   }
-  int _sv0t38 = pool_size(pool);
-  if ((_sv0t38 != 2)) {
+  int _sv0t39 = pool_size(pool);
+  if ((_sv0t39 != 2)) {
     return 15;
   } else {
   }
-  int _sv0t39 = sv0_vec_new();
-  int out4 = _sv0t39;
+  int _sv0t40 = sv0_vec_new();
+  int out4 = _sv0t40;
   Instr req3;
-  Expr _sv0t40;
-  Value _sv0t41;
-  _sv0t41.tag = 1;
-  int _sv0t42 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t42, 0, _sv0t41.tag);
-  sv0_box_store(_sv0t42, 1, _sv0t41.p0);
-  sv0_box_store(_sv0t42, 2, _sv0t41.p1);
-  _sv0t40.tag = 0;
-  _sv0t40.p0 = _sv0t42;
-  int _sv0t43 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t43, 0, _sv0t40.tag);
-  sv0_box_store(_sv0t43, 1, _sv0t40.p0);
-  sv0_box_store(_sv0t43, 2, _sv0t40.p1);
-  sv0_box_store(_sv0t43, 3, _sv0t40.p2);
+  Expr _sv0t41;
+  Value _sv0t42;
+  _sv0t42.tag = 1;
+  int _sv0t43 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t43, 0, _sv0t42.tag);
+  sv0_box_store(_sv0t43, 1, _sv0t42.p0);
+  sv0_box_store(_sv0t43, 2, _sv0t42.p1);
+  _sv0t41.tag = 0;
+  _sv0t41.p0 = _sv0t43;
+  int _sv0t44 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t44, 0, _sv0t41.tag);
+  sv0_box_store(_sv0t44, 1, _sv0t41.p0);
+  sv0_box_store(_sv0t44, 2, _sv0t41.p1);
+  sv0_box_store(_sv0t44, 3, _sv0t41.p2);
   req3.tag = 12;
-  req3.p0 = _sv0t43;
+  req3.p0 = _sv0t44;
   req3.p1 = 99;
-  int _sv0t44 = emit_instr(req3, en, eb, ew, efs, eff, pool, source, starts, ends, fns, out4);
-  int r4 = _sv0t44;
+  int _sv0t45 = emit_instr(req3, en, eb, ew, ec, efs, eff, pool, source, starts, ends, fns, out4);
+  int r4 = _sv0t45;
   if ((r4 != 4)) {
     return 16;
   } else {
   }
-  int _sv0t45 = sv0_vec_get(out4, 3);
-  if ((_sv0t45 != 2)) {
+  int _sv0t46 = sv0_vec_get(out4, 3);
+  if ((_sv0t46 != 2)) {
     return 17;
   } else {
   }
-  int _sv0t46 = pool_size(pool);
-  if ((_sv0t46 != 3)) {
+  int _sv0t47 = pool_size(pool);
+  if ((_sv0t47 != 3)) {
     return 18;
   } else {
   }
-  int _sv0t47 = contract_pool_key(42, 0);
-  int k0 = _sv0t47;
-  int _sv0t48 = contract_pool_key(42, 1);
-  int k1 = _sv0t48;
-  int _sv0t49 = contract_pool_key(99, 0);
-  int k2 = _sv0t49;
+  int _sv0t48 = contract_pool_key(42, 0);
+  int k0 = _sv0t48;
+  int _sv0t49 = contract_pool_key(42, 1);
+  int k1 = _sv0t49;
+  int _sv0t50 = contract_pool_key(99, 0);
+  int k2 = _sv0t50;
   if ((k0 == k1)) {
     return 19;
   } else {
@@ -7442,704 +7470,730 @@ static int test_local_count_and_env(void) {
   int _sv0t6 = sv0_vec_new();
   int ew0 = _sv0t6;
   int _sv0t7 = sv0_vec_new();
-  int efs0 = _sv0t7;
+  int ec0 = _sv0t7;
   int _sv0t8 = sv0_vec_new();
-  int pn0 = _sv0t8;
+  int efs0 = _sv0t8;
   int _sv0t9 = sv0_vec_new();
-  int pc0 = _sv0t9;
+  int pn0 = _sv0t9;
   int _sv0t10 = sv0_vec_new();
-  int ins0 = _sv0t10;
+  int pc0 = _sv0t10;
   int _sv0t11 = sv0_vec_new();
+  int ins0 = _sv0t11;
   int _sv0t12 = sv0_vec_new();
   int _sv0t13 = sv0_vec_new();
   int _sv0t14 = sv0_vec_new();
   int _sv0t15 = sv0_vec_new();
-  int _sv0t16 = local_count_and_env(pn0, pc0, ins0, en0, eb0, ew0, efs0, sn, sfc, enn, enw, _sv0t11, _sv0t12, _sv0t13, "", _sv0t14, _sv0t15);
-  int lc0 = _sv0t16;
+  int _sv0t16 = sv0_vec_new();
+  int _sv0t17 = local_count_and_env(pn0, pc0, ins0, en0, eb0, ew0, ec0, efs0, sn, sfc, enn, enw, _sv0t12, _sv0t13, _sv0t14, "", _sv0t15, _sv0t16);
+  int lc0 = _sv0t17;
   if ((lc0 != 0)) {
     return 1;
   } else {
   }
-  int _sv0t17 = sv0_vec_len(en0);
-  if ((_sv0t17 != 0)) {
+  int _sv0t18 = sv0_vec_len(en0);
+  if ((_sv0t18 != 0)) {
     return 2;
   } else {
   }
-  int _sv0t18 = sv0_vec_new();
-  int en1 = _sv0t18;
   int _sv0t19 = sv0_vec_new();
-  int eb1 = _sv0t19;
+  int en1 = _sv0t19;
   int _sv0t20 = sv0_vec_new();
-  int ew1 = _sv0t20;
+  int eb1 = _sv0t20;
   int _sv0t21 = sv0_vec_new();
-  int efs1 = _sv0t21;
+  int ew1 = _sv0t21;
   int _sv0t22 = sv0_vec_new();
-  int pn1 = _sv0t22;
+  int ec1 = _sv0t22;
   int _sv0t23 = sv0_vec_new();
-  int pc1 = _sv0t23;
+  int efs1 = _sv0t23;
+  int _sv0t24 = sv0_vec_new();
+  int pn1 = _sv0t24;
+  int _sv0t25 = sv0_vec_new();
+  int pc1 = _sv0t25;
   sv0_vec_push(pn1, 10);
   sv0_vec_push(pc1, 777);
   sv0_vec_push(pn1, 20);
   sv0_vec_push(pc1, 778);
-  int _sv0t24 = sv0_vec_new();
-  int ins1 = _sv0t24;
-  int _sv0t25 = sv0_vec_new();
   int _sv0t26 = sv0_vec_new();
+  int ins1 = _sv0t26;
   int _sv0t27 = sv0_vec_new();
   int _sv0t28 = sv0_vec_new();
   int _sv0t29 = sv0_vec_new();
-  int _sv0t30 = local_count_and_env(pn1, pc1, ins1, en1, eb1, ew1, efs1, sn, sfc, enn, enw, _sv0t25, _sv0t26, _sv0t27, "", _sv0t28, _sv0t29);
-  int lc1 = _sv0t30;
+  int _sv0t30 = sv0_vec_new();
+  int _sv0t31 = sv0_vec_new();
+  int _sv0t32 = local_count_and_env(pn1, pc1, ins1, en1, eb1, ew1, ec1, efs1, sn, sfc, enn, enw, _sv0t27, _sv0t28, _sv0t29, "", _sv0t30, _sv0t31);
+  int lc1 = _sv0t32;
   if ((lc1 != 2)) {
     return 3;
   } else {
   }
-  int _sv0t31 = sv0_vec_len(en1);
-  if ((_sv0t31 != 2)) {
+  int _sv0t33 = sv0_vec_len(en1);
+  if ((_sv0t33 != 2)) {
     return 4;
   } else {
   }
-  int _sv0t32 = sv0_vec_get(en1, 0);
-  if ((_sv0t32 != 10)) {
+  int _sv0t34 = sv0_vec_get(en1, 0);
+  if ((_sv0t34 != 10)) {
     return 5;
   } else {
   }
-  int _sv0t33 = sv0_vec_get(eb1, 0);
-  if ((_sv0t33 != 0)) {
+  int _sv0t35 = sv0_vec_get(eb1, 0);
+  if ((_sv0t35 != 0)) {
     return 6;
   } else {
   }
-  int _sv0t34 = sv0_vec_get(ew1, 0);
-  if ((_sv0t34 != 1)) {
+  int _sv0t36 = sv0_vec_get(ew1, 0);
+  if ((_sv0t36 != 1)) {
     return 7;
   } else {
   }
-  int _sv0t35 = sv0_vec_get(en1, 1);
-  if ((_sv0t35 != 20)) {
+  int _sv0t37 = sv0_vec_get(en1, 1);
+  if ((_sv0t37 != 20)) {
     return 8;
   } else {
   }
-  int _sv0t36 = sv0_vec_get(eb1, 1);
-  if ((_sv0t36 != 1)) {
+  int _sv0t38 = sv0_vec_get(eb1, 1);
+  if ((_sv0t38 != 1)) {
     return 9;
   } else {
   }
-  int _sv0t37 = sv0_vec_new();
-  int sn2 = _sv0t37;
-  int _sv0t38 = sv0_vec_new();
-  int sfc2 = _sv0t38;
+  int _sv0t39 = sv0_vec_new();
+  int sn2 = _sv0t39;
+  int _sv0t40 = sv0_vec_new();
+  int sfc2 = _sv0t40;
   sv0_vec_push(sn2, 500);
   sv0_vec_push(sfc2, 3);
-  int _sv0t39 = sv0_vec_new();
-  int en2 = _sv0t39;
-  int _sv0t40 = sv0_vec_new();
-  int eb2 = _sv0t40;
   int _sv0t41 = sv0_vec_new();
-  int ew2 = _sv0t41;
+  int en2 = _sv0t41;
   int _sv0t42 = sv0_vec_new();
-  int efs2 = _sv0t42;
+  int eb2 = _sv0t42;
   int _sv0t43 = sv0_vec_new();
-  int pn2 = _sv0t43;
+  int ew2 = _sv0t43;
   int _sv0t44 = sv0_vec_new();
-  int pc2 = _sv0t44;
+  int ec2 = _sv0t44;
+  int _sv0t45 = sv0_vec_new();
+  int efs2 = _sv0t45;
+  int _sv0t46 = sv0_vec_new();
+  int pn2 = _sv0t46;
+  int _sv0t47 = sv0_vec_new();
+  int pc2 = _sv0t47;
   sv0_vec_push(pn2, 30);
   sv0_vec_push(pc2, 500);
-  int _sv0t45 = sv0_vec_new();
-  int ins2 = _sv0t45;
-  int _sv0t46 = sv0_vec_new();
-  int _sv0t47 = sv0_vec_new();
   int _sv0t48 = sv0_vec_new();
+  int ins2 = _sv0t48;
   int _sv0t49 = sv0_vec_new();
   int _sv0t50 = sv0_vec_new();
-  int _sv0t51 = local_count_and_env(pn2, pc2, ins2, en2, eb2, ew2, efs2, sn2, sfc2, enn, enw, _sv0t46, _sv0t47, _sv0t48, "", _sv0t49, _sv0t50);
-  int lc2 = _sv0t51;
+  int _sv0t51 = sv0_vec_new();
+  int _sv0t52 = sv0_vec_new();
+  int _sv0t53 = sv0_vec_new();
+  int _sv0t54 = local_count_and_env(pn2, pc2, ins2, en2, eb2, ew2, ec2, efs2, sn2, sfc2, enn, enw, _sv0t49, _sv0t50, _sv0t51, "", _sv0t52, _sv0t53);
+  int lc2 = _sv0t54;
   if ((lc2 != 3)) {
     return 10;
   } else {
   }
-  int _sv0t52 = sv0_vec_get(ew2, 0);
-  if ((_sv0t52 != 3)) {
+  int _sv0t55 = sv0_vec_get(ew2, 0);
+  if ((_sv0t55 != 3)) {
     return 11;
   } else {
   }
-  int _sv0t53 = sv0_vec_get(eb2, 0);
-  if ((_sv0t53 != 0)) {
+  int _sv0t56 = sv0_vec_get(eb2, 0);
+  if ((_sv0t56 != 0)) {
     return 12;
   } else {
   }
-  int _sv0t54 = sv0_vec_new();
-  int en3 = _sv0t54;
-  int _sv0t55 = sv0_vec_new();
-  int eb3 = _sv0t55;
-  int _sv0t56 = sv0_vec_new();
-  int ew3 = _sv0t56;
   int _sv0t57 = sv0_vec_new();
-  int efs3 = _sv0t57;
+  int en3 = _sv0t57;
   int _sv0t58 = sv0_vec_new();
-  int pn3 = _sv0t58;
+  int eb3 = _sv0t58;
   int _sv0t59 = sv0_vec_new();
-  int pc3 = _sv0t59;
+  int ew3 = _sv0t59;
   int _sv0t60 = sv0_vec_new();
-  int ins3 = _sv0t60;
-  Instr _sv0t61;
-  _sv0t61.tag = 1;
-  _sv0t61.p0 = 40;
-  int _sv0t62 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t62, 0, _sv0t61.tag);
-  sv0_box_store(_sv0t62, 1, _sv0t61.p0);
-  sv0_box_store(_sv0t62, 2, _sv0t61.p1);
-  sv0_box_store(_sv0t62, 3, _sv0t61.p2);
-  sv0_box_store(_sv0t62, 4, _sv0t61.p3);
-  sv0_vec_push(ins3, _sv0t62);
+  int ec3 = _sv0t60;
+  int _sv0t61 = sv0_vec_new();
+  int efs3 = _sv0t61;
+  int _sv0t62 = sv0_vec_new();
+  int pn3 = _sv0t62;
   int _sv0t63 = sv0_vec_new();
+  int pc3 = _sv0t63;
   int _sv0t64 = sv0_vec_new();
-  int _sv0t65 = sv0_vec_new();
-  int _sv0t66 = sv0_vec_new();
+  int ins3 = _sv0t64;
+  Instr _sv0t65;
+  _sv0t65.tag = 1;
+  _sv0t65.p0 = 40;
+  int _sv0t66 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t66, 0, _sv0t65.tag);
+  sv0_box_store(_sv0t66, 1, _sv0t65.p0);
+  sv0_box_store(_sv0t66, 2, _sv0t65.p1);
+  sv0_box_store(_sv0t66, 3, _sv0t65.p2);
+  sv0_box_store(_sv0t66, 4, _sv0t65.p3);
+  sv0_vec_push(ins3, _sv0t66);
   int _sv0t67 = sv0_vec_new();
-  int _sv0t68 = local_count_and_env(pn3, pc3, ins3, en3, eb3, ew3, efs3, sn, sfc, enn, enw, _sv0t63, _sv0t64, _sv0t65, "", _sv0t66, _sv0t67);
-  int lc3 = _sv0t68;
+  int _sv0t68 = sv0_vec_new();
+  int _sv0t69 = sv0_vec_new();
+  int _sv0t70 = sv0_vec_new();
+  int _sv0t71 = sv0_vec_new();
+  int _sv0t72 = local_count_and_env(pn3, pc3, ins3, en3, eb3, ew3, ec3, efs3, sn, sfc, enn, enw, _sv0t67, _sv0t68, _sv0t69, "", _sv0t70, _sv0t71);
+  int lc3 = _sv0t72;
   if ((lc3 != 1)) {
     return 13;
   } else {
   }
-  int _sv0t69 = sv0_vec_get(en3, 0);
-  if ((_sv0t69 != 40)) {
+  int _sv0t73 = sv0_vec_get(en3, 0);
+  if ((_sv0t73 != 40)) {
     return 14;
   } else {
   }
-  int _sv0t70 = sv0_vec_get(eb3, 0);
-  if ((_sv0t70 != 0)) {
+  int _sv0t74 = sv0_vec_get(eb3, 0);
+  if ((_sv0t74 != 0)) {
     return 15;
   } else {
   }
-  int _sv0t71 = sv0_vec_get(ew3, 0);
-  if ((_sv0t71 != 1)) {
+  int _sv0t75 = sv0_vec_get(ew3, 0);
+  if ((_sv0t75 != 1)) {
     return 16;
   } else {
   }
-  int _sv0t72 = sv0_vec_new();
-  int en4 = _sv0t72;
-  int _sv0t73 = sv0_vec_new();
-  int eb4 = _sv0t73;
-  int _sv0t74 = sv0_vec_new();
-  int ew4 = _sv0t74;
-  int _sv0t75 = sv0_vec_new();
-  int efs4 = _sv0t75;
   int _sv0t76 = sv0_vec_new();
-  int pn4 = _sv0t76;
+  int en4 = _sv0t76;
   int _sv0t77 = sv0_vec_new();
-  int pc4 = _sv0t77;
+  int eb4 = _sv0t77;
   int _sv0t78 = sv0_vec_new();
-  int ins4 = _sv0t78;
-  Instr _sv0t79;
-  _sv0t79.tag = 1;
-  _sv0t79.p0 = 50;
-  int _sv0t80 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t80, 0, _sv0t79.tag);
-  sv0_box_store(_sv0t80, 1, _sv0t79.p0);
-  sv0_box_store(_sv0t80, 2, _sv0t79.p1);
-  sv0_box_store(_sv0t80, 3, _sv0t79.p2);
-  sv0_box_store(_sv0t80, 4, _sv0t79.p3);
-  sv0_vec_push(ins4, _sv0t80);
-  Instr _sv0t81;
-  _sv0t81.tag = 1;
-  _sv0t81.p0 = 50;
-  int _sv0t82 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t82, 0, _sv0t81.tag);
-  sv0_box_store(_sv0t82, 1, _sv0t81.p0);
-  sv0_box_store(_sv0t82, 2, _sv0t81.p1);
-  sv0_box_store(_sv0t82, 3, _sv0t81.p2);
-  sv0_box_store(_sv0t82, 4, _sv0t81.p3);
-  sv0_vec_push(ins4, _sv0t82);
+  int ew4 = _sv0t78;
+  int _sv0t79 = sv0_vec_new();
+  int ec4 = _sv0t79;
+  int _sv0t80 = sv0_vec_new();
+  int efs4 = _sv0t80;
+  int _sv0t81 = sv0_vec_new();
+  int pn4 = _sv0t81;
+  int _sv0t82 = sv0_vec_new();
+  int pc4 = _sv0t82;
   int _sv0t83 = sv0_vec_new();
-  int _sv0t84 = sv0_vec_new();
-  int _sv0t85 = sv0_vec_new();
-  int _sv0t86 = sv0_vec_new();
-  int _sv0t87 = sv0_vec_new();
-  int _sv0t88 = local_count_and_env(pn4, pc4, ins4, en4, eb4, ew4, efs4, sn, sfc, enn, enw, _sv0t83, _sv0t84, _sv0t85, "", _sv0t86, _sv0t87);
-  int lc4 = _sv0t88;
+  int ins4 = _sv0t83;
+  Instr _sv0t84;
+  _sv0t84.tag = 1;
+  _sv0t84.p0 = 50;
+  int _sv0t85 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t85, 0, _sv0t84.tag);
+  sv0_box_store(_sv0t85, 1, _sv0t84.p0);
+  sv0_box_store(_sv0t85, 2, _sv0t84.p1);
+  sv0_box_store(_sv0t85, 3, _sv0t84.p2);
+  sv0_box_store(_sv0t85, 4, _sv0t84.p3);
+  sv0_vec_push(ins4, _sv0t85);
+  Instr _sv0t86;
+  _sv0t86.tag = 1;
+  _sv0t86.p0 = 50;
+  int _sv0t87 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t87, 0, _sv0t86.tag);
+  sv0_box_store(_sv0t87, 1, _sv0t86.p0);
+  sv0_box_store(_sv0t87, 2, _sv0t86.p1);
+  sv0_box_store(_sv0t87, 3, _sv0t86.p2);
+  sv0_box_store(_sv0t87, 4, _sv0t86.p3);
+  sv0_vec_push(ins4, _sv0t87);
+  int _sv0t88 = sv0_vec_new();
+  int _sv0t89 = sv0_vec_new();
+  int _sv0t90 = sv0_vec_new();
+  int _sv0t91 = sv0_vec_new();
+  int _sv0t92 = sv0_vec_new();
+  int _sv0t93 = local_count_and_env(pn4, pc4, ins4, en4, eb4, ew4, ec4, efs4, sn, sfc, enn, enw, _sv0t88, _sv0t89, _sv0t90, "", _sv0t91, _sv0t92);
+  int lc4 = _sv0t93;
   if ((lc4 != 1)) {
     return 17;
   } else {
   }
-  int _sv0t89 = sv0_vec_len(en4);
-  if ((_sv0t89 != 1)) {
+  int _sv0t94 = sv0_vec_len(en4);
+  if ((_sv0t94 != 1)) {
     return 18;
   } else {
   }
-  int _sv0t90 = sv0_vec_new();
-  int en5 = _sv0t90;
-  int _sv0t91 = sv0_vec_new();
-  int eb5 = _sv0t91;
-  int _sv0t92 = sv0_vec_new();
-  int ew5 = _sv0t92;
-  int _sv0t93 = sv0_vec_new();
-  int efs5 = _sv0t93;
-  int _sv0t94 = sv0_vec_new();
-  int pn5 = _sv0t94;
   int _sv0t95 = sv0_vec_new();
-  int pc5 = _sv0t95;
+  int en5 = _sv0t95;
   int _sv0t96 = sv0_vec_new();
-  int ins5 = _sv0t96;
-  Instr _sv0t97;
-  Expr _sv0t98;
-  Value _sv0t99;
-  _sv0t99.tag = 0;
-  _sv0t99.p0 = 7;
-  int _sv0t100 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t100, 0, _sv0t99.tag);
-  sv0_box_store(_sv0t100, 1, _sv0t99.p0);
-  sv0_box_store(_sv0t100, 2, _sv0t99.p1);
-  _sv0t98.tag = 0;
-  _sv0t98.p0 = _sv0t100;
-  int _sv0t101 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t101, 0, _sv0t98.tag);
-  sv0_box_store(_sv0t101, 1, _sv0t98.p0);
-  sv0_box_store(_sv0t101, 2, _sv0t98.p1);
-  sv0_box_store(_sv0t101, 3, _sv0t98.p2);
-  _sv0t97.tag = 3;
-  _sv0t97.p0 = 60;
-  _sv0t97.p1 = _sv0t101;
-  int _sv0t102 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t102, 0, _sv0t97.tag);
-  sv0_box_store(_sv0t102, 1, _sv0t97.p0);
-  sv0_box_store(_sv0t102, 2, _sv0t97.p1);
-  sv0_box_store(_sv0t102, 3, _sv0t97.p2);
-  sv0_box_store(_sv0t102, 4, _sv0t97.p3);
-  sv0_vec_push(ins5, _sv0t102);
-  int _sv0t103 = sv0_vec_new();
-  int _sv0t104 = sv0_vec_new();
-  int _sv0t105 = sv0_vec_new();
-  int _sv0t106 = sv0_vec_new();
-  int _sv0t107 = sv0_vec_new();
-  int _sv0t108 = local_count_and_env(pn5, pc5, ins5, en5, eb5, ew5, efs5, sn, sfc, enn, enw, _sv0t103, _sv0t104, _sv0t105, "", _sv0t106, _sv0t107);
-  int lc5 = _sv0t108;
+  int eb5 = _sv0t96;
+  int _sv0t97 = sv0_vec_new();
+  int ew5 = _sv0t97;
+  int _sv0t98 = sv0_vec_new();
+  int ec5 = _sv0t98;
+  int _sv0t99 = sv0_vec_new();
+  int efs5 = _sv0t99;
+  int _sv0t100 = sv0_vec_new();
+  int pn5 = _sv0t100;
+  int _sv0t101 = sv0_vec_new();
+  int pc5 = _sv0t101;
+  int _sv0t102 = sv0_vec_new();
+  int ins5 = _sv0t102;
+  Instr _sv0t103;
+  Expr _sv0t104;
+  Value _sv0t105;
+  _sv0t105.tag = 0;
+  _sv0t105.p0 = 7;
+  int _sv0t106 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t106, 0, _sv0t105.tag);
+  sv0_box_store(_sv0t106, 1, _sv0t105.p0);
+  sv0_box_store(_sv0t106, 2, _sv0t105.p1);
+  _sv0t104.tag = 0;
+  _sv0t104.p0 = _sv0t106;
+  int _sv0t107 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t107, 0, _sv0t104.tag);
+  sv0_box_store(_sv0t107, 1, _sv0t104.p0);
+  sv0_box_store(_sv0t107, 2, _sv0t104.p1);
+  sv0_box_store(_sv0t107, 3, _sv0t104.p2);
+  _sv0t103.tag = 3;
+  _sv0t103.p0 = 60;
+  _sv0t103.p1 = _sv0t107;
+  int _sv0t108 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t108, 0, _sv0t103.tag);
+  sv0_box_store(_sv0t108, 1, _sv0t103.p0);
+  sv0_box_store(_sv0t108, 2, _sv0t103.p1);
+  sv0_box_store(_sv0t108, 3, _sv0t103.p2);
+  sv0_box_store(_sv0t108, 4, _sv0t103.p3);
+  sv0_vec_push(ins5, _sv0t108);
+  int _sv0t109 = sv0_vec_new();
+  int _sv0t110 = sv0_vec_new();
+  int _sv0t111 = sv0_vec_new();
+  int _sv0t112 = sv0_vec_new();
+  int _sv0t113 = sv0_vec_new();
+  int _sv0t114 = local_count_and_env(pn5, pc5, ins5, en5, eb5, ew5, ec5, efs5, sn, sfc, enn, enw, _sv0t109, _sv0t110, _sv0t111, "", _sv0t112, _sv0t113);
+  int lc5 = _sv0t114;
   if ((lc5 != 1)) {
     return 19;
   } else {
   }
-  int _sv0t109 = sv0_vec_get(en5, 0);
-  if ((_sv0t109 != 60)) {
+  int _sv0t115 = sv0_vec_get(en5, 0);
+  if ((_sv0t115 != 60)) {
     return 20;
   } else {
   }
-  int _sv0t110 = sv0_vec_new();
-  int en6 = _sv0t110;
-  int _sv0t111 = sv0_vec_new();
-  int eb6 = _sv0t111;
-  int _sv0t112 = sv0_vec_new();
-  int ew6 = _sv0t112;
-  int _sv0t113 = sv0_vec_new();
-  int efs6 = _sv0t113;
-  int _sv0t114 = sv0_vec_new();
-  int pn6 = _sv0t114;
-  int _sv0t115 = sv0_vec_new();
-  int pc6 = _sv0t115;
   int _sv0t116 = sv0_vec_new();
-  int ins6 = _sv0t116;
+  int en6 = _sv0t116;
   int _sv0t117 = sv0_vec_new();
-  int cargs = _sv0t117;
-  Instr _sv0t118;
-  _sv0t118.tag = 11;
-  _sv0t118.p0 = 70;
-  _sv0t118.p1 = 100;
-  _sv0t118.p2 = cargs;
-  _sv0t118.p3 = 999;
-  int _sv0t119 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t119, 0, _sv0t118.tag);
-  sv0_box_store(_sv0t119, 1, _sv0t118.p0);
-  sv0_box_store(_sv0t119, 2, _sv0t118.p1);
-  sv0_box_store(_sv0t119, 3, _sv0t118.p2);
-  sv0_box_store(_sv0t119, 4, _sv0t118.p3);
-  sv0_vec_push(ins6, _sv0t119);
+  int eb6 = _sv0t117;
+  int _sv0t118 = sv0_vec_new();
+  int ew6 = _sv0t118;
+  int _sv0t119 = sv0_vec_new();
+  int ec6 = _sv0t119;
   int _sv0t120 = sv0_vec_new();
+  int efs6 = _sv0t120;
   int _sv0t121 = sv0_vec_new();
+  int pn6 = _sv0t121;
   int _sv0t122 = sv0_vec_new();
+  int pc6 = _sv0t122;
   int _sv0t123 = sv0_vec_new();
+  int ins6 = _sv0t123;
   int _sv0t124 = sv0_vec_new();
-  int _sv0t125 = local_count_and_env(pn6, pc6, ins6, en6, eb6, ew6, efs6, sn, sfc, enn, enw, _sv0t120, _sv0t121, _sv0t122, "", _sv0t123, _sv0t124);
-  int lc6 = _sv0t125;
+  int cargs = _sv0t124;
+  Instr _sv0t125;
+  _sv0t125.tag = 11;
+  _sv0t125.p0 = 70;
+  _sv0t125.p1 = 100;
+  _sv0t125.p2 = cargs;
+  _sv0t125.p3 = 999;
+  int _sv0t126 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t126, 0, _sv0t125.tag);
+  sv0_box_store(_sv0t126, 1, _sv0t125.p0);
+  sv0_box_store(_sv0t126, 2, _sv0t125.p1);
+  sv0_box_store(_sv0t126, 3, _sv0t125.p2);
+  sv0_box_store(_sv0t126, 4, _sv0t125.p3);
+  sv0_vec_push(ins6, _sv0t126);
+  int _sv0t127 = sv0_vec_new();
+  int _sv0t128 = sv0_vec_new();
+  int _sv0t129 = sv0_vec_new();
+  int _sv0t130 = sv0_vec_new();
+  int _sv0t131 = sv0_vec_new();
+  int _sv0t132 = local_count_and_env(pn6, pc6, ins6, en6, eb6, ew6, ec6, efs6, sn, sfc, enn, enw, _sv0t127, _sv0t128, _sv0t129, "", _sv0t130, _sv0t131);
+  int lc6 = _sv0t132;
   if ((lc6 != 1)) {
     return 21;
   } else {
   }
-  int _sv0t126 = sv0_vec_get(en6, 0);
-  if ((_sv0t126 != 70)) {
+  int _sv0t133 = sv0_vec_get(en6, 0);
+  if ((_sv0t133 != 70)) {
     return 22;
   } else {
   }
-  int _sv0t127 = sv0_vec_new();
-  int en7 = _sv0t127;
-  int _sv0t128 = sv0_vec_new();
-  int eb7 = _sv0t128;
-  int _sv0t129 = sv0_vec_new();
-  int ew7 = _sv0t129;
-  int _sv0t130 = sv0_vec_new();
-  int efs7 = _sv0t130;
-  int _sv0t131 = sv0_vec_new();
-  int pn7 = _sv0t131;
-  int _sv0t132 = sv0_vec_new();
-  int pc7 = _sv0t132;
-  int _sv0t133 = sv0_vec_new();
-  int ins7 = _sv0t133;
   int _sv0t134 = sv0_vec_new();
-  int cargs2 = _sv0t134;
-  Instr _sv0t135;
-  _sv0t135.tag = 11;
-  _sv0t135.p0 = 0;
-  _sv0t135.p1 = 100;
-  _sv0t135.p2 = cargs2;
-  _sv0t135.p3 = 999;
-  int _sv0t136 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t136, 0, _sv0t135.tag);
-  sv0_box_store(_sv0t136, 1, _sv0t135.p0);
-  sv0_box_store(_sv0t136, 2, _sv0t135.p1);
-  sv0_box_store(_sv0t136, 3, _sv0t135.p2);
-  sv0_box_store(_sv0t136, 4, _sv0t135.p3);
-  sv0_vec_push(ins7, _sv0t136);
+  int en7 = _sv0t134;
+  int _sv0t135 = sv0_vec_new();
+  int eb7 = _sv0t135;
+  int _sv0t136 = sv0_vec_new();
+  int ew7 = _sv0t136;
   int _sv0t137 = sv0_vec_new();
+  int ec7 = _sv0t137;
   int _sv0t138 = sv0_vec_new();
+  int efs7 = _sv0t138;
   int _sv0t139 = sv0_vec_new();
+  int pn7 = _sv0t139;
   int _sv0t140 = sv0_vec_new();
+  int pc7 = _sv0t140;
   int _sv0t141 = sv0_vec_new();
-  int _sv0t142 = local_count_and_env(pn7, pc7, ins7, en7, eb7, ew7, efs7, sn, sfc, enn, enw, _sv0t137, _sv0t138, _sv0t139, "", _sv0t140, _sv0t141);
-  int lc7 = _sv0t142;
+  int ins7 = _sv0t141;
+  int _sv0t142 = sv0_vec_new();
+  int cargs2 = _sv0t142;
+  Instr _sv0t143;
+  _sv0t143.tag = 11;
+  _sv0t143.p0 = 0;
+  _sv0t143.p1 = 100;
+  _sv0t143.p2 = cargs2;
+  _sv0t143.p3 = 999;
+  int _sv0t144 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t144, 0, _sv0t143.tag);
+  sv0_box_store(_sv0t144, 1, _sv0t143.p0);
+  sv0_box_store(_sv0t144, 2, _sv0t143.p1);
+  sv0_box_store(_sv0t144, 3, _sv0t143.p2);
+  sv0_box_store(_sv0t144, 4, _sv0t143.p3);
+  sv0_vec_push(ins7, _sv0t144);
+  int _sv0t145 = sv0_vec_new();
+  int _sv0t146 = sv0_vec_new();
+  int _sv0t147 = sv0_vec_new();
+  int _sv0t148 = sv0_vec_new();
+  int _sv0t149 = sv0_vec_new();
+  int _sv0t150 = local_count_and_env(pn7, pc7, ins7, en7, eb7, ew7, ec7, efs7, sn, sfc, enn, enw, _sv0t145, _sv0t146, _sv0t147, "", _sv0t148, _sv0t149);
+  int lc7 = _sv0t150;
   if ((lc7 != 0)) {
     return 23;
   } else {
   }
-  int _sv0t143 = sv0_vec_len(en7);
-  if ((_sv0t143 != 0)) {
+  int _sv0t151 = sv0_vec_len(en7);
+  if ((_sv0t151 != 0)) {
     return 24;
   } else {
   }
-  int _sv0t144 = sv0_vec_new();
-  int en8 = _sv0t144;
-  int _sv0t145 = sv0_vec_new();
-  int eb8 = _sv0t145;
-  int _sv0t146 = sv0_vec_new();
-  int ew8 = _sv0t146;
-  int _sv0t147 = sv0_vec_new();
-  int efs8 = _sv0t147;
-  int _sv0t148 = sv0_vec_new();
-  int pn8 = _sv0t148;
-  int _sv0t149 = sv0_vec_new();
-  int pc8 = _sv0t149;
-  int _sv0t150 = sv0_vec_new();
-  int ins8 = _sv0t150;
-  int _sv0t151 = sv0_vec_new();
-  int cargs3 = _sv0t151;
-  Instr _sv0t152;
-  _sv0t152.tag = 11;
-  _sv0t152.p0 = 80;
-  _sv0t152.p1 = 100;
-  _sv0t152.p2 = cargs3;
-  _sv0t152.p3 = 500;
-  int _sv0t153 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t153, 0, _sv0t152.tag);
-  sv0_box_store(_sv0t153, 1, _sv0t152.p0);
-  sv0_box_store(_sv0t153, 2, _sv0t152.p1);
-  sv0_box_store(_sv0t153, 3, _sv0t152.p2);
-  sv0_box_store(_sv0t153, 4, _sv0t152.p3);
-  sv0_vec_push(ins8, _sv0t153);
+  int _sv0t152 = sv0_vec_new();
+  int en8 = _sv0t152;
+  int _sv0t153 = sv0_vec_new();
+  int eb8 = _sv0t153;
   int _sv0t154 = sv0_vec_new();
+  int ew8 = _sv0t154;
   int _sv0t155 = sv0_vec_new();
+  int ec8 = _sv0t155;
   int _sv0t156 = sv0_vec_new();
+  int efs8 = _sv0t156;
   int _sv0t157 = sv0_vec_new();
+  int pn8 = _sv0t157;
   int _sv0t158 = sv0_vec_new();
-  int _sv0t159 = local_count_and_env(pn8, pc8, ins8, en8, eb8, ew8, efs8, sn2, sfc2, enn, enw, _sv0t154, _sv0t155, _sv0t156, "", _sv0t157, _sv0t158);
-  int lc8 = _sv0t159;
+  int pc8 = _sv0t158;
+  int _sv0t159 = sv0_vec_new();
+  int ins8 = _sv0t159;
+  int _sv0t160 = sv0_vec_new();
+  int cargs3 = _sv0t160;
+  Instr _sv0t161;
+  _sv0t161.tag = 11;
+  _sv0t161.p0 = 80;
+  _sv0t161.p1 = 100;
+  _sv0t161.p2 = cargs3;
+  _sv0t161.p3 = 500;
+  int _sv0t162 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t162, 0, _sv0t161.tag);
+  sv0_box_store(_sv0t162, 1, _sv0t161.p0);
+  sv0_box_store(_sv0t162, 2, _sv0t161.p1);
+  sv0_box_store(_sv0t162, 3, _sv0t161.p2);
+  sv0_box_store(_sv0t162, 4, _sv0t161.p3);
+  sv0_vec_push(ins8, _sv0t162);
+  int _sv0t163 = sv0_vec_new();
+  int _sv0t164 = sv0_vec_new();
+  int _sv0t165 = sv0_vec_new();
+  int _sv0t166 = sv0_vec_new();
+  int _sv0t167 = sv0_vec_new();
+  int _sv0t168 = local_count_and_env(pn8, pc8, ins8, en8, eb8, ew8, ec8, efs8, sn2, sfc2, enn, enw, _sv0t163, _sv0t164, _sv0t165, "", _sv0t166, _sv0t167);
+  int lc8 = _sv0t168;
   if ((lc8 != 3)) {
     return 25;
   } else {
   }
-  int _sv0t160 = sv0_vec_get(ew8, 0);
-  if ((_sv0t160 != 3)) {
+  int _sv0t169 = sv0_vec_get(ew8, 0);
+  if ((_sv0t169 != 3)) {
     return 26;
   } else {
   }
-  int _sv0t161 = sv0_vec_new();
-  int en9 = _sv0t161;
-  int _sv0t162 = sv0_vec_new();
-  int eb9 = _sv0t162;
-  int _sv0t163 = sv0_vec_new();
-  int ew9 = _sv0t163;
-  int _sv0t164 = sv0_vec_new();
-  int efs9 = _sv0t164;
-  int _sv0t165 = sv0_vec_new();
-  int pn9 = _sv0t165;
-  int _sv0t166 = sv0_vec_new();
-  int pc9 = _sv0t166;
-  int _sv0t167 = sv0_vec_new();
-  int ins9 = _sv0t167;
-  int _sv0t168 = sv0_vec_new();
-  int th9 = _sv0t168;
-  int _sv0t169 = sv0_vec_new();
-  int el9 = _sv0t169;
-  Instr _sv0t170;
-  _sv0t170.tag = 1;
-  _sv0t170.p0 = 90;
-  int _sv0t171 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t171, 0, _sv0t170.tag);
-  sv0_box_store(_sv0t171, 1, _sv0t170.p0);
-  sv0_box_store(_sv0t171, 2, _sv0t170.p1);
-  sv0_box_store(_sv0t171, 3, _sv0t170.p2);
-  sv0_box_store(_sv0t171, 4, _sv0t170.p3);
-  sv0_vec_push(th9, _sv0t171);
-  Instr _sv0t172;
-  _sv0t172.tag = 1;
-  _sv0t172.p0 = 91;
-  int _sv0t173 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t173, 0, _sv0t172.tag);
-  sv0_box_store(_sv0t173, 1, _sv0t172.p0);
-  sv0_box_store(_sv0t173, 2, _sv0t172.p1);
-  sv0_box_store(_sv0t173, 3, _sv0t172.p2);
-  sv0_box_store(_sv0t173, 4, _sv0t172.p3);
-  sv0_vec_push(el9, _sv0t173);
-  Instr _sv0t174;
-  Expr _sv0t175;
-  Value _sv0t176;
-  _sv0t176.tag = 1;
-  int _sv0t177 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t177, 0, _sv0t176.tag);
-  sv0_box_store(_sv0t177, 1, _sv0t176.p0);
-  sv0_box_store(_sv0t177, 2, _sv0t176.p1);
-  _sv0t175.tag = 0;
-  _sv0t175.p0 = _sv0t177;
-  int _sv0t178 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t178, 0, _sv0t175.tag);
-  sv0_box_store(_sv0t178, 1, _sv0t175.p0);
-  sv0_box_store(_sv0t178, 2, _sv0t175.p1);
-  sv0_box_store(_sv0t178, 3, _sv0t175.p2);
-  _sv0t174.tag = 6;
-  _sv0t174.p0 = _sv0t178;
-  _sv0t174.p1 = th9;
-  _sv0t174.p2 = el9;
-  int _sv0t179 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t179, 0, _sv0t174.tag);
-  sv0_box_store(_sv0t179, 1, _sv0t174.p0);
-  sv0_box_store(_sv0t179, 2, _sv0t174.p1);
-  sv0_box_store(_sv0t179, 3, _sv0t174.p2);
-  sv0_box_store(_sv0t179, 4, _sv0t174.p3);
-  sv0_vec_push(ins9, _sv0t179);
-  int _sv0t180 = sv0_vec_new();
-  int _sv0t181 = sv0_vec_new();
-  int _sv0t182 = sv0_vec_new();
-  int _sv0t183 = sv0_vec_new();
-  int _sv0t184 = sv0_vec_new();
-  int _sv0t185 = local_count_and_env(pn9, pc9, ins9, en9, eb9, ew9, efs9, sn, sfc, enn, enw, _sv0t180, _sv0t181, _sv0t182, "", _sv0t183, _sv0t184);
-  int lc9 = _sv0t185;
+  int _sv0t170 = sv0_vec_new();
+  int en9 = _sv0t170;
+  int _sv0t171 = sv0_vec_new();
+  int eb9 = _sv0t171;
+  int _sv0t172 = sv0_vec_new();
+  int ew9 = _sv0t172;
+  int _sv0t173 = sv0_vec_new();
+  int ec9 = _sv0t173;
+  int _sv0t174 = sv0_vec_new();
+  int efs9 = _sv0t174;
+  int _sv0t175 = sv0_vec_new();
+  int pn9 = _sv0t175;
+  int _sv0t176 = sv0_vec_new();
+  int pc9 = _sv0t176;
+  int _sv0t177 = sv0_vec_new();
+  int ins9 = _sv0t177;
+  int _sv0t178 = sv0_vec_new();
+  int th9 = _sv0t178;
+  int _sv0t179 = sv0_vec_new();
+  int el9 = _sv0t179;
+  Instr _sv0t180;
+  _sv0t180.tag = 1;
+  _sv0t180.p0 = 90;
+  int _sv0t181 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t181, 0, _sv0t180.tag);
+  sv0_box_store(_sv0t181, 1, _sv0t180.p0);
+  sv0_box_store(_sv0t181, 2, _sv0t180.p1);
+  sv0_box_store(_sv0t181, 3, _sv0t180.p2);
+  sv0_box_store(_sv0t181, 4, _sv0t180.p3);
+  sv0_vec_push(th9, _sv0t181);
+  Instr _sv0t182;
+  _sv0t182.tag = 1;
+  _sv0t182.p0 = 91;
+  int _sv0t183 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t183, 0, _sv0t182.tag);
+  sv0_box_store(_sv0t183, 1, _sv0t182.p0);
+  sv0_box_store(_sv0t183, 2, _sv0t182.p1);
+  sv0_box_store(_sv0t183, 3, _sv0t182.p2);
+  sv0_box_store(_sv0t183, 4, _sv0t182.p3);
+  sv0_vec_push(el9, _sv0t183);
+  Instr _sv0t184;
+  Expr _sv0t185;
+  Value _sv0t186;
+  _sv0t186.tag = 1;
+  int _sv0t187 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t187, 0, _sv0t186.tag);
+  sv0_box_store(_sv0t187, 1, _sv0t186.p0);
+  sv0_box_store(_sv0t187, 2, _sv0t186.p1);
+  _sv0t185.tag = 0;
+  _sv0t185.p0 = _sv0t187;
+  int _sv0t188 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t188, 0, _sv0t185.tag);
+  sv0_box_store(_sv0t188, 1, _sv0t185.p0);
+  sv0_box_store(_sv0t188, 2, _sv0t185.p1);
+  sv0_box_store(_sv0t188, 3, _sv0t185.p2);
+  _sv0t184.tag = 6;
+  _sv0t184.p0 = _sv0t188;
+  _sv0t184.p1 = th9;
+  _sv0t184.p2 = el9;
+  int _sv0t189 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t189, 0, _sv0t184.tag);
+  sv0_box_store(_sv0t189, 1, _sv0t184.p0);
+  sv0_box_store(_sv0t189, 2, _sv0t184.p1);
+  sv0_box_store(_sv0t189, 3, _sv0t184.p2);
+  sv0_box_store(_sv0t189, 4, _sv0t184.p3);
+  sv0_vec_push(ins9, _sv0t189);
+  int _sv0t190 = sv0_vec_new();
+  int _sv0t191 = sv0_vec_new();
+  int _sv0t192 = sv0_vec_new();
+  int _sv0t193 = sv0_vec_new();
+  int _sv0t194 = sv0_vec_new();
+  int _sv0t195 = local_count_and_env(pn9, pc9, ins9, en9, eb9, ew9, ec9, efs9, sn, sfc, enn, enw, _sv0t190, _sv0t191, _sv0t192, "", _sv0t193, _sv0t194);
+  int lc9 = _sv0t195;
   if ((lc9 != 2)) {
     return 27;
   } else {
   }
-  int _sv0t186 = sv0_vec_get(en9, 0);
-  if ((_sv0t186 != 90)) {
+  int _sv0t196 = sv0_vec_get(en9, 0);
+  if ((_sv0t196 != 90)) {
     return 28;
   } else {
   }
-  int _sv0t187 = sv0_vec_get(en9, 1);
-  if ((_sv0t187 != 91)) {
+  int _sv0t197 = sv0_vec_get(en9, 1);
+  if ((_sv0t197 != 91)) {
     return 29;
   } else {
   }
-  int _sv0t188 = sv0_vec_new();
-  int en10 = _sv0t188;
-  int _sv0t189 = sv0_vec_new();
-  int eb10 = _sv0t189;
-  int _sv0t190 = sv0_vec_new();
-  int ew10 = _sv0t190;
-  int _sv0t191 = sv0_vec_new();
-  int efs10 = _sv0t191;
-  int _sv0t192 = sv0_vec_new();
-  int pn10 = _sv0t192;
-  int _sv0t193 = sv0_vec_new();
-  int pc10 = _sv0t193;
-  int _sv0t194 = sv0_vec_new();
-  int ins10 = _sv0t194;
-  int _sv0t195 = sv0_vec_new();
-  int wbod = _sv0t195;
-  Instr _sv0t196;
-  _sv0t196.tag = 1;
-  _sv0t196.p0 = 95;
-  int _sv0t197 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t197, 0, _sv0t196.tag);
-  sv0_box_store(_sv0t197, 1, _sv0t196.p0);
-  sv0_box_store(_sv0t197, 2, _sv0t196.p1);
-  sv0_box_store(_sv0t197, 3, _sv0t196.p2);
-  sv0_box_store(_sv0t197, 4, _sv0t196.p3);
-  sv0_vec_push(wbod, _sv0t197);
-  Instr _sv0t198;
-  Expr _sv0t199;
-  Value _sv0t200;
-  _sv0t200.tag = 1;
-  int _sv0t201 = sv0_box_alloc(3);
-  sv0_box_store(_sv0t201, 0, _sv0t200.tag);
-  sv0_box_store(_sv0t201, 1, _sv0t200.p0);
-  sv0_box_store(_sv0t201, 2, _sv0t200.p1);
-  _sv0t199.tag = 0;
-  _sv0t199.p0 = _sv0t201;
-  int _sv0t202 = sv0_box_alloc(4);
-  sv0_box_store(_sv0t202, 0, _sv0t199.tag);
-  sv0_box_store(_sv0t202, 1, _sv0t199.p0);
-  sv0_box_store(_sv0t202, 2, _sv0t199.p1);
-  sv0_box_store(_sv0t202, 3, _sv0t199.p2);
-  _sv0t198.tag = 7;
-  _sv0t198.p0 = _sv0t202;
-  _sv0t198.p1 = wbod;
-  int _sv0t203 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t203, 0, _sv0t198.tag);
-  sv0_box_store(_sv0t203, 1, _sv0t198.p0);
-  sv0_box_store(_sv0t203, 2, _sv0t198.p1);
-  sv0_box_store(_sv0t203, 3, _sv0t198.p2);
-  sv0_box_store(_sv0t203, 4, _sv0t198.p3);
-  sv0_vec_push(ins10, _sv0t203);
+  int _sv0t198 = sv0_vec_new();
+  int en10 = _sv0t198;
+  int _sv0t199 = sv0_vec_new();
+  int eb10 = _sv0t199;
+  int _sv0t200 = sv0_vec_new();
+  int ew10 = _sv0t200;
+  int _sv0t201 = sv0_vec_new();
+  int ec10 = _sv0t201;
+  int _sv0t202 = sv0_vec_new();
+  int efs10 = _sv0t202;
+  int _sv0t203 = sv0_vec_new();
+  int pn10 = _sv0t203;
   int _sv0t204 = sv0_vec_new();
+  int pc10 = _sv0t204;
   int _sv0t205 = sv0_vec_new();
+  int ins10 = _sv0t205;
   int _sv0t206 = sv0_vec_new();
-  int _sv0t207 = sv0_vec_new();
-  int _sv0t208 = sv0_vec_new();
-  int _sv0t209 = local_count_and_env(pn10, pc10, ins10, en10, eb10, ew10, efs10, sn, sfc, enn, enw, _sv0t204, _sv0t205, _sv0t206, "", _sv0t207, _sv0t208);
-  int lc10 = _sv0t209;
+  int wbod = _sv0t206;
+  Instr _sv0t207;
+  _sv0t207.tag = 1;
+  _sv0t207.p0 = 95;
+  int _sv0t208 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t208, 0, _sv0t207.tag);
+  sv0_box_store(_sv0t208, 1, _sv0t207.p0);
+  sv0_box_store(_sv0t208, 2, _sv0t207.p1);
+  sv0_box_store(_sv0t208, 3, _sv0t207.p2);
+  sv0_box_store(_sv0t208, 4, _sv0t207.p3);
+  sv0_vec_push(wbod, _sv0t208);
+  Instr _sv0t209;
+  Expr _sv0t210;
+  Value _sv0t211;
+  _sv0t211.tag = 1;
+  int _sv0t212 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t212, 0, _sv0t211.tag);
+  sv0_box_store(_sv0t212, 1, _sv0t211.p0);
+  sv0_box_store(_sv0t212, 2, _sv0t211.p1);
+  _sv0t210.tag = 0;
+  _sv0t210.p0 = _sv0t212;
+  int _sv0t213 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t213, 0, _sv0t210.tag);
+  sv0_box_store(_sv0t213, 1, _sv0t210.p0);
+  sv0_box_store(_sv0t213, 2, _sv0t210.p1);
+  sv0_box_store(_sv0t213, 3, _sv0t210.p2);
+  _sv0t209.tag = 7;
+  _sv0t209.p0 = _sv0t213;
+  _sv0t209.p1 = wbod;
+  int _sv0t214 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t214, 0, _sv0t209.tag);
+  sv0_box_store(_sv0t214, 1, _sv0t209.p0);
+  sv0_box_store(_sv0t214, 2, _sv0t209.p1);
+  sv0_box_store(_sv0t214, 3, _sv0t209.p2);
+  sv0_box_store(_sv0t214, 4, _sv0t209.p3);
+  sv0_vec_push(ins10, _sv0t214);
+  int _sv0t215 = sv0_vec_new();
+  int _sv0t216 = sv0_vec_new();
+  int _sv0t217 = sv0_vec_new();
+  int _sv0t218 = sv0_vec_new();
+  int _sv0t219 = sv0_vec_new();
+  int _sv0t220 = local_count_and_env(pn10, pc10, ins10, en10, eb10, ew10, ec10, efs10, sn, sfc, enn, enw, _sv0t215, _sv0t216, _sv0t217, "", _sv0t218, _sv0t219);
+  int lc10 = _sv0t220;
   if ((lc10 != 1)) {
     return 30;
   } else {
   }
-  int _sv0t210 = sv0_vec_get(en10, 0);
-  if ((_sv0t210 != 95)) {
+  int _sv0t221 = sv0_vec_get(en10, 0);
+  if ((_sv0t221 != 95)) {
     return 31;
   } else {
   }
-  int _sv0t211 = sv0_vec_new();
-  int en11 = _sv0t211;
-  int _sv0t212 = sv0_vec_new();
-  int eb11 = _sv0t212;
-  int _sv0t213 = sv0_vec_new();
-  int ew11 = _sv0t213;
-  int _sv0t214 = sv0_vec_new();
-  int efs11 = _sv0t214;
-  int _sv0t215 = sv0_vec_new();
-  int pn11 = _sv0t215;
-  int _sv0t216 = sv0_vec_new();
-  int pc11 = _sv0t216;
+  int _sv0t222 = sv0_vec_new();
+  int en11 = _sv0t222;
+  int _sv0t223 = sv0_vec_new();
+  int eb11 = _sv0t223;
+  int _sv0t224 = sv0_vec_new();
+  int ew11 = _sv0t224;
+  int _sv0t225 = sv0_vec_new();
+  int ec11 = _sv0t225;
+  int _sv0t226 = sv0_vec_new();
+  int efs11 = _sv0t226;
+  int _sv0t227 = sv0_vec_new();
+  int pn11 = _sv0t227;
+  int _sv0t228 = sv0_vec_new();
+  int pc11 = _sv0t228;
   sv0_vec_push(pn11, 200);
   sv0_vec_push(pc11, 777);
-  int _sv0t217 = sv0_vec_new();
-  int ins11 = _sv0t217;
-  Instr _sv0t218;
-  _sv0t218.tag = 1;
-  _sv0t218.p0 = 201;
-  int _sv0t219 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t219, 0, _sv0t218.tag);
-  sv0_box_store(_sv0t219, 1, _sv0t218.p0);
-  sv0_box_store(_sv0t219, 2, _sv0t218.p1);
-  sv0_box_store(_sv0t219, 3, _sv0t218.p2);
-  sv0_box_store(_sv0t219, 4, _sv0t218.p3);
-  sv0_vec_push(ins11, _sv0t219);
-  Instr _sv0t220;
-  _sv0t220.tag = 1;
-  _sv0t220.p0 = 202;
-  int _sv0t221 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t221, 0, _sv0t220.tag);
-  sv0_box_store(_sv0t221, 1, _sv0t220.p0);
-  sv0_box_store(_sv0t221, 2, _sv0t220.p1);
-  sv0_box_store(_sv0t221, 3, _sv0t220.p2);
-  sv0_box_store(_sv0t221, 4, _sv0t220.p3);
-  sv0_vec_push(ins11, _sv0t221);
-  int _sv0t222 = sv0_vec_new();
-  int _sv0t223 = sv0_vec_new();
-  int _sv0t224 = sv0_vec_new();
-  int _sv0t225 = sv0_vec_new();
-  int _sv0t226 = sv0_vec_new();
-  int _sv0t227 = local_count_and_env(pn11, pc11, ins11, en11, eb11, ew11, efs11, sn, sfc, enn, enw, _sv0t222, _sv0t223, _sv0t224, "", _sv0t225, _sv0t226);
-  int lc11 = _sv0t227;
+  int _sv0t229 = sv0_vec_new();
+  int ins11 = _sv0t229;
+  Instr _sv0t230;
+  _sv0t230.tag = 1;
+  _sv0t230.p0 = 201;
+  int _sv0t231 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t231, 0, _sv0t230.tag);
+  sv0_box_store(_sv0t231, 1, _sv0t230.p0);
+  sv0_box_store(_sv0t231, 2, _sv0t230.p1);
+  sv0_box_store(_sv0t231, 3, _sv0t230.p2);
+  sv0_box_store(_sv0t231, 4, _sv0t230.p3);
+  sv0_vec_push(ins11, _sv0t231);
+  Instr _sv0t232;
+  _sv0t232.tag = 1;
+  _sv0t232.p0 = 202;
+  int _sv0t233 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t233, 0, _sv0t232.tag);
+  sv0_box_store(_sv0t233, 1, _sv0t232.p0);
+  sv0_box_store(_sv0t233, 2, _sv0t232.p1);
+  sv0_box_store(_sv0t233, 3, _sv0t232.p2);
+  sv0_box_store(_sv0t233, 4, _sv0t232.p3);
+  sv0_vec_push(ins11, _sv0t233);
+  int _sv0t234 = sv0_vec_new();
+  int _sv0t235 = sv0_vec_new();
+  int _sv0t236 = sv0_vec_new();
+  int _sv0t237 = sv0_vec_new();
+  int _sv0t238 = sv0_vec_new();
+  int _sv0t239 = local_count_and_env(pn11, pc11, ins11, en11, eb11, ew11, ec11, efs11, sn, sfc, enn, enw, _sv0t234, _sv0t235, _sv0t236, "", _sv0t237, _sv0t238);
+  int lc11 = _sv0t239;
   if ((lc11 != 3)) {
     return 32;
   } else {
   }
-  int _sv0t228 = sv0_vec_len(en11);
-  if ((_sv0t228 != 3)) {
+  int _sv0t240 = sv0_vec_len(en11);
+  if ((_sv0t240 != 3)) {
     return 33;
   } else {
   }
-  int _sv0t229 = sv0_vec_get(eb11, 0);
-  if ((_sv0t229 != 0)) {
+  int _sv0t241 = sv0_vec_get(eb11, 0);
+  if ((_sv0t241 != 0)) {
     return 34;
   } else {
   }
-  int _sv0t230 = sv0_vec_get(eb11, 1);
-  if ((_sv0t230 != 1)) {
+  int _sv0t242 = sv0_vec_get(eb11, 1);
+  if ((_sv0t242 != 1)) {
     return 35;
   } else {
   }
-  int _sv0t231 = sv0_vec_get(eb11, 2);
-  if ((_sv0t231 != 2)) {
+  int _sv0t243 = sv0_vec_get(eb11, 2);
+  if ((_sv0t243 != 2)) {
     return 36;
   } else {
   }
-  int _sv0t232 = sv0_vec_new();
-  int en12 = _sv0t232;
-  int _sv0t233 = sv0_vec_new();
-  int eb12 = _sv0t233;
-  int _sv0t234 = sv0_vec_new();
-  int ew12 = _sv0t234;
-  int _sv0t235 = sv0_vec_new();
-  int efs12 = _sv0t235;
-  int _sv0t236 = sv0_vec_new();
-  int pn12 = _sv0t236;
-  int _sv0t237 = sv0_vec_new();
-  int pc12 = _sv0t237;
-  int _sv0t238 = sv0_vec_new();
-  int ins12 = _sv0t238;
-  Instr _sv0t239;
-  _sv0t239.tag = 0;
-  int _sv0t240 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t240, 0, _sv0t239.tag);
-  sv0_box_store(_sv0t240, 1, _sv0t239.p0);
-  sv0_box_store(_sv0t240, 2, _sv0t239.p1);
-  sv0_box_store(_sv0t240, 3, _sv0t239.p2);
-  sv0_box_store(_sv0t240, 4, _sv0t239.p3);
-  sv0_vec_push(ins12, _sv0t240);
-  Instr _sv0t241;
-  _sv0t241.tag = 9;
-  int _sv0t242 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t242, 0, _sv0t241.tag);
-  sv0_box_store(_sv0t242, 1, _sv0t241.p0);
-  sv0_box_store(_sv0t242, 2, _sv0t241.p1);
-  sv0_box_store(_sv0t242, 3, _sv0t241.p2);
-  sv0_box_store(_sv0t242, 4, _sv0t241.p3);
-  sv0_vec_push(ins12, _sv0t242);
-  Instr _sv0t243;
-  _sv0t243.tag = 10;
-  int _sv0t244 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t244, 0, _sv0t243.tag);
-  sv0_box_store(_sv0t244, 1, _sv0t243.p0);
-  sv0_box_store(_sv0t244, 2, _sv0t243.p1);
-  sv0_box_store(_sv0t244, 3, _sv0t243.p2);
-  sv0_box_store(_sv0t244, 4, _sv0t243.p3);
-  sv0_vec_push(ins12, _sv0t244);
-  Instr _sv0t245;
-  _sv0t245.tag = 14;
-  int _sv0t246 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t246, 0, _sv0t245.tag);
-  sv0_box_store(_sv0t246, 1, _sv0t245.p0);
-  sv0_box_store(_sv0t246, 2, _sv0t245.p1);
-  sv0_box_store(_sv0t246, 3, _sv0t245.p2);
-  sv0_box_store(_sv0t246, 4, _sv0t245.p3);
-  sv0_vec_push(ins12, _sv0t246);
+  int _sv0t244 = sv0_vec_new();
+  int en12 = _sv0t244;
+  int _sv0t245 = sv0_vec_new();
+  int eb12 = _sv0t245;
+  int _sv0t246 = sv0_vec_new();
+  int ew12 = _sv0t246;
   int _sv0t247 = sv0_vec_new();
+  int ec12 = _sv0t247;
   int _sv0t248 = sv0_vec_new();
+  int efs12 = _sv0t248;
   int _sv0t249 = sv0_vec_new();
+  int pn12 = _sv0t249;
   int _sv0t250 = sv0_vec_new();
+  int pc12 = _sv0t250;
   int _sv0t251 = sv0_vec_new();
-  int _sv0t252 = local_count_and_env(pn12, pc12, ins12, en12, eb12, ew12, efs12, sn, sfc, enn, enw, _sv0t247, _sv0t248, _sv0t249, "", _sv0t250, _sv0t251);
-  int lc12 = _sv0t252;
+  int ins12 = _sv0t251;
+  Instr _sv0t252;
+  _sv0t252.tag = 0;
+  int _sv0t253 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t253, 0, _sv0t252.tag);
+  sv0_box_store(_sv0t253, 1, _sv0t252.p0);
+  sv0_box_store(_sv0t253, 2, _sv0t252.p1);
+  sv0_box_store(_sv0t253, 3, _sv0t252.p2);
+  sv0_box_store(_sv0t253, 4, _sv0t252.p3);
+  sv0_vec_push(ins12, _sv0t253);
+  Instr _sv0t254;
+  _sv0t254.tag = 9;
+  int _sv0t255 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t255, 0, _sv0t254.tag);
+  sv0_box_store(_sv0t255, 1, _sv0t254.p0);
+  sv0_box_store(_sv0t255, 2, _sv0t254.p1);
+  sv0_box_store(_sv0t255, 3, _sv0t254.p2);
+  sv0_box_store(_sv0t255, 4, _sv0t254.p3);
+  sv0_vec_push(ins12, _sv0t255);
+  Instr _sv0t256;
+  _sv0t256.tag = 10;
+  int _sv0t257 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t257, 0, _sv0t256.tag);
+  sv0_box_store(_sv0t257, 1, _sv0t256.p0);
+  sv0_box_store(_sv0t257, 2, _sv0t256.p1);
+  sv0_box_store(_sv0t257, 3, _sv0t256.p2);
+  sv0_box_store(_sv0t257, 4, _sv0t256.p3);
+  sv0_vec_push(ins12, _sv0t257);
+  Instr _sv0t258;
+  _sv0t258.tag = 14;
+  int _sv0t259 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t259, 0, _sv0t258.tag);
+  sv0_box_store(_sv0t259, 1, _sv0t258.p0);
+  sv0_box_store(_sv0t259, 2, _sv0t258.p1);
+  sv0_box_store(_sv0t259, 3, _sv0t258.p2);
+  sv0_box_store(_sv0t259, 4, _sv0t258.p3);
+  sv0_vec_push(ins12, _sv0t259);
+  int _sv0t260 = sv0_vec_new();
+  int _sv0t261 = sv0_vec_new();
+  int _sv0t262 = sv0_vec_new();
+  int _sv0t263 = sv0_vec_new();
+  int _sv0t264 = sv0_vec_new();
+  int _sv0t265 = local_count_and_env(pn12, pc12, ins12, en12, eb12, ew12, ec12, efs12, sn, sfc, enn, enw, _sv0t260, _sv0t261, _sv0t262, "", _sv0t263, _sv0t264);
+  int lc12 = _sv0t265;
   if ((lc12 != 0)) {
     return 37;
   } else {
   }
-  int _sv0t253 = sv0_vec_len(en12);
-  if ((_sv0t253 != 0)) {
+  int _sv0t266 = sv0_vec_len(en12);
+  if ((_sv0t266 != 0)) {
     return 38;
   } else {
   }
