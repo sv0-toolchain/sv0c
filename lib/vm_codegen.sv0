@@ -821,6 +821,92 @@ fn unop_tag_to_insn(tag: i32) -> i32 {
     return 0 - 1;
 }
 
+/* ── typed opcode selection (VMF-006c) ───────────────────────
+   Pick the width/kind-specific arithmetic opcode from the combined operand
+   category (0 = i32/default, 1 = f64/f32, 2 = i64/u64). Comparisons (tags
+   5-10) and logic (11-12) stay the single polymorphic opcodes 64-69 / 80-81
+   — sv0vm disambiguates those by the runtime cell kind (VMF-012). Float has
+   no `%` and no bitwise/shift (the checker rejects both), so those return -1
+   for category 1. i64/u64 bitwise/shift (tags 13-17) currently fall back to
+   the i32 opcodes: the .sv0b instruction set has no *_I64 bitwise variants
+   and sv0vm's wide-int bitwise support is a separate item (VMF-011/012) — a
+   documented narrower-than-C limitation, matching megaTU-main's own u64
+   residual note. */
+fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
+    if cat == 1 {
+        if tag == 0 { return 48; }
+        if tag == 1 { return 49; }
+        if tag == 2 { return 50; }
+        if tag == 3 { return 51; }
+        if tag == 4 { return 0 - 1; }
+        if tag >= 13 { return 0 - 1; }
+        return binop_tag_to_insn(tag);
+    }
+    if cat == 2 {
+        if tag == 0 { return 32; }
+        if tag == 1 { return 33; }
+        if tag == 2 { return 34; }
+        if tag == 3 { return 35; }
+        if tag == 4 { return 36; }
+        return binop_tag_to_insn(tag);
+    }
+    return binop_tag_to_insn(tag);
+}
+
+fn unop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
+    if tag == 0 {
+        if cat == 1 { return 52; }
+        if cat == 2 { return 37; }
+        return 21;
+    }
+    return unop_tag_to_insn(tag);
+}
+
+/* Guarded per-slot category read (parallel to slot_base / slot_width). */
+fn slot_cat(env_cats: Vec<i32>, idx: i32) -> i32 {
+    if idx < 0 { return 0; }
+    if idx >= vec_len(env_cats) { return 0; }
+    return vec_get(env_cats, idx);
+}
+
+/* Combine two operand categories for a binop/unop result: float beats wide
+   int beats plain int (mirrors megaTU-main's megatu_combine_categories). */
+fn combine_cat(a: i32, b: i32) -> i32 {
+    if a == 1 { return 1; }
+    if b == 1 { return 1; }
+    if a == 2 { return 2; }
+    if b == 2 { return 2; }
+    return 0;
+}
+
+/* Category of one IR Value operand. VFloat/VIntWide are self-identifying;
+   a VVar resolves through the slot env's env_cats; a VMember (struct-field
+   access) is category 0 for now — struct-field category tracking is a
+   VMF-006 follow-on, and sv0-mathlib's field-to-local workaround
+   (BUGS.md #13/#16/#19) already sidesteps it. */
+fn operand_cat(v: Value,
+               env_names: Vec<i32>, env_bases: Vec<i32>,
+               env_widths: Vec<i32>, env_cats: Vec<i32>,
+               source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    match v {
+        Value::VFloat(h) => { return 1; },
+        Value::VIntWide(h) => { return 2; },
+        Value::VVar(x) => {
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
+                                      source, starts, ends);
+            return slot_cat(env_cats, si);
+        },
+        Value::VInt(n) => { return 0; },
+        Value::VBoolTrue => { return 0; },
+        Value::VBoolFalse => { return 0; },
+        Value::VUnit => { return 0; },
+        Value::VString(s) => { return 0; },
+        Value::VMember(bv, f) => { return 0; },
+        Value::VAddrOf(x) => { return 0; },
+    }
+    return 0;
+}
+
 /* ── handle → operator string → opcode helpers ────────────── */
 
 fn binop_handle_to_insn(op_h: i32, source: string,
@@ -1035,19 +1121,26 @@ fn emit_expr(e: Expr,
         Expr::Binop(op_h, bv1, bv2) => {
             let v1: Value = box_deref(bv1);
             let v2: Value = box_deref(bv2);
+            let c1: i32 = operand_cat(v1, env_names, env_bases, env_widths,
+                                      env_cats, source, starts, ends);
+            let c2: i32 = operand_cat(v2, env_names, env_bases, env_widths,
+                                      env_cats, source, starts, ends);
             let n1: i32 = emit_value(v1, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n1 < 0 { return 0 - 1; }
             let n2: i32 = emit_value(v2, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n2 < 0 { return 0 - 1; }
-            let opc: i32 = binop_tag_to_insn(op_h);
+            let opc: i32 = binop_tag_to_insn_typed(op_h, combine_cat(c1, c2));
+            if opc < 0 { return 0 - 1; }
             vec_push(out, opc);
             return n1 + n2 + 1;
         },
         Expr::Unop(op_h, bv) => {
             let v: Value = box_deref(bv);
+            let c: i32 = operand_cat(v, env_names, env_bases, env_widths,
+                                     env_cats, source, starts, ends);
             let n: i32 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n < 0 { return 0 - 1; }
-            let opc: i32 = unop_tag_to_insn(op_h);
+            let opc: i32 = unop_tag_to_insn_typed(op_h, c);
             if opc >= 0 {
                 vec_push(out, opc);
                 return n + 1;
@@ -2499,6 +2592,25 @@ fn test_emit_expr() -> i32 {
     let foob: Expr = Expr::FieldAccess(box_new(Value::VVar(80)), 3);
     let r9: i32 = emit_expr(foob, en, eb, ew, ec, vec_new(), vec_new(), pool, source, starts, ends, out9);
     if r9 != 0 - 1 { return 30; }
+    /* VMF-006c: f64 (cat 1) operands -> ADD_F64 (48), not ADD_I32 (16).
+       Register two slots for VVar(60)/VVar(61) with category 1. */
+    let enf: Vec<i32> = vec_new();
+    let ebf: Vec<i32> = vec_new();
+    let ewf: Vec<i32> = vec_new();
+    let ecf: Vec<i32> = vec_new();
+    vec_push(enf, 60); vec_push(ebf, 0); vec_push(ewf, 1); vec_push(ecf, 1);
+    vec_push(enf, 61); vec_push(ebf, 1); vec_push(ewf, 1); vec_push(ecf, 1);
+    let out10: Vec<i32> = vec_new();
+    let fadd: Expr = Expr::Binop(0, box_new(Value::VVar(60)), box_new(Value::VVar(61)));
+    let r10: i32 = emit_expr(fadd, enf, ebf, ewf, ecf, vec_new(), vec_new(), pool, source, starts, ends, out10);
+    if r10 != 5 { return 31; }
+    if vec_get(out10, 4) != 48 { return 32; }
+    /* unary minus on an f64 slot -> NEG_F64 (52) */
+    let out11: Vec<i32> = vec_new();
+    let fneg: Expr = Expr::Unop(0, box_new(Value::VVar(60)));
+    let r11: i32 = emit_expr(fneg, enf, ebf, ewf, ecf, vec_new(), vec_new(), pool, source, starts, ends, out11);
+    if r11 != 3 { return 33; }
+    if vec_get(out11, 2) != 52 { return 34; }
     return 0;
 }
 
@@ -3542,6 +3654,59 @@ fn test_emit_program() -> i32 {
     return 0;
 }
 
+fn test_typed_opcode_select() -> i32 {
+    /* combine_cat: float beats wide beats int */
+    if combine_cat(0, 0) != 0 { return 1; }
+    if combine_cat(0, 2) != 2 { return 2; }
+    if combine_cat(2, 1) != 1 { return 3; }
+    if combine_cat(1, 0) != 1 { return 4; }
+    /* binop typed: int (cat 0) unchanged */
+    if binop_tag_to_insn_typed(0, 0) != 16 { return 10; }
+    if binop_tag_to_insn_typed(4, 0) != 20 { return 11; }
+    if binop_tag_to_insn_typed(13, 0) != 88 { return 12; }
+    /* binop typed: f64 (cat 1) */
+    if binop_tag_to_insn_typed(0, 1) != 48 { return 20; }
+    if binop_tag_to_insn_typed(1, 1) != 49 { return 21; }
+    if binop_tag_to_insn_typed(2, 1) != 50 { return 22; }
+    if binop_tag_to_insn_typed(3, 1) != 51 { return 23; }
+    if binop_tag_to_insn_typed(4, 1) != 0 - 1 { return 24; }
+    if binop_tag_to_insn_typed(7, 1) != 66 { return 25; }
+    if binop_tag_to_insn_typed(13, 1) != 0 - 1 { return 26; }
+    /* binop typed: i64/u64 (cat 2) */
+    if binop_tag_to_insn_typed(0, 2) != 32 { return 30; }
+    if binop_tag_to_insn_typed(3, 2) != 35 { return 31; }
+    if binop_tag_to_insn_typed(4, 2) != 36 { return 32; }
+    if binop_tag_to_insn_typed(8, 2) != 67 { return 33; }
+    /* unop typed: neg picks NEG_F64 / NEG_I64 / NEG_I32; not stays 82 */
+    if unop_tag_to_insn_typed(0, 0) != 21 { return 40; }
+    if unop_tag_to_insn_typed(0, 1) != 52 { return 41; }
+    if unop_tag_to_insn_typed(0, 2) != 37 { return 42; }
+    if unop_tag_to_insn_typed(1, 1) != 82 { return 43; }
+    /* slot_cat: guarded */
+    let ec: Vec<i32> = vec_new();
+    vec_push(ec, 0);
+    vec_push(ec, 1);
+    vec_push(ec, 2);
+    if slot_cat(ec, 0 - 1) != 0 { return 50; }
+    if slot_cat(ec, 1) != 1 { return 51; }
+    if slot_cat(ec, 2) != 2 { return 52; }
+    if slot_cat(ec, 9) != 0 { return 53; }
+    /* operand_cat: self-identifying variants + a VVar through env_cats */
+    let en: Vec<i32> = vec_new();
+    let eb: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    if operand_cat(Value::VFloat(0), en, eb, ew, ec, "", vec_new(), vec_new()) != 1 { return 60; }
+    if operand_cat(Value::VIntWide(0), en, eb, ew, ec, "", vec_new(), vec_new()) != 2 { return 61; }
+    if operand_cat(Value::VInt(7), en, eb, ew, ec, "", vec_new(), vec_new()) != 0 { return 62; }
+    vec_push(en, 50);
+    vec_push(eb, 0);
+    vec_push(ew, 1);
+    let ec2: Vec<i32> = vec_new();
+    vec_push(ec2, 1);
+    if operand_cat(Value::VVar(50), en, eb, ew, ec2, "", vec_new(), vec_new()) != 1 { return 63; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -3621,5 +3786,7 @@ fn main() -> i32 {
     if r38 != 0 { return 660 + r38; }
     let r39: i32 = test_emit_program();
     if r39 != 0 { return 670 + r39; }
+    let r40: i32 = test_typed_opcode_select();
+    if r40 != 0 { return 690 + r40; }
     return 0;
 }
