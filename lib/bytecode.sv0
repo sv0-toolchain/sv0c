@@ -427,6 +427,47 @@ fn decode_pool_string(source: string, s: i32, e: i32, out: Vec<i32>) -> i32 {
     return n;
 }
 
+fn bc_push_ascii(s: string, out: Vec<i32>) -> i32 {
+    let n: i32 = string_len(s);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(out, string_char_at(s, i));
+        i = i + 1;
+    }
+    return n;
+}
+
+/* Decode a negative contract-message sentinel from vm_codegen.contract_pool_key
+   ( key = -(kind*1000000 + fn_h + 1) ) into "requires failed: <fn>" /
+   "ensures failed: <fn>" bytes in `sbuf`, mirroring the SML VM emitter's
+   `poolAdd pool ("requires failed: " ^ fnName)`. Returns the byte length. */
+fn decode_contract_key(idx: i32, source: string, starts: Vec<i32>,
+                       ends: Vec<i32>, sbuf: Vec<i32>) -> i32 {
+    let neg: i32 = 0 - idx - 1;
+    let kind: i32 = neg / 1000000;
+    let fn_h: i32 = neg - kind * 1000000;
+    let mut plen: i32 = 0;
+    if kind == 0 {
+        plen = bc_push_ascii("requires failed: ", sbuf);
+    } else {
+        plen = bc_push_ascii("ensures failed: ", sbuf);
+    }
+    let mut nlen: i32 = 0;
+    if fn_h >= 0 {
+        if fn_h < vec_len(starts) {
+            let fs: i32 = vec_get(starts, fn_h);
+            let fe: i32 = vec_get(ends, fn_h);
+            let mut k: i32 = fs;
+            while k < fe {
+                vec_push(sbuf, string_char_at(source, k));
+                k = k + 1;
+            }
+            nlen = fe - fs;
+        }
+    }
+    return plen + nlen;
+}
+
 fn encode_strings(strings: Vec<i32>, source: string, starts: Vec<i32>,
                   ends: Vec<i32>, out: Vec<i32>) -> i32 {
     let count: i32 = vec_len(strings);
@@ -435,10 +476,15 @@ fn encode_strings(strings: Vec<i32>, source: string, starts: Vec<i32>,
     let mut i: i32 = 0;
     while i < count {
         let idx: i32 = vec_get(strings, i);
-        let s: i32 = vec_get(starts, idx);
-        let e: i32 = vec_get(ends, idx);
         let sbuf: Vec<i32> = vec_new();
-        let slen: i32 = decode_pool_string(source, s, e, sbuf);
+        let mut slen: i32 = 0;
+        if idx < 0 {
+            slen = decode_contract_key(idx, source, starts, ends, sbuf);
+        } else {
+            let s: i32 = vec_get(starts, idx);
+            let e: i32 = vec_get(ends, idx);
+            slen = decode_pool_string(source, s, e, sbuf);
+        }
         encode_u32_le(slen, out);
         total = total + 4;
         let mut j: i32 = 0;
