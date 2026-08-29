@@ -991,20 +991,26 @@ fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>,
 
 /* Resolve a struct/enum field handle to its C field name. Enum layout (see
    emit_enum_td / the enum-ctor lowering): the tag field is the sentinel -1 ->
-   "tag", and payload i is the sentinel -10 - i -> "p<i>". Tuple projection fields
-   use 500..599 -> "f<n>". Everything else is a struct field name token. */
+   "tag", and payload i is the sentinel -10 - i -> "p<i>". Tuple projection
+   fields use -2000000-n -> "f<n>" (previously the REAL, positive token-index
+   range 500..599 — collided with genuine struct field tokens in any file
+   large enough to reach token 500; fixed for the same reason lower_temp_base
+   picks a value "far above any realistic token count," mirrored onto the
+   negative axis instead, since real token indices are always >= 0 — see
+   lowering.sv0's ExprTupleField comment for the full story, BUGS.md
+   sv0-mathlib R0.2). Checked before the payload-slot range since -2000000-n
+   is numerically inside `fh <= -10`'s catch-all. Everything else is a struct
+   field name token. */
 fn megatu_field_name(fh: i32, source: string, starts: Vec<i32>,
                      ends: Vec<i32>) -> string {
     if fh == 0 - 1 {
         return "tag";
     }
+    if fh <= (0 - 2000000) {
+        return string_concat("f", int_to_string((0 - 2000000) - fh));
+    }
     if fh <= 0 - 10 {
         return string_concat("p", int_to_string(0 - 10 - fh));
-    }
-    if fh >= 500 {
-        if fh < 600 {
-            return string_concat("f", int_to_string(fh - 500));
-        }
     }
     return handle_to_str(fh, source, starts, ends);
 }

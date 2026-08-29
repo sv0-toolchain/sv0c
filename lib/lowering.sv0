@@ -1337,9 +1337,27 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         return Value::VMember(box_new(v1), field_tok);
     }
-    /* ExprTupleField: obj.N — encode tuple projection as VMember with
-       synthetic field handle 500+field_num (distinct from struct
-       field token positions). C codegen maps 500..599 to f0,f1,… */
+    /* ExprTupleField: obj.N — encode tuple projection as VMember with a
+       synthetic field handle. Was `500 + field_num`, decoded by
+       megatu_field_name as "any fh in [500,600) is a tuple field" — a
+       REAL, positive source token index, not a reserved sentinel space,
+       so any file with 500+ tokens before a genuine struct field access
+       (`obj.fieldname`, tag 6 above, which uses the field's own raw
+       token position as fh with NO offset) could collide: a real field
+       token landing at index 500-599 was silently misread as a tuple
+       projection index instead, emitting the wrong C field name
+       (`fN` instead of the real name) — not a rare edge case, any
+       moderately-sized multi-function file reaches token 500. Found via
+       sv0-mathlib's R0.2 trig work (a struct literal in a file large
+       enough to push a real field-name token past 500). Fixed by moving
+       to a NEGATIVE sentinel range instead — real token indices are
+       always >= 0, so this is unconditionally collision-free. `-10-i`
+       (the existing enum payload-slot sentinel) was too close a
+       neighbor to reuse directly — a large-enough enum's payload count
+       could still reach it — so this uses `-2000000-field_num` instead,
+       the same "far enough that no realistic count could ever reach it"
+       margin `lower_temp_base` (below) already uses on the positive
+       side for temp handles, just mirrored onto the negative axis. */
     if tag == 7 {
         let obj_idx7: i32 = vec_get(ed1, idx);
         let field_num: i32 = vec_get(ed2, idx);
@@ -1350,7 +1368,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_tag_counts,
                                                enum_tags_flat, fn_ctx,
                                                builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-        let fh: i32 = 500 + field_num;
+        let fh: i32 = (0 - 2000000) - field_num;
         return Value::VMember(box_new(vobj), fh);
     }
     /* ExprMethodCall (tag 5): `rcv.method(args…)` — same IR as a direct
