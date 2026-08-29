@@ -145,6 +145,24 @@ fn width_of_cty(cty_handle: i32,
     return 1;
 }
 
+/* Slot type-category for typed-opcode selection (VMF-006): resolve a cty token
+   handle to its sv0 source name and map f32/f64 -> 1 (float), i64/u64 -> 2
+   (wide int), everything else -> 0 (int / default). Mirrors megaTU-main.sv0's
+   megatu_cty_category but keyed on the sv0 type name rather than the emitted C
+   type, since the VM emitter never resolves cty handles to C strings. Guards an
+   out-of-range / synthetic-test handle to 0. Read by emit_expr in VMF-006c to
+   pick ADD_F64/ADD_I64 vs ADD_I32; unused until then. */
+fn cty_cat_of_handle(cty_h: i32, source: string,
+                     starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    if slot_handle_in_range(cty_h, starts) != true { return 0; }
+    let s: string = handle_to_str(cty_h, source, starts, ends);
+    if string_eq(s, "f64") { return 1; }
+    if string_eq(s, "f32") { return 1; }
+    if string_eq(s, "i64") { return 2; }
+    if string_eq(s, "u64") { return 2; }
+    return 0;
+}
+
 fn width_of_cty_scalar(cty: string) -> i32 {
     if is_void_cty(cty) { return 0; }
     return 1;
@@ -1699,7 +1717,7 @@ fn scan_instr_env(ins: Instr,
             vec_push(env_names, x);
             vec_push(env_bases, next_slot);
             vec_push(env_widths, w);
-            vec_push(env_cats, 0);
+            vec_push(env_cats, cty_cat_of_handle(cty, source, starts, ends));
             vec_push(env_field_starts,
                      record_field_layout(cty, structs_names, structs_field_counts,
                                          structs_fields_flat, structs_field_starts,
@@ -1722,7 +1740,7 @@ fn scan_instr_env(ins: Instr,
             vec_push(env_names, dst);
             vec_push(env_bases, next_slot);
             vec_push(env_widths, w);
-            vec_push(env_cats, 0);
+            vec_push(env_cats, cty_cat_of_handle(rty, source, starts, ends));
             vec_push(env_field_starts,
                      record_field_layout(rty, structs_names, structs_field_counts,
                                          structs_fields_flat, structs_field_starts,
@@ -1839,7 +1857,7 @@ fn local_count_and_env(param_names: Vec<i32>, param_ctys: Vec<i32>,
         vec_push(env_names, pn);
         vec_push(env_bases, ns);
         vec_push(env_widths, w);
-        vec_push(env_cats, 0);
+        vec_push(env_cats, cty_cat_of_handle(pc, source, starts, ends));
         vec_push(env_field_starts,
                  record_field_layout(pc, structs_names, structs_field_counts,
                                      structs_fields_flat, structs_field_starts,

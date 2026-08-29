@@ -30,6 +30,7 @@ static int layout_lookup(int names, int widths, int name);
 static int is_void_cty(const char* cty);
 static int is_scalar_cty(const char* cty);
 static int width_of_cty(int cty_handle, int structs_names, int structs_field_counts, int enums_names, int enums_widths, const char* source, int starts, int ends);
+static int cty_cat_of_handle(int cty_h, const char* source, int starts, int ends);
 static int width_of_cty_scalar(const char* cty);
 static int width_of_cty_simple(const char* cty);
 static int index_of_field(int fields, int field_name);
@@ -266,6 +267,38 @@ static int width_of_cty(int cty_handle, int structs_names, int structs_field_cou
     ei = (ei + 1);
   }
   return 1;
+}
+
+static int cty_cat_of_handle(int cty_h, const char* source, int starts, int ends) {
+  int _sv0t0 = slot_handle_in_range(cty_h, starts);
+  if ((_sv0t0 != 1)) {
+    return 0;
+  } else {
+  }
+  const char* _sv0t1 = handle_to_str(cty_h, source, starts, ends);
+  const char* s;
+  s = _sv0t1;
+  int _sv0t2 = sv0_string_eq(s, "f64");
+  if (_sv0t2) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = sv0_string_eq(s, "f32");
+  if (_sv0t3) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(s, "i64");
+  if (_sv0t4) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_string_eq(s, "u64");
+  if (_sv0t5) {
+    return 2;
+  } else {
+  }
+  return 0;
 }
 
 static int width_of_cty_scalar(const char* cty) {
@@ -2941,30 +2974,31 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
   int _sv0t0;
   if ((ins.tag == 1)) {
     int x = ins.p0;
-    int _sv0t14 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
-    return _sv0t14;
+    int _sv0t16 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
+    return _sv0t16;
     _sv0t0 = 0;
   } else {
     if ((ins.tag == 2)) {
       int cty = ins.p0;
       int x = ins.p1;
-      int _sv0t11 = width_of_cty(cty, structs_names, structs_field_counts, enums_names, enums_widths, source, starts, ends);
-      int w = _sv0t11;
+      int _sv0t12 = width_of_cty(cty, structs_names, structs_field_counts, enums_names, enums_widths, source, starts, ends);
+      int w = _sv0t12;
       sv0_vec_push(env_names, x);
       sv0_vec_push(env_bases, next_slot);
       sv0_vec_push(env_widths, w);
-      sv0_vec_push(env_cats, 0);
-      int _sv0t12 = record_field_layout(cty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
-      sv0_vec_push(env_field_starts, _sv0t12);
-      int _sv0t13 = (next_slot + w);
-      return _sv0t13;
+      int _sv0t13 = cty_cat_of_handle(cty, source, starts, ends);
+      sv0_vec_push(env_cats, _sv0t13);
+      int _sv0t14 = record_field_layout(cty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+      sv0_vec_push(env_field_starts, _sv0t14);
+      int _sv0t15 = (next_slot + w);
+      return _sv0t15;
       _sv0t0 = 0;
     } else {
       if ((ins.tag == 3)) {
         int x = ins.p0;
         int be = ins.p1;
-        int _sv0t10 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
-        return _sv0t10;
+        int _sv0t11 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
+        return _sv0t11;
         _sv0t0 = 0;
       } else {
         if ((ins.tag == 11)) {
@@ -2990,11 +3024,12 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
           sv0_vec_push(env_names, dst);
           sv0_vec_push(env_bases, next_slot);
           sv0_vec_push(env_widths, w);
-          sv0_vec_push(env_cats, 0);
-          int _sv0t8 = record_field_layout(rty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
-          sv0_vec_push(env_field_starts, _sv0t8);
-          int _sv0t9 = (next_slot + w);
-          return _sv0t9;
+          int _sv0t8 = cty_cat_of_handle(rty, source, starts, ends);
+          sv0_vec_push(env_cats, _sv0t8);
+          int _sv0t9 = record_field_layout(rty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+          sv0_vec_push(env_field_starts, _sv0t9);
+          int _sv0t10 = (next_slot + w);
+          return _sv0t10;
           _sv0t0 = 0;
         } else {
           if ((ins.tag == 6)) {
@@ -3132,14 +3167,15 @@ static int local_count_and_env(int param_names, int param_ctys, int instrs, int 
     sv0_vec_push(env_names, pn);
     sv0_vec_push(env_bases, ns);
     sv0_vec_push(env_widths, w);
-    sv0_vec_push(env_cats, 0);
-    int _sv0t4 = record_field_layout(pc, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
-    sv0_vec_push(env_field_starts, _sv0t4);
+    int _sv0t4 = cty_cat_of_handle(pc, source, starts, ends);
+    sv0_vec_push(env_cats, _sv0t4);
+    int _sv0t5 = record_field_layout(pc, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+    sv0_vec_push(env_field_starts, _sv0t5);
     ns = (ns + w);
     pi = (pi + 1);
   }
-  int _sv0t5 = scan_instrs_env(instrs, env_names, env_bases, env_widths, env_cats, env_field_starts, ns, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
-  return _sv0t5;
+  int _sv0t6 = scan_instrs_env(instrs, env_names, env_bases, env_widths, env_cats, env_field_starts, ns, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, env_fields_flat, source, starts, ends);
+  return _sv0t6;
 }
 
 static int compute_arity(int param_ctys, int structs_names, int structs_field_counts, int enums_names, int enums_widths, const char* source, int starts, int ends) {
