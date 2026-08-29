@@ -36,3 +36,39 @@ When the **sv0** compiler emits VM bytecode, add a second tier (e.g. **`golden/s
 - The **native** mega-TU VM emitter (**`scripts/build-sv0-megatu-vm-native.sh`** → **`build/sv0-megatu-vm-native`**) implements the same emit contract and is **byte-identical** to the SML **`--target=vm`** golden for **all 18 mega-TU compiler modules** as of **P4/D2** (driver closed via `prepool_loop_seq`). **`scripts/sv0-vm-tier2-native-emitter.sh`** is the **`SV0_VM_BYTECODE_EMITTER`** wrapper for it (it builds the native emitter on demand, then re-emits one manifest path into **`build/vm/<stem>.sv0b`**). The former SML-heap surrogate (`sv0-vm-tier2-emit-bootstrap.sh`) was a tautological SML-vs-SML check and is **retired** — the native emitter is the real gate.
 - **`./scripts/sv0 vm-parity-tier2-emit`** runs the byte-parity leg standalone: it **defaults** **`SV0_VM_BYTECODE_EMITTER`** to the native wrapper (no SML-heap fallback) and **`cmp`**s each manifest path to its golden. Grow **`tier2-manifest.txt`** toward full **`manifest.txt`** as more programs reach byte-parity.
 - Workflow **`.github/workflows/vm-parity-tier2.yml`** (push/PR/dispatch): job **`tier2-policy`** runs the policy script (no SML); job **`tier2-byte-parity`** builds the native emitter and runs **`sv0 vm-parity-tier2-emit`** as a **byte-parity gate**.
+
+## Tier 3 (VMF-###) — behavioral parity for f64 / wide-int
+
+**Why a third tier:** tiers 1–2 are **byte-identical vs an SML `--target=vm` golden**.
+The SML VM backend has **no float support at all** (`sml-legacy/backend/vm/vm_codegen.sml`
+raises on `VFloat`) and emits `ADD_I32` unconditionally (no `ADD_I64`). So there is
+**no SML reference** to byte-diff `f64` or wide-int (`i64`/`u64`) programs against, and
+the native emitter emitting `ADD_I64` / `*_F64` would *by design* diverge from the
+frozen goldens. The `sv0c-vm-float-parity` task (slices `VMF-###`) adds that surface
+to the **native** VM emitter + the `sv0vm` interpreter.
+
+**Acceptance oracle (behavioral, not byte):** for each fixture, run it **twice** —
+
+1. **C backend:** native `emit-c` → `cc -std=c99` → execute; capture stdout + exit.
+2. **VM backend:** native VM-emit (`build/sv0-megatu-vm-native`, via
+   `SV0_DRV_REQUEST`) → `.sv0b` → `sv0vm` (`scripts/run_sv0b.sml`); capture stdout
+   + exit.
+
+Then compare:
+
+- **integer / i64 / u64 / modular:** results MUST be **bit-identical** (COMPAT-001).
+- **floating-point:** results MUST agree **within the fixture's pinned ULP bound**
+  (COMPAT-002). Use the bit-pattern-ordering ULP metric from
+  `sv0-mathlib/docs/ulp_audit_harness.c` (monotonic ordering of IEEE-754 doubles,
+  near-zero absolute-error fallback). A divergence beyond the bound is a **release
+  blocker**, not a documented limitation.
+
+**Regression tripwire:** because there is no cross-impl byte-oracle, each Tier-3
+fixture also gets a **checked-in behavioral golden** (expected stdout+exit,
+captured once and reviewed in the landing PR). `scripts/sv0`'s
+`run_vm_parity_behavioral()` (parallel to `run_vm_parity_tier2_emit_compare`, NOT
+the `cmp` path) replays it. Fixtures live in `test/vm-parity/programs/` and are
+listed in a new `behavioral-manifest.txt`.
+
+**`sv0-mathlib` consumes this** via the same harness across its `test/fixtures/*.csv`
+tables (`sv0-mathlib` BL-048 / BL-090); that closes its TEST-005.
