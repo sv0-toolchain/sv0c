@@ -6764,41 +6764,77 @@ static int lower_fn(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_
       int _sv0t22 = ctr_fresh(ctr);
       ret_slot = _sv0t22;
     }
-    Instr _sv0t23;
-    _sv0t23.tag = 1;
-    _sv0t23.p0 = ret_slot;
-    int _sv0t24 = sv0_box_alloc(5);
-    sv0_box_store(_sv0t24, 0, _sv0t23.tag);
-    sv0_box_store(_sv0t24, 1, _sv0t23.p0);
-    sv0_box_store(_sv0t24, 2, _sv0t23.p1);
-    sv0_box_store(_sv0t24, 3, _sv0t23.p2);
-    sv0_box_store(_sv0t24, 4, _sv0t23.p3);
-    sv0_vec_push(decl_instrs, _sv0t24);
+    int _sv0t23 = lower_scan_fn_ret_ty_tok(tok_tags, source, starts, ends, fn_name_h);
+    int rtt = _sv0t23;
+    int use_named = 0;
+    if ((rtt >= 0)) {
+      const char* _sv0t24 = handle_to_str(rtt, source, starts, ends);
+      const char* rtn;
+      rtn = _sv0t24;
+      int _sv0t25 = sv0_string_eq(rtn, "i32");
+      if ((_sv0t25 != 1)) {
+        int _sv0t26 = sv0_string_eq(rtn, "bool");
+        if ((_sv0t26 != 1)) {
+          int _sv0t27 = sv0_string_eq(rtn, "unit");
+          if ((_sv0t27 != 1)) {
+            use_named = 1;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    if (use_named) {
+      Instr _sv0t28;
+      _sv0t28.tag = 2;
+      _sv0t28.p0 = rtt;
+      _sv0t28.p1 = ret_slot;
+      int _sv0t29 = sv0_box_alloc(5);
+      sv0_box_store(_sv0t29, 0, _sv0t28.tag);
+      sv0_box_store(_sv0t29, 1, _sv0t28.p0);
+      sv0_box_store(_sv0t29, 2, _sv0t28.p1);
+      sv0_box_store(_sv0t29, 3, _sv0t28.p2);
+      sv0_box_store(_sv0t29, 4, _sv0t28.p3);
+      sv0_vec_push(decl_instrs, _sv0t29);
+    } else {
+      Instr _sv0t30;
+      _sv0t30.tag = 1;
+      _sv0t30.p0 = ret_slot;
+      int _sv0t31 = sv0_box_alloc(5);
+      sv0_box_store(_sv0t31, 0, _sv0t30.tag);
+      sv0_box_store(_sv0t31, 1, _sv0t30.p0);
+      sv0_box_store(_sv0t31, 2, _sv0t30.p1);
+      sv0_box_store(_sv0t31, 3, _sv0t30.p2);
+      sv0_box_store(_sv0t31, 4, _sv0t30.p3);
+      sv0_vec_push(decl_instrs, _sv0t31);
+    }
   } else {
   }
-  int _sv0t25 = sv0_vec_new();
-  int ens_instrs = _sv0t25;
+  int _sv0t32 = sv0_vec_new();
+  int ens_instrs = _sv0t32;
   int ej = 0;
   while (1) {
-    int _sv0t26 = sv0_vec_len(ens_roots);
-    int _sv0t29 = (ej < _sv0t26);
-    if ((!_sv0t29)) {
+    int _sv0t33 = sv0_vec_len(ens_roots);
+    int _sv0t36 = (ej < _sv0t33);
+    if ((!_sv0t36)) {
       break;
     } else {
     }
-    int _sv0t27 = sv0_vec_get(ens_roots, ej);
-    int _sv0t28 = lower_ensures_clause(et, ed1, ed2, ed3, ed4, pp, tok_tags, _sv0t27, use_slot, fn_name_h, ctr, ens_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-    int discard_ens = _sv0t28;
+    int _sv0t34 = sv0_vec_get(ens_roots, ej);
+    int _sv0t35 = lower_ensures_clause(et, ed1, ed2, ed3, ed4, pp, tok_tags, _sv0t34, use_slot, fn_name_h, ctr, ens_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+    int discard_ens = _sv0t35;
     ej = (ej + 1);
   }
-  int _sv0t30 = inject_ensures_and_ret_slot(body_instrs, ens_instrs, use_slot, ret_slot);
-  int body_final = _sv0t30;
-  int _sv0t31 = append_instrs(out_instrs, decl_instrs);
-  int discard_append_decl = _sv0t31;
-  int _sv0t32 = append_instrs(out_instrs, req_instrs);
-  int discard_append_req = _sv0t32;
-  int _sv0t33 = append_instrs(out_instrs, body_final);
-  int discard_append_body = _sv0t33;
+  int _sv0t37 = inject_ensures_and_ret_slot(body_instrs, ens_instrs, use_slot, ret_slot);
+  int body_final = _sv0t37;
+  int _sv0t38 = append_instrs(out_instrs, decl_instrs);
+  int discard_append_decl = _sv0t38;
+  int _sv0t39 = append_instrs(out_instrs, req_instrs);
+  int discard_append_req = _sv0t39;
+  int _sv0t40 = append_instrs(out_instrs, body_final);
+  int discard_append_body = _sv0t40;
   return 0;
 }
 

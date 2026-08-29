@@ -3831,7 +3831,32 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         } else {
             ret_slot = ctr_fresh(ctr);
         }
-        vec_push(decl_instrs, box_new(Instr::DeclVar(ret_slot)));
+        /* VMF-014a: declare the `result` slot with the function's real return
+           type when it is not a plain i32/bool/unit. A bare DeclVar leaves it
+           a scalar (width 1, no struct field layout), which the C backend
+           papers over via its tyenv but the VM emitter does not -- so
+           `ensures(result.re == a && result.im == b)` on a struct-returning
+           fn failed to VM-emit (emit_member_load_from_var on `result` found a
+           width-1 scalar slot). DeclNamed with a wide primitive is also more
+           correct for the C side (`double result;` not `int result;`). */
+        let rtt: i32 = lower_scan_fn_ret_ty_tok(tok_tags, source, starts, ends,
+                                                fn_name_h);
+        let mut use_named: bool = false;
+        if rtt >= 0 {
+            let rtn: string = handle_to_str(rtt, source, starts, ends);
+            if string_eq(rtn, "i32") != true {
+                if string_eq(rtn, "bool") != true {
+                    if string_eq(rtn, "unit") != true {
+                        use_named = true;
+                    }
+                }
+            }
+        }
+        if use_named {
+            vec_push(decl_instrs, box_new(Instr::DeclNamed(rtt, ret_slot)));
+        } else {
+            vec_push(decl_instrs, box_new(Instr::DeclVar(ret_slot)));
+        }
     }
     let ens_instrs: Vec<i32> = vec_new();
     let mut ej: i32 = 0;
