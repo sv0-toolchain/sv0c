@@ -3422,6 +3422,35 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                        ety_tok, vn_tok_n, source, starts, ends);
                     let tag_en: Expr = Expr::Literal(box_new(Value::VInt(k_n)));
                     vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1, box_new(tag_en))));
+                    /* KC-006 fix (C target only, mirrors KC-003's own gate): a
+                       unit-variant ctor (`let e: E = E::B;`) only stores
+                       `.tag`, leaving the enum struct's other `.p<i>` payload
+                       slots (needed by SOME OTHER variant of E) genuinely
+                       uninitialized -- the exact site GitHub CI's Linux/GCC
+                       run caught live (enum_match_unit.sv0: "'e.p0' may be
+                       used uninitialized"), never surfaced by this dev
+                       machine's Clang. Confirmed (via a temporary debug
+                       write_file probe) that THIS function is the one that
+                       actually lowers that fixture's `let e: E = E::B;` --
+                       two other structurally-identical enum-nullary-ctor
+                       blocks elsewhere in this file were tried first and
+                       ruled out, one of which (in lower_expr_to_value, the
+                       general-expression path) triggers an unrelated,
+                       pre-existing self-hosting panic ("vec: index out of
+                       bounds") when this exact fix shape is added there --
+                       deliberately not applied there; flagged as its own
+                       follow-up investigation rather than chased down here. */
+                    if lower_vm_target() == 0 {
+                        let maxp_n: i32 = enum_max_payload_lookup_str(enum_names, enum_max_payloads,
+                                                                       ety_tok, source, starts, ends);
+                        let mut pzn: i32 = 0;
+                        while pzn < maxp_n {
+                            let pzn_e: Instr = Instr::StoreField(name_tok, 0 - 10 - pzn,
+                                box_new(Expr::Literal(box_new(Value::VInt(0)))));
+                            vec_push(out_instrs, box_new(pzn_e));
+                            pzn = pzn + 1;
+                        }
+                    }
                     let_declared = 1;
                     init_handled = 1;
                 }
@@ -5554,6 +5583,30 @@ fn enum_max_payload_lookup(enum_names: Vec<i32>, enum_max_payloads: Vec<i32>,
     let mut i: i32 = 0;
     while i < n {
         if vec_get(enum_names, i) == name {
+            return vec_get(enum_max_payloads, i);
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* Text-based variant of the above (mirrors enum_tag_lookup_str): `name` is a
+   USE-site token (e.g. the `E` in `E::B`), while `enum_names` holds
+   DEFINITION-site tokens -- raw token equality only works when they happen
+   to be the same occurrence, so a real lookup needs text comparison, same
+   as enum_tag_lookup_str already does for variant tags. Used by the
+   unit-variant ctor path (KC-006) to find how many payload slots the
+   enum's C struct actually has, so every slot can be defensively
+   zero-initialized regardless of which variant is being constructed. */
+fn enum_max_payload_lookup_str(enum_names: Vec<i32>, enum_max_payloads: Vec<i32>,
+                               name: i32, source: string, starts: Vec<i32>,
+                               ends: Vec<i32>) -> i32 {
+    let want: string = handle_to_str(name, source, starts, ends);
+    let n: i32 = vec_len(enum_names);
+    let mut i: i32 = 0;
+    while i < n {
+        let e_nm: string = handle_to_str(vec_get(enum_names, i), source, starts, ends);
+        if string_eq(e_nm, want) {
             return vec_get(enum_max_payloads, i);
         }
         i = i + 1;
