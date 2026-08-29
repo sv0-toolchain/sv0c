@@ -6037,12 +6037,38 @@ static Value lower_tag_match(int et, int ed1, int ed2, int ed3, int ed4, int pp,
   sv0_box_store(_sv0t18, 3, dv.p2);
   sv0_box_store(_sv0t18, 4, dv.p3);
   sv0_vec_push(out_instrs, _sv0t18);
-  int _sv0t19 = lower_match_arms(et, ed1, ed2, ed3, ed4, pp, tok_tags, arms_first, arm_count, arms_sidecar, out, scrut_var, sct, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env, source, starts, ends, import_aliases);
-  int discard_ma = _sv0t19;
+  Instr zero_init;
+  Expr _sv0t19;
   Value _sv0t20;
-  _sv0t20.tag = 3;
-  _sv0t20.p0 = out;
-  return _sv0t20;
+  _sv0t20.tag = 0;
+  _sv0t20.p0 = 0;
+  int _sv0t21 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t21, 0, _sv0t20.tag);
+  sv0_box_store(_sv0t21, 1, _sv0t20.p0);
+  sv0_box_store(_sv0t21, 2, _sv0t20.p1);
+  _sv0t19.tag = 0;
+  _sv0t19.p0 = _sv0t21;
+  int _sv0t22 = sv0_box_alloc(4);
+  sv0_box_store(_sv0t22, 0, _sv0t19.tag);
+  sv0_box_store(_sv0t22, 1, _sv0t19.p0);
+  sv0_box_store(_sv0t22, 2, _sv0t19.p1);
+  sv0_box_store(_sv0t22, 3, _sv0t19.p2);
+  zero_init.tag = 4;
+  zero_init.p0 = out;
+  zero_init.p1 = _sv0t22;
+  int _sv0t23 = sv0_box_alloc(5);
+  sv0_box_store(_sv0t23, 0, zero_init.tag);
+  sv0_box_store(_sv0t23, 1, zero_init.p0);
+  sv0_box_store(_sv0t23, 2, zero_init.p1);
+  sv0_box_store(_sv0t23, 3, zero_init.p2);
+  sv0_box_store(_sv0t23, 4, zero_init.p3);
+  sv0_vec_push(out_instrs, _sv0t23);
+  int _sv0t24 = lower_match_arms(et, ed1, ed2, ed3, ed4, pp, tok_tags, arms_first, arm_count, arms_sidecar, out, scrut_var, sct, ctr, out_instrs, enum_names, enum_tag_offsets, enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env, source, starts, ends, import_aliases);
+  int discard_ma = _sv0t24;
+  Value _sv0t25;
+  _sv0t25.tag = 3;
+  _sv0t25.p0 = out;
+  return _sv0t25;
 }
 
 static int lower_return(int et, int ed1, int ed2, int ed3, int ed4, int pp, int tok_tags, int idx, int ctr, int out_instrs, int enum_names, int enum_tag_offsets, int enum_tag_counts, int enum_tags_flat, int fn_ctx, int builtin_map, int lit_sf_names, const char* source, int starts, int ends, int item_tags, int item_names, int item_d2, int item_d3, int item_d4, int item_field_counts, int enum_vnames_flat, int enum_max_payloads, int item_fn_row, int match_env_inherit, int import_aliases) {

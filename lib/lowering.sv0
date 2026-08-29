@@ -3242,6 +3242,23 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let out: i32 = ctr_fresh(ctr);
     let dv: Instr = Instr::DeclVar(out);
     vec_push(out_instrs, box_new(dv));
+    /* KC-003 fix: lower_match_arms builds the if/else-if chain with an
+       EMPTY final else (the innermost `result_instrs` it starts from,
+       used as the last arm's implicit else-branch) -- currently
+       unreachable only because the checker enforces match exhaustiveness
+       ahead of codegen, but the emitted C left `out` genuinely
+       uninitialized on that path, which is real UB if that guarantee
+       were ever violated and is exactly what Clang's own
+       -Wsometimes-uninitialized correctly flagged (16 occurrences across
+       the behavior corpus, confirmed during NEX-049a). A defensive zero
+       store here -- `out` is always plain `int` for a match result
+       (DeclVar's own emission never gives it another type; see
+       megatu_emit_instr's DeclVar case) -- makes every path through the
+       chain assign it a defined value, eliminating the UB without
+       touching lower_match_arms' own, more delicate arm-by-arm
+       plumbing. */
+    let zero_init: Instr = Instr::Store(out, box_new(Expr::Literal(box_new(Value::VInt(0)))));
+    vec_push(out_instrs, box_new(zero_init));
     let discard_ma: i32 = lower_match_arms(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, arms_first, arm_count,
                                             arms_sidecar,
