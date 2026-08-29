@@ -12,18 +12,37 @@
 # sv0_vec_table (a file-scope static array), so it is a deliberate,
 # intentional "leak" at process exit, not a bug -- LeakSanitizer would
 # otherwise flag it on every single Vec-using program.
-#
-# leak:sv0_vec_new
-#
+leak:sv0_vec_new
+leak:sv0_vec_push
+
+# string_substr and string_concat (sv0_runtime.h) each malloc a fresh buffer
+# and return it directly -- sv0 has no manual memory management at all (no
+# `free` builtin exists), so every such buffer is intentionally left alive
+# for the rest of the process's short lifetime, same as Vec above. Found via
+# a real Linux/GCC CI run (NEX-050c): test/behavior/cases/string_substr_len.sv0
+# (a totally ordinary, correct fixture -- `string_len(string_substr("hello",
+# 1, 3))`) exited 1 under LeakSanitizer with a 4-byte leak report pointing
+# directly at sv0_string_substr, reproduced exactly via a local
+# ubuntu:22.04 Docker container. This suppression file existed since
+# NEX-050b but had two real gaps that made it silently inert until this:
+# (a) its ONE entry (the leak:sv0_vec_new line above) was accidentally
+# left commented out, never an active rule at all; (b) LSAN_OPTIONS was
+# never actually wired to point at this file when running any sanitized
+# binary (see native_exe_sanitizer_build.sanitizer_env). Both fixed here.
+leak:sv0_string_substr
+leak:sv0_string_concat
+
 # NOTE (observed while writing this, not assumed): LeakSanitizer is not
 # supported on macOS at all -- Apple's ASan runtime does not implement leak
 # detection, so `-fsanitize=address` alone never reports a leak on this dev
 # machine regardless of this suppression file's presence. This file is
 # real and load-bearing on Linux (NEX-050c's CI job), where LSan does run
-# by default under ASan; it is inert-but-present here. Confirmed directly:
-# running box_deref_chain_stress.sv0 and vec_growth_stress.sv0 under
+# by default under ASan. Confirmed directly: running
+# box_deref_chain_stress.sv0 and vec_growth_stress.sv0 under
 # `-fsanitize=address,undefined` at both -O0 and -O2 on this arm64/macOS
-# machine produces zero leak output either way, with or without this file.
+# machine produces zero leak output either way, with or without this file;
+# the real Linux verification for this file's own entries was done via a
+# local Docker container (ubuntu:22.04 + gcc), not just reasoned about.
 #
 # The box pool (sv0_box_pool, sv0_runtime.h) is a file-scope STATIC array,
 # not a heap allocation at all -- box_new/box_alloc never call malloc, so
