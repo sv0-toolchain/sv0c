@@ -1,6 +1,13 @@
 # Standalone .sv0 programs under sv0c/ (paths relative to sv0c/).
 # Each file must define fn main() -> i32 (or unit) and exit 0 on the VM (bootstrap-build).
 # Order is arbitrary today (each program is compiled separately).
+#
+# lib/driver.sv0 is deliberately NOT listed: it's a native-only CLI entry
+# point/test harness (its fn main() calls getenv("SV0_DRV_REQUEST"), NEX-055c/
+# REL-004), and vm_codegen.sml (the SML VM bytecode emitter) has no case for
+# compiling a getenv call -- there is no host-environment concept on the VM.
+# It was never meant to run on the VM; excluding it here rather than adding
+# VM support for a host-env builtin no VM program has any real use for.
 
 
 # Integration smoke (exit 0 on VM).
@@ -102,4 +109,3 @@ lib/checker.sv0
 lib/lowering.sv0
 lib/parser.sv0
 lib/main.sv0
-lib/driver.sv0

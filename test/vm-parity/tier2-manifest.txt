@@ -1,5 +1,7 @@
 # Tier-2 VM parity policy subset (M3-S-045): paths must appear in manifest.txt.
 # Optional compare: set SV0_VM_BYTECODE_EMITTER (see test/vm-parity/README.md § Tier 2).
+#
+# lib/driver.sv0 deliberately excluded -- see manifest.txt's own comment.
 lib/span.sv0
 lexer/token.sv0
 lib/ast.sv0
@@ -17,4 +19,3 @@ lib/unify.sv0
 lib/codegen.sv0
 lib/checker.sv0
 lib/lowering.sv0
-lib/driver.sv0
