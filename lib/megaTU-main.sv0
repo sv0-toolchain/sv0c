@@ -349,6 +349,46 @@ fn main() -> i32 {
                                                      ptt, ptd1, ptd2, pp));
         fti = fti + 1;
     }
+    /* Per-struct-item field-category lookup table (BUGS.md #13,
+       sv0-mathlib): mirrors the eit_* table above, but for struct fields
+       — a binop performed directly on a struct field access (`sa.hi *
+       sb.hi`) had no per-field category table to consult, so it always
+       fell back to `int`. sit_nt[i] = struct item i's name token;
+       sit_base[i]/sit_cnt[i] = its field run inside the flat
+       sit_field_name/sit_field_cat arrays. Walks `it`/`ifc` the same way
+       collect_typedefs_str (lowering.sv0) does to slice the flat
+       sf_names/sf_types arrays back into per-struct-item windows (`sf`
+       there, `sf_off` here) — unlike enum payloads, a struct field's
+       category needs no cross-variant agreement step: each field has
+       exactly one declared type, resolved straight from its own
+       sf_types entry via the same megatu_ty_name + megatu_cty_category
+       pipeline DeclNamed already uses. */
+    let sit_nt: Vec<i32> = vec_new();
+    let sit_base: Vec<i32> = vec_new();
+    let sit_cnt: Vec<i32> = vec_new();
+    let sit_field_name: Vec<i32> = vec_new();
+    let sit_field_cat: Vec<i32> = vec_new();
+    let mut sf_off: i32 = 0;
+    let mut sti: i32 = 0;
+    while sti < vec_len(it) {
+        if vec_get(it, sti) == 1 {
+            let fc2: i32 = vec_get(ifc, sti);
+            vec_push(sit_nt, vec_get(id1, sti));
+            vec_push(sit_base, vec_len(sit_field_name));
+            vec_push(sit_cnt, fc2);
+            let mut fk: i32 = 0;
+            while fk < fc2 {
+                let fname2: i32 = vec_get(sf_names, sf_off + fk);
+                let ftype_tok: i32 = vec_get(sf_types, sf_off + fk);
+                let fcty: string = megatu_ty_name(ftype_tok, source, starts, ends);
+                vec_push(sit_field_name, fname2);
+                vec_push(sit_field_cat, megatu_cty_category(fcty));
+                fk = fk + 1;
+            }
+            sf_off = sf_off + fc2;
+        }
+        sti = sti + 1;
+    }
     let ob: Vec<i32> = vec_new();
     let osn: Vec<i32> = vec_new();
     let oso: Vec<i32> = vec_new();
@@ -387,7 +427,9 @@ fn main() -> i32 {
     let c: string = megatu_emit_program(td, out_blocks, source, starts, ends,
                                         it, id1, id2, id3, id5, fpn,
                                         fpt, frt, ptt, ptd1, ptd2, pp, sidx,
-                                        eit_nt, eit_base, eit_cnt, eit_cats);
+                                        eit_nt, eit_base, eit_cnt, eit_cats,
+                                        sit_nt, sit_base, sit_cnt,
+                                        sit_field_name, sit_field_cat);
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
@@ -580,7 +622,8 @@ fn megatu_seed_param_tyenv(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i3
                            fpt: Vec<i32>, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
                            pp: Vec<i32>, source: string, starts: Vec<i32>,
                            ends: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>,
-                           tyenv_e: Vec<i32>, eit_nt: Vec<i32>) -> i32 {
+                           tyenv_e: Vec<i32>, eit_nt: Vec<i32>,
+                           tyenv_st: Vec<i32>, sit_nt: Vec<i32>) -> i32 {
     if item_i < 0 { return 0; }
     let pc: i32 = vec_get(id3, item_i);
     let base: i32 = vec_get(id5, item_i);
@@ -591,7 +634,8 @@ fn megatu_seed_param_tyenv(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i3
                                              ptt, ptd1, ptd2, pp,
                                              source, starts, ends, it, id1);
         let eidx: i32 = megatu_enum_idx_of_cty(cty, eit_nt, source, starts, ends);
-        megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, nt, megatu_cty_category(cty), eidx);
+        let sidx: i32 = megatu_struct_idx_of_cty(cty, sit_nt, source, starts, ends);
+        megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, nt, megatu_cty_category(cty), eidx, sidx);
         k = k + 1;
     }
     return 0;
@@ -611,7 +655,9 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                        ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
                        pp: Vec<i32>, sidx: Vec<i32>,
                        eit_nt: Vec<i32>, eit_base: Vec<i32>, eit_cnt: Vec<i32>,
-                       eit_cats: Vec<i32>) -> string {
+                       eit_cats: Vec<i32>,
+                       sit_nt: Vec<i32>, sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                       sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>) -> string {
     let num_blocks: i32 = vec_len(blocks) / 4;
     if num_blocks == 0 {
         return "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
@@ -660,13 +706,16 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
         let tyenv_h: Vec<i32> = vec_new();
         let tyenv_f: Vec<i32> = vec_new();
         let tyenv_e: Vec<i32> = vec_new();
+        let tyenv_st: Vec<i32> = vec_new();
         megatu_seed_param_tyenv(item_i, it, id1, id3, id5, fpn, fpt,
                                 ptt, ptd1, ptd2, pp, source, starts, ends,
-                                tyenv_h, tyenv_f, tyenv_e, eit_nt);
+                                tyenv_h, tyenv_f, tyenv_e, eit_nt, tyenv_st, sit_nt);
         let body: string = megatu_emit_instrs(instrs, "  ", ret_name,
                                               source, starts, ends, sidx,
                                               tyenv_h, tyenv_f, tyenv_e,
                                               eit_nt, eit_base, eit_cnt, eit_cats,
+                                              tyenv_st, sit_nt, sit_base, sit_cnt,
+                                              sit_field_name, sit_field_cat,
                                               it, id1, id2, frt, ptt, ptd1, ptd2, pp);
         if string_eq(fn_name, "main") {
             /* NEX-016 (~/Documents/project-specs/sv0c-runtime-executable/SPEC.md
@@ -1178,11 +1227,31 @@ fn megatu_cty_category(cty: string) -> i32 {
 }
 
 fn megatu_tyenv_push(tyenv_h: Vec<i32>, tyenv_c: Vec<i32>, tyenv_e: Vec<i32>,
-                     h: i32, category: i32, enum_idx: i32) -> i32 {
+                     tyenv_st: Vec<i32>,
+                     h: i32, category: i32, enum_idx: i32, struct_idx: i32) -> i32 {
     vec_push(tyenv_h, h);
     vec_push(tyenv_c, category);
     vec_push(tyenv_e, enum_idx);
+    vec_push(tyenv_st, struct_idx);
     return 0;
+}
+
+/* Same rationale as megatu_enum_idx_of_cty, for top-level STRUCT items
+   instead — BUGS.md #13 (sv0-mathlib): a binop performed directly on a
+   struct field access (`sa.hi * sb.hi`) mistyped its own temp as `int`,
+   the same "everything defaults to int" family as bug #8/#11 fixed for
+   enum payload access, but never extended to plain struct fields. */
+fn megatu_struct_idx_of_cty(name: string, sit_nt: Vec<i32>, source: string,
+                            starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(sit_nt);
+    let mut i: i32 = 0;
+    while i < n {
+        if string_eq(handle_to_str(vec_get(sit_nt, i), source, starts, ends), name) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
 }
 
 /* `name` is a top-level enum item's own C typedef name (e.g. "Option") ->
@@ -1275,6 +1344,60 @@ fn megatu_tyenv_lookup_enum_idx(h: i32, tyenv_h: Vec<i32>, tyenv_e: Vec<i32>,
     return 0 - 1;
 }
 
+/* Same handle-equality-then-text-fallback lookup, against tyenv_st
+   (per-handle struct-item-index) instead of tyenv_e — BUGS.md #13. */
+fn megatu_tyenv_lookup_struct_idx(h: i32, tyenv_h: Vec<i32>, tyenv_st: Vec<i32>,
+                                  source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let mut i: i32 = vec_len(tyenv_h) - 1;
+    while i >= 0 {
+        if vec_get(tyenv_h, i) == h {
+            return vec_get(tyenv_st, i);
+        }
+        i = i - 1;
+    }
+    if h >= lower_temp_base() { return 0 - 1; }
+    if h < 0 { return 0 - 1; }
+    let name: string = handle_to_str(h, source, starts, ends);
+    let mut j: i32 = vec_len(tyenv_h) - 1;
+    while j >= 0 {
+        let oh: i32 = vec_get(tyenv_h, j);
+        if oh >= 0 {
+            if oh < lower_temp_base() {
+                if string_eq(handle_to_str(oh, source, starts, ends), name) {
+                    return vec_get(tyenv_st, j);
+                }
+            }
+        }
+        j = j - 1;
+    }
+    return 0 - 1;
+}
+
+/* Resolve a struct field access's real category: `struct_idx` (from
+   tyenv_st) identifies which struct item the scrutinee is; scan that
+   struct's field range comparing FIELD NAME TEXT against `fh` (a
+   `.field` access's own token is a different source position than the
+   field's declaration, the same reason megatu_tyenv_lookup_cty needs a
+   text fallback) — BUGS.md #13. */
+fn megatu_struct_field_cty(struct_idx: i32, fh: i32,
+                           sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                           sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    if struct_idx < 0 { return 0; }
+    let base: i32 = vec_get(sit_base, struct_idx);
+    let cnt: i32 = vec_get(sit_cnt, struct_idx);
+    let target: string = handle_to_str(fh, source, starts, ends);
+    let mut i: i32 = 0;
+    while i < cnt {
+        let fname: i32 = vec_get(sit_field_name, base + i);
+        if string_eq(handle_to_str(fname, source, starts, ends), target) {
+            return vec_get(sit_field_cat, base + i);
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
 /* `bv`'s inner value handle when it's VVar/VAddrOf (the only scrutinee
    shapes a match-arm payload access wraps), else -1. Small helper so
    megatu_value_cty's VMember arm can resolve the scrutinee's own handle
@@ -1290,6 +1413,8 @@ fn megatu_value_scrutinee_handle(v: codegen_Value) -> i32 {
 fn megatu_value_cty(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
                     tyenv_e: Vec<i32>, eit_base: Vec<i32>, eit_cnt: Vec<i32>,
                     eit_cats: Vec<i32>,
+                    tyenv_st: Vec<i32>, sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                    sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                     source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     match v {
         codegen_Value::VFloat(_) => { return 1; },
@@ -1330,6 +1455,30 @@ fn megatu_value_cty(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
                         }
                     }
                 }
+                return 0;
+            }
+            /* BUGS.md #13, sv0-mathlib: a plain struct field access (fh is
+               a real, positive field-NAME token — neither the tag
+               sentinel -1 nor an enum payload-slot/tuple-projection
+               sentinel, both handled above/via the `fh <= -10` branch).
+               Resolve the scrutinee's own struct item (tyenv_st,
+               populated at its DeclNamed/param-seed/Call-result site) and
+               look up that field's category by name in the table main()
+               built, so `sa.hi * sb.hi` on a Pair2 { hi: f64, lo: f64 }
+               resolves hi's category as double, instead of always
+               falling back to int. */
+            if fh >= 0 {
+                let inner2: codegen_Value = box_deref(bv);
+                let ih2: i32 = megatu_value_scrutinee_handle(inner2);
+                if ih2 >= 0 {
+                    let sidx: i32 = megatu_tyenv_lookup_struct_idx(ih2, tyenv_h, tyenv_st,
+                                                                    source, starts, ends);
+                    if sidx >= 0 {
+                        return megatu_struct_field_cty(sidx, fh, sit_base, sit_cnt,
+                                                        sit_field_name, sit_field_cat,
+                                                        source, starts, ends);
+                    }
+                }
             }
             return 0;
         },
@@ -1350,11 +1499,13 @@ fn megatu_cty_max(a: i32, b: i32) -> i32 {
 fn megatu_expr_cty(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
                    tyenv_e: Vec<i32>, eit_base: Vec<i32>, eit_cnt: Vec<i32>,
                    eit_cats: Vec<i32>,
+                   tyenv_st: Vec<i32>, sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                   sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                    source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     match e {
         codegen_Expr::Literal(bv) => {
             let v: codegen_Value = box_deref(bv);
-            return megatu_value_cty(v, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, source, starts, ends);
+            return megatu_value_cty(v, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
         },
         codegen_Expr::Load(h) => {
             return megatu_tyenv_lookup_cty(h, tyenv_h, tyenv_c, source, starts, ends);
@@ -1371,8 +1522,8 @@ fn megatu_expr_cty(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
             if op_h > 4 { return 0; }
             let v1: codegen_Value = box_deref(bv1);
             let v2: codegen_Value = box_deref(bv2);
-            return megatu_cty_max(megatu_value_cty(v1, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, source, starts, ends),
-                                  megatu_value_cty(v2, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, source, starts, ends));
+            return megatu_cty_max(megatu_value_cty(v1, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends),
+                                  megatu_value_cty(v2, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends));
         },
         codegen_Expr::Unop(op_h, bv) => {
             /* Only Neg (0) propagates operand category; Not/BitNot/Deref/
@@ -1380,7 +1531,7 @@ fn megatu_expr_cty(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
                restriction above). */
             if op_h != 0 { return 0; }
             let v: codegen_Value = box_deref(bv);
-            return megatu_value_cty(v, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, source, starts, ends);
+            return megatu_value_cty(v, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
         },
         codegen_Expr::FieldAccess(_, _) => { return 0; },
     }
@@ -1556,6 +1707,8 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                      sidx: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>,
                      tyenv_e: Vec<i32>, eit_nt: Vec<i32>, eit_base: Vec<i32>,
                      eit_cnt: Vec<i32>, eit_cats: Vec<i32>,
+                     tyenv_st: Vec<i32>, sit_nt: Vec<i32>, sit_base: Vec<i32>,
+                     sit_cnt: Vec<i32>, sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                      it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
                      ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>) -> string {
     match ins {
@@ -1576,13 +1729,14 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, cty);
             let a2: string = string_concat(a, " ");
             let b: string = string_concat(a2, nm);
-            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, h, megatu_cty_category(cty), 0 - 1);
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, megatu_cty_category(cty), 0 - 1, 0 - 1);
             return string_concat(b, ";\n");
         },
         codegen_Instr::DeclNamed(ct, h) => {
             let cty: string = megatu_ty_name(ct, source, starts, ends);
             let eidx: i32 = megatu_enum_idx_of_cty(cty, eit_nt, source, starts, ends);
-            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, h, megatu_cty_category(cty), eidx);
+            let sidx2: i32 = megatu_struct_idx_of_cty(cty, sit_nt, source, starts, ends);
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, megatu_cty_category(cty), eidx, sidx2);
             let a: string = string_concat(indent, cty);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(h, source, starts, ends, sidx));
@@ -1590,8 +1744,8 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
         },
         codegen_Instr::Assign(h, be) => {
             let e: codegen_Expr = box_deref(be);
-            let category: i32 = megatu_expr_cty(e, tyenv_h, tyenv_f, tyenv_e, eit_base, eit_cnt, eit_cats, source, starts, ends);
-            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, h, category, 0 - 1);
+            let category: i32 = megatu_expr_cty(e, tyenv_h, tyenv_f, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, category, 0 - 1, 0 - 1);
             let cty: string = megatu_cty_of_category(category);
             let a: string = string_concat(indent, cty);
             let a2: string = string_concat(a, " ");
@@ -1622,10 +1776,10 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "if (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let f: string = string_concat(d, indent);
             let g: string = string_concat(f, "} else {\n");
-            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let j: string = string_concat(h, indent);
             return string_concat(j, "}\n");
         },
@@ -1635,14 +1789,14 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "while (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let f: string = string_concat(d, indent);
             return string_concat(f, "}\n");
         },
         codegen_Instr::BlockInstr(body) => {
             let deeper: string = string_concat(indent, "  ");
             let a: string = string_concat(indent, "{\n");
-            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
             let c: string = string_concat(b, indent);
             return string_concat(c, "}\n");
         },
@@ -1721,7 +1875,8 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                was correctly typed. Compute it the same way DeclNamed
                does, from the call's own resolved return type name. */
             let call_eidx: i32 = megatu_enum_idx_of_cty(ret_name, eit_nt, source, starts, ends);
-            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, dst_h, megatu_cty_category(ret_name), call_eidx);
+            let call_sidx: i32 = megatu_struct_idx_of_cty(ret_name, sit_nt, source, starts, ends);
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, dst_h, megatu_cty_category(ret_name), call_eidx, call_sidx);
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");
             let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends, sidx));
@@ -1768,6 +1923,8 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
                       sidx: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>,
                       tyenv_e: Vec<i32>, eit_nt: Vec<i32>, eit_base: Vec<i32>,
                       eit_cnt: Vec<i32>, eit_cats: Vec<i32>,
+                      tyenv_st: Vec<i32>, sit_nt: Vec<i32>, sit_base: Vec<i32>,
+                      sit_cnt: Vec<i32>, sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                       it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
                       ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>) -> string {
     let count: i32 = vec_len(instrs);
@@ -1777,7 +1934,7 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
     while idx < count {
         let bh: Box<codegen_Instr> = vec_get(instrs, idx);
         let ins: codegen_Instr = box_deref(bh);
-        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
         idx = idx + 1;
     }
     return out;
