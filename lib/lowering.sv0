@@ -3256,9 +3256,23 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
        megatu_emit_instr's DeclVar case) -- makes every path through the
        chain assign it a defined value, eliminating the UB without
        touching lower_match_arms' own, more delicate arm-by-arm
-       plumbing. */
-    let zero_init: Instr = Instr::Store(out, box_new(Expr::Literal(box_new(Value::VInt(0)))));
-    vec_push(out_instrs, box_new(zero_init));
+       plumbing.
+
+       Gated to the C target only (lower_vm_target()==0): the VM has no
+       analogous "uninitialized C local" UB (it executes an explicit
+       Instr stream, not C stack variables reachable by an unguarded
+       fallthrough), and the SML --target=vm golden this native VM
+       emitter is byte-compared against has no equivalent extra store --
+       found live, not hypothetically, when this fix (originally emitted
+       unconditionally) broke tier-2 VM byte-parity for every module
+       containing a match expression. Emitting it unconditionally would
+       add a real, harmless-but-extra Instr::Store to VM bytecode with
+       no VM-side bug to justify it, permanently diverging from the SML
+       reference. */
+    if lower_vm_target() == 0 {
+        let zero_init: Instr = Instr::Store(out, box_new(Expr::Literal(box_new(Value::VInt(0)))));
+        vec_push(out_instrs, box_new(zero_init));
+    }
     let discard_ma: i32 = lower_match_arms(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, arms_first, arm_count,
                                             arms_sidecar,
