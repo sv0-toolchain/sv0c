@@ -1359,6 +1359,47 @@ fn f64_push_bits(neg: i32, exp_field: i32, frac_hi20: i32, frac_lo32: i32,
     return 3;
 }
 
+/* bit p (0-based) of the 53-bit value carried as (qh: bits 32.., ql: bits 0..31).
+   `ql >> p & 1` is correct for a negative ql too — an arithmetic shift keeps bit 0
+   of the result equal to bit p of the source. */
+fn qbit(qh: i32, ql: i32, p: i32) -> i32 {
+    if p < 0 { return 0; }
+    if p < 32 { return (ql >> p) & 1; }
+    if p < 53 { return (qh >> (p - 32)) & 1; }
+    return 0;
+}
+
+/* any of bits 0..(upto-1) of (qh, ql) set? */
+fn q_low_nonzero(qh: i32, ql: i32, upto: i32) -> i32 {
+    let mut b: i32 = 0;
+    while b < upto {
+        if qbit(qh, ql, b) == 1 { return 1; }
+        b = b + 1;
+    }
+    return 0;
+}
+
+/* m = (qh,ql) >> drop, as [mlo, mhi] with m < 2^52 (52 result bits max) */
+fn q_shr52(qh: i32, ql: i32, drop: i32) -> Vec<i32> {
+    let mut mlo: i32 = 0;
+    let mut mhi: i32 = 0;
+    let mut b: i32 = 0;
+    while b < 52 {
+        if qbit(qh, ql, drop + b) == 1 {
+            if b < 32 {
+                mlo = mlo | (1 << b);
+            } else {
+                mhi = mhi | (1 << (b - 32));
+            }
+        }
+        b = b + 1;
+    }
+    let r: Vec<i32> = vec_new();
+    vec_push(r, mlo);
+    vec_push(r, mhi);
+    return r;
+}
+
 fn f64_bits_from_parts(neg: i32, digits: Vec<i32>, dexp10: i32,
                        out: Vec<i32>) -> i32 {
     let nd: i32 = vec_len(digits);
@@ -1447,36 +1488,71 @@ fn f64_bits_from_parts(neg: i32, digits: Vec<i32>, dexp10: i32,
         }
     }
     if tries != 100 { return 0 - 1; }
-    let mut e2: i32 = 0 - k;
+    let e2: i32 = 0 - k;
+    /* exponent field if q (in [2^52, 2^53)) is kept as the mantissa, before any
+       rounding: value = q * 2^e2 = 1.f * 2^(e2+52), field = (e2+52) + 1023. */
+    let exp_pre: i32 = e2 + 1075;
 
-    /* round-half-to-even on 2*rem vs denk */
-    let tr: Vec<i32> = bi_copy(rem);
-    let _sr: i32 = bi_shl_bits(tr, 1);
-    let cmp: i32 = bi_cmp(tr, denk);
-    let mut round_up: i32 = 0;
-    if cmp > 0 { round_up = 1; }
-    if cmp == 0 {
-        if (q_lo & 1) == 1 { round_up = 1; }
-    }
-    if round_up == 1 {
-        if q_lo == 0 - 1 {
-            q_lo = 0;
-            q_hi = q_hi + 1;
-        } else {
-            q_lo = q_lo + 1;
+    /* rem/denk is the fraction below bit 0 of q: value = (q + rem/denk) * 2^e2,
+       0 <= rem < denk. */
+    let rem_nz: i32 = if bi_is_zero(rem) { 0 } else { 1 };
+
+    if exp_pre >= 1 {
+        /* NORMAL: round q at its ULP via 2*rem vs denk (round-half-to-even). */
+        let tr: Vec<i32> = bi_copy(rem);
+        let _sr: i32 = bi_shl_bits(tr, 1);
+        let cmp: i32 = bi_cmp(tr, denk);
+        let mut qh: i32 = q_hi;
+        let mut ql: i32 = q_lo;
+        let mut ef: i32 = exp_pre;
+        let mut ru: i32 = 0;
+        if cmp > 0 { ru = 1; }
+        if cmp == 0 {
+            if (ql & 1) == 1 { ru = 1; }
         }
-        if q_hi >= 2097152 {
-            q_hi = q_hi >> 1;
-            q_lo = 0;
-            e2 = e2 + 1;
+        if ru == 1 {
+            if ql == 0 - 1 {
+                ql = 0;
+                qh = qh + 1;
+            } else {
+                ql = ql + 1;
+            }
+            if qh >= 2097152 {
+                qh = qh >> 1;
+                ql = 0;
+                ef = ef + 1;
+            }
         }
+        if ef >= 2047 { return f64_push_bits(neg, 2047, 0, 0, out); }
+        return f64_push_bits(neg, ef, qh & 1048575, ql, out);
     }
 
-    let exp_field: i32 = e2 + 52 + 1023;
-    if exp_field >= 2047 { return f64_push_bits(neg, 2047, 0, 0, out); }
-    if exp_field <= 0 { return f64_push_bits(neg, 0, 0, 0, out); }
-    let frac_hi: i32 = q_hi & 1048575;
-    return f64_push_bits(neg, exp_field, frac_hi, q_lo, out);
+    /* SUBNORMAL (exp_pre <= 0): the stored 52-bit fraction m satisfies
+       value = m * 2^-1074, so m = q >> drop with drop = 1 - exp_pre >= 1.
+       Round at bit (drop-1) of q; sticky = lower bits of q OR rem != 0. */
+    let drop: i32 = 1 - exp_pre;
+    let mm: Vec<i32> = q_shr52(q_hi, q_lo, drop);
+    let mut mlo: i32 = vec_get(mm, 0);
+    let mut mhi: i32 = vec_get(mm, 1);
+    let rbit: i32 = qbit(q_hi, q_lo, drop - 1);
+    let mut sticky: i32 = rem_nz;
+    if q_low_nonzero(q_hi, q_lo, drop - 1) == 1 { sticky = 1; }
+    if rbit == 1 {
+        if sticky == 1 || (mlo & 1) == 1 {
+            if mlo == 0 - 1 {
+                mlo = 0;
+                mhi = mhi + 1;
+            } else {
+                mlo = mlo + 1;
+            }
+        }
+    }
+    if mhi >= 1048576 {
+        /* rounded up into the normal range: smallest normal, frac 0 */
+        return f64_push_bits(neg, 1, 0, 0, out);
+    }
+    if mhi == 0 && mlo == 0 { return f64_push_bits(neg, 0, 0, 0, out); }
+    return f64_push_bits(neg, 0, mhi, mlo, out);
 }
 
 fn emit_value(v: Value,
@@ -4270,6 +4346,26 @@ fn test_f64_bits() -> i32 {
     if fbits_check("123.456", 446676599, 1079958831) != 0 { return 12; }
     /* negative zero */
     if fbits_check("-0.0", 0, 0 - 2147483648) != 0 { return 13; }
+    /* VMF-007d edges */
+    /* huge normal 1e308 */
+    if fbits_check("1e308", 0 - 2048145248, 2145504499) != 0 { return 14; }
+    /* DBL_MAX */
+    if fbits_check("1.7976931348623157e308", 0 - 1, 2146435071) != 0 { return 15; }
+    /* overflow -> +inf / -inf */
+    if fbits_check("1e309", 0, 2146435072) != 0 { return 16; }
+    if fbits_check("-1e309", 0, 0 - 1048576) != 0 { return 17; }
+    /* smallest subnormal 5e-324 -> 0x0000000000000001 */
+    if fbits_check("5e-324", 1, 0) != 0 { return 18; }
+    if fbits_check("1e-323", 2, 0) != 0 { return 19; }
+    /* smallest normal 2.2250738585072014e-308 -> 0x0010000000000000 */
+    if fbits_check("2.2250738585072014e-308", 0, 1048576) != 0 { return 20; }
+    /* largest subnormal 2.2250738585072009e-308 -> 0x000FFFFFFFFFFFFF */
+    if fbits_check("2.2250738585072009e-308", 0 - 1, 1048575) != 0 { return 21; }
+    /* mid subnormal 1e-310 */
+    if fbits_check("1e-310", 0 - 1955535317, 4712) != 0 { return 22; }
+    if fbits_check("1e-320", 2024, 0) != 0 { return 23; }
+    /* far underflow -> +0 */
+    if fbits_check("1e-400", 0, 0) != 0 { return 24; }
     return 0;
 }
 

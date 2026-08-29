@@ -112,6 +112,9 @@ static int is_dec_digit(int c);
 static int parse_f64_literal(const char* s, int out_digits, int out_meta);
 static int bi_add_small(int a, int k);
 static int f64_push_bits(int neg, int exp_field, int frac_hi20, int frac_lo32, int out);
+static int qbit(int qh, int ql, int p);
+static int q_low_nonzero(int qh, int ql, int upto);
+static int q_shr52(int qh, int ql, int drop);
 static int f64_bits_from_parts(int neg, int digits, int dexp10, int out);
 static int emit_value(Value v, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
 static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
@@ -2307,6 +2310,67 @@ static int f64_push_bits(int neg, int exp_field, int frac_hi20, int frac_lo32, i
   return 3;
 }
 
+static int qbit(int qh, int ql, int p) {
+  if ((p < 0)) {
+    return 0;
+  } else {
+  }
+  if ((p < 32)) {
+    int _sv0t0 = (ql >> p);
+    int _sv0t1 = (_sv0t0 & 1);
+    return _sv0t1;
+  } else {
+  }
+  if ((p < 53)) {
+    int _sv0t2 = (p - 32);
+    int _sv0t3 = (qh >> _sv0t2);
+    int _sv0t4 = (_sv0t3 & 1);
+    return _sv0t4;
+  } else {
+  }
+  return 0;
+}
+
+static int q_low_nonzero(int qh, int ql, int upto) {
+  int b = 0;
+  while ((b < upto)) {
+    int _sv0t0 = qbit(qh, ql, b);
+    if ((_sv0t0 == 1)) {
+      return 1;
+    } else {
+    }
+    b = (b + 1);
+  }
+  return 0;
+}
+
+static int q_shr52(int qh, int ql, int drop) {
+  int mlo = 0;
+  int mhi = 0;
+  int b = 0;
+  while ((b < 52)) {
+    int _sv0t0 = (drop + b);
+    int _sv0t1 = qbit(qh, ql, _sv0t0);
+    if ((_sv0t1 == 1)) {
+      if ((b < 32)) {
+        int _sv0t2 = (1 << b);
+        mlo = (mlo | _sv0t2);
+      } else {
+        int _sv0t3 = (b - 32);
+        int _sv0t4 = (1 << _sv0t3);
+        mhi = (mhi | _sv0t4);
+      }
+    } else {
+    }
+    b = (b + 1);
+  }
+  int _sv0t5 = sv0_vec_new();
+  int r = _sv0t5;
+  sv0_vec_push(r, mlo);
+  sv0_vec_push(r, mhi);
+  return r;
+}
+
 static int f64_bits_from_parts(int neg, int digits, int dexp10, int out) {
   int _sv0t0 = sv0_vec_len(digits);
   int nd = _sv0t0;
@@ -2444,56 +2508,113 @@ static int f64_bits_from_parts(int neg, int digits, int dexp10, int out) {
   } else {
   }
   int e2 = (0 - k);
-  int _sv0t39 = bi_copy(rem);
-  int tr = _sv0t39;
-  int _sv0t40 = bi_shl_bits(tr, 1);
-  int _sr = _sv0t40;
-  int _sv0t41 = bi_cmp(tr, denk);
-  int cmp = _sv0t41;
-  int round_up = 0;
-  if ((cmp > 0)) {
-    round_up = 1;
+  int exp_pre = (e2 + 1075);
+  int _sv0t41 = bi_is_zero(rem);
+  int _sv0t39;
+  int _sv0t40;
+  if (_sv0t41) {
+    _sv0t40 = 0;
+  } else {
+    _sv0t40 = 1;
+  }
+  _sv0t39 = _sv0t40;
+  int rem_nz = _sv0t39;
+  if ((exp_pre >= 1)) {
+    int _sv0t42 = bi_copy(rem);
+    int tr = _sv0t42;
+    int _sv0t43 = bi_shl_bits(tr, 1);
+    int _sr = _sv0t43;
+    int _sv0t44 = bi_cmp(tr, denk);
+    int cmp = _sv0t44;
+    int qh = q_hi;
+    int ql = q_lo;
+    int ef = exp_pre;
+    int ru = 0;
+    if ((cmp > 0)) {
+      ru = 1;
+    } else {
+    }
+    if ((cmp == 0)) {
+      int _sv0t45 = (ql & 1);
+      if ((_sv0t45 == 1)) {
+        ru = 1;
+      } else {
+      }
+    } else {
+    }
+    if ((ru == 1)) {
+      int _sv0t46 = (0 - 1);
+      if ((ql == _sv0t46)) {
+        ql = 0;
+        qh = (qh + 1);
+      } else {
+        ql = (ql + 1);
+      }
+      if ((qh >= 2097152)) {
+        qh = (qh >> 1);
+        ql = 0;
+        ef = (ef + 1);
+      } else {
+      }
+    } else {
+    }
+    if ((ef >= 2047)) {
+      int _sv0t47 = f64_push_bits(neg, 2047, 0, 0, out);
+      return _sv0t47;
+    } else {
+    }
+    int _sv0t48 = (qh & 1048575);
+    int _sv0t49 = f64_push_bits(neg, ef, _sv0t48, ql, out);
+    return _sv0t49;
   } else {
   }
-  if ((cmp == 0)) {
-    int _sv0t42 = (q_lo & 1);
-    if ((_sv0t42 == 1)) {
-      round_up = 1;
+  int drop = (1 - exp_pre);
+  int _sv0t50 = q_shr52(q_hi, q_lo, drop);
+  int mm = _sv0t50;
+  int _sv0t51 = sv0_vec_get(mm, 0);
+  int mlo = _sv0t51;
+  int _sv0t52 = sv0_vec_get(mm, 1);
+  int mhi = _sv0t52;
+  int _sv0t53 = (drop - 1);
+  int _sv0t54 = qbit(q_hi, q_lo, _sv0t53);
+  int rbit = _sv0t54;
+  int sticky = rem_nz;
+  int _sv0t55 = (drop - 1);
+  int _sv0t56 = q_low_nonzero(q_hi, q_lo, _sv0t55);
+  if ((_sv0t56 == 1)) {
+    sticky = 1;
+  } else {
+  }
+  if ((rbit == 1)) {
+    int _sv0t57 = (sticky == 1);
+    int _sv0t58 = (mlo & 1);
+    int _sv0t59 = (_sv0t58 == 1);
+    if ((_sv0t57 || _sv0t59)) {
+      int _sv0t60 = (0 - 1);
+      if ((mlo == _sv0t60)) {
+        mlo = 0;
+        mhi = (mhi + 1);
+      } else {
+        mlo = (mlo + 1);
+      }
     } else {
     }
   } else {
   }
-  if ((round_up == 1)) {
-    int _sv0t43 = (0 - 1);
-    if ((q_lo == _sv0t43)) {
-      q_lo = 0;
-      q_hi = (q_hi + 1);
-    } else {
-      q_lo = (q_lo + 1);
-    }
-    if ((q_hi >= 2097152)) {
-      q_hi = (q_hi >> 1);
-      q_lo = 0;
-      e2 = (e2 + 1);
-    } else {
-    }
+  if ((mhi >= 1048576)) {
+    int _sv0t61 = f64_push_bits(neg, 1, 0, 0, out);
+    return _sv0t61;
   } else {
   }
-  int _sv0t44 = (e2 + 52);
-  int exp_field = (_sv0t44 + 1023);
-  if ((exp_field >= 2047)) {
-    int _sv0t45 = f64_push_bits(neg, 2047, 0, 0, out);
-    return _sv0t45;
+  int _sv0t62 = (mhi == 0);
+  int _sv0t63 = (mlo == 0);
+  if ((_sv0t62 && _sv0t63)) {
+    int _sv0t64 = f64_push_bits(neg, 0, 0, 0, out);
+    return _sv0t64;
   } else {
   }
-  if ((exp_field <= 0)) {
-    int _sv0t46 = f64_push_bits(neg, 0, 0, 0, out);
-    return _sv0t46;
-  } else {
-  }
-  int frac_hi = (q_hi & 1048575);
-  int _sv0t47 = f64_push_bits(neg, exp_field, frac_hi, q_lo, out);
-  return _sv0t47;
+  int _sv0t65 = f64_push_bits(neg, 0, mhi, mlo, out);
+  return _sv0t65;
 }
 
 static int emit_value(Value v, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out) {
@@ -9840,6 +9961,66 @@ static int test_f64_bits(void) {
   int _sv0t16 = fbits_check("-0.0", 0, _sv0t15);
   if ((_sv0t16 != 0)) {
     return 13;
+  } else {
+  }
+  int _sv0t17 = (0 - 2048145248);
+  int _sv0t18 = fbits_check("1e308", _sv0t17, 2145504499);
+  if ((_sv0t18 != 0)) {
+    return 14;
+  } else {
+  }
+  int _sv0t19 = (0 - 1);
+  int _sv0t20 = fbits_check("1.7976931348623157e308", _sv0t19, 2146435071);
+  if ((_sv0t20 != 0)) {
+    return 15;
+  } else {
+  }
+  int _sv0t21 = fbits_check("1e309", 0, 2146435072);
+  if ((_sv0t21 != 0)) {
+    return 16;
+  } else {
+  }
+  int _sv0t22 = (0 - 1048576);
+  int _sv0t23 = fbits_check("-1e309", 0, _sv0t22);
+  if ((_sv0t23 != 0)) {
+    return 17;
+  } else {
+  }
+  int _sv0t24 = fbits_check("5e-324", 1, 0);
+  if ((_sv0t24 != 0)) {
+    return 18;
+  } else {
+  }
+  int _sv0t25 = fbits_check("1e-323", 2, 0);
+  if ((_sv0t25 != 0)) {
+    return 19;
+  } else {
+  }
+  int _sv0t26 = fbits_check("2.2250738585072014e-308", 0, 1048576);
+  if ((_sv0t26 != 0)) {
+    return 20;
+  } else {
+  }
+  int _sv0t27 = (0 - 1);
+  int _sv0t28 = fbits_check("2.2250738585072009e-308", _sv0t27, 1048575);
+  if ((_sv0t28 != 0)) {
+    return 21;
+  } else {
+  }
+  int _sv0t29 = (0 - 1955535317);
+  int _sv0t30 = fbits_check("1e-310", _sv0t29, 4712);
+  if ((_sv0t30 != 0)) {
+    return 22;
+  } else {
+  }
+  int _sv0t31 = fbits_check("1e-320", 2024, 0);
+  if ((_sv0t31 != 0)) {
+    return 23;
+  } else {
+  }
+  int _sv0t32 = fbits_check("1e-400", 0, 0);
+  if ((_sv0t32 != 0)) {
+    return 24;
   } else {
   }
   return 0;
