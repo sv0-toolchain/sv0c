@@ -697,13 +697,26 @@ structure Checker :> CHECKER = struct
                   native side documents. *)
                fun isLiteralDefault t =
                  t = Types.TyInt 32 orelse t = Types.TyFloat 64
+               (* Real bug fix (found while closing out the last SML test
+                  failure this project had): the four-branch version below
+                  used to let EITHER "isNumericTy a" or "isNumericTy b" pick
+                  a result type unconditionally, without ever checking the
+                  OTHER operand at all -- so `1 + true` picked `a` (TyInt 32,
+                  numeric) via the third branch and returned i32 with `b`
+                  (TyBool) never examined, silently accepting an int/bool
+                  binop. Fixed by checking BOTH operands are numeric FIRST;
+                  only then does the literal-default-vs-concrete-type
+                  preference (the actual point of BUGS.md #2's own fix,
+                  preserved unchanged below) get to choose which one wins. A
+                  non-numeric operand on either side now always reaches
+                  `expect`, which raises E0400 via Unify.unify. *)
                fun pick (a, b) =
-                 if isNumericTy a andalso not (isLiteralDefault a) then a
-                 else if isNumericTy b andalso not (isLiteralDefault b) then b
-                 else if isNumericTy a then a
-                 else if isNumericTy b then b
-                 else (expect (a, Types.TyInt 32); expect (b, Types.TyInt 32);
-                       Types.TyInt 32)
+                 if not (isNumericTy a) orelse not (isNumericTy b) then
+                   (expect (a, Types.TyInt 32); expect (b, Types.TyInt 32);
+                    Types.TyInt 32)
+                 else if not (isLiteralDefault a) then a
+                 else if not (isLiteralDefault b) then b
+                 else a
              in
                pick (tl, tr)
              end
