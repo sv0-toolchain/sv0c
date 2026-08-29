@@ -748,6 +748,15 @@ enum Value {
     VString(i32),
     VMember(Box<Value>, i32),
     VAddrOf(i32),
+    /* Appended (tags 8, 9) to stay a prefix-compatible layout match with
+       lowering.sv0's enum Value, which megaTU-main.sv0's VM tail reinterprets
+       these boxes as via box_deref. lowering.sv0 added VFloat/VIntWide for the C
+       backend (sv0-mathlib BUGS.md #5 / #1); this copy had drifted to 8 variants.
+       h is the literal's source token handle (no eager numeric parse — same
+       "print the source text verbatim" strategy as the C backend). Emission is
+       deferred: VMF-005 only restores the ADT match; VMF-007 wires the bytes. */
+    VFloat(i32),
+    VIntWide(i32),
 }
 
 enum Expr {
@@ -949,6 +958,8 @@ fn emit_value(v: Value,
                 Value::VUnit => { return 0 - 1; },
                 Value::VMember(bv2, f2) => { return 0 - 1; },
                 Value::VAddrOf(h2) => { return 0 - 1; },
+                Value::VFloat(h2) => { return 0 - 1; },
+                Value::VIntWide(h2) => { return 0 - 1; },
             }
             return 0 - 1;
         },
@@ -961,6 +972,12 @@ fn emit_value(v: Value,
             vec_push(out, base);
             return 2;
         },
+        /* Deferred to VMF-007: PUSH_F64 (op 6) / PUSH_I64 (op 5) as [opc, lo, hi]
+           insn words. Returning -1 here means a float/wide literal makes
+           emit_program fail cleanly (compose-main exit 5), same as before this
+           variant existed. */
+        Value::VFloat(h) => { return 0 - 1; },
+        Value::VIntWide(h) => { return 0 - 1; },
     }
     return 0 - 1;
 }
@@ -1035,6 +1052,8 @@ fn emit_expr(e: Expr,
                 Value::VUnit => { return 0 - 1; },
                 Value::VMember(bv2, f2) => { return 0 - 1; },
                 Value::VAddrOf(h2) => { return 0 - 1; },
+                Value::VFloat(h2) => { return 0 - 1; },
+                Value::VIntWide(h2) => { return 0 - 1; },
             }
             return 0 - 1;
         },
@@ -1091,6 +1110,8 @@ fn emit_ret_width(v: Value,
         Value::VUnit => { return 1; },
         Value::VMember(bv, f) => { return 1; },
         Value::VAddrOf(h) => { return 1; },
+        Value::VFloat(h) => { return 1; },
+        Value::VIntWide(h) => { return 1; },
     }
     return 1;
 }
@@ -1173,6 +1194,8 @@ fn emit_box_new(dst_h: i32, args: Vec<i32>,
         Value::VUnit => { w = 1; },
         Value::VMember(bv, f) => { w = 1; },
         Value::VAddrOf(h2) => { w = 1; },
+        Value::VFloat(h2) => { w = 1; },
+        Value::VIntWide(h2) => { w = 1; },
     }
     /* box_alloc(W): PUSH_INT W ; CALL_BUILTIN 12 ; STORE_LOCAL base_d */
     vec_push(out, 4);   vec_push(out, w);
