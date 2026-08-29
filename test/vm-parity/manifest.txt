@@ -1,5 +1,10 @@
 # VM parity v1 — keep in sync with lib/bootstrap-sources.list (same paths).
 # Paths relative to sv0c/.
+#
+# lib/driver.sv0 deliberately excluded -- see bootstrap-sources.list's own
+# comment (it's a native-only CLI entry point calling getenv(), which
+# vm_codegen.sml has no VM-bytecode-emission support for; never meant to run
+# on the VM).
 
 
 test/integration/hello/hello.sv0
@@ -99,4 +104,3 @@ lib/codegen.sv0
 lib/link.sv0
 lib/lexer.sv0
 lib/resolver.sv0
-lib/driver.sv0
