@@ -101,6 +101,8 @@ static int bc_string_escape_char(int c);
 static int bc_hex_digit_value(int c);
 static int decode_one_escape(const char* source, int pos, int end, int out);
 static int decode_pool_string(const char* source, int s, int e, int out);
+static int bc_push_ascii(const char* s, int out);
+static int decode_contract_key(int idx, const char* source, int starts, int ends, int sbuf);
 static int encode_strings(int strings, const char* source, int starts, int ends, int out);
 static int encode_string_literals(int strs, int out);
 static int decode_strings(int buf, int pos, int out_starts, int out_lens);
@@ -1035,6 +1037,55 @@ static int decode_pool_string(const char* source, int s, int e, int out) {
   return n;
 }
 
+static int bc_push_ascii(const char* s, int out) {
+  int _sv0t0 = sv0_string_len(s);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_string_char_at(s, i);
+    sv0_vec_push(out, _sv0t1);
+    i = (i + 1);
+  }
+  return n;
+}
+
+static int decode_contract_key(int idx, const char* source, int starts, int ends, int sbuf) {
+  int _sv0t0 = (0 - idx);
+  int neg = (_sv0t0 - 1);
+  int kind = (neg / 1000000);
+  int _sv0t1 = (kind * 1000000);
+  int fn_h = (neg - _sv0t1);
+  int plen = 0;
+  if ((kind == 0)) {
+    int _sv0t2 = bc_push_ascii("requires failed: ", sbuf);
+    plen = _sv0t2;
+  } else {
+    int _sv0t3 = bc_push_ascii("ensures failed: ", sbuf);
+    plen = _sv0t3;
+  }
+  int nlen = 0;
+  if ((fn_h >= 0)) {
+    int _sv0t4 = sv0_vec_len(starts);
+    if ((fn_h < _sv0t4)) {
+      int _sv0t5 = sv0_vec_get(starts, fn_h);
+      int fs = _sv0t5;
+      int _sv0t6 = sv0_vec_get(ends, fn_h);
+      int fe = _sv0t6;
+      int k = fs;
+      while ((k < fe)) {
+        int _sv0t7 = sv0_string_char_at(source, k);
+        sv0_vec_push(sbuf, _sv0t7);
+        k = (k + 1);
+      }
+      nlen = (fe - fs);
+    } else {
+    }
+  } else {
+  }
+  int _sv0t8 = (plen + nlen);
+  return _sv0t8;
+}
+
 static int encode_strings(int strings, const char* source, int starts, int ends, int out) {
   int _sv0t0 = sv0_vec_len(strings);
   int count = _sv0t0;
@@ -1044,20 +1095,26 @@ static int encode_strings(int strings, const char* source, int starts, int ends,
   while ((i < count)) {
     int _sv0t2 = sv0_vec_get(strings, i);
     int idx = _sv0t2;
-    int _sv0t3 = sv0_vec_get(starts, idx);
-    int s = _sv0t3;
-    int _sv0t4 = sv0_vec_get(ends, idx);
-    int e = _sv0t4;
-    int _sv0t5 = sv0_vec_new();
-    int sbuf = _sv0t5;
-    int _sv0t6 = decode_pool_string(source, s, e, sbuf);
-    int slen = _sv0t6;
-    int _sv0t7 = encode_u32_le(slen, out);
+    int _sv0t3 = sv0_vec_new();
+    int sbuf = _sv0t3;
+    int slen = 0;
+    if ((idx < 0)) {
+      int _sv0t4 = decode_contract_key(idx, source, starts, ends, sbuf);
+      slen = _sv0t4;
+    } else {
+      int _sv0t5 = sv0_vec_get(starts, idx);
+      int s = _sv0t5;
+      int _sv0t6 = sv0_vec_get(ends, idx);
+      int e = _sv0t6;
+      int _sv0t7 = decode_pool_string(source, s, e, sbuf);
+      slen = _sv0t7;
+    }
+    int _sv0t8 = encode_u32_le(slen, out);
     total = (total + 4);
     int j = 0;
     while ((j < slen)) {
-      int _sv0t8 = sv0_vec_get(sbuf, j);
-      sv0_vec_push(out, _sv0t8);
+      int _sv0t9 = sv0_vec_get(sbuf, j);
+      sv0_vec_push(out, _sv0t9);
       j = (j + 1);
     }
     total = (total + slen);

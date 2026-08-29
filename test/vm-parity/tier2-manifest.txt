@@ -2,6 +2,12 @@
 # Optional compare: set SV0_VM_BYTECODE_EMITTER (see test/vm-parity/README.md § Tier 2).
 #
 # lib/driver.sv0 deliberately excluded -- see manifest.txt's own comment.
+#
+# contracts.sv0 added by VMF-013a (sv0c-vm-float-parity): the native VM emitter
+# used to panic on any requires/ensures program (encode_strings deref'd the
+# negative contract-message sentinel as a token handle). Now byte-identical to
+# the SML --target=vm golden -- keeps the contract emit path guarded.
+test/integration/contracts/contracts.sv0
 lib/span.sv0
 lexer/token.sv0
 lib/ast.sv0
