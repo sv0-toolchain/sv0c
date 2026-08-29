@@ -52,18 +52,24 @@ Two build profiles exist, both in `scripts/native_exe_argv_builder.py`:
 | Profile | Optimization | Extra flags | Notes |
 |---|---|---|---|
 | `dev` (default) | `-O0` | `-g` | Byte-identical to R0's original argv shape. |
-| `release` | `-O2` | `-fno-strict-aliasing`, `-g` | Never `-O3`, LTO, `-ffast-math`, or `NDEBUG`-based contract stripping (§16.5). |
+| `release` | `-O2` | `-g` | Never `-O3`, LTO, `-ffast-math`, or `NDEBUG`-based contract stripping (§16.5). |
 
-`-fno-strict-aliasing` is not a generic safety margin — it's the specific,
-audited mitigation for two real strict-aliasing violations found in
-[`native-executable-ub-audit.md`](native-executable-ub-audit.md) (NEX-048a,
-Sites 1/2: the box-pool pointer-cast deref, and a cross-reinterpretation
-inside the bootstrap compiler's own generated C). Behavioral parity
-between the two profiles is proven on the full 114-fixture behavior corpus
-by `native_exe_release_parity.py` (NEX-051b) — the one documented,
-expected exception is `overflow_wrap_mask.sv0`, which deliberately
-exercises real signed-overflow UB whose exact manifestation is
-optimization-level-dependent by definition.
+The release profile carried `-fno-strict-aliasing` through R1 as the
+specific, audited mitigation for two real strict-aliasing violations found
+in [`native-executable-ub-audit.md`](native-executable-ub-audit.md)
+(NEX-048a, Sites 1/2: the box-pool pointer-cast deref, and a
+cross-reinterpretation inside the bootstrap compiler's own generated C).
+**Post-R1 (KC-004 cleanup pass): both sites were fixed for real** —
+`sv0__box_deref_raw` now reads via `memcpy` into a same-typed local
+instead of a pointer-cast deref, eliminating the violation at the
+representation level rather than compiling around it — so the flag was
+removed from the release argv; see the audit doc's Sites 1/2 entries for
+the fix and its verification. Behavioral parity between the two profiles
+is proven on the full 114-fixture behavior corpus by
+`native_exe_release_parity.py` (NEX-051b) — the one documented, expected
+exception is `overflow_wrap_mask.sv0`, which deliberately exercises real
+signed-overflow UB whose exact manifestation is optimization-level-dependent
+by definition.
 
 `release` is wired into `build_native_executable` via a `profile`
 parameter (NEX-051c); an unrecognized profile value is a hard usage error,
