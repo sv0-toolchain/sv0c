@@ -1356,7 +1356,7 @@ fn f64_push_bits(neg: i32, exp_field: i32, frac_hi20: i32, frac_lo32: i32,
     if neg == 1 { hi = hi | (1 << 31); }
     vec_push(out, frac_lo32);
     vec_push(out, hi);
-    return 3;
+    return 2;
 }
 
 /* bit p (0-based) of the 53-bit value carried as (qh: bits 32.., ql: bits 0..31).
@@ -1633,10 +1633,21 @@ fn emit_value(v: Value,
             vec_push(out, base);
             return 2;
         },
-        /* VMF-007a: wide int literal -> PUSH_I64. VMF-007b/e: VFloat -> PUSH_F64
-           (still deferred here; a float literal makes emit_program fail cleanly,
-           compose-main exit 5, same as before this variant existed). */
-        Value::VFloat(h) => { return 0 - 1; },
+        /* VMF-007a: wide int literal -> PUSH_I64. VMF-007e: float literal ->
+           PUSH_F64 (op 6) [opcode, lo32, hi32], bits via the pure-integer
+           decimal converter. */
+        Value::VFloat(h) => {
+            if slot_handle_in_range(h, starts) != true { return 0 - 1; }
+            let fs: string = handle_to_str(h, source, starts, ends);
+            let fdg: Vec<i32> = vec_new();
+            let fmt: Vec<i32> = vec_new();
+            if parse_f64_literal(fs, fdg, fmt) != 0 { return 0 - 1; }
+            vec_push(out, 6);
+            let fnb: i32 = f64_bits_from_parts(vec_get(fmt, 0), fdg,
+                                               vec_get(fmt, 1), out);
+            if fnb < 0 { return 0 - 1; }
+            return fnb + 1;
+        },
         Value::VIntWide(h) => {
             return push_wide_int_literal(h, source, starts, ends, out);
         },
@@ -3075,6 +3086,20 @@ fn test_emit_value() -> i32 {
     let vm_oob: Value = Value::VMember(box_new(Value::VVar(60)), 3);
     let r10: i32 = emit_value(vm_oob, en, eb, ew, vec_new(), vec_new(), pool, "", vec_new(), vec_new(), out11);
     if r10 != 0 - 1 { return 33; }
+    /* VMF-007e: float literal -> PUSH_F64 [6, lo, hi]. source "1.5" -> handle 0;
+       1.5 = 0x3FF8000000000000 -> lo 0, hi 0x3FF80000 = 1073217536. */
+    let fsrc: string = "1.5";
+    let fst: Vec<i32> = vec_new();
+    let fen: Vec<i32> = vec_new();
+    vec_push(fst, 0);
+    vec_push(fen, 3);
+    let out12: Vec<i32> = vec_new();
+    let r11: i32 = emit_value(Value::VFloat(0), en, eb, ew, vec_new(), vec_new(),
+                              pool, fsrc, fst, fen, out12);
+    if r11 != 3 { return 34; }
+    if vec_get(out12, 0) != 6 { return 35; }
+    if vec_get(out12, 1) != 0 { return 36; }
+    if vec_get(out12, 2) != 1073217536 { return 37; }
     return 0;
 }
 
@@ -3169,6 +3194,21 @@ fn test_emit_expr() -> i32 {
     let r11: i32 = emit_expr(fneg, enf, ebf, ewf, ecf, vec_new(), vec_new(), pool, source, starts, ends, out11);
     if r11 != 3 { return 33; }
     if vec_get(out11, 2) != 52 { return 34; }
+    /* VMF-007e: f64 LITERAL binop -> two PUSH_F64 + ADD_F64.
+       source "2.5" (handle 0) -> 2.5 = 0x4004000000000000 -> lo 0, hi 1074003968. */
+    let fls: string = "2.5";
+    let flst: Vec<i32> = vec_new();
+    let flen: Vec<i32> = vec_new();
+    vec_push(flst, 0);
+    vec_push(flen, 3);
+    let out12: Vec<i32> = vec_new();
+    let flit: Expr = Expr::Binop(0, box_new(Value::VFloat(0)), box_new(Value::VFloat(0)));
+    let r12: i32 = emit_expr(flit, enf, ebf, ewf, ecf, vec_new(), vec_new(), pool, fls, flst, flen, out12);
+    if r12 != 7 { return 35; }
+    if vec_get(out12, 0) != 6 { return 36; }
+    if vec_get(out12, 2) != 1074003968 { return 37; }
+    if vec_get(out12, 3) != 6 { return 38; }
+    if vec_get(out12, 6) != 48 { return 39; }
     return 0;
 }
 
