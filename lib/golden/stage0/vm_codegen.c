@@ -90,6 +90,7 @@ static const char* handle_to_str(int h, const char* source, int starts, int ends
 static int index_of_fn(int fn_h, int fn_names, const char* source, int starts, int ends);
 static int member_offset_from_field(int width, int field_h);
 static int emit_member_load_from_var(int x, int field_h, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends, int out);
+static int push_wide_int_literal(int h, const char* source, int starts, int ends, int out);
 static int emit_value(Value v, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
 static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out);
 static int vec_append(int dst, int src);
@@ -148,6 +149,7 @@ static int test_is_main_label(void);
 static int test_build_func_order(void);
 static int emit_program_1fn(const char* source, int starts, int ends, int lab, int pn, int pc, int ins, int pool, int ft);
 static int test_emit_program(void);
+static int test_wide_int_literal(void);
 static int test_typed_opcode_select(void);
 
 static int variant_slots_unit(void) {
@@ -1736,6 +1738,69 @@ static int emit_member_load_from_var(int x, int field_h, int env_names, int env_
   return 2;
 }
 
+static int push_wide_int_literal(int h, const char* source, int starts, int ends, int out) {
+  int _sv0t0 = slot_handle_in_range(h, starts);
+  if ((_sv0t0 != 1)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  const char* _sv0t2 = handle_to_str(h, source, starts, ends);
+  const char* s;
+  s = _sv0t2;
+  int _sv0t3 = sv0_string_len(s);
+  int n = _sv0t3;
+  if ((n <= 0)) {
+    int _sv0t4 = (0 - 1);
+    return _sv0t4;
+  } else {
+  }
+  int l0 = 0;
+  int l1 = 0;
+  int l2 = 0;
+  int l3 = 0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t5 = sv0_string_char_at(s, i);
+    int c = _sv0t5;
+    if ((c < 48)) {
+      int _sv0t6 = (0 - 1);
+      return _sv0t6;
+    } else {
+    }
+    if ((c > 57)) {
+      int _sv0t7 = (0 - 1);
+      return _sv0t7;
+    } else {
+    }
+    int d = (c - 48);
+    int _sv0t8 = (l0 * 10);
+    int t0 = (_sv0t8 + d);
+    l0 = (t0 & 65535);
+    int _sv0t9 = (l1 * 10);
+    int _sv0t10 = (t0 >> 16);
+    int t1 = (_sv0t9 + _sv0t10);
+    l1 = (t1 & 65535);
+    int _sv0t11 = (l2 * 10);
+    int _sv0t12 = (t1 >> 16);
+    int t2 = (_sv0t11 + _sv0t12);
+    l2 = (t2 & 65535);
+    int _sv0t13 = (l3 * 10);
+    int _sv0t14 = (t2 >> 16);
+    int t3 = (_sv0t13 + _sv0t14);
+    l3 = (t3 & 65535);
+    i = (i + 1);
+  }
+  int _sv0t15 = (l1 << 16);
+  int lo = (l0 | _sv0t15);
+  int _sv0t16 = (l3 << 16);
+  int hi = (l2 | _sv0t16);
+  sv0_vec_push(out, 5);
+  sv0_vec_push(out, lo);
+  sv0_vec_push(out, hi);
+  return 3;
+}
+
 static int emit_value(Value v, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, int pool, const char* source, int starts, int ends, int out) {
   int _sv0t0;
   if ((v.tag == 0)) {
@@ -1906,7 +1971,7 @@ static int emit_value(Value v, int env_names, int env_bases, int env_widths, int
                   } else {
                     if ((v.tag == 9)) {
                       int h = v.p0;
-                      int _sv0t1 = (0 - 1);
+                      int _sv0t1 = push_wide_int_literal(h, source, starts, ends, out);
                       return _sv0t1;
                       _sv0t0 = 0;
                     } else {
@@ -8650,6 +8715,120 @@ static int test_emit_program(void) {
   return 0;
 }
 
+static int test_wide_int_literal(void) {
+  const char* src;
+  src = "4294967296 9223372036854775807 18446744073709551615";
+  int _sv0t0 = sv0_vec_new();
+  int st = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int en = _sv0t1;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 10);
+  sv0_vec_push(st, 11);
+  sv0_vec_push(en, 30);
+  sv0_vec_push(st, 31);
+  sv0_vec_push(en, 51);
+  int _sv0t2 = sv0_vec_new();
+  int o1 = _sv0t2;
+  int _sv0t3 = push_wide_int_literal(0, src, st, en, o1);
+  int r1 = _sv0t3;
+  if ((r1 != 3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(o1, 0);
+  if ((_sv0t4 != 5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(o1, 1);
+  if ((_sv0t5 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(o1, 2);
+  if ((_sv0t6 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_new();
+  int o2 = _sv0t7;
+  int _sv0t8 = push_wide_int_literal(1, src, st, en, o2);
+  int r2 = _sv0t8;
+  int _sv0t9 = sv0_vec_get(o2, 1);
+  int _sv0t10 = (0 - 1);
+  if ((_sv0t9 != _sv0t10)) {
+    return 5;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_get(o2, 2);
+  if ((_sv0t11 != 2147483647)) {
+    return 6;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int o3 = _sv0t12;
+  int _sv0t13 = push_wide_int_literal(2, src, st, en, o3);
+  int r3 = _sv0t13;
+  int _sv0t14 = sv0_vec_get(o3, 1);
+  int _sv0t15 = (0 - 1);
+  if ((_sv0t14 != _sv0t15)) {
+    return 7;
+  } else {
+  }
+  int _sv0t16 = sv0_vec_get(o3, 2);
+  int _sv0t17 = (0 - 1);
+  if ((_sv0t16 != _sv0t17)) {
+    return 8;
+  } else {
+  }
+  int _sv0t18 = sv0_vec_new();
+  int o4 = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int pool = _sv0t19;
+  Value _sv0t20;
+  _sv0t20.tag = 9;
+  _sv0t20.p0 = 0;
+  int _sv0t21 = sv0_vec_new();
+  int _sv0t22 = sv0_vec_new();
+  int _sv0t23 = sv0_vec_new();
+  int _sv0t24 = sv0_vec_new();
+  int _sv0t25 = sv0_vec_new();
+  int _sv0t26 = emit_value(_sv0t20, _sv0t21, _sv0t22, _sv0t23, _sv0t24, _sv0t25, pool, src, st, en, o4);
+  int r4 = _sv0t26;
+  if ((r4 != 3)) {
+    return 9;
+  } else {
+  }
+  int _sv0t27 = sv0_vec_get(o4, 0);
+  if ((_sv0t27 != 5)) {
+    return 10;
+  } else {
+  }
+  int _sv0t28 = sv0_vec_get(o4, 2);
+  if ((_sv0t28 != 1)) {
+    return 11;
+  } else {
+  }
+  const char* bad;
+  bad = "12x4";
+  int _sv0t29 = sv0_vec_new();
+  int bst = _sv0t29;
+  int _sv0t30 = sv0_vec_new();
+  int ben = _sv0t30;
+  sv0_vec_push(bst, 0);
+  sv0_vec_push(ben, 4);
+  int _sv0t31 = sv0_vec_new();
+  int o5 = _sv0t31;
+  int _sv0t32 = push_wide_int_literal(0, bad, bst, ben, o5);
+  int _sv0t33 = (0 - 1);
+  if ((_sv0t32 != _sv0t33)) {
+    return 12;
+  } else {
+  }
+  return 0;
+}
+
 static int test_typed_opcode_select(void) {
   int _sv0t0 = combine_cat(0, 0);
   if ((_sv0t0 != 0)) {
@@ -9122,6 +9301,13 @@ int main(void) {
   if ((r40 != 0)) {
     int _sv0t78 = (690 + r40);
     return _sv0t78;
+  } else {
+  }
+  int _sv0t79 = test_wide_int_literal();
+  int r41 = _sv0t79;
+  if ((r41 != 0)) {
+    int _sv0t80 = (710 + r41);
+    return _sv0t80;
   } else {
   }
   return 0;
