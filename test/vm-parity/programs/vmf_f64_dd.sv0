@@ -1,0 +1,25 @@
+/* VMF-018: double-double style (two_prod / spilled f64 temps). */
+struct P2 { hi: f64, lo: f64 }
+fn dsplit(a: f64) -> P2 {
+    let c: f64 = a * 134217729.0;
+    let hi: f64 = c - (c - a);
+    let lo: f64 = a - hi;
+    return P2 { hi: hi, lo: lo };
+}
+fn two_prod(a: f64, b: f64) -> P2 {
+    let p: f64 = a * b;
+    let sa: P2 = dsplit(a);
+    let sb: P2 = dsplit(b);
+    let sa_hi: f64 = sa.hi;
+    let sa_lo: f64 = sa.lo;
+    let sb_hi: f64 = sb.hi;
+    let sb_lo: f64 = sb.lo;
+    let e: f64 = ((sa_hi * sb_hi - p) + sa_hi * sb_lo + sa_lo * sb_hi) + sa_lo * sb_lo;
+    return P2 { hi: p, lo: e };
+}
+fn main() -> i32 {
+    let r: P2 = two_prod(1.1, 2.2);
+    let h: f64 = r.hi;
+    if h > 2.41 { if h < 2.43 { return 33; } }
+    return 0;
+}

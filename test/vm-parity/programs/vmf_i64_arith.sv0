@@ -1,0 +1,17 @@
+/* VMF-018: i64 arithmetic with values outside i32 range. */
+fn main() -> i32 {
+    let x: i64 = 5000000000;
+    let y: i64 = 3000000000;
+    let mut code: i32 = 0;
+    let s: i64 = x + y;
+    if s == 8000000000 { code = code + 1; }
+    let d: i64 = x - y;
+    if d == 2000000000 { code = code + 2; }
+    let m: i64 = x * y;
+    if m > 0 { code = code + 4; }
+    let z: i64 = x / y;
+    if z == 1 { code = code + 8; }
+    let n: i64 = 0 - x;
+    if n < 0 { code = code + 16; }
+    return code;
+}

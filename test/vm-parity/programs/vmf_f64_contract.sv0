@@ -1,0 +1,19 @@
+/* VMF-018: compound ensures over result.<field> on a struct-returning fn. */
+struct C { re: f64, im: f64 }
+fn re_of(c: C) -> f64 { let r: f64 = c.re; return r; }
+fn im_of(c: C) -> f64 { let r: f64 = c.im; return r; }
+fn add_c(a: C, b: C) -> C
+    ensures(result.re == re_of(a) + re_of(b) && result.im == im_of(a) + im_of(b))
+{
+    let are: f64 = a.re;
+    let bre: f64 = b.re;
+    let aim: f64 = a.im;
+    let bim: f64 = b.im;
+    return C { re: are + bre, im: aim + bim };
+}
+fn main() -> i32 {
+    let z: C = C { re: 1.5, im: 2.5 };
+    let r: C = add_c(z, z);
+    if r.re > 2.9 { if r.re < 3.1 { return 17; } }
+    return 0;
+}
