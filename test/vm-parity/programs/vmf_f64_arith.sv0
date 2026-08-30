@@ -1,0 +1,17 @@
+/* VMF-018: f64 add sub mul div plus comparisons -- cross-backend behavioral parity. */
+fn main() -> i32 {
+    let a: f64 = 3.5;
+    let b: f64 = 1.25;
+    let s: f64 = a + b;
+    let d: f64 = a - b;
+    let p: f64 = a * b;
+    let q: f64 = a / b;
+    let mut code: i32 = 0;
+    if s > 4.74 { if s < 4.76 { code = code + 1; } }
+    if d > 2.24 { if d < 2.26 { code = code + 2; } }
+    if p > 4.37 { if p < 4.38 { code = code + 4; } }
+    if q > 2.79 { if q < 2.81 { code = code + 8; } }
+    let n: f64 = 0.0 - a;
+    if n < 0.0 { code = code + 16; }
+    return code;
+}

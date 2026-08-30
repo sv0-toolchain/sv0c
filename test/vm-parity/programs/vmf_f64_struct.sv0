@@ -1,0 +1,17 @@
+/* VMF-018: f64-field struct construction + field access + arithmetic. */
+struct Pair2 { hi: f64, lo: f64 }
+fn sum(p: Pair2) -> f64 {
+    let a: f64 = p.hi;
+    let b: f64 = p.lo;
+    return a + b;
+}
+fn main() -> i32 {
+    let q: Pair2 = Pair2 { hi: 6.0, lo: 2.5 };
+    let s: f64 = sum(q);
+    if s > 8.49 {
+        if s < 8.51 {
+            return 42;
+        }
+    }
+    return 0;
+}
