@@ -76,6 +76,9 @@ recipe).
 
 **`sv0-mathlib` consumes this** — its `scripts/ci` runs the same harness (which
 picks up `--project ../sv0-mathlib`), closing COMPAT-001 / COMPAT-002 / TEST-005
-for the exit-code surface. The per-fixture bit/ULP diff over its
-`test/fixtures/*.csv` tables (BL-048 / BL-090) remains C-backend-only and is
-tracked as future polish.
+for the exit-code surface. It also runs its own `scripts/run_fixture_parity.py`,
+which generates one `fn main()` check per row of `test/fixtures/{rounding,trig}.csv`
+and runs it through BOTH backends, asserting each result matches the fixture's
+expected value and that the C and VM exit codes agree — the per-fixture surface.
+The broad full-domain ULP sweep in `sv0-mathlib/docs/ulp_audit_harness.c` stays
+C-backend-only by design (it needs `<math.h>` as its reference oracle).
