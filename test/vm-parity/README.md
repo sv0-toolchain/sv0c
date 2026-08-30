@@ -57,18 +57,25 @@ to the **native** VM emitter + the `sv0vm` interpreter.
 Then compare:
 
 - **integer / i64 / u64 / modular:** results MUST be **bit-identical** (COMPAT-001).
-- **floating-point:** results MUST agree **within the fixture's pinned ULP bound**
-  (COMPAT-002). Use the bit-pattern-ordering ULP metric from
-  `sv0-mathlib/docs/ulp_audit_harness.c` (monotonic ordering of IEEE-754 doubles,
-  near-zero absolute-error fallback). A divergence beyond the bound is a **release
-  blocker**, not a documented limitation.
+- **floating-point:** a fixture whose check is not exit-code-based would need a
+  ULP compare (bit-pattern-ordering metric, `sv0-mathlib/docs/ulp_audit_harness.c`).
+  None exist yet — every current fixture (and `sv0-mathlib`'s own `main.sv0`)
+  reduces its result to an exit code, which already exercises the f64
+  arithmetic / comparison paths.
 
-**Regression tripwire:** because there is no cross-impl byte-oracle, each Tier-3
-fixture also gets a **checked-in behavioral golden** (expected stdout+exit,
-captured once and reviewed in the landing PR). `scripts/sv0`'s
-`run_vm_parity_behavioral()` (parallel to `run_vm_parity_tier2_emit_compare`, NOT
-the `cmp` path) replays it. Fixtures live in `test/vm-parity/programs/` and are
-listed in a new `behavioral-manifest.txt`.
+**Status (2026-08-29): implemented.** `scripts/vm_behavioral_parity.py` reads
+`behavioral-manifest.txt` (this dir) — one entry per line, a repo-root-relative
+`.sv0` path or `--project <dir>` (an absent `--project` dir is skipped: the
+sibling `sv0-mathlib` checkout is present in `sv0-mathlib`'s CI, absent in
+`sv0-toolchain`'s). Fixtures: `programs/vmf_f64_*.sv0`, `programs/vmf_i64_*.sv0`,
+plus `int_min` / `contracts` and the optional `--project ../sv0-mathlib`. Run it
+via `./scripts/sv0 vm-behavioral-parity`; it is also a step in `./scripts/sv0
+test` (after tier-2) and in `.github/workflows/vm-parity-tier2.yml`. C emit goes
+through `native_exe_canonical_compile.compile_and_publish` (no manual `cc`
+recipe).
 
-**`sv0-mathlib` consumes this** via the same harness across its `test/fixtures/*.csv`
-tables (`sv0-mathlib` BL-048 / BL-090); that closes its TEST-005.
+**`sv0-mathlib` consumes this** — its `scripts/ci` runs the same harness (which
+picks up `--project ../sv0-mathlib`), closing COMPAT-001 / COMPAT-002 / TEST-005
+for the exit-code surface. The per-fixture bit/ULP diff over its
+`test/fixtures/*.csv` tables (BL-048 / BL-090) remains C-backend-only and is
+tracked as future polish.
