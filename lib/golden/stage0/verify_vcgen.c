@@ -2545,18 +2545,23 @@ static int vc_type_is_narrow(const char* nm) {
     return 1;
   } else {
   }
-  int _sv0t1 = sv0_string_eq(nm, "u16");
+  int _sv0t1 = sv0_string_eq(nm, "byte");
   if (_sv0t1) {
     return 1;
   } else {
   }
-  int _sv0t2 = sv0_string_eq(nm, "i8");
+  int _sv0t2 = sv0_string_eq(nm, "u16");
   if (_sv0t2) {
     return 1;
   } else {
   }
-  int _sv0t3 = sv0_string_eq(nm, "i16");
+  int _sv0t3 = sv0_string_eq(nm, "i8");
   if (_sv0t3) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_string_eq(nm, "i16");
+  if (_sv0t4) {
     return 1;
   } else {
   }
@@ -2585,13 +2590,18 @@ static int vc_type_hi(const char* nm) {
     return 255;
   } else {
   }
-  int _sv0t1 = sv0_string_eq(nm, "i8");
+  int _sv0t1 = sv0_string_eq(nm, "byte");
   if (_sv0t1) {
+    return 255;
+  } else {
+  }
+  int _sv0t2 = sv0_string_eq(nm, "i8");
+  if (_sv0t2) {
     return 127;
   } else {
   }
-  int _sv0t2 = sv0_string_eq(nm, "i16");
-  if (_sv0t2) {
+  int _sv0t3 = sv0_string_eq(nm, "i16");
+  if (_sv0t3) {
     return 32767;
   } else {
   }

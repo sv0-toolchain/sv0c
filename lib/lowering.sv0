@@ -5114,6 +5114,7 @@ fn ast_ty_to_c_string(name: string) -> string {
     if string_eq(name, "bool") { return "int"; }
     if string_eq(name, "i8") { return "int8_t"; }
     if string_eq(name, "u8") { return "uint8_t"; }
+    if string_eq(name, "byte") { return "uint8_t"; }
     if string_eq(name, "i16") { return "int16_t"; }
     if string_eq(name, "u16") { return "uint16_t"; }
     if string_eq(name, "i64") { return "int64_t"; }
@@ -5147,6 +5148,7 @@ fn ast_ty_to_c_string(name: string) -> string {
 fn is_wide_primitive_ty_name(name: string) -> bool {
     if string_eq(name, "i8") { return true; }
     if string_eq(name, "u8") { return true; }
+    if string_eq(name, "byte") { return true; }
     if string_eq(name, "i16") { return true; }
     if string_eq(name, "u16") { return true; }
     if string_eq(name, "i64") { return true; }
@@ -7041,6 +7043,8 @@ fn test_ty_to_c() -> i32 {
     if string_eq(ast_ty_to_c_string("Vec"), "int") != true { return 7; }
     if string_eq(ast_ty_to_c_string("Box"), "int") != true { return 8; }
     if string_eq(ast_ty_to_c_string("u8"), "uint8_t") != true { return 9; }
+    if string_eq(ast_ty_to_c_string("byte"), "uint8_t") != true { return 14; }
+    if is_wide_primitive_ty_name("byte") != true { return 15; }
     if string_eq(ast_ty_to_c_string("isize"), "intptr_t") != true { return 10; }
     if is_void_cty("void") != true { return 11; }
     if is_void_cty("unit") != true { return 12; }

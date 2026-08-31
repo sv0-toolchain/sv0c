@@ -182,6 +182,7 @@ fn ast_type_name_to_tag(name: string) -> i32 {
     if string_eq(name, "u128") { return 1; }
     if string_eq(name, "i8") { return 0; }
     if string_eq(name, "u8") { return 1; }
+    if string_eq(name, "byte") { return 1; }
     if string_eq(name, "i16") { return 0; }
     if string_eq(name, "u16") { return 1; }
     if string_eq(name, "isize") { return 8; }
@@ -201,6 +202,7 @@ fn is_primitive_type_name(name: string) -> bool {
 fn int_width_from_name(name: string) -> i32 {
     if string_eq(name, "i8") { return 8; }
     if string_eq(name, "u8") { return 8; }
+    if string_eq(name, "byte") { return 8; }
     if string_eq(name, "i16") { return 16; }
     if string_eq(name, "u16") { return 16; }
     if string_eq(name, "i32") { return 32; }
@@ -234,6 +236,7 @@ fn ast_ty_to_types_tag(name: string) -> i32 {
     if string_eq(name, "i64") { return 7; }
     if string_eq(name, "i128") { return 7; }
     if string_eq(name, "u8") { return 8; }
+    if string_eq(name, "byte") { return 8; }
     if string_eq(name, "u16") { return 8; }
     if string_eq(name, "u32") { return 8; }
     if string_eq(name, "u64") { return 8; }
@@ -4380,6 +4383,11 @@ fn test_ast_type_names() -> i32 {
     if int_width_from_name("u8") != 8 { return 13; }
     if int_width_from_name("f64") != 64 { return 14; }
     if int_width_from_name("bool") != 0 { return 15; }
+    /* `byte` is the normative alias of `u8` (sv0doc §4.1; SPEC UP-018). */
+    if ast_type_name_to_tag("byte") != 1 { return 16; }
+    if is_primitive_type_name("byte") != true { return 17; }
+    if int_width_from_name("byte") != 8 { return 18; }
+    if ast_ty_to_types_tag("byte") != 8 { return 19; }
     return 0;
 }
 

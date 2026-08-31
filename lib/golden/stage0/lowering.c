@@ -9084,73 +9084,78 @@ static const char* ast_ty_to_c_string(const char* name) {
     return "uint8_t";
   } else {
   }
-  int _sv0t5 = sv0_string_eq(name, "i16");
+  int _sv0t5 = sv0_string_eq(name, "byte");
   if (_sv0t5) {
+    return "uint8_t";
+  } else {
+  }
+  int _sv0t6 = sv0_string_eq(name, "i16");
+  if (_sv0t6) {
     return "int16_t";
   } else {
   }
-  int _sv0t6 = sv0_string_eq(name, "u16");
-  if (_sv0t6) {
+  int _sv0t7 = sv0_string_eq(name, "u16");
+  if (_sv0t7) {
     return "uint16_t";
   } else {
   }
-  int _sv0t7 = sv0_string_eq(name, "i64");
-  if (_sv0t7) {
+  int _sv0t8 = sv0_string_eq(name, "i64");
+  if (_sv0t8) {
     return "int64_t";
   } else {
   }
-  int _sv0t8 = sv0_string_eq(name, "u64");
-  if (_sv0t8) {
+  int _sv0t9 = sv0_string_eq(name, "u64");
+  if (_sv0t9) {
     return "uint64_t";
   } else {
   }
-  int _sv0t9 = sv0_string_eq(name, "u32");
-  if (_sv0t9) {
+  int _sv0t10 = sv0_string_eq(name, "u32");
+  if (_sv0t10) {
     return "uint32_t";
   } else {
   }
-  int _sv0t10 = sv0_string_eq(name, "f32");
-  if (_sv0t10) {
+  int _sv0t11 = sv0_string_eq(name, "f32");
+  if (_sv0t11) {
     return "float";
   } else {
   }
-  int _sv0t11 = sv0_string_eq(name, "f64");
-  if (_sv0t11) {
+  int _sv0t12 = sv0_string_eq(name, "f64");
+  if (_sv0t12) {
     return "double";
   } else {
   }
-  int _sv0t12 = sv0_string_eq(name, "isize");
-  if (_sv0t12) {
+  int _sv0t13 = sv0_string_eq(name, "isize");
+  if (_sv0t13) {
     return "intptr_t";
   } else {
   }
-  int _sv0t13 = sv0_string_eq(name, "usize");
-  if (_sv0t13) {
+  int _sv0t14 = sv0_string_eq(name, "usize");
+  if (_sv0t14) {
     return "uintptr_t";
   } else {
   }
-  int _sv0t14 = sv0_string_eq(name, "string");
-  if (_sv0t14) {
-    return "const char*";
-  } else {
-  }
-  int _sv0t15 = sv0_string_eq(name, "str");
+  int _sv0t15 = sv0_string_eq(name, "string");
   if (_sv0t15) {
     return "const char*";
   } else {
   }
-  int _sv0t16 = sv0_string_eq(name, "String");
+  int _sv0t16 = sv0_string_eq(name, "str");
   if (_sv0t16) {
     return "const char*";
   } else {
   }
-  int _sv0t17 = sv0_string_eq(name, "Vec");
+  int _sv0t17 = sv0_string_eq(name, "String");
   if (_sv0t17) {
+    return "const char*";
+  } else {
+  }
+  int _sv0t18 = sv0_string_eq(name, "Vec");
+  if (_sv0t18) {
     return "int";
   } else {
   }
-  int _sv0t18 = sv0_string_eq(name, "Box");
-  if (_sv0t18) {
+  int _sv0t19 = sv0_string_eq(name, "Box");
+  if (_sv0t19) {
     return "int";
   } else {
   }
@@ -9168,48 +9173,53 @@ static int is_wide_primitive_ty_name(const char* name) {
     return 1;
   } else {
   }
-  int _sv0t2 = sv0_string_eq(name, "i16");
+  int _sv0t2 = sv0_string_eq(name, "byte");
   if (_sv0t2) {
     return 1;
   } else {
   }
-  int _sv0t3 = sv0_string_eq(name, "u16");
+  int _sv0t3 = sv0_string_eq(name, "i16");
   if (_sv0t3) {
     return 1;
   } else {
   }
-  int _sv0t4 = sv0_string_eq(name, "i64");
+  int _sv0t4 = sv0_string_eq(name, "u16");
   if (_sv0t4) {
     return 1;
   } else {
   }
-  int _sv0t5 = sv0_string_eq(name, "u64");
+  int _sv0t5 = sv0_string_eq(name, "i64");
   if (_sv0t5) {
     return 1;
   } else {
   }
-  int _sv0t6 = sv0_string_eq(name, "u32");
+  int _sv0t6 = sv0_string_eq(name, "u64");
   if (_sv0t6) {
     return 1;
   } else {
   }
-  int _sv0t7 = sv0_string_eq(name, "f32");
+  int _sv0t7 = sv0_string_eq(name, "u32");
   if (_sv0t7) {
     return 1;
   } else {
   }
-  int _sv0t8 = sv0_string_eq(name, "f64");
+  int _sv0t8 = sv0_string_eq(name, "f32");
   if (_sv0t8) {
     return 1;
   } else {
   }
-  int _sv0t9 = sv0_string_eq(name, "isize");
+  int _sv0t9 = sv0_string_eq(name, "f64");
   if (_sv0t9) {
     return 1;
   } else {
   }
-  int _sv0t10 = sv0_string_eq(name, "usize");
+  int _sv0t10 = sv0_string_eq(name, "isize");
   if (_sv0t10) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = sv0_string_eq(name, "usize");
+  if (_sv0t11) {
     return 1;
   } else {
   }
@@ -11973,24 +11983,35 @@ static int test_ty_to_c(void) {
     return 9;
   } else {
   }
-  const char* _sv0t18 = ast_ty_to_c_string("isize");
-  int _sv0t19 = sv0_string_eq(_sv0t18, "intptr_t");
+  const char* _sv0t18 = ast_ty_to_c_string("byte");
+  int _sv0t19 = sv0_string_eq(_sv0t18, "uint8_t");
   if ((_sv0t19 != 1)) {
+    return 14;
+  } else {
+  }
+  int _sv0t20 = is_wide_primitive_ty_name("byte");
+  if ((_sv0t20 != 1)) {
+    return 15;
+  } else {
+  }
+  const char* _sv0t21 = ast_ty_to_c_string("isize");
+  int _sv0t22 = sv0_string_eq(_sv0t21, "intptr_t");
+  if ((_sv0t22 != 1)) {
     return 10;
   } else {
   }
-  int _sv0t20 = is_void_cty("void");
-  if ((_sv0t20 != 1)) {
+  int _sv0t23 = is_void_cty("void");
+  if ((_sv0t23 != 1)) {
     return 11;
   } else {
   }
-  int _sv0t21 = is_void_cty("unit");
-  if ((_sv0t21 != 1)) {
+  int _sv0t24 = is_void_cty("unit");
+  if ((_sv0t24 != 1)) {
     return 12;
   } else {
   }
-  int _sv0t22 = is_void_cty("int");
-  if ((_sv0t22 != 0)) {
+  int _sv0t25 = is_void_cty("int");
+  if ((_sv0t25 != 0)) {
     return 13;
   } else {
   }
