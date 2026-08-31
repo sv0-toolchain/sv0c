@@ -124,6 +124,11 @@ fn unop_result_ty_tag(op_tag: i32) -> i32 {
     if op_tag == 0 { return TY_INT(); }
     if op_tag == 1 { return TY_BOOL(); }
     if op_tag == 2 { return TY_INT(); }
+    /* Ref (4) / RefMut (5): `&e` / `&mut e`. Previously fell through to
+       TY_UNKNOWN, which made `let r = &e;` fail check with no diagnostic
+       (the LetStmt RHS only requires synth >= 0). SS-U03b b3. */
+    if op_tag == 4 { return TY_REF(); }
+    if op_tag == 5 { return TY_REFMUT(); }
     return TY_UNKNOWN();
 }
 
@@ -168,6 +173,13 @@ fn TY_REFMUT() -> i32 { return 13; }
 fn TY_TUPLE() -> i32 { return 14; }
 fn TY_NAMED() -> i32 { return 15; }
 fn TY_VAR() -> i32 { return 16; }
+/* Slice views (SS-U03b b3). Distinct from TY_REF so lowering (b4) can tell
+   `&s[a..b]` / `&s[..]` from a plain `&T` and emit sv0_slice_* rather than
+   sv0_vec_*. The checker stays width-agnostic — no element type is carried
+   in the tag (byte/i32 both read back as TY_INT on indexing), matching how
+   the rest of this checker treats primitives. */
+fn TY_SLICE() -> i32 { return 17; }
+fn TY_SLICEMUT() -> i32 { return 18; }
 fn TY_UNKNOWN() -> i32 { return 0 - 1; }
 
 fn ast_type_name_to_tag(name: string) -> i32 {
@@ -3731,6 +3743,20 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
            hardcoded TY_INT. Not (1) still resolves to TY_BOOL. */
         if unop_tag == 0 { return op_ty; }
         if unop_tag == 2 { return op_ty; }
+        /* Deref (3): `*e` — best-effort pass-through of the operand type
+           (refs carry no pointee tag here). SS-U03b b3. */
+        if unop_tag == 3 { return op_ty; }
+        /* Ref (4) / RefMut (5) of a slice view: `&s[a..b]` is slice
+           construction, not a double reference — keep it a slice so
+           lowering (b4) picks sv0_slice_* over sv0_vec_*. SS-U03b b3. */
+        if unop_tag == 4 {
+            if op_ty == TY_SLICE() { return TY_SLICE(); }
+            if op_ty == TY_SLICEMUT() { return TY_SLICE(); }
+        }
+        if unop_tag == 5 {
+            if op_ty == TY_SLICE() { return TY_SLICEMUT(); }
+            if op_ty == TY_SLICEMUT() { return TY_SLICEMUT(); }
+        }
         return unop_result_ty_tag(unop_tag);
     }
     if tag == 3 {
@@ -3867,6 +3893,10 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                       ret_ty, loop_depth,
                                       index_idx);
         if idx_ty < 0 { return 0 - 1; }
+        /* `e[lo..hi]` / `e[..]` — an ExprRange index makes this slice
+           construction, not an element load. SS-U03b b3. Plain scalar
+           index still reads back as TY_INT (width-agnostic, as before). */
+        if vec_get(et, index_idx) == 21 { return TY_SLICE(); }
         return TY_INT();
     }
     if tag == 10 {
@@ -5001,6 +5031,8 @@ fn test_binop_unop_result_ty() -> i32 {
     if unop_result_ty_tag(1) != TY_BOOL() { return 6; }
     if unop_result_ty_tag(2) != TY_INT() { return 7; }
     if unop_result_ty_tag(99) != TY_UNKNOWN() { return 8; }
+    if unop_result_ty_tag(4) != TY_REF() { return 9; }
+    if unop_result_ty_tag(5) != TY_REFMUT() { return 10; }
     return 0;
 }
 
