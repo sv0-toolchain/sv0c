@@ -65,17 +65,16 @@ Then compare:
 
 **Status (2026-08-29): implemented.** `scripts/vm_behavioral_parity.py` reads
 `behavioral-manifest.txt` (this dir) — one entry per line, a repo-root-relative
-`.sv0` path or `--project <dir>` (an absent `--project` dir is skipped: the
-sibling `sv0-mathlib` checkout is present in `sv0-mathlib`'s CI, absent in
-`sv0-toolchain`'s). Fixtures: `programs/vmf_f64_*.sv0`, `programs/vmf_i64_*.sv0`,
-plus `int_min` / `contracts` and the optional `--project ../sv0-mathlib`. Run it
-via `./scripts/sv0 vm-behavioral-parity`; it is also a step in `./scripts/sv0
-test` (after tier-2) and in `.github/workflows/vm-parity-tier2.yml`. C emit goes
-through `native_exe_canonical_compile.compile_and_publish` (no manual `cc`
-recipe).
+`.sv0` path or `--project <dir>` (an absent `--project` dir is skipped). Fixtures:
+`programs/vmf_f64_*.sv0`, `programs/vmf_i64_*.sv0`, plus `int_min` / `contracts`
+and `--project sv0-mathlib` (the `sv0-mathlib` submodule — present in every
+recursive checkout). Run it via `./scripts/sv0 vm-behavioral-parity`; it is also a
+step in `./scripts/sv0 test` (after tier-2) and in
+`.github/workflows/vm-parity-tier2.yml`. C emit goes through
+`native_exe_canonical_compile.compile_and_publish` (no manual `cc` recipe).
 
-**`sv0-mathlib` consumes this** — its `scripts/ci` runs the same harness (which
-picks up `--project ../sv0-mathlib`), closing COMPAT-001 / COMPAT-002 / TEST-005
+**`sv0-mathlib` also consumes this** — its own `scripts/ci` runs the same
+harness (`--project sv0-mathlib`), closing COMPAT-001 / COMPAT-002 / TEST-005
 for the exit-code surface. It also runs its own `scripts/run_fixture_parity.py`,
 which generates one `fn main()` check per row of `test/fixtures/{rounding,trig}.csv`
 and runs it through BOTH backends, asserting each result matches the fixture's

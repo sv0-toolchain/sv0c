@@ -1,8 +1,9 @@
 # VMF-018: cross-backend behavioral parity (scripts/vm_behavioral_parity.py).
 # Each entry is run through native emit-c->cc->run AND native VM-emit->sv0vm;
 # exit code + stdout must match. Paths are repo-root-relative; a `--project`
-# dir that is absent is SKIPPED (the sibling sv0-mathlib checkout is present
-# in sv0-mathlib CI, absent in sv0-toolchain CI).
+# dir that is absent is SKIPPED. `sv0-mathlib` is a submodule of
+# `sv0-toolchain`, so `--project sv0-mathlib` runs in every recursive
+# checkout (init the submodule to include it).
 sv0c/test/vm-parity/programs/vmf_f64_arith.sv0
 sv0c/test/vm-parity/programs/vmf_f64_struct.sv0
 sv0c/test/vm-parity/programs/vmf_f64_contract.sv0
@@ -10,4 +11,4 @@ sv0c/test/vm-parity/programs/vmf_f64_dd.sv0
 sv0c/test/vm-parity/programs/vmf_i64_arith.sv0
 sv0c/test/integration/int_min/int_min.sv0
 sv0c/test/integration/contracts/contracts.sv0
---project ../sv0-mathlib
+--project sv0-mathlib
