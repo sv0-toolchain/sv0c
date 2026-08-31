@@ -1739,19 +1739,122 @@ fn parse_postfix_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 }
             } else {
                 if t == 10 {
-                    let ix_p: i32 = parse_expr_sf(tags, starts, ends, source,
-                                                p + 1, et, ed1, ed2, ed3,
-                                                ed4, pp, sf_names, 1);
-                    if ix_p < 0 { return 0 - 1; }
-                    let ix_idx: i32 = vec_len(et) - 1;
-                    if ps_peek(tags, ix_p) != 11 { return 0 - 1; }
-                    vec_push(et, 8);
-                    vec_push(ed1, cur);
-                    vec_push(ed2, ix_idx);
-                    vec_push(ed3, 0);
-                    vec_push(ed4, 0);
-                    cur = vec_len(et) - 1;
-                    p = ix_p + 1;
+                    /* `[` postfix: plain index `e[i]`, or a slicing range
+                       `e[..]` / `e[..hi]` / `e[lo..]` / `e[lo..hi]`. A range
+                       operand is encoded as ExprRange (tag 21) with
+                       d1=lo_idx (-1 = open) and d2=hi_idx (-1 = open); the
+                       enclosing node is still ExprIndex (tag 8). SS-U03b b2:
+                       previously the bracket body was parsed with
+                       `parse_expr_sf`, which made bare `[..]` / `[lo..]` a
+                       syntax error and let `[lo..hi]` through only as a
+                       whole-range ExprRange the seed lowering then dropped. */
+                    let a1: i32 = ps_peek(tags, p + 1);
+                    if a1 == 17 {
+                        /* leading `..` → open low bound */
+                        if ps_peek(tags, p + 2) == 11 {
+                            /* `[..]` full range */
+                            vec_push(et, 21);
+                            vec_push(ed1, 0 - 1);
+                            vec_push(ed2, 0 - 1);
+                            vec_push(ed3, 0);
+                            vec_push(ed4, 0);
+                            let rng_idx: i32 = vec_len(et) - 1;
+                            vec_push(et, 8);
+                            vec_push(ed1, cur);
+                            vec_push(ed2, rng_idx);
+                            vec_push(ed3, 0);
+                            vec_push(ed4, 0);
+                            cur = vec_len(et) - 1;
+                            p = p + 3;
+                        } else {
+                            /* `[..hi]` */
+                            let hp: i32 = parse_expr_sf(tags, starts, ends,
+                                                       source, p + 2, et, ed1,
+                                                       ed2, ed3, ed4, pp,
+                                                       sf_names, 1);
+                            if hp < 0 { return 0 - 1; }
+                            let hi_idx: i32 = vec_len(et) - 1;
+                            if ps_peek(tags, hp) != 11 { return 0 - 1; }
+                            vec_push(et, 21);
+                            vec_push(ed1, 0 - 1);
+                            vec_push(ed2, hi_idx);
+                            vec_push(ed3, 0);
+                            vec_push(ed4, 0);
+                            let rng_idx: i32 = vec_len(et) - 1;
+                            vec_push(et, 8);
+                            vec_push(ed1, cur);
+                            vec_push(ed2, rng_idx);
+                            vec_push(ed3, 0);
+                            vec_push(ed4, 0);
+                            cur = vec_len(et) - 1;
+                            p = hp + 1;
+                        }
+                    } else {
+                        /* Parse the first operand with `parse_or_expr` so it
+                           stops before a `..` (range is lower precedence);
+                           throwaway ty arenas since no type appears here. */
+                        let bt: Vec<i32> = vec_new();
+                        let bd1: Vec<i32> = vec_new();
+                        let bd2: Vec<i32> = vec_new();
+                        let bd3: Vec<i32> = vec_new();
+                        let fp: i32 = parse_or_expr(tags, starts, ends, source,
+                                                    p + 1, et, ed1, ed2, ed3,
+                                                    ed4, pp, sf_names,
+                                                    bt, bd1, bd2, bd3, 1);
+                        if fp < 0 { return 0 - 1; }
+                        let first_idx: i32 = vec_len(et) - 1;
+                        let nt: i32 = ps_peek(tags, fp);
+                        if nt == 11 {
+                            /* plain `e[i]` */
+                            vec_push(et, 8);
+                            vec_push(ed1, cur);
+                            vec_push(ed2, first_idx);
+                            vec_push(ed3, 0);
+                            vec_push(ed4, 0);
+                            cur = vec_len(et) - 1;
+                            p = fp + 1;
+                        } else {
+                            if nt != 17 { return 0 - 1; }
+                            if ps_peek(tags, fp + 1) == 11 {
+                                /* `[lo..]` */
+                                vec_push(et, 21);
+                                vec_push(ed1, first_idx);
+                                vec_push(ed2, 0 - 1);
+                                vec_push(ed3, 0);
+                                vec_push(ed4, 0);
+                                let rng_idx2: i32 = vec_len(et) - 1;
+                                vec_push(et, 8);
+                                vec_push(ed1, cur);
+                                vec_push(ed2, rng_idx2);
+                                vec_push(ed3, 0);
+                                vec_push(ed4, 0);
+                                cur = vec_len(et) - 1;
+                                p = fp + 2;
+                            } else {
+                                /* `[lo..hi]` */
+                                let hp2: i32 = parse_expr_sf(tags, starts, ends,
+                                                            source, fp + 1, et,
+                                                            ed1, ed2, ed3, ed4,
+                                                            pp, sf_names, 1);
+                                if hp2 < 0 { return 0 - 1; }
+                                let hi_idx2: i32 = vec_len(et) - 1;
+                                if ps_peek(tags, hp2) != 11 { return 0 - 1; }
+                                vec_push(et, 21);
+                                vec_push(ed1, first_idx);
+                                vec_push(ed2, hi_idx2);
+                                vec_push(ed3, 0);
+                                vec_push(ed4, 0);
+                                let rng_idx3: i32 = vec_len(et) - 1;
+                                vec_push(et, 8);
+                                vec_push(ed1, cur);
+                                vec_push(ed2, rng_idx3);
+                                vec_push(ed3, 0);
+                                vec_push(ed4, 0);
+                                cur = vec_len(et) - 1;
+                                p = hp2 + 1;
+                            }
+                        }
+                    }
                 } else {
                     if t == 34 {
                         /* `expr?` postfix -> ExprTry (tag 22, d1=inner). Lowering
@@ -5269,6 +5372,71 @@ fn test_parse_expr_index() -> i32 {
     return 0;
 }
 
+/* SS-U03b b2: `a[..]` — full-range slice in index position. Previously a
+   hard syntax error; now an ExprIndex (tag 8) whose index operand is an
+   ExprRange (tag 21) with both bounds open (d1 == d2 == -1). */
+fn test_parse_expr_index_range_full() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 10); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 17); vec_push(starts, 2); vec_push(ends, 4);
+    vec_push(tags, 11); vec_push(starts, 4); vec_push(ends, 5);
+    vec_push(tags, 97); vec_push(starts, 5); vec_push(ends, 5);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "a[..]", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 4 { return 1; }
+    if vec_len(et) != 3 { return 2; }
+    if vec_get(et, 0) != 1 { return 3; }
+    if vec_get(et, 1) != 21 { return 4; }
+    if vec_get(et, 2) != 8 { return 5; }
+    if vec_get(ed1, 1) != 0 - 1 { return 6; }
+    if vec_get(ed2, 1) != 0 - 1 { return 7; }
+    if vec_get(ed1, 2) != 0 { return 8; }
+    if vec_get(ed2, 2) != 1 { return 9; }
+    return 0;
+}
+
+/* SS-U03b b2: `a[1..3]` — bounded range carried through as ExprRange with
+   both bounds present (the seed dropped the upper bound entirely). */
+fn test_parse_expr_index_range_bounded() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 5); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 10); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 0); vec_push(starts, 2); vec_push(ends, 3);
+    vec_push(tags, 17); vec_push(starts, 3); vec_push(ends, 5);
+    vec_push(tags, 0); vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(tags, 11); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 97); vec_push(starts, 7); vec_push(ends, 7);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "a[1..3]", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 6 { return 1; }
+    if vec_len(et) != 5 { return 2; }
+    if vec_get(et, 0) != 1 { return 3; }
+    if vec_get(et, 3) != 21 { return 4; }
+    if vec_get(et, 4) != 8 { return 5; }
+    if vec_get(ed1, 3) != 1 { return 6; }
+    if vec_get(ed2, 3) != 2 { return 7; }
+    if vec_get(ed1, 4) != 0 { return 8; }
+    if vec_get(ed2, 4) != 3 { return 9; }
+    return 0;
+}
+
 fn test_parse_block_empty() -> i32 {
     let tags: Vec<i32> = vec_new();
     let starts: Vec<i32> = vec_new();
@@ -6507,5 +6675,9 @@ fn main() -> i32 {
     if r72 != 0 { return 830 + r72; }
     let r73: i32 = test_parse_program();
     if r73 != 0 { return 840 + r73; }
+    let r74: i32 = test_parse_expr_index_range_full();
+    if r74 != 0 { return 850 + r74; }
+    let r75: i32 = test_parse_expr_index_range_bounded();
+    if r75 != 0 { return 860 + r75; }
     return 0;
 }
