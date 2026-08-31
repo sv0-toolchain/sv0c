@@ -8,6 +8,7 @@ sv0c/test/vm-parity/programs/vmf_f64_arith.sv0
 sv0c/test/vm-parity/programs/vmf_f64_struct.sv0
 sv0c/test/vm-parity/programs/vmf_f64_contract.sv0
 sv0c/test/vm-parity/programs/vmf_f64_dd.sv0
+sv0c/test/vm-parity/programs/vmf_byte_alias.sv0
 sv0c/test/vm-parity/programs/vmf_i64_arith.sv0
 sv0c/test/integration/int_min/int_min.sv0
 sv0c/test/integration/contracts/contracts.sv0

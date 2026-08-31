@@ -483,6 +483,7 @@ fn res_is_prelude_type(name: string) -> bool {
     if string_eq(name, "i64") { return true; }
     if string_eq(name, "i128") { return true; }
     if string_eq(name, "u8") { return true; }
+    if string_eq(name, "byte") { return true; }
     if string_eq(name, "u16") { return true; }
     if string_eq(name, "u32") { return true; }
     if string_eq(name, "u64") { return true; }
@@ -2002,6 +2003,8 @@ fn test_res_type_exists() -> i32 {
     if res_type_exists(mt, "i32", source, starts, ends) != true { return 2; }
     if res_type_exists(mt, "bool", source, starts, ends) != true { return 3; }
     if res_type_exists(mt, "Nope", source, starts, ends) != false { return 4; }
+    /* `byte` is the normative alias of `u8` (sv0doc §4.1; SPEC UP-018). */
+    if res_type_exists(mt, "byte", source, starts, ends) != true { return 5; }
     return 0;
 }
 

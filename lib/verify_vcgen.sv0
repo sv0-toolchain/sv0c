@@ -1334,6 +1334,7 @@ fn verify_trait_contracts(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id3: Vec<i
    runtime check is kept. ──────────────────────────────────────────────────── */
 fn vc_type_is_narrow(nm: string) -> bool {
     if string_eq(nm, "u8") { return true; }
+    if string_eq(nm, "byte") { return true; }
     if string_eq(nm, "u16") { return true; }
     if string_eq(nm, "i8") { return true; }
     if string_eq(nm, "i16") { return true; }
@@ -1346,6 +1347,7 @@ fn vc_type_lo(nm: string) -> i32 {
 }
 fn vc_type_hi(nm: string) -> i32 {
     if string_eq(nm, "u8") { return 255; }
+    if string_eq(nm, "byte") { return 255; }
     if string_eq(nm, "i8") { return 127; }
     if string_eq(nm, "i16") { return 32767; }
     return 65535;

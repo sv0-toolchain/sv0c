@@ -1,0 +1,26 @@
+/* `byte` (normative alias of `u8`, sv0doc §4.1 / SPEC UP-018) must produce
+ * the same result on the native C and native VM emitters. Values stay in
+ * 0..255. main returns 0 on success (parity harness compares exit + stdout).
+ */
+fn sum3(a: byte, b: byte, c: byte) -> byte {
+    return a + b + c;
+}
+
+fn main() -> i32 {
+    let a: byte = 10;
+    let b: byte = 20;
+    let c: byte = 12;
+    let s: byte = sum3(a, b, c);
+    if s != 42 {
+        return 1;
+    }
+    let u: u8 = s;
+    if u != 42 {
+        return 2;
+    }
+    let d: byte = u - a;
+    if d != 32 {
+        return 3;
+    }
+    return 0;
+}

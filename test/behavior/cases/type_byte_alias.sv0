@@ -1,0 +1,22 @@
+/* `byte` is the normative alias of `u8` (sv0doc §4.1; sv0-strings SPEC UP-018).
+ * Exercises `byte` in a param, return, local, and let-annotation, and `byte`
+ * <-> `u8` interop. Values stay in 0..255 so no narrowing is relied on
+ * (u8/byte arithmetic width-narrowing is a separate VM-backend gap).
+ * `native` leg: the frozen SML `--target=vm` path predates the alias.
+ * main returns 42.
+ */
+fn add_bytes(a: byte, b: byte) -> byte {
+    return a + b;
+}
+
+fn main() -> i32 {
+    let x: byte = 40;
+    let y: byte = 2;
+    let z: byte = add_bytes(x, y);
+    let u: u8 = z;
+    let back: byte = u;
+    if back != 42 {
+        return 1;
+    }
+    return back as i32;
+}
