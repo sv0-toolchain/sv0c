@@ -128,6 +128,71 @@ static inline void sv0_vec_set(int32_t h, int32_t idx, intptr_t val) {
   sv0_vec_table[h].data[idx] = val;
 }
 
+/* Slice `&[T]` / `&mut [T]` (SS-U03b, sv0-strings Track U).
+ *
+ * Runtime realization of the normative slice ABI in
+ * sv0doc/type-system/rules.md §2.2.1 (`T-SLICE-ABI-001`): a slice is a
+ * by-value two-word record `{ data: non-null *T, len: usize }` where `data`
+ * addresses element 0 of a contiguous run and `len` is the element count
+ * (not a byte count). `&mut [T]` shares this layout — mutability is enforced
+ * in the front end, not carried at runtime.
+ *
+ * In this bootstrap runtime every element is word-sized (`intptr_t`, as in
+ * `sv0_vec_table`), so `data` is an `intptr_t *` into a Vec's backing buffer.
+ * Constructing a slice copies nothing and never reallocs; the borrow rules
+ * (enforced pre-lowering, SS-U03d) keep the source pinned for the view's
+ * lifetime, so `data` cannot dangle across a `sv0_vec_push` realloc.
+ *
+ * `sv0_slice_from_vec` range-checks `0 <= lo <= hi <= len` at the slicing
+ * site (never an out-of-range pair), and `sv0_slice_get` / `sv0_slice_set`
+ * bounds-check `i < len` BEFORE touching memory (UP-003) — the same
+ * fail-closed panic class the VM backend must mirror (SS-U03c). */
+typedef struct {
+  intptr_t *data;
+  int32_t len;
+} sv0_slice;
+
+static inline sv0_slice sv0_slice_full_vec(int32_t h) {
+  sv0_slice s;
+  s.data = sv0_vec_table[h].data;
+  s.len = sv0_vec_table[h].len;
+  return s;
+}
+
+static inline sv0_slice sv0_slice_from_vec(int32_t h, int32_t lo, int32_t hi) {
+  int32_t n = sv0_vec_table[h].len;
+  if (lo < 0 || hi < lo || hi > n)
+    sv0_panic("slice: range out of bounds");
+  sv0_slice s;
+  s.data = sv0_vec_table[h].data + lo;
+  s.len = hi - lo;
+  return s;
+}
+
+static inline sv0_slice sv0_slice_subslice(sv0_slice src, int32_t lo,
+                                           int32_t hi) {
+  if (lo < 0 || hi < lo || hi > src.len)
+    sv0_panic("slice: range out of bounds");
+  sv0_slice s;
+  s.data = src.data + lo;
+  s.len = hi - lo;
+  return s;
+}
+
+static inline int32_t sv0_slice_len(sv0_slice s) { return s.len; }
+
+static inline intptr_t sv0_slice_get(sv0_slice s, int32_t idx) {
+  if (idx < 0 || idx >= s.len)
+    sv0_panic("slice: index out of bounds");
+  return s.data[idx];
+}
+
+static inline void sv0_slice_set(sv0_slice s, int32_t idx, intptr_t val) {
+  if (idx < 0 || idx >= s.len)
+    sv0_panic("slice: index out of bounds");
+  s.data[idx] = val;
+}
+
 /* Box<T> (T0-6): handle-based heap indirection for recursive types.
  * Each box_alloc(nwords) returns a handle into a flat word pool.
  * Used for recursive enum variants like Box<Expr> in AST definitions.
