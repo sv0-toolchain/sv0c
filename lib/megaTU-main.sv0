@@ -1095,6 +1095,13 @@ fn megatu_builtin_name(bid: i32) -> string {
     if bid == 17 { return "sv0_read_dir"; }
     if bid == 18 { return "sv0_write_bytes"; }
     if bid == 19 { return "sv0_getenv"; }
+    /* Slice builtins (SS-U03b b4). All take/return `int` handles, so no
+       megatu_builtin_ret_cty entry is needed (the default is int). */
+    if bid == 20 { return "sv0_slice_from_vec"; }
+    if bid == 21 { return "sv0_slice_full_vec"; }
+    if bid == 22 { return "sv0_idx_get"; }
+    if bid == 23 { return "sv0_idx_set"; }
+    if bid == 24 { return "sv0_slice_len"; }
     return "sv0_unknown_builtin";
 }
 

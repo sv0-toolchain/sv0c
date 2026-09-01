@@ -130,21 +130,24 @@ static inline void sv0_vec_set(int32_t h, int32_t idx, intptr_t val) {
 
 /* Slice `&[T]` / `&mut [T]` (SS-U03b, sv0-strings Track U).
  *
- * Runtime realization of the normative slice ABI in
- * sv0doc/type-system/rules.md §2.2.1 (`T-SLICE-ABI-001`): a slice is a
- * by-value two-word record `{ data: non-null *T, len: usize }` where `data`
- * addresses element 0 of a contiguous run and `len` is the element count
- * (not a byte count). `&mut [T]` shares this layout — mutability is enforced
- * in the front end, not carried at runtime.
+ * `sv0doc/type-system/rules.md` §2.2.1 (`T-SLICE-ABI-001`) is the normative
+ * *target* ABI: a by-value two-word record `{ data: non-null *T, len }`,
+ * `data` addressing element 0 of a contiguous run, `len` the element count.
+ * This bootstrap runtime realizes it the same way it realizes `Vec<T>` —
+ * indirectly, through a handle into a side table whose entries hold exactly
+ * that `{ data, len }` pair in that field order. A real by-value slice lands
+ * with a non-bootstrap backend; here a slice is an `int` handle so it needs
+ * no new C type in codegen and no per-local type tracking in lowering.
  *
- * In this bootstrap runtime every element is word-sized (`intptr_t`, as in
- * `sv0_vec_table`), so `data` is an `intptr_t *` into a Vec's backing buffer.
- * Constructing a slice copies nothing and never reallocs; the borrow rules
- * (enforced pre-lowering, SS-U03d) keep the source pinned for the view's
- * lifetime, so `data` cannot dangle across a `sv0_vec_push` realloc.
+ * The handle carries `SV0_SLICE_TAG` in a high bit so `sv0_idx_get` /
+ * `sv0_idx_set` can accept either a slice handle or a plain Vec/array handle
+ * (`e[i]` sugar lowers to those and must work for both). `data` points
+ * straight into the source Vec's buffer — no copy, no realloc; the borrow
+ * rules (enforced pre-lowering, SS-U03d) keep the source pinned so `data`
+ * cannot dangle across a `sv0_vec_push` realloc.
  *
  * `sv0_slice_from_vec` range-checks `0 <= lo <= hi <= len` at the slicing
- * site (never an out-of-range pair), and `sv0_slice_get` / `sv0_slice_set`
+ * site (never an out-of-range pair); `sv0_slice_get` / `sv0_slice_set`
  * bounds-check `i < len` BEFORE touching memory (UP-003) — the same
  * fail-closed panic class the VM backend must mirror (SS-U03c). */
 typedef struct {
@@ -152,45 +155,71 @@ typedef struct {
   int32_t len;
 } sv0_slice;
 
-static inline sv0_slice sv0_slice_full_vec(int32_t h) {
-  sv0_slice s;
-  s.data = sv0_vec_table[h].data;
-  s.len = sv0_vec_table[h].len;
-  return s;
+#define SV0_SLICE_MAX 262144
+#define SV0_SLICE_TAG 0x40000000
+
+static sv0_slice sv0_slice_table[SV0_SLICE_MAX];
+static int32_t sv0_slice_count = 0;
+
+static inline int32_t sv0_slice_intern(intptr_t *data, int32_t len) {
+  if (sv0_slice_count >= SV0_SLICE_MAX)
+    sv0_panic("slice: too many slices");
+  int32_t s = sv0_slice_count++;
+  sv0_slice_table[s].data = data;
+  sv0_slice_table[s].len = len;
+  return s | SV0_SLICE_TAG;
 }
 
-static inline sv0_slice sv0_slice_from_vec(int32_t h, int32_t lo, int32_t hi) {
+static inline int32_t sv0_slice_full_vec(int32_t h) {
+  return sv0_slice_intern(sv0_vec_table[h].data, sv0_vec_table[h].len);
+}
+
+static inline int32_t sv0_slice_from_vec(int32_t h, int32_t lo, int32_t hi) {
   int32_t n = sv0_vec_table[h].len;
   if (lo < 0 || hi < lo || hi > n)
     sv0_panic("slice: range out of bounds");
-  sv0_slice s;
-  s.data = sv0_vec_table[h].data + lo;
-  s.len = hi - lo;
-  return s;
+  return sv0_slice_intern(sv0_vec_table[h].data + lo, hi - lo);
 }
 
-static inline sv0_slice sv0_slice_subslice(sv0_slice src, int32_t lo,
-                                           int32_t hi) {
+static inline int32_t sv0_slice_subslice(int32_t sh, int32_t lo, int32_t hi) {
+  sv0_slice src = sv0_slice_table[sh & ~SV0_SLICE_TAG];
   if (lo < 0 || hi < lo || hi > src.len)
     sv0_panic("slice: range out of bounds");
-  sv0_slice s;
-  s.data = src.data + lo;
-  s.len = hi - lo;
-  return s;
+  return sv0_slice_intern(src.data + lo, hi - lo);
 }
 
-static inline int32_t sv0_slice_len(sv0_slice s) { return s.len; }
+static inline int32_t sv0_slice_len(int32_t sh) {
+  return sv0_slice_table[sh & ~SV0_SLICE_TAG].len;
+}
 
-static inline intptr_t sv0_slice_get(sv0_slice s, int32_t idx) {
+static inline intptr_t sv0_slice_get(int32_t sh, int32_t idx) {
+  sv0_slice s = sv0_slice_table[sh & ~SV0_SLICE_TAG];
   if (idx < 0 || idx >= s.len)
     sv0_panic("slice: index out of bounds");
   return s.data[idx];
 }
 
-static inline void sv0_slice_set(sv0_slice s, int32_t idx, intptr_t val) {
+static inline void sv0_slice_set(int32_t sh, int32_t idx, intptr_t val) {
+  sv0_slice s = sv0_slice_table[sh & ~SV0_SLICE_TAG];
   if (idx < 0 || idx >= s.len)
     sv0_panic("slice: index out of bounds");
   s.data[idx] = val;
+}
+
+/* `e[i]` / `e[i] = v` sugar: `e` may be a Vec/array handle or a slice
+   handle — dispatch on the tag bit. Explicit `vec_get`/`vec_set` builtin
+   calls keep going straight to `sv0_vec_*`. */
+static inline intptr_t sv0_idx_get(int32_t h, int32_t idx) {
+  if (h & SV0_SLICE_TAG)
+    return sv0_slice_get(h, idx);
+  return sv0_vec_get(h, idx);
+}
+
+static inline void sv0_idx_set(int32_t h, int32_t idx, intptr_t val) {
+  if (h & SV0_SLICE_TAG)
+    sv0_slice_set(h, idx, val);
+  else
+    sv0_vec_set(h, idx, val);
 }
 
 /* Box<T> (T0-6): handle-based heap indirection for recursive types.
