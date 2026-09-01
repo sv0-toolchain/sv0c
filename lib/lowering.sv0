@@ -1290,6 +1290,30 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 }
             }
         }
+        /* `&e[a..b]` / `&mut e[..]` — the slice IS the borrow; the `&`
+           is transparent. Lower the range-index directly (SS-U03b b4). */
+        if unop_tag == 4 {
+            if vec_get(et, operand_idx) == 8 {
+                if vec_get(et, vec_get(ed2, operand_idx)) == 21 {
+                    return lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                               tok_tags, operand_idx, ctr,
+                                               out_instrs, enum_names,
+                                               enum_tag_offsets, enum_tag_counts,
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                }
+            }
+        }
+        if unop_tag == 5 {
+            if vec_get(et, operand_idx) == 8 {
+                if vec_get(et, vec_get(ed2, operand_idx)) == 21 {
+                    return lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                               tok_tags, operand_idx, ctr,
+                                               out_instrs, enum_names,
+                                               enum_tag_offsets, enum_tag_counts,
+                                               enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                }
+            }
+        }
         let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, operand_idx, ctr,
                                             out_instrs, enum_names,
@@ -1445,8 +1469,14 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         vec_push(out_instrs, box_new(bc_mc));
         return Value::VVar(t_mc);
     }
-    /* ExprIndex (tag 8): obj[index] — Vec element load via sv0_vec_get
-       (CALL_BUILTIN 10), matching ExprCall(vec_get, ...) lowering. */
+    /* ExprIndex (tag 8): `obj[index]`.
+       - scalar index → element load via the universal accessor
+         sv0_idx_get (builtin 22), which dispatches Vec/array vs slice on
+         the handle tag. Was sv0_vec_get (10); nothing in the bootstrap
+         uses `x[i]` sugar so the emission change is inert there.
+       - range index (`obj[lo..hi]` / `obj[..]` / `obj[lo..]` / `obj[..hi]`)
+         → slice construction: sv0_slice_from_vec (20) / sv0_slice_full_vec
+         (21). SS-U03b b4. */
     if tag == 8 {
         let ob: i32 = vec_get(ed1, idx);
         let ix: i32 = vec_get(ed2, idx);
@@ -1457,6 +1487,57 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_counts,
                                              enum_tags_flat, fn_ctx,
                                              builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        if vec_get(et, ix) == 21 {
+            let lo_c: i32 = vec_get(ed1, ix);
+            let hi_c: i32 = vec_get(ed2, ix);
+            /* materialize the source handle so it can be read more than once */
+            let ob_t: i32 = ctr_fresh(ctr);
+            vec_push(out_instrs, box_new(Instr::Assign(ob_t, box_new(value_to_expr(v_o)))));
+            if lo_c < 0 {
+                if hi_c < 0 {
+                    let t_fs: i32 = ctr_fresh(ctr);
+                    let mut a_fs: Vec<i32> = vec_new();
+                    vec_push(a_fs, box_new(Value::VVar(ob_t)));
+                    vec_push(out_instrs, box_new(Instr::Call(t_fs, 0 - 21, a_fs, 0)));
+                    return Value::VVar(t_fs);
+                }
+            }
+            let lo_t: i32 = ctr_fresh(ctr);
+            if lo_c < 0 {
+                vec_push(out_instrs, box_new(Instr::Assign(lo_t, box_new(Expr::Literal(box_new(Value::VInt(0)))))));
+            } else {
+                let v_lo: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                     tok_tags, lo_c, ctr,
+                                                     out_instrs, enum_names,
+                                                     enum_tag_offsets,
+                                                     enum_tag_counts,
+                                                     enum_tags_flat, fn_ctx,
+                                                     builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                vec_push(out_instrs, box_new(Instr::Assign(lo_t, box_new(value_to_expr(v_lo)))));
+            }
+            let hi_t: i32 = ctr_fresh(ctr);
+            if hi_c < 0 {
+                let mut a_ln: Vec<i32> = vec_new();
+                vec_push(a_ln, box_new(Value::VVar(ob_t)));
+                vec_push(out_instrs, box_new(Instr::Call(hi_t, 0 - 9, a_ln, 0)));
+            } else {
+                let v_hi: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                     tok_tags, hi_c, ctr,
+                                                     out_instrs, enum_names,
+                                                     enum_tag_offsets,
+                                                     enum_tag_counts,
+                                                     enum_tags_flat, fn_ctx,
+                                                     builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                vec_push(out_instrs, box_new(Instr::Assign(hi_t, box_new(value_to_expr(v_hi)))));
+            }
+            let t_sl: i32 = ctr_fresh(ctr);
+            let mut a_sl: Vec<i32> = vec_new();
+            vec_push(a_sl, box_new(Value::VVar(ob_t)));
+            vec_push(a_sl, box_new(Value::VVar(lo_t)));
+            vec_push(a_sl, box_new(Value::VVar(hi_t)));
+            vec_push(out_instrs, box_new(Instr::Call(t_sl, 0 - 20, a_sl, 0)));
+            return Value::VVar(t_sl);
+        }
         let v_i: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, ix, ctr,
                                              out_instrs, enum_names,
@@ -1468,8 +1549,8 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let mut arg_ix: Vec<i32> = vec_new();
         vec_push(arg_ix, box_new(v_o));
         vec_push(arg_ix, box_new(v_i));
-        let vec_get_fn_h: i32 = 0 - 10;
-        let call_ix: Instr = Instr::Call(t_ix, vec_get_fn_h, arg_ix, 0);
+        let idx_get_fn_h: i32 = 0 - 22;
+        let call_ix: Instr = Instr::Call(t_ix, idx_get_fn_h, arg_ix, 0);
         vec_push(out_instrs, box_new(call_ix));
         return Value::VVar(t_ix);
     }

@@ -1,0 +1,27 @@
+// SS-U03b b4 (sv0-strings Track U): slice `&[T]` construction + read indexing
+// on the C backend. Exercises all four range forms, including the open-bound
+// length lookup:  &a[lo..hi]   &a[..]   &a[lo..]   &a[..hi]
+//
+// C leg only (`native`): the sml-legacy parser still rejects `..` in index
+// position — that path is SS-U03c (the VM backend). `&mut` element stores and
+// re-slicing a slice are later passes (b5). Expected exit: 42.
+
+fn main() -> i32 {
+    let a: [i32; 6] = [1, 2, 3, 4, 5, 6];
+
+    let mid: &[i32] = &a[1..4];        // 2 3 4
+    let all: &[i32] = &a[..];          // 1 2 3 4 5 6
+    let tail: &[i32] = &a[3..];        // 4 5 6
+    let head: &[i32] = &a[..3];        // 1 2 3
+
+    // 2 + 4 + 3          (mid[0], mid[2], mid[1])
+    let s_mid: i32 = mid[0] + mid[2] + mid[1];       // 9
+    // 1 + 6             (all[0], all[5])
+    let s_all: i32 = all[0] + all[5];                // 7
+    // 4 + 5 + 6
+    let s_tail: i32 = tail[0] + tail[1] + tail[2];   // 15
+    // 1 + 2 + 3
+    let s_head: i32 = head[0] + head[1] + head[2];   // 6
+
+    return s_mid + s_all + s_tail + s_head + 5;      // 9 + 7 + 15 + 6 + 5 = 42
+}
