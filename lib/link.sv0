@@ -110,12 +110,113 @@ fn listing_count_nonempty_paths(listing: string) -> i32 {
     return n;
 }
 
+/* ── SS-U09: project entry-point discovery guard ─────────────────────────────
+   `--project <dir>` source-concats every `.sv0` under <dir>. When two files
+   each define a top-level `fn main` the emitter silently keeps only the one
+   whose path sorts last (sv0-strings docs/BUGS.md #4 / SPEC UP-026, AC-036).
+   The designated entry sits at the TOP LEVEL of a file that lives DIRECTLY in
+   the project directory; a `fn main` in a subdirectory (test-runner
+   convention) or indented inside another item is not an entry candidate. If
+   more than one entry candidate exists the concat fails closed with a stable
+   E0302 diagnostic on stderr instead of building an ambiguous program. */
+
+fn ss_is_ident_char(c: i32) -> bool {
+    if c >= 97 { if c <= 122 { return true; } }
+    if c >= 65 { if c <= 90 { return true; } }
+    if c >= 48 { if c <= 57 { return true; } }
+    return c == 95;
+}
+
+/* `src[p..]` is `fn` + whitespace(+) + `main` + a non-identifier boundary,
+   with `p` at column 0 (start of file or just past a newline). */
+fn ss_at_toplevel_fn_main(src: string, p: i32) -> bool {
+    let n: i32 = string_len(src);
+    if p + 3 > n { return false; }
+    if string_char_at(src, p) != 102 { return false; }
+    if string_char_at(src, p + 1) != 110 { return false; }
+    let ws0: i32 = string_char_at(src, p + 2);
+    if ws0 != 32 { if ws0 != 9 { return false; } }
+    let mut q: i32 = p + 3;
+    while q < n {
+        let c: i32 = string_char_at(src, q);
+        if c != 32 { if c != 9 { break; } }
+        q = q + 1;
+    }
+    if q + 4 > n { return false; }
+    if string_char_at(src, q) != 109 { return false; }
+    if string_char_at(src, q + 1) != 97 { return false; }
+    if string_char_at(src, q + 2) != 105 { return false; }
+    if string_char_at(src, q + 3) != 110 { return false; }
+    if q + 4 == n { return true; }
+    return ss_is_ident_char(string_char_at(src, q + 4)) != true;
+}
+
+fn source_defines_project_entry(src: string) -> bool {
+    let n: i32 = string_len(src);
+    if n == 0 { return false; }
+    if ss_at_toplevel_fn_main(src, 0) { return true; }
+    let mut i: i32 = 0;
+    while i < n {
+        if string_char_at(src, i) == 10 {
+            if ss_at_toplevel_fn_main(src, i + 1) { return true; }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn link_norm_dir(dir: string) -> string {
+    let n: i32 = string_len(dir);
+    if n > 1 {
+        if string_char_at(dir, n - 1) == 47 { return string_substr(dir, 0, n - 1); }
+    }
+    return dir;
+}
+
+/* `path` sits directly in `dir` (its containing directory IS `dir`, no
+   intervening subdirectory). A path with no slash degrades to `false` so a
+   `--project .` invocation whose listing is bare filenames never trips the
+   guard on a false positive. */
+fn link_path_is_direct_child(path: string, dir: string) -> bool {
+    let slash: i32 = find_last_slash(path);
+    if slash < 0 { return false; }
+    return string_eq(string_substr(path, 0, slash), link_norm_dir(dir));
+}
+
+fn link_listing_root_entry_count(listing: string, dir: string) -> i32 {
+    let len: i32 = string_len(listing);
+    let mut p: i32 = 0;
+    let mut count: i32 = 0;
+    while p < len {
+        let nl: i32 = listing_find_newline(listing, p);
+        let lsz: i32 = nl - p;
+        if lsz > 0 {
+            let path: string = string_substr(listing, p, lsz);
+            if link_path_is_direct_child(path, dir) {
+                if source_defines_project_entry(parse_file(path)) {
+                    count = count + 1;
+                }
+            }
+        }
+        p = nl + 1;
+    }
+    return count;
+}
+
+fn link_dup_entry_message() -> string {
+    return "sv0c error: E0302: project defines more than one entry point (top-level `fn main`) directly in the project directory; keep exactly one entry file there and move any test entry points into a subdirectory\n";
+}
+
 /* SML linkProjectDir: listSv0(dir) then per-path parseFile — source-level bridge
    uses host read_dir ordering (see sv0doc/compiler/bootstrap-host-io.md) +
    link_project_concat_sources_from_listing. AST mapProgramUnit remains in parser. */
 
 fn link_project_concat_sources_from_dir(dir: string) -> string {
     let listing: string = link_project_dir(dir);
+    if link_listing_root_entry_count(listing, dir) > 1 {
+        write_file("/dev/stderr", link_dup_entry_message());
+        return "";
+    }
     return link_project_concat_sources_from_listing(listing);
 }
 
@@ -2694,6 +2795,49 @@ fn test_link_project_concat_sources_from_listing() -> i32 {
     return 0;
 }
 
+fn test_source_defines_project_entry() -> i32 {
+    if source_defines_project_entry("fn main() -> i32 { return 0; }") != true { return 1; }
+    if source_defines_project_entry("fn add(x: i32) -> i32 { return x; }\nfn main() -> i32 { return 0; }") != true { return 2; }
+    if source_defines_project_entry("fn mains() -> i32 { return 0; }") != false { return 3; }
+    if source_defines_project_entry("fn helper() -> i32 { fn main() -> i32 { return 0; } return 0; }") != false { return 4; }
+    if source_defines_project_entry("fn maincheck() -> i32 { return 0; }") != false { return 5; }
+    if source_defines_project_entry("") != false { return 6; }
+    if source_defines_project_entry("fn  main () -> i32 { return 0; }") != true { return 7; }
+    return 0;
+}
+
+fn test_link_path_is_direct_child() -> i32 {
+    if link_path_is_direct_child("proj/main.sv0", "proj") != true { return 1; }
+    if link_path_is_direct_child("proj/test/unit.sv0", "proj") != false { return 2; }
+    if link_path_is_direct_child("proj/main.sv0", "proj/") != true { return 3; }
+    if link_path_is_direct_child("main.sv0", "proj") != false { return 4; }
+    if link_path_is_direct_child("/a/b/proj/main.sv0", "/a/b/proj") != true { return 5; }
+    return 0;
+}
+
+fn test_link_listing_root_entry_count() -> i32 {
+    /* All *real* files sit directly in /tmp (always present). The subdir path
+       in the listing is never read: link_path_is_direct_child rejects it
+       before parse_file, which is exactly the property under test. */
+    let pa: string = "/tmp/sv0_link_rec_main.sv0";
+    let pb: string = "/tmp/sv0_link_rec_lib.sv0";
+    let pc: string = "/tmp/sv0_link_rec_main_two.sv0";
+    write_file(pa, "fn main() -> i32 { return 7; }\n");
+    write_file(pb, "fn add1(x: i32) -> i32 { return x + 1; }\n");
+    write_file(pc, "fn main() -> i32 { return 9; }\n");
+    let mut listing: string = pa;
+    listing = string_concat(listing, "\n");
+    listing = string_concat(listing, pb);
+    listing = string_concat(listing, "\n");
+    listing = string_concat(listing, "/tmp/test/unit.sv0");
+    listing = string_concat(listing, "\n");
+    if link_listing_root_entry_count(listing, "/tmp") != 1 { return 1; }
+    listing = string_concat(listing, pc);
+    listing = string_concat(listing, "\n");
+    if link_listing_root_entry_count(listing, "/tmp") != 2 { return 2; }
+    return 0;
+}
+
 fn test_listing_count_nonempty_paths() -> i32 {
     if listing_count_nonempty_paths("") != 0 { return 1; }
     if listing_count_nonempty_paths("\n\n") != 0 { return 2; }
@@ -4063,6 +4207,12 @@ fn main() -> i32 {
     if r21b2 != 0 { return 246 + r21b2; }
     let r21b2a: i32 = test_listing_count_nonempty_paths();
     if r21b2a != 0 { return 247 + r21b2a; }
+    let r21b2b: i32 = test_source_defines_project_entry();
+    if r21b2b != 0 { return 250 + r21b2b; }
+    let r21b2c: i32 = test_link_path_is_direct_child();
+    if r21b2c != 0 { return 260 + r21b2c; }
+    let r21b2d: i32 = test_link_listing_root_entry_count();
+    if r21b2d != 0 { return 270 + r21b2d; }
     let r21c: i32 = test_link_ty_tyname_path_needs_mangle();
     if r21c != 0 { return 217 + r21c; }
     let r21c2: i32 = test_link_path_pool_prefix_needs_mangle();
