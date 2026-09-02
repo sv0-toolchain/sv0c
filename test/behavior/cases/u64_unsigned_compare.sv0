@@ -43,8 +43,7 @@ fn main() -> i32 {
     let q: u64 = max / half;                // (2^64-1) / 2^63 = 1
     if q != one { return 30; }
     let r: u64 = max % half;                // (2^64-1) - 2^63 = 2^63 - 1
-    let want_r: u64 = half - one;           // 2^63 - 1
-    if r != want_r { return 31; }
+    if r != (half - one) { return 31; }     // uint64_t temp -- no sign-compare (SS-U14 follow-up)
 
     return 42;
 }
