@@ -1471,12 +1471,15 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     }
     /* ExprIndex (tag 8): `obj[index]`.
        - scalar index → element load via the universal accessor
-         sv0_idx_get (builtin 22), which dispatches Vec/array vs slice on
+         sv0_idx_get (builtin 32), which dispatches Vec/array vs slice on
          the handle tag. Was sv0_vec_get (10); nothing in the bootstrap
          uses `x[i]` sugar so the emission change is inert there.
        - range index (`obj[lo..hi]` / `obj[..]` / `obj[lo..]` / `obj[..hi]`)
-         → slice construction: sv0_slice_from_vec (20) / sv0_slice_full_vec
-         (21). SS-U03b b4. */
+         → slice construction: sv0_slice_from_vec (30) / sv0_slice_full_vec
+         (31); an open upper bound is resolved with sv0_view_len (34).
+         Slice builtins are 30..34 — clear of the VM box_load alias at
+         id 21 (lowering.sv0 emits `0 - 21` for box_load on the VM target).
+         SS-U03b b4, renumbered in SS-U03c. */
     if tag == 8 {
         let ob: i32 = vec_get(ed1, idx);
         let ix: i32 = vec_get(ed2, idx);
@@ -1498,7 +1501,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     let t_fs: i32 = ctr_fresh(ctr);
                     let mut a_fs: Vec<i32> = vec_new();
                     vec_push(a_fs, box_new(Value::VVar(ob_t)));
-                    vec_push(out_instrs, box_new(Instr::Call(t_fs, 0 - 21, a_fs, 0)));
+                    vec_push(out_instrs, box_new(Instr::Call(t_fs, 0 - 31, a_fs, 0)));
                     return Value::VVar(t_fs);
                 }
             }
@@ -1519,7 +1522,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if hi_c < 0 {
                 let mut a_ln: Vec<i32> = vec_new();
                 vec_push(a_ln, box_new(Value::VVar(ob_t)));
-                vec_push(out_instrs, box_new(Instr::Call(hi_t, 0 - 9, a_ln, 0)));
+                vec_push(out_instrs, box_new(Instr::Call(hi_t, 0 - 34, a_ln, 0)));
             } else {
                 let v_hi: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                                      tok_tags, hi_c, ctr,
@@ -1535,7 +1538,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_push(a_sl, box_new(Value::VVar(ob_t)));
             vec_push(a_sl, box_new(Value::VVar(lo_t)));
             vec_push(a_sl, box_new(Value::VVar(hi_t)));
-            vec_push(out_instrs, box_new(Instr::Call(t_sl, 0 - 20, a_sl, 0)));
+            vec_push(out_instrs, box_new(Instr::Call(t_sl, 0 - 30, a_sl, 0)));
             return Value::VVar(t_sl);
         }
         let v_i: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
@@ -1549,7 +1552,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let mut arg_ix: Vec<i32> = vec_new();
         vec_push(arg_ix, box_new(v_o));
         vec_push(arg_ix, box_new(v_i));
-        let idx_get_fn_h: i32 = 0 - 22;
+        let idx_get_fn_h: i32 = 0 - 32;
         let call_ix: Instr = Instr::Call(t_ix, idx_get_fn_h, arg_ix, 0);
         vec_push(out_instrs, box_new(call_ix));
         return Value::VVar(t_ix);
@@ -1738,7 +1741,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let lhs_idx: i32 = vec_get(ed1, idx);
         let rhs_idx: i32 = vec_get(ed2, idx);
         /* `e[i] = v` — element store through the universal accessor
-           sv0_idx_set (builtin 23), which dispatches Vec/array vs slice on
+           sv0_idx_set (builtin 33), which dispatches Vec/array vs slice on
            the handle tag. classify_assign_lhs_arena has no ExprIndex case
            (it returned -1 and the statement was silently dropped), so this
            is handled directly here. SS-U03b b5. */
@@ -1764,7 +1767,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_push(a_iset, box_new(v_base));
             vec_push(a_iset, box_new(v_ixe));
             vec_push(a_iset, box_new(v_rhs_s));
-            vec_push(out_instrs, box_new(Instr::Call(0, 0 - 23, a_iset, 0)));
+            vec_push(out_instrs, box_new(Instr::Call(0, 0 - 33, a_iset, 0)));
             return Value::VUnit;
         }
         /* SML ExprAssign: Store(x, <rhs as Ir.expr>) via lowerExprWithInstrs —
