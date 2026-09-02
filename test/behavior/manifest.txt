@@ -121,3 +121,4 @@ test/behavior/cases/slice_construct_index.sv0|42|native
 test/behavior/cases/slice_mut_reslice.sv0|42|native
 test/behavior/cases/string_embedded_nul.sv0|42
 test/behavior/cases/string_alloc_fault.sv0|42
+test/behavior/cases/u64_unsigned_compare.sv0|42|native

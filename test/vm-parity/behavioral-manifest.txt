@@ -16,3 +16,4 @@ sv0c/test/integration/contracts/contracts.sv0
 sv0c/test/behavior/cases/slice_construct_index.sv0
 sv0c/test/behavior/cases/slice_mut_reslice.sv0
 sv0c/test/behavior/cases/string_embedded_nul.sv0
+sv0c/test/behavior/cases/u64_unsigned_compare.sv0
