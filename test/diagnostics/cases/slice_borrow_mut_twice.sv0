@@ -1,0 +1,8 @@
+/* SS-U03d: two live `&mut` slice views of the same source — expects E0323
+   (native only). */
+fn main() -> i32 {
+    let a: [i32; 4] = [1, 2, 3, 4];
+    let m: &mut [i32] = &mut a[..];
+    let n: &mut [i32] = &mut a[0..2];
+    return 0;
+}

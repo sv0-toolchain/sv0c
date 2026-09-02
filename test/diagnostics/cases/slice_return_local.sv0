@@ -1,0 +1,7 @@
+/* SS-U03d: returning a slice that borrows a function-local — expects E0322
+   (native only; the sml-legacy parser rejects `..` in index position). */
+fn bad() -> &[i32] {
+    let a: [i32; 3] = [1, 2, 3];
+    return &a[..];
+}
+fn main() -> i32 { return 0; }
