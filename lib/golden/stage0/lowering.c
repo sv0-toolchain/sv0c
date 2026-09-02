@@ -9424,17 +9424,17 @@ static const char* ast_ty_to_c_string(const char* name) {
   }
   int _sv0t15 = sv0_string_eq(name, "string");
   if (_sv0t15) {
-    return "const char*";
+    return "int";
   } else {
   }
   int _sv0t16 = sv0_string_eq(name, "str");
   if (_sv0t16) {
-    return "const char*";
+    return "int";
   } else {
   }
   int _sv0t17 = sv0_string_eq(name, "String");
   if (_sv0t17) {
-    return "const char*";
+    return "int";
   } else {
   }
   int _sv0t18 = sv0_string_eq(name, "Vec");
@@ -12242,13 +12242,13 @@ static int test_ty_to_c(void) {
   } else {
   }
   const char* _sv0t8 = ast_ty_to_c_string("string");
-  int _sv0t9 = sv0_string_eq(_sv0t8, "const char*");
+  int _sv0t9 = sv0_string_eq(_sv0t8, "int");
   if ((_sv0t9 != 1)) {
     return 5;
   } else {
   }
   const char* _sv0t10 = ast_ty_to_c_string("String");
-  int _sv0t11 = sv0_string_eq(_sv0t10, "const char*");
+  int _sv0t11 = sv0_string_eq(_sv0t10, "int");
   if ((_sv0t11 != 1)) {
     return 6;
   } else {

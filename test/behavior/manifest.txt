@@ -119,3 +119,4 @@ test/behavior/cases/vec_growth_stress.sv0|188
 test/behavior/cases/type_byte_alias.sv0|42|native
 test/behavior/cases/slice_construct_index.sv0|42|native
 test/behavior/cases/slice_mut_reslice.sv0|42|native
+test/behavior/cases/string_embedded_nul.sv0|42|native

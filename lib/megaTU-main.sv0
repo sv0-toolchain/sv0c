@@ -1075,12 +1075,15 @@ fn megatu_field_name(fh: i32, source: string, starts: Vec<i32>,
    (string_concat/substr) still get an `int` dest today — non-int call returns are
    a separate gap — so string_api is not yet fully supported. */
 fn megatu_builtin_name(bid: i32) -> string {
-    if bid == 1 { return "sv0_println"; }
-    if bid == 2 { return "sv0_string_len"; }
-    if bid == 3 { return "sv0_string_eq"; }
-    if bid == 4 { return "sv0_string_concat"; }
-    if bid == 5 { return "sv0_string_char_at"; }
-    if bid == 6 { return "sv0_string_substr"; }
+    /* SS-U02b p2: `string` is now a length-bearing sv0_str handle (int).
+       These map to the sv0_str_* API (embedded-NUL safe, bounds-checked)
+       instead of the strlen/strcmp-based sv0_string_*. */
+    if bid == 1 { return "sv0_str_println"; }
+    if bid == 2 { return "sv0_str_len"; }
+    if bid == 3 { return "sv0_str_eq"; }
+    if bid == 4 { return "sv0_str_concat"; }
+    if bid == 5 { return "sv0_str_char_at"; }
+    if bid == 6 { return "sv0_str_substr"; }
     if bid == 7 { return "sv0_vec_new"; }
     if bid == 8 { return "sv0_vec_push"; }
     if bid == 9 { return "sv0_vec_len"; }
@@ -1094,11 +1097,11 @@ fn megatu_builtin_name(bid: i32) -> string {
     if bid == 12 { return "sv0__box_new_raw"; }
     if bid == 13 { return "sv0__box_deref_raw"; }
     if bid == 14 { return "sv0_no_alias"; }
-    if bid == 15 { return "sv0_read_file"; }
-    if bid == 16 { return "sv0_write_file"; }
-    if bid == 17 { return "sv0_read_dir"; }
-    if bid == 18 { return "sv0_write_bytes"; }
-    if bid == 19 { return "sv0_getenv"; }
+    if bid == 15 { return "sv0_str_read_file"; }
+    if bid == 16 { return "sv0_str_write_file"; }
+    if bid == 17 { return "sv0_str_read_dir"; }
+    if bid == 18 { return "sv0_str_write_bytes"; }
+    if bid == 19 { return "sv0_str_getenv"; }
     /* Slice builtins (SS-U03b b4; renumbered to 30..34 in SS-U03c to clear
        the VM box_load alias at id 21). All take/return `int` handles, so no
        megatu_builtin_ret_cty entry is needed (the default is int). */
@@ -1110,17 +1113,11 @@ fn megatu_builtin_name(bid: i32) -> string {
     return "sv0_unknown_builtin";
 }
 
-/* C return type of a builtin call's result (dst) by builtin id. String-returning
-   builtins (string_concat=4, string_substr=6, read_file=15, read_dir=17,
-   getenv=19) yield const char*; everything else that returns a value
-   (string_len, string_eq, char_at, vec_*, box_*) is int. Used to type the
-   call-result temp. */
+/* C return type of a builtin call's result (dst) by builtin id. SS-U02b p2:
+   `string` is now an int handle (sv0_str), so the string-returning builtins
+   (concat=4, substr=6, read_file=15, read_dir=17, getenv=19) return int like
+   everything else — no more const char* result temps. */
 fn megatu_builtin_ret_cty(bid: i32) -> string {
-    if bid == 4 { return "const char*"; }
-    if bid == 6 { return "const char*"; }
-    if bid == 15 { return "const char*"; }
-    if bid == 17 { return "const char*"; }
-    if bid == 19 { return "const char*"; }
     return "int";
 }
 
@@ -1153,15 +1150,20 @@ fn megatu_primitive_cty_or_raw(name: string) -> string {
     if string_eq(name, "f64") { return "double"; }
     if string_eq(name, "isize") { return "intptr_t"; }
     if string_eq(name, "usize") { return "uintptr_t"; }
+    /* SS-U02b p2: owned `string` is a length-bearing sv0_str handle (int). */
+    if string_eq(name, "string") { return "int"; }
+    if string_eq(name, "str") { return "int"; }
+    if string_eq(name, "String") { return "int"; }
     return name;
 }
 
 fn megatu_ty_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>) -> string {
     /* String-primitive sentinel from lowering (lower_string_cty): a string-typed
        `let` gets this as its DeclNamed ctype. Must be handled before handle_to_str,
-       which would read a negative token index out of bounds. */
+       which would read a negative token index out of bounds. SS-U02b p2: `string`
+       is now a length-bearing sv0_str handle (int), not const char*. */
     if h == lower_string_cty() {
-        return "const char*";
+        return "int";
     }
     /* A type ctype `h` (DeclNamed type, Call rt, box_deref elem type) is a REAL
        source token — resolve it directly by its source text. Do NOT consult
@@ -1599,6 +1601,33 @@ fn megatu_fn_ret_cty(fn_h: i32, it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                               source, starts, ends, it, id1);
 }
 
+/* Decoded content-byte count of a string-literal body (quotes already
+   stripped). sv0 escapes: `\x` + 2 hex digits = 1 byte (4 source chars);
+   any other `\?` = 1 byte (2 source chars); a plain char = 1 byte. Matches
+   lexer.sv0's scan_escape, and equals what the C compiler decodes for the
+   same body — so `sv0_str_lit("<body>", <this>)` copies exactly the right
+   run, embedded `\0` included. SS-U02b p1. */
+fn megatu_decoded_len(s: string) -> i32 {
+    let n: i32 = string_len(s);
+    let mut i: i32 = 0;
+    let mut count: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(s, i);
+        if c == 92 {
+            if i + 1 < n {
+                let d: i32 = string_char_at(s, i + 1);
+                if d == 120 { i = i + 4; } else { i = i + 2; }
+            } else {
+                i = i + 1;
+            }
+        } else {
+            i = i + 1;
+        }
+        count = count + 1;
+    }
+    return count;
+}
+
 fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>) -> string {
     match v {
         codegen_Value::VInt(i) => { return int_to_string(i); },
@@ -1609,20 +1638,22 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
         codegen_Value::VString(h) => {
             /* A string literal's handle is a source token whose text still includes
                the surrounding double quotes (e.g. `"golden"` or `"a\nb"`). Strip the
-               quotes and emit the inner body VERBATIM: sv0 string-escape syntax
-               (\n \t \\ \" …) already matches C, so the source body is a valid C
-               string body. Do NOT re-escape it — c_escape_string would double the
-               backslash of `\n`, turning the newline into a literal backslash-n
-               (broke lexer's skip_line_comment). name_of's stub returned bare names,
-               so codegen never hit this. */
+               quotes and emit the inner body VERBATIM as a C string body: sv0's
+               escape syntax (\n \t \\ \" \0 \xNN) already matches C, so no
+               re-escaping. SS-U02b p2: `string` is now a length-bearing sv0_str
+               handle, so emit `sv0_str_lit("<body>", <n>)` where n is the DECODED
+               content byte count — an embedded \0 is content, never a terminator. */
             let raw: string = megatu_val_name(h, source, starts, ends, sidx);
             let mut inner: string = raw;
             let rlen: i32 = string_len(raw);
             if rlen >= 2 {
                 inner = string_substr(raw, 1, rlen - 2);
             }
-            let a: string = string_concat("\"", inner);
-            return string_concat(a, "\"");
+            let dlen: i32 = megatu_decoded_len(inner);
+            let a: string = string_concat("sv0_str_lit(\"", inner);
+            let b: string = string_concat(a, "\", ");
+            let c: string = string_concat(b, int_to_string(dlen));
+            return string_concat(c, ")");
         },
         codegen_Value::VMember(bv, fh) => {
             let inner: codegen_Value = box_deref(bv);
