@@ -1,0 +1,20 @@
+// SS-U02d (sv0-strings Track U, UP-007 / BL-015): owned-`string` allocation
+// fault injection. This program does exactly 4 owned-string allocations:
+//   3 literals + 1 concat  (the empty literal allocates nothing).
+// With no SV0_STR_FAIL_AT it returns 42; verify_string_alloc_failure.py runs
+// it again with the env var set to inject a failure at the Nth allocation and
+// asserts the process fails closed ("sv0 panic: string: allocation failed",
+// exit 1) rather than producing a partially-initialised value.
+
+fn main() -> i32 {
+    let a: string = "one";
+    let b: string = "two";
+    let c: string = "three";
+    let _e: string = "";                  // empty: no allocation
+    let r: string = string_concat(a, b);  // 4th allocation
+
+    if string_len(a) != 3 { return 1; }
+    if string_len(c) != 5 { return 2; }
+    if string_len(r) != 6 { return 3; }
+    return 42;
+}
