@@ -279,7 +279,7 @@ fn insn_size(opc: i32) -> i32 {
         if opc <= 21 { return 1; }
     }
     if opc >= 32 {
-        if opc <= 39 { return 1; }
+        if opc <= 42 { return 1; }
     }
     if opc >= 48 {
         if opc <= 52 { return 1; }
@@ -832,11 +832,12 @@ fn unop_tag_to_insn(tag: i32) -> i32 {
    5-10) and logic (11-12) stay the single polymorphic opcodes 64-69 / 80-81
    — sv0vm disambiguates those by the runtime cell kind (VMF-012). Float has
    no `%` and no bitwise/shift (the checker rejects both), so those return -1
-   for category 1. i64/u64 bitwise/shift (tags 13-17) currently fall back to
-   the i32 opcodes: the .sv0b instruction set has no *_I64 bitwise variants
-   and sv0vm's wide-int bitwise support is a separate item (VMF-011/012) — a
-   documented narrower-than-C limitation, matching megaTU-main's own u64
-   residual note. */
+   for category 1. i64/u64 shifts (tags 16-17) take the wide 64-bit shift
+   opcodes 40-42 (SS-U14 residual #1): SHL is width-only, i64 right-shift is
+   arithmetic, u64 right-shift is logical. i64/u64 bitwise AND/OR/XOR (tags
+   13-15) still fall back to the 32-bit opcodes — the .sv0b set has no wide
+   bitwise variants and sv0vm's wide-int bitwise support is a separate item
+   (VMF-011/012). */
 fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
     if cat == 1 {
         if tag == 0 { return 48; }
@@ -853,6 +854,9 @@ fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
         if tag == 2 { return 34; }
         if tag == 3 { return 35; }
         if tag == 4 { return 36; }
+        /* SS-U14 residual #1: wide shifts. i64 `>>` is arithmetic. */
+        if tag == 16 { return 40; }
+        if tag == 17 { return 41; }
         return binop_tag_to_insn(tag);
     }
     /* SS-U14: cat 3 = unsigned wide. add/sub/mul reuse the I64 opcodes
@@ -869,6 +873,9 @@ fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
         if tag == 8 { return 71; }
         if tag == 9 { return 72; }
         if tag == 10 { return 73; }
+        /* SS-U14 residual #1: wide shifts. u64 `>>` is logical. */
+        if tag == 16 { return 40; }
+        if tag == 17 { return 42; }
         return binop_tag_to_insn(tag);
     }
     return binop_tag_to_insn(tag);
@@ -4613,6 +4620,13 @@ fn test_typed_opcode_select() -> i32 {
     if binop_tag_to_insn_typed(3, 2) != 35 { return 31; }
     if binop_tag_to_insn_typed(4, 2) != 36 { return 32; }
     if binop_tag_to_insn_typed(8, 2) != 67 { return 33; }
+    /* SS-U14 residual #1: wide shifts. cat 2 (i64): SHL 40, SHR arith 41.
+       cat 3 (u64): SHL 40, SHR logical 42. bitwise AND (13) still 88. */
+    if binop_tag_to_insn_typed(16, 2) != 40 { return 34; }
+    if binop_tag_to_insn_typed(17, 2) != 41 { return 35; }
+    if binop_tag_to_insn_typed(16, 3) != 40 { return 36; }
+    if binop_tag_to_insn_typed(17, 3) != 42 { return 37; }
+    if binop_tag_to_insn_typed(13, 2) != 88 { return 38; }
     /* unop typed: neg picks NEG_F64 / NEG_I64 / NEG_I32; not stays 82 */
     if unop_tag_to_insn_typed(0, 0) != 21 { return 40; }
     if unop_tag_to_insn_typed(0, 1) != 52 { return 41; }
