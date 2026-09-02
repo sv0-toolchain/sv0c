@@ -335,9 +335,19 @@ static int cty_cat_of_handle(int cty_h, const char* source, int starts, int ends
     return 2;
   } else {
   }
-  int _sv0t5 = sv0_string_eq(s, "u64");
+  int _sv0t5 = sv0_string_eq(s, "isize");
   if (_sv0t5) {
     return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_string_eq(s, "u64");
+  if (_sv0t6) {
+    return 3;
+  } else {
+  }
+  int _sv0t7 = sv0_string_eq(s, "usize");
+  if (_sv0t7) {
+    return 3;
   } else {
   }
   return 0;
@@ -567,7 +577,7 @@ static int insn_size(int opc) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 37)) {
+    if ((opc <= 39)) {
       return 1;
     } else {
     }
@@ -581,7 +591,7 @@ static int insn_size(int opc) {
   } else {
   }
   if ((opc >= 64)) {
-    if ((opc <= 69)) {
+    if ((opc <= 73)) {
       return 1;
     } else {
     }
@@ -1524,8 +1534,49 @@ static int binop_tag_to_insn_typed(int tag, int cat) {
     return _sv0t3;
   } else {
   }
-  int _sv0t4 = binop_tag_to_insn(tag);
-  return _sv0t4;
+  if ((cat == 3)) {
+    if ((tag == 0)) {
+      return 32;
+    } else {
+    }
+    if ((tag == 1)) {
+      return 33;
+    } else {
+    }
+    if ((tag == 2)) {
+      return 34;
+    } else {
+    }
+    if ((tag == 3)) {
+      return 38;
+    } else {
+    }
+    if ((tag == 4)) {
+      return 39;
+    } else {
+    }
+    if ((tag == 7)) {
+      return 70;
+    } else {
+    }
+    if ((tag == 8)) {
+      return 71;
+    } else {
+    }
+    if ((tag == 9)) {
+      return 72;
+    } else {
+    }
+    if ((tag == 10)) {
+      return 73;
+    } else {
+    }
+    int _sv0t4 = binop_tag_to_insn(tag);
+    return _sv0t4;
+  } else {
+  }
+  int _sv0t5 = binop_tag_to_insn(tag);
+  return _sv0t5;
 }
 
 static int unop_tag_to_insn_typed(int tag, int cat) {
@@ -1566,6 +1617,14 @@ static int combine_cat(int a, int b) {
   }
   if ((b == 1)) {
     return 1;
+  } else {
+  }
+  if ((a == 3)) {
+    return 3;
+  } else {
+  }
+  if ((b == 3)) {
+    return 3;
   } else {
   }
   if ((a == 2)) {

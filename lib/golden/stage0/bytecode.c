@@ -26,6 +26,8 @@ static int OP_MUL_I64(void);
 static int OP_DIV_I64(void);
 static int OP_MOD_I64(void);
 static int OP_NEG_I64(void);
+static int OP_DIV_U64(void);
+static int OP_MOD_U64(void);
 static int OP_ADD_F64(void);
 static int OP_SUB_F64(void);
 static int OP_MUL_F64(void);
@@ -37,6 +39,10 @@ static int OP_LT(void);
 static int OP_GT(void);
 static int OP_LTE(void);
 static int OP_GTE(void);
+static int OP_LT_U64(void);
+static int OP_GT_U64(void);
+static int OP_LTE_U64(void);
+static int OP_GTE_U64(void);
 static int OP_AND(void);
 static int OP_OR(void);
 static int OP_NOT(void);
@@ -239,6 +245,14 @@ static int OP_NEG_I64(void) {
   return 37;
 }
 
+static int OP_DIV_U64(void) {
+  return 38;
+}
+
+static int OP_MOD_U64(void) {
+  return 39;
+}
+
 static int OP_ADD_F64(void) {
   return 48;
 }
@@ -281,6 +295,22 @@ static int OP_LTE(void) {
 
 static int OP_GTE(void) {
   return 69;
+}
+
+static int OP_LT_U64(void) {
+  return 70;
+}
+
+static int OP_GT_U64(void) {
+  return 71;
+}
+
+static int OP_LTE_U64(void) {
+  return 72;
+}
+
+static int OP_GTE_U64(void) {
+  return 73;
 }
 
 static int OP_AND(void) {
@@ -444,7 +474,7 @@ static int insn_encoded_size(int opc) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 37)) {
+    if ((opc <= 39)) {
       return 1;
     } else {
     }
@@ -458,7 +488,7 @@ static int insn_encoded_size(int opc) {
   } else {
   }
   if ((opc >= 64)) {
-    if ((opc <= 69)) {
+    if ((opc <= 73)) {
       return 1;
     } else {
     }
@@ -640,7 +670,7 @@ static int is_arithmetic_opcode(int opc) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 37)) {
+    if ((opc <= 39)) {
       return 1;
     } else {
     }
@@ -658,7 +688,7 @@ static int is_arithmetic_opcode(int opc) {
 
 static int is_compare_opcode(int opc) {
   if ((opc >= 64)) {
-    if ((opc <= 69)) {
+    if ((opc <= 73)) {
       return 1;
     } else {
     }
@@ -1243,7 +1273,7 @@ static int encode_insn_at(int instrs, int idx, int out) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 37)) {
+    if ((opc <= 39)) {
       int _sv0t31 = (idx + 1);
       return _sv0t31;
     } else {
@@ -1259,7 +1289,7 @@ static int encode_insn_at(int instrs, int idx, int out) {
   } else {
   }
   if ((opc >= 64)) {
-    if ((opc <= 69)) {
+    if ((opc <= 73)) {
       int _sv0t33 = (idx + 1);
       return _sv0t33;
     } else {
@@ -1533,7 +1563,7 @@ static int decode_insn_at(int buf, int pos, int out) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 37)) {
+    if ((opc <= 39)) {
       int _sv0t25 = (pos + 1);
       return _sv0t25;
     } else {
@@ -1549,7 +1579,7 @@ static int decode_insn_at(int buf, int pos, int out) {
   } else {
   }
   if ((opc >= 64)) {
-    if ((opc <= 69)) {
+    if ((opc <= 73)) {
       int _sv0t27 = (pos + 1);
       return _sv0t27;
     } else {
@@ -2085,43 +2115,63 @@ static int test_insn_sizes(void) {
     return 8;
   } else {
   }
-  int _sv0t8 = insn_encoded_size(64);
+  int _sv0t8 = insn_encoded_size(38);
   if ((_sv0t8 != 1)) {
+    return 80;
+  } else {
+  }
+  int _sv0t9 = insn_encoded_size(39);
+  if ((_sv0t9 != 1)) {
+    return 81;
+  } else {
+  }
+  int _sv0t10 = insn_encoded_size(70);
+  if ((_sv0t10 != 1)) {
+    return 82;
+  } else {
+  }
+  int _sv0t11 = insn_encoded_size(73);
+  if ((_sv0t11 != 1)) {
+    return 83;
+  } else {
+  }
+  int _sv0t12 = insn_encoded_size(64);
+  if ((_sv0t12 != 1)) {
     return 9;
   } else {
   }
-  int _sv0t9 = insn_encoded_size(96);
-  if ((_sv0t9 != 5)) {
+  int _sv0t13 = insn_encoded_size(96);
+  if ((_sv0t13 != 5)) {
     return 10;
   } else {
   }
-  int _sv0t10 = insn_encoded_size(112);
-  if ((_sv0t10 != 5)) {
+  int _sv0t14 = insn_encoded_size(112);
+  if ((_sv0t14 != 5)) {
     return 11;
   } else {
   }
-  int _sv0t11 = insn_encoded_size(115);
-  if ((_sv0t11 != 9)) {
+  int _sv0t15 = insn_encoded_size(115);
+  if ((_sv0t15 != 9)) {
     return 12;
   } else {
   }
-  int _sv0t12 = insn_encoded_size(116);
-  if ((_sv0t12 != 1)) {
+  int _sv0t16 = insn_encoded_size(116);
+  if ((_sv0t16 != 1)) {
     return 13;
   } else {
   }
-  int _sv0t13 = insn_encoded_size(118);
-  if ((_sv0t13 != 2)) {
+  int _sv0t17 = insn_encoded_size(118);
+  if ((_sv0t17 != 2)) {
     return 14;
   } else {
   }
-  int _sv0t14 = insn_encoded_size(144);
-  if ((_sv0t14 != 13)) {
+  int _sv0t18 = insn_encoded_size(144);
+  if ((_sv0t18 != 13)) {
     return 15;
   } else {
   }
-  int _sv0t15 = insn_encoded_size(161);
-  if ((_sv0t15 != 5)) {
+  int _sv0t19 = insn_encoded_size(161);
+  if ((_sv0t19 != 5)) {
     return 16;
   } else {
   }

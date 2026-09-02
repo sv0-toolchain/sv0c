@@ -50,6 +50,9 @@ fn OP_MUL_I64() -> i32 { return 34; }
 fn OP_DIV_I64() -> i32 { return 35; }
 fn OP_MOD_I64() -> i32 { return 36; }
 fn OP_NEG_I64() -> i32 { return 37; }
+/* SS-U14: unsigned wide div/rem (2^64-1 must not read as Int64 -1). */
+fn OP_DIV_U64() -> i32 { return 38; }
+fn OP_MOD_U64() -> i32 { return 39; }
 
 fn OP_ADD_F64() -> i32 { return 48; }
 fn OP_SUB_F64() -> i32 { return 49; }
@@ -63,6 +66,11 @@ fn OP_LT() -> i32 { return 66; }
 fn OP_GT() -> i32 { return 67; }
 fn OP_LTE() -> i32 { return 68; }
 fn OP_GTE() -> i32 { return 69; }
+/* SS-U14: unsigned ordered comparisons for u64 / usize. */
+fn OP_LT_U64() -> i32 { return 70; }
+fn OP_GT_U64() -> i32 { return 71; }
+fn OP_LTE_U64() -> i32 { return 72; }
+fn OP_GTE_U64() -> i32 { return 73; }
 
 fn OP_AND() -> i32 { return 80; }
 fn OP_OR() -> i32 { return 81; }
@@ -117,13 +125,13 @@ fn insn_encoded_size(opc: i32) -> i32 {
         if opc <= 21 { return 1; }
     }
     if opc >= 32 {
-        if opc <= 37 { return 1; }
+        if opc <= 39 { return 1; }
     }
     if opc >= 48 {
         if opc <= 52 { return 1; }
     }
     if opc >= 64 {
-        if opc <= 69 { return 1; }
+        if opc <= 73 { return 1; }
     }
     if opc >= 80 {
         if opc <= 82 { return 1; }
@@ -187,7 +195,7 @@ fn is_arithmetic_opcode(opc: i32) -> bool {
         if opc <= 21 { return true; }
     }
     if opc >= 32 {
-        if opc <= 37 { return true; }
+        if opc <= 39 { return true; }
     }
     if opc >= 48 {
         if opc <= 52 { return true; }
@@ -197,7 +205,7 @@ fn is_arithmetic_opcode(opc: i32) -> bool {
 
 fn is_compare_opcode(opc: i32) -> bool {
     if opc >= 64 {
-        if opc <= 69 { return true; }
+        if opc <= 73 { return true; }
     }
     return false;
 }
@@ -571,13 +579,13 @@ fn encode_insn_at(instrs: Vec<i32>, idx: i32, out: Vec<i32>) -> i32 {
         if opc <= 21 { return idx + 1; }
     }
     if opc >= 32 {
-        if opc <= 37 { return idx + 1; }
+        if opc <= 39 { return idx + 1; }
     }
     if opc >= 48 {
         if opc <= 52 { return idx + 1; }
     }
     if opc >= 64 {
-        if opc <= 69 { return idx + 1; }
+        if opc <= 73 { return idx + 1; }
     }
     if opc >= 80 {
         if opc <= 82 { return idx + 1; }
@@ -714,13 +722,13 @@ fn decode_insn_at(buf: Vec<i32>, pos: i32, out: Vec<i32>) -> i32 {
         if opc <= 21 { return pos + 1; }
     }
     if opc >= 32 {
-        if opc <= 37 { return pos + 1; }
+        if opc <= 39 { return pos + 1; }
     }
     if opc >= 48 {
         if opc <= 52 { return pos + 1; }
     }
     if opc >= 64 {
-        if opc <= 69 { return pos + 1; }
+        if opc <= 73 { return pos + 1; }
     }
     if opc >= 80 {
         if opc <= 82 { return pos + 1; }
@@ -1010,6 +1018,10 @@ fn test_insn_sizes() -> i32 {
     if insn_encoded_size(7) != 2 { return 6; }
     if insn_encoded_size(8) != 5 { return 7; }
     if insn_encoded_size(16) != 1 { return 8; }
+    if insn_encoded_size(38) != 1 { return 80; }
+    if insn_encoded_size(39) != 1 { return 81; }
+    if insn_encoded_size(70) != 1 { return 82; }
+    if insn_encoded_size(73) != 1 { return 83; }
     if insn_encoded_size(64) != 1 { return 9; }
     if insn_encoded_size(96) != 5 { return 10; }
     if insn_encoded_size(112) != 5 { return 11; }

@@ -1,0 +1,50 @@
+// SS-U14 (sv0-strings Track U, docs/BUGS.md #3): full-range u64 / usize
+// arithmetic and comparison must give the SAME result on the C backend
+// (uint64_t) and the native VM. Before SS-U14 the VM compared u64 with a
+// signed Int64.<, so 2^64-1 (== Int64 -1) sorted below 0 and a `s < a` wrap
+// detector picked the wrong branch. Expected exit: 42.
+//
+// Boundary values are built by wrapping arithmetic rather than out-of-range
+// decimal literals, so the emitted C stays warning-clean.
+
+enum CU { Val(u64), Over }
+
+fn cadd(a: u64, b: u64) -> CU {
+    let s: u64 = a + b;           // wraps mod 2^64
+    if s < a { return CU::Over; } // unsigned: a wrap makes s smaller than a
+    return CU::Val(s);
+}
+
+fn main() -> i32 {
+    let zero: u64 = 0;
+    let one: u64 = 1;
+    let max: u64 = zero - one;              // wraps to 2^64 - 1
+    let two: u64 = 2;
+    let half: u64 = (max / two) + one;      // (2^63-1)+1 = 2^63 (crosses the signed boundary)
+
+    // wrap is detected
+    let e1: i32 = match cadd(max, max) { CU::Val(x) => 0 - 1, CU::Over => 1 };
+    if e1 != 1 { return 10; }
+    let e2: i32 = match cadd(max, one) { CU::Val(x) => 0 - 1, CU::Over => 1 };
+    if e2 != 1 { return 11; }
+    // no wrap
+    let e3: i32 = match cadd(10, 20) { CU::Val(s) => s, CU::Over => 0 - 1 };
+    if e3 != 30 { return 12; }
+
+    // ordered comparisons are unsigned
+    let hundred: u64 = 100;
+    let five: u64 = 5;
+    if max <= hundred { return 20; }        // max is the largest
+    if five >= max { return 21; }           // five is small
+    if half < hundred { return 22; }
+    if max < half { return 23; }            // max > half
+
+    // unsigned div / rem
+    let q: u64 = max / half;                // (2^64-1) / 2^63 = 1
+    if q != one { return 30; }
+    let r: u64 = max % half;                // (2^64-1) - 2^63 = 2^63 - 1
+    let want_r: u64 = half - one;           // 2^63 - 1
+    if r != want_r { return 31; }
+
+    return 42;
+}
