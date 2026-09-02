@@ -28,6 +28,9 @@ static int OP_MOD_I64(void);
 static int OP_NEG_I64(void);
 static int OP_DIV_U64(void);
 static int OP_MOD_U64(void);
+static int OP_SHL_I64(void);
+static int OP_SHR_I64(void);
+static int OP_SHR_U64(void);
 static int OP_ADD_F64(void);
 static int OP_SUB_F64(void);
 static int OP_MUL_F64(void);
@@ -253,6 +256,18 @@ static int OP_MOD_U64(void) {
   return 39;
 }
 
+static int OP_SHL_I64(void) {
+  return 40;
+}
+
+static int OP_SHR_I64(void) {
+  return 41;
+}
+
+static int OP_SHR_U64(void) {
+  return 42;
+}
+
 static int OP_ADD_F64(void) {
   return 48;
 }
@@ -474,7 +489,7 @@ static int insn_encoded_size(int opc) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 39)) {
+    if ((opc <= 42)) {
       return 1;
     } else {
     }
@@ -670,7 +685,7 @@ static int is_arithmetic_opcode(int opc) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 39)) {
+    if ((opc <= 42)) {
       return 1;
     } else {
     }
@@ -1273,7 +1288,7 @@ static int encode_insn_at(int instrs, int idx, int out) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 39)) {
+    if ((opc <= 42)) {
       int _sv0t31 = (idx + 1);
       return _sv0t31;
     } else {
@@ -1563,7 +1578,7 @@ static int decode_insn_at(int buf, int pos, int out) {
   } else {
   }
   if ((opc >= 32)) {
-    if ((opc <= 39)) {
+    if ((opc <= 42)) {
       int _sv0t25 = (pos + 1);
       return _sv0t25;
     } else {
@@ -2135,43 +2150,53 @@ static int test_insn_sizes(void) {
     return 83;
   } else {
   }
-  int _sv0t12 = insn_encoded_size(64);
+  int _sv0t12 = insn_encoded_size(40);
   if ((_sv0t12 != 1)) {
+    return 84;
+  } else {
+  }
+  int _sv0t13 = insn_encoded_size(42);
+  if ((_sv0t13 != 1)) {
+    return 85;
+  } else {
+  }
+  int _sv0t14 = insn_encoded_size(64);
+  if ((_sv0t14 != 1)) {
     return 9;
   } else {
   }
-  int _sv0t13 = insn_encoded_size(96);
-  if ((_sv0t13 != 5)) {
+  int _sv0t15 = insn_encoded_size(96);
+  if ((_sv0t15 != 5)) {
     return 10;
   } else {
   }
-  int _sv0t14 = insn_encoded_size(112);
-  if ((_sv0t14 != 5)) {
+  int _sv0t16 = insn_encoded_size(112);
+  if ((_sv0t16 != 5)) {
     return 11;
   } else {
   }
-  int _sv0t15 = insn_encoded_size(115);
-  if ((_sv0t15 != 9)) {
+  int _sv0t17 = insn_encoded_size(115);
+  if ((_sv0t17 != 9)) {
     return 12;
   } else {
   }
-  int _sv0t16 = insn_encoded_size(116);
-  if ((_sv0t16 != 1)) {
+  int _sv0t18 = insn_encoded_size(116);
+  if ((_sv0t18 != 1)) {
     return 13;
   } else {
   }
-  int _sv0t17 = insn_encoded_size(118);
-  if ((_sv0t17 != 2)) {
+  int _sv0t19 = insn_encoded_size(118);
+  if ((_sv0t19 != 2)) {
     return 14;
   } else {
   }
-  int _sv0t18 = insn_encoded_size(144);
-  if ((_sv0t18 != 13)) {
+  int _sv0t20 = insn_encoded_size(144);
+  if ((_sv0t20 != 13)) {
     return 15;
   } else {
   }
-  int _sv0t19 = insn_encoded_size(161);
-  if ((_sv0t19 != 5)) {
+  int _sv0t21 = insn_encoded_size(161);
+  if ((_sv0t21 != 5)) {
     return 16;
   } else {
   }
@@ -2229,48 +2254,63 @@ static int test_opcode_classify(void) {
     return 10;
   } else {
   }
-  int _sv0t10 = is_compare_opcode(64);
+  int _sv0t10 = is_arithmetic_opcode(40);
   if ((_sv0t10 != 1)) {
+    return 100;
+  } else {
+  }
+  int _sv0t11 = is_arithmetic_opcode(42);
+  if ((_sv0t11 != 1)) {
+    return 101;
+  } else {
+  }
+  int _sv0t12 = is_arithmetic_opcode(43);
+  if ((_sv0t12 != 0)) {
+    return 102;
+  } else {
+  }
+  int _sv0t13 = is_compare_opcode(64);
+  if ((_sv0t13 != 1)) {
     return 11;
   } else {
   }
-  int _sv0t11 = is_compare_opcode(69);
-  if ((_sv0t11 != 1)) {
+  int _sv0t14 = is_compare_opcode(69);
+  if ((_sv0t14 != 1)) {
     return 12;
   } else {
   }
-  int _sv0t12 = is_logic_opcode(80);
-  if ((_sv0t12 != 1)) {
+  int _sv0t15 = is_logic_opcode(80);
+  if ((_sv0t15 != 1)) {
     return 13;
   } else {
   }
-  int _sv0t13 = is_bitwise_opcode(88);
-  if ((_sv0t13 != 1)) {
+  int _sv0t16 = is_bitwise_opcode(88);
+  if ((_sv0t16 != 1)) {
     return 14;
   } else {
   }
-  int _sv0t14 = is_bitwise_opcode(93);
-  if ((_sv0t14 != 1)) {
+  int _sv0t17 = is_bitwise_opcode(93);
+  if ((_sv0t17 != 1)) {
     return 15;
   } else {
   }
-  int _sv0t15 = is_control_flow_opcode(112);
-  if ((_sv0t15 != 1)) {
+  int _sv0t18 = is_control_flow_opcode(112);
+  if ((_sv0t18 != 1)) {
     return 16;
   } else {
   }
-  int _sv0t16 = is_control_flow_opcode(118);
-  if ((_sv0t16 != 1)) {
+  int _sv0t19 = is_control_flow_opcode(118);
+  if ((_sv0t19 != 1)) {
     return 17;
   } else {
   }
-  int _sv0t17 = is_struct_opcode(128);
-  if ((_sv0t17 != 1)) {
+  int _sv0t20 = is_struct_opcode(128);
+  if ((_sv0t20 != 1)) {
     return 18;
   } else {
   }
-  int _sv0t18 = is_variant_opcode(144);
-  if ((_sv0t18 != 1)) {
+  int _sv0t21 = is_variant_opcode(144);
+  if ((_sv0t21 != 1)) {
     return 19;
   } else {
   }

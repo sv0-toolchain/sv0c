@@ -1,0 +1,34 @@
+// SS-U14 residual #1: 64-bit `<<` / `>>` on u64 and i64 must shift at the
+// full width on the native VM. The polymorphic SHL/SHR opcodes truncate the
+// operand (and the count) to 32 bits -- `one << 40` came out as `1 << 8`.
+// The wide SHL_I64 / SHR_I64 / SHR_U64 opcodes fix it; the C backend was
+// always correct. Expected exit: 42 (native VM only -- the SML reference
+// rejects u64/i64 literals with E0400).
+
+fn main() -> i32 {
+    let one: u64 = 1;
+
+    // left shift past bit 32, then bring it back
+    let hi: u64 = one << 40;              // 2^40 -- 0 (or 2^8) if truncated
+    if hi == 0 { return 10; }
+    let unit: u64 = one << 20;            // 2^20
+    if (hi / unit) != unit { return 11; } // 2^40 / 2^20 == 2^20; truncated => 1
+
+    let back: u64 = hi >> 40;
+    if back != one { return 12; }
+
+    // u64 right shift is logical, not sign-extending
+    let top: u64 = one << 63;             // MSB set
+    let lo: u64 = top >> 62;              // logical => 2
+    if lo != 2 { return 13; }
+
+    // i64 right shift is arithmetic (sign-extends)
+    let neg: i64 = 0 - 1;                 // all ones
+    if (neg >> 8) != neg { return 14; }   // arithmetic: still -1
+
+    let p: i64 = 1;
+    let ps: i64 = p << 40;
+    if (ps >> 40) != p { return 15; }
+
+    return 42;
+}
