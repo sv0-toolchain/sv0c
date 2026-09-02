@@ -81,6 +81,123 @@ static inline const char *sv0_string_substr(const char *s, int start, int len) {
   return r;
 }
 
+/* Owned `string` — length-bearing (SS-U02b, sv0-strings Track U).
+ *
+ * `sv0doc/type-system/rules.md` §1.3.1 is the normative *target* ABI: a
+ * by-value three-field record `{ data: non-null *u8, len: usize, cap: usize }`
+ * (`cap >= len`), content = exactly `len` bytes of UTF-8, an embedded `\0` is
+ * content, no implicit terminator. This bootstrap runtime realizes it the
+ * same way it realizes `Vec<T>` and slices — indirectly, through an `int`
+ * handle into `sv0_str_table`, whose entries hold exactly that triple. A real
+ * by-value string lands with a non-bootstrap backend.
+ *
+ * These `sv0_str_*` helpers are the length-based replacements for the
+ * `strlen`/`strcmp`-based `sv0_string_*` above (SS-009's embedded-NUL red
+ * corpus fails on those): length and comparison never scan for a terminator
+ * (UP-002), and byte access / substring bounds-check before any read (UP-003)
+ * and fail closed via `sv0_panic`. Allocation failure and `len + other.len`
+ * overflow in concat are checked before the value is observable, with the
+ * inputs left unchanged. The compiler front end still emits the old API; the
+ * migration (literals carrying a decoded byte length, `ast_ty_to_c_string`
+ * `string -> sv0_str`, `sv0_println`) is the rest of SS-U02b. */
+#define SV0_STR_MAX 262144
+
+typedef struct {
+  uint8_t *data;
+  int32_t len;
+  int32_t cap;
+} sv0_str;
+
+static sv0_str sv0_str_table[SV0_STR_MAX];
+static int32_t sv0_str_count = 0;
+static uint8_t sv0_str_empty_base[1] = {0}; /* non-null base for len == 0 */
+
+static inline int32_t sv0_str_slot(void) {
+  if (sv0_str_count >= SV0_STR_MAX)
+    sv0_panic("string: too many strings");
+  return sv0_str_count++;
+}
+
+/* Store an already-owned heap buffer (or set up the empty string). */
+static inline int32_t sv0_str_adopt(uint8_t *buf, int32_t len) {
+  int32_t h = sv0_str_slot();
+  if (len <= 0) {
+    if (buf)
+      free(buf);
+    sv0_str_table[h].data = sv0_str_empty_base;
+    sv0_str_table[h].len = 0;
+    sv0_str_table[h].cap = 0;
+    return h;
+  }
+  sv0_str_table[h].data = buf;
+  sv0_str_table[h].len = len;
+  sv0_str_table[h].cap = len;
+  return h;
+}
+
+static inline int32_t sv0_str_intern(const uint8_t *bytes, int32_t len) {
+  if (len <= 0)
+    return sv0_str_adopt((uint8_t *)0, 0);
+  uint8_t *buf = (uint8_t *)malloc((size_t)len);
+  if (!buf)
+    sv0_panic("string: allocation failed");
+  memcpy(buf, bytes, (size_t)len);
+  return sv0_str_adopt(buf, len);
+}
+
+/* String literal: raw bytes with a compile-time length (embedded `\0`
+   included) — never `strlen`. */
+static inline int32_t sv0_str_lit(const char *bytes, int32_t len) {
+  return sv0_str_intern((const uint8_t *)bytes, len);
+}
+
+static inline int32_t sv0_str_len(int32_t h) { return sv0_str_table[h].len; }
+
+static inline int sv0_str_eq(int32_t a, int32_t b) {
+  sv0_str x = sv0_str_table[a];
+  sv0_str y = sv0_str_table[b];
+  if (x.len != y.len)
+    return 0;
+  return memcmp(x.data, y.data, (size_t)x.len) == 0;
+}
+
+static inline int32_t sv0_str_concat(int32_t a, int32_t b) {
+  sv0_str x = sv0_str_table[a];
+  sv0_str y = sv0_str_table[b];
+  if (x.len < 0 || y.len < 0 || x.len > 0x7fffffff - y.len)
+    sv0_panic("string: length overflow in concat");
+  int32_t n = x.len + y.len;
+  if (n == 0)
+    return sv0_str_adopt((uint8_t *)0, 0);
+  uint8_t *buf = (uint8_t *)malloc((size_t)n);
+  if (!buf)
+    sv0_panic("string: allocation failed");
+  memcpy(buf, x.data, (size_t)x.len);
+  memcpy(buf + x.len, y.data, (size_t)y.len);
+  return sv0_str_adopt(buf, n);
+}
+
+static inline int sv0_str_char_at(int32_t h, int32_t i) {
+  sv0_str s = sv0_str_table[h];
+  if (i < 0 || i >= s.len)
+    sv0_panic("string: index out of bounds");
+  return (int)s.data[i];
+}
+
+static inline int32_t sv0_str_substr(int32_t h, int32_t start, int32_t len) {
+  sv0_str s = sv0_str_table[h];
+  if (start < 0 || len < 0 || start > s.len - len)
+    sv0_panic("string: substring out of bounds");
+  return sv0_str_intern(s.data + start, len);
+}
+
+static inline void sv0_str_println(int32_t h) {
+  sv0_str s = sv0_str_table[h];
+  if (s.len > 0)
+    fwrite(s.data, 1u, (size_t)s.len, stdout);
+  fputc('\n', stdout);
+}
+
 /* Vec<T> (T0-4): handle-based dynamic array for bootstrap.
  * Each vec_new() returns an int handle into a global table.
  * Elements are stored as intptr_t (word-sized); works for i32, bool, pointers.
