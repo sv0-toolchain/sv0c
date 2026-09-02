@@ -179,7 +179,13 @@ static inline int32_t sv0_str_concat(int32_t a, int32_t b) {
 
 static inline int sv0_str_char_at(int32_t h, int32_t i) {
   sv0_str s = sv0_str_table[h];
-  if (i < 0 || i >= s.len)
+  /* `i == len` returns 0 without a memory read — preserves the historical
+     "one past the end reads the terminator" idiom the self-hosted compiler's
+     scanners rely on, while still being embedded-NUL-safe for 0..len-1 and
+     never reading past the buffer. A genuine over-range still fails closed. */
+  if (i == s.len)
+    return 0;
+  if (i < 0 || i > s.len)
     sv0_panic("string: index out of bounds");
   return (int)s.data[i];
 }
