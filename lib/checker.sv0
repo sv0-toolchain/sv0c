@@ -2545,6 +2545,181 @@ fn check_body_let_unknown_type(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
     return 0;
 }
 
+/* SS-U03d borrow checks, scoped strictly to slice-construction syntax
+   (`&e[..]` / `&e[a..b]`) so non-slice code can never be flagged:
+     E0322 — `return`ing a slice whose source is a function LOCAL (`let`
+             binding), directly or one hop via `let s = &local[..]; return s;`.
+             A slice over a PARAMETER is allowed — its borrow outlives the call.
+     E0323 — a source that already has a live slice view in the same block is
+             borrowed again while either borrow is `&mut` (`&mut a[..]` twice,
+             or `&a[..]` while `&mut a[..]` is live).
+   Conservative: a borrow is treated as live to the end of its block; multiple
+   shared (`&`) borrows of the same source do not conflict. */
+
+/* Peel `&`/`&mut` off `node`, then require an ExprIndex (tag 8) whose index
+   child is an ExprRange (tag 21); return the base expr idx, else -1. Also sets
+   out_is_mut[0] to 1 when an outer `&mut` was peeled, 0 otherwise. */
+fn slice_ctor_base_node(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                        node: i32, out_is_mut: Vec<i32>) -> i32 {
+    vec_push(out_is_mut, 0);
+    if node < 0 { return 0 - 1; }
+    let mut n: i32 = node;
+    if vec_get(bet, n) == 2 {
+        let u: i32 = vec_get(bed1, n);
+        if u == 4 { n = vec_get(bed2, n); }
+        else {
+            if u == 5 {
+                vec_set(out_is_mut, 0, 1);
+                n = vec_get(bed2, n);
+            }
+        }
+    }
+    if n < 0 { return 0 - 1; }
+    if vec_get(bet, n) != 8 { return 0 - 1; }
+    let ixc: i32 = vec_get(bed2, n);
+    if ixc < 0 { return 0 - 1; }
+    if vec_get(bet, ixc) != 21 { return 0 - 1; }
+    return vec_get(bed1, n);
+}
+
+/* Token index of a 1-segment ExprPath (tag 1) node's identifier, else -1. */
+fn path1_name_tok(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bpp: Vec<i32>,
+                  node: i32) -> i32 {
+    if node < 0 { return 0 - 1; }
+    if vec_get(bet, node) != 1 { return 0 - 1; }
+    if vec_get(bed2, node) != 1 { return 0 - 1; }
+    return vec_get(bpp, vec_get(bed1, node));
+}
+
+fn tok_ident_eq(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                a: i32, b: i32) -> bool {
+    if a < 0 { return false; }
+    if b < 0 { return false; }
+    let as1: i32 = vec_get(starts, a);
+    let ae: i32 = vec_get(ends, a);
+    let bs: i32 = vec_get(starts, b);
+    let be: i32 = vec_get(ends, b);
+    if ae <= as1 { return false; }
+    if be <= bs { return false; }
+    return string_eq(string_substr(source, as1, ae - as1),
+                     string_substr(source, bs, be - bs));
+}
+
+fn tok_in_list(source: string, starts: Vec<i32>, ends: Vec<i32>,
+               list: Vec<i32>, t: i32) -> bool {
+    let mut i: i32 = 0;
+    while i < vec_len(list) {
+        if tok_ident_eq(source, starts, ends, vec_get(list, i), t) { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn check_body_slice_borrow(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
+                           bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>,
+                           body_root: i32, param_name_toks: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>,
+                           diag_sink: Vec<i32>) -> i32 {
+    if body_root < 0 { return 0; }
+    if body_root >= vec_len(bet) { return 0; }
+    if vec_get(bet, body_root) != 9 { return 0; }
+    let sfirst: i32 = vec_get(bed1, body_root);
+    let scount: i32 = vec_get(bed2, body_root);
+    let sidecar: i32 = vec_get(bed4, body_root);
+
+    /* local `let` names, and the subset bound to a slice over a local */
+    let local_names: Vec<i32> = vec_new();
+    let slice_alias_name: Vec<i32> = vec_new();
+    /* live slice borrows in this block */
+    let borrowed_base: Vec<i32> = vec_new();
+    let borrowed_mut: Vec<i32> = vec_new();
+
+    let mut si: i32 = 0;
+    while si < scount {
+        let st: i32 = block_stmt_index(bpp, sfirst, sidecar, si);
+        let stag: i32 = vec_get(bet, st);
+        if stag == 27 {
+            let lname: i32 = vec_get(bed1, st);
+            let linit: i32 = vec_get(bed3, st);
+            if lname >= 0 { vec_push(local_names, lname); }
+            if linit >= 0 {
+                let im: Vec<i32> = vec_new();
+                let base_n: i32 = slice_ctor_base_node(bet, bed1, bed2, linit, im);
+                if base_n >= 0 {
+                    let base_tok: i32 = path1_name_tok(bet, bed1, bed2, bpp, base_n);
+                    if base_tok >= 0 {
+                        let this_mut: i32 = vec_get(im, 0);
+                        /* E0323: conflict with an already-live borrow */
+                        let mut bi: i32 = 0;
+                        let mut flagged: i32 = 0;
+                        while bi < vec_len(borrowed_base) {
+                            if flagged == 0 {
+                                if tok_ident_eq(source, starts, ends,
+                                                vec_get(borrowed_base, bi), base_tok) {
+                                    if this_mut == 1 { flagged = 1; }
+                                    else { if vec_get(borrowed_mut, bi) == 1 { flagged = 1; } }
+                                }
+                            }
+                            bi = bi + 1;
+                        }
+                        if flagged == 1 {
+                            vec_push(diag_sink, 323);
+                            vec_push(diag_sink, lname);
+                        }
+                        vec_push(borrowed_base, base_tok);
+                        vec_push(borrowed_mut, this_mut);
+                        /* record `s` as an alias of a slice over a local */
+                        if lname >= 0 {
+                            if tok_in_list(source, starts, ends, local_names, base_tok) {
+                                vec_push(slice_alias_name, lname);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        si = si + 1;
+    }
+
+    /* E0322: return of a slice over a local (direct or one-hop alias) */
+    let mut ri: i32 = 0;
+    while ri < scount {
+        let rt: i32 = block_stmt_index(bpp, sfirst, sidecar, ri);
+        let rtag: i32 = vec_get(bet, rt);
+        let mut rnode: i32 = 0 - 1;
+        if rtag == 15 { rnode = vec_get(bed1, rt); }
+        if rtag == 28 {
+            let inr: i32 = vec_get(bed1, rt);
+            if inr >= 0 { if vec_get(bet, inr) == 15 { rnode = vec_get(bed1, inr); } }
+        }
+        if rnode >= 0 {
+            let im2: Vec<i32> = vec_new();
+            let base_r: i32 = slice_ctor_base_node(bet, bed1, bed2, rnode, im2);
+            if base_r >= 0 {
+                let base_rt: i32 = path1_name_tok(bet, bed1, bed2, bpp, base_r);
+                if base_rt >= 0 {
+                    if tok_in_list(source, starts, ends, local_names, base_rt) {
+                        if tok_in_list(source, starts, ends, param_name_toks, base_rt) != true {
+                            vec_push(diag_sink, 322);
+                            vec_push(diag_sink, base_rt);
+                        }
+                    }
+                }
+            } else {
+                let rvt: i32 = path1_name_tok(bet, bed1, bed2, bpp, rnode);
+                if rvt >= 0 {
+                    if tok_in_list(source, starts, ends, slice_alias_name, rvt) {
+                        vec_push(diag_sink, 322);
+                        vec_push(diag_sink, rvt);
+                    }
+                }
+            }
+        }
+        ri = ri + 1;
+    }
+    return 0;
+}
+
 fn check_body_field_access(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
                            bed3: Vec<i32>, bed4: Vec<i32>, bpp: Vec<i32>,
                            body_root: i32,
@@ -2786,6 +2961,11 @@ fn check_program(
                                 param_name_pos, param_tyname_toks,
                                 sdef_names, sdef_field_offsets, sdef_field_counts,
                                 sdef_fnames_flat, source, starts, ends, diag_sink);
+            /* SS-U03d: slice borrow checks (E0322 return-of-local-slice,
+               E0323 conflicting slice borrow). */
+            let _rsb: i32 = check_body_slice_borrow(body_et, body_ed1, body_ed2,
+                                body_ed3, body_ed4, bpp, body_root_idx,
+                                param_name_pos, source, starts, ends, diag_sink);
             /* BH-8 (Slice 5): unknown type in a `let x: T` annotation → E0301. */
             let _rut: i32 = check_body_let_unknown_type(body_et, body_ed1,
                                 body_ed2, body_ed4, bpp, body_root_idx,

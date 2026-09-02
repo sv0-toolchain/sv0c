@@ -35,3 +35,9 @@ test/diagnostics/cases/tuple_triple.sv0|E0446
 test/diagnostics/cases/invalid_use_clause.sv0|E0309
 test/diagnostics/cases/tuple_pattern_let.sv0|E0446
 test/diagnostics/cases/println_non_string.sv0|E0444|sml
+# SS-U03d (sv0-strings Track U): slice borrow compile-fail suite. native only —
+# the sml-legacy parser rejects `..` in index position (that path is SS-U03c).
+test/diagnostics/cases/slice_return_local.sv0|E0322|native
+test/diagnostics/cases/slice_return_local_alias.sv0|E0322|native
+test/diagnostics/cases/slice_borrow_mut_twice.sv0|E0323|native
+test/diagnostics/cases/slice_borrow_mut_and_shared.sv0|E0323|native
