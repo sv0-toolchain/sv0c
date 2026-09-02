@@ -112,6 +112,30 @@ static sv0_str sv0_str_table[SV0_STR_MAX];
 static int32_t sv0_str_count = 0;
 static uint8_t sv0_str_empty_base[1] = {0}; /* non-null base for len == 0 */
 
+/* Allocation accounting + fault injection (SS-U02d / UP-007, BL-015).
+   sv0_str_alloc_count bumps on every owned-string buffer allocation.
+   sv0_str_fail_at, when > 0, makes the Nth such allocation fail closed
+   (as if malloc returned NULL) so fault-injection tests are deterministic
+   without exhausting memory -- read once from SV0_STR_FAIL_AT.
+   OQ-003: recoverable, Result-returning alloc failure is deferred to a
+   non-bootstrap backend; this runtime fails closed via sv0_panic, and it
+   allocates string / Vec / Box buffers arena-style (freed at process
+   exit), so per-value Drop is likewise deferred -- the counter is what
+   lets a test pin "this op did exactly K allocations". */
+static long sv0_str_alloc_count = 0;
+static long sv0_str_fail_at = -1; /* -1 = uninitialised */
+
+static inline uint8_t *sv0_str_alloc(int32_t nbytes) {
+  if (sv0_str_fail_at < 0) {
+    const char *e = getenv("SV0_STR_FAIL_AT");
+    sv0_str_fail_at = (e && e[0]) ? strtol(e, (char **)0, 10) : 0;
+  }
+  sv0_str_alloc_count++;
+  if (sv0_str_fail_at > 0 && sv0_str_alloc_count == sv0_str_fail_at)
+    return (uint8_t *)0;
+  return (uint8_t *)malloc((size_t)nbytes);
+}
+
 static inline int32_t sv0_str_slot(void) {
   if (sv0_str_count >= SV0_STR_MAX)
     sv0_panic("string: too many strings");
@@ -138,7 +162,7 @@ static inline int32_t sv0_str_adopt(uint8_t *buf, int32_t len) {
 static inline int32_t sv0_str_intern(const uint8_t *bytes, int32_t len) {
   if (len <= 0)
     return sv0_str_adopt((uint8_t *)0, 0);
-  uint8_t *buf = (uint8_t *)malloc((size_t)len);
+  uint8_t *buf = (uint8_t *)sv0_str_alloc(len);
   if (!buf)
     sv0_panic("string: allocation failed");
   memcpy(buf, bytes, (size_t)len);
@@ -169,7 +193,7 @@ static inline int32_t sv0_str_concat(int32_t a, int32_t b) {
   int32_t n = x.len + y.len;
   if (n == 0)
     return sv0_str_adopt((uint8_t *)0, 0);
-  uint8_t *buf = (uint8_t *)malloc((size_t)n);
+  uint8_t *buf = (uint8_t *)sv0_str_alloc(n);
   if (!buf)
     sv0_panic("string: allocation failed");
   memcpy(buf, x.data, (size_t)x.len);
