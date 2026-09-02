@@ -1737,6 +1737,36 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if tag == 18 {
         let lhs_idx: i32 = vec_get(ed1, idx);
         let rhs_idx: i32 = vec_get(ed2, idx);
+        /* `e[i] = v` — element store through the universal accessor
+           sv0_idx_set (builtin 23), which dispatches Vec/array vs slice on
+           the handle tag. classify_assign_lhs_arena has no ExprIndex case
+           (it returned -1 and the statement was silently dropped), so this
+           is handled directly here. SS-U03b b5. */
+        if vec_get(et, lhs_idx) == 8 {
+            let base_c: i32 = vec_get(ed1, lhs_idx);
+            let ixe_c: i32 = vec_get(ed2, lhs_idx);
+            let v_base: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                   tok_tags, base_c, ctr,
+                                                   out_instrs, enum_names,
+                                                   enum_tag_offsets, enum_tag_counts,
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let v_ixe: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                   tok_tags, ixe_c, ctr,
+                                                   out_instrs, enum_names,
+                                                   enum_tag_offsets, enum_tag_counts,
+                                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let v_rhs_s: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                    tok_tags, rhs_idx, ctr,
+                                                    out_instrs, enum_names,
+                                                    enum_tag_offsets, enum_tag_counts,
+                                                    enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let mut a_iset: Vec<i32> = vec_new();
+            vec_push(a_iset, box_new(v_base));
+            vec_push(a_iset, box_new(v_ixe));
+            vec_push(a_iset, box_new(v_rhs_s));
+            vec_push(out_instrs, box_new(Instr::Call(0, 0 - 23, a_iset, 0)));
+            return Value::VUnit;
+        }
         /* SML ExprAssign: Store(x, <rhs as Ir.expr>) via lowerExprWithInstrs —
            a binop RHS is stored directly, not spilled through a temp. */
         let rhs_e: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,

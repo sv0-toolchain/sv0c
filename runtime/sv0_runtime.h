@@ -170,22 +170,34 @@ static inline int32_t sv0_slice_intern(intptr_t *data, int32_t len) {
   return s | SV0_SLICE_TAG;
 }
 
+/* Base pointer + element count of a Vec/array handle OR a slice handle —
+   so `&e[..]` / `&e[a..b]` work whether `e` is a collection or already a
+   slice (re-slicing), without lowering needing to know which. */
+static inline intptr_t *sv0_view_data(int32_t h) {
+  if (h & SV0_SLICE_TAG)
+    return sv0_slice_table[h & ~SV0_SLICE_TAG].data;
+  return sv0_vec_table[h].data;
+}
+
+static inline int32_t sv0_view_len(int32_t h) {
+  if (h & SV0_SLICE_TAG)
+    return sv0_slice_table[h & ~SV0_SLICE_TAG].len;
+  return sv0_vec_table[h].len;
+}
+
 static inline int32_t sv0_slice_full_vec(int32_t h) {
-  return sv0_slice_intern(sv0_vec_table[h].data, sv0_vec_table[h].len);
+  return sv0_slice_intern(sv0_view_data(h), sv0_view_len(h));
 }
 
 static inline int32_t sv0_slice_from_vec(int32_t h, int32_t lo, int32_t hi) {
-  int32_t n = sv0_vec_table[h].len;
+  int32_t n = sv0_view_len(h);
   if (lo < 0 || hi < lo || hi > n)
     sv0_panic("slice: range out of bounds");
-  return sv0_slice_intern(sv0_vec_table[h].data + lo, hi - lo);
+  return sv0_slice_intern(sv0_view_data(h) + lo, hi - lo);
 }
 
 static inline int32_t sv0_slice_subslice(int32_t sh, int32_t lo, int32_t hi) {
-  sv0_slice src = sv0_slice_table[sh & ~SV0_SLICE_TAG];
-  if (lo < 0 || hi < lo || hi > src.len)
-    sv0_panic("slice: range out of bounds");
-  return sv0_slice_intern(src.data + lo, hi - lo);
+  return sv0_slice_from_vec(sh, lo, hi);
 }
 
 static inline int32_t sv0_slice_len(int32_t sh) {

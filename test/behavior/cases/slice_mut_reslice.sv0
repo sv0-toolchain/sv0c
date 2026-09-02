@@ -1,0 +1,26 @@
+// SS-U03b b5 (sv0-strings Track U): `&mut [T]` element stores writing through
+// to the source, compound element assignment, and re-slicing a slice
+// (`&s[a..b]`). Complements slice_construct_index.sv0 (construct + read).
+//
+// C leg only (`native`): the sml-legacy parser still rejects `..` in index
+// position (SS-U03c, the VM backend). Expected exit: 42.
+
+fn main() -> i32 {
+    let a: [i32; 6] = [1, 2, 3, 4, 5, 6];
+
+    let m: &mut [i32] = &mut a[1..5];   // views a[1..5] = 2 3 4 5
+
+    m[0] = 20;                          // a[1] = 20   -> m = 20 3 4 5
+    m[3] = m[3] + 10;                   // a[4] = 15   -> m = 20 3 4 15
+
+    let re: &[i32] = &m[1..3];          // re-slice of a slice: m[1..3] = 3 4
+
+    // m      = 20 3 4 15
+    // re     = 3 4
+    // a[0]   = 1   (untouched)
+    // a[5]   = 6   (untouched)
+    let acc: i32 = m[0] + m[2] + re[0] + re[1] + a[0] + a[5];
+    //             20   + 4    + 3     + 4     + 1    + 6     = 38
+
+    return acc + m[1] + 1;             // 38 + 3 + 1 = 42
+}
