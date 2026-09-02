@@ -450,4 +450,74 @@ static inline void sv0_write_bytes(const char *path, int32_t vec) {
     sv0_panic("write_bytes: fclose failed");
 }
 
+/* Host-I/O shims for the length-bearing `sv0_str` world (SS-U02b p0b).
+ * The underlying host builtins take/return NUL-terminated `const char *`;
+ * these wrap them so codegen can stay uniform once `string` becomes an
+ * `sv0_str` handle. Host paths / dir listings / env values are NUL-free,
+ * so `strlen` on them is exact. Unreferenced until the SS-U02b codegen
+ * flip (p1/p2) retargets the emitted names. */
+
+/* NUL-terminated copy of a handle's bytes (for passing to a `const char *`
+   host API). The handle's own bytes may contain interior NUL; a path that
+   does is simply not found by the OS -- same as today. Caller owns the
+   returned buffer. */
+static inline char *sv0_str_cstr(int32_t h) {
+  sv0_str s = sv0_str_table[h];
+  char *r = (char *)malloc((size_t)s.len + 1u);
+  if (!r)
+    sv0_panic("string: allocation failed");
+  if (s.len > 0)
+    memcpy(r, s.data, (size_t)s.len);
+  r[s.len] = '\0';
+  return r;
+}
+
+/* `const char *` (NUL-terminated) -> owned sv0_str handle. */
+static inline int32_t sv0_str_from_cstr(const char *s) {
+  return sv0_str_intern((const uint8_t *)s, (int32_t)strlen(s));
+}
+
+/* NB: sv0_read_file returns a `const char *` with no length, so file content
+   is measured with strlen -- an interior NUL truncates the result. That is
+   sv0_read_file's own ABI limitation, not new here; the self-hosted compiler
+   only reads NUL-free `.sv0` source. A length-returning read_file is a
+   separate host-ABI change, out of SS-U02b's scope (the `string` *type*). */
+static inline int32_t sv0_str_read_file(int32_t path_h) {
+  char *p = sv0_str_cstr(path_h);
+  const char *body = sv0_read_file(p);
+  free(p);
+  return sv0_str_from_cstr(body);
+}
+
+static inline void sv0_str_write_file(int32_t path_h, int32_t contents_h) {
+  char *p = sv0_str_cstr(path_h);
+  char *c = sv0_str_cstr(contents_h); /* NUL-safe: sv0_write_file uses strlen,
+                                         so interior NUL would truncate -- same
+                                         limitation as the pre-sv0_str backend;
+                                         the .sv0b path uses sv0_write_bytes. */
+  sv0_write_file(p, c);
+  free(p);
+  free(c);
+}
+
+static inline int32_t sv0_str_read_dir(int32_t dir_h) {
+  char *d = sv0_str_cstr(dir_h);
+  const char *listing = sv0_read_dir(d);
+  free(d);
+  return sv0_str_from_cstr(listing);
+}
+
+static inline int32_t sv0_str_getenv(int32_t name_h) {
+  char *n = sv0_str_cstr(name_h);
+  const char *v = sv0_getenv(n); /* "" when unset -- never NULL (its contract) */
+  free(n);
+  return sv0_str_from_cstr(v);
+}
+
+static inline void sv0_str_write_bytes(int32_t path_h, int32_t vec) {
+  char *p = sv0_str_cstr(path_h);
+  sv0_write_bytes(p, vec);
+  free(p);
+}
+
 #endif /* SV0_RUNTIME_H */
