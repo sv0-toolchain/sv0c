@@ -3033,7 +3033,7 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
           sv0_box_store(_sv0t111, 2, _sv0t110.p1);
           sv0_vec_push(a_fs, _sv0t111);
           Instr _sv0t112;
-          int _sv0t113 = (0 - 21);
+          int _sv0t113 = (0 - 31);
           _sv0t112.tag = 11;
           _sv0t112.p0 = t_fs;
           _sv0t112.p1 = _sv0t113;
@@ -3119,7 +3119,7 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
         sv0_box_store(_sv0t131, 2, _sv0t130.p1);
         sv0_vec_push(a_ln, _sv0t131);
         Instr _sv0t132;
-        int _sv0t133 = (0 - 9);
+        int _sv0t133 = (0 - 34);
         _sv0t132.tag = 11;
         _sv0t132.p0 = hi_t;
         _sv0t132.p1 = _sv0t133;
@@ -3183,7 +3183,7 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
       sv0_box_store(_sv0t147, 2, _sv0t146.p1);
       sv0_vec_push(a_sl, _sv0t147);
       Instr _sv0t148;
-      int _sv0t149 = (0 - 20);
+      int _sv0t149 = (0 - 30);
       _sv0t148.tag = 11;
       _sv0t148.p0 = t_sl;
       _sv0t148.p1 = _sv0t149;
@@ -3219,7 +3219,7 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
     sv0_box_store(_sv0t156, 1, v_i.p0);
     sv0_box_store(_sv0t156, 2, v_i.p1);
     sv0_vec_push(arg_ix, _sv0t156);
-    int idx_get_fn_h = (0 - 22);
+    int idx_get_fn_h = (0 - 32);
     Instr call_ix;
     call_ix.tag = 11;
     call_ix.p0 = t_ix;
@@ -3643,7 +3643,7 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
       sv0_box_store(_sv0t243, 2, v_rhs_s.p1);
       sv0_vec_push(a_iset, _sv0t243);
       Instr _sv0t244;
-      int _sv0t245 = (0 - 23);
+      int _sv0t245 = (0 - 33);
       _sv0t244.tag = 11;
       _sv0t244.p0 = 0;
       _sv0t244.p1 = _sv0t245;
