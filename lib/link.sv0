@@ -71,7 +71,408 @@ fn listing_find_newline(listing: string, start: i32) -> i32 {
     return len;
 }
 
+/* ── SS-U15: collision-gated per-module symbol mangling (--project concat) ────
+   The `--project` source-concat drops every file into ONE C translation unit
+   with UNMANGLED top-level names. The sv0-strings SPEC surface deliberately
+   reuses names across its flat modules (`strings_bytes::equal` /
+   `strings_text::equal`; `find`, `rfind`, `starts_with`, `ends_with`), which
+   the megaTU emitter would then emit twice -> a C "redefinition" error.
+
+   This pass rewrites ONLY names defined at top level in two or more distinct
+   modules of the project ("the collision set"), prefixing each with its
+   owning module id (`strings_bytes__equal`). A project with no such collision
+   -- every current consumer: sv0-mathlib, modules_diamond,
+   modules_generic_carrier -- is returned byte-for-byte unchanged (the
+   `collide` set is empty and `link_u15_mangle_source` short-circuits).
+
+   Per file (module M, with `use P::N;` imports), for a collision name N:
+     - a top-level definition of N            -> M__N
+     - an unqualified reference to N in M      -> M__N  (M defines it; or,
+       if N is neither defined here nor imported, still M__N, turning an
+       already-ambiguous bare call into a hard error instead of a silent
+       wrong pick)
+     - a file with `use P::N;`                 -> bare N binds to P__N
+     - a qualified `Q::N` anywhere             -> Q__N
+   Identifiers after `.` (field / method), and text inside string / char
+   literals, comments, and `use` / `module` lines, are never touched. Enum
+   variants (`Ordering::Equal`) are not top-level defs, so they never enter
+   the collision set. Paths of three or more segments (`a::b::N`) are left
+   alone; the flat consumer libraries do not use them. */
+
+fn link_u15_is_ident_start(c: i32) -> bool {
+    if c == 95 { return true; }
+    if c >= 65 { if c <= 90 { return true; } }
+    if c >= 97 { if c <= 122 { return true; } }
+    return false;
+}
+
+fn link_u15_is_ident_char(c: i32) -> bool {
+    if link_u15_is_ident_start(c) { return true; }
+    if c >= 48 { if c <= 57 { return true; } }
+    return false;
+}
+
+/* is `tok` one of the "\n"-separated entries in `set` (which begins and ends
+   with "\n")? */
+fn link_u15_set_has(set: string, tok: string) -> bool {
+    let want: string = string_concat("\n", string_concat(tok, "\n"));
+    let sl: i32 = string_len(set);
+    let wl: i32 = string_len(want);
+    if wl > sl { return false; }
+    let mut i: i32 = 0;
+    while i + wl <= sl {
+        if string_eq(string_substr(set, i, wl), want) { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn link_u15_colons_to_us(s: string) -> string {
+    let n: i32 = string_len(s);
+    let mut out: string = "";
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(s, i);
+        if c == 58 { out = string_concat(out, "_"); }
+        else { out = string_concat(out, string_substr(s, i, 1)); }
+        i = i + 1;
+    }
+    return out;
+}
+
+fn link_u15_trim(s: string) -> string {
+    let n: i32 = string_len(s);
+    let mut a: i32 = 0;
+    while a < n {
+        let c: i32 = string_char_at(s, a);
+        if c == 32 { a = a + 1; } else { if c == 9 { a = a + 1; } else { break; } }
+    }
+    let mut b: i32 = n;
+    while b > a {
+        let c2: i32 = string_char_at(s, b - 1);
+        if c2 == 32 { b = b - 1; } else { if c2 == 9 { b = b - 1; } else { break; } }
+    }
+    return string_substr(s, a, b - a);
+}
+
+fn link_u15_line_at_col0(src: string, i: i32) -> bool {
+    if i == 0 { return true; }
+    return string_char_at(src, i - 1) == 10;
+}
+
+/* the `module <id>;` id with `::` -> `__`, or "" if absent. */
+fn link_u15_module_id(src: string) -> string {
+    let n: i32 = string_len(src);
+    let mut i: i32 = 0;
+    while i < n {
+        if link_u15_line_at_col0(src, i) {
+            if i + 7 <= n {
+                if string_eq(string_substr(src, i, 7), "module ") {
+                    let mut j: i32 = i + 7;
+                    while j < n { if string_char_at(src, j) == 32 { j = j + 1; } else { break; } }
+                    let mut out: string = "";
+                    while j < n {
+                        let c: i32 = string_char_at(src, j);
+                        if c == 59 { break; }
+                        if c == 32 { break; }
+                        if c == 58 { out = string_concat(out, "_"); }
+                        else { out = string_concat(out, string_substr(src, j, 1)); }
+                        j = j + 1;
+                    }
+                    return out;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+/* top-level def name at col-0 position `i` (`pub`? then fn/struct/enum/trait/
+   type then an identifier), or "". */
+fn link_u15_line_def_name(src: string, i: i32) -> string {
+    let n: i32 = string_len(src);
+    let mut j: i32 = i;
+    /* a top-level def begins in column 0 -- an indented `fn` (impl method,
+       nested item) is not one, so nothing before `pub`/`fn` may be skipped. */
+    let mut had_pub: bool = false;
+    if j + 4 <= n { if string_eq(string_substr(src, j, 4), "pub ") { j = j + 4; had_pub = true; } }
+    if had_pub {
+        while j < n { if string_char_at(src, j) == 32 { j = j + 1; } else { break; } }
+    }
+    let mut kw: bool = false;
+    if j + 3 <= n { if string_eq(string_substr(src, j, 3), "fn ") { j = j + 3; kw = true; } }
+    if kw != true { if j + 7 <= n { if string_eq(string_substr(src, j, 7), "struct ") { j = j + 7; kw = true; } } }
+    if kw != true { if j + 5 <= n { if string_eq(string_substr(src, j, 5), "enum ") { j = j + 5; kw = true; } } }
+    if kw != true { if j + 6 <= n { if string_eq(string_substr(src, j, 6), "trait ") { j = j + 6; kw = true; } } }
+    if kw != true { if j + 5 <= n { if string_eq(string_substr(src, j, 5), "type ") { j = j + 5; kw = true; } } }
+    if kw != true { return ""; }
+    while j < n { if string_char_at(src, j) == 32 { j = j + 1; } else { break; } }
+    let start: i32 = j;
+    while j < n { if link_u15_is_ident_char(string_char_at(src, j)) { j = j + 1; } else { break; } }
+    if j == start { return ""; }
+    return string_substr(src, start, j - start);
+}
+
+/* module P (segments joined by `__`) of a top-level `use P::<name>;`, or "". */
+fn link_u15_use_target(src: string, name: string) -> string {
+    let n: i32 = string_len(src);
+    let mut i: i32 = 0;
+    while i < n {
+        if link_u15_line_at_col0(src, i) {
+            if i + 4 <= n {
+                if string_eq(string_substr(src, i, 4), "use ") {
+                    let mut j: i32 = i + 4;
+                    while j < n { if string_char_at(src, j) == 32 { j = j + 1; } else { break; } }
+                    let pstart: i32 = j;
+                    while j < n { if string_char_at(src, j) == 59 { break; } j = j + 1; }
+                    let path: string = string_substr(src, pstart, j - pstart);
+                    let pl: i32 = string_len(path);
+                    let mut lastsep: i32 = 0 - 1;
+                    let mut k: i32 = 0;
+                    while k + 1 < pl {
+                        if string_char_at(path, k) == 58 {
+                            if string_char_at(path, k + 1) == 58 { lastsep = k; }
+                        }
+                        k = k + 1;
+                    }
+                    if lastsep >= 0 {
+                        let last: string = link_u15_trim(string_substr(path, lastsep + 2, pl - lastsep - 2));
+                        if string_eq(last, name) {
+                            return link_u15_colons_to_us(link_u15_trim(string_substr(path, 0, lastsep)));
+                        }
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
+/* names defined at top level in two or more distinct modules of the listing,
+   as "\n"-framed set text ("\n" when there is no collision). */
+fn link_u15_collision_set(listing: string) -> string {
+    let llen: i32 = string_len(listing);
+    let mut seen_names: string = "\n";
+    let mut seen_pairs: string = "\n";
+    let mut collide: string = "\n";
+    let mut p: i32 = 0;
+    while p < llen {
+        let nl: i32 = listing_find_newline(listing, p);
+        let lsz: i32 = nl - p;
+        if lsz > 0 {
+            let src: string = parse_file(string_substr(listing, p, lsz));
+            let modid: string = link_u15_module_id(src);
+            let slen: i32 = string_len(src);
+            let mut i: i32 = 0;
+            while i < slen {
+                if link_u15_line_at_col0(src, i) {
+                    let nm: string = link_u15_line_def_name(src, i);
+                    if string_len(nm) > 0 {
+                        let pair: string = string_concat(modid, string_concat("#", nm));
+                        if link_u15_set_has(seen_names, nm) {
+                            if link_u15_set_has(seen_pairs, pair) != true {
+                                if link_u15_set_has(collide, nm) != true {
+                                    collide = string_concat(collide, string_concat(nm, "\n"));
+                                }
+                            }
+                        }
+                        if link_u15_set_has(seen_names, nm) != true {
+                            seen_names = string_concat(seen_names, string_concat(nm, "\n"));
+                        }
+                        if link_u15_set_has(seen_pairs, pair) != true {
+                            seen_pairs = string_concat(seen_pairs, string_concat(pair, "\n"));
+                        }
+                    }
+                }
+                i = i + 1;
+            }
+        }
+        p = nl + 1;
+    }
+    return collide;
+}
+
+/* last significant char of `src` strictly before `i` (space / tab / newline
+   skipped), or -1. */
+fn link_u15_prev_sig(src: string, i: i32) -> i32 {
+    let mut k: i32 = i - 1;
+    while k >= 0 {
+        let c: i32 = string_char_at(src, k);
+        if c == 32 { k = k - 1; } else { if c == 10 { k = k - 1; } else { if c == 9 { k = k - 1; } else { return c; } } }
+    }
+    return 0 - 1;
+}
+
+fn link_u15_prev_sig2(src: string, i: i32) -> i32 {
+    let mut k: i32 = i - 1;
+    let mut hits: i32 = 0;
+    while k >= 0 {
+        let c: i32 = string_char_at(src, k);
+        if c == 32 { k = k - 1; }
+        else { if c == 10 { k = k - 1; } else { if c == 9 { k = k - 1; } else {
+            hits = hits + 1;
+            if hits == 2 { return c; }
+            k = k - 1;
+        } } }
+    }
+    return 0 - 1;
+}
+
+/* rewrite `src` so every collision-set name is module-prefixed. */
+fn link_u15_mangle_source(src: string, collide: string) -> string {
+    if string_len(collide) <= 1 { return src; }
+    let modid: string = link_u15_module_id(src);
+    let n: i32 = string_len(src);
+    let mut out: string = "";
+    let mut seg: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(src, i);
+
+        let mut handled: bool = false;
+
+        /* `use ` / `module ` lines: copy verbatim */
+        if handled != true {
+            if link_u15_line_at_col0(src, i) {
+                let is_use: bool = if i + 4 <= n { string_eq(string_substr(src, i, 4), "use ") } else { false };
+                let is_mod: bool = if i + 7 <= n { string_eq(string_substr(src, i, 7), "module ") } else { false };
+                if is_use {
+                    let e: i32 = listing_find_newline(src, i);
+                    i = e;
+                    handled = true;
+                }
+                if handled != true {
+                    if is_mod {
+                        let e2: i32 = listing_find_newline(src, i);
+                        i = e2;
+                        handled = true;
+                    }
+                }
+            }
+        }
+
+        /* line comment */
+        if handled != true {
+            if c == 47 { if i + 1 < n { if string_char_at(src, i + 1) == 47 {
+                let e: i32 = listing_find_newline(src, i);
+                i = e;
+                handled = true;
+            } } }
+        }
+
+        /* block comment */
+        if handled != true {
+            if c == 47 { if i + 1 < n { if string_char_at(src, i + 1) == 42 {
+                let mut j: i32 = i + 2;
+                let mut closed: bool = false;
+                while j + 1 < n {
+                    if string_char_at(src, j) == 42 { if string_char_at(src, j + 1) == 47 { j = j + 2; closed = true; break; } }
+                    j = j + 1;
+                }
+                if closed != true { j = n; }
+                i = j;
+                handled = true;
+            } } }
+        }
+
+        /* string literal */
+        if handled != true {
+            if c == 34 {
+                let mut j: i32 = i + 1;
+                while j < n {
+                    let d: i32 = string_char_at(src, j);
+                    if d == 92 { j = j + 2; } else { if d == 34 { j = j + 1; break; } else { j = j + 1; } }
+                }
+                if j > n { j = n; }
+                i = j;
+                handled = true;
+            }
+        }
+
+        /* char literal */
+        if handled != true {
+            if c == 39 {
+                let mut j: i32 = i + 1;
+                while j < n {
+                    let d: i32 = string_char_at(src, j);
+                    if d == 92 { j = j + 2; } else { if d == 39 { j = j + 1; break; } else { j = j + 1; } }
+                }
+                if j > n { j = n; }
+                i = j;
+                handled = true;
+            }
+        }
+
+        /* identifier run */
+        if handled != true {
+            if link_u15_is_ident_start(c) {
+                let start: i32 = i;
+                let mut j: i32 = i;
+                while j < n { if link_u15_is_ident_char(string_char_at(src, j)) { j = j + 1; } else { break; } }
+                let w: string = string_substr(src, start, j - start);
+
+                let pc: i32 = link_u15_prev_sig(src, start);
+                let pc2: i32 = link_u15_prev_sig2(src, start);
+
+                let mut k: i32 = j;
+                while k < n { if string_char_at(src, k) == 32 { k = k + 1; } else { break; } }
+                let has_colons: bool = if k + 1 < n {
+                    if string_char_at(src, k) == 58 { string_char_at(src, k + 1) == 58 } else { false }
+                } else { false };
+
+                let mut rep: string = w;
+                let mut consumed: i32 = j;
+
+                if pc == 46 {
+                    /* field / method access -- leave */
+                } else {
+                    if has_colons {
+                        let mut m: i32 = k + 2;
+                        while m < n { if string_char_at(src, m) == 32 { m = m + 1; } else { break; } }
+                        let qs: i32 = m;
+                        while m < n { if link_u15_is_ident_char(string_char_at(src, m)) { m = m + 1; } else { break; } }
+                        let q: string = string_substr(src, qs, m - qs);
+                        if link_u15_set_has(collide, q) {
+                            rep = string_concat(w, string_concat("__", q));
+                            consumed = m;
+                        }
+                    } else {
+                        let is_path_tail: bool = if pc == 58 { pc2 == 58 } else { false };
+                        if is_path_tail {
+                            /* tail of a non-collision `P::w` -- leave */
+                        } else {
+                            if link_u15_set_has(collide, w) {
+                                let tgt: string = link_u15_use_target(src, w);
+                                if string_len(tgt) > 0 {
+                                    rep = string_concat(tgt, string_concat("__", w));
+                                } else {
+                                    rep = string_concat(modid, string_concat("__", w));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if string_eq(rep, w) != true {
+                    if start > seg { out = string_concat(out, string_substr(src, seg, start - seg)); }
+                    out = string_concat(out, rep);
+                    seg = consumed;
+                }
+                i = consumed;
+                handled = true;
+            }
+        }
+
+        if handled != true { i = i + 1; }
+    }
+    if n > seg { out = string_concat(out, string_substr(src, seg, n - seg)); }
+    return out;
+}
+
 fn link_project_concat_sources_from_listing(listing: string) -> string {
+    let collide: string = link_u15_collision_set(listing);
     let len: i32 = string_len(listing);
     let mut p: i32 = 0;
     let mut out: string = "";
@@ -81,7 +482,7 @@ fn link_project_concat_sources_from_listing(listing: string) -> string {
         let lsz: i32 = nl - p;
         if lsz > 0 {
             let path: string = string_substr(listing, p, lsz);
-            let src: string = parse_file(path);
+            let src: string = link_u15_mangle_source(parse_file(path), collide);
             if first {
                 out = src;
                 first = false;
@@ -2795,6 +3196,72 @@ fn test_link_project_concat_sources_from_listing() -> i32 {
     return 0;
 }
 
+fn link_u15_contains(hay: string, needle: string) -> bool {
+    let hl: i32 = string_len(hay);
+    let nl: i32 = string_len(needle);
+    if nl == 0 { return true; }
+    if nl > hl { return false; }
+    let mut i: i32 = 0;
+    while i + nl <= hl {
+        if string_eq(string_substr(hay, i, nl), needle) { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn test_link_u15_symbol_mangle() -> i32 {
+    /* helpers */
+    if string_eq(link_u15_module_id("module strings_text;\n"), "strings_text") != true { return 1; }
+    if string_eq(link_u15_module_id("/// doc\nmodule a::b;\n"), "a__b") != true { return 2; }
+    if string_eq(link_u15_module_id("fn main() {}"), "") != true { return 3; }
+    if string_eq(link_u15_line_def_name("pub fn equal(a: i32) {}", 0), "equal") != true { return 4; }
+    if string_eq(link_u15_line_def_name("fn find_pure() {}", 0), "find_pure") != true { return 5; }
+    if string_eq(link_u15_line_def_name("  fn nested() {}", 0), "") != true { return 6; }
+    if string_eq(link_u15_use_target("use strings_text::equal;\n", "equal"), "strings_text") != true { return 7; }
+    if string_eq(link_u15_use_target("use strings_bytes::compare;\n", "equal"), "") != true { return 8; }
+
+    /* collision detection across two modules */
+    let pa: string = "/tmp/sv0_u15_a.sv0";
+    let pb: string = "/tmp/sv0_u15_b.sv0";
+    let pm: string = "/tmp/sv0_u15_main.sv0";
+    write_file(pa, "module strings_bytes;\npub fn equal(a: i32) -> i32 { return a; }\npub fn only_a() -> i32 { return 1; }\n");
+    write_file(pb, "module strings_text;\npub fn equal(b: i32) -> i32 { return b; }\n");
+    write_file(pm, "use strings_text::equal;\nfn main() -> i32 { return equal(7); }\n");
+    let mut listing: string = pa;
+    listing = string_concat(listing, "\n");
+    listing = string_concat(listing, pb);
+    listing = string_concat(listing, "\n");
+    listing = string_concat(listing, pm);
+    listing = string_concat(listing, "\n");
+
+    let cs: string = link_u15_collision_set(listing);
+    if link_u15_set_has(cs, "equal") != true { return 10; }
+    if link_u15_set_has(cs, "only_a") != false { return 11; }
+    if link_u15_set_has(cs, "main") != false { return 12; }
+
+    let merged: string = link_project_concat_sources_from_listing(listing);
+    /* both definitions are module-prefixed */
+    if link_u15_set_has(string_concat("\n", string_concat(merged, "\n")), "x") != false { return 13; }
+    if link_u15_contains(merged, "fn strings_bytes__equal(") != true { return 14; }
+    if link_u15_contains(merged, "fn strings_text__equal(") != true { return 15; }
+    /* the imported bare call in main resolves to the strings_text copy */
+    if link_u15_contains(merged, "return strings_text__equal(7)") != true { return 16; }
+    /* the non-colliding name is untouched */
+    if link_u15_contains(merged, "fn only_a(") != true { return 17; }
+    /* `use` line copied verbatim (not mangled into an invalid single-seg use) */
+    if link_u15_contains(merged, "use strings_text::equal;") != true { return 18; }
+
+    /* no-collision project: byte-identical passthrough */
+    let pc1: string = "/tmp/sv0_u15_c.sv0";
+    write_file(pc1, "module m;\npub fn solo() -> i32 { return 0; }\n");
+    let mut l2: string = pc1;
+    l2 = string_concat(l2, "\n");
+    let plain: string = link_project_concat_sources_from_listing(l2);
+    if string_eq(plain, "module m;\npub fn solo() -> i32 { return 0; }\n") != true { return 19; }
+
+    return 0;
+}
+
 fn test_source_defines_project_entry() -> i32 {
     if source_defines_project_entry("fn main() -> i32 { return 0; }") != true { return 1; }
     if source_defines_project_entry("fn add(x: i32) -> i32 { return x; }\nfn main() -> i32 { return 0; }") != true { return 2; }
@@ -4205,6 +4672,8 @@ fn main() -> i32 {
     if r21b != 0 { return 215 + r21b; }
     let r21b2: i32 = test_link_project_concat_sources_from_listing();
     if r21b2 != 0 { return 246 + r21b2; }
+    let r21u15: i32 = test_link_u15_symbol_mangle();
+    if r21u15 != 0 { return 500 + r21u15; }
     let r21b2a: i32 = test_listing_count_nonempty_paths();
     if r21b2a != 0 { return 247 + r21b2a; }
     let r21b2b: i32 = test_source_defines_project_entry();
