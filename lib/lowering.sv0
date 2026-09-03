@@ -4109,11 +4109,30 @@ fn contract_kw_pos_of_root(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<
     return 0 - 1;
 }
 
+/* SS-U05: an advanced clause (uses old / forall / exists) is not lowered to a
+   runtime check on the native or VM backend. Rather than silently dropping it
+   — which lets a false postcondition pass unnoticed — emit one stable,
+   machine-readable note per clause to stderr. Downstream greps
+   `sv0c: note: contract clause` + `model-only`. `sv0 verify` still discharges
+   these via the SMT path; this note is for the RUNTIME lowering path only. */
+fn lower_note_model_only(source: string, starts: Vec<i32>, kwpos: i32, ckind: i32) -> i32 {
+    let line: i32 = lower_line_of_pos(source, vec_get(starts, kwpos));
+    let kind: string = if ckind == 83 { "requires" } else { "ensures" };
+    let mut m: string = "sv0c: note: contract clause (";
+    m = string_concat(m, kind);
+    m = string_concat(m, ") at line ");
+    m = string_concat(m, lower_int_to_str(line));
+    m = string_concat(m, " is model-only: uses old/forall/exists, not lowered to a runtime check on this backend (SS-U05)\n");
+    write_file("/dev/stderr", m);
+    return 0;
+}
+
 /* A contract clause is "advanced" if its condition uses a quantifier
    (exists=63 / forall=67) or old(80). The native emit does not yet lower those
-   (SML does), so BH-10a scopes to simple requires/ensures and DROPS advanced
-   clauses (leaving them unchecked, as before) rather than emitting invalid C.
-   Scans the clause's `( … )` range from its keyword; LPAREN=6, RPAREN=7. */
+   (SML does), so BH-10a scopes to simple requires/ensures and reports advanced
+   clauses as model-only (lower_note_model_only) rather than emitting invalid C
+   or dropping them silently. Scans the clause's `( … )` range from its keyword;
+   LPAREN=6, RPAREN=7. */
 fn contract_is_advanced(tok_tags: Vec<i32>, kw_pos: i32) -> bool {
     let n: i32 = vec_len(tok_tags);
     let mut t: i32 = kw_pos + 1;
@@ -4343,7 +4362,9 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
                         let kwpos: i32 = contract_kw_pos_of_root(body_et, body_ed1,
                                             body_ed2, body_ed3, body_pp, tok_tags, croot);
                         if kwpos >= 0 {
-                            if contract_is_advanced(tok_tags, kwpos) != true {
+                            if contract_is_advanced(tok_tags, kwpos) {
+                                let _mo: i32 = lower_note_model_only(source, starts, kwpos, vec_get(tok_tags, kwpos));
+                            } else {
                                 let ckind: i32 = vec_get(tok_tags, kwpos);
                                 if ckind == 83 {
                                     /* requires: dropped only in disabled mode (they

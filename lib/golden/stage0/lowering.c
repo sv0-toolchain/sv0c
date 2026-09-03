@@ -70,6 +70,7 @@ static int build_builtin_map_classify(const char* s);
 static int build_builtin_map(int tok_tags, const char* source, int starts, int ends);
 static int expr_any_tok(int et, int ed1, int ed2, int ed3, int pp, int idx);
 static int contract_kw_pos_of_root(int et, int ed1, int ed2, int ed3, int pp, int tok_tags, int root);
+static int lower_note_model_only(const char* source, int starts, int kwpos, int ckind);
 static int contract_is_advanced(int tok_tags, int kw_pos);
 static int lower_tok_str_eq(const char* source, int starts, int ends, int a, int b);
 static int lower_name_is_enum(int enum_names, int tok, const char* source, int starts, int ends);
@@ -7355,6 +7356,35 @@ static int contract_kw_pos_of_root(int et, int ed1, int ed2, int ed3, int pp, in
   return _sv0t3;
 }
 
+static int lower_note_model_only(const char* source, int starts, int kwpos, int ckind) {
+  int _sv0t0 = sv0_vec_get(starts, kwpos);
+  int _sv0t1 = lower_line_of_pos(source, _sv0t0);
+  int line = _sv0t1;
+  const char* _sv0t2;
+  const char* _sv0t3;
+  if ((ckind == 83)) {
+    _sv0t3 = "requires";
+  } else {
+    _sv0t3 = "ensures";
+  }
+  _sv0t2 = _sv0t3;
+  const char* kind;
+  kind = _sv0t2;
+  const char* m;
+  m = "sv0c: note: contract clause (";
+  const char* _sv0t4 = sv0_string_concat(m, kind);
+  m = _sv0t4;
+  const char* _sv0t5 = sv0_string_concat(m, ") at line ");
+  m = _sv0t5;
+  const char* _sv0t6 = lower_int_to_str(line);
+  const char* _sv0t7 = sv0_string_concat(m, _sv0t6);
+  m = _sv0t7;
+  const char* _sv0t8 = sv0_string_concat(m, " is model-only: uses old/forall/exists, not lowered to a runtime check on this backend (SS-U05)\n");
+  m = _sv0t8;
+  sv0_write_file("/dev/stderr", m);
+  return 0;
+}
+
 static int contract_is_advanced(int tok_tags, int kw_pos) {
   int _sv0t0 = sv0_vec_len(tok_tags);
   int n = _sv0t0;
@@ -7640,9 +7670,13 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
             int kwpos = _sv0t39;
             if ((kwpos >= 0)) {
               int _sv0t40 = contract_is_advanced(tok_tags, kwpos);
-              if ((_sv0t40 != 1)) {
+              if (_sv0t40) {
                 int _sv0t41 = sv0_vec_get(tok_tags, kwpos);
-                int ckind = _sv0t41;
+                int _sv0t42 = lower_note_model_only(source, starts, kwpos, _sv0t41);
+                int _mo = _sv0t42;
+              } else {
+                int _sv0t43 = sv0_vec_get(tok_tags, kwpos);
+                int ckind = _sv0t43;
                 if ((ckind == 83)) {
                   if ((contract_mode != 2)) {
                     sv0_vec_push(req_roots, croot);
@@ -7656,11 +7690,11 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
                     } else {
                     }
                     if ((contract_mode == 1)) {
-                      int _sv0t42 = sv0_vec_get(starts, kwpos);
-                      int _sv0t43 = lower_line_of_pos(source, _sv0t42);
-                      int eline = _sv0t43;
-                      int _sv0t44 = lower_proven_has(proven_lines, eline);
-                      if (_sv0t44) {
+                      int _sv0t44 = sv0_vec_get(starts, kwpos);
+                      int _sv0t45 = lower_line_of_pos(source, _sv0t44);
+                      int eline = _sv0t45;
+                      int _sv0t46 = lower_proven_has(proven_lines, eline);
+                      if (_sv0t46) {
                         keep_ens = 0;
                       } else {
                       }
@@ -7673,7 +7707,6 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
                   } else {
                   }
                 }
-              } else {
               }
             } else {
             }
@@ -7685,24 +7718,24 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
       }
       if ((has_body_arenas > 0)) {
         if ((body_root >= 0)) {
-          int _sv0t45 = sv0_vec_new();
-          int _sv0t46 = lower_fn(body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_pp, tok_tags, body_root, label_h, req_roots, ens_roots, instrs, out_enum_names, out_enum_tag_offsets, out_enum_tag_counts, out_enum_tag_flat, fn_ctx, builtin_map, body_sf, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, out_enum_max, i, _sv0t45, import_aliases);
-          int discard_lf = _sv0t46;
+          int _sv0t47 = sv0_vec_new();
+          int _sv0t48 = lower_fn(body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_pp, tok_tags, body_root, label_h, req_roots, ens_roots, instrs, out_enum_names, out_enum_tag_offsets, out_enum_tag_counts, out_enum_tag_flat, fn_ctx, builtin_map, body_sf, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, out_enum_max, i, _sv0t47, import_aliases);
+          int discard_lf = _sv0t48;
         } else {
         }
       } else {
       }
-      int _sv0t47 = sv0_vec_new();
-      int params = _sv0t47;
+      int _sv0t49 = sv0_vec_new();
+      int params = _sv0t49;
       int ret_h = 9;
       sv0_vec_push(out_blocks, label_h);
       sv0_vec_push(out_blocks, ret_h);
-      int _sv0t48 = sv0_box_alloc(1);
-      sv0_box_store(_sv0t48, 0, params);
-      sv0_vec_push(out_blocks, _sv0t48);
-      int _sv0t49 = sv0_box_alloc(1);
-      sv0_box_store(_sv0t49, 0, instrs);
-      sv0_vec_push(out_blocks, _sv0t49);
+      int _sv0t50 = sv0_box_alloc(1);
+      sv0_box_store(_sv0t50, 0, params);
+      sv0_vec_push(out_blocks, _sv0t50);
+      int _sv0t51 = sv0_box_alloc(1);
+      sv0_box_store(_sv0t51, 0, instrs);
+      sv0_vec_push(out_blocks, _sv0t51);
     } else {
     }
     i = (i + 1);
