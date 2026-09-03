@@ -1,0 +1,30 @@
+// A `main` that returns an i64 / u64 / usize *expression* value left a CI64
+// on the sv0vm stack, which the final "exit code = top of stack" case did not
+// handle -> the program silently exited 0 regardless of the real value. The C
+// backend was always correct. This exercises both the direct form and a wide
+// value carried out through an enum payload + match. Expected exit: 42.
+// (native only -- the SML --target=vm reference rejects usize literals E0400.)
+
+enum R { Ok(usize), Err(i32) }
+
+fn checked(a: usize, b: usize) -> R {
+    if b == 0 { return R::Err(0 - 1); }
+    return R::Ok(a / b);            // usize division -> ADD_I64-class result
+}
+
+fn main() -> i32 {
+    // direct: a wide arithmetic value as the return/exit expression
+    let x: usize = 20;
+    let doubled: usize = x + x;     // 40
+    if doubled != 40 { return 10; }
+
+    // carried through an enum payload and pulled back out by match
+    let r: R = checked(84, 2);      // Ok(42)
+    let out: i32 = match r {
+        R::Ok(v) => v,
+        R::Err(e) => e,
+    };
+    if out != 42 { return 11; }
+
+    return out;                      // 42, as a value that has been usize-typed
+}
