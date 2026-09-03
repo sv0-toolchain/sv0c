@@ -1,0 +1,42 @@
+/* SS-U04 / sv0-strings SPEC UP-006, SEC-004 — range non-overlap must be
+   expressible/checkable by FULL INTERVALS, not pointer inequality alone.
+   `//@ <status>` is the expected `sv0 verify` result (verified | runtime).
+
+   Ranges are [start, start+len). "Disjoint" means one ends at or before the
+   other starts: `a + alen <= b || b + blen <= a`. */
+
+/* An interval that ends at or before another's start shares no index -- the
+   solver proves this from linear arithmetic over the endpoints. */
+fn ends_before(a: i32, alen: i32, b: i32) -> bool
+    requires(alen >= 1)                       //@ runtime
+    requires(a + alen <= b)                   //@ runtime
+    ensures(result == true)                   //@ verified
+{
+    return a + alen - 1 < b;
+}
+
+/* Given the full-interval disjointness precondition, the two ranges provably
+   share no index (`a < b + blen && b < a + alen` is the "they overlap" test). */
+fn overlap_free_pair(a: i32, alen: i32, b: i32, blen: i32) -> bool
+    requires(alen >= 1)                       //@ runtime
+    requires(blen >= 1)                       //@ runtime
+    requires(a + alen <= b || b + blen <= a)  //@ runtime
+    ensures(result == false)                  //@ verified
+{
+    return a < b + blen && b < a + alen;
+}
+
+/* Pointer inequality is NOT sufficient: `a != b` with both ranges length >= 2
+   still permits a partial overlap (e.g. a=0,b=1,len=2). The solver finds that
+   counterexample, so this postcondition stays a sound runtime residual --
+   which is exactly the point of UP-006. */
+fn pointer_ineq_insufficient(a: i32, alen: i32, b: i32, blen: i32) -> bool
+    requires(alen >= 2)                       //@ runtime
+    requires(blen >= 2)                       //@ runtime
+    requires(a != b)                          //@ runtime
+    ensures(result == false)                  //@ runtime
+{
+    return a < b + blen && b < a + alen;
+}
+
+fn main() -> i32 { return 0; }
