@@ -4026,6 +4026,10 @@ fn build_builtin_map_classify(s: string) -> i32 {
     if string_eq(s, "getenv") { return 19; }
     /* slice_len -> sv0_view_len (id 34; SS-U03e enabler). */
     if string_eq(s, "slice_len") { return 34; }
+    /* SS-U16: string <-> byte-slice bridges for strings_text::from_utf8 /
+       as_bytes. 35 -> sv0_str_from_byte_slice, 36 -> sv0_str_byte_view. */
+    if string_eq(s, "string_from_bytes") { return 35; }
+    if string_eq(s, "string_byte_view") { return 36; }
     return 0;
 }
 
@@ -4973,6 +4977,7 @@ fn lower_init_is_string(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>
                 if string_eq(nm, "read_file") { return true; }
                 if string_eq(nm, "read_dir") { return true; }
                 if string_eq(nm, "getenv") { return true; }
+                if string_eq(nm, "string_from_bytes") { return true; }
             }
         }
     }

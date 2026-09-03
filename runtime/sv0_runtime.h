@@ -381,6 +381,42 @@ static inline void sv0_idx_set(int32_t h, int32_t idx, intptr_t val) {
     sv0_vec_set(h, idx, val);
 }
 
+/* SS-U16: string <-> byte-slice bridges for strings_text::from_utf8 /
+ * as_bytes. A `&[byte]` slice stores its elements as `intptr_t` words
+ * (sv0_slice.data); an sv0_str stores packed uint8_t. Neither can alias the
+ * other's buffer, so each bridge materialises once — sound here because a
+ * `string` value is immutable, so an owned byte copy is observationally a
+ * read-only borrow.
+ *
+ * sv0_str_from_byte_slice: one owned-string allocation (fault-injectable via
+ * SV0_STR_FAIL_AT, SS-U02d), narrowing each word to its low byte. */
+static inline int32_t sv0_str_from_byte_slice(int32_t sh) {
+  int32_t n = sv0_view_len(sh);
+  if (n <= 0)
+    return sv0_str_adopt((uint8_t *)0, 0);
+  uint8_t *buf = sv0_str_alloc(n);
+  if (!buf)
+    sv0_panic("string: allocation failed");
+  intptr_t *d = sv0_view_data(sh);
+  for (int32_t i = 0; i < n; i++)
+    buf[i] = (uint8_t)(d[i] & 0xFF);
+  return sv0_str_adopt(buf, n);
+}
+
+/* sv0_str_byte_view: a read-only `&[byte]` slice handle over a fresh word
+ * array holding the string's bytes (widened). The array is arena-lived like
+ * every other slice backing store, so the handle can never dangle. */
+static inline int32_t sv0_str_byte_view(int32_t h) {
+  sv0_str s = sv0_str_table[h];
+  int32_t cap = s.len > 0 ? s.len : 1;
+  intptr_t *arr = (intptr_t *)malloc(sizeof(intptr_t) * (size_t)cap);
+  if (!arr)
+    sv0_panic("string: allocation failed");
+  for (int32_t i = 0; i < s.len; i++)
+    arr[i] = (intptr_t)s.data[i];
+  return sv0_slice_intern(arr, s.len);
+}
+
 /* Box<T> (T0-6): handle-based heap indirection for recursive types.
  * Each box_alloc(nwords) returns a handle into a flat word pool.
  * Used for recursive enum variants like Box<Expr> in AST definitions.
