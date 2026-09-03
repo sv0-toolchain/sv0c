@@ -13,6 +13,7 @@ sv0c/test/vm-parity/programs/vmf_i64_arith.sv0
 sv0c/test/integration/int_min/int_min.sv0
 sv0c/test/integration/contracts/contracts.sv0
 --project sv0c/test/integration/modules_diamond
+--project sv0c/test/integration/modules_generic_carrier
 --project sv0-mathlib
 sv0c/test/behavior/cases/slice_construct_index.sv0
 sv0c/test/behavior/cases/slice_mut_reslice.sv0

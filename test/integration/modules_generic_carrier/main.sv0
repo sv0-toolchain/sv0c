@@ -1,0 +1,21 @@
+use ops::wide_ok;
+use ops::wide_err;
+use ops::narrow;
+
+/* Each generic instantiation round-trips through construct + match on both
+   backends. Expected exit: 42. */
+fn main() -> i32 {
+    let r1: Res<usize, i32> = wide_ok(84, 2);
+    let a: i32 = match r1 { Res::Ok(v) => v, Res::Err(e) => e };   // 42
+    if a != 42 { return 10; }
+
+    let r2: Res<i32, usize> = wide_err(0);
+    let b: i32 = match r2 { Res::Ok(v) => v, Res::Err(e) => e };   // 200
+    if b != 200 { return 11; }
+
+    let r3: Res<i32, i32> = narrow(50);
+    let c: i32 = match r3 { Res::Ok(v) => v, Res::Err(e) => e };   // 100
+    if c != 100 { return 12; }
+
+    return a + (b - c) - 100;   // 42 + (200 - 100) - 100 = 42
+}
