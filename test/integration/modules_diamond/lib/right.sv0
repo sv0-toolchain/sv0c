@@ -1,0 +1,5 @@
+module right;
+
+use common::seed;
+
+fn right_cfg() -> Cfg { return seed(30); }

@@ -1,0 +1,5 @@
+module left;
+
+use common::seed;
+
+fn left_cfg() -> Cfg { return seed(10); }
