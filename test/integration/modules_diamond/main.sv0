@@ -1,0 +1,10 @@
+use left::left_cfg;
+use right::right_cfg;
+
+/* `Cfg` is imported transitively from BOTH left and right -- the diamond.
+   Expected exit: 42 (10 + 30 + 2). */
+fn main() -> i32 {
+    let a: Cfg = left_cfg();
+    let b: Cfg = right_cfg();
+    return a.base + b.base + 2;
+}

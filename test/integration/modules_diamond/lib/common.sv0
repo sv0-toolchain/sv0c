@@ -1,0 +1,9 @@
+module common;
+
+/* SS-U07 / SPEC UP-024 diamond-import fixture. `Cfg` is the single shared
+   type; both `left` and `right` import it, and `main` imports both, so the
+   flattened project sees `Cfg` reached through two paths. It MUST resolve to
+   one declaration -- a duplicate-type diagnostic here is a release blocker. */
+struct Cfg { base: i32 }
+
+fn seed(n: i32) -> Cfg { return Cfg { base: n }; }
