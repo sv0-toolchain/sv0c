@@ -1538,7 +1538,18 @@ fn resolve_top_item(it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>,
                     pp: Vec<i32>, tparam_names: Vec<i32>) -> i32 {
     let tag: i32 = vec_get(it, idx);
     if tag == 5 { return 0; }
-    if tag == 6 { return 0; }
+    if tag == 6 {
+        /* SS-U08: a `module` declaration must name a single segment. A dotted
+           path (`module strings::bytes;`) used to be accepted silently and its
+           `pub` items then leaked to global scope. sv0's module system is flat
+           (sv0-strings SPEC ARCH-001; hierarchical aliases are Future) — reject
+           the nested form. id1[idx] = first path-seg slot in pp, id2[idx] =
+           segment count. */
+        if vec_get(id2, idx) > 1 {
+            return diag_pack(310, vec_get(pp, vec_get(id1, idx)));
+        }
+        return 0;
+    }
     if tag == 0 {
         let body_root: i32 = vec_get(id4, idx);
         let param_count: i32 = vec_get(id3, idx);
@@ -2528,6 +2539,58 @@ fn test_resolve_top_item_struct_field() -> i32 {
     return 0;
 }
 
+/* SS-U08: a single-segment `module` item resolves as a no-op; a dotted
+   (`module a::b;`) item is rejected with packed code 310 (E0310). */
+fn test_resolve_top_item_nested_module() -> i32 {
+    let source: string = "a b";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(starts, 2); vec_push(ends, 3);
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    vec_push(pp, 1);
+    let it: Vec<i32> = vec_new();
+    vec_push(it, 6);
+    vec_push(it, 6);
+    let id1: Vec<i32> = vec_new();
+    vec_push(id1, 0);
+    vec_push(id1, 0);
+    let id2: Vec<i32> = vec_new();
+    vec_push(id2, 1);   /* item 0: one segment  -> ok */
+    vec_push(id2, 2);   /* item 1: two segments -> E0310 */
+    let id3: Vec<i32> = vec_new();
+    vec_push(id3, 0); vec_push(id3, 0);
+    let id4: Vec<i32> = vec_new();
+    vec_push(id4, 0 - 1); vec_push(id4, 0 - 1);
+    let id5: Vec<i32> = vec_new();
+    vec_push(id5, 0 - 1); vec_push(id5, 0 - 1);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let empty: Vec<i32> = vec_new();
+    let r0: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, 0,
+                                    et, ed1, ed2, ed3, ed4, empty,
+                                    empty, empty, empty, empty, empty,
+                                    empty, empty,
+                                    empty, empty, empty, empty, empty,
+                                    source, starts, ends, mv, mt, fa, pp, empty);
+    if r0 != 0 { return 1; }
+    let r1: i32 = resolve_top_item(it, id1, id2, id3, id4, id5, 1,
+                                    et, ed1, ed2, ed3, ed4, empty,
+                                    empty, empty, empty, empty, empty,
+                                    empty, empty,
+                                    empty, empty, empty, empty, empty,
+                                    source, starts, ends, mv, mt, fa, pp, empty);
+    if diag_code_of(r1) != 310 { return 2; }
+    return 0;
+}
+
 fn test_resolve_top_item_fn_signature_contracts() -> i32 {
     let source: string = "x i32";
     let starts: Vec<i32> = vec_new();
@@ -2897,6 +2960,8 @@ fn main() -> i32 {
     if r37c != 0 { return 162 + r37c; }
     let r37d: i32 = test_resolve_top_item_enum_payload_type();
     if r37d != 0 { return 163 + r37d; }
+    let r37f: i32 = test_resolve_top_item_nested_module();
+    if r37f != 0 { return 180 + r37f; }
     let r38: i32 = test_resolve_program();
     if r38 != 0 { return 164 + r38; }
     let r38a: i32 = test_resolve_program_cast_type_roots();

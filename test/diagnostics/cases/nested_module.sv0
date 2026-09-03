@@ -1,0 +1,8 @@
+/* SS-U08: a dotted `module a::b;` path used to be accepted silently (its `pub`
+   items then leaked to global scope). sv0's module system is flat -- the nested
+   form is rejected with E0310 on both backends. */
+module strings::bytes;
+
+pub fn ping() -> i32 { return 7; }
+
+fn main() -> i32 { return ping(); }

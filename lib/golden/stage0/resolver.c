@@ -106,6 +106,7 @@ static int test_apply_use_clause_unknown(void);
 static int test_apply_use_clause_unmangled(void);
 static int test_path_join_vec_three(void);
 static int test_resolve_top_item_struct_field(void);
+static int test_resolve_top_item_nested_module(void);
 static int test_resolve_top_item_fn_signature_contracts(void);
 static int test_resolve_top_item_enum_payload_type(void);
 static int test_resolve_program(void);
@@ -2196,87 +2197,95 @@ static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5,
   } else {
   }
   if ((tag == 6)) {
+    int _sv0t1 = sv0_vec_get(id2, idx);
+    if ((_sv0t1 > 1)) {
+      int _sv0t2 = sv0_vec_get(id1, idx);
+      int _sv0t3 = sv0_vec_get(pp, _sv0t2);
+      int _sv0t4 = diag_pack(310, _sv0t3);
+      return _sv0t4;
+    } else {
+    }
     return 0;
   } else {
   }
   if ((tag == 0)) {
-    int _sv0t1 = sv0_vec_get(id4, idx);
-    int body_root = _sv0t1;
-    int _sv0t2 = sv0_vec_get(id3, idx);
-    int param_count = _sv0t2;
-    int _sv0t3 = sv0_vec_get(id5, idx);
-    int pbase = _sv0t3;
-    int _sv0t4 = sv0_vec_new();
-    int frames = _sv0t4;
+    int _sv0t5 = sv0_vec_get(id4, idx);
+    int body_root = _sv0t5;
+    int _sv0t6 = sv0_vec_get(id3, idx);
+    int param_count = _sv0t6;
+    int _sv0t7 = sv0_vec_get(id5, idx);
+    int pbase = _sv0t7;
+    int _sv0t8 = sv0_vec_new();
+    int frames = _sv0t8;
     int pti = 0;
     while ((pti < param_count)) {
-      int _sv0t5 = (pbase + pti);
-      int _sv0t6 = sv0_vec_get(fn_param_ty_root, _sv0t5);
-      int tr = _sv0t6;
-      int _sv0t7 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
-      int rty = _sv0t7;
+      int _sv0t9 = (pbase + pti);
+      int _sv0t10 = sv0_vec_get(fn_param_ty_root, _sv0t9);
+      int tr = _sv0t10;
+      int _sv0t11 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
+      int rty = _sv0t11;
       if ((rty != 0)) {
         return rty;
       } else {
       }
       pti = (pti + 1);
     }
-    int _sv0t8 = sv0_vec_get(fn_ret_ty_root_by_item, idx);
-    int ret_root = _sv0t8;
+    int _sv0t12 = sv0_vec_get(fn_ret_ty_root_by_item, idx);
+    int ret_root = _sv0t12;
     if ((ret_root >= 0)) {
-      int _sv0t9 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, ret_root, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
-      int rr = _sv0t9;
+      int _sv0t13 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, ret_root, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
+      int rr = _sv0t13;
       if ((rr != 0)) {
         return rr;
       } else {
       }
     } else {
     }
-    int _sv0t10 = res_enter_scope(frames);
+    int _sv0t14 = res_enter_scope(frames);
     int pi = 0;
     while ((pi < param_count)) {
-      int _sv0t11 = (pbase + pi);
-      int _sv0t12 = sv0_vec_get(fn_param_name_toks, _sv0t11);
-      int tok = _sv0t12;
+      int _sv0t15 = (pbase + pi);
+      int _sv0t16 = sv0_vec_get(fn_param_name_toks, _sv0t15);
+      int tok = _sv0t16;
       if ((tok >= 0)) {
-        int _sv0t13 = res_bind_local(frames, tok);
+        int _sv0t17 = res_bind_local(frames, tok);
       } else {
       }
       pi = (pi + 1);
     }
-    int _sv0t14 = sv0_vec_get(fn_contract_base_by_item, idx);
-    int cbase = _sv0t14;
-    int _sv0t15 = sv0_vec_get(id2, idx);
-    int ccount = (_sv0t15 / 2);
+    int _sv0t18 = sv0_vec_get(fn_contract_base_by_item, idx);
+    int cbase = _sv0t18;
+    int _sv0t19 = sv0_vec_get(id2, idx);
+    int ccount = (_sv0t19 / 2);
     int ci = 0;
     while ((ci < ccount)) {
-      int _sv0t16 = (cbase + ci);
-      int _sv0t17 = sv0_vec_get(fn_contract_root, _sv0t16);
-      int cr = _sv0t17;
-      int _sv0t18 = resolve_contract(et, ed1, ed2, ed3, ed4, cr, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-      int rc = _sv0t18;
+      int _sv0t20 = (cbase + ci);
+      int _sv0t21 = sv0_vec_get(fn_contract_root, _sv0t20);
+      int cr = _sv0t21;
+      int _sv0t22 = resolve_contract(et, ed1, ed2, ed3, ed4, cr, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+      int rc = _sv0t22;
       if ((rc != 0)) {
         return rc;
       } else {
       }
       ci = (ci + 1);
     }
-    int _sv0t19 = resolve_expr(et, ed1, ed2, ed3, ed4, body_root, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
-    return _sv0t19;
+    int _sv0t23 = resolve_expr(et, ed1, ed2, ed3, ed4, body_root, source, starts, ends, mod_vals, mod_tys, fn_arities, frames, pp);
+    return _sv0t23;
   } else {
   }
   if ((tag == 1)) {
-    int _sv0t20 = sv0_vec_get(id2, idx);
-    int fc = _sv0t20;
-    int _sv0t21 = sv0_vec_get(id3, idx);
-    int sfb = _sv0t21;
+    int _sv0t24 = sv0_vec_get(id2, idx);
+    int fc = _sv0t24;
+    int _sv0t25 = sv0_vec_get(id3, idx);
+    int sfb = _sv0t25;
     int fi = 0;
     while ((fi < fc)) {
-      int _sv0t22 = (sfb + fi);
-      int _sv0t23 = sv0_vec_get(struct_field_ty_root, _sv0t22);
-      int tr = _sv0t23;
-      int _sv0t24 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
-      int rr = _sv0t24;
+      int _sv0t26 = (sfb + fi);
+      int _sv0t27 = sv0_vec_get(struct_field_ty_root, _sv0t26);
+      int tr = _sv0t27;
+      int _sv0t28 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
+      int rr = _sv0t28;
       if ((rr != 0)) {
         return rr;
       } else {
@@ -2287,17 +2296,17 @@ static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5,
   } else {
   }
   if ((tag == 2)) {
-    int _sv0t25 = sv0_vec_get(enum_variant_payload_base_by_item, idx);
-    int base = _sv0t25;
-    int _sv0t26 = sv0_vec_get(enum_variant_payload_count_by_item, idx);
-    int cnt = _sv0t26;
+    int _sv0t29 = sv0_vec_get(enum_variant_payload_base_by_item, idx);
+    int base = _sv0t29;
+    int _sv0t30 = sv0_vec_get(enum_variant_payload_count_by_item, idx);
+    int cnt = _sv0t30;
     int vi = 0;
     while ((vi < cnt)) {
-      int _sv0t27 = (base + vi);
-      int _sv0t28 = sv0_vec_get(enum_variant_payload_ty_root, _sv0t27);
-      int tr = _sv0t28;
-      int _sv0t29 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
-      int rr = _sv0t29;
+      int _sv0t31 = (base + vi);
+      int _sv0t32 = sv0_vec_get(enum_variant_payload_ty_root, _sv0t31);
+      int tr = _sv0t32;
+      int _sv0t33 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, tr, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
+      int rr = _sv0t33;
       if ((rr != 0)) {
         return rr;
       } else {
@@ -2308,10 +2317,10 @@ static int resolve_top_item(int it, int id1, int id2, int id3, int id4, int id5,
   } else {
   }
   if ((tag == 7)) {
-    int _sv0t30 = sv0_vec_get(id2, idx);
-    int alias_root = _sv0t30;
-    int _sv0t31 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, alias_root, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
-    return _sv0t31;
+    int _sv0t34 = sv0_vec_get(id2, idx);
+    int alias_root = _sv0t34;
+    int _sv0t35 = resolve_ty(pty_tt, pty_td1, pty_td2, pty_td3, alias_root, source, starts, ends, mod_tys, mod_vals, pp, tparam_names);
+    return _sv0t35;
   } else {
   }
   return 0;
@@ -4259,6 +4268,83 @@ static int test_resolve_top_item_struct_field(void) {
   return 0;
 }
 
+static int test_resolve_top_item_nested_module(void) {
+  const char* source;
+  source = "a b";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 1);
+  sv0_vec_push(starts, 2);
+  sv0_vec_push(ends, 3);
+  int _sv0t2 = sv0_vec_new();
+  int mv = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int mt = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int fa = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(pp, 0);
+  sv0_vec_push(pp, 1);
+  int _sv0t6 = sv0_vec_new();
+  int it = _sv0t6;
+  sv0_vec_push(it, 6);
+  sv0_vec_push(it, 6);
+  int _sv0t7 = sv0_vec_new();
+  int id1 = _sv0t7;
+  sv0_vec_push(id1, 0);
+  sv0_vec_push(id1, 0);
+  int _sv0t8 = sv0_vec_new();
+  int id2 = _sv0t8;
+  sv0_vec_push(id2, 1);
+  sv0_vec_push(id2, 2);
+  int _sv0t9 = sv0_vec_new();
+  int id3 = _sv0t9;
+  sv0_vec_push(id3, 0);
+  sv0_vec_push(id3, 0);
+  int _sv0t10 = sv0_vec_new();
+  int id4 = _sv0t10;
+  int _sv0t11 = (0 - 1);
+  sv0_vec_push(id4, _sv0t11);
+  int _sv0t12 = (0 - 1);
+  sv0_vec_push(id4, _sv0t12);
+  int _sv0t13 = sv0_vec_new();
+  int id5 = _sv0t13;
+  int _sv0t14 = (0 - 1);
+  sv0_vec_push(id5, _sv0t14);
+  int _sv0t15 = (0 - 1);
+  sv0_vec_push(id5, _sv0t15);
+  int _sv0t16 = sv0_vec_new();
+  int et = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int ed1 = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int ed2 = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int ed3 = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int ed4 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int empty = _sv0t21;
+  int _sv0t22 = resolve_top_item(it, id1, id2, id3, id4, id5, 0, et, ed1, ed2, ed3, ed4, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, source, starts, ends, mv, mt, fa, pp, empty);
+  int r0 = _sv0t22;
+  if ((r0 != 0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t23 = resolve_top_item(it, id1, id2, id3, id4, id5, 1, et, ed1, ed2, ed3, ed4, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, empty, source, starts, ends, mv, mt, fa, pp, empty);
+  int r1 = _sv0t23;
+  int _sv0t24 = diag_code_of(r1);
+  if ((_sv0t24 != 310)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 static int test_resolve_top_item_fn_signature_contracts(void) {
   const char* source;
   source = "x i32";
@@ -4988,25 +5074,32 @@ int main(void) {
     return _sv0t82;
   } else {
   }
-  int _sv0t83 = test_resolve_program();
-  int r38 = _sv0t83;
-  if ((r38 != 0)) {
-    int _sv0t84 = (164 + r38);
+  int _sv0t83 = test_resolve_top_item_nested_module();
+  int r37f = _sv0t83;
+  if ((r37f != 0)) {
+    int _sv0t84 = (180 + r37f);
     return _sv0t84;
   } else {
   }
-  int _sv0t85 = test_resolve_program_cast_type_roots();
-  int r38a = _sv0t85;
-  if ((r38a != 0)) {
-    int _sv0t86 = (166 + r38a);
+  int _sv0t85 = test_resolve_program();
+  int r38 = _sv0t85;
+  if ((r38 != 0)) {
+    int _sv0t86 = (164 + r38);
     return _sv0t86;
   } else {
   }
-  int _sv0t87 = test_path_join_vec_three();
-  int r39 = _sv0t87;
-  if ((r39 != 0)) {
-    int _sv0t88 = (167 + r39);
+  int _sv0t87 = test_resolve_program_cast_type_roots();
+  int r38a = _sv0t87;
+  if ((r38a != 0)) {
+    int _sv0t88 = (166 + r38a);
     return _sv0t88;
+  } else {
+  }
+  int _sv0t89 = test_path_join_vec_three();
+  int r39 = _sv0t89;
+  if ((r39 != 0)) {
+    int _sv0t90 = (167 + r39);
+    return _sv0t90;
   } else {
   }
   return 0;
