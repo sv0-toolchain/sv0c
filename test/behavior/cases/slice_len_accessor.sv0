@@ -1,0 +1,18 @@
+// SS-U03e (sv0-strings Track L enabler): `slice_len(s)` is the source-callable
+// form of a slice's `len` field (sv0doc type-system/rules.md §2.2.1; lowering
+// builtin 34 sv0_view_len). Needed by strings_bytes::compare/equal (SS-101).
+// Exercises a passed-in &[T] param, `&a[..]`, an open upper bound, and an
+// empty range. Expected exit: 42. C leg only -- the sml-legacy parser rejects
+// `..` in index position (as with the other SS-U03 fixtures).
+
+fn count(s: &[i32]) -> i32 { return slice_len(s); }
+
+fn main() -> i32 {
+    let a: [i32; 6] = [1, 2, 3, 4, 5, 6];
+    if count(&a[1..4]) != 3 { return 10; }
+    if count(&a[..]) != 6 { return 11; }
+    if slice_len(&a[4..]) != 2 { return 12; }
+    if slice_len(&a[3..3]) != 0 { return 13; }
+    let m: &[i32] = &a[0..5];
+    return count(m) + slice_len(&a[..2]) + 35;   // 5 + 2 + 35 = 42
+}
