@@ -41,3 +41,4 @@ test/diagnostics/cases/slice_return_local.sv0|E0322|native
 test/diagnostics/cases/slice_return_local_alias.sv0|E0322|native
 test/diagnostics/cases/slice_borrow_mut_twice.sv0|E0323|native
 test/diagnostics/cases/slice_borrow_mut_and_shared.sv0|E0323|native
+test/diagnostics/cases/nested_module.sv0|E0310|native

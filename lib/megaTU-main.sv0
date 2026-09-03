@@ -25,6 +25,7 @@ fn megatu_diag_code_str(code: i32) -> string {
     if code == 306 { return "E0306"; }
     if code == 307 { return "E0307"; }
     if code == 309 { return "E0309"; }
+    if code == 310 { return "E0310"; }
     if code == 322 { return "E0322"; }
     if code == 323 { return "E0323"; }
     if code == 409 { return "E0409"; }
@@ -41,6 +42,7 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 306 { return "unsupported pattern"; }
     if code == 307 { return "wrong number of arguments"; }
     if code == 309 { return "invalid use clause"; }
+    if code == 310 { return "nested module declarations are not supported (module paths must be a single segment)"; }
     if code == 409 { return "contract requires an explicit return type"; }
     if code == 322 { return "cannot return a slice that borrows a local"; }
     if code == 323 { return "conflicting borrow of a slice source"; }
