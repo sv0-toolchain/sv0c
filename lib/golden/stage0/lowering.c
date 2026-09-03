@@ -7223,6 +7223,11 @@ static int build_builtin_map_classify(const char* s) {
     return 19;
   } else {
   }
+  int _sv0t19 = sv0_string_eq(s, "slice_len");
+  if (_sv0t19) {
+    return 34;
+  } else {
+  }
   return 0;
 }
 

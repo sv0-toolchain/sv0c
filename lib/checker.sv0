@@ -3399,10 +3399,15 @@ fn builtin_fn_lookup(name_str: string) -> i32 {
     if string_eq(name_str, "read_dir") { return 15; }
     if string_eq(name_str, "write_bytes") { return 16; }
     if string_eq(name_str, "getenv") { return 17; }
+    /* slice_len(&[T]) -> usize : the source-callable form of the slice `len`
+       field (sv0doc type-system/rules.md §2.2.1; lowering builtin id 34
+       sv0_view_len). SS-U03e enabler for sv0-strings Track L. */
+    if string_eq(name_str, "slice_len") { return 18; }
     return 0 - 1;
 }
 
 fn builtin_fn_ret_type(bid: i32) -> i32 {
+    if bid == 18 { return TY_INT(); }
     if bid == 0 { return TY_UNIT(); }
     if bid == 1 { return TY_INT(); }
     if bid == 2 { return TY_BOOL(); }
@@ -3425,6 +3430,7 @@ fn builtin_fn_ret_type(bid: i32) -> i32 {
 }
 
 fn builtin_fn_param_count(bid: i32) -> i32 {
+    if bid == 18 { return 1; }
     if bid == 0 { return 1; }
     if bid == 1 { return 1; }
     if bid == 2 { return 2; }
@@ -3447,6 +3453,7 @@ fn builtin_fn_param_count(bid: i32) -> i32 {
 }
 
 fn builtin_fn_param_type(bid: i32, idx: i32) -> i32 {
+    if bid == 18 { return TY_VAR(); }
     if bid == 0 { return TY_STRING(); }
     if bid == 1 { return TY_STRING(); }
     if bid == 2 { return TY_STRING(); }

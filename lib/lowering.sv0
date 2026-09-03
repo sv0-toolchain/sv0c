@@ -4024,6 +4024,8 @@ fn build_builtin_map_classify(s: string) -> i32 {
     if string_eq(s, "read_dir") { return 17; }
     if string_eq(s, "write_bytes") { return 18; }
     if string_eq(s, "getenv") { return 19; }
+    /* slice_len -> sv0_view_len (id 34; SS-U03e enabler). */
+    if string_eq(s, "slice_len") { return 34; }
     return 0;
 }
 

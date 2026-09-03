@@ -314,6 +314,11 @@ static int is_intrinsic(const char* name) {
     return 1;
   } else {
   }
+  int _sv0t22 = sv0_string_eq(name, "slice_len");
+  if (_sv0t22) {
+    return 1;
+  } else {
+  }
   return 0;
 }
 
@@ -428,8 +433,13 @@ static int intrinsic_arity(const char* name) {
     return 1;
   } else {
   }
-  int _sv0t22 = (0 - 1);
-  return _sv0t22;
+  int _sv0t22 = sv0_string_eq(name, "slice_len");
+  if (_sv0t22) {
+    return 1;
+  } else {
+  }
+  int _sv0t23 = (0 - 1);
+  return _sv0t23;
 }
 
 static int intrinsic_count(void) {
