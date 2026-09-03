@@ -1,0 +1,20 @@
+module ops;
+
+use carrier::Res;
+
+/* wide payload in the Ok slot (usize) */
+fn wide_ok(a: usize, b: usize) -> Res<usize, i32> {
+    if b == 0 { return Res::Err(0 - 7); }
+    return Res::Ok(a / b);
+}
+
+/* wide payload in the Err slot (usize) */
+fn wide_err(flag: i32) -> Res<i32, usize> {
+    if flag == 0 { let e: usize = 100; return Res::Err(e + e); }
+    return Res::Ok(flag);
+}
+
+/* both slots narrow (i32) */
+fn narrow(a: i32) -> Res<i32, i32> {
+    return Res::Ok(a + a);
+}

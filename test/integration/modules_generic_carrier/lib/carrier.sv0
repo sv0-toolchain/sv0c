@@ -1,0 +1,6 @@
+module carrier;
+
+/* SS-U06 / SPEC UP-020, AC-031: one user-declared generic carrier, several
+   payload layouts, consumed across module files. `Res<T, E>` is defined once
+   here and instantiated three ways in `ops`. */
+enum Res<T, E> { Ok(T), Err(E) }
