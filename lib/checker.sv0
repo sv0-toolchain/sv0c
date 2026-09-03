@@ -3403,11 +3403,17 @@ fn builtin_fn_lookup(name_str: string) -> i32 {
        field (sv0doc type-system/rules.md §2.2.1; lowering builtin id 34
        sv0_view_len). SS-U03e enabler for sv0-strings Track L. */
     if string_eq(name_str, "slice_len") { return 18; }
+    /* SS-U16: string <-> byte-slice bridges for strings_text::from_utf8 /
+       as_bytes (lowering builtins 35/36). */
+    if string_eq(name_str, "string_from_bytes") { return 19; }
+    if string_eq(name_str, "string_byte_view") { return 20; }
     return 0 - 1;
 }
 
 fn builtin_fn_ret_type(bid: i32) -> i32 {
     if bid == 18 { return TY_INT(); }
+    if bid == 19 { return TY_STRING(); }
+    if bid == 20 { return TY_SLICE(); }
     if bid == 0 { return TY_UNIT(); }
     if bid == 1 { return TY_INT(); }
     if bid == 2 { return TY_BOOL(); }
@@ -3431,6 +3437,8 @@ fn builtin_fn_ret_type(bid: i32) -> i32 {
 
 fn builtin_fn_param_count(bid: i32) -> i32 {
     if bid == 18 { return 1; }
+    if bid == 19 { return 1; }
+    if bid == 20 { return 1; }
     if bid == 0 { return 1; }
     if bid == 1 { return 1; }
     if bid == 2 { return 2; }
@@ -3454,6 +3462,8 @@ fn builtin_fn_param_count(bid: i32) -> i32 {
 
 fn builtin_fn_param_type(bid: i32, idx: i32) -> i32 {
     if bid == 18 { return TY_VAR(); }
+    if bid == 19 { return TY_VAR(); }
+    if bid == 20 { return TY_STRING(); }
     if bid == 0 { return TY_STRING(); }
     if bid == 1 { return TY_STRING(); }
     if bid == 2 { return TY_STRING(); }
@@ -6105,6 +6115,13 @@ fn test_builtin_fn_lookup() -> i32 {
     if builtin_fn_ret_type(17) != TY_STRING() { return 21; }
     if builtin_fn_param_count(17) != 1 { return 22; }
     if builtin_fn_param_type(17, 0) != TY_STRING() { return 23; }
+    /* SS-U16 */
+    if builtin_fn_lookup("string_from_bytes") != 19 { return 24; }
+    if builtin_fn_lookup("string_byte_view") != 20 { return 25; }
+    if builtin_fn_ret_type(19) != TY_STRING() { return 26; }
+    if builtin_fn_ret_type(20) != TY_SLICE() { return 27; }
+    if builtin_fn_param_count(19) != 1 { return 28; }
+    if builtin_fn_param_type(20, 0) != TY_STRING() { return 29; }
     return 0;
 }
 

@@ -140,6 +140,10 @@ fn is_intrinsic(name: string) -> bool {
     if string_eq(name, "getenv") { return true; }
     /* slice_len(&[T]) -> usize (lowering builtin 34; sv0doc §2.2.1). SS-U03e. */
     if string_eq(name, "slice_len") { return true; }
+    /* SS-U16: string <-> byte-slice bridges (lowering builtins 35/36) for
+       strings_text::from_utf8 / as_bytes. */
+    if string_eq(name, "string_from_bytes") { return true; }
+    if string_eq(name, "string_byte_view") { return true; }
     return false;
 }
 
@@ -167,6 +171,8 @@ fn intrinsic_arity(name: string) -> i32 {
     if string_eq(name, "write_bytes") { return 2; }
     if string_eq(name, "getenv") { return 1; }
     if string_eq(name, "slice_len") { return 1; }
+    if string_eq(name, "string_from_bytes") { return 1; }
+    if string_eq(name, "string_byte_view") { return 1; }
     return 0 - 1;
 }
 

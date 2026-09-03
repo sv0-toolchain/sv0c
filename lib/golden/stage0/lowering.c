@@ -7228,6 +7228,16 @@ static int build_builtin_map_classify(const char* s) {
     return 34;
   } else {
   }
+  int _sv0t20 = sv0_string_eq(s, "string_from_bytes");
+  if (_sv0t20) {
+    return 35;
+  } else {
+  }
+  int _sv0t21 = sv0_string_eq(s, "string_byte_view");
+  if (_sv0t21) {
+    return 36;
+  } else {
+  }
   return 0;
 }
 
@@ -8914,6 +8924,11 @@ static int lower_init_is_string(int et, int ed1, int ed2, int pp, int init_idx, 
         }
         int _sv0t12 = sv0_string_eq(nm, "getenv");
         if (_sv0t12) {
+          return 1;
+        } else {
+        }
+        int _sv0t13 = sv0_string_eq(nm, "string_from_bytes");
+        if (_sv0t13) {
           return 1;
         } else {
         }
