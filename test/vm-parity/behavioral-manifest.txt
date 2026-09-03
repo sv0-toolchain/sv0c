@@ -19,3 +19,4 @@ sv0c/test/behavior/cases/slice_mut_reslice.sv0
 sv0c/test/behavior/cases/string_embedded_nul.sv0
 sv0c/test/behavior/cases/u64_unsigned_compare.sv0
 sv0c/test/behavior/cases/wide_shift.sv0
+sv0c/test/behavior/cases/vm_exit_wide_return.sv0
