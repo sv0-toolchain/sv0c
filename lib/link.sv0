@@ -250,8 +250,21 @@ fn link_u15_use_target(src: string, name: string) -> string {
     return "";
 }
 
-/* names defined at top level in two or more distinct modules of the listing,
-   as "\n"-framed set text ("\n" when there is no collision). */
+/* SS-U18: reserved C library identifiers. A `--project` file may legitimately
+   define a top-level `fn memcpy` (the `sv0-strings` C23 / POSIX compat
+   façades name their functions after `<string.h>` / `<strings.h>` symbols),
+   but the emitted C `#include <string.h>` already declares those — and the
+   fortify macros expand `memcpy(a,b,c)` inside a `int memcpy(int,int,int)`
+   prototype to garbage. So a top-level definition of one of these is always
+   module-prefixed in the concat, exactly as a cross-module collision is. */
+fn link_u15_reserved_c_name(nm: string) -> bool {
+    let set: string = "\nmemcpy\nmemmove\nmemset\nmemset_explicit\nmemcmp\nmemchr\nmemccpy\nmempcpy\nmemmem\nstrcpy\nstrncpy\nstpcpy\nstpncpy\nstrlcpy\nstrlcat\nstrcat\nstrncat\nstrcmp\nstrncmp\nstrcasecmp\nstrncasecmp\nstrcoll\nstrxfrm\nstrchr\nstrrchr\nstrchrnul\nstrspn\nstrcspn\nstrpbrk\nstrstr\nstrcasestr\nstrtok\nstrtok_r\nstrsep\nstrlen\nstrnlen\nstrdup\nstrndup\nstrerror\nstrerror_r\nstrsignal\nexplicit_bzero\nbcopy\nbzero\nbcmp\nindex\nrindex\nffs\n";
+    return link_u15_set_has(set, nm);
+}
+
+/* names defined at top level in two or more distinct modules of the listing
+   (or matching a reserved C library identifier), as "\n"-framed set text
+   ("\n" when there is nothing to mangle). */
 fn link_u15_collision_set(listing: string) -> string {
     let llen: i32 = string_len(listing);
     let mut seen_names: string = "\n";
@@ -271,6 +284,11 @@ fn link_u15_collision_set(listing: string) -> string {
                     let nm: string = link_u15_line_def_name(src, i);
                     if string_len(nm) > 0 {
                         let pair: string = string_concat(modid, string_concat("#", nm));
+                        if link_u15_reserved_c_name(nm) {
+                            if link_u15_set_has(collide, nm) != true {
+                                collide = string_concat(collide, string_concat(nm, "\n"));
+                            }
+                        }
                         if link_u15_set_has(seen_names, nm) {
                             if link_u15_set_has(seen_pairs, pair) != true {
                                 if link_u15_set_has(collide, nm) != true {
@@ -3238,6 +3256,17 @@ fn test_link_u15_symbol_mangle() -> i32 {
     if link_u15_set_has(cs, "equal") != true { return 10; }
     if link_u15_set_has(cs, "only_a") != false { return 11; }
     if link_u15_set_has(cs, "main") != false { return 12; }
+
+    /* SS-U18: a reserved C library name is mangled even when defined once */
+    if link_u15_reserved_c_name("memcpy") != true { return 40; }
+    if link_u15_reserved_c_name("strlen") != true { return 41; }
+    if link_u15_reserved_c_name("compare_bytes") != false { return 42; }
+    let pr: string = "/tmp/sv0_u15_res.sv0";
+    write_file(pr, "module strings_c23;\npub fn memcpy(a: i32) -> i32 { return a; }\n");
+    let mut lr: string = pr;
+    lr = string_concat(lr, "\n");
+    let mr: string = link_project_concat_sources_from_listing(lr);
+    if link_u15_contains(mr, "fn strings_c23__memcpy(") != true { return 43; }
 
     let merged: string = link_project_concat_sources_from_listing(listing);
     /* both definitions are module-prefixed */

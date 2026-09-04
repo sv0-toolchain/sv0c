@@ -16,6 +16,7 @@ static int link_u15_line_at_col0(const char* src, int i);
 static const char* link_u15_module_id(const char* src);
 static const char* link_u15_line_def_name(const char* src, int i);
 static const char* link_u15_use_target(const char* src, const char* name);
+static int link_u15_reserved_c_name(const char* nm);
 static const char* link_u15_collision_set(const char* listing);
 static int link_u15_prev_sig(const char* src, int i);
 static int link_u15_prev_sig2(const char* src, int i);
@@ -671,6 +672,13 @@ static const char* link_u15_use_target(const char* src, const char* name) {
   return "";
 }
 
+static int link_u15_reserved_c_name(const char* nm) {
+  const char* set;
+  set = "\nmemcpy\nmemmove\nmemset\nmemset_explicit\nmemcmp\nmemchr\nmemccpy\nmempcpy\nmemmem\nstrcpy\nstrncpy\nstpcpy\nstpncpy\nstrlcpy\nstrlcat\nstrcat\nstrncat\nstrcmp\nstrncmp\nstrcasecmp\nstrncasecmp\nstrcoll\nstrxfrm\nstrchr\nstrrchr\nstrchrnul\nstrspn\nstrcspn\nstrpbrk\nstrstr\nstrcasestr\nstrtok\nstrtok_r\nstrsep\nstrlen\nstrnlen\nstrdup\nstrndup\nstrerror\nstrerror_r\nstrsignal\nexplicit_bzero\nbcopy\nbzero\nbcmp\nindex\nrindex\nffs\n";
+  int _sv0t0 = link_u15_set_has(set, nm);
+  return _sv0t0;
+}
+
 static const char* link_u15_collision_set(const char* listing) {
   int _sv0t0 = sv0_string_len(listing);
   int llen = _sv0t0;
@@ -708,33 +716,44 @@ static const char* link_u15_collision_set(const char* listing) {
             const char* _sv0t10 = sv0_string_concat(modid, _sv0t9);
             const char* pair;
             pair = _sv0t10;
-            int _sv0t11 = link_u15_set_has(seen_names, nm);
+            int _sv0t11 = link_u15_reserved_c_name(nm);
             if (_sv0t11) {
-              int _sv0t12 = link_u15_set_has(seen_pairs, pair);
+              int _sv0t12 = link_u15_set_has(collide, nm);
               if ((_sv0t12 != 1)) {
-                int _sv0t13 = link_u15_set_has(collide, nm);
-                if ((_sv0t13 != 1)) {
-                  const char* _sv0t14 = sv0_string_concat(nm, "\n");
-                  const char* _sv0t15 = sv0_string_concat(collide, _sv0t14);
-                  collide = _sv0t15;
+                const char* _sv0t13 = sv0_string_concat(nm, "\n");
+                const char* _sv0t14 = sv0_string_concat(collide, _sv0t13);
+                collide = _sv0t14;
+              } else {
+              }
+            } else {
+            }
+            int _sv0t15 = link_u15_set_has(seen_names, nm);
+            if (_sv0t15) {
+              int _sv0t16 = link_u15_set_has(seen_pairs, pair);
+              if ((_sv0t16 != 1)) {
+                int _sv0t17 = link_u15_set_has(collide, nm);
+                if ((_sv0t17 != 1)) {
+                  const char* _sv0t18 = sv0_string_concat(nm, "\n");
+                  const char* _sv0t19 = sv0_string_concat(collide, _sv0t18);
+                  collide = _sv0t19;
                 } else {
                 }
               } else {
               }
             } else {
             }
-            int _sv0t16 = link_u15_set_has(seen_names, nm);
-            if ((_sv0t16 != 1)) {
-              const char* _sv0t17 = sv0_string_concat(nm, "\n");
-              const char* _sv0t18 = sv0_string_concat(seen_names, _sv0t17);
-              seen_names = _sv0t18;
+            int _sv0t20 = link_u15_set_has(seen_names, nm);
+            if ((_sv0t20 != 1)) {
+              const char* _sv0t21 = sv0_string_concat(nm, "\n");
+              const char* _sv0t22 = sv0_string_concat(seen_names, _sv0t21);
+              seen_names = _sv0t22;
             } else {
             }
-            int _sv0t19 = link_u15_set_has(seen_pairs, pair);
-            if ((_sv0t19 != 1)) {
-              const char* _sv0t20 = sv0_string_concat(pair, "\n");
-              const char* _sv0t21 = sv0_string_concat(seen_pairs, _sv0t20);
-              seen_pairs = _sv0t21;
+            int _sv0t23 = link_u15_set_has(seen_pairs, pair);
+            if ((_sv0t23 != 1)) {
+              const char* _sv0t24 = sv0_string_concat(pair, "\n");
+              const char* _sv0t25 = sv0_string_concat(seen_pairs, _sv0t24);
+              seen_pairs = _sv0t25;
             } else {
             }
           } else {
@@ -5992,38 +6011,68 @@ static int test_link_u15_symbol_mangle(void) {
     return 12;
   } else {
   }
-  const char* _sv0t25 = link_project_concat_sources_from_listing(listing);
+  int _sv0t25 = link_u15_reserved_c_name("memcpy");
+  if ((_sv0t25 != 1)) {
+    return 40;
+  } else {
+  }
+  int _sv0t26 = link_u15_reserved_c_name("strlen");
+  if ((_sv0t26 != 1)) {
+    return 41;
+  } else {
+  }
+  int _sv0t27 = link_u15_reserved_c_name("compare_bytes");
+  if ((_sv0t27 != 0)) {
+    return 42;
+  } else {
+  }
+  const char* pr;
+  pr = "/tmp/sv0_u15_res.sv0";
+  sv0_write_file(pr, "module strings_c23;\npub fn memcpy(a: i32) -> i32 { return a; }\n");
+  const char* lr;
+  lr = pr;
+  const char* _sv0t28 = sv0_string_concat(lr, "\n");
+  lr = _sv0t28;
+  const char* _sv0t29 = link_project_concat_sources_from_listing(lr);
+  const char* mr;
+  mr = _sv0t29;
+  int _sv0t30 = link_u15_contains(mr, "fn strings_c23__memcpy(");
+  if ((_sv0t30 != 1)) {
+    return 43;
+  } else {
+  }
+  const char* _sv0t31 = link_project_concat_sources_from_listing(listing);
   const char* merged;
-  merged = _sv0t25;
-  const char* _sv0t26 = sv0_string_concat(merged, "\n");
-  const char* _sv0t27 = sv0_string_concat("\n", _sv0t26);
-  int _sv0t28 = link_u15_set_has(_sv0t27, "x");
-  if ((_sv0t28 != 0)) {
+  merged = _sv0t31;
+  const char* _sv0t32 = sv0_string_concat(merged, "\n");
+  const char* _sv0t33 = sv0_string_concat("\n", _sv0t32);
+  int _sv0t34 = link_u15_set_has(_sv0t33, "x");
+  if ((_sv0t34 != 0)) {
     return 13;
   } else {
   }
-  int _sv0t29 = link_u15_contains(merged, "fn strings_bytes__equal(");
-  if ((_sv0t29 != 1)) {
+  int _sv0t35 = link_u15_contains(merged, "fn strings_bytes__equal(");
+  if ((_sv0t35 != 1)) {
     return 14;
   } else {
   }
-  int _sv0t30 = link_u15_contains(merged, "fn strings_text__equal(");
-  if ((_sv0t30 != 1)) {
+  int _sv0t36 = link_u15_contains(merged, "fn strings_text__equal(");
+  if ((_sv0t36 != 1)) {
     return 15;
   } else {
   }
-  int _sv0t31 = link_u15_contains(merged, "return strings_text__equal(7)");
-  if ((_sv0t31 != 1)) {
+  int _sv0t37 = link_u15_contains(merged, "return strings_text__equal(7)");
+  if ((_sv0t37 != 1)) {
     return 16;
   } else {
   }
-  int _sv0t32 = link_u15_contains(merged, "fn only_a(");
-  if ((_sv0t32 != 1)) {
+  int _sv0t38 = link_u15_contains(merged, "fn only_a(");
+  if ((_sv0t38 != 1)) {
     return 17;
   } else {
   }
-  int _sv0t33 = link_u15_contains(merged, "use strings_text::equal;");
-  if ((_sv0t33 != 1)) {
+  int _sv0t39 = link_u15_contains(merged, "use strings_text::equal;");
+  if ((_sv0t39 != 1)) {
     return 18;
   } else {
   }
@@ -6032,13 +6081,13 @@ static int test_link_u15_symbol_mangle(void) {
   sv0_write_file(pc1, "module m;\npub fn solo() -> i32 { return 0; }\n");
   const char* l2;
   l2 = pc1;
-  const char* _sv0t34 = sv0_string_concat(l2, "\n");
-  l2 = _sv0t34;
-  const char* _sv0t35 = link_project_concat_sources_from_listing(l2);
+  const char* _sv0t40 = sv0_string_concat(l2, "\n");
+  l2 = _sv0t40;
+  const char* _sv0t41 = link_project_concat_sources_from_listing(l2);
   const char* plain;
-  plain = _sv0t35;
-  int _sv0t36 = sv0_string_eq(plain, "module m;\npub fn solo() -> i32 { return 0; }\n");
-  if ((_sv0t36 != 1)) {
+  plain = _sv0t41;
+  int _sv0t42 = sv0_string_eq(plain, "module m;\npub fn solo() -> i32 { return 0; }\n");
+  if ((_sv0t42 != 1)) {
     return 19;
   } else {
   }
