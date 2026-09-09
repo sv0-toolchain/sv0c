@@ -674,7 +674,7 @@ static const char* link_u15_use_target(const char* src, const char* name) {
 
 static int link_u15_reserved_c_name(const char* nm) {
   const char* set;
-  set = "\nmemcpy\nmemmove\nmemset\nmemset_explicit\nmemcmp\nmemchr\nmemccpy\nmempcpy\nmemmem\nstrcpy\nstrncpy\nstpcpy\nstpncpy\nstrlcpy\nstrlcat\nstrcat\nstrncat\nstrcmp\nstrncmp\nstrcasecmp\nstrncasecmp\nstrcoll\nstrxfrm\nstrchr\nstrrchr\nstrchrnul\nstrspn\nstrcspn\nstrpbrk\nstrstr\nstrcasestr\nstrtok\nstrtok_r\nstrsep\nstrlen\nstrnlen\nstrdup\nstrndup\nstrerror\nstrerror_r\nstrsignal\nexplicit_bzero\nbcopy\nbzero\nbcmp\nindex\nrindex\nffs\n";
+  set = "\nmemcpy\nmemmove\nmemset\nmemset_explicit\nmemcmp\nmemchr\nmemccpy\nmempcpy\nmemmem\nstrcpy\nstrncpy\nstpcpy\nstpncpy\nstrlcpy\nstrlcat\nstrcat\nstrncat\nstrcmp\nstrncmp\nstrcasecmp\nstrncasecmp\nstrcasecmp_l\nstrncasecmp_l\nstrcoll\nstrcoll_l\nstrxfrm\nstrxfrm_l\nstrchr\nstrrchr\nstrchrnul\nstrspn\nstrcspn\nstrpbrk\nstrstr\nstrcasestr\nstrcasestr_l\nstrtok\nstrtok_r\nstrsep\nstrlen\nstrnlen\nstrdup\nstrndup\nstrerror\nstrerror_r\nstrerror_l\nstrsignal\nexplicit_bzero\nbcopy\nbzero\nbcmp\nindex\nrindex\nffs\nffsl\nffsll\n";
   int _sv0t0 = link_u15_set_has(set, nm);
   return _sv0t0;
 }

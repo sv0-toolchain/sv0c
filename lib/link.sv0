@@ -256,9 +256,13 @@ fn link_u15_use_target(src: string, name: string) -> string {
    but the emitted C `#include <string.h>` already declares those — and the
    fortify macros expand `memcpy(a,b,c)` inside a `int memcpy(int,int,int)`
    prototype to garbage. So a top-level definition of one of these is always
-   module-prefixed in the concat, exactly as a cross-module collision is. */
+   module-prefixed in the concat, exactly as a cross-module collision is.
+   The set includes the POSIX Issue 8 XSI `_l` explicit-locale variants
+   (`strcoll_l` / `strxfrm_l` / `strcasecmp_l` / `strncasecmp_l` /
+   `strerror_l` / `strcasestr_l`) and the `ffs` width family (`ffsl` /
+   `ffsll`), which glibc declares just like the base names. */
 fn link_u15_reserved_c_name(nm: string) -> bool {
-    let set: string = "\nmemcpy\nmemmove\nmemset\nmemset_explicit\nmemcmp\nmemchr\nmemccpy\nmempcpy\nmemmem\nstrcpy\nstrncpy\nstpcpy\nstpncpy\nstrlcpy\nstrlcat\nstrcat\nstrncat\nstrcmp\nstrncmp\nstrcasecmp\nstrncasecmp\nstrcoll\nstrxfrm\nstrchr\nstrrchr\nstrchrnul\nstrspn\nstrcspn\nstrpbrk\nstrstr\nstrcasestr\nstrtok\nstrtok_r\nstrsep\nstrlen\nstrnlen\nstrdup\nstrndup\nstrerror\nstrerror_r\nstrsignal\nexplicit_bzero\nbcopy\nbzero\nbcmp\nindex\nrindex\nffs\n";
+    let set: string = "\nmemcpy\nmemmove\nmemset\nmemset_explicit\nmemcmp\nmemchr\nmemccpy\nmempcpy\nmemmem\nstrcpy\nstrncpy\nstpcpy\nstpncpy\nstrlcpy\nstrlcat\nstrcat\nstrncat\nstrcmp\nstrncmp\nstrcasecmp\nstrncasecmp\nstrcasecmp_l\nstrncasecmp_l\nstrcoll\nstrcoll_l\nstrxfrm\nstrxfrm_l\nstrchr\nstrrchr\nstrchrnul\nstrspn\nstrcspn\nstrpbrk\nstrstr\nstrcasestr\nstrcasestr_l\nstrtok\nstrtok_r\nstrsep\nstrlen\nstrnlen\nstrdup\nstrndup\nstrerror\nstrerror_r\nstrerror_l\nstrsignal\nexplicit_bzero\nbcopy\nbzero\nbcmp\nindex\nrindex\nffs\nffsl\nffsll\n";
     return link_u15_set_has(set, nm);
 }
 
