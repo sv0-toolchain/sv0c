@@ -180,6 +180,17 @@ fn TY_VAR() -> i32 { return 16; }
    the rest of this checker treats primitives. */
 fn TY_SLICE() -> i32 { return 17; }
 fn TY_SLICEMUT() -> i32 { return 18; }
+/* Raw pointers (FFI-003, task/sv0c-ffi-raw-pointer-abi.Rmd). Distinct from
+   TY_REF/TY_REFMUT: a reference participates in the (slice) borrow checker
+   and is created by `&e`/`&mut e` directly; a raw pointer is created only
+   by an explicit `&e as *const T` / `&e as *mut T` cast (ast.sv0's
+   Ty::TyPtr / Ty::TyPtrMut, tags 8/9) and never participates in borrow
+   checking at all -- see check_body_slice_borrow's own doc comment: it
+   pattern-matches ExprIndex-over-ExprRange syntax only, so a pointer-cast
+   expression can never match its shape regardless of this tag. Like
+   TY_SLICE, width-agnostic -- no pointee type is carried in the tag. */
+fn TY_PTR() -> i32 { return 19; }
+fn TY_PTRMUT() -> i32 { return 20; }
 fn TY_UNKNOWN() -> i32 { return 0 - 1; }
 
 fn ast_type_name_to_tag(name: string) -> i32 {
@@ -1119,15 +1130,16 @@ fn resolve_field_ty_tag(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
     if idx < 0 { return 0 - 1; }
     let tag: i32 = vec_get(ty_tags, idx);
     if tag == 6 { return TY_UNIT(); }
-    /* pty tags (parse_type / ast.sv0 ty_tag): 1 TyRef, 2 TyRefMut, 5 TyTuple.
+    /* pty tags (parse_type / ast.sv0 ty_tag): 1 TyRef, 2 TyRefMut, 5 TyTuple,
+       8 TyPtr, 9 TyPtrMut (FFI-003, task/sv0c-ffi-raw-pointer-abi.Rmd).
        3 TyArray / 4 TySlice / 7 TyInfer are unsupported here and fall through to
        the TyName (0) / -1 paths below. (Matches pty_root_to_type_tag; the old
-       2→REF / 3→REFMUT / 7→TUPLE was a stale/wrong tag scheme.) 8 TyPtr /
-       9 TyPtrMut (FFI-002, task/sv0c-ffi-raw-pointer-abi.Rmd) parse but are
-       likewise unsupported here until FFI-003 adds real checker support. */
+       2→REF / 3→REFMUT / 7→TUPLE was a stale/wrong tag scheme.) */
     if tag == 1 { return TY_REF(); }
     if tag == 2 { return TY_REFMUT(); }
     if tag == 5 { return TY_TUPLE(); }
+    if tag == 8 { return TY_PTR(); }
+    if tag == 9 { return TY_PTRMUT(); }
     if tag == 0 {
         let seg_count: i32 = vec_get(ty_d2, idx);
         if seg_count == 1 {
@@ -1180,15 +1192,16 @@ fn ast_ty_to_ty_payload(ty_tags: Vec<i32>, ty_d1: Vec<i32>,
     if idx < 0 { return 0 - 1; }
     let tag: i32 = vec_get(ty_tags, idx);
     if tag == 6 { return TY_UNIT(); }
-    /* pty tags (parse_type / ast.sv0 ty_tag): 1 TyRef, 2 TyRefMut, 5 TyTuple.
+    /* pty tags (parse_type / ast.sv0 ty_tag): 1 TyRef, 2 TyRefMut, 5 TyTuple,
+       8 TyPtr, 9 TyPtrMut (FFI-003, task/sv0c-ffi-raw-pointer-abi.Rmd).
        3 TyArray / 4 TySlice / 7 TyInfer are unsupported here and fall through to
        the TyName (0) / -1 paths below. (Matches pty_root_to_type_tag; the old
-       2→REF / 3→REFMUT / 7→TUPLE was a stale/wrong tag scheme.) 8 TyPtr /
-       9 TyPtrMut (FFI-002, task/sv0c-ffi-raw-pointer-abi.Rmd) parse but are
-       likewise unsupported here until FFI-003 adds real checker support. */
+       2→REF / 3→REFMUT / 7→TUPLE was a stale/wrong tag scheme.) */
     if tag == 1 { return TY_REF(); }
     if tag == 2 { return TY_REFMUT(); }
     if tag == 5 { return TY_TUPLE(); }
+    if tag == 8 { return TY_PTR(); }
+    if tag == 9 { return TY_PTRMUT(); }
     if tag == 0 {
         let seg_count: i32 = vec_get(ty_d2, idx);
         if seg_count == 1 {
@@ -7021,6 +7034,88 @@ fn test_synth_building_blocks() -> i32 {
     return 0;
 }
 
+/* FFI-003 (task/sv0c-ffi-raw-pointer-abi.Rmd): resolve_field_ty_tag /
+   ast_ty_to_ty_payload now resolve TyPtr(8)/TyPtrMut(9) to real TY_PTR /
+   TY_PTRMUT tags instead of falling through to -1 "unresolved". Both
+   functions treat a pointer the same shallow way they already treat
+   TyRef/TyRefMut: no pointee type is decoded here (matches TY_SLICE's own
+   width-agnostic precedent), so a minimal single-entry ty_tags array is
+   sufficient -- neither function reads ty_d1 for tag 8/9. */
+fn test_resolve_field_ty_tag_ptr() -> i32 {
+    let empty_i: Vec<i32> = vec_new();
+    let source: string = "";
+    let ty_tags_c: Vec<i32> = vec_new();
+    vec_push(ty_tags_c, 8);
+    let ty_d1_c: Vec<i32> = vec_new();
+    vec_push(ty_d1_c, 0 - 1);
+    let r1: i32 = resolve_field_ty_tag(ty_tags_c, ty_d1_c, empty_i, empty_i,
+                                       empty_i, source, empty_i, empty_i,
+                                       empty_i, empty_i, empty_i, 0, 0);
+    if r1 != TY_PTR() { return 1; }
+
+    let ty_tags_m: Vec<i32> = vec_new();
+    vec_push(ty_tags_m, 9);
+    let ty_d1_m: Vec<i32> = vec_new();
+    vec_push(ty_d1_m, 0 - 1);
+    let r2: i32 = resolve_field_ty_tag(ty_tags_m, ty_d1_m, empty_i, empty_i,
+                                       empty_i, source, empty_i, empty_i,
+                                       empty_i, empty_i, empty_i, 0, 0);
+    if r2 != TY_PTRMUT() { return 2; }
+    return 0;
+}
+
+fn test_ast_ty_to_ty_payload_ptr() -> i32 {
+    let empty_i: Vec<i32> = vec_new();
+    let source: string = "";
+    let ty_tags_c: Vec<i32> = vec_new();
+    vec_push(ty_tags_c, 8);
+    let ty_d1_c: Vec<i32> = vec_new();
+    vec_push(ty_d1_c, 0 - 1);
+    let out1: Vec<i32> = vec_new();
+    let r1: i32 = ast_ty_to_ty_payload(ty_tags_c, ty_d1_c, empty_i, empty_i,
+                                       empty_i, source, empty_i, empty_i,
+                                       empty_i, empty_i, empty_i, 0, 0, out1);
+    if r1 != TY_PTR() { return 1; }
+    if vec_len(out1) != 0 { return 2; }
+
+    let ty_tags_m: Vec<i32> = vec_new();
+    vec_push(ty_tags_m, 9);
+    let ty_d1_m: Vec<i32> = vec_new();
+    vec_push(ty_d1_m, 0 - 1);
+    let out2: Vec<i32> = vec_new();
+    let r2: i32 = ast_ty_to_ty_payload(ty_tags_m, ty_d1_m, empty_i, empty_i,
+                                       empty_i, source, empty_i, empty_i,
+                                       empty_i, empty_i, empty_i, 0, 0, out2);
+    if r2 != TY_PTRMUT() { return 3; }
+    if vec_len(out2) != 0 { return 4; }
+    return 0;
+}
+
+/* FFI-003 borrow-checker exclusion: sv0doc documents that raw pointers do
+   not participate in the borrow checker. check_body_slice_borrow's own
+   doc comment already scopes it to `&e[..]`/`&e[a..b]` syntax specifically
+   (via slice_ctor_base_node's ExprIndex-over-ExprRange pattern match), so
+   a pointer-creation expression `&x as *const T` -- syntactically
+   ExprCast(ExprUnop(Borrow, x), ptr_ty) -- can never match that shape: the
+   outer node is a Cast (tag 20), not the Unop (tag 2) or Index (tag 8) the
+   peel logic looks for. This proves the exclusion is real, not assumed,
+   with zero code change needed in check_body_slice_borrow itself. */
+fn test_slice_ctor_base_node_excludes_ptr_cast() -> i32 {
+    let bet: Vec<i32> = vec_new();
+    let bed1: Vec<i32> = vec_new();
+    let bed2: Vec<i32> = vec_new();
+    /* node0: ExprPath "x" (tag 1) */
+    vec_push(bet, 1); vec_push(bed1, 0); vec_push(bed2, 0);
+    /* node1: ExprUnop Borrow(4) of node0 (tag 2, d1=unop_tag, d2=operand) */
+    vec_push(bet, 2); vec_push(bed1, 4); vec_push(bed2, 0);
+    /* node2: ExprCast(node1, ty_idx=0) -- `&x as *const T` (tag 20) */
+    vec_push(bet, 20); vec_push(bed1, 1); vec_push(bed2, 0);
+    let out_is_mut: Vec<i32> = vec_new();
+    let r: i32 = slice_ctor_base_node(bet, bed1, bed2, 2, out_is_mut);
+    if r != (0 - 1) { return 1; }
+    return 0;
+}
+
 fn test_named_only_ty_basic() -> i32 {
     let sn: Vec<i32> = vec_new();
     vec_push(sn, 7);
@@ -7174,5 +7269,11 @@ fn main() -> i32 {
     if r65m != 0 { return 695 + r65m; }
     let r66: i32 = test_named_only_ty_basic();
     if r66 != 0 { return 690 + r66; }
+    let r67: i32 = test_resolve_field_ty_tag_ptr();
+    if r67 != 0 { return 700 + r67; }
+    let r68: i32 = test_ast_ty_to_ty_payload_ptr();
+    if r68 != 0 { return 710 + r68; }
+    let r69: i32 = test_slice_ctor_base_node_excludes_ptr_cast();
+    if r69 != 0 { return 720 + r69; }
     return 0;
 }

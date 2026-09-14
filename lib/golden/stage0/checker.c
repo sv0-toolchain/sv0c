@@ -36,6 +36,8 @@ static int TY_NAMED(void);
 static int TY_VAR(void);
 static int TY_SLICE(void);
 static int TY_SLICEMUT(void);
+static int TY_PTR(void);
+static int TY_PTRMUT(void);
 static int TY_UNKNOWN(void);
 static int ast_type_name_to_tag(const char* name);
 static int is_primitive_type_name(const char* name);
@@ -254,6 +256,9 @@ static int test_check_program_mangled_name(void);
 static int test_process_item_use(void);
 static int test_build_mod_env(void);
 static int test_synth_building_blocks(void);
+static int test_resolve_field_ty_tag_ptr(void);
+static int test_ast_ty_to_ty_payload_ptr(void);
+static int test_slice_ctor_base_node_excludes_ptr_cast(void);
 static int test_named_only_ty_basic(void);
 
 static int BINOP_ARITH(void) {
@@ -496,6 +501,14 @@ static int TY_SLICE(void) {
 
 static int TY_SLICEMUT(void) {
   return 18;
+}
+
+static int TY_PTR(void) {
+  return 19;
+}
+
+static int TY_PTRMUT(void) {
+  return 20;
 }
 
 static int TY_UNKNOWN(void) {
@@ -1974,77 +1987,87 @@ static int resolve_field_ty_tag(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
     return _sv0t5;
   } else {
   }
+  if ((tag == 8)) {
+    int _sv0t6 = TY_PTR();
+    return _sv0t6;
+  } else {
+  }
+  if ((tag == 9)) {
+    int _sv0t7 = TY_PTRMUT();
+    return _sv0t7;
+  } else {
+  }
   if ((tag == 0)) {
-    int _sv0t6 = sv0_vec_get(ty_d2, idx);
-    int seg_count = _sv0t6;
+    int _sv0t8 = sv0_vec_get(ty_d2, idx);
+    int seg_count = _sv0t8;
     if ((seg_count == 1)) {
-      int _sv0t7 = sv0_vec_get(ty_d1, idx);
-      int pps = _sv0t7;
-      int _sv0t8 = sv0_vec_get(pp, pps);
-      int tok = _sv0t8;
-      int _sv0t9 = sv0_vec_get(starts, tok);
-      int s = _sv0t9;
-      int _sv0t10 = sv0_vec_get(ends, tok);
-      int e = _sv0t10;
-      int _sv0t11 = (e - s);
-      const char* _sv0t12 = sv0_string_substr(source, s, _sv0t11);
+      int _sv0t9 = sv0_vec_get(ty_d1, idx);
+      int pps = _sv0t9;
+      int _sv0t10 = sv0_vec_get(pp, pps);
+      int tok = _sv0t10;
+      int _sv0t11 = sv0_vec_get(starts, tok);
+      int s = _sv0t11;
+      int _sv0t12 = sv0_vec_get(ends, tok);
+      int e = _sv0t12;
+      int _sv0t13 = (e - s);
+      const char* _sv0t14 = sv0_string_substr(source, s, _sv0t13);
       const char* name;
-      name = _sv0t12;
-      int _sv0t13 = ast_ty_to_types_tag(name);
-      int prim = _sv0t13;
+      name = _sv0t14;
+      int _sv0t15 = ast_ty_to_types_tag(name);
+      int prim = _sv0t15;
       if ((prim >= 0)) {
         return prim;
       } else {
       }
       int ni = 0;
       while (1) {
-        int _sv0t14 = sv0_vec_len(struct_names);
-        int _sv0t17 = (ni < _sv0t14);
-        if ((!_sv0t17)) {
+        int _sv0t16 = sv0_vec_len(struct_names);
+        int _sv0t19 = (ni < _sv0t16);
+        if ((!_sv0t19)) {
           break;
         } else {
         }
-        int _sv0t15 = sv0_vec_get(struct_names, ni);
-        if ((_sv0t15 == tok)) {
-          int _sv0t16 = TY_STRUCT();
-          return _sv0t16;
+        int _sv0t17 = sv0_vec_get(struct_names, ni);
+        if ((_sv0t17 == tok)) {
+          int _sv0t18 = TY_STRUCT();
+          return _sv0t18;
         } else {
         }
         ni = (ni + 1);
       }
       int ei = 0;
       while (1) {
-        int _sv0t18 = sv0_vec_len(enum_names);
-        int _sv0t21 = (ei < _sv0t18);
-        if ((!_sv0t21)) {
+        int _sv0t20 = sv0_vec_len(enum_names);
+        int _sv0t23 = (ei < _sv0t20);
+        if ((!_sv0t23)) {
           break;
         } else {
         }
-        int _sv0t19 = sv0_vec_get(enum_names, ei);
-        if ((_sv0t19 == tok)) {
-          int _sv0t20 = TY_ENUM();
-          return _sv0t20;
+        int _sv0t21 = sv0_vec_get(enum_names, ei);
+        if ((_sv0t21 == tok)) {
+          int _sv0t22 = TY_ENUM();
+          return _sv0t22;
         } else {
         }
         ei = (ei + 1);
       }
-      int _sv0t22 = type_param_lookup(type_params, tp_limit, tok);
-      int tp = _sv0t22;
+      int _sv0t24 = type_param_lookup(type_params, tp_limit, tok);
+      int tp = _sv0t24;
       if ((tp >= 0)) {
-        int _sv0t23 = TY_VAR();
-        return _sv0t23;
+        int _sv0t25 = TY_VAR();
+        return _sv0t25;
       } else {
       }
-      int _sv0t24 = (0 - 1);
-      return _sv0t24;
+      int _sv0t26 = (0 - 1);
+      return _sv0t26;
     } else {
     }
-    int _sv0t25 = (0 - 1);
-    return _sv0t25;
+    int _sv0t27 = (0 - 1);
+    return _sv0t27;
   } else {
   }
-  int _sv0t26 = (0 - 1);
-  return _sv0t26;
+  int _sv0t28 = (0 - 1);
+  return _sv0t28;
 }
 
 static int ast_ty_to_ty_payload(int ty_tags, int ty_d1, int ty_d2, int ty_d3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int idx, int out_payload) {
@@ -2075,27 +2098,37 @@ static int ast_ty_to_ty_payload(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
     return _sv0t5;
   } else {
   }
+  if ((tag == 8)) {
+    int _sv0t6 = TY_PTR();
+    return _sv0t6;
+  } else {
+  }
+  if ((tag == 9)) {
+    int _sv0t7 = TY_PTRMUT();
+    return _sv0t7;
+  } else {
+  }
   if ((tag == 0)) {
-    int _sv0t6 = sv0_vec_get(ty_d2, idx);
-    int seg_count = _sv0t6;
+    int _sv0t8 = sv0_vec_get(ty_d2, idx);
+    int seg_count = _sv0t8;
     if ((seg_count == 1)) {
-      int _sv0t7 = sv0_vec_get(ty_d1, idx);
-      int pps = _sv0t7;
-      int _sv0t8 = sv0_vec_get(pp, pps);
-      int tok = _sv0t8;
-      int _sv0t9 = sv0_vec_get(starts, tok);
-      int s = _sv0t9;
-      int _sv0t10 = sv0_vec_get(ends, tok);
-      int e = _sv0t10;
-      int _sv0t11 = (e - s);
-      const char* _sv0t12 = sv0_string_substr(source, s, _sv0t11);
+      int _sv0t9 = sv0_vec_get(ty_d1, idx);
+      int pps = _sv0t9;
+      int _sv0t10 = sv0_vec_get(pp, pps);
+      int tok = _sv0t10;
+      int _sv0t11 = sv0_vec_get(starts, tok);
+      int s = _sv0t11;
+      int _sv0t12 = sv0_vec_get(ends, tok);
+      int e = _sv0t12;
+      int _sv0t13 = (e - s);
+      const char* _sv0t14 = sv0_string_substr(source, s, _sv0t13);
       const char* name;
-      name = _sv0t12;
-      int _sv0t13 = ast_type_name_to_tag(name);
-      int prim = _sv0t13;
+      name = _sv0t14;
+      int _sv0t15 = ast_type_name_to_tag(name);
+      int prim = _sv0t15;
       if ((prim >= 0)) {
-        int _sv0t14 = int_width_from_name(name);
-        int w = _sv0t14;
+        int _sv0t16 = int_width_from_name(name);
+        int w = _sv0t16;
         if ((w > 0)) {
           sv0_vec_push(out_payload, w);
         } else {
@@ -2105,56 +2138,56 @@ static int ast_ty_to_ty_payload(int ty_tags, int ty_d1, int ty_d2, int ty_d3, in
       }
       int ni = 0;
       while (1) {
-        int _sv0t15 = sv0_vec_len(struct_names);
-        int _sv0t18 = (ni < _sv0t15);
-        if ((!_sv0t18)) {
+        int _sv0t17 = sv0_vec_len(struct_names);
+        int _sv0t20 = (ni < _sv0t17);
+        if ((!_sv0t20)) {
           break;
         } else {
         }
-        int _sv0t16 = sv0_vec_get(struct_names, ni);
-        if ((_sv0t16 == tok)) {
+        int _sv0t18 = sv0_vec_get(struct_names, ni);
+        if ((_sv0t18 == tok)) {
           sv0_vec_push(out_payload, tok);
-          int _sv0t17 = TY_STRUCT();
-          return _sv0t17;
+          int _sv0t19 = TY_STRUCT();
+          return _sv0t19;
         } else {
         }
         ni = (ni + 1);
       }
       int ei = 0;
       while (1) {
-        int _sv0t19 = sv0_vec_len(enum_names);
-        int _sv0t22 = (ei < _sv0t19);
-        if ((!_sv0t22)) {
+        int _sv0t21 = sv0_vec_len(enum_names);
+        int _sv0t24 = (ei < _sv0t21);
+        if ((!_sv0t24)) {
           break;
         } else {
         }
-        int _sv0t20 = sv0_vec_get(enum_names, ei);
-        if ((_sv0t20 == tok)) {
+        int _sv0t22 = sv0_vec_get(enum_names, ei);
+        if ((_sv0t22 == tok)) {
           sv0_vec_push(out_payload, tok);
-          int _sv0t21 = TY_ENUM();
-          return _sv0t21;
+          int _sv0t23 = TY_ENUM();
+          return _sv0t23;
         } else {
         }
         ei = (ei + 1);
       }
-      int _sv0t23 = type_param_lookup(type_params, tp_limit, tok);
-      int tp = _sv0t23;
+      int _sv0t25 = type_param_lookup(type_params, tp_limit, tok);
+      int tp = _sv0t25;
       if ((tp >= 0)) {
         sv0_vec_push(out_payload, tp);
-        int _sv0t24 = TY_VAR();
-        return _sv0t24;
+        int _sv0t26 = TY_VAR();
+        return _sv0t26;
       } else {
       }
-      int _sv0t25 = (0 - 1);
-      return _sv0t25;
+      int _sv0t27 = (0 - 1);
+      return _sv0t27;
     } else {
     }
-    int _sv0t26 = (0 - 1);
-    return _sv0t26;
+    int _sv0t28 = (0 - 1);
+    return _sv0t28;
   } else {
   }
-  int _sv0t27 = (0 - 1);
-  return _sv0t27;
+  int _sv0t29 = (0 - 1);
+  return _sv0t29;
 }
 
 static int enum_ctor_count(int variant_enum_ids, int enum_name) {
@@ -11572,6 +11605,120 @@ static int test_synth_building_blocks(void) {
   return 0;
 }
 
+static int test_resolve_field_ty_tag_ptr(void) {
+  int _sv0t0 = sv0_vec_new();
+  int empty_i = _sv0t0;
+  const char* source;
+  source = "";
+  int _sv0t1 = sv0_vec_new();
+  int ty_tags_c = _sv0t1;
+  sv0_vec_push(ty_tags_c, 8);
+  int _sv0t2 = sv0_vec_new();
+  int ty_d1_c = _sv0t2;
+  int _sv0t3 = (0 - 1);
+  sv0_vec_push(ty_d1_c, _sv0t3);
+  int _sv0t4 = resolve_field_ty_tag(ty_tags_c, ty_d1_c, empty_i, empty_i, empty_i, source, empty_i, empty_i, empty_i, empty_i, empty_i, 0, 0);
+  int r1 = _sv0t4;
+  int _sv0t5 = TY_PTR();
+  if ((r1 != _sv0t5)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int ty_tags_m = _sv0t6;
+  sv0_vec_push(ty_tags_m, 9);
+  int _sv0t7 = sv0_vec_new();
+  int ty_d1_m = _sv0t7;
+  int _sv0t8 = (0 - 1);
+  sv0_vec_push(ty_d1_m, _sv0t8);
+  int _sv0t9 = resolve_field_ty_tag(ty_tags_m, ty_d1_m, empty_i, empty_i, empty_i, source, empty_i, empty_i, empty_i, empty_i, empty_i, 0, 0);
+  int r2 = _sv0t9;
+  int _sv0t10 = TY_PTRMUT();
+  if ((r2 != _sv0t10)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_ast_ty_to_ty_payload_ptr(void) {
+  int _sv0t0 = sv0_vec_new();
+  int empty_i = _sv0t0;
+  const char* source;
+  source = "";
+  int _sv0t1 = sv0_vec_new();
+  int ty_tags_c = _sv0t1;
+  sv0_vec_push(ty_tags_c, 8);
+  int _sv0t2 = sv0_vec_new();
+  int ty_d1_c = _sv0t2;
+  int _sv0t3 = (0 - 1);
+  sv0_vec_push(ty_d1_c, _sv0t3);
+  int _sv0t4 = sv0_vec_new();
+  int out1 = _sv0t4;
+  int _sv0t5 = ast_ty_to_ty_payload(ty_tags_c, ty_d1_c, empty_i, empty_i, empty_i, source, empty_i, empty_i, empty_i, empty_i, empty_i, 0, 0, out1);
+  int r1 = _sv0t5;
+  int _sv0t6 = TY_PTR();
+  if ((r1 != _sv0t6)) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(out1);
+  if ((_sv0t7 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_new();
+  int ty_tags_m = _sv0t8;
+  sv0_vec_push(ty_tags_m, 9);
+  int _sv0t9 = sv0_vec_new();
+  int ty_d1_m = _sv0t9;
+  int _sv0t10 = (0 - 1);
+  sv0_vec_push(ty_d1_m, _sv0t10);
+  int _sv0t11 = sv0_vec_new();
+  int out2 = _sv0t11;
+  int _sv0t12 = ast_ty_to_ty_payload(ty_tags_m, ty_d1_m, empty_i, empty_i, empty_i, source, empty_i, empty_i, empty_i, empty_i, empty_i, 0, 0, out2);
+  int r2 = _sv0t12;
+  int _sv0t13 = TY_PTRMUT();
+  if ((r2 != _sv0t13)) {
+    return 3;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_len(out2);
+  if ((_sv0t14 != 0)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_slice_ctor_base_node_excludes_ptr_cast(void) {
+  int _sv0t0 = sv0_vec_new();
+  int bet = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int bed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int bed2 = _sv0t2;
+  sv0_vec_push(bet, 1);
+  sv0_vec_push(bed1, 0);
+  sv0_vec_push(bed2, 0);
+  sv0_vec_push(bet, 2);
+  sv0_vec_push(bed1, 4);
+  sv0_vec_push(bed2, 0);
+  sv0_vec_push(bet, 20);
+  sv0_vec_push(bed1, 1);
+  sv0_vec_push(bed2, 0);
+  int _sv0t3 = sv0_vec_new();
+  int out_is_mut = _sv0t3;
+  int _sv0t4 = slice_ctor_base_node(bet, bed1, bed2, 2, out_is_mut);
+  int r = _sv0t4;
+  int _sv0t5 = (0 - 1);
+  if ((r != _sv0t5)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_named_only_ty_basic(void) {
   int _sv0t0 = sv0_vec_new();
   int sn = _sv0t0;
@@ -12086,6 +12233,27 @@ int main(void) {
   if ((r66 != 0)) {
     int _sv0t138 = (690 + r66);
     return _sv0t138;
+  } else {
+  }
+  int _sv0t139 = test_resolve_field_ty_tag_ptr();
+  int r67 = _sv0t139;
+  if ((r67 != 0)) {
+    int _sv0t140 = (700 + r67);
+    return _sv0t140;
+  } else {
+  }
+  int _sv0t141 = test_ast_ty_to_ty_payload_ptr();
+  int r68 = _sv0t141;
+  if ((r68 != 0)) {
+    int _sv0t142 = (710 + r68);
+    return _sv0t142;
+  } else {
+  }
+  int _sv0t143 = test_slice_ctor_base_node_excludes_ptr_cast();
+  int r69 = _sv0t143;
+  if ((r69 != 0)) {
+    int _sv0t144 = (720 + r69);
+    return _sv0t144;
   } else {
   }
   return 0;
