@@ -555,7 +555,12 @@ fn megatu_is_user_type(nm: string, it: Vec<i32>, id1: Vec<i32>,
    i8->int8_t, u8->uint8_t, i64->int64_t, string->const char*, unit->void, ...). A
    name that is not a primitive but matches a top-level struct/enum resolves to that
    typedef name (the emitted C typedef). root < 0 means no type (unit) -> "void".
-   TyRef and other constructors fall back to "int". */
+   TyPtr/TyPtrMut (tags 8/9, FFI-004): a raw pointer *is* a real C pointer, so these
+   recurse on the pointee (ptd1[root]) and append " *", with a "const " prefix for
+   TyPtr (`*const T`) — TyPtrMut (`*mut T`) gets no const qualifier. TyRef/TyRefMut
+   and other constructors still fall back to "int" (references have no C-pointer
+   representation in this backend yet; out of scope for FFI-004, which is raw
+   pointers only — see task/sv0c-ffi-raw-pointer-abi.Rmd). */
 fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
                       pp: Vec<i32>, source: string, starts: Vec<i32>,
                       ends: Vec<i32>, it: Vec<i32>, id1: Vec<i32>) -> string {
@@ -584,6 +589,18 @@ fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
             return nm;
         }
         return "int";
+    }
+    if vec_get(ptt, root) == 8 {
+        let inner_const: string = megatu_cty_of_root(vec_get(ptd1, root), ptt, ptd1,
+                                                      ptd2, pp, source, starts, ends,
+                                                      it, id1);
+        return string_concat("const ", string_concat(inner_const, " *"));
+    }
+    if vec_get(ptt, root) == 9 {
+        let inner_mut: string = megatu_cty_of_root(vec_get(ptd1, root), ptt, ptd1,
+                                                    ptd2, pp, source, starts, ends,
+                                                    it, id1);
+        return string_concat(inner_mut, " *");
     }
     return "int";
 }

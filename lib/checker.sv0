@@ -1575,6 +1575,19 @@ fn pty_root_to_type_tag(pty_tt: Vec<i32>, pty_td1: Vec<i32>,
     if tag == 5 { return TY_TUPLE(); }
     if tag == 3 { return 0 - 1; }
     if tag == 4 { return 0 - 1; }
+    /* TyPtr/TyPtrMut (tags 8/9, FFI-004): pty_root_to_type_tag feeds the
+       fn-signature table (scan_fn_param_type_tags_arena / item_fn_ret_ty_tag's
+       sibling scan_fn_ret_type_tag_arena), used to check call sites and
+       `return` expressions against a fn's declared param/return types. This
+       is a separate resolver from resolve_field_ty_tag/ast_ty_to_ty_payload
+       (already extended in FFI-003 for local/field type resolution) — missing
+       tags 8/9 here left a `-> *const T`/`-> *mut T` return type unresolved
+       (TY_UNKNOWN), silently crashing the checker on any real `return`
+       against such a signature rather than reporting a diagnostic. Found
+       while implementing FFI-004; fixed here rather than deferred, since a
+       raw-pointer return type is unusable without it. */
+    if tag == 8 { return TY_PTR(); }
+    if tag == 9 { return TY_PTRMUT(); }
     if tag == 0 {
         if vec_get(pty_td3, root) > 0 { return TY_NAMED(); }
         let pps: i32 = vec_get(pty_td1, root);
@@ -7207,6 +7220,39 @@ fn test_synth_expr_cast_non_ptr_still_ty_int() -> i32 {
     return 0;
 }
 
+/* FFI-004: pty_root_to_type_tag is a SEPARATE resolver from
+   resolve_field_ty_tag/ast_ty_to_ty_payload (already extended for tags 8/9 in
+   FFI-003) -- it feeds the fn-signature table used to check `return`
+   expressions and call sites against a fn's declared param/return types.
+   Missing tags 8/9 here left a `-> *const T`/`-> *mut T` signature
+   unresolved (TY_UNKNOWN), which crashed the checker silently (no
+   diagnostic, just a bad exit code) the moment a real `return` was checked
+   against it -- found while implementing FFI-004's C-backend lowering.
+   root 0 = TyName i32; root 1 = TyPtr(i32) (`*const i32`); root 2 =
+   TyPtrMut(i32) (`*mut i32`). */
+fn test_pty_root_to_type_tag_ptr() -> i32 {
+    let source: string = "i32";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let tt: Vec<i32> = vec_new();
+    vec_push(tt, 0); vec_push(tt, 8); vec_push(tt, 9);
+    let td1: Vec<i32> = vec_new();
+    vec_push(td1, 0); vec_push(td1, 0); vec_push(td1, 0);
+    let td2: Vec<i32> = vec_new();
+    vec_push(td2, 1); vec_push(td2, 0); vec_push(td2, 0);
+    let td3: Vec<i32> = vec_new();
+    vec_push(td3, 0); vec_push(td3, 0); vec_push(td3, 0);
+    if pty_root_to_type_tag(tt, td1, td2, td3, pp, 1, source, starts, ends, sn, en, tp, 0) != TY_PTR() { return 1; }
+    if pty_root_to_type_tag(tt, td1, td2, td3, pp, 2, source, starts, ends, sn, en, tp, 0) != TY_PTRMUT() { return 2; }
+    return 0;
+}
+
 fn test_named_only_ty_basic() -> i32 {
     let sn: Vec<i32> = vec_new();
     vec_push(sn, 7);
@@ -7376,5 +7422,7 @@ fn main() -> i32 {
     if r73 != 0 { return 760 + r73; }
     let r74: i32 = test_synth_expr_cast_non_ptr_still_ty_int();
     if r74 != 0 { return 770 + r74; }
+    let r75: i32 = test_pty_root_to_type_tag_ptr();
+    if r75 != 0 { return 780 + r75; }
     return 0;
 }

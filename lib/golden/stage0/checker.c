@@ -265,6 +265,7 @@ static int test_synth_expr_ptr_cast_const_from_mut_ref(void);
 static int test_synth_expr_ptr_cast_mut_from_mut_ref(void);
 static int test_synth_expr_ptr_cast_mut_from_shared_ref_rejected(void);
 static int test_synth_expr_cast_non_ptr_still_ty_int(void);
+static int test_pty_root_to_type_tag_ptr(void);
 static int test_named_only_ty_basic(void);
 
 static int BINOP_ARITH(void) {
@@ -2641,96 +2642,106 @@ static int pty_root_to_type_tag(int pty_tt, int pty_td1, int pty_td2, int pty_td
     return _sv0t9;
   } else {
   }
+  if ((tag == 8)) {
+    int _sv0t10 = TY_PTR();
+    return _sv0t10;
+  } else {
+  }
+  if ((tag == 9)) {
+    int _sv0t11 = TY_PTRMUT();
+    return _sv0t11;
+  } else {
+  }
   if ((tag == 0)) {
-    int _sv0t10 = sv0_vec_get(pty_td3, root);
-    if ((_sv0t10 > 0)) {
-      int _sv0t11 = TY_NAMED();
-      return _sv0t11;
+    int _sv0t12 = sv0_vec_get(pty_td3, root);
+    if ((_sv0t12 > 0)) {
+      int _sv0t13 = TY_NAMED();
+      return _sv0t13;
     } else {
     }
-    int _sv0t12 = sv0_vec_get(pty_td1, root);
-    int pps = _sv0t12;
-    int _sv0t13 = sv0_vec_get(pp, pps);
-    int tok = _sv0t13;
-    int _sv0t14 = sv0_vec_get(starts, tok);
-    int s = _sv0t14;
-    int _sv0t15 = sv0_vec_get(ends, tok);
-    int e = _sv0t15;
-    int _sv0t16 = (e - s);
-    const char* _sv0t17 = sv0_string_substr(source, s, _sv0t16);
+    int _sv0t14 = sv0_vec_get(pty_td1, root);
+    int pps = _sv0t14;
+    int _sv0t15 = sv0_vec_get(pp, pps);
+    int tok = _sv0t15;
+    int _sv0t16 = sv0_vec_get(starts, tok);
+    int s = _sv0t16;
+    int _sv0t17 = sv0_vec_get(ends, tok);
+    int e = _sv0t17;
+    int _sv0t18 = (e - s);
+    const char* _sv0t19 = sv0_string_substr(source, s, _sv0t18);
     const char* name;
-    name = _sv0t17;
-    int _sv0t18 = ast_type_name_to_tag(name);
-    int prim = _sv0t18;
+    name = _sv0t19;
+    int _sv0t20 = ast_type_name_to_tag(name);
+    int prim = _sv0t20;
     if ((prim >= 0)) {
       return prim;
     } else {
     }
     int ni = 0;
     while (1) {
-      int _sv0t19 = sv0_vec_len(struct_names);
-      int _sv0t27 = (ni < _sv0t19);
-      if ((!_sv0t27)) {
+      int _sv0t21 = sv0_vec_len(struct_names);
+      int _sv0t29 = (ni < _sv0t21);
+      if ((!_sv0t29)) {
         break;
       } else {
       }
-      int _sv0t20 = sv0_vec_get(struct_names, ni);
-      int sn = _sv0t20;
-      int _sv0t21 = sv0_vec_get(starts, sn);
-      int ss = _sv0t21;
-      int _sv0t22 = sv0_vec_get(ends, sn);
-      int se = _sv0t22;
-      int _sv0t23 = (se - ss);
-      const char* _sv0t24 = sv0_string_substr(source, ss, _sv0t23);
+      int _sv0t22 = sv0_vec_get(struct_names, ni);
+      int sn = _sv0t22;
+      int _sv0t23 = sv0_vec_get(starts, sn);
+      int ss = _sv0t23;
+      int _sv0t24 = sv0_vec_get(ends, sn);
+      int se = _sv0t24;
+      int _sv0t25 = (se - ss);
+      const char* _sv0t26 = sv0_string_substr(source, ss, _sv0t25);
       const char* sname;
-      sname = _sv0t24;
-      int _sv0t25 = sv0_string_eq(name, sname);
-      if (_sv0t25) {
-        int _sv0t26 = TY_STRUCT();
-        return _sv0t26;
+      sname = _sv0t26;
+      int _sv0t27 = sv0_string_eq(name, sname);
+      if (_sv0t27) {
+        int _sv0t28 = TY_STRUCT();
+        return _sv0t28;
       } else {
       }
       ni = (ni + 1);
     }
     int ei = 0;
     while (1) {
-      int _sv0t28 = sv0_vec_len(enum_names);
-      int _sv0t36 = (ei < _sv0t28);
-      if ((!_sv0t36)) {
+      int _sv0t30 = sv0_vec_len(enum_names);
+      int _sv0t38 = (ei < _sv0t30);
+      if ((!_sv0t38)) {
         break;
       } else {
       }
-      int _sv0t29 = sv0_vec_get(enum_names, ei);
-      int en_pos = _sv0t29;
-      int _sv0t30 = sv0_vec_get(starts, en_pos);
-      int es = _sv0t30;
-      int _sv0t31 = sv0_vec_get(ends, en_pos);
-      int ee = _sv0t31;
-      int _sv0t32 = (ee - es);
-      const char* _sv0t33 = sv0_string_substr(source, es, _sv0t32);
+      int _sv0t31 = sv0_vec_get(enum_names, ei);
+      int en_pos = _sv0t31;
+      int _sv0t32 = sv0_vec_get(starts, en_pos);
+      int es = _sv0t32;
+      int _sv0t33 = sv0_vec_get(ends, en_pos);
+      int ee = _sv0t33;
+      int _sv0t34 = (ee - es);
+      const char* _sv0t35 = sv0_string_substr(source, es, _sv0t34);
       const char* ename;
-      ename = _sv0t33;
-      int _sv0t34 = sv0_string_eq(name, ename);
-      if (_sv0t34) {
-        int _sv0t35 = TY_ENUM();
-        return _sv0t35;
+      ename = _sv0t35;
+      int _sv0t36 = sv0_string_eq(name, ename);
+      if (_sv0t36) {
+        int _sv0t37 = TY_ENUM();
+        return _sv0t37;
       } else {
       }
       ei = (ei + 1);
     }
-    int _sv0t37 = type_param_lookup_str(type_params, tp_limit, source, starts, ends, name);
-    int tp = _sv0t37;
+    int _sv0t39 = type_param_lookup_str(type_params, tp_limit, source, starts, ends, name);
+    int tp = _sv0t39;
     if ((tp >= 0)) {
-      int _sv0t38 = TY_VAR();
-      return _sv0t38;
+      int _sv0t40 = TY_VAR();
+      return _sv0t40;
     } else {
     }
-    int _sv0t39 = (0 - 1);
-    return _sv0t39;
+    int _sv0t41 = (0 - 1);
+    return _sv0t41;
   } else {
   }
-  int _sv0t40 = (0 - 1);
-  return _sv0t40;
+  int _sv0t42 = (0 - 1);
+  return _sv0t42;
 }
 
 static int scan_fn_param_type_tags_arena(int fn_param_ty_root, int pbase, int param_count, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit, int out_param_types) {
@@ -11865,6 +11876,59 @@ static int test_synth_expr_cast_non_ptr_still_ty_int(void) {
   return 0;
 }
 
+static int test_pty_root_to_type_tag_ptr(void) {
+  const char* source;
+  source = "i32";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 3);
+  int _sv0t2 = sv0_vec_new();
+  int pp = _sv0t2;
+  sv0_vec_push(pp, 0);
+  int _sv0t3 = sv0_vec_new();
+  int sn = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int en = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int tp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int tt = _sv0t6;
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(tt, 8);
+  sv0_vec_push(tt, 9);
+  int _sv0t7 = sv0_vec_new();
+  int td1 = _sv0t7;
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td1, 0);
+  sv0_vec_push(td1, 0);
+  int _sv0t8 = sv0_vec_new();
+  int td2 = _sv0t8;
+  sv0_vec_push(td2, 1);
+  sv0_vec_push(td2, 0);
+  sv0_vec_push(td2, 0);
+  int _sv0t9 = sv0_vec_new();
+  int td3 = _sv0t9;
+  sv0_vec_push(td3, 0);
+  sv0_vec_push(td3, 0);
+  sv0_vec_push(td3, 0);
+  int _sv0t10 = pty_root_to_type_tag(tt, td1, td2, td3, pp, 1, source, starts, ends, sn, en, tp, 0);
+  int _sv0t11 = TY_PTR();
+  if ((_sv0t10 != _sv0t11)) {
+    return 1;
+  } else {
+  }
+  int _sv0t12 = pty_root_to_type_tag(tt, td1, td2, td3, pp, 2, source, starts, ends, sn, en, tp, 0);
+  int _sv0t13 = TY_PTRMUT();
+  if ((_sv0t12 != _sv0t13)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
 static int test_named_only_ty_basic(void) {
   int _sv0t0 = sv0_vec_new();
   int sn = _sv0t0;
@@ -12435,6 +12499,13 @@ int main(void) {
   if ((r74 != 0)) {
     int _sv0t154 = (770 + r74);
     return _sv0t154;
+  } else {
+  }
+  int _sv0t155 = test_pty_root_to_type_tag_ptr();
+  int r75 = _sv0t155;
+  if ((r75 != 0)) {
+    int _sv0t156 = (780 + r75);
+    return _sv0t156;
   } else {
   }
   return 0;
