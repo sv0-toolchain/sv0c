@@ -757,6 +757,43 @@ fn parse_type(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         vec_push(ty_data3, 0);
         return p2;
     }
+    /* FFI-002 (task/sv0c-ffi-raw-pointer-abi.Rmd): raw pointer types
+       `*const T` / `*mut T` (sv0doc memory-model §8.4 / type-system §3.3).
+       Unlike `&T` there is no bare `*T` form -- a raw pointer always
+       names its mutability explicitly, so a `*` not immediately followed
+       by `const`/`mut` is a parse error here, not "not a type". Parser
+       syntax only for now: checker.sv0's resolve_field_ty_tag and
+       friends fall through to the -1 "unresolved" path for tags 8/9
+       until FFI-003 adds real checker support -- see ast.sv0's Ty::TyPtr
+       / Ty::TyPtrMut doc comment. */
+    if t == 24 {
+        let p1: i32 = pos + 1;
+        if ps_peek(tags, p1) == 58 {
+            let p2: i32 = parse_type(tags, starts, ends, source, p1 + 1,
+                                      ty_tags, ty_data1, ty_data2,
+                                      ty_data3, path_pool);
+            if p2 < 0 { return 0 - 1; }
+            let inner: i32 = vec_len(ty_tags) - 1;
+            vec_push(ty_tags, 8);
+            vec_push(ty_data1, inner);
+            vec_push(ty_data2, 0);
+            vec_push(ty_data3, 0);
+            return p2;
+        }
+        if ps_peek(tags, p1) == 77 {
+            let p2: i32 = parse_type(tags, starts, ends, source, p1 + 1,
+                                      ty_tags, ty_data1, ty_data2,
+                                      ty_data3, path_pool);
+            if p2 < 0 { return 0 - 1; }
+            let inner: i32 = vec_len(ty_tags) - 1;
+            vec_push(ty_tags, 9);
+            vec_push(ty_data1, inner);
+            vec_push(ty_data2, 0);
+            vec_push(ty_data3, 0);
+            return p2;
+        }
+        return 0 - 1;
+    }
     if t == 10 {
         let p1: i32 = pos + 1;
         let p2: i32 = parse_type(tags, starts, ends, source, p1,
@@ -4494,6 +4531,76 @@ fn test_parse_type_ref_mut() -> i32 {
     return 0;
 }
 
+fn test_parse_type_ptr_const() -> i32 {
+    let src: string = "*const i32";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 24); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 58); vec_push(starts, 1); vec_push(ends, 6);
+    vec_push(tags, 5); vec_push(starts, 7); vec_push(ends, 10);
+    vec_push(tags, 97); vec_push(starts, 10); vec_push(ends, 10);
+    let ty_tags: Vec<i32> = vec_new();
+    let ty_d1: Vec<i32> = vec_new();
+    let ty_d2: Vec<i32> = vec_new();
+    let ty_d3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_type(tags, starts, ends, src, 0,
+                             ty_tags, ty_d1, ty_d2, ty_d3, pp);
+    if p != 3 { return 1; }
+    if vec_len(ty_tags) != 2 { return 2; }
+    if vec_get(ty_tags, 0) != 0 { return 3; }
+    if vec_get(ty_tags, 1) != 8 { return 4; }
+    if vec_get(ty_d1, 1) != 0 { return 5; }
+    return 0;
+}
+
+fn test_parse_type_ptr_mut() -> i32 {
+    let src: string = "*mut i32";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 24); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 77); vec_push(starts, 1); vec_push(ends, 4);
+    vec_push(tags, 5); vec_push(starts, 5); vec_push(ends, 8);
+    vec_push(tags, 97); vec_push(starts, 8); vec_push(ends, 8);
+    let ty_tags: Vec<i32> = vec_new();
+    let ty_d1: Vec<i32> = vec_new();
+    let ty_d2: Vec<i32> = vec_new();
+    let ty_d3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_type(tags, starts, ends, src, 0,
+                             ty_tags, ty_d1, ty_d2, ty_d3, pp);
+    if p != 3 { return 1; }
+    if vec_len(ty_tags) != 2 { return 2; }
+    if vec_get(ty_tags, 0) != 0 { return 3; }
+    if vec_get(ty_tags, 1) != 9 { return 4; }
+    if vec_get(ty_d1, 1) != 0 { return 5; }
+    return 0;
+}
+
+/* FFI-002: a bare `*i32` (no const/mut) MUST be a parse error, never a
+   silently-accepted type -- unlike `&T`, raw pointers always name their
+   mutability explicitly (sv0doc). */
+fn test_parse_type_ptr_bare_star_rejected() -> i32 {
+    let src: string = "*i32";
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 24); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 5); vec_push(starts, 1); vec_push(ends, 4);
+    vec_push(tags, 97); vec_push(starts, 4); vec_push(ends, 4);
+    let ty_tags: Vec<i32> = vec_new();
+    let ty_d1: Vec<i32> = vec_new();
+    let ty_d2: Vec<i32> = vec_new();
+    let ty_d3: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_type(tags, starts, ends, src, 0,
+                             ty_tags, ty_d1, ty_d2, ty_d3, pp);
+    if p != (0 - 1) { return 1; }
+    return 0;
+}
+
 fn test_parse_type_slice() -> i32 {
     let src: string = "[i32]";
     let tags: Vec<i32> = vec_new();
@@ -6771,5 +6878,11 @@ fn main() -> i32 {
     if r74 != 0 { return 850 + r74; }
     let r75: i32 = test_parse_expr_index_range_bounded();
     if r75 != 0 { return 860 + r75; }
+    let r76: i32 = test_parse_type_ptr_const();
+    if r76 != 0 { return 870 + r76; }
+    let r77: i32 = test_parse_type_ptr_mut();
+    if r77 != 0 { return 880 + r77; }
+    let r78: i32 = test_parse_type_ptr_bare_star_rejected();
+    if r78 != 0 { return 890 + r78; }
     return 0;
 }

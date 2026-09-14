@@ -330,6 +330,20 @@ static int ty_tag(Ty t) {
                   return 7;
                   _sv0t0 = 0;
                 } else {
+                  if ((t.tag == 8)) {
+                    int inner = t.p0;
+                    int s = t.p1;
+                    return 8;
+                    _sv0t0 = 0;
+                  } else {
+                    if ((t.tag == 9)) {
+                      int inner = t.p0;
+                      int s = t.p1;
+                      return 9;
+                      _sv0t0 = 0;
+                    } else {
+                    }
+                  }
                 }
               }
             }

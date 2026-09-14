@@ -32,6 +32,12 @@ enum Ty {
     TyTuple(i32, i32),
     TyUnit(i32),
     TyInfer(i32),
+    /* FFI-002 (task/sv0c-ffi-raw-pointer-abi.Rmd): raw pointer types
+       `*const T` / `*mut T`. Parser-only for now -- resolve_field_ty_tag
+       and friends in checker.sv0 fall through to the -1 "unresolved"
+       path for these tags until FFI-003 lands real checker support. */
+    TyPtr(Box<Ty>, i32),
+    TyPtrMut(Box<Ty>, i32),
 }
 
 enum Pat {
@@ -202,6 +208,8 @@ fn ty_tag(t: Ty) -> i32 {
         Ty::TyTuple(ts, s) => { return 5; },
         Ty::TyUnit(s) => { return 6; },
         Ty::TyInfer(s) => { return 7; },
+        Ty::TyPtr(inner, s) => { return 8; },
+        Ty::TyPtrMut(inner, s) => { return 9; },
     }
 }
 
