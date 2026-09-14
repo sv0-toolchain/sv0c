@@ -2022,11 +2022,24 @@ fn parse_cast_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 let tsegc: i32 = vec_get(ty_d2, ty_root);
                 if tsegc > 0 { tyname_tok = vec_get(pp, vec_get(ty_d1, ty_root) + tsegc - 1); }
             }
+            /* FFI-003b (task/sv0c-ffi-raw-pointer-abi.Rmd): same transient-arena
+               problem as M4-S-034 above, same fix shape -- the checker cannot
+               thread the (discarded) type arena down to synth_expr without a
+               much larger refactor (73 recursive call sites; see the doc's
+               FFI-003 addendum), so record just the ONE bit synth_expr actually
+               needs -- "is this cast's target Ty::TyPtr (8) or Ty::TyPtrMut (9)"
+               -- directly in the otherwise-always-0 ed4 slot. 0 = not a pointer
+               cast (preserves every existing cast's behavior exactly), 1 =
+               `as *const T`, 2 = `as *mut T`. Checked: no other pass
+               (lowering.sv0, verify_vcgen.sv0) reads ed4 for tag 20 today. */
+            let mut ptr_cast_kind: i32 = 0;
+            if vec_get(ty_tags, ty_root) == 8 { ptr_cast_kind = 1; }
+            if vec_get(ty_tags, ty_root) == 9 { ptr_cast_kind = 2; }
             vec_push(et, 20);
             vec_push(ed1, cur);
             vec_push(ed2, ty_idx);
             vec_push(ed3, tyname_tok);
-            vec_push(ed4, 0);
+            vec_push(ed4, ptr_cast_kind);
             cur = vec_len(et) - 1;
             p = pt;
         } else {
@@ -5479,6 +5492,87 @@ fn test_parse_expr_cast() -> i32 {
     return 0;
 }
 
+/* FFI-003b (task/sv0c-ffi-raw-pointer-abi.Rmd): `&x as *const i32` records
+   ed4=1 on the ExprCast node (the pointer-cast marker synth_expr reads --
+   see checker.sv0's tag==20 handling) even though the type arena that
+   produced it is transient and discarded right after this call returns. */
+fn test_parse_expr_cast_ptr_const() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 27); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 5); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 54); vec_push(starts, 3); vec_push(ends, 5);
+    vec_push(tags, 24); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tags, 58); vec_push(starts, 7); vec_push(ends, 12);
+    vec_push(tags, 5); vec_push(starts, 13); vec_push(ends, 16);
+    vec_push(tags, 97); vec_push(starts, 16); vec_push(ends, 16);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "&x as *const i32", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 6 { return 1; }
+    if vec_len(et) != 3 { return 2; }
+    if vec_get(et, 2) != 20 { return 3; }
+    if vec_get(ed4, 2) != 1 { return 4; }
+    return 0;
+}
+
+fn test_parse_expr_cast_ptr_mut() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 27); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 77); vec_push(starts, 1); vec_push(ends, 4);
+    vec_push(tags, 5); vec_push(starts, 5); vec_push(ends, 6);
+    vec_push(tags, 54); vec_push(starts, 7); vec_push(ends, 9);
+    vec_push(tags, 24); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 77); vec_push(starts, 11); vec_push(ends, 14);
+    vec_push(tags, 5); vec_push(starts, 15); vec_push(ends, 18);
+    vec_push(tags, 97); vec_push(starts, 18); vec_push(ends, 18);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "&mut x as *mut i32", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 7 { return 1; }
+    if vec_len(et) != 3 { return 2; }
+    if vec_get(et, 2) != 20 { return 3; }
+    if vec_get(ed4, 2) != 2 { return 4; }
+    return 0;
+}
+
+/* Non-pointer casts must keep ed4 == 0 exactly as before -- no regression
+   for the "simplified" TY_INT() cast path every existing program uses. */
+fn test_parse_expr_cast_non_ptr_unaffected() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tags, 0); vec_push(starts, 0); vec_push(ends, 2);
+    vec_push(tags, 54); vec_push(starts, 3); vec_push(ends, 5);
+    vec_push(tags, 5); vec_push(starts, 6); vec_push(ends, 9);
+    vec_push(tags, 97); vec_push(starts, 9); vec_push(ends, 9);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let p: i32 = parse_expr(tags, starts, ends, "42 as i32", 0,
+                             et, ed1, ed2, ed3, ed4, pp, 1);
+    if p != 3 { return 1; }
+    if vec_get(et, 1) != 20 { return 2; }
+    if vec_get(ed4, 1) != 0 { return 3; }
+    return 0;
+}
+
 fn test_parse_expr_precedence() -> i32 {
     let tags: Vec<i32> = vec_new();
     let starts: Vec<i32> = vec_new();
@@ -6884,5 +6978,11 @@ fn main() -> i32 {
     if r77 != 0 { return 880 + r77; }
     let r78: i32 = test_parse_type_ptr_bare_star_rejected();
     if r78 != 0 { return 890 + r78; }
+    let r79: i32 = test_parse_expr_cast_ptr_const();
+    if r79 != 0 { return 900 + r79; }
+    let r80: i32 = test_parse_expr_cast_ptr_mut();
+    if r80 != 0 { return 910 + r80; }
+    let r81: i32 = test_parse_expr_cast_non_ptr_unaffected();
+    if r81 != 0 { return 920 + r81; }
     return 0;
 }
