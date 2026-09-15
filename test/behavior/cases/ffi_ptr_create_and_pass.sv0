@@ -1,0 +1,16 @@
+/* FFI-004b: `let`-bound raw pointers and the `as *const/mut T` cast itself
+   now lower to real C pointer types (DeclPtr), not the int-erasure every
+   other cast still gets -- confirmed a hard Clang compile failure before
+   this fix (FFI-004's own addendum). A real pointer is created, stored in
+   a local, and passed to another function across a real call boundary.
+   Exits 7. */
+fn use_ptr(p: *const i32) -> i32 {
+    let q: *const i32 = p;
+    if q == p { return 7; }
+    return 0;
+}
+fn main() -> i32 {
+    let x: i32 = 5;
+    let p: *const i32 = &x as *const i32;
+    return use_ptr(p);
+}

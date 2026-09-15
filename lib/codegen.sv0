@@ -253,6 +253,9 @@ enum Instr {
     Ensures(Box<Expr>, i32),
     ReturnVoid,
     ReturnVal(Box<Value>),
+    /* FFI-004b: mirrors lowering.sv0's Instr::DeclPtr exactly (kept in
+       lockstep, same shape as DeclNamed already is). */
+    DeclPtr(i32, i32, i32),
 }
 
 fn instr_tag(ins: Instr) -> i32 {
@@ -273,6 +276,7 @@ fn instr_tag(ins: Instr) -> i32 {
         Instr::Ensures(be, fh) => { return 13; },
         Instr::ReturnVoid => { return 14; },
         Instr::ReturnVal(bv) => { return 15; },
+        Instr::DeclPtr(inner, kind, h) => { return 16; },
     }
 }
 
@@ -422,6 +426,14 @@ fn emit_instr(indent: string, ret_ty: string, ins: Instr) -> string {
             let a: string = string_concat(indent, "return ");
             let b: string = string_concat(a, emit_value(v));
             return string_concat(b, ";\n");
+        },
+        Instr::DeclPtr(inner, kind, h) => {
+            let mut a: string = indent;
+            if kind == 1 { a = string_concat(a, "const "); }
+            let b: string = string_concat(a, name_of(inner));
+            let c: string = string_concat(b, " * ");
+            let d: string = string_concat(c, name_of(h));
+            return string_concat(d, ";\n");
         },
     }
     return "";
@@ -716,6 +728,22 @@ fn test_instr_declnamed() -> i32 {
     let ins: Instr = Instr::DeclNamed(9, 4);
     let s: string = emit_instr("  ", "int", ins);
     if !string_eq(s, "  int tmp;\n") { return 1; }
+    return 0;
+}
+
+/* FFI-004b: DeclPtr(inner, kind, h) -- kind 1 = `*const T` (const-prefixed),
+   kind 2 = `*mut T` (no const). */
+fn test_instr_declptr_const() -> i32 {
+    let ins: Instr = Instr::DeclPtr(9, 1, 4);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  const int * tmp;\n") { return 1; }
+    return 0;
+}
+
+fn test_instr_declptr_mut() -> i32 {
+    let ins: Instr = Instr::DeclPtr(9, 2, 4);
+    let s: string = emit_instr("  ", "int", ins);
+    if !string_eq(s, "  int * tmp;\n") { return 1; }
     return 0;
 }
 
@@ -1248,5 +1276,11 @@ fn main() -> i32 {
     let r42: i32 = test_split_main_index();
     if r42 != 0 { return 410 + r42; }
     println("PASS test_split_main_index");
+    let r43: i32 = test_instr_declptr_const();
+    if r43 != 0 { return 420 + r43; }
+    println("PASS test_instr_declptr_const");
+    let r44: i32 = test_instr_declptr_mut();
+    if r44 != 0 { return 430 + r44; }
+    println("PASS test_instr_declptr_mut");
     return 0;
 }

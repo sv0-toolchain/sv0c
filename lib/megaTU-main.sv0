@@ -1993,6 +1993,16 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let b: string = string_concat(a, megatu_emit_value(v, source, starts, ends, sidx));
             return string_concat(b, ";\n");
         },
+        codegen_Instr::DeclPtr(inner, kind, h) => {
+            let base_cty: string = megatu_ty_name(inner, source, starts, ends);
+            let mut cty: string = string_concat(base_cty, " *");
+            if kind == 1 { cty = string_concat("const ", cty); }
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, megatu_cty_category(cty), 0 - 1, 0 - 1);
+            let a2: string = string_concat(indent, cty);
+            let b2: string = string_concat(a2, " ");
+            let c2: string = string_concat(b2, megatu_val_name(h, source, starts, ends, sidx));
+            return string_concat(c2, ";\n");
+        },
     }
     return "";
 }

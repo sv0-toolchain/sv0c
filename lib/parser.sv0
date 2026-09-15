@@ -2022,6 +2022,30 @@ fn parse_cast_expr(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                 let tsegc: i32 = vec_get(ty_d2, ty_root);
                 if tsegc > 0 { tyname_tok = vec_get(pp, vec_get(ty_d1, ty_root) + tsegc - 1); }
             }
+            /* FFI-004b: same transient-arena extraction, one level deeper --
+               for `as *const T`/`as *mut T` (ty_root tag 8/9), ed3 above
+               stayed -1 (the TyName check only matches the pointer node
+               itself, tag 8/9, never its pointee). The pointee's own name
+               token is what lowering.sv0 needs to emit a real `T *` cast
+               temp, so recurse one level into ty_d1[ty_root] (the pointee
+               root) and extract ITS name token when it too is a plain
+               TyName -- matching scope decision 2's "minimal" pointer
+               surface (`*const T`/`*mut T` with T a simple named type, no
+               pointer-to-pointer). */
+            if vec_get(ty_tags, ty_root) == 8 {
+                let pte0: i32 = vec_get(ty_d1, ty_root);
+                if vec_get(ty_tags, pte0) == 0 {
+                    let psegc0: i32 = vec_get(ty_d2, pte0);
+                    if psegc0 > 0 { tyname_tok = vec_get(pp, vec_get(ty_d1, pte0) + psegc0 - 1); }
+                }
+            }
+            if vec_get(ty_tags, ty_root) == 9 {
+                let pte1: i32 = vec_get(ty_d1, ty_root);
+                if vec_get(ty_tags, pte1) == 0 {
+                    let psegc1: i32 = vec_get(ty_d2, pte1);
+                    if psegc1 > 0 { tyname_tok = vec_get(pp, vec_get(ty_d1, pte1) + psegc1 - 1); }
+                }
+            }
             /* FFI-003b (task/sv0c-ffi-raw-pointer-abi.Rmd): same transient-arena
                problem as M4-S-034 above, same fix shape -- the checker cannot
                thread the (discarded) type arena down to synth_expr without a
@@ -5519,6 +5543,11 @@ fn test_parse_expr_cast_ptr_const() -> i32 {
     if vec_len(et) != 3 { return 2; }
     if vec_get(et, 2) != 20 { return 3; }
     if vec_get(ed4, 2) != 1 { return 4; }
+    /* FFI-004b: ed3 now also carries the pointee's name token (index 5,
+       "i32") for a pointer-target cast -- previously stayed -1 since the
+       TyName check only matched the cast's own root (tag 8, TyPtr), never
+       its pointee. */
+    if vec_get(ed3, 2) != 5 { return 5; }
     return 0;
 }
 
@@ -5546,6 +5575,8 @@ fn test_parse_expr_cast_ptr_mut() -> i32 {
     if vec_len(et) != 3 { return 2; }
     if vec_get(et, 2) != 20 { return 3; }
     if vec_get(ed4, 2) != 2 { return 4; }
+    /* FFI-004b: ed3 carries the pointee's name token (index 6, "i32"). */
+    if vec_get(ed3, 2) != 6 { return 5; }
     return 0;
 }
 

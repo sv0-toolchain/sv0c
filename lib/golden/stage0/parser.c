@@ -3467,14 +3467,54 @@ static int parse_cast_expr(int tags, int starts, int ends, const char* source, i
         }
       } else {
       }
-      int ptr_cast_kind = 0;
       int _sv0t15 = sv0_vec_get(ty_tags, ty_root);
       if ((_sv0t15 == 8)) {
+        int _sv0t16 = sv0_vec_get(ty_d1, ty_root);
+        int pte0 = _sv0t16;
+        int _sv0t17 = sv0_vec_get(ty_tags, pte0);
+        if ((_sv0t17 == 0)) {
+          int _sv0t18 = sv0_vec_get(ty_d2, pte0);
+          int psegc0 = _sv0t18;
+          if ((psegc0 > 0)) {
+            int _sv0t19 = sv0_vec_get(ty_d1, pte0);
+            int _sv0t20 = (_sv0t19 + psegc0);
+            int _sv0t21 = (_sv0t20 - 1);
+            int _sv0t22 = sv0_vec_get(pp, _sv0t21);
+            tyname_tok = _sv0t22;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+      int _sv0t23 = sv0_vec_get(ty_tags, ty_root);
+      if ((_sv0t23 == 9)) {
+        int _sv0t24 = sv0_vec_get(ty_d1, ty_root);
+        int pte1 = _sv0t24;
+        int _sv0t25 = sv0_vec_get(ty_tags, pte1);
+        if ((_sv0t25 == 0)) {
+          int _sv0t26 = sv0_vec_get(ty_d2, pte1);
+          int psegc1 = _sv0t26;
+          if ((psegc1 > 0)) {
+            int _sv0t27 = sv0_vec_get(ty_d1, pte1);
+            int _sv0t28 = (_sv0t27 + psegc1);
+            int _sv0t29 = (_sv0t28 - 1);
+            int _sv0t30 = sv0_vec_get(pp, _sv0t29);
+            tyname_tok = _sv0t30;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+      int ptr_cast_kind = 0;
+      int _sv0t31 = sv0_vec_get(ty_tags, ty_root);
+      if ((_sv0t31 == 8)) {
         ptr_cast_kind = 1;
       } else {
       }
-      int _sv0t16 = sv0_vec_get(ty_tags, ty_root);
-      if ((_sv0t16 == 9)) {
+      int _sv0t32 = sv0_vec_get(ty_tags, ty_root);
+      if ((_sv0t32 == 9)) {
         ptr_cast_kind = 2;
       } else {
       }
@@ -3483,8 +3523,8 @@ static int parse_cast_expr(int tags, int starts, int ends, const char* source, i
       sv0_vec_push(ed2, ty_idx);
       sv0_vec_push(ed3, tyname_tok);
       sv0_vec_push(ed4, ptr_cast_kind);
-      int _sv0t17 = sv0_vec_len(et);
-      cur = (_sv0t17 - 1);
+      int _sv0t33 = sv0_vec_len(et);
+      cur = (_sv0t33 - 1);
       p = pt;
     } else {
       done = 1;
@@ -9625,6 +9665,11 @@ static int test_parse_expr_cast_ptr_const(void) {
     return 4;
   } else {
   }
+  int _sv0t13 = sv0_vec_get(ed3, 2);
+  if ((_sv0t13 != 5)) {
+    return 5;
+  } else {
+  }
   return 0;
 }
 
@@ -9690,6 +9735,11 @@ static int test_parse_expr_cast_ptr_mut(void) {
   int _sv0t12 = sv0_vec_get(ed4, 2);
   if ((_sv0t12 != 2)) {
     return 4;
+  } else {
+  }
+  int _sv0t13 = sv0_vec_get(ed3, 2);
+  if ((_sv0t13 != 6)) {
+    return 5;
   } else {
   }
   return 0;

@@ -106,6 +106,13 @@ enum Instr {
     Ensures(Box<Expr>, i32),
     ReturnVoid,
     ReturnVal(Box<Value>),
+    /* FFI-004b: declare a raw-pointer-typed C local (`T *`/`const T *`),
+       used for `let`-bound pointer annotations and the `as *const/mut T`
+       cast temp -- DeclNamed's single-token ctype can't represent a
+       compound "pointer to X" string. inner_name_tok = the pointee's
+       primitive/user-type name token; ptr_kind = 1 (`*const T`) or 2
+       (`*mut T`); h = the declared variable/temp's own handle. */
+    DeclPtr(i32, i32, i32),
 }
 
 fn ir_value_tag(v: Value) -> i32 {
@@ -151,6 +158,7 @@ fn ir_instr_tag(ins: Instr) -> i32 {
         Instr::Ensures(_, _) => { return 13; },
         Instr::ReturnVoid => { return 14; },
         Instr::ReturnVal(_) => { return 15; },
+        Instr::DeclPtr(_, _, _) => { return 16; },
     }
 }
 
@@ -615,6 +623,15 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                after the init — not up front. Mirrors lower_stmt's fn-body path. */
             let mut deferred_ty: i32 = 0 - 1;
             let mut has_deferred_decl: i32 = 0;
+            /* FFI-004b: `let x: *const T = ..;`/`*mut T` -- deferred_ty (a
+               single token) can't represent a compound pointer type, so a
+               separate deferred slot pairs with the new DeclPtr instr.
+               deferred_ptr_inner is T's own name token; deferred_ptr_kind
+               is 1 (`*const`) or 2 (`*mut`). Checked ahead of the
+               is_wide_primitive_ty_name scan below since a `*` annotation
+               never matches a primitive name anyway. */
+            let mut deferred_ptr_inner: i32 = 0 - 1;
+            let mut deferred_ptr_kind: i32 = 0;
             if init_idx >= 0 {
                 /* Struct-literal / enum-ctor lets CONSTRUCT DIRECTLY into the let
                    var (mirrors lower_stmt's fn-body path), not into a fresh temp
@@ -783,14 +800,37 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                    excluded (is_wide_primitive_ty_name) and keep using the
                    existing DeclVar path unchanged — that default is already
                    correct for them. BUGS.md #7, sv0-mathlib. */
+                /* `let x: *const T = ..;`/`*mut T` (FFI-004b) — a raw-pointer
+                   annotation's leading token is `*` (STAR, tag 24), never a
+                   primitive name, so this is checked first and skips the
+                   is_wide_primitive_ty_name scan below on a match (the
+                   const/mut token follows at +1, T's own name token at +2 —
+                   mirrors parse_type's own `*const T`/`*mut T` grammar). */
                 if let_declared == 0 {
-                    let ann_tok_lb: i32 = vec_get(ed2, s_idx);
-                    if ann_tok_lb >= 0 {
-                        if lower_tok_in_bounds(ann_tok_lb, starts, ends) {
-                            let ann_name_lb: string = handle_to_str(ann_tok_lb, source, starts, ends);
-                            if is_wide_primitive_ty_name(ann_name_lb) {
-                                deferred_ty = ann_tok_lb;
-                                has_deferred_decl = 1;
+                    let ann_tok_lbp: i32 = vec_get(ed2, s_idx);
+                    if ann_tok_lbp >= 0 {
+                        if lower_tok_in_bounds(ann_tok_lbp, starts, ends) {
+                            if vec_get(tok_tags, ann_tok_lbp) == 24 {
+                                let kind_tag_lb: i32 = vec_get(tok_tags, ann_tok_lbp + 1);
+                                if kind_tag_lb == 58 { deferred_ptr_kind = 1; }
+                                if kind_tag_lb == 77 { deferred_ptr_kind = 2; }
+                                if deferred_ptr_kind != 0 {
+                                    deferred_ptr_inner = ann_tok_lbp + 2;
+                                }
+                            }
+                        }
+                    }
+                }
+                if let_declared == 0 {
+                    if deferred_ptr_kind == 0 {
+                        let ann_tok_lb: i32 = vec_get(ed2, s_idx);
+                        if ann_tok_lb >= 0 {
+                            if lower_tok_in_bounds(ann_tok_lb, starts, ends) {
+                                let ann_name_lb: string = handle_to_str(ann_tok_lb, source, starts, ends);
+                                if is_wide_primitive_ty_name(ann_name_lb) {
+                                    deferred_ty = ann_tok_lb;
+                                    has_deferred_decl = 1;
+                                }
                             }
                         }
                     }
@@ -817,19 +857,27 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                          enum_tag_offsets,
                                                          enum_tag_counts,
                                                          enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-                    if has_deferred_decl == 1 {
-                        vec_push(out_instrs, box_new(Instr::DeclNamed(deferred_ty, name_tok)));
+                    if deferred_ptr_kind != 0 {
+                        vec_push(out_instrs, box_new(Instr::DeclPtr(deferred_ptr_inner, deferred_ptr_kind, name_tok)));
                     } else {
-                        if let_declared == 0 {
-                            vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                        if has_deferred_decl == 1 {
+                            vec_push(out_instrs, box_new(Instr::DeclNamed(deferred_ty, name_tok)));
+                        } else {
+                            if let_declared == 0 {
+                                vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                            }
                         }
                     }
                     let asgn: Instr = Instr::Store(name_tok, box_new(e));
                     vec_push(out_instrs, box_new(asgn));
                 }
             } else {
-                if let_declared == 0 {
-                    vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                if deferred_ptr_kind != 0 {
+                    vec_push(out_instrs, box_new(Instr::DeclPtr(deferred_ptr_inner, deferred_ptr_kind, name_tok)));
+                } else {
+                    if let_declared == 0 {
+                        vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                    }
                 }
             }
         }
@@ -1854,6 +1902,26 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_offsets, enum_tag_counts,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         let ct2: i32 = ctr_fresh(ctr);
+        /* FFI-004b: a pointer cast (ed4 marker 1/2, set by parse_cast_expr
+           for `as *const T`/`as *mut T`) declares its temp as a real C
+           pointer (DeclPtr) instead of falling into the generic
+           Assign-always-int path every other cast still uses below --
+           ed3 carries the pointee's name token (also extracted at parse
+           time, FFI-004b). `cv` is always Value::VAddrOf(x) here (the
+           checker requires the cast source to synthesize as TY_REF/
+           TY_REFMUT, which lower_expr_to_value's tag==2 Borrow/BorrowMut
+           case already returns as VAddrOf directly, never a spilled int
+           temp), so the Store below emits a real `&x` into a real `T *`
+           slot -- no explicit C cast needed (a plain pointer converts to
+           a const-qualified pointer to the same type implicitly in C). */
+        let ptr_cast_kind: i32 = vec_get(ed4, idx);
+        if ptr_cast_kind != 0 {
+            let inner_tok: i32 = vec_get(ed3, idx);
+            vec_push(out_instrs, box_new(Instr::DeclPtr(inner_tok, ptr_cast_kind, ct2)));
+            let store_e: Expr = Expr::Unop(99, box_new(cv));
+            vec_push(out_instrs, box_new(Instr::Store(ct2, box_new(store_e))));
+            return Value::VVar(ct2);
+        }
         let cast_e: Expr = Expr::Unop(99, box_new(cv));
         let cast_i: Instr = Instr::Assign(ct2, box_new(cast_e));
         vec_push(out_instrs, box_new(cast_i));
@@ -3482,6 +3550,10 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
            so a separate flag marks whether a deferral was requested. */
         let mut deferred_ty: i32 = 0 - 1;
         let mut has_deferred_decl: i32 = 0;
+        /* FFI-004b: mirrors lower_tag_block's identical deferred_ptr_*
+           pair (nested blocks) -- see that copy's comment. */
+        let mut deferred_ptr_inner: i32 = 0 - 1;
+        let mut deferred_ptr_kind: i32 = 0;
         /* str_let: this let binds a string; its name joins str_locals so later
            `let y = x` aliases resolve to const char* too. */
         let mut str_let: i32 = 0;
@@ -3703,11 +3775,32 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     init_handled = 1;
                 }
             }
+            /* `let x: *const T = ..;`/`*mut T` (FFI-004b) — mirrors the
+               identical detection in lower_tag_block (nested blocks); see
+               that copy's comment. Checked first, ahead of the wide-
+               primitive scan below, since a `*` annotation never matches
+               a primitive name. */
+            if let_declared == 0 {
+                let ann_tok_lsp: i32 = vec_get(ed2, s_idx);
+                if ann_tok_lsp >= 0 {
+                    if lower_tok_in_bounds(ann_tok_lsp, starts, ends) {
+                        if vec_get(tok_tags, ann_tok_lsp) == 24 {
+                            let kind_tag_ls: i32 = vec_get(tok_tags, ann_tok_lsp + 1);
+                            if kind_tag_ls == 58 { deferred_ptr_kind = 1; }
+                            if kind_tag_ls == 77 { deferred_ptr_kind = 2; }
+                            if deferred_ptr_kind != 0 {
+                                deferred_ptr_inner = ann_tok_lsp + 2;
+                            }
+                        }
+                    }
+                }
+            }
             /* `let x: <i64/u64/u32/f32/f64/...> = <anything not already
                special-cased above>;` — mirrors the identical fix in
                lower_tag_block (nested blocks); see that copy's comment and
                BUGS.md #7, sv0-mathlib, for the full rationale. */
             if let_declared == 0 {
+              if deferred_ptr_kind == 0 {
                 let ann_tok_ls: i32 = vec_get(ed2, s_idx);
                 if ann_tok_ls >= 0 {
                     if lower_tok_in_bounds(ann_tok_ls, starts, ends) {
@@ -3718,6 +3811,7 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         }
                     }
                 }
+              }
             }
         }
         if str_let == 1 {
@@ -3736,19 +3830,27 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                        enum_tag_offsets,
                                                        enum_tag_counts,
                                                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-                if has_deferred_decl == 1 {
-                    vec_push(out_instrs, box_new(Instr::DeclNamed(deferred_ty, name_tok)));
+                if deferred_ptr_kind != 0 {
+                    vec_push(out_instrs, box_new(Instr::DeclPtr(deferred_ptr_inner, deferred_ptr_kind, name_tok)));
                 } else {
-                    if let_declared == 0 {
-                        vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                    if has_deferred_decl == 1 {
+                        vec_push(out_instrs, box_new(Instr::DeclNamed(deferred_ty, name_tok)));
+                    } else {
+                        if let_declared == 0 {
+                            vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                        }
                     }
                 }
                 let si: Instr = Instr::Store(name_tok, box_new(e));
                 vec_push(out_instrs, box_new(si));
             }
         } else {
-            if let_declared == 0 {
-                vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+            if deferred_ptr_kind != 0 {
+                vec_push(out_instrs, box_new(Instr::DeclPtr(deferred_ptr_inner, deferred_ptr_kind, name_tok)));
+            } else {
+                if let_declared == 0 {
+                    vec_push(out_instrs, box_new(Instr::DeclVar(name_tok)));
+                }
             }
         }
         return 0;

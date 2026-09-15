@@ -63,6 +63,8 @@ static int test_emit_expr_field(void);
 static int test_instr_nop(void);
 static int test_instr_declvar(void);
 static int test_instr_declnamed(void);
+static int test_instr_declptr_const(void);
+static int test_instr_declptr_mut(void);
 static int test_instr_assign(void);
 static int test_instr_store(void);
 static int test_instr_storefield(void);
@@ -764,6 +766,14 @@ static int instr_tag(Instr ins) {
                                   return 15;
                                   _sv0t0 = 0;
                                 } else {
+                                  if ((ins.tag == 16)) {
+                                    int inner = ins.p0;
+                                    int kind = ins.p1;
+                                    int h = ins.p2;
+                                    return 16;
+                                    _sv0t0 = 0;
+                                  } else {
+                                  }
                                 }
                               }
                             }
@@ -882,262 +892,262 @@ static const char* emit_instr(const char* indent, const char* ret_ty, Instr ins)
   } else {
     if ((ins.tag == 1)) {
       int h = ins.p0;
-      const char* _sv0t121 = sv0_string_concat(indent, "int ");
+      const char* _sv0t128 = sv0_string_concat(indent, "int ");
       const char* a;
-      a = _sv0t121;
-      const char* _sv0t122 = name_of(h);
-      const char* _sv0t123 = sv0_string_concat(a, _sv0t122);
+      a = _sv0t128;
+      const char* _sv0t129 = name_of(h);
+      const char* _sv0t130 = sv0_string_concat(a, _sv0t129);
       const char* b;
-      b = _sv0t123;
-      const char* _sv0t124 = sv0_string_concat(b, ";\n");
-      return _sv0t124;
+      b = _sv0t130;
+      const char* _sv0t131 = sv0_string_concat(b, ";\n");
+      return _sv0t131;
       _sv0t0 = 0;
     } else {
       if ((ins.tag == 2)) {
         int ct = ins.p0;
         int h = ins.p1;
-        const char* _sv0t115 = name_of(ct);
-        const char* _sv0t116 = sv0_string_concat(indent, _sv0t115);
+        const char* _sv0t122 = name_of(ct);
+        const char* _sv0t123 = sv0_string_concat(indent, _sv0t122);
         const char* a;
-        a = _sv0t116;
-        const char* _sv0t117 = sv0_string_concat(a, " ");
+        a = _sv0t123;
+        const char* _sv0t124 = sv0_string_concat(a, " ");
         const char* b;
-        b = _sv0t117;
-        const char* _sv0t118 = name_of(h);
-        const char* _sv0t119 = sv0_string_concat(b, _sv0t118);
+        b = _sv0t124;
+        const char* _sv0t125 = name_of(h);
+        const char* _sv0t126 = sv0_string_concat(b, _sv0t125);
         const char* c;
-        c = _sv0t119;
-        const char* _sv0t120 = sv0_string_concat(c, ";\n");
-        return _sv0t120;
+        c = _sv0t126;
+        const char* _sv0t127 = sv0_string_concat(c, ";\n");
+        return _sv0t127;
         _sv0t0 = 0;
       } else {
         if ((ins.tag == 3)) {
           int h = ins.p0;
           int be = ins.p1;
-          Expr _sv0t103;
-          int _sv0t104 = sv0_box_load(be, 0);
-          _sv0t103.tag = _sv0t104;
-          int _sv0t105 = sv0_box_load(be, 1);
-          _sv0t103.p0 = _sv0t105;
-          int _sv0t106 = sv0_box_load(be, 2);
-          _sv0t103.p1 = _sv0t106;
-          int _sv0t107 = sv0_box_load(be, 3);
-          _sv0t103.p2 = _sv0t107;
+          Expr _sv0t110;
+          int _sv0t111 = sv0_box_load(be, 0);
+          _sv0t110.tag = _sv0t111;
+          int _sv0t112 = sv0_box_load(be, 1);
+          _sv0t110.p0 = _sv0t112;
+          int _sv0t113 = sv0_box_load(be, 2);
+          _sv0t110.p1 = _sv0t113;
+          int _sv0t114 = sv0_box_load(be, 3);
+          _sv0t110.p2 = _sv0t114;
           Expr e;
-          e.tag = (_sv0t103).tag;
-          e.p0 = (_sv0t103).p0;
-          e.p1 = (_sv0t103).p1;
-          e.p2 = (_sv0t103).p2;
-          const char* _sv0t108 = sv0_string_concat(indent, "int ");
+          e.tag = (_sv0t110).tag;
+          e.p0 = (_sv0t110).p0;
+          e.p1 = (_sv0t110).p1;
+          e.p2 = (_sv0t110).p2;
+          const char* _sv0t115 = sv0_string_concat(indent, "int ");
           const char* a;
-          a = _sv0t108;
-          const char* _sv0t109 = name_of(h);
-          const char* _sv0t110 = sv0_string_concat(a, _sv0t109);
+          a = _sv0t115;
+          const char* _sv0t116 = name_of(h);
+          const char* _sv0t117 = sv0_string_concat(a, _sv0t116);
           const char* b;
-          b = _sv0t110;
-          const char* _sv0t111 = sv0_string_concat(b, " = ");
+          b = _sv0t117;
+          const char* _sv0t118 = sv0_string_concat(b, " = ");
           const char* c;
-          c = _sv0t111;
-          const char* _sv0t112 = emit_expr(e);
-          const char* _sv0t113 = sv0_string_concat(c, _sv0t112);
+          c = _sv0t118;
+          const char* _sv0t119 = emit_expr(e);
+          const char* _sv0t120 = sv0_string_concat(c, _sv0t119);
           const char* d;
-          d = _sv0t113;
-          const char* _sv0t114 = sv0_string_concat(d, ";\n");
-          return _sv0t114;
+          d = _sv0t120;
+          const char* _sv0t121 = sv0_string_concat(d, ";\n");
+          return _sv0t121;
           _sv0t0 = 0;
         } else {
           if ((ins.tag == 4)) {
             int h = ins.p0;
             int be = ins.p1;
-            Expr _sv0t92;
-            int _sv0t93 = sv0_box_load(be, 0);
-            _sv0t92.tag = _sv0t93;
-            int _sv0t94 = sv0_box_load(be, 1);
-            _sv0t92.p0 = _sv0t94;
-            int _sv0t95 = sv0_box_load(be, 2);
-            _sv0t92.p1 = _sv0t95;
-            int _sv0t96 = sv0_box_load(be, 3);
-            _sv0t92.p2 = _sv0t96;
+            Expr _sv0t99;
+            int _sv0t100 = sv0_box_load(be, 0);
+            _sv0t99.tag = _sv0t100;
+            int _sv0t101 = sv0_box_load(be, 1);
+            _sv0t99.p0 = _sv0t101;
+            int _sv0t102 = sv0_box_load(be, 2);
+            _sv0t99.p1 = _sv0t102;
+            int _sv0t103 = sv0_box_load(be, 3);
+            _sv0t99.p2 = _sv0t103;
             Expr e;
-            e.tag = (_sv0t92).tag;
-            e.p0 = (_sv0t92).p0;
-            e.p1 = (_sv0t92).p1;
-            e.p2 = (_sv0t92).p2;
-            const char* _sv0t97 = name_of(h);
-            const char* _sv0t98 = sv0_string_concat(indent, _sv0t97);
+            e.tag = (_sv0t99).tag;
+            e.p0 = (_sv0t99).p0;
+            e.p1 = (_sv0t99).p1;
+            e.p2 = (_sv0t99).p2;
+            const char* _sv0t104 = name_of(h);
+            const char* _sv0t105 = sv0_string_concat(indent, _sv0t104);
             const char* a;
-            a = _sv0t98;
-            const char* _sv0t99 = sv0_string_concat(a, " = ");
+            a = _sv0t105;
+            const char* _sv0t106 = sv0_string_concat(a, " = ");
             const char* b;
-            b = _sv0t99;
-            const char* _sv0t100 = emit_expr(e);
-            const char* _sv0t101 = sv0_string_concat(b, _sv0t100);
+            b = _sv0t106;
+            const char* _sv0t107 = emit_expr(e);
+            const char* _sv0t108 = sv0_string_concat(b, _sv0t107);
             const char* c;
-            c = _sv0t101;
-            const char* _sv0t102 = sv0_string_concat(c, ";\n");
-            return _sv0t102;
+            c = _sv0t108;
+            const char* _sv0t109 = sv0_string_concat(c, ";\n");
+            return _sv0t109;
             _sv0t0 = 0;
           } else {
             if ((ins.tag == 5)) {
               int bh = ins.p0;
               int fh = ins.p1;
               int be = ins.p2;
-              Expr _sv0t78;
-              int _sv0t79 = sv0_box_load(be, 0);
-              _sv0t78.tag = _sv0t79;
-              int _sv0t80 = sv0_box_load(be, 1);
-              _sv0t78.p0 = _sv0t80;
-              int _sv0t81 = sv0_box_load(be, 2);
-              _sv0t78.p1 = _sv0t81;
-              int _sv0t82 = sv0_box_load(be, 3);
-              _sv0t78.p2 = _sv0t82;
+              Expr _sv0t85;
+              int _sv0t86 = sv0_box_load(be, 0);
+              _sv0t85.tag = _sv0t86;
+              int _sv0t87 = sv0_box_load(be, 1);
+              _sv0t85.p0 = _sv0t87;
+              int _sv0t88 = sv0_box_load(be, 2);
+              _sv0t85.p1 = _sv0t88;
+              int _sv0t89 = sv0_box_load(be, 3);
+              _sv0t85.p2 = _sv0t89;
               Expr e;
-              e.tag = (_sv0t78).tag;
-              e.p0 = (_sv0t78).p0;
-              e.p1 = (_sv0t78).p1;
-              e.p2 = (_sv0t78).p2;
-              const char* _sv0t83 = name_of(bh);
-              const char* _sv0t84 = sv0_string_concat(indent, _sv0t83);
+              e.tag = (_sv0t85).tag;
+              e.p0 = (_sv0t85).p0;
+              e.p1 = (_sv0t85).p1;
+              e.p2 = (_sv0t85).p2;
+              const char* _sv0t90 = name_of(bh);
+              const char* _sv0t91 = sv0_string_concat(indent, _sv0t90);
               const char* a;
-              a = _sv0t84;
-              const char* _sv0t85 = sv0_string_concat(a, ".");
+              a = _sv0t91;
+              const char* _sv0t92 = sv0_string_concat(a, ".");
               const char* b;
-              b = _sv0t85;
-              const char* _sv0t86 = name_of(fh);
-              const char* _sv0t87 = sv0_string_concat(b, _sv0t86);
+              b = _sv0t92;
+              const char* _sv0t93 = name_of(fh);
+              const char* _sv0t94 = sv0_string_concat(b, _sv0t93);
               const char* c;
-              c = _sv0t87;
-              const char* _sv0t88 = sv0_string_concat(c, " = ");
+              c = _sv0t94;
+              const char* _sv0t95 = sv0_string_concat(c, " = ");
               const char* d;
-              d = _sv0t88;
-              const char* _sv0t89 = emit_expr(e);
-              const char* _sv0t90 = sv0_string_concat(d, _sv0t89);
+              d = _sv0t95;
+              const char* _sv0t96 = emit_expr(e);
+              const char* _sv0t97 = sv0_string_concat(d, _sv0t96);
               const char* f;
-              f = _sv0t90;
-              const char* _sv0t91 = sv0_string_concat(f, ";\n");
-              return _sv0t91;
+              f = _sv0t97;
+              const char* _sv0t98 = sv0_string_concat(f, ";\n");
+              return _sv0t98;
               _sv0t0 = 0;
             } else {
               if ((ins.tag == 6)) {
                 int be = ins.p0;
                 int th = ins.p1;
                 int el = ins.p2;
-                Expr _sv0t60;
-                int _sv0t61 = sv0_box_load(be, 0);
-                _sv0t60.tag = _sv0t61;
-                int _sv0t62 = sv0_box_load(be, 1);
-                _sv0t60.p0 = _sv0t62;
-                int _sv0t63 = sv0_box_load(be, 2);
-                _sv0t60.p1 = _sv0t63;
-                int _sv0t64 = sv0_box_load(be, 3);
-                _sv0t60.p2 = _sv0t64;
+                Expr _sv0t67;
+                int _sv0t68 = sv0_box_load(be, 0);
+                _sv0t67.tag = _sv0t68;
+                int _sv0t69 = sv0_box_load(be, 1);
+                _sv0t67.p0 = _sv0t69;
+                int _sv0t70 = sv0_box_load(be, 2);
+                _sv0t67.p1 = _sv0t70;
+                int _sv0t71 = sv0_box_load(be, 3);
+                _sv0t67.p2 = _sv0t71;
                 Expr e;
-                e.tag = (_sv0t60).tag;
-                e.p0 = (_sv0t60).p0;
-                e.p1 = (_sv0t60).p1;
-                e.p2 = (_sv0t60).p2;
-                const char* _sv0t65 = sv0_string_concat(indent, "  ");
+                e.tag = (_sv0t67).tag;
+                e.p0 = (_sv0t67).p0;
+                e.p1 = (_sv0t67).p1;
+                e.p2 = (_sv0t67).p2;
+                const char* _sv0t72 = sv0_string_concat(indent, "  ");
                 const char* deeper;
-                deeper = _sv0t65;
-                const char* _sv0t66 = sv0_string_concat(indent, "if (");
+                deeper = _sv0t72;
+                const char* _sv0t73 = sv0_string_concat(indent, "if (");
                 const char* a;
-                a = _sv0t66;
-                const char* _sv0t67 = emit_expr(e);
-                const char* _sv0t68 = sv0_string_concat(a, _sv0t67);
+                a = _sv0t73;
+                const char* _sv0t74 = emit_expr(e);
+                const char* _sv0t75 = sv0_string_concat(a, _sv0t74);
                 const char* b;
-                b = _sv0t68;
-                const char* _sv0t69 = sv0_string_concat(b, ") {\n");
+                b = _sv0t75;
+                const char* _sv0t76 = sv0_string_concat(b, ") {\n");
                 const char* c;
-                c = _sv0t69;
-                const char* _sv0t70 = emit_instrs(th, deeper, ret_ty);
-                const char* _sv0t71 = sv0_string_concat(c, _sv0t70);
+                c = _sv0t76;
+                const char* _sv0t77 = emit_instrs(th, deeper, ret_ty);
+                const char* _sv0t78 = sv0_string_concat(c, _sv0t77);
                 const char* d;
-                d = _sv0t71;
-                const char* _sv0t72 = sv0_string_concat(d, indent);
+                d = _sv0t78;
+                const char* _sv0t79 = sv0_string_concat(d, indent);
                 const char* f;
-                f = _sv0t72;
-                const char* _sv0t73 = sv0_string_concat(f, "} else {\n");
+                f = _sv0t79;
+                const char* _sv0t80 = sv0_string_concat(f, "} else {\n");
                 const char* g;
-                g = _sv0t73;
-                const char* _sv0t74 = emit_instrs(el, deeper, ret_ty);
-                const char* _sv0t75 = sv0_string_concat(g, _sv0t74);
+                g = _sv0t80;
+                const char* _sv0t81 = emit_instrs(el, deeper, ret_ty);
+                const char* _sv0t82 = sv0_string_concat(g, _sv0t81);
                 const char* h;
-                h = _sv0t75;
-                const char* _sv0t76 = sv0_string_concat(h, indent);
+                h = _sv0t82;
+                const char* _sv0t83 = sv0_string_concat(h, indent);
                 const char* j;
-                j = _sv0t76;
-                const char* _sv0t77 = sv0_string_concat(j, "}\n");
-                return _sv0t77;
+                j = _sv0t83;
+                const char* _sv0t84 = sv0_string_concat(j, "}\n");
+                return _sv0t84;
                 _sv0t0 = 0;
               } else {
                 if ((ins.tag == 7)) {
                   int be = ins.p0;
                   int body = ins.p1;
-                  Expr _sv0t46;
-                  int _sv0t47 = sv0_box_load(be, 0);
-                  _sv0t46.tag = _sv0t47;
-                  int _sv0t48 = sv0_box_load(be, 1);
-                  _sv0t46.p0 = _sv0t48;
-                  int _sv0t49 = sv0_box_load(be, 2);
-                  _sv0t46.p1 = _sv0t49;
-                  int _sv0t50 = sv0_box_load(be, 3);
-                  _sv0t46.p2 = _sv0t50;
+                  Expr _sv0t53;
+                  int _sv0t54 = sv0_box_load(be, 0);
+                  _sv0t53.tag = _sv0t54;
+                  int _sv0t55 = sv0_box_load(be, 1);
+                  _sv0t53.p0 = _sv0t55;
+                  int _sv0t56 = sv0_box_load(be, 2);
+                  _sv0t53.p1 = _sv0t56;
+                  int _sv0t57 = sv0_box_load(be, 3);
+                  _sv0t53.p2 = _sv0t57;
                   Expr e;
-                  e.tag = (_sv0t46).tag;
-                  e.p0 = (_sv0t46).p0;
-                  e.p1 = (_sv0t46).p1;
-                  e.p2 = (_sv0t46).p2;
-                  const char* _sv0t51 = sv0_string_concat(indent, "  ");
+                  e.tag = (_sv0t53).tag;
+                  e.p0 = (_sv0t53).p0;
+                  e.p1 = (_sv0t53).p1;
+                  e.p2 = (_sv0t53).p2;
+                  const char* _sv0t58 = sv0_string_concat(indent, "  ");
                   const char* deeper;
-                  deeper = _sv0t51;
-                  const char* _sv0t52 = sv0_string_concat(indent, "while (");
+                  deeper = _sv0t58;
+                  const char* _sv0t59 = sv0_string_concat(indent, "while (");
                   const char* a;
-                  a = _sv0t52;
-                  const char* _sv0t53 = emit_expr(e);
-                  const char* _sv0t54 = sv0_string_concat(a, _sv0t53);
+                  a = _sv0t59;
+                  const char* _sv0t60 = emit_expr(e);
+                  const char* _sv0t61 = sv0_string_concat(a, _sv0t60);
                   const char* b;
-                  b = _sv0t54;
-                  const char* _sv0t55 = sv0_string_concat(b, ") {\n");
+                  b = _sv0t61;
+                  const char* _sv0t62 = sv0_string_concat(b, ") {\n");
                   const char* c;
-                  c = _sv0t55;
-                  const char* _sv0t56 = emit_instrs(body, deeper, ret_ty);
-                  const char* _sv0t57 = sv0_string_concat(c, _sv0t56);
+                  c = _sv0t62;
+                  const char* _sv0t63 = emit_instrs(body, deeper, ret_ty);
+                  const char* _sv0t64 = sv0_string_concat(c, _sv0t63);
                   const char* d;
-                  d = _sv0t57;
-                  const char* _sv0t58 = sv0_string_concat(d, indent);
+                  d = _sv0t64;
+                  const char* _sv0t65 = sv0_string_concat(d, indent);
                   const char* f;
-                  f = _sv0t58;
-                  const char* _sv0t59 = sv0_string_concat(f, "}\n");
-                  return _sv0t59;
+                  f = _sv0t65;
+                  const char* _sv0t66 = sv0_string_concat(f, "}\n");
+                  return _sv0t66;
                   _sv0t0 = 0;
                 } else {
                   if ((ins.tag == 8)) {
                     int body = ins.p0;
-                    const char* _sv0t40 = sv0_string_concat(indent, "  ");
+                    const char* _sv0t47 = sv0_string_concat(indent, "  ");
                     const char* deeper;
-                    deeper = _sv0t40;
-                    const char* _sv0t41 = sv0_string_concat(indent, "{\n");
+                    deeper = _sv0t47;
+                    const char* _sv0t48 = sv0_string_concat(indent, "{\n");
                     const char* a;
-                    a = _sv0t41;
-                    const char* _sv0t42 = emit_instrs(body, deeper, ret_ty);
-                    const char* _sv0t43 = sv0_string_concat(a, _sv0t42);
+                    a = _sv0t48;
+                    const char* _sv0t49 = emit_instrs(body, deeper, ret_ty);
+                    const char* _sv0t50 = sv0_string_concat(a, _sv0t49);
                     const char* b;
-                    b = _sv0t43;
-                    const char* _sv0t44 = sv0_string_concat(b, indent);
+                    b = _sv0t50;
+                    const char* _sv0t51 = sv0_string_concat(b, indent);
                     const char* c;
-                    c = _sv0t44;
-                    const char* _sv0t45 = sv0_string_concat(c, "}\n");
-                    return _sv0t45;
+                    c = _sv0t51;
+                    const char* _sv0t52 = sv0_string_concat(c, "}\n");
+                    return _sv0t52;
                     _sv0t0 = 0;
                   } else {
                     if ((ins.tag == 9)) {
-                      const char* _sv0t39 = sv0_string_concat(indent, "break;\n");
-                      return _sv0t39;
+                      const char* _sv0t46 = sv0_string_concat(indent, "break;\n");
+                      return _sv0t46;
                       _sv0t0 = 0;
                     } else {
                       if ((ins.tag == 10)) {
-                        const char* _sv0t38 = sv0_string_concat(indent, "continue;\n");
-                        return _sv0t38;
+                        const char* _sv0t45 = sv0_string_concat(indent, "continue;\n");
+                        return _sv0t45;
                         _sv0t0 = 0;
                       } else {
                         if ((ins.tag == 11)) {
@@ -1146,119 +1156,146 @@ static const char* emit_instr(const char* indent, const char* ret_ty, Instr ins)
                           int args = ins.p2;
                           int rt_h = ins.p3;
                           if ((dst_h == 0)) {
-                            const char* _sv0t36 = emit_call_void(indent, fn_h, args);
-                            return _sv0t36;
+                            const char* _sv0t43 = emit_call_void(indent, fn_h, args);
+                            return _sv0t43;
                           } else {
                           }
-                          const char* _sv0t37 = emit_call_dest(indent, dst_h, fn_h, args, rt_h);
-                          return _sv0t37;
+                          const char* _sv0t44 = emit_call_dest(indent, dst_h, fn_h, args, rt_h);
+                          return _sv0t44;
                           _sv0t0 = 0;
                         } else {
                           if ((ins.tag == 12)) {
                             int be = ins.p0;
                             int fh = ins.p1;
-                            Expr _sv0t24;
-                            int _sv0t25 = sv0_box_load(be, 0);
-                            _sv0t24.tag = _sv0t25;
-                            int _sv0t26 = sv0_box_load(be, 1);
-                            _sv0t24.p0 = _sv0t26;
-                            int _sv0t27 = sv0_box_load(be, 2);
-                            _sv0t24.p1 = _sv0t27;
-                            int _sv0t28 = sv0_box_load(be, 3);
-                            _sv0t24.p2 = _sv0t28;
+                            Expr _sv0t31;
+                            int _sv0t32 = sv0_box_load(be, 0);
+                            _sv0t31.tag = _sv0t32;
+                            int _sv0t33 = sv0_box_load(be, 1);
+                            _sv0t31.p0 = _sv0t33;
+                            int _sv0t34 = sv0_box_load(be, 2);
+                            _sv0t31.p1 = _sv0t34;
+                            int _sv0t35 = sv0_box_load(be, 3);
+                            _sv0t31.p2 = _sv0t35;
                             Expr e;
-                            e.tag = (_sv0t24).tag;
-                            e.p0 = (_sv0t24).p0;
-                            e.p1 = (_sv0t24).p1;
-                            e.p2 = (_sv0t24).p2;
-                            const char* _sv0t29 = sv0_string_concat(indent, "sv0_requires(");
+                            e.tag = (_sv0t31).tag;
+                            e.p0 = (_sv0t31).p0;
+                            e.p1 = (_sv0t31).p1;
+                            e.p2 = (_sv0t31).p2;
+                            const char* _sv0t36 = sv0_string_concat(indent, "sv0_requires(");
                             const char* a;
-                            a = _sv0t29;
-                            const char* _sv0t30 = emit_expr(e);
-                            const char* _sv0t31 = sv0_string_concat(a, _sv0t30);
+                            a = _sv0t36;
+                            const char* _sv0t37 = emit_expr(e);
+                            const char* _sv0t38 = sv0_string_concat(a, _sv0t37);
                             const char* b;
-                            b = _sv0t31;
-                            const char* _sv0t32 = sv0_string_concat(b, ", \"");
+                            b = _sv0t38;
+                            const char* _sv0t39 = sv0_string_concat(b, ", \"");
                             const char* c;
-                            c = _sv0t32;
-                            const char* _sv0t33 = name_of(fh);
-                            const char* _sv0t34 = sv0_string_concat(c, _sv0t33);
+                            c = _sv0t39;
+                            const char* _sv0t40 = name_of(fh);
+                            const char* _sv0t41 = sv0_string_concat(c, _sv0t40);
                             const char* d;
-                            d = _sv0t34;
-                            const char* _sv0t35 = sv0_string_concat(d, "\");\n");
-                            return _sv0t35;
+                            d = _sv0t41;
+                            const char* _sv0t42 = sv0_string_concat(d, "\");\n");
+                            return _sv0t42;
                             _sv0t0 = 0;
                           } else {
                             if ((ins.tag == 13)) {
                               int be = ins.p0;
                               int fh = ins.p1;
-                              Expr _sv0t12;
-                              int _sv0t13 = sv0_box_load(be, 0);
-                              _sv0t12.tag = _sv0t13;
-                              int _sv0t14 = sv0_box_load(be, 1);
-                              _sv0t12.p0 = _sv0t14;
-                              int _sv0t15 = sv0_box_load(be, 2);
-                              _sv0t12.p1 = _sv0t15;
-                              int _sv0t16 = sv0_box_load(be, 3);
-                              _sv0t12.p2 = _sv0t16;
+                              Expr _sv0t19;
+                              int _sv0t20 = sv0_box_load(be, 0);
+                              _sv0t19.tag = _sv0t20;
+                              int _sv0t21 = sv0_box_load(be, 1);
+                              _sv0t19.p0 = _sv0t21;
+                              int _sv0t22 = sv0_box_load(be, 2);
+                              _sv0t19.p1 = _sv0t22;
+                              int _sv0t23 = sv0_box_load(be, 3);
+                              _sv0t19.p2 = _sv0t23;
                               Expr e;
-                              e.tag = (_sv0t12).tag;
-                              e.p0 = (_sv0t12).p0;
-                              e.p1 = (_sv0t12).p1;
-                              e.p2 = (_sv0t12).p2;
-                              const char* _sv0t17 = sv0_string_concat(indent, "sv0_ensures(");
+                              e.tag = (_sv0t19).tag;
+                              e.p0 = (_sv0t19).p0;
+                              e.p1 = (_sv0t19).p1;
+                              e.p2 = (_sv0t19).p2;
+                              const char* _sv0t24 = sv0_string_concat(indent, "sv0_ensures(");
                               const char* a;
-                              a = _sv0t17;
-                              const char* _sv0t18 = emit_expr(e);
-                              const char* _sv0t19 = sv0_string_concat(a, _sv0t18);
+                              a = _sv0t24;
+                              const char* _sv0t25 = emit_expr(e);
+                              const char* _sv0t26 = sv0_string_concat(a, _sv0t25);
                               const char* b;
-                              b = _sv0t19;
-                              const char* _sv0t20 = sv0_string_concat(b, ", \"");
+                              b = _sv0t26;
+                              const char* _sv0t27 = sv0_string_concat(b, ", \"");
                               const char* c;
-                              c = _sv0t20;
-                              const char* _sv0t21 = name_of(fh);
-                              const char* _sv0t22 = sv0_string_concat(c, _sv0t21);
+                              c = _sv0t27;
+                              const char* _sv0t28 = name_of(fh);
+                              const char* _sv0t29 = sv0_string_concat(c, _sv0t28);
                               const char* d;
-                              d = _sv0t22;
-                              const char* _sv0t23 = sv0_string_concat(d, "\");\n");
-                              return _sv0t23;
+                              d = _sv0t29;
+                              const char* _sv0t30 = sv0_string_concat(d, "\");\n");
+                              return _sv0t30;
                               _sv0t0 = 0;
                             } else {
                               if ((ins.tag == 14)) {
-                                const char* _sv0t11 = sv0_string_concat(indent, "return;\n");
-                                return _sv0t11;
+                                const char* _sv0t18 = sv0_string_concat(indent, "return;\n");
+                                return _sv0t18;
                                 _sv0t0 = 0;
                               } else {
                                 if ((ins.tag == 15)) {
                                   int bv = ins.p0;
-                                  int _sv0t1 = sv0_string_eq(ret_ty, "void");
-                                  if (_sv0t1) {
-                                    const char* _sv0t2 = sv0_string_concat(indent, "return;\n");
-                                    return _sv0t2;
+                                  int _sv0t8 = sv0_string_eq(ret_ty, "void");
+                                  if (_sv0t8) {
+                                    const char* _sv0t9 = sv0_string_concat(indent, "return;\n");
+                                    return _sv0t9;
                                   } else {
                                   }
-                                  Value _sv0t3;
-                                  int _sv0t4 = sv0_box_load(bv, 0);
-                                  _sv0t3.tag = _sv0t4;
-                                  int _sv0t5 = sv0_box_load(bv, 1);
-                                  _sv0t3.p0 = _sv0t5;
-                                  int _sv0t6 = sv0_box_load(bv, 2);
-                                  _sv0t3.p1 = _sv0t6;
+                                  Value _sv0t10;
+                                  int _sv0t11 = sv0_box_load(bv, 0);
+                                  _sv0t10.tag = _sv0t11;
+                                  int _sv0t12 = sv0_box_load(bv, 1);
+                                  _sv0t10.p0 = _sv0t12;
+                                  int _sv0t13 = sv0_box_load(bv, 2);
+                                  _sv0t10.p1 = _sv0t13;
                                   Value v;
-                                  v.tag = (_sv0t3).tag;
-                                  v.p0 = (_sv0t3).p0;
-                                  v.p1 = (_sv0t3).p1;
-                                  const char* _sv0t7 = sv0_string_concat(indent, "return ");
+                                  v.tag = (_sv0t10).tag;
+                                  v.p0 = (_sv0t10).p0;
+                                  v.p1 = (_sv0t10).p1;
+                                  const char* _sv0t14 = sv0_string_concat(indent, "return ");
                                   const char* a;
-                                  a = _sv0t7;
-                                  const char* _sv0t8 = emit_value(v);
-                                  const char* _sv0t9 = sv0_string_concat(a, _sv0t8);
+                                  a = _sv0t14;
+                                  const char* _sv0t15 = emit_value(v);
+                                  const char* _sv0t16 = sv0_string_concat(a, _sv0t15);
                                   const char* b;
-                                  b = _sv0t9;
-                                  const char* _sv0t10 = sv0_string_concat(b, ";\n");
-                                  return _sv0t10;
+                                  b = _sv0t16;
+                                  const char* _sv0t17 = sv0_string_concat(b, ";\n");
+                                  return _sv0t17;
                                   _sv0t0 = 0;
                                 } else {
+                                  if ((ins.tag == 16)) {
+                                    int inner = ins.p0;
+                                    int kind = ins.p1;
+                                    int h = ins.p2;
+                                    const char* a;
+                                    a = indent;
+                                    if ((kind == 1)) {
+                                      const char* _sv0t1 = sv0_string_concat(a, "const ");
+                                      a = _sv0t1;
+                                    } else {
+                                    }
+                                    const char* _sv0t2 = name_of(inner);
+                                    const char* _sv0t3 = sv0_string_concat(a, _sv0t2);
+                                    const char* b;
+                                    b = _sv0t3;
+                                    const char* _sv0t4 = sv0_string_concat(b, " * ");
+                                    const char* c;
+                                    c = _sv0t4;
+                                    const char* _sv0t5 = name_of(h);
+                                    const char* _sv0t6 = sv0_string_concat(c, _sv0t5);
+                                    const char* d;
+                                    d = _sv0t6;
+                                    const char* _sv0t7 = sv0_string_concat(d, ";\n");
+                                    return _sv0t7;
+                                    _sv0t0 = 0;
+                                  } else {
+                                  }
                                 }
                               }
                             }
@@ -1951,6 +1988,40 @@ static int test_instr_declnamed(void) {
   const char* s;
   s = _sv0t0;
   int _sv0t1 = sv0_string_eq(s, "  int tmp;\n");
+  if ((!_sv0t1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_instr_declptr_const(void) {
+  Instr ins;
+  ins.tag = 16;
+  ins.p0 = 9;
+  ins.p1 = 1;
+  ins.p2 = 4;
+  const char* _sv0t0 = emit_instr("  ", "int", ins);
+  const char* s;
+  s = _sv0t0;
+  int _sv0t1 = sv0_string_eq(s, "  const int * tmp;\n");
+  if ((!_sv0t1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_instr_declptr_mut(void) {
+  Instr ins;
+  ins.tag = 16;
+  ins.p0 = 9;
+  ins.p1 = 2;
+  ins.p2 = 4;
+  const char* _sv0t0 = emit_instr("  ", "int", ins);
+  const char* s;
+  s = _sv0t0;
+  int _sv0t1 = sv0_string_eq(s, "  int * tmp;\n");
   if ((!_sv0t1)) {
     return 1;
   } else {
@@ -3420,6 +3491,22 @@ int main(void) {
   } else {
   }
   sv0_println("PASS test_split_main_index");
+  int _sv0t93 = test_instr_declptr_const();
+  int r43 = _sv0t93;
+  if ((r43 != 0)) {
+    int _sv0t94 = (420 + r43);
+    return _sv0t94;
+  } else {
+  }
+  sv0_println("PASS test_instr_declptr_const");
+  int _sv0t95 = test_instr_declptr_mut();
+  int r44 = _sv0t95;
+  if ((r44 != 0)) {
+    int _sv0t96 = (430 + r44);
+    return _sv0t96;
+  } else {
+  }
+  sv0_println("PASS test_instr_declptr_mut");
   return 0;
 }
 
