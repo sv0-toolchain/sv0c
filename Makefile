@@ -3,7 +3,13 @@ ML_BUILD := ml-build
 HEAP     := sv0c
 CC       ?= cc
 
-.PHONY: build test check heap clean e2e test-contract-runtime integration integration-vm legacy-bootstrap-check legacy-bootstrap-heap
+# Every .sml/.sig file ml-build can actually read (sources.cm's Group lists
+# a subset of these plus $/basis.cm etc., which don't change locally) --
+# used below so `make heap`/`make check` skip the (slow) ml-build step
+# entirely when nothing sv0c compiles from has changed since the last build.
+SML_SOURCES := $(shell find sml-legacy \( -name '*.sml' -o -name '*.sig' \) -not -path '*/.cm/*' 2>/dev/null)
+
+.PHONY: build test check clean e2e test-contract-runtime integration integration-vm legacy-bootstrap-check legacy-bootstrap-heap
 
 # M3-S-052: default `check` = heap + one-file emit smoke (scripts/smoke-self-host-compiler.sh — works standalone + as submodule).
 # Full CM.make compile of sml-legacy is legacy-bootstrap-check (CI keeps both).
@@ -24,7 +30,13 @@ legacy-bootstrap-check:
 	  if grep -q 'Error:' $$tmp; then tail -40 $$tmp; rm -f $$tmp; exit 1; fi; \
 	  rm -f $$tmp
 
-heap:
+# `heap` is a thin phony alias for the real file target below, so
+# `make heap`/`make check` (check: heap) skip ml-build whenever
+# build/$(HEAP) is already newer than sources.cm and every .sml/.sig file.
+.PHONY: heap
+heap: build/$(HEAP)
+
+build/$(HEAP): sources.cm $(SML_SOURCES)
 	mkdir -p build
 	$(ML_BUILD) sources.cm Main.main build/$(HEAP)
 	@cd build && \
@@ -36,6 +48,7 @@ heap:
 	      break; \
 	    done; \
 	  fi
+	touch build/$(HEAP)
 
 build/e2e_generated.c: scripts/export_e2e.sml sources.cm
 	mkdir -p build
