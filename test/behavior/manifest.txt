@@ -126,3 +126,4 @@ test/behavior/cases/u64_unsigned_compare.sv0|42|native
 test/behavior/cases/wide_shift.sv0|42|native
 test/behavior/cases/vm_exit_wide_return.sv0|42|native
 test/behavior/cases/ffi_ptr_create_and_pass.sv0|7|native
+test/behavior/cases/ffi_unsafe_block_transparent.sv0|8

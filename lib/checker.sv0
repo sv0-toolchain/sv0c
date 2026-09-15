@@ -4616,6 +4616,24 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
     if tag == 33 {
         return TY_UNIT();
     }
+    /* FFI-005: ExprUnsafeBlock (`unsafe { ... }`) wraps a single ordinary
+       ExprBlock (tag 9) at ed1 -- purely a marker for FFI-006's future
+       checker enforcement (dereference/FFI calls only inside `unsafe`),
+       not yet a real gate. Transparently delegate to the inner block's own
+       tag-9 handling above so `unsafe { ... }`'s value type is exactly its
+       tail's type, same as a plain block -- unsafe has no type-level
+       effect of its own. */
+    if tag == 34 {
+        return synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                          source, starts, ends,
+                          env_names, env_types, env_muts,
+                          edef_names, edef_variant_offsets,
+                          edef_variant_counts,
+                          edef_vnames_flat, edef_vshapes_flat,
+                          fn_names, fn_ret_types,
+                          ret_ty, loop_depth,
+                          vec_get(ed1, idx));
+    }
     return 0 - 1;
 }
 
@@ -7253,6 +7271,44 @@ fn test_pty_root_to_type_tag_ptr() -> i32 {
     return 0;
 }
 
+/* FFI-005: synth_expr's tag==34 (ExprUnsafeBlock) arm delegates transparently
+   to the wrapped ExprBlock's own tag==9 handling -- `unsafe { 42 }` must
+   synthesize to exactly TY_INT(), same as the bare block `{ 42 }` would.
+   node 0 = ExprLit(42); node 1 = ExprBlock(tail=0); node 2 =
+   ExprUnsafeBlock(ed1=1). */
+fn test_synth_expr_unsafe_block_transparent() -> i32 {
+    let source: string = "42";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 2);
+    let en: Vec<i32> = vec_new();
+    let ety: Vec<i32> = vec_new();
+    let em: Vec<i32> = vec_new();
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let edn: Vec<i32> = vec_new();
+    let edvo: Vec<i32> = vec_new();
+    let edvc: Vec<i32> = vec_new();
+    let edvn: Vec<i32> = vec_new();
+    let edvs: Vec<i32> = vec_new();
+    let tfn: Vec<i32> = vec_new();
+    let tfrt: Vec<i32> = vec_new();
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 9); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 34); vec_push(ed1, 1); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    let r: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                            source, starts, ends, en, ety, em,
+                            edn, edvo, edvc, edvn, edvs,
+                            tfn, tfrt,
+                            TY_INT(), 0, 2);
+    if r != TY_INT() { return 1; }
+    return 0;
+}
+
 fn test_named_only_ty_basic() -> i32 {
     let sn: Vec<i32> = vec_new();
     vec_push(sn, 7);
@@ -7424,5 +7480,7 @@ fn main() -> i32 {
     if r74 != 0 { return 770 + r74; }
     let r75: i32 = test_pty_root_to_type_tag_ptr();
     if r75 != 0 { return 780 + r75; }
+    let r76: i32 = test_synth_expr_unsafe_block_transparent();
+    if r76 != 0 { return 790 + r76; }
     return 0;
 }

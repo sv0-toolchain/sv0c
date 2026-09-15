@@ -1,0 +1,16 @@
+/* FFI-005: `unsafe { ... }` now parses as a real ExprUnsafeBlock node (not
+   silently erased to a plain block) but stays behaviorally transparent --
+   same value, same statements, same C output as the unwrapped block would
+   produce. `unsafe` has no checker-time gate yet (FFI-006); this only
+   confirms the new AST node doesn't change what a program does. Exits 8. */
+fn side_effect(x: i32) -> i32 {
+    return x + 1;
+}
+fn main() -> i32 {
+    let a: i32 = unsafe { 3 };
+    let mut b: i32 = a;
+    unsafe {
+        b = side_effect(b);
+    }
+    return b + 4;
+}

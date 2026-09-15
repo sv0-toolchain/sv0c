@@ -1666,6 +1666,19 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                 enum_tag_offsets, enum_tag_counts,
                                 enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 0, 0 - 1);
     }
+    /* FFI-005: ExprUnsafeBlock (`unsafe { ... }`) wraps a single ordinary
+       ExprBlock (tag 9) at ed1 -- `unsafe` has no runtime representation
+       (Epic B's own framing), so lowering is fully transparent: delegate
+       straight to lower_tag_block on the INNER block's own index. Without
+       this arm the tag fell through to the function's Value::VUnit
+       default below -- silently dropping the block's statements/tail
+       instead of erroring, worse than a crash. */
+    if tag == 34 {
+        return lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                vec_get(ed1, idx), ctr, out_instrs, enum_names,
+                                enum_tag_offsets, enum_tag_counts,
+                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 0, 0 - 1);
+    }
     if tag == 10 {
         return lower_tag_if(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                              idx, ctr, out_instrs, enum_names,
@@ -2139,6 +2152,18 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 1, 0 - 1);
         return 0;
     }
+    /* FFI-005: ExprUnsafeBlock, same effect-mode delegation as tag 9 above
+       but on the wrapped inner block's own index -- without this arm the
+       default fallthrough below still works (via lower_expr_to_value's own
+       tag-34 handling) but in VALUE mode, allocating a needless result temp
+       for a statement whose value is discarded. */
+    if etag == 34 {
+        lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                        vec_get(ed1, idx), ctr, out_instrs, enum_names,
+                        enum_tag_offsets, enum_tag_counts,
+                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 1, 0 - 1);
+        return 0;
+    }
     if etag == 10 {
         let cond_idx: i32 = vec_get(ed1, idx);
         let then_idx: i32 = vec_get(ed2, idx);
@@ -2205,6 +2230,15 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if btag == 9 {
         lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
                         body_idx, ctr, out_instrs, enum_names,
+                        enum_tag_offsets, enum_tag_counts,
+                        enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 0, dest);
+        return 0;
+    }
+    /* FFI-005: ExprUnsafeBlock, same dest-directed delegation as btag == 9
+       above but unwrapped to the inner block's own index. */
+    if btag == 34 {
+        lower_tag_block(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                        vec_get(ed1, body_idx), ctr, out_instrs, enum_names,
                         enum_tag_offsets, enum_tag_counts,
                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases, 0, dest);
         return 0;
