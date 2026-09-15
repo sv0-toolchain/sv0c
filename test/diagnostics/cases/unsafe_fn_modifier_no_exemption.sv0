@@ -1,0 +1,12 @@
+/* FFI-007: locks the deprecation decision behaviorally, not just in docs --
+   `unsafe fn` grants NO whole-body exemption (unlike Rust). A raw-pointer
+   dereference in an `unsafe fn`'s body still needs its own `unsafe { }`
+   block; expects E0550 (native only, raw pointers don't exist in the
+   sml-legacy checker). */
+unsafe fn read_it(p: *const i32) -> i32 {
+    return *p;
+}
+fn main() -> i32 {
+    let x: i32 = 5;
+    return read_it(&x as *const i32);
+}

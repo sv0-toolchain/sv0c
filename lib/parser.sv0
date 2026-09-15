@@ -259,6 +259,12 @@ fn ps_skip_optional_pub(tags: Vec<i32>, pos: i32) -> i32 {
     return pos + 1;
 }
 
+/* FFI-007: locked decision (task/sv0c-ffi-raw-pointer-abi.Rmd, "open
+   questions") -- `unsafe fn` does NOT get Rust's "whole body is implicitly
+   unsafe" semantics; it stays a parsed-and-discarded no-op, deprecated in
+   favor of block-scoped `unsafe { ... }` (the only form the checker's
+   FFI-006 gate ever recognizes). Kept parsing for backward compatibility
+   with existing sources, never given real teeth. */
 fn ps_skip_optional_unsafe(tags: Vec<i32>, pos: i32) -> i32 {
     if ps_peek(tags, pos) == 93 { return pos + 1; }
     return pos;

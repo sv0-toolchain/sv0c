@@ -45,3 +45,6 @@ test/diagnostics/cases/nested_module.sv0|E0310|native
 # FFI-006: raw-pointer/unsafe checker gate. native only — raw pointers don't
 # exist in the sml-legacy checker at all.
 test/diagnostics/cases/unsafe_deref_outside_unsafe.sv0|E0550|native
+# FFI-007: `unsafe fn` modifier is deprecated/inert — locks that decision
+# behaviorally (no whole-body exemption, unlike Rust). native only.
+test/diagnostics/cases/unsafe_fn_modifier_no_exemption.sv0|E0550|native
