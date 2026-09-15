@@ -42,3 +42,6 @@ test/diagnostics/cases/slice_return_local_alias.sv0|E0322|native
 test/diagnostics/cases/slice_borrow_mut_twice.sv0|E0323|native
 test/diagnostics/cases/slice_borrow_mut_and_shared.sv0|E0323|native
 test/diagnostics/cases/nested_module.sv0|E0310|native
+# FFI-006: raw-pointer/unsafe checker gate. native only — raw pointers don't
+# exist in the sml-legacy checker at all.
+test/diagnostics/cases/unsafe_deref_outside_unsafe.sv0|E0550|native

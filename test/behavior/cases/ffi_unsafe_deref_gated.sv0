@@ -1,0 +1,14 @@
+/* FFI-006: a real raw-pointer dereference, properly wrapped in `unsafe {}`,
+   compiles and runs correctly -- the checker gate (E0550) only rejects a
+   deref OUTSIDE unsafe; it doesn't disable dereferencing altogether.
+   Exits 5. */
+fn read_through(p: *const i32) -> i32 {
+    unsafe {
+        return *p;
+    }
+}
+fn main() -> i32 {
+    let x: i32 = 5;
+    let p: *const i32 = &x as *const i32;
+    return read_through(p);
+}

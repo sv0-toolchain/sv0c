@@ -1,0 +1,7 @@
+/* FFI-006: dereferencing a raw pointer outside an `unsafe` block — expects
+   E0550 (native only, raw pointers don't exist in the sml-legacy checker). */
+fn main() -> i32 {
+    let x: i32 = 5;
+    let p: *const i32 = &x as *const i32;
+    return *p;
+}

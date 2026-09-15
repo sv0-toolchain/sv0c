@@ -2835,6 +2835,452 @@ fn find_multi_element_tuple(bet: Vec<i32>, bed2: Vec<i32>) -> i32 {
     return 0 - 1;
 }
 
+/* ── check_unsafe_gate (FFI-006) ──────────────────────────────
+   Structural walk of a function body (real per-function arena, not a
+   contract clause) looking for `*ptr` (ExprUnop Deref, unop_tag==3) where
+   `ptr`'s type is a raw pointer (TY_PTR/TY_PTRMUT) and the site is not
+   nested inside an `unsafe { ... }` block (ExprUnsafeBlock, tag 34) —
+   E0550 on a violation, pushed to diag_sink exactly like
+   check_body_slice_borrow's E0322/E0323.
+
+   Modeled on expr_references_result's shape (a boolean tree-walk with no
+   type info, used for contract `old(result)` scanning) rather than
+   threading a new "in_unsafe" parameter through synth_expr's ~76 call
+   sites — that shape of fix was already tried and rejected once this
+   session (FFI-003's own addendum, for a structurally identical problem:
+   threading new context through a deeply recursive function is the wrong
+   fix when a self-contained walker suffices). Only a Deref node needs a
+   real TYPE (to tell a raw-pointer deref from any other use of `*`), so
+   only THAT call site invokes the real synth_expr — everywhere else this
+   function just recurses structurally, tracking `in_unsafe` and the local
+   env itself (env_extend/env_scope_restore, mirroring synth_expr's own
+   ExprBlock/LetStmt handling) exactly as far as is needed to resolve that
+   one Deref's operand correctly.
+
+   Deliberately narrower than full generality in two spots, matching this
+   checker's own established precedent (check_body_field_access's own
+   comment: "strictly narrower than check_fn_body so it never misflags
+   valid access"): match-arm pattern-bound payload names are not added to
+   env here (they are always the TY_INT payload surface today, never a raw
+   pointer, so they can never legally be the operand of a flagged Deref);
+   ExprCall/ExprMatch-arm child indexing uses the same `first + i` /
+   `arms_first + i` simplification `expr_references_result` already uses
+   for contract scanning, not the exact sidecar-based `block_stmt_index`
+   resolution — a real but narrow gap for a call/match-arm subexpression
+   that itself contains further nested sub-expressions pushing extra
+   nodes; real block statements (tag 9/34) DO use the sidecar correctly,
+   since that's where local pointer `let`s are actually declared. */
+fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
+                     ed4: Vec<i32>, pp: Vec<i32>,
+                     source: string, starts: Vec<i32>, ends: Vec<i32>,
+                     env_names: Vec<i32>, env_types: Vec<i32>, env_muts: Vec<i32>,
+                     edef_names: Vec<i32>,
+                     edef_variant_offsets: Vec<i32>,
+                     edef_variant_counts: Vec<i32>,
+                     edef_vnames_flat: Vec<i32>,
+                     edef_vshapes_flat: Vec<i32>,
+                     fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
+                     ret_ty: i32, loop_depth: i32,
+                     in_unsafe: i32, idx: i32,
+                     diag_sink: Vec<i32>) -> i32 {
+    if idx < 0 { return 0; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 0 { return 0; }
+    if tag == 1 { return 0; }
+    if tag == 2 {
+        let unop_tag: i32 = vec_get(ed1, idx);
+        let operand_idx: i32 = vec_get(ed2, idx);
+        if unop_tag == 3 {
+            if in_unsafe == 0 {
+                let op_ty: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                                            source, starts, ends,
+                                            env_names, env_types, env_muts,
+                                            edef_names, edef_variant_offsets,
+                                            edef_variant_counts,
+                                            edef_vnames_flat, edef_vshapes_flat,
+                                            fn_names, fn_ret_types,
+                                            ret_ty, loop_depth,
+                                            operand_idx);
+                if op_ty == TY_PTR() { vec_push(diag_sink, 550); vec_push(diag_sink, expr_span_tok(et, ed1, pp, idx)); }
+                if op_ty == TY_PTRMUT() { vec_push(diag_sink, 550); vec_push(diag_sink, expr_span_tok(et, ed1, pp, idx)); }
+            }
+        }
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, operand_idx, diag_sink);
+    }
+    if tag == 3 {
+        let _l3: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed3, idx), diag_sink);
+    }
+    if tag == 4 {
+        /* ExprCall: d1=callee, d2=args_first, d3=args_count, d4=args_sidecar
+           -- args are NOT contiguous at args_first+i (an earlier arg's own
+           sub-expressions push nodes in between); resolved via the same
+           block_stmt_index sidecar synth_expr_call_simple actually uses.
+           A first cut of this function used the `first + i` shortcut
+           expr_references_result gets away with for CONTRACT clauses
+           (always argument-simple expressions there) -- real function
+           bodies routinely have nested call args, and that shortcut
+           computed a garbage index and crashed the compiler (segfault on
+           `impl_methods.sv0`, found by the full test suite). */
+        let af4: i32 = vec_get(ed2, idx);
+        let ac4: i32 = vec_get(ed3, idx);
+        let sc4: i32 = vec_get(ed4, idx);
+        let _c4: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+        let mut ai4: i32 = 0;
+        while ai4 < ac4 {
+            let _a4: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                     env_names, env_types, env_muts,
+                                     edef_names, edef_variant_offsets, edef_variant_counts,
+                                     edef_vnames_flat, edef_vshapes_flat,
+                                     fn_names, fn_ret_types, ret_ty, loop_depth,
+                                     in_unsafe, block_stmt_index(pp, af4, sc4, ai4), diag_sink);
+            ai4 = ai4 + 1;
+        }
+        return 0;
+    }
+    if tag == 5 {
+        /* ExprMethodCall: d1=obj, d2=method_tok, d3=args_count,
+           d4=args_sidecar (NOT args_first -- see synth_expr's own tag==5,
+           checker.sv0 ~4510). Same sidecar resolution as tag 4 above,
+           same crash this fixed. */
+        let mc_ac: i32 = vec_get(ed3, idx);
+        let mc_sc: i32 = vec_get(ed4, idx);
+        let _mo5: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+        let mut ai5: i32 = 0;
+        while ai5 < mc_ac {
+            let _a5: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                     env_names, env_types, env_muts,
+                                     edef_names, edef_variant_offsets, edef_variant_counts,
+                                     edef_vnames_flat, edef_vshapes_flat,
+                                     fn_names, fn_ret_types, ret_ty, loop_depth,
+                                     in_unsafe, block_stmt_index(pp, 0, mc_sc, ai5), diag_sink);
+            ai5 = ai5 + 1;
+        }
+        return 0;
+    }
+    if tag == 6 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 7 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 8 {
+        let _o8: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+    }
+    if tag == 9 {
+        let sf9: i32 = vec_get(ed1, idx);
+        let sc9: i32 = vec_get(ed2, idx);
+        let tail9: i32 = vec_get(ed3, idx);
+        let sidecar9: i32 = vec_get(ed4, idx);
+        let env_mark9: i32 = vec_len(env_names);
+        let mut si9: i32 = 0;
+        while si9 < sc9 {
+            let st9: i32 = block_stmt_index(pp, sf9, sidecar9, si9);
+            let stag9: i32 = vec_get(et, st9);
+            if stag9 == 27 {
+                let name9: i32 = vec_get(ed1, st9);
+                let init9: i32 = vec_get(ed3, st9);
+                let ismut9: i32 = vec_get(ed4, st9);
+                if init9 >= 0 {
+                    let _i9: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                             env_names, env_types, env_muts,
+                                             edef_names, edef_variant_offsets, edef_variant_counts,
+                                             edef_vnames_flat, edef_vshapes_flat,
+                                             fn_names, fn_ret_types, ret_ty, loop_depth,
+                                             in_unsafe, init9, diag_sink);
+                    let ty9: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                                              source, starts, ends,
+                                              env_names, env_types, env_muts,
+                                              edef_names, edef_variant_offsets,
+                                              edef_variant_counts,
+                                              edef_vnames_flat, edef_vshapes_flat,
+                                              fn_names, fn_ret_types,
+                                              ret_ty, loop_depth,
+                                              init9);
+                    if ty9 >= 0 {
+                        env_extend(env_names, env_types, env_muts, name9, ty9, ismut9);
+                    }
+                }
+            }
+            if stag9 == 28 {
+                let e9: i32 = vec_get(ed1, st9);
+                let _s9: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                         env_names, env_types, env_muts,
+                                         edef_names, edef_variant_offsets, edef_variant_counts,
+                                         edef_vnames_flat, edef_vshapes_flat,
+                                         fn_names, fn_ret_types, ret_ty, loop_depth,
+                                         in_unsafe, e9, diag_sink);
+            }
+            si9 = si9 + 1;
+        }
+        let r9: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, tail9, diag_sink);
+        let _rst9: i32 = env_scope_restore(env_names, env_mark9);
+        return r9;
+    }
+    if tag == 10 {
+        let _c10: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+        let _t10: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+        let else10: i32 = vec_get(ed3, idx);
+        if else10 >= 0 {
+            return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                     env_names, env_types, env_muts,
+                                     edef_names, edef_variant_offsets, edef_variant_counts,
+                                     edef_vnames_flat, edef_vshapes_flat,
+                                     fn_names, fn_ret_types, ret_ty, loop_depth,
+                                     in_unsafe, else10, diag_sink);
+        }
+        return 0;
+    }
+    if tag == 11 {
+        /* ExprMatch arms are sidecar-resolved too (ed4[idx] =
+           arms_sidecar), same as ExprCall/ExprMethodCall args above --
+           same crash-causing shortcut, same fix. */
+        let scrut11: i32 = vec_get(ed1, idx);
+        let arms_f11: i32 = vec_get(ed2, idx);
+        let arms_c11: i32 = vec_get(ed3, idx);
+        let arms_sc11: i32 = vec_get(ed4, idx);
+        let _s11: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, scrut11, diag_sink);
+        let mut ami11: i32 = 0;
+        while ami11 < arms_c11 {
+            let arm11: i32 = block_stmt_index(pp, arms_f11, arms_sc11, ami11);
+            let guard11: i32 = vec_get(ed3, arm11);
+            let body11: i32 = vec_get(ed4, arm11);
+            if guard11 >= 0 {
+                let _g11: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                         env_names, env_types, env_muts,
+                                         edef_names, edef_variant_offsets, edef_variant_counts,
+                                         edef_vnames_flat, edef_vshapes_flat,
+                                         fn_names, fn_ret_types, ret_ty, loop_depth,
+                                         in_unsafe, guard11, diag_sink);
+            }
+            let _b11: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                     env_names, env_types, env_muts,
+                                     edef_names, edef_variant_offsets, edef_variant_counts,
+                                     edef_vnames_flat, edef_vshapes_flat,
+                                     fn_names, fn_ret_types, ret_ty, loop_depth,
+                                     in_unsafe, body11, diag_sink);
+            ami11 = ami11 + 1;
+        }
+        return 0;
+    }
+    if tag == 12 {
+        let _c12: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth + 1,
+                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+    }
+    if tag == 13 {
+        let _it13: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth + 1,
+                                 in_unsafe, vec_get(ed3, idx), diag_sink);
+    }
+    if tag == 14 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth + 1,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 15 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 16 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 18 {
+        let _l18: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+    }
+    if tag == 19 {
+        let _l19: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed3, idx), diag_sink);
+    }
+    if tag == 20 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 22 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 23 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+    }
+    if tag == 24 {
+        /* ExprStruct field values: NOT traversed. synth_expr's own tag==24
+           (checker.sv0 ~5016) is itself "simplified, field traversal
+           deferred" -- it never looks inside a struct literal's field
+           expressions for type-checking either, so a dormant indexing bug
+           here (the "walk backward sfc slots from idx" shortcut, valid
+           only when every field value is a single leaf node, false the
+           moment any field's value has its own sub-expressions) would go
+           uncaught the same way it did for tag 4/5/11 above until the
+           segfault. Matching the main checker's own stance is the
+           conservative fix: `Point { x: *p, y: 2 }` (a raw-pointer deref
+           inside a struct-literal field) is a real, narrow, documented gap
+           in this gate, not a landmine. */
+        return 0;
+    }
+    if tag == 25 {
+        /* ExprTuple: only ever 1-element in this slice (E0446 rejects
+           multi-element tuples before this point), matching synth_expr's
+           own tag==25 handling -- no loop needed. */
+        let tc25: i32 = vec_get(ed2, idx);
+        if tc25 == 1 {
+            return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                     env_names, env_types, env_muts,
+                                     edef_names, edef_variant_offsets, edef_variant_counts,
+                                     edef_vnames_flat, edef_vshapes_flat,
+                                     fn_names, fn_ret_types, ret_ty, loop_depth,
+                                     in_unsafe, vec_get(ed1, idx), diag_sink);
+        }
+        return 0;
+    }
+    if tag == 26 {
+        /* ExprArray: not traversed, same rationale as ExprStruct above --
+           synth_expr's own tag==26 is "simplified, element traversal
+           deferred" too, and element indices here have the identical
+           only-valid-for-leaf-elements shortcut risk. */
+        return 0;
+    }
+    if tag == 34 {
+        return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 1, vec_get(ed1, idx), diag_sink);
+    }
+    return 0;
+}
+
 fn check_program(
     tok_tags: Vec<i32>,
     source: string,
@@ -2996,6 +3442,40 @@ fn check_program(
             let _rsb: i32 = check_body_slice_borrow(body_et, body_ed1, body_ed2,
                                 body_ed3, body_ed4, bpp, body_root_idx,
                                 param_name_pos, source, starts, ends, diag_sink);
+            /* FFI-006: raw-pointer dereference outside `unsafe` → E0550.
+               Params get their own fresh env (mirroring check_fn_body's own
+               seeding exactly, since check_fn_body's copy is internal and
+               not exposed here) so `fn use_ptr(p: *const i32) -> i32 {
+               *p }` is caught even when the deref is on a PARAMETER, not
+               just a local `let`. */
+            let ug_env_n: Vec<i32> = vec_new();
+            let ug_env_t: Vec<i32> = vec_new();
+            let ug_env_m: Vec<i32> = vec_new();
+            let ug_me_len: i32 = vec_len(mod_env_names);
+            let mut ug_j: i32 = 0;
+            while ug_j < ug_me_len {
+                vec_push(ug_env_n, vec_get(mod_env_names, ug_j));
+                vec_push(ug_env_t, vec_get(mod_env_types, ug_j));
+                vec_push(ug_env_m, vec_get(mod_env_muts, ug_j));
+                ug_j = ug_j + 1;
+            }
+            let mut ug_pi: i32 = 0;
+            while ug_pi < param_count {
+                env_extend(ug_env_n, ug_env_t, ug_env_m,
+                          vec_get(param_name_pos, ug_pi),
+                          vec_get(param_types, ug_pi),
+                          vec_get(param_muts, ug_pi));
+                ug_pi = ug_pi + 1;
+            }
+            let _rug: i32 = check_unsafe_gate(body_et, body_ed1, body_ed2,
+                                body_ed3, body_ed4, bpp,
+                                source, starts, ends,
+                                ug_env_n, ug_env_t, ug_env_m,
+                                edef_names, edef_variant_offsets,
+                                edef_variant_counts,
+                                edef_vnames_flat, edef_vshapes_flat,
+                                fn_names, fn_ret_types,
+                                ret_ty, 0, 0, body_root_idx, diag_sink);
             /* BH-8 (Slice 5): unknown type in a `let x: T` annotation → E0301. */
             let _rut: i32 = check_body_let_unknown_type(body_et, body_ed1,
                                 body_ed2, body_ed4, bpp, body_root_idx,
@@ -7309,6 +7789,59 @@ fn test_synth_expr_unsafe_block_transparent() -> i32 {
     return 0;
 }
 
+/* FFI-006: check_unsafe_gate flags `*p` (Deref of a TY_PTR-typed path) when
+   in_unsafe==0, and stays silent for the identical node when in_unsafe==1
+   (the same "wrapped in unsafe {}" state check_unsafe_gate's own tag==34
+   arm sets before recursing). node 0 = ExprPath("p"); node 1 =
+   ExprUnop(Deref, operand=0). */
+fn unsafe_gate_deref_fixture(in_unsafe: i32) -> Vec<i32> {
+    let source: string = "p";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 1);
+    let en: Vec<i32> = vec_new();
+    let ety: Vec<i32> = vec_new();
+    let em: Vec<i32> = vec_new();
+    env_extend(en, ety, em, 0, TY_PTR(), 0);
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 0);
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 2); vec_push(ed1, 3); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    let edn: Vec<i32> = vec_new();
+    let edvo: Vec<i32> = vec_new();
+    let edvc: Vec<i32> = vec_new();
+    let edvn: Vec<i32> = vec_new();
+    let edvs: Vec<i32> = vec_new();
+    let tfn: Vec<i32> = vec_new();
+    let tfrt: Vec<i32> = vec_new();
+    let diag_sink: Vec<i32> = vec_new();
+    let _r: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp,
+                                    source, starts, ends,
+                                    en, ety, em,
+                                    edn, edvo, edvc, edvn, edvs,
+                                    tfn, tfrt,
+                                    TY_INT(), 0, in_unsafe, 1, diag_sink);
+    return diag_sink;
+}
+
+fn test_check_unsafe_gate_flags_deref_outside_unsafe() -> i32 {
+    let diag_sink: Vec<i32> = unsafe_gate_deref_fixture(0);
+    if vec_len(diag_sink) != 2 { return 1; }
+    if vec_get(diag_sink, 0) != 550 { return 2; }
+    return 0;
+}
+
+fn test_check_unsafe_gate_silent_inside_unsafe() -> i32 {
+    let diag_sink: Vec<i32> = unsafe_gate_deref_fixture(1);
+    if vec_len(diag_sink) != 0 { return 1; }
+    return 0;
+}
+
 fn test_named_only_ty_basic() -> i32 {
     let sn: Vec<i32> = vec_new();
     vec_push(sn, 7);
@@ -7482,5 +8015,9 @@ fn main() -> i32 {
     if r75 != 0 { return 780 + r75; }
     let r76: i32 = test_synth_expr_unsafe_block_transparent();
     if r76 != 0 { return 790 + r76; }
+    let r77: i32 = test_check_unsafe_gate_flags_deref_outside_unsafe();
+    if r77 != 0 { return 800 + r77; }
+    let r78: i32 = test_check_unsafe_gate_silent_inside_unsafe();
+    if r78 != 0 { return 810 + r78; }
     return 0;
 }
