@@ -1,0 +1,10 @@
+/* FFI-009: the new safe<->C type-mapping checker gate must stay SILENT on a
+   signature built entirely from FFI-safe types (int/uint/bool/pointer, plus
+   an implicit unit return) -- this is the regression guard proving the
+   whitelist doesn't misfire on ordinary, legitimate declarations. Exits 9. */
+#[extern_c]
+fn c_check(x: i32, count: u64, ok: bool, p: *const i32) -> i32;
+
+fn main() -> i32 {
+    return 9;
+}

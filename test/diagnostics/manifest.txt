@@ -51,3 +51,6 @@ test/diagnostics/cases/unsafe_fn_modifier_no_exemption.sv0|E0550|native
 # FFI-008: `#[extern_c] fn ...;` must be header-only. native only —
 # `#[extern_c]` doesn't exist in the sml-legacy parser.
 test/diagnostics/cases/extern_c_with_body_rejected.sv0|E0100|native
+# FFI-009: safe<->C type-mapping validation for `#[extern_c]` signatures.
+# native only -- `#[extern_c]` doesn't exist in the sml-legacy parser.
+test/diagnostics/cases/extern_c_unsafe_abi_type_rejected.sv0|E0551|native

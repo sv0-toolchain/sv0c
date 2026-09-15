@@ -193,6 +193,39 @@ fn TY_PTR() -> i32 { return 19; }
 fn TY_PTRMUT() -> i32 { return 20; }
 fn TY_UNKNOWN() -> i32 { return 0 - 1; }
 
+/* FFI-009: the safe<->C type-mapping whitelist for `#[extern_c]` signatures
+   (task/sv0c-ffi-raw-pointer-abi.Rmd, Epic C, scope decision 4's "every
+   declared type has a real safe<->C mapping"). A raw pointer is FFI-safe
+   regardless of its pointee -- in C, a pointer of any kind is just a
+   machine word, so `*const MyStruct` crossing the boundary as an opaque
+   handle is ordinary, idiomatic C FFI (this checker never needs to resolve
+   the pointee's own C-safety to accept it). Excluded: TY_STRING (sv0's
+   managed string is not a bare `char*`), TY_STRUCT/TY_ENUM/TY_TUPLE (no
+   layout decided for crossing the boundary by value), TY_REF/TY_REFMUT (a
+   borrow, not a raw pointer -- doesn't participate in this ABI at all),
+   TY_NAMED/TY_VAR (unresolved/generic), TY_SLICE/TY_SLICEMUT/TY_FN (no C
+   representation), and TY_UNKNOWN (already reported elsewhere, E0301). */
+fn is_ffi_safe_type_tag(tag: i32) -> bool {
+    if tag == TY_INT() { return true; }
+    if tag == TY_UINT() { return true; }
+    if tag == TY_BOOL() { return true; }
+    if tag == TY_CHAR() { return true; }
+    if tag == TY_ISIZE() { return true; }
+    if tag == TY_USIZE() { return true; }
+    if tag == TY_FLOAT() { return true; }
+    if tag == TY_PTR() { return true; }
+    if tag == TY_PTRMUT() { return true; }
+    return false;
+}
+
+/* A return type may additionally be TY_UNIT() (void); a parameter may not --
+   sv0 has no `()`-typed parameter syntax and C has no void-valued
+   argument. */
+fn is_ffi_safe_ret_type_tag(tag: i32) -> bool {
+    if tag == TY_UNIT() { return true; }
+    return is_ffi_safe_type_tag(tag);
+}
+
 fn ast_type_name_to_tag(name: string) -> i32 {
     if string_eq(name, "unit") { return 2; }
     if string_eq(name, "bool") { return 3; }
@@ -3281,6 +3314,39 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
     return 0;
 }
 
+/* ── check_extern_fn_signature (FFI-009) ──────────────────────
+   Validates an `#[extern_c] fn name(args) -> T;` declaration's already-
+   resolved param/return type tags against the FFI-safe whitelist
+   (is_ffi_safe_type_tag/is_ffi_safe_ret_type_tag above). Pushes one E0551
+   per offending param plus (if applicable) one for the return type,
+   spanned on the item's own name token -- matching the existing
+   item-level-span precedent (E0409's contract-needs-return-type check,
+   just above in check_program, spans the same way) rather than resolving
+   a token deep inside the type arena for a marginally tighter span. An
+   extern declaration has no body to walk, so this is the whole of FFI-009's
+   checker work for one item. */
+
+fn check_extern_fn_signature(param_types: Vec<i32>, param_count: i32,
+                             ret_tag: i32, has_ret: i32,
+                             name_pos: i32, diag_sink: Vec<i32>) -> i32 {
+    let mut pi: i32 = 0;
+    while pi < param_count {
+        let pt: i32 = vec_get(param_types, pi);
+        if is_ffi_safe_type_tag(pt) != true {
+            vec_push(diag_sink, 551);
+            vec_push(diag_sink, name_pos);
+        }
+        pi = pi + 1;
+    }
+    if has_ret != 0 {
+        if is_ffi_safe_ret_type_tag(ret_tag) != true {
+            vec_push(diag_sink, 551);
+            vec_push(diag_sink, name_pos);
+        }
+    }
+    return 0;
+}
+
 fn check_program(
     tok_tags: Vec<i32>,
     source: string,
@@ -3496,6 +3562,32 @@ fn check_program(
                 }
                 return 0 - 1;
             }
+        }
+        if vec_get(it, ii) == 8 {
+            /* FFI-009: `#[extern_c] fn ...;` -- ItemExternFn (FFI-008) has no
+               body (id4 is always -1), so there is nothing here to
+               check_fn_body/check_unsafe_gate/etc. over -- only the declared
+               signature itself needs validating against the FFI-safe
+               whitelist. */
+            let ext_name_pos: i32 = vec_get(id1, ii);
+            let ext_param_count: i32 = vec_get(id3, ii);
+            let ext_pbase: i32 = vec_get(id5, ii);
+            let ext_param_types: Vec<i32> = vec_new();
+            let ext_rpt: i32 = scan_fn_param_type_tags_arena(fn_param_ty_root,
+                              ext_pbase, ext_param_count, pty_tt, pty_td1,
+                              pty_td2, pty_td3, pp, source, starts, ends,
+                              struct_names, enum_names, type_params,
+                              tp_limit, ext_param_types);
+            if ext_rpt < 0 { return 0 - 1; }
+            let ext_has_ret: i32 = vec_get(id2, ii) % 2;
+            let ext_ret_tag: i32 = scan_fn_ret_type_tag_arena(
+                              fn_ret_ty_root_by_item, ii, ext_has_ret,
+                              pty_tt, pty_td1, pty_td2, pty_td3, pp,
+                              source, starts, ends, struct_names,
+                              enum_names, type_params, tp_limit);
+            let _cefs: i32 = check_extern_fn_signature(ext_param_types,
+                              ext_param_count, ext_ret_tag, ext_has_ret,
+                              ext_name_pos, diag_sink);
         }
         ii = ii + 1;
     }
@@ -7842,6 +7934,39 @@ fn test_check_unsafe_gate_silent_inside_unsafe() -> i32 {
     return 0;
 }
 
+fn test_check_extern_fn_signature_flags_bad_param() -> i32 {
+    let param_types: Vec<i32> = vec_new();
+    vec_push(param_types, TY_STRING());
+    let diag_sink: Vec<i32> = vec_new();
+    let _r: i32 = check_extern_fn_signature(param_types, 1, TY_INT(), 1, 42, diag_sink);
+    if vec_len(diag_sink) != 2 { return 1; }
+    if vec_get(diag_sink, 0) != 551 { return 2; }
+    if vec_get(diag_sink, 1) != 42 { return 3; }
+    return 0;
+}
+
+fn test_check_extern_fn_signature_flags_bad_return() -> i32 {
+    let param_types: Vec<i32> = vec_new();
+    vec_push(param_types, TY_INT());
+    let diag_sink: Vec<i32> = vec_new();
+    let _r: i32 = check_extern_fn_signature(param_types, 1, TY_STRUCT(), 1, 7, diag_sink);
+    if vec_len(diag_sink) != 2 { return 1; }
+    if vec_get(diag_sink, 0) != 551 { return 2; }
+    if vec_get(diag_sink, 1) != 7 { return 3; }
+    return 0;
+}
+
+fn test_check_extern_fn_signature_silent_on_all_safe() -> i32 {
+    let param_types: Vec<i32> = vec_new();
+    vec_push(param_types, TY_INT());
+    vec_push(param_types, TY_PTR());
+    vec_push(param_types, TY_BOOL());
+    let diag_sink: Vec<i32> = vec_new();
+    let _r: i32 = check_extern_fn_signature(param_types, 3, TY_UNIT(), 0, 5, diag_sink);
+    if vec_len(diag_sink) != 0 { return 1; }
+    return 0;
+}
+
 fn test_named_only_ty_basic() -> i32 {
     let sn: Vec<i32> = vec_new();
     vec_push(sn, 7);
@@ -8019,5 +8144,11 @@ fn main() -> i32 {
     if r77 != 0 { return 800 + r77; }
     let r78: i32 = test_check_unsafe_gate_silent_inside_unsafe();
     if r78 != 0 { return 810 + r78; }
+    let r79: i32 = test_check_extern_fn_signature_flags_bad_param();
+    if r79 != 0 { return 820 + r79; }
+    let r80: i32 = test_check_extern_fn_signature_flags_bad_return();
+    if r80 != 0 { return 830 + r80; }
+    let r81: i32 = test_check_extern_fn_signature_silent_on_all_safe();
+    if r81 != 0 { return 840 + r81; }
     return 0;
 }

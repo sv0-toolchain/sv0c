@@ -39,6 +39,8 @@ static int TY_SLICEMUT(void);
 static int TY_PTR(void);
 static int TY_PTRMUT(void);
 static int TY_UNKNOWN(void);
+static int is_ffi_safe_type_tag(int tag);
+static int is_ffi_safe_ret_type_tag(int tag);
 static int ast_type_name_to_tag(const char* name);
 static int is_primitive_type_name(const char* name);
 static int int_width_from_name(const char* name);
@@ -158,6 +160,7 @@ static int check_body_slice_borrow(int bet, int bed1, int bed2, int bed3, int be
 static int check_body_field_access(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int param_name_toks, int param_tyname_toks, int sdef_names, int sdef_field_offsets, int sdef_field_counts, int sdef_fnames_flat, const char* source, int starts, int ends, int diag_sink);
 static int find_multi_element_tuple(int bet, int bed2);
 static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int in_unsafe, int idx, int diag_sink);
+static int check_extern_fn_signature(int param_types, int param_count, int ret_tag, int has_ret, int name_pos, int diag_sink);
 static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit, int diag_sink);
 static int contract_expr_new(void);
 static int contract_expr_enter(int flag);
@@ -271,6 +274,9 @@ static int test_synth_expr_unsafe_block_transparent(void);
 static int unsafe_gate_deref_fixture(int in_unsafe);
 static int test_check_unsafe_gate_flags_deref_outside_unsafe(void);
 static int test_check_unsafe_gate_silent_inside_unsafe(void);
+static int test_check_extern_fn_signature_flags_bad_param(void);
+static int test_check_extern_fn_signature_flags_bad_return(void);
+static int test_check_extern_fn_signature_silent_on_all_safe(void);
 static int test_named_only_ty_basic(void);
 
 static int BINOP_ARITH(void) {
@@ -526,6 +532,65 @@ static int TY_PTRMUT(void) {
 static int TY_UNKNOWN(void) {
   int _sv0t0 = (0 - 1);
   return _sv0t0;
+}
+
+static int is_ffi_safe_type_tag(int tag) {
+  int _sv0t0 = TY_INT();
+  if ((tag == _sv0t0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = TY_UINT();
+  if ((tag == _sv0t1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t2 = TY_BOOL();
+  if ((tag == _sv0t2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t3 = TY_CHAR();
+  if ((tag == _sv0t3)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = TY_ISIZE();
+  if ((tag == _sv0t4)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = TY_USIZE();
+  if ((tag == _sv0t5)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = TY_FLOAT();
+  if ((tag == _sv0t6)) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = TY_PTR();
+  if ((tag == _sv0t7)) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = TY_PTRMUT();
+  if ((tag == _sv0t8)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int is_ffi_safe_ret_type_tag(int tag) {
+  int _sv0t0 = TY_UNIT();
+  if ((tag == _sv0t0)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = is_ffi_safe_type_tag(tag);
+  return _sv0t1;
 }
 
 static int ast_type_name_to_tag(const char* name) {
@@ -4646,6 +4711,31 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
   return 0;
 }
 
+static int check_extern_fn_signature(int param_types, int param_count, int ret_tag, int has_ret, int name_pos, int diag_sink) {
+  int pi = 0;
+  while ((pi < param_count)) {
+    int _sv0t0 = sv0_vec_get(param_types, pi);
+    int pt = _sv0t0;
+    int _sv0t1 = is_ffi_safe_type_tag(pt);
+    if ((_sv0t1 != 1)) {
+      sv0_vec_push(diag_sink, 551);
+      sv0_vec_push(diag_sink, name_pos);
+    } else {
+    }
+    pi = (pi + 1);
+  }
+  if ((has_ret != 0)) {
+    int _sv0t2 = is_ffi_safe_ret_type_tag(ret_tag);
+    if ((_sv0t2 != 1)) {
+      sv0_vec_push(diag_sink, 551);
+      sv0_vec_push(diag_sink, name_pos);
+    } else {
+    }
+  } else {
+  }
+  return 0;
+}
+
 static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit, int diag_sink) {
   int _sv0t0 = sv0_vec_new();
   int struct_names = _sv0t0;
@@ -4849,12 +4939,37 @@ static int check_program(int tok_tags, const char* source, int starts, int ends,
       }
     } else {
     }
+    int _sv0t76 = sv0_vec_get(it, ii);
+    if ((_sv0t76 == 8)) {
+      int _sv0t77 = sv0_vec_get(id1, ii);
+      int ext_name_pos = _sv0t77;
+      int _sv0t78 = sv0_vec_get(id3, ii);
+      int ext_param_count = _sv0t78;
+      int _sv0t79 = sv0_vec_get(id5, ii);
+      int ext_pbase = _sv0t79;
+      int _sv0t80 = sv0_vec_new();
+      int ext_param_types = _sv0t80;
+      int _sv0t81 = scan_fn_param_type_tags_arena(fn_param_ty_root, ext_pbase, ext_param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, ext_param_types);
+      int ext_rpt = _sv0t81;
+      if ((ext_rpt < 0)) {
+        int _sv0t82 = (0 - 1);
+        return _sv0t82;
+      } else {
+      }
+      int _sv0t83 = sv0_vec_get(id2, ii);
+      int ext_has_ret = (_sv0t83 % 2);
+      int _sv0t84 = scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item, ii, ext_has_ret, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit);
+      int ext_ret_tag = _sv0t84;
+      int _sv0t85 = check_extern_fn_signature(ext_param_types, ext_param_count, ext_ret_tag, ext_has_ret, ext_name_pos, diag_sink);
+      int _cefs = _sv0t85;
+    } else {
+    }
     ii = (ii + 1);
   }
-  int _sv0t76 = sv0_vec_len(diag_sink);
-  if ((_sv0t76 > 0)) {
-    int _sv0t77 = (0 - 1);
-    return _sv0t77;
+  int _sv0t86 = sv0_vec_len(diag_sink);
+  if ((_sv0t86 > 0)) {
+    int _sv0t87 = (0 - 1);
+    return _sv0t87;
   } else {
   }
   return 0;
@@ -12443,6 +12558,84 @@ static int test_check_unsafe_gate_silent_inside_unsafe(void) {
   return 0;
 }
 
+static int test_check_extern_fn_signature_flags_bad_param(void) {
+  int _sv0t0 = sv0_vec_new();
+  int param_types = _sv0t0;
+  int _sv0t1 = TY_STRING();
+  sv0_vec_push(param_types, _sv0t1);
+  int _sv0t2 = sv0_vec_new();
+  int diag_sink = _sv0t2;
+  int _sv0t3 = TY_INT();
+  int _sv0t4 = check_extern_fn_signature(param_types, 1, _sv0t3, 1, 42, diag_sink);
+  int _r = _sv0t4;
+  int _sv0t5 = sv0_vec_len(diag_sink);
+  if ((_sv0t5 != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(diag_sink, 0);
+  if ((_sv0t6 != 551)) {
+    return 2;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(diag_sink, 1);
+  if ((_sv0t7 != 42)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_check_extern_fn_signature_flags_bad_return(void) {
+  int _sv0t0 = sv0_vec_new();
+  int param_types = _sv0t0;
+  int _sv0t1 = TY_INT();
+  sv0_vec_push(param_types, _sv0t1);
+  int _sv0t2 = sv0_vec_new();
+  int diag_sink = _sv0t2;
+  int _sv0t3 = TY_STRUCT();
+  int _sv0t4 = check_extern_fn_signature(param_types, 1, _sv0t3, 1, 7, diag_sink);
+  int _r = _sv0t4;
+  int _sv0t5 = sv0_vec_len(diag_sink);
+  if ((_sv0t5 != 2)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(diag_sink, 0);
+  if ((_sv0t6 != 551)) {
+    return 2;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(diag_sink, 1);
+  if ((_sv0t7 != 7)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_check_extern_fn_signature_silent_on_all_safe(void) {
+  int _sv0t0 = sv0_vec_new();
+  int param_types = _sv0t0;
+  int _sv0t1 = TY_INT();
+  sv0_vec_push(param_types, _sv0t1);
+  int _sv0t2 = TY_PTR();
+  sv0_vec_push(param_types, _sv0t2);
+  int _sv0t3 = TY_BOOL();
+  sv0_vec_push(param_types, _sv0t3);
+  int _sv0t4 = sv0_vec_new();
+  int diag_sink = _sv0t4;
+  int _sv0t5 = TY_UNIT();
+  int _sv0t6 = check_extern_fn_signature(param_types, 3, _sv0t5, 0, 5, diag_sink);
+  int _r = _sv0t6;
+  int _sv0t7 = sv0_vec_len(diag_sink);
+  if ((_sv0t7 != 0)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_named_only_ty_basic(void) {
   int _sv0t0 = sv0_vec_new();
   int sn = _sv0t0;
@@ -13041,6 +13234,27 @@ int main(void) {
   if ((r78 != 0)) {
     int _sv0t162 = (810 + r78);
     return _sv0t162;
+  } else {
+  }
+  int _sv0t163 = test_check_extern_fn_signature_flags_bad_param();
+  int r79 = _sv0t163;
+  if ((r79 != 0)) {
+    int _sv0t164 = (820 + r79);
+    return _sv0t164;
+  } else {
+  }
+  int _sv0t165 = test_check_extern_fn_signature_flags_bad_return();
+  int r80 = _sv0t165;
+  if ((r80 != 0)) {
+    int _sv0t166 = (830 + r80);
+    return _sv0t166;
+  } else {
+  }
+  int _sv0t167 = test_check_extern_fn_signature_silent_on_all_safe();
+  int r81 = _sv0t167;
+  if ((r81 != 0)) {
+    int _sv0t168 = (840 + r81);
+    return _sv0t168;
   } else {
   }
   return 0;
