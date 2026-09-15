@@ -1,0 +1,12 @@
+/* FFI-008: `#[extern_c] fn ...;` is a real, distinct AST item (tag 8,
+   ItemExternFn) that parses and compiles clean -- checker validation
+   (FFI-009) and real extern-C call lowering (FFI-010) aren't built yet, so
+   the declaration itself has no C output (nothing to warn about being
+   unused); this only proves the declaration syntax itself is accepted and
+   doesn't disturb anything else in the same file. Exits 3. */
+#[extern_c]
+fn c_abs(x: i32) -> i32;
+
+fn main() -> i32 {
+    return 3;
+}

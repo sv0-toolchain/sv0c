@@ -299,6 +299,29 @@ fn ps_skip_where_clause(tags: Vec<i32>, pos: i32) -> i32 {
     return p;
 }
 
+/* FFI-008: recognizes exactly `#[extern_c]` (HASH LBRACKET IDENT("extern_c")
+   RBRACKET) at `pos` -- the plain, no-argument v1 form locked by scope
+   decision 3. Returns the position right after `]`, or -1 on no match
+   (including the reserved-for-later `#[extern_c(name = "...")]` argument
+   form, or any other attribute -- those fall through to the generic
+   ps_skip_attributes path below and are treated as ordinary, non-extern
+   items, matching the decision not to build the argument grammar
+   speculatively). Must run BEFORE ps_skip_attributes, which would
+   otherwise blindly discard this exact information. */
+fn ps_peek_extern_c_attribute(tags: Vec<i32>, source: string,
+                              starts: Vec<i32>, ends: Vec<i32>,
+                              pos: i32) -> i32 {
+    if ps_peek(tags, pos) != 21 { return 0 - 1; }
+    if ps_peek(tags, pos + 1) != 10 { return 0 - 1; }
+    if ps_peek(tags, pos + 2) != 5 { return 0 - 1; }
+    let s: i32 = vec_get(starts, pos + 2);
+    let e: i32 = vec_get(ends, pos + 2);
+    let nm: string = string_substr(source, s, e - s);
+    if !string_eq(nm, "extern_c") { return 0 - 1; }
+    if ps_peek(tags, pos + 3) != 11 { return 0 - 1; }
+    return pos + 4;
+}
+
 fn ps_skip_attributes(tags: Vec<i32>, pos: i32) -> i32 {
     let mut p: i32 = pos;
     let mut scanning: bool = true;
@@ -4087,6 +4110,42 @@ fn parse_item(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
               tparam_names_out: Vec<i32>,
               enum_variant_payload_count_by_variant: Vec<i32>,
               enum_variant_payload_ty_name_tok: Vec<i32>) -> i32 {
+    /* FFI-008: `#[extern_c] fn name(args) -> T;` -- a header-only fn
+       declaration (scope decision 3), reusing the SAME bodyless-ItemFn
+       machinery M4-S-033 already built for trait method declarations
+       (parse_fn_body already accepts `;` instead of `{ ... }`), but
+       tagged distinctly (item tag 8, ItemExternFn, not tag 0) so the
+       checker/lowering can dispatch on it later (FFI-009/010) instead of
+       it being indistinguishable from -- and silently rejected the same
+       way as -- an accidental bodyless top-level fn with no attribute at
+       all. Checked before the generic ps_skip_attributes below, which
+       would otherwise discard this exact information. A body ({ ... }
+       instead of `;`) on an extern_c declaration is a parse error --
+       an external function's real implementation lives elsewhere, by
+       definition. */
+    let extc_pos: i32 = ps_peek_extern_c_attribute(tags, source, starts, ends, pos);
+    if extc_pos >= 0 {
+        let extc_p0: i32 = ps_skip_optional_pub(tags, extc_pos);
+        if ps_peek(tags, extc_p0) != 65 { return 0 - 1; }
+        let it_len_before: i32 = vec_len(it);
+        let pm_extc: i32 = parse_fn_body(tags, starts, ends, source, extc_p0,
+                             it, id1, id2, id3, id4, id5, pp,
+                             fn_param_name_toks,
+                             fn_param_ty_root,
+                             fn_ret_ty_root_by_item,
+                             fn_contract_base_by_item,
+                             fn_contract_root,
+                             enum_variant_payload_base_by_item,
+                             enum_variant_payload_count_by_item,
+                             enum_variant_payload_max_by_item,
+                             pty_tt, pty_td1, pty_td2, pty_td3,
+                             body_et, body_ed1, body_ed2,
+                             body_ed3, body_ed4, body_sf);
+        if pm_extc < 0 { return 0 - 1; }
+        if vec_get(id4, it_len_before) >= 0 { return 0 - 1; }
+        vec_set(it, it_len_before, 8);
+        return pm_extc;
+    }
     let p0: i32 = ps_skip_optional_pub(tags, ps_skip_attributes(tags, pos));
     let t: i32 = ps_peek(tags, p0);
     if t == 75 {
@@ -4257,7 +4316,17 @@ fn parse_program(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         let p0: i32 = ps_skip_attributes(tags, p);
         if ps_peek(tags, p0) == 97 { done = true; }
         else {
-            let pi: i32 = parse_item(tags, starts, ends, source, p0,
+            /* FFI-008: pass the UNSKIPPED `p`, not `p0` -- parse_item does
+               its own attribute handling internally (ps_peek_extern_c_attribute
+               checked before its own generic ps_skip_attributes fallback), and
+               needs to see a leading `#[extern_c]` itself. Passing the
+               already-skipped p0 here silently discarded that information
+               one layer up, before parse_item's own check ever ran --
+               `#[extern_c] fn foo();` parsed as an ordinary bodyless ItemFn
+               (tag 0), indistinguishable from an unmarked one, not the new
+               ItemExternFn (tag 8). p0 is still used for the EOF check above
+               (trailing attributes with nothing following). */
+            let pi: i32 = parse_item(tags, starts, ends, source, p,
                                       it, id1, id2, id3, id4, id5, pp,
                                       enum_variant_name_toks,
                                       struct_field_name_toks,
@@ -6906,6 +6975,122 @@ fn test_parse_program() -> i32 {
     return 0;
 }
 
+/* FFI-008: `#[extern_c] fn c_abs(x: i32) -> i32;` parses to a SINGLE item
+   tagged 8 (ItemExternFn, not 0/ItemFn) with body_root == -1 (bodyless,
+   like a trait method declaration) -- and a real real C-linkage
+   signature (name, 1 param, return type), not just a bare marker. */
+fn test_parse_extern_c_fn_decl() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    let source: string = "#[extern_c] fn c_abs(x: i32) -> i32;";
+    vec_push(tags, 21); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 10); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 5);  vec_push(starts, 2); vec_push(ends, 10);
+    vec_push(tags, 11); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 65); vec_push(starts, 12); vec_push(ends, 14);
+    vec_push(tags, 5);  vec_push(starts, 15); vec_push(ends, 20);
+    vec_push(tags, 6);  vec_push(starts, 20); vec_push(ends, 21);
+    vec_push(tags, 5);  vec_push(starts, 21); vec_push(ends, 22);
+    vec_push(tags, 14); vec_push(starts, 22); vec_push(ends, 23);
+    vec_push(tags, 5);  vec_push(starts, 24); vec_push(ends, 27);
+    vec_push(tags, 7);  vec_push(starts, 27); vec_push(ends, 28);
+    vec_push(tags, 19); vec_push(starts, 29); vec_push(ends, 31);
+    vec_push(tags, 5);  vec_push(starts, 32); vec_push(ends, 35);
+    vec_push(tags, 13); vec_push(starts, 35); vec_push(ends, 36);
+    vec_push(tags, 97); vec_push(starts, 36); vec_push(ends, 36);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let bet: Vec<i32> = vec_new();
+    let be1: Vec<i32> = vec_new();
+    let be2: Vec<i32> = vec_new();
+    let be3: Vec<i32> = vec_new();
+    let be4: Vec<i32> = vec_new();
+    let bsf: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
+    let r: i32 = parse_program(tags, starts, ends, source, 0,
+                                it, id1, id2, id3, id4, id5, pp,
+                                vec_new(), vec_new(), fn_ptoks,
+                                vec_new(), vec_new(),
+                                vec_new(), vec_new(),
+                                vec_new(), vec_new(),
+                                vec_new(),
+                                vec_new(),
+                                pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
+                                bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
+    if r != 14 { return 1; }
+    if vec_len(it) != 1 { return 2; }
+    if vec_get(it, 0) != 8 { return 3; }
+    if vec_get(id1, 0) != 5 { return 4; }
+    if vec_get(id3, 0) != 1 { return 5; }
+    if vec_get(id4, 0) != (0 - 1) { return 6; }
+    return 0;
+}
+
+/* A body on an `#[extern_c]` declaration is a parse error -- an external
+   function's real implementation lives elsewhere, by definition; a `{ }`
+   body would be nonsensical (and never lowered/called). */
+fn test_parse_extern_c_fn_with_body_rejected() -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    let source: string = "#[extern_c] fn c_abs() { }";
+    vec_push(tags, 21); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tags, 10); vec_push(starts, 1); vec_push(ends, 2);
+    vec_push(tags, 5);  vec_push(starts, 2); vec_push(ends, 10);
+    vec_push(tags, 11); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tags, 65); vec_push(starts, 12); vec_push(ends, 14);
+    vec_push(tags, 5);  vec_push(starts, 15); vec_push(ends, 20);
+    vec_push(tags, 6);  vec_push(starts, 20); vec_push(ends, 21);
+    vec_push(tags, 7);  vec_push(starts, 21); vec_push(ends, 22);
+    vec_push(tags, 8);  vec_push(starts, 23); vec_push(ends, 24);
+    vec_push(tags, 9);  vec_push(starts, 25); vec_push(ends, 26);
+    vec_push(tags, 97); vec_push(starts, 26); vec_push(ends, 26);
+    let it: Vec<i32> = vec_new();
+    let id1: Vec<i32> = vec_new();
+    let id2: Vec<i32> = vec_new();
+    let id3: Vec<i32> = vec_new();
+    let id4: Vec<i32> = vec_new();
+    let id5: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    let bet: Vec<i32> = vec_new();
+    let be1: Vec<i32> = vec_new();
+    let be2: Vec<i32> = vec_new();
+    let be3: Vec<i32> = vec_new();
+    let be4: Vec<i32> = vec_new();
+    let bsf: Vec<i32> = vec_new();
+    let fn_ptoks: Vec<i32> = vec_new();
+    let pty_tt: Vec<i32> = vec_new();
+    let pty_td1: Vec<i32> = vec_new();
+    let pty_td2: Vec<i32> = vec_new();
+    let pty_td3: Vec<i32> = vec_new();
+    let sf_ty_root: Vec<i32> = vec_new();
+    let r: i32 = parse_program(tags, starts, ends, source, 0,
+                                it, id1, id2, id3, id4, id5, pp,
+                                vec_new(), vec_new(), fn_ptoks,
+                                vec_new(), vec_new(),
+                                vec_new(), vec_new(),
+                                vec_new(), vec_new(),
+                                vec_new(),
+                                vec_new(),
+                                pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root,
+                                bet, be1, be2, be3, be4, bsf, vec_new(),
+                             vec_new(), vec_new());
+    if r >= 0 { return 1; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r0: i32 = test_item_fn_id2_pack_roundtrip();
     if r0 != 0 { return 2000 + r0; }
@@ -7077,5 +7262,9 @@ fn main() -> i32 {
     if r81 != 0 { return 920 + r81; }
     let r82: i32 = test_parse_unsafe_block_empty();
     if r82 != 0 { return 930 + r82; }
+    let r83: i32 = test_parse_extern_c_fn_decl();
+    if r83 != 0 { return 940 + r83; }
+    let r84: i32 = test_parse_extern_c_fn_with_body_rejected();
+    if r84 != 0 { return 950 + r84; }
     return 0;
 }

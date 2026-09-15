@@ -105,6 +105,7 @@ static int ps_skip_optional_pub(int tags, int pos);
 static int ps_skip_optional_unsafe(int tags, int pos);
 static int ps_skip_generic_params(int tags, int pos);
 static int ps_skip_where_clause(int tags, int pos);
+static int ps_peek_extern_c_attribute(int tags, const char* source, int starts, int ends, int pos);
 static int ps_skip_attributes(int tags, int pos);
 static int parse_use_item(int tags, int pos, int path_out);
 static int parse_module_decl(int tags, int pos, int path_out);
@@ -307,6 +308,8 @@ static int test_parse_enum_mixed(void);
 static int test_parse_impl(void);
 static int test_parse_fn_contract(void);
 static int test_parse_program(void);
+static int test_parse_extern_c_fn_decl(void);
+static int test_parse_extern_c_fn_with_body_rejected(void);
 
 static int TK_INT_LIT(void) {
   return 0;
@@ -920,6 +923,54 @@ static int ps_skip_where_clause(int tags, int pos) {
     p = (p + 1);
   }
   return p;
+}
+
+static int ps_peek_extern_c_attribute(int tags, const char* source, int starts, int ends, int pos) {
+  int _sv0t0 = ps_peek(tags, pos);
+  if ((_sv0t0 != 21)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = (pos + 1);
+  int _sv0t3 = ps_peek(tags, _sv0t2);
+  if ((_sv0t3 != 10)) {
+    int _sv0t4 = (0 - 1);
+    return _sv0t4;
+  } else {
+  }
+  int _sv0t5 = (pos + 2);
+  int _sv0t6 = ps_peek(tags, _sv0t5);
+  if ((_sv0t6 != 5)) {
+    int _sv0t7 = (0 - 1);
+    return _sv0t7;
+  } else {
+  }
+  int _sv0t8 = (pos + 2);
+  int _sv0t9 = sv0_vec_get(starts, _sv0t8);
+  int s = _sv0t9;
+  int _sv0t10 = (pos + 2);
+  int _sv0t11 = sv0_vec_get(ends, _sv0t10);
+  int e = _sv0t11;
+  int _sv0t12 = (e - s);
+  const char* _sv0t13 = sv0_string_substr(source, s, _sv0t12);
+  const char* nm;
+  nm = _sv0t13;
+  int _sv0t14 = sv0_string_eq(nm, "extern_c");
+  if ((!_sv0t14)) {
+    int _sv0t15 = (0 - 1);
+    return _sv0t15;
+  } else {
+  }
+  int _sv0t16 = (pos + 3);
+  int _sv0t17 = ps_peek(tags, _sv0t16);
+  if ((_sv0t17 != 11)) {
+    int _sv0t18 = (0 - 1);
+    return _sv0t18;
+  } else {
+  }
+  int _sv0t19 = (pos + 4);
+  return _sv0t19;
 }
 
 static int ps_skip_attributes(int tags, int pos) {
@@ -6177,55 +6228,54 @@ static int parse_impl_item(int tags, int starts, int ends, const char* source, i
 }
 
 static int parse_item(int tags, int starts, int ends, const char* source, int pos, int it, int id1, int id2, int id3, int id4, int id5, int pp, int enum_variant_name_toks, int struct_field_name_toks, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int fn_contract_base_by_item, int fn_contract_root, int enum_variant_payload_ty_root, int enum_variant_payload_base_by_item, int enum_variant_payload_count_by_item, int enum_variant_payload_max_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int body_sf, int tparam_names_out, int enum_variant_payload_count_by_variant, int enum_variant_payload_ty_name_tok) {
-  int _sv0t0 = ps_skip_attributes(tags, pos);
-  int _sv0t1 = ps_skip_optional_pub(tags, _sv0t0);
-  int p0 = _sv0t1;
-  int _sv0t2 = ps_peek(tags, p0);
-  int t = _sv0t2;
-  if ((t == 75)) {
-    int _sv0t3 = sv0_vec_len(pp);
-    int pps = _sv0t3;
-    int _sv0t4 = parse_module_decl(tags, p0, pp);
-    int pm = _sv0t4;
-    if ((pm == p0)) {
-      int _sv0t5 = (0 - 1);
-      return _sv0t5;
+  int _sv0t0 = ps_peek_extern_c_attribute(tags, source, starts, ends, pos);
+  int extc_pos = _sv0t0;
+  if ((extc_pos >= 0)) {
+    int _sv0t1 = ps_skip_optional_pub(tags, extc_pos);
+    int extc_p0 = _sv0t1;
+    int _sv0t2 = ps_peek(tags, extc_p0);
+    if ((_sv0t2 != 65)) {
+      int _sv0t3 = (0 - 1);
+      return _sv0t3;
     } else {
     }
-    int _sv0t6 = sv0_vec_len(pp);
-    int ppc = (_sv0t6 - pps);
-    sv0_vec_push(it, 6);
-    sv0_vec_push(id1, pps);
-    sv0_vec_push(id2, ppc);
-    sv0_vec_push(id3, 0);
-    int _sv0t7 = (0 - 1);
-    sv0_vec_push(id4, _sv0t7);
-    int _sv0t8 = (0 - 1);
-    sv0_vec_push(id5, _sv0t8);
-    int _sv0t9 = (0 - 1);
-    sv0_vec_push(fn_ret_ty_root_by_item, _sv0t9);
-    int _sv0t10 = (0 - 1);
-    sv0_vec_push(fn_contract_base_by_item, _sv0t10);
-    int _sv0t11 = (0 - 1);
-    sv0_vec_push(enum_variant_payload_base_by_item, _sv0t11);
-    sv0_vec_push(enum_variant_payload_count_by_item, 0);
-    sv0_vec_push(enum_variant_payload_max_by_item, 0);
-    return pm;
+    int _sv0t4 = sv0_vec_len(it);
+    int it_len_before = _sv0t4;
+    int _sv0t5 = parse_fn_body(tags, starts, ends, source, extc_p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
+    int pm_extc = _sv0t5;
+    if ((pm_extc < 0)) {
+      int _sv0t6 = (0 - 1);
+      return _sv0t6;
+    } else {
+    }
+    int _sv0t7 = sv0_vec_get(id4, it_len_before);
+    if ((_sv0t7 >= 0)) {
+      int _sv0t8 = (0 - 1);
+      return _sv0t8;
+    } else {
+    }
+    sv0_vec_set(it, it_len_before, 8);
+    return pm_extc;
   } else {
   }
-  if ((t == 94)) {
+  int _sv0t9 = ps_skip_attributes(tags, pos);
+  int _sv0t10 = ps_skip_optional_pub(tags, _sv0t9);
+  int p0 = _sv0t10;
+  int _sv0t11 = ps_peek(tags, p0);
+  int t = _sv0t11;
+  if ((t == 75)) {
     int _sv0t12 = sv0_vec_len(pp);
     int pps = _sv0t12;
-    int _sv0t13 = parse_use_item(tags, p0, pp);
-    int pu = _sv0t13;
-    if ((pu < 0)) {
+    int _sv0t13 = parse_module_decl(tags, p0, pp);
+    int pm = _sv0t13;
+    if ((pm == p0)) {
       int _sv0t14 = (0 - 1);
       return _sv0t14;
     } else {
     }
     int _sv0t15 = sv0_vec_len(pp);
     int ppc = (_sv0t15 - pps);
-    sv0_vec_push(it, 5);
+    sv0_vec_push(it, 6);
     sv0_vec_push(id1, pps);
     sv0_vec_push(id2, ppc);
     sv0_vec_push(id3, 0);
@@ -6241,46 +6291,77 @@ static int parse_item(int tags, int starts, int ends, const char* source, int po
     sv0_vec_push(enum_variant_payload_base_by_item, _sv0t20);
     sv0_vec_push(enum_variant_payload_count_by_item, 0);
     sv0_vec_push(enum_variant_payload_max_by_item, 0);
+    return pm;
+  } else {
+  }
+  if ((t == 94)) {
+    int _sv0t21 = sv0_vec_len(pp);
+    int pps = _sv0t21;
+    int _sv0t22 = parse_use_item(tags, p0, pp);
+    int pu = _sv0t22;
+    if ((pu < 0)) {
+      int _sv0t23 = (0 - 1);
+      return _sv0t23;
+    } else {
+    }
+    int _sv0t24 = sv0_vec_len(pp);
+    int ppc = (_sv0t24 - pps);
+    sv0_vec_push(it, 5);
+    sv0_vec_push(id1, pps);
+    sv0_vec_push(id2, ppc);
+    sv0_vec_push(id3, 0);
+    int _sv0t25 = (0 - 1);
+    sv0_vec_push(id4, _sv0t25);
+    int _sv0t26 = (0 - 1);
+    sv0_vec_push(id5, _sv0t26);
+    int _sv0t27 = (0 - 1);
+    sv0_vec_push(fn_ret_ty_root_by_item, _sv0t27);
+    int _sv0t28 = (0 - 1);
+    sv0_vec_push(fn_contract_base_by_item, _sv0t28);
+    int _sv0t29 = (0 - 1);
+    sv0_vec_push(enum_variant_payload_base_by_item, _sv0t29);
+    sv0_vec_push(enum_variant_payload_count_by_item, 0);
+    sv0_vec_push(enum_variant_payload_max_by_item, 0);
     return pu;
   } else {
   }
   if ((t == 65)) {
-    int _sv0t21 = parse_fn_body(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
-    return _sv0t21;
+    int _sv0t30 = parse_fn_body(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
+    return _sv0t30;
   } else {
   }
   if ((t == 93)) {
-    int _sv0t22 = parse_fn_body(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
-    return _sv0t22;
+    int _sv0t31 = parse_fn_body(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
+    return _sv0t31;
   } else {
   }
   if ((t == 89)) {
-    int _sv0t23 = parse_struct_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, struct_field_name_toks, fn_ret_ty_root_by_item, fn_contract_base_by_item, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root);
-    return _sv0t23;
+    int _sv0t32 = parse_struct_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, struct_field_name_toks, fn_ret_ty_root_by_item, fn_contract_base_by_item, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root);
+    return _sv0t32;
   } else {
   }
   if ((t == 62)) {
-    int _sv0t24 = parse_enum_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, enum_variant_name_toks, fn_ret_ty_root_by_item, fn_contract_base_by_item, enum_variant_payload_ty_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, tparam_names_out, enum_variant_payload_count_by_variant, enum_variant_payload_ty_name_tok);
-    return _sv0t24;
+    int _sv0t33 = parse_enum_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, enum_variant_name_toks, fn_ret_ty_root_by_item, fn_contract_base_by_item, enum_variant_payload_ty_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, tparam_names_out, enum_variant_payload_count_by_variant, enum_variant_payload_ty_name_tok);
+    return _sv0t33;
   } else {
   }
   if ((t == 90)) {
-    int _sv0t25 = parse_trait_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
-    return _sv0t25;
+    int _sv0t34 = parse_trait_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
+    return _sv0t34;
   } else {
   }
   if ((t == 69)) {
-    int _sv0t26 = parse_impl_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
-    return _sv0t26;
+    int _sv0t35 = parse_impl_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
+    return _sv0t35;
   } else {
   }
   if ((t == 92)) {
-    int _sv0t27 = parse_type_alias_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_ret_ty_root_by_item, fn_contract_base_by_item, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
-    return _sv0t27;
+    int _sv0t36 = parse_type_alias_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, fn_ret_ty_root_by_item, fn_contract_base_by_item, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf);
+    return _sv0t36;
   } else {
   }
-  int _sv0t28 = (0 - 1);
-  return _sv0t28;
+  int _sv0t37 = (0 - 1);
+  return _sv0t37;
 }
 
 static int parse_program(int tags, int starts, int ends, const char* source, int pos, int it, int id1, int id2, int id3, int id4, int id5, int pp, int enum_variant_name_toks, int struct_field_name_toks, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int fn_contract_base_by_item, int fn_contract_root, int enum_variant_payload_ty_root, int enum_variant_payload_base_by_item, int enum_variant_payload_count_by_item, int enum_variant_payload_max_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int struct_field_ty_root, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int body_sf, int tparam_names_out, int enum_variant_payload_count_by_variant, int enum_variant_payload_ty_name_tok) {
@@ -6293,7 +6374,7 @@ static int parse_program(int tags, int starts, int ends, const char* source, int
     if ((_sv0t1 == 97)) {
       done = 1;
     } else {
-      int _sv0t2 = parse_item(tags, starts, ends, source, p0, it, id1, id2, id3, id4, id5, pp, enum_variant_name_toks, struct_field_name_toks, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_ty_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf, tparam_names_out, enum_variant_payload_count_by_variant, enum_variant_payload_ty_name_tok);
+      int _sv0t2 = parse_item(tags, starts, ends, source, p, it, id1, id2, id3, id4, id5, pp, enum_variant_name_toks, struct_field_name_toks, fn_param_name_toks, fn_param_ty_root, fn_ret_ty_root_by_item, fn_contract_base_by_item, fn_contract_root, enum_variant_payload_ty_root, enum_variant_payload_base_by_item, enum_variant_payload_count_by_item, enum_variant_payload_max_by_item, pty_tt, pty_td1, pty_td2, pty_td3, struct_field_ty_root, body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_sf, tparam_names_out, enum_variant_payload_count_by_variant, enum_variant_payload_ty_name_tok);
       int pi = _sv0t2;
       if ((pi < 0)) {
         int _sv0t3 = (0 - p0);
@@ -13073,6 +13154,248 @@ static int test_parse_program(void) {
   return 0;
 }
 
+static int test_parse_extern_c_fn_decl(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int starts = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ends = _sv0t2;
+  const char* source;
+  source = "#[extern_c] fn c_abs(x: i32) -> i32;";
+  sv0_vec_push(tags, 21);
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 1);
+  sv0_vec_push(tags, 10);
+  sv0_vec_push(starts, 1);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(starts, 2);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(tags, 11);
+  sv0_vec_push(starts, 10);
+  sv0_vec_push(ends, 11);
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(starts, 12);
+  sv0_vec_push(ends, 14);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(starts, 15);
+  sv0_vec_push(ends, 20);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(starts, 20);
+  sv0_vec_push(ends, 21);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(starts, 21);
+  sv0_vec_push(ends, 22);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(starts, 22);
+  sv0_vec_push(ends, 23);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(starts, 24);
+  sv0_vec_push(ends, 27);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(starts, 27);
+  sv0_vec_push(ends, 28);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(starts, 29);
+  sv0_vec_push(ends, 31);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(starts, 32);
+  sv0_vec_push(ends, 35);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(starts, 35);
+  sv0_vec_push(ends, 36);
+  sv0_vec_push(tags, 97);
+  sv0_vec_push(starts, 36);
+  sv0_vec_push(ends, 36);
+  int _sv0t3 = sv0_vec_new();
+  int it = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int id1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int id2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int id3 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id4 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id5 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int pp = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int bet = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int be1 = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int be2 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int be3 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int be4 = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int bsf = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int fn_ptoks = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int pty_tt = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int pty_td1 = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int pty_td2 = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int pty_td3 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int sf_ty_root = _sv0t21;
+  int _sv0t22 = sv0_vec_new();
+  int _sv0t23 = sv0_vec_new();
+  int _sv0t24 = sv0_vec_new();
+  int _sv0t25 = sv0_vec_new();
+  int _sv0t26 = sv0_vec_new();
+  int _sv0t27 = sv0_vec_new();
+  int _sv0t28 = sv0_vec_new();
+  int _sv0t29 = sv0_vec_new();
+  int _sv0t30 = sv0_vec_new();
+  int _sv0t31 = sv0_vec_new();
+  int _sv0t32 = sv0_vec_new();
+  int _sv0t33 = sv0_vec_new();
+  int _sv0t34 = sv0_vec_new();
+  int _sv0t35 = parse_program(tags, starts, ends, source, 0, it, id1, id2, id3, id4, id5, pp, _sv0t22, _sv0t23, fn_ptoks, _sv0t24, _sv0t25, _sv0t26, _sv0t27, _sv0t28, _sv0t29, _sv0t30, _sv0t31, pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root, bet, be1, be2, be3, be4, bsf, _sv0t32, _sv0t33, _sv0t34);
+  int r = _sv0t35;
+  if ((r != 14)) {
+    return 1;
+  } else {
+  }
+  int _sv0t36 = sv0_vec_len(it);
+  if ((_sv0t36 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t37 = sv0_vec_get(it, 0);
+  if ((_sv0t37 != 8)) {
+    return 3;
+  } else {
+  }
+  int _sv0t38 = sv0_vec_get(id1, 0);
+  if ((_sv0t38 != 5)) {
+    return 4;
+  } else {
+  }
+  int _sv0t39 = sv0_vec_get(id3, 0);
+  if ((_sv0t39 != 1)) {
+    return 5;
+  } else {
+  }
+  int _sv0t40 = sv0_vec_get(id4, 0);
+  int _sv0t41 = (0 - 1);
+  if ((_sv0t40 != _sv0t41)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
+static int test_parse_extern_c_fn_with_body_rejected(void) {
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int starts = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ends = _sv0t2;
+  const char* source;
+  source = "#[extern_c] fn c_abs() { }";
+  sv0_vec_push(tags, 21);
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 1);
+  sv0_vec_push(tags, 10);
+  sv0_vec_push(starts, 1);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(starts, 2);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(tags, 11);
+  sv0_vec_push(starts, 10);
+  sv0_vec_push(ends, 11);
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(starts, 12);
+  sv0_vec_push(ends, 14);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(starts, 15);
+  sv0_vec_push(ends, 20);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(starts, 20);
+  sv0_vec_push(ends, 21);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(starts, 21);
+  sv0_vec_push(ends, 22);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(starts, 23);
+  sv0_vec_push(ends, 24);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(starts, 25);
+  sv0_vec_push(ends, 26);
+  sv0_vec_push(tags, 97);
+  sv0_vec_push(starts, 26);
+  sv0_vec_push(ends, 26);
+  int _sv0t3 = sv0_vec_new();
+  int it = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int id1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int id2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int id3 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int id4 = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int id5 = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int pp = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int bet = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int be1 = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int be2 = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int be3 = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int be4 = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int bsf = _sv0t15;
+  int _sv0t16 = sv0_vec_new();
+  int fn_ptoks = _sv0t16;
+  int _sv0t17 = sv0_vec_new();
+  int pty_tt = _sv0t17;
+  int _sv0t18 = sv0_vec_new();
+  int pty_td1 = _sv0t18;
+  int _sv0t19 = sv0_vec_new();
+  int pty_td2 = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int pty_td3 = _sv0t20;
+  int _sv0t21 = sv0_vec_new();
+  int sf_ty_root = _sv0t21;
+  int _sv0t22 = sv0_vec_new();
+  int _sv0t23 = sv0_vec_new();
+  int _sv0t24 = sv0_vec_new();
+  int _sv0t25 = sv0_vec_new();
+  int _sv0t26 = sv0_vec_new();
+  int _sv0t27 = sv0_vec_new();
+  int _sv0t28 = sv0_vec_new();
+  int _sv0t29 = sv0_vec_new();
+  int _sv0t30 = sv0_vec_new();
+  int _sv0t31 = sv0_vec_new();
+  int _sv0t32 = sv0_vec_new();
+  int _sv0t33 = sv0_vec_new();
+  int _sv0t34 = sv0_vec_new();
+  int _sv0t35 = parse_program(tags, starts, ends, source, 0, it, id1, id2, id3, id4, id5, pp, _sv0t22, _sv0t23, fn_ptoks, _sv0t24, _sv0t25, _sv0t26, _sv0t27, _sv0t28, _sv0t29, _sv0t30, _sv0t31, pty_tt, pty_td1, pty_td2, pty_td3, sf_ty_root, bet, be1, be2, be3, be4, bsf, _sv0t32, _sv0t33, _sv0t34);
+  int r = _sv0t35;
+  if ((r >= 0)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_item_fn_id2_pack_roundtrip();
   int r0 = _sv0t0;
@@ -13666,6 +13989,20 @@ int main(void) {
   if ((r82 != 0)) {
     int _sv0t168 = (930 + r82);
     return _sv0t168;
+  } else {
+  }
+  int _sv0t169 = test_parse_extern_c_fn_decl();
+  int r83 = _sv0t169;
+  if ((r83 != 0)) {
+    int _sv0t170 = (940 + r83);
+    return _sv0t170;
+  } else {
+  }
+  int _sv0t171 = test_parse_extern_c_fn_with_body_rejected();
+  int r84 = _sv0t171;
+  if ((r84 != 0)) {
+    int _sv0t172 = (950 + r84);
+    return _sv0t172;
   } else {
   }
   return 0;
