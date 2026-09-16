@@ -4,6 +4,8 @@
    the declaration itself has no C output (nothing to warn about being
    unused); this only proves the declaration syntax itself is accepted and
    doesn't disturb anything else in the same file. Exits 3. */
+/// Caller obligation (FFI-011): declaration only, never called here -- mirrors
+/// libc's abs(x), so a real caller would need x != i32::MIN.
 #[extern_c]
 fn c_abs(x: i32) -> i32;
 

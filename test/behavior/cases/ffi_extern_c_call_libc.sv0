@@ -1,6 +1,8 @@
 /* FFI-010 smoke: a real "hello from C" round trip -- an `#[extern_c]`
    declaration for a genuinely external, non-sv0-emitted C function (libc's
    own abs()), called like any other sv0 function. Exits 42. */
+/// Caller obligation (FFI-011): `x` must not be `i32::MIN` -- `abs(INT_MIN)`
+/// overflows the representable range and is undefined behavior in C.
 #[extern_c]
 fn abs(x: i32) -> i32;
 

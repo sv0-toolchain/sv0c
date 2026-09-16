@@ -2,6 +2,9 @@
    signature built entirely from FFI-safe types (int/uint/bool/pointer, plus
    an implicit unit return) -- this is the regression guard proving the
    whitelist doesn't misfire on ordinary, legitimate declarations. Exits 9. */
+/// Caller obligation (FFI-011): synthetic signature for type-mapping
+/// coverage only, never called -- `p` would need to be non-null and valid
+/// for a real implementation to dereference it.
 #[extern_c]
 fn c_check(x: i32, count: u64, ok: bool, p: *const i32) -> i32;
 

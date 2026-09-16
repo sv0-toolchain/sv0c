@@ -2,6 +2,8 @@
    is a parse error (an external function's real implementation lives
    elsewhere, by definition). Expects E0100 (native only, `#[extern_c]`
    doesn't exist in the sml-legacy parser). */
+/// Caller obligation (FFI-011): moot here -- this declaration is rejected
+/// for having a body (E0100) before any caller could exist.
 #[extern_c]
 fn c_abs(x: i32) -> i32 {
     return x;

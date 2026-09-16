@@ -3,6 +3,8 @@
    decision 4). sv0's managed `string` has no bare `char*` representation
    decided yet, so it has no C ABI mapping and must be rejected -- E0551.
    native only: `#[extern_c]` doesn't exist in the sml-legacy parser. */
+/// Caller obligation (FFI-011): mirrors libc's puts(s) -- moot here, since
+/// the signature itself is rejected (E0551) before any caller could exist.
 #[extern_c]
 fn c_puts(s: string) -> i32;
 
