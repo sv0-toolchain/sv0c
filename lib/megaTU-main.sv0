@@ -780,6 +780,43 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
         }
         idx = idx + 1;
     }
+    /* FFI-010: `#[extern_c] fn name(args) -> T;` (ItemExternFn, tag 8,
+       FFI-008) declares a REAL external C symbol, defined outside this
+       translation unit -- it never appears in `blocks` above (lower() only
+       ever pushes a block for an item with a body, and an extern decl's
+       body_root is always -1), so without this pass the declaration
+       produced no C output at all (FFI-008's own stated boundary). The
+       prototype gets NO `static`, unlike every internally-defined fn's own
+       fwd_decls entry just above -- `static` would give it internal linkage,
+       which is exactly wrong for a symbol this translation unit does not
+       define and expects the linker to resolve elsewhere. Reuses
+       megatu_cty_of_root/megatu_param_list, the same signature-to-C-type
+       machinery an ordinary fn's own prototype uses (including the
+       raw-pointer "T *" handling from FFI-004), so a pointer or primitive
+       parameter/return type renders identically whether the fn has a body
+       or not. */
+    let mut ei: i32 = 0;
+    let n_items: i32 = vec_len(it);
+    while ei < n_items {
+        if vec_get(it, ei) == 8 {
+            let efn_name: string = handle_to_str(vec_get(id1, ei), source, starts, ends);
+            let eidv: i32 = vec_get(id2, ei);
+            let ehas_ret: i32 = eidv - (eidv / 2) * 2;
+            let mut eret_name: string = "void";
+            if ehas_ret != 0 {
+                eret_name = megatu_cty_of_root(vec_get(frt, ei), ptt, ptd1, ptd2,
+                                               pp, source, starts, ends, it, id1);
+            }
+            let epstr: string = megatu_param_list(ei, it, id1, id3, id5, fpn,
+                                                  fpt, ptt, ptd1, ptd2, pp,
+                                                  source, starts, ends);
+            let eproto: string = string_concat(eret_name,
+                string_concat(" ", string_concat(efn_name,
+                    string_concat("(", string_concat(epstr, ")")))));
+            fwd_decls = string_concat(fwd_decls, string_concat(eproto, ";\n"));
+        }
+        ei = ei + 1;
+    }
     if string_eq(main_part, "") {
         main_part = "int main(void) { return 0; }\n";
     }
@@ -1610,9 +1647,23 @@ fn megatu_find_fn_item_by_name_text(it: Vec<i32>, id1: Vec<i32>, source: string,
     let n: i32 = vec_len(it);
     let mut i: i32 = 0;
     while i < n {
-        if vec_get(it, i) == 0 {
+        let tg: i32 = vec_get(it, i);
+        /* FFI-010: also match ItemExternFn (tag 8, FFI-008) -- a call to a
+           declared `#[extern_c]` fn needs the same return-type resolution
+           (megatu_fn_ret_cty, below) an ordinary fn call gets, or its result
+           temp silently defaults to "int" regardless of the declared C
+           return type (the exact BUGS.md #5 shape this function's own doc
+           comment already describes for f64, just triggered by a different
+           item tag). */
+        if tg == 0 {
             let name_h: i32 = vec_get(id1, i);
             if string_eq(handle_to_str(name_h, source, starts, ends), target) {
+                return i;
+            }
+        }
+        if tg == 8 {
+            let name_h8: i32 = vec_get(id1, i);
+            if string_eq(handle_to_str(name_h8, source, starts, ends), target) {
                 return i;
             }
         }

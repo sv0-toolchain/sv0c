@@ -245,6 +245,7 @@ static int test_scan_fn_param_type_tags(void);
 static int test_fn_table_lookup_str(void);
 static int test_scan_fn_ret_type_tag(void);
 static int test_register_all_item_fns(void);
+static int test_register_all_item_fns_extern_fn(void);
 static int test_scan_enum_variant_shapes(void);
 static int test_init_struct_defs(void);
 static int test_init_enum_defs(void);
@@ -3057,10 +3058,20 @@ static int register_all_item_fns(int tok_tags, const char* source, int starts, i
   int i = 0;
   while ((i < n)) {
     int _sv0t1 = sv0_vec_get(it, i);
-    if ((_sv0t1 == 0)) {
+    int tg = _sv0t1;
+    if ((tg == 0)) {
       int _sv0t2 = item_fn_ty_to_table(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, id1, id2, id3, id5, fn_param_ty_root, fn_ret_ty_root_by_item, pty_tt, pty_td1, pty_td2, pty_td3, pp, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, i);
       int r = _sv0t2;
       if ((r == 0)) {
+        count = (count + 1);
+      } else {
+      }
+    } else {
+    }
+    if ((tg == 8)) {
+      int _sv0t3 = item_fn_ty_to_table(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, id1, id2, id3, id5, fn_param_ty_root, fn_ret_ty_root_by_item, pty_tt, pty_td1, pty_td2, pty_td3, pp, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, i);
+      int r8 = _sv0t3;
+      if ((r8 == 0)) {
         count = (count + 1);
       } else {
       }
@@ -10059,6 +10070,134 @@ static int test_register_all_item_fns(void) {
   return 0;
 }
 
+static int test_register_all_item_fns_extern_fn(void) {
+  const char* source;
+  source = "fn e ( x : i32 ) -> i32 ;";
+  int _sv0t0 = sv0_vec_new();
+  int starts = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ends = _sv0t1;
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 2);
+  sv0_vec_push(starts, 3);
+  sv0_vec_push(ends, 4);
+  sv0_vec_push(starts, 5);
+  sv0_vec_push(ends, 6);
+  sv0_vec_push(starts, 7);
+  sv0_vec_push(ends, 8);
+  sv0_vec_push(starts, 9);
+  sv0_vec_push(ends, 10);
+  sv0_vec_push(starts, 11);
+  sv0_vec_push(ends, 14);
+  sv0_vec_push(starts, 15);
+  sv0_vec_push(ends, 16);
+  sv0_vec_push(starts, 17);
+  sv0_vec_push(ends, 19);
+  sv0_vec_push(starts, 20);
+  sv0_vec_push(ends, 23);
+  sv0_vec_push(starts, 24);
+  sv0_vec_push(ends, 25);
+  int _sv0t2 = sv0_vec_new();
+  int tt = _sv0t2;
+  sv0_vec_push(tt, 65);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 6);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 14);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 7);
+  sv0_vec_push(tt, 19);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(tt, 13);
+  int _sv0t3 = sv0_vec_new();
+  int item_t = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int item_d1 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int item_d2 = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int item_d3 = _sv0t6;
+  sv0_vec_push(item_t, 8);
+  sv0_vec_push(item_d1, 1);
+  sv0_vec_push(item_d2, 1);
+  sv0_vec_push(item_d3, 1);
+  int _sv0t7 = sv0_vec_new();
+  int sn = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int en = _sv0t8;
+  int _sv0t9 = sv0_vec_new();
+  int tp = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int fnames = _sv0t10;
+  int _sv0t11 = sv0_vec_new();
+  int fpcs = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int frets = _sv0t12;
+  int _sv0t13 = sv0_vec_new();
+  int foffs = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int fptf = _sv0t14;
+  int _sv0t15 = sv0_vec_new();
+  int r_id5 = _sv0t15;
+  sv0_vec_push(r_id5, 0);
+  int _sv0t16 = sv0_vec_new();
+  int r_fpt = _sv0t16;
+  sv0_vec_push(r_fpt, 0);
+  int _sv0t17 = sv0_vec_new();
+  int r_frt = _sv0t17;
+  sv0_vec_push(r_frt, 1);
+  int _sv0t18 = sv0_vec_new();
+  int r_pp = _sv0t18;
+  sv0_vec_push(r_pp, 5);
+  sv0_vec_push(r_pp, 8);
+  int _sv0t19 = sv0_vec_new();
+  int r_ptt = _sv0t19;
+  sv0_vec_push(r_ptt, 0);
+  sv0_vec_push(r_ptt, 0);
+  int _sv0t20 = sv0_vec_new();
+  int r_ptd1 = _sv0t20;
+  sv0_vec_push(r_ptd1, 0);
+  sv0_vec_push(r_ptd1, 1);
+  int _sv0t21 = sv0_vec_new();
+  int r_ptd2 = _sv0t21;
+  sv0_vec_push(r_ptd2, 1);
+  sv0_vec_push(r_ptd2, 1);
+  int _sv0t22 = sv0_vec_new();
+  int r_ptd3 = _sv0t22;
+  sv0_vec_push(r_ptd3, 0);
+  sv0_vec_push(r_ptd3, 0);
+  int _sv0t23 = register_all_item_fns(tt, source, starts, ends, sn, en, tp, 0, item_t, item_d1, item_d2, item_d3, r_id5, r_fpt, r_frt, r_ptt, r_ptd1, r_ptd2, r_ptd3, r_pp, fnames, fpcs, frets, foffs, fptf);
+  int count = _sv0t23;
+  if ((count != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t24 = fn_table_lookup_str(fnames, source, starts, ends, "e");
+  int idx0 = _sv0t24;
+  if ((idx0 < 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t25 = fn_table_ret_type(frets, idx0);
+  int _sv0t26 = TY_INT();
+  if ((_sv0t25 != _sv0t26)) {
+    return 3;
+  } else {
+  }
+  int _sv0t27 = fn_table_param_count(fpcs, idx0);
+  if ((_sv0t27 != 1)) {
+    return 4;
+  } else {
+  }
+  int _sv0t28 = fn_table_param_type(foffs, fptf, idx0, 0);
+  int _sv0t29 = TY_INT();
+  if ((_sv0t28 != _sv0t29)) {
+    return 5;
+  } else {
+  }
+  return 0;
+}
+
 static int test_scan_enum_variant_shapes(void) {
   int _sv0t0 = sv0_vec_new();
   int tt = _sv0t0;
@@ -13255,6 +13394,13 @@ int main(void) {
   if ((r81 != 0)) {
     int _sv0t168 = (840 + r81);
     return _sv0t168;
+  } else {
+  }
+  int _sv0t169 = test_register_all_item_fns_extern_fn();
+  int r82 = _sv0t169;
+  if ((r82 != 0)) {
+    int _sv0t170 = (850 + r82);
+    return _sv0t170;
   } else {
   }
   return 0;

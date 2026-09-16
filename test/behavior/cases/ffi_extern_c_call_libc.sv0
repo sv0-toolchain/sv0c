@@ -1,0 +1,9 @@
+/* FFI-010 smoke: a real "hello from C" round trip -- an `#[extern_c]`
+   declaration for a genuinely external, non-sv0-emitted C function (libc's
+   own abs()), called like any other sv0 function. Exits 42. */
+#[extern_c]
+fn abs(x: i32) -> i32;
+
+fn main() -> i32 {
+    return abs(0 - 42);
+}

@@ -448,6 +448,17 @@ fn register_item(item_tag: i32, item_d1: i32, item_d2: i32,
         vec_push(mod_tys, item_d1);
         return 0;
     }
+    /* FFI-010: ItemExternFn (tag 8, FFI-008) is a callable value exactly like
+       an ordinary ItemFn (tag 0) -- register it the same way so a call site
+       resolves through mod_vals/fn_arities instead of failing E0300 unbound
+       name here, before checker.sv0's own (separately-fixed) fn table is
+       ever reached. */
+    if item_tag == 8 {
+        vec_push(mod_vals, item_d1);
+        vec_push(fn_arities, item_d1);
+        vec_push(fn_arities, item_d3);
+        return 0;
+    }
     return 0;
 }
 
@@ -1943,6 +1954,24 @@ fn test_register_item_fn() -> i32 {
     return 0;
 }
 
+fn test_register_item_extern_fn() -> i32 {
+    /* FFI-010: ItemExternFn (tag 8, FFI-008) registers exactly like an
+       ordinary ItemFn (tag 0, test_register_item_fn above) -- a call to a
+       declared `#[extern_c]` fn must resolve through mod_vals/fn_arities,
+       not stay unbound (E0300). */
+    let mv: Vec<i32> = vec_new();
+    let mt: Vec<i32> = vec_new();
+    let fa: Vec<i32> = vec_new();
+    register_item(8, 42, 1, 3, 0 - 1, mv, mt, fa);
+    if vec_len(mv) != 1 { return 1; }
+    if vec_get(mv, 0) != 42 { return 2; }
+    if vec_len(mt) != 0 { return 3; }
+    if vec_len(fa) != 2 { return 4; }
+    if vec_get(fa, 0) != 42 { return 5; }
+    if vec_get(fa, 1) != 3 { return 6; }
+    return 0;
+}
+
 fn test_register_item_struct() -> i32 {
     let mv: Vec<i32> = vec_new();
     let mt: Vec<i32> = vec_new();
@@ -2977,5 +3006,7 @@ fn main() -> i32 {
     if r38a != 0 { return 166 + r38a; }
     let r39: i32 = test_path_join_vec_three();
     if r39 != 0 { return 167 + r39; }
+    let r40: i32 = test_register_item_extern_fn();
+    if r40 != 0 { return 170 + r40; }
     return 0;
 }

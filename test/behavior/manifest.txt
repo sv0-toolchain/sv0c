@@ -130,3 +130,4 @@ test/behavior/cases/ffi_unsafe_block_transparent.sv0|8
 test/behavior/cases/ffi_unsafe_deref_gated.sv0|5|native
 test/behavior/cases/ffi_extern_c_decl_parses.sv0|3|native
 test/behavior/cases/ffi_extern_c_signature_valid.sv0|9|native
+test/behavior/cases/ffi_extern_c_call_libc.sv0|42|native

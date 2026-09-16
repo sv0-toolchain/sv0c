@@ -84,6 +84,7 @@ static int test_enum_variant_reg(void);
 static int test_pat_binds_vec(void);
 static int test_bind_pattern_locals(void);
 static int test_register_item_fn(void);
+static int test_register_item_extern_fn(void);
 static int test_register_item_struct(void);
 static int test_register_items(void);
 static int test_tok_str(void);
@@ -827,6 +828,13 @@ static int register_item(int item_tag, int item_d1, int item_d2, int item_d3, in
   }
   if ((item_tag == 7)) {
     sv0_vec_push(mod_tys, item_d1);
+    return 0;
+  } else {
+  }
+  if ((item_tag == 8)) {
+    sv0_vec_push(mod_vals, item_d1);
+    sv0_vec_push(fn_arities, item_d1);
+    sv0_vec_push(fn_arities, item_d3);
     return 0;
   } else {
   }
@@ -3098,6 +3106,48 @@ static int test_register_item_fn(void) {
   return 0;
 }
 
+static int test_register_item_extern_fn(void) {
+  int _sv0t0 = sv0_vec_new();
+  int mv = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int mt = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int fa = _sv0t2;
+  int _sv0t3 = (0 - 1);
+  int _sv0t4 = register_item(8, 42, 1, 3, _sv0t3, mv, mt, fa);
+  int _sv0t5 = sv0_vec_len(mv);
+  if ((_sv0t5 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_get(mv, 0);
+  if ((_sv0t6 != 42)) {
+    return 2;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_len(mt);
+  if ((_sv0t7 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_len(fa);
+  if ((_sv0t8 != 2)) {
+    return 4;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(fa, 0);
+  if ((_sv0t9 != 42)) {
+    return 5;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(fa, 1);
+  if ((_sv0t10 != 3)) {
+    return 6;
+  } else {
+  }
+  return 0;
+}
+
 static int test_register_item_struct(void) {
   int _sv0t0 = sv0_vec_new();
   int mv = _sv0t0;
@@ -5130,6 +5180,13 @@ int main(void) {
   if ((r39 != 0)) {
     int _sv0t90 = (167 + r39);
     return _sv0t90;
+  } else {
+  }
+  int _sv0t91 = test_register_item_extern_fn();
+  int r40 = _sv0t91;
+  if ((r40 != 0)) {
+    int _sv0t92 = (170 + r40);
+    return _sv0t92;
   } else {
   }
   return 0;
