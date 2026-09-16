@@ -1,0 +1,16 @@
+/* FFI-013: two #[extern_c] declarations for the SAME C symbol with the
+   IDENTICAL signature must NOT conflict -- matches real C's own tolerance
+   for repeating an identical extern prototype (e.g. two headers both
+   declaring the same libc function). Exits 7. */
+/// Caller obligation: x must not be i32::MIN (mirrors libc's abs()).
+#[extern_c]
+fn c_dup(x: i32) -> i32;
+
+/// Caller obligation: x must not be i32::MIN (mirrors libc's abs()) --
+/// identical to the declaration above on purpose.
+#[extern_c]
+fn c_dup(x: i32) -> i32;
+
+fn main() -> i32 {
+    return 7;
+}

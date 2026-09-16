@@ -573,6 +573,83 @@ fn fn_table_lookup_str(fn_names: Vec<i32>,
     return 0 - 1;
 }
 
+/* ── extern_fn_signature_eq / extern_fn_manifest_conflict (FFI-013) ──
+   FFI-012's ABI manifest, wired: register_all_item_fns's fn_is_extern
+   marks which fn-table rows came from a tag-8 `#[extern_c]` item; this
+   compares every pair of extern-only rows sharing a spelled-out symbol
+   name (`#[extern_c(name = "...")]` is still deferred, scope decision 3,
+   so the symbol name is always the sv0 fn name for now). Per-declaration
+   FFI-safety of each individual type is already fully covered by
+   check_extern_fn_signature (FFI-009, E0551) by the time this ever runs --
+   the one thing a single declaration's own check structurally cannot see
+   is a SECOND declaration of the same C symbol with a different
+   signature, exactly the link-time-UB-in-real-C shape Epic D exists to
+   catch. An EXACT duplicate (same ret + param count + every param type)
+   is allowed silently, matching how repeating an identical `extern`
+   prototype twice is legal in real C too -- only a genuine mismatch is a
+   conflict. Returns the fn-table index of the second (later) declaration
+   in the first conflicting pair found, or -1 if the manifest is
+   internally consistent. */
+
+fn extern_fn_signature_eq(fn_ret_types: Vec<i32>, fn_param_counts: Vec<i32>,
+                          fn_param_offsets: Vec<i32>,
+                          fn_param_types_flat: Vec<i32>,
+                          a: i32, b: i32) -> bool {
+    if fn_table_ret_type(fn_ret_types, a) != fn_table_ret_type(fn_ret_types, b) {
+        return false;
+    }
+    let pca: i32 = fn_table_param_count(fn_param_counts, a);
+    let pcb: i32 = fn_table_param_count(fn_param_counts, b);
+    if pca != pcb { return false; }
+    let mut k: i32 = 0;
+    while k < pca {
+        let ta: i32 = fn_table_param_type(fn_param_offsets, fn_param_types_flat, a, k);
+        let tb: i32 = fn_table_param_type(fn_param_offsets, fn_param_types_flat, b, k);
+        if ta != tb { return false; }
+        k = k + 1;
+    }
+    return true;
+}
+
+fn extern_fn_manifest_conflict(fn_names: Vec<i32>, fn_param_counts: Vec<i32>,
+                               fn_ret_types: Vec<i32>,
+                               fn_param_offsets: Vec<i32>,
+                               fn_param_types_flat: Vec<i32>,
+                               fn_is_extern: Vec<i32>,
+                               source: string, starts: Vec<i32>,
+                               ends: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(fn_names);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(fn_is_extern, i) == 1 {
+            let ipos: i32 = vec_get(fn_names, i);
+            let is2: i32 = vec_get(starts, ipos);
+            let ie: i32 = vec_get(ends, ipos);
+            let iname: string = string_substr(source, is2, ie - is2);
+            let mut j: i32 = i + 1;
+            while j < n {
+                if vec_get(fn_is_extern, j) == 1 {
+                    let jpos: i32 = vec_get(fn_names, j);
+                    let js: i32 = vec_get(starts, jpos);
+                    let je: i32 = vec_get(ends, jpos);
+                    let jname: string = string_substr(source, js, je - js);
+                    if string_eq(iname, jname) {
+                        if extern_fn_signature_eq(fn_ret_types, fn_param_counts,
+                                                  fn_param_offsets,
+                                                  fn_param_types_flat,
+                                                  i, j) != true {
+                            return j;
+                        }
+                    }
+                }
+                j = j + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 /* ── variant shape classification ───────────────────────────── */
 
 fn VS_UNIT() -> i32 { return 0; }
@@ -1946,7 +2023,8 @@ fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
                          fn_param_counts: Vec<i32>,
                          fn_ret_types: Vec<i32>,
                          fn_param_offsets: Vec<i32>,
-                         fn_param_types_flat: Vec<i32>) -> i32 {
+                         fn_param_types_flat: Vec<i32>,
+                         fn_is_extern: Vec<i32>) -> i32 {
     let n: i32 = vec_len(it);
     let mut count: i32 = 0;
     let mut i: i32 = 0;
@@ -1961,7 +2039,14 @@ fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
            that requires FFI-009 (checker validation) and FFI-010 (real
            lowering)" -- FFI-009 validated the signature; this is the other
            half. item_fn_ty_to_table only reads id1/id2/id3/id5 + the pty
-           arena, none of which differ in shape between the two item kinds. */
+           arena, none of which differ in shape between the two item kinds.
+           FFI-013: fn_is_extern is the ABI manifest FFI-012 designed --
+           a parallel boolean vector, one entry per successfully-registered
+           fn_table row (pushed only when item_fn_ty_to_table's own row-add
+           actually happened, so it stays index-aligned with fn_names et al),
+           recording which rows came from a tag-8 item. Built inline in this
+           existing walk, per FFI-012's own decision, not a second pass over
+           `it`. */
         if tg == 0 {
             let r: i32 = item_fn_ty_to_table(tok_tags, source,
                                               starts, ends,
@@ -1975,7 +2060,10 @@ fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
                                               fn_names, fn_param_counts,
                                               fn_ret_types, fn_param_offsets,
                                               fn_param_types_flat, i);
-            if r == 0 { count = count + 1; }
+            if r == 0 {
+                count = count + 1;
+                vec_push(fn_is_extern, 0);
+            }
         }
         if tg == 8 {
             let r8: i32 = item_fn_ty_to_table(tok_tags, source,
@@ -1990,7 +2078,10 @@ fn register_all_item_fns(tok_tags: Vec<i32>, source: string,
                                               fn_names, fn_param_counts,
                                               fn_ret_types, fn_param_offsets,
                                               fn_param_types_flat, i);
-            if r8 == 0 { count = count + 1; }
+            if r8 == 0 {
+                count = count + 1;
+                vec_push(fn_is_extern, 1);
+            }
         }
         i = i + 1;
     }
@@ -3432,6 +3523,7 @@ fn check_program(
     let fn_ret_types: Vec<i32> = vec_new();
     let fn_param_offsets: Vec<i32> = vec_new();
     let fn_param_types_flat: Vec<i32> = vec_new();
+    let fn_is_extern: Vec<i32> = vec_new();
     let _fc: i32 = register_all_item_fns(tok_tags, source, starts, ends,
                                           struct_names, enum_names,
                                           type_params, tp_limit,
@@ -3442,7 +3534,20 @@ fn check_program(
                                           pp,
                                           fn_names, fn_param_counts,
                                           fn_ret_types, fn_param_offsets,
-                                          fn_param_types_flat);
+                                          fn_param_types_flat, fn_is_extern);
+    /* FFI-013: the ABI manifest FFI-012 designed, wired -- a conflicting
+       `#[extern_c]` re-declaration of the same C symbol is a real bug (link-
+       time UB in C too) that FFI-009's per-declaration E0551 check cannot
+       see, since each half of the conflict can be individually FFI-safe. */
+    let extern_conflict: i32 = extern_fn_manifest_conflict(fn_names,
+                                fn_param_counts, fn_ret_types,
+                                fn_param_offsets, fn_param_types_flat,
+                                fn_is_extern, source, starts, ends);
+    if extern_conflict >= 0 {
+        vec_push(diag_sink, 552);
+        vec_push(diag_sink, vec_get(fn_names, extern_conflict));
+        return 0 - 1;
+    }
     let mod_env_names: Vec<i32> = vec_new();
     let mod_env_types: Vec<i32> = vec_new();
     let mod_env_muts: Vec<i32> = vec_new();
@@ -6504,6 +6609,7 @@ fn test_register_all_item_fns() -> i32 {
     let frets: Vec<i32> = vec_new();
     let foffs: Vec<i32> = vec_new();
     let fptf: Vec<i32> = vec_new();
+    let fis: Vec<i32> = vec_new();
     /* PC-7c arenas. foo(x: i32)->bool: param x type i32 @tok5, ret bool
        @tok8; bar()->i32: ret i32 @tok16. pty roots 0=i32(param) 1=bool
        2=i32; pp=[5,8,16]. id5=[0,1] (pbase); fpt=[0] (foo's one param);
@@ -6532,8 +6638,10 @@ fn test_register_all_item_fns() -> i32 {
                                             r_ptt, r_ptd1, r_ptd2, r_ptd3,
                                             r_pp,
                                             fnames, fpcs,
-                                            frets, foffs, fptf);
+                                            frets, foffs, fptf, fis);
     if count != 2 { return 1; }
+    if vec_get(fis, 0) != 0 { return 10; }
+    if vec_get(fis, 1) != 0 { return 11; }
     if vec_len(fnames) != 2 { return 2; }
     let idx0: i32 = fn_table_lookup_str(fnames, source, starts, ends,
                                          "foo");
@@ -6588,6 +6696,7 @@ fn test_register_all_item_fns_extern_fn() -> i32 {
     let frets: Vec<i32> = vec_new();
     let foffs: Vec<i32> = vec_new();
     let fptf: Vec<i32> = vec_new();
+    let fis: Vec<i32> = vec_new();
     let r_id5: Vec<i32> = vec_new();
     vec_push(r_id5, 0);
     let r_fpt: Vec<i32> = vec_new();
@@ -6612,13 +6721,123 @@ fn test_register_all_item_fns_extern_fn() -> i32 {
                                             r_ptt, r_ptd1, r_ptd2, r_ptd3,
                                             r_pp,
                                             fnames, fpcs,
-                                            frets, foffs, fptf);
+                                            frets, foffs, fptf, fis);
     if count != 1 { return 1; }
     let idx0: i32 = fn_table_lookup_str(fnames, source, starts, ends, "e");
     if idx0 < 0 { return 2; }
     if fn_table_ret_type(frets, idx0) != TY_INT() { return 3; }
     if fn_table_param_count(fpcs, idx0) != 1 { return 4; }
     if fn_table_param_type(foffs, fptf, idx0, 0) != TY_INT() { return 5; }
+    if vec_get(fis, 0) != 1 { return 6; }
+    return 0;
+}
+
+fn test_extern_fn_manifest_conflict_mismatch() -> i32 {
+    /* FFI-013: two `#[extern_c]` declarations spelled "foo" (source "foo
+       foo", tok 0 @0..3, tok 1 @4..7) with DIFFERING signatures -- one
+       param i32->i32, the other two params i32,i32->i32 -- must conflict:
+       the manifest catches this even though each declaration alone is
+       individually FFI-safe (FFI-009 already accepted both). */
+    let source: string = "foo foo";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    let fn_names: Vec<i32> = vec_new();
+    let fn_param_counts: Vec<i32> = vec_new();
+    let fn_ret_types: Vec<i32> = vec_new();
+    let fn_param_offsets: Vec<i32> = vec_new();
+    let fn_param_types_flat: Vec<i32> = vec_new();
+    let fn_is_extern: Vec<i32> = vec_new();
+    let p1: Vec<i32> = vec_new();
+    vec_push(p1, TY_INT());
+    let _r0: i32 = fn_table_add(fn_names, fn_param_counts, fn_ret_types,
+                                fn_param_offsets, fn_param_types_flat,
+                                0, TY_INT(), p1, 1);
+    vec_push(fn_is_extern, 1);
+    let p2: Vec<i32> = vec_new();
+    vec_push(p2, TY_INT()); vec_push(p2, TY_INT());
+    let _r1: i32 = fn_table_add(fn_names, fn_param_counts, fn_ret_types,
+                                fn_param_offsets, fn_param_types_flat,
+                                1, TY_INT(), p2, 2);
+    vec_push(fn_is_extern, 1);
+    let conflict: i32 = extern_fn_manifest_conflict(fn_names,
+                          fn_param_counts, fn_ret_types, fn_param_offsets,
+                          fn_param_types_flat, fn_is_extern,
+                          source, starts, ends);
+    if conflict != 1 { return 1; }
+    return 0;
+}
+
+fn test_extern_fn_manifest_conflict_silent_on_identical_redecl() -> i32 {
+    /* FFI-013: two IDENTICAL `#[extern_c] fn foo(x: i32) -> i32;`
+       declarations (real C allows repeating an identical prototype) must
+       NOT conflict. */
+    let source: string = "foo foo";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    let fn_names: Vec<i32> = vec_new();
+    let fn_param_counts: Vec<i32> = vec_new();
+    let fn_ret_types: Vec<i32> = vec_new();
+    let fn_param_offsets: Vec<i32> = vec_new();
+    let fn_param_types_flat: Vec<i32> = vec_new();
+    let fn_is_extern: Vec<i32> = vec_new();
+    let p1: Vec<i32> = vec_new();
+    vec_push(p1, TY_INT());
+    let _r0: i32 = fn_table_add(fn_names, fn_param_counts, fn_ret_types,
+                                fn_param_offsets, fn_param_types_flat,
+                                0, TY_INT(), p1, 1);
+    vec_push(fn_is_extern, 1);
+    let p2: Vec<i32> = vec_new();
+    vec_push(p2, TY_INT());
+    let _r1: i32 = fn_table_add(fn_names, fn_param_counts, fn_ret_types,
+                                fn_param_offsets, fn_param_types_flat,
+                                1, TY_INT(), p2, 1);
+    vec_push(fn_is_extern, 1);
+    let conflict: i32 = extern_fn_manifest_conflict(fn_names,
+                          fn_param_counts, fn_ret_types, fn_param_offsets,
+                          fn_param_types_flat, fn_is_extern,
+                          source, starts, ends);
+    if conflict != 0 - 1 { return 1; }
+    return 0;
+}
+
+fn test_extern_fn_manifest_conflict_ignores_non_extern_rows() -> i32 {
+    /* FFI-013: a mismatched-signature pair sharing a name only conflicts
+       when BOTH rows are extern (fn_is_extern[i]==1) -- an ordinary ItemFn
+       (tag 0) sharing a spelling with an unrelated extern decl is out of
+       scope for this check (the two live in the same fn table but the
+       manifest is #[extern_c]-only, per FFI-012's own design). */
+    let source: string = "foo foo";
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(starts, 0); vec_push(ends, 3);
+    vec_push(starts, 4); vec_push(ends, 7);
+    let fn_names: Vec<i32> = vec_new();
+    let fn_param_counts: Vec<i32> = vec_new();
+    let fn_ret_types: Vec<i32> = vec_new();
+    let fn_param_offsets: Vec<i32> = vec_new();
+    let fn_param_types_flat: Vec<i32> = vec_new();
+    let fn_is_extern: Vec<i32> = vec_new();
+    let p1: Vec<i32> = vec_new();
+    vec_push(p1, TY_INT());
+    let _r0: i32 = fn_table_add(fn_names, fn_param_counts, fn_ret_types,
+                                fn_param_offsets, fn_param_types_flat,
+                                0, TY_INT(), p1, 1);
+    vec_push(fn_is_extern, 0);
+    let p2: Vec<i32> = vec_new();
+    vec_push(p2, TY_INT()); vec_push(p2, TY_INT());
+    let _r1: i32 = fn_table_add(fn_names, fn_param_counts, fn_ret_types,
+                                fn_param_offsets, fn_param_types_flat,
+                                1, TY_INT(), p2, 2);
+    vec_push(fn_is_extern, 1);
+    let conflict: i32 = extern_fn_manifest_conflict(fn_names,
+                          fn_param_counts, fn_ret_types, fn_param_offsets,
+                          fn_param_types_flat, fn_is_extern,
+                          source, starts, ends);
+    if conflict != 0 - 1 { return 1; }
     return 0;
 }
 
@@ -8251,5 +8470,11 @@ fn main() -> i32 {
     if r81 != 0 { return 840 + r81; }
     let r82: i32 = test_register_all_item_fns_extern_fn();
     if r82 != 0 { return 850 + r82; }
+    let r83: i32 = test_extern_fn_manifest_conflict_mismatch();
+    if r83 != 0 { return 860 + r83; }
+    let r84: i32 = test_extern_fn_manifest_conflict_silent_on_identical_redecl();
+    if r84 != 0 { return 870 + r84; }
+    let r85: i32 = test_extern_fn_manifest_conflict_ignores_non_extern_rows();
+    if r85 != 0 { return 880 + r85; }
     return 0;
 }

@@ -1,0 +1,20 @@
+/* FFI-013: the ABI manifest FFI-012 designed, wired. Two #[extern_c]
+   declarations naming the same C symbol ("c_thing") with DIFFERING
+   signatures -- each individually FFI-safe on its own (FFI-009's E0551
+   would accept either alone) -- is a real link-time UB bug in real C too;
+   the manifest catches what a single declaration's own check structurally
+   cannot see. Expects E0552 (native only: `#[extern_c]` doesn't exist in
+   the sml-legacy parser). */
+/// Caller obligation: n/a -- this file exists to trigger the conflict
+/// diagnostic, not to declare a real usable symbol.
+#[extern_c]
+fn c_thing(x: i32) -> i32;
+
+/// Caller obligation: n/a -- conflicting re-declaration, rejected before
+/// any caller could exist.
+#[extern_c]
+fn c_thing(x: i32, y: i32) -> i32;
+
+fn main() -> i32 {
+    return 0;
+}
