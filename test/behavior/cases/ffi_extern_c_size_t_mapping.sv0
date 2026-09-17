@@ -1,0 +1,24 @@
+/* FFI-016: `#[extern_c]` signatures using `usize`/`byte` must emit the
+   EXACT platform C-typedef spellings (`size_t`/`char`) a real libc header
+   already declares, not sv0's own internal runtime spelling
+   (`uintptr_t`/`uint8_t`) -- every sv0c-emitted C file `#include`s
+   <string.h> via sv0_runtime.h, which already declares
+   `size_t strlen(const char *)`; a mismatched redeclaration is a hard
+   `error: conflicting types for 'strlen'`, confirmed by actually
+   compiling the emitted C (sv0-strings SS-203), not just a style
+   preference. Calls the REAL libc strlen on a real, non-UB pointer (the
+   address of a single zero byte -- an empty C string, well-defined:
+   reads exactly the one byte that is genuinely ours). Exits 42. */
+/// Caller obligation: `s` must be a valid, non-null pointer to a
+/// NUL-terminated byte sequence; the pointed-to memory must remain valid
+/// for the duration of the call. Mirrors libc's own strlen(3) contract.
+#[extern_c]
+fn strlen(s: *const byte) -> usize;
+
+fn main() -> i32 {
+    let x: byte = 0;
+    let p: *const byte = &x as *const byte;
+    let n: usize = strlen(p);
+    if n == 0 { return 42; }
+    return 1;
+}

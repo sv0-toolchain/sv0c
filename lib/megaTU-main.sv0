@@ -645,6 +645,97 @@ fn megatu_param_list(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
     return out;
 }
 
+/* FFI-016: `#[extern_c]` signatures need EXACT platform C-typedef
+   spellings, not sv0's own internal runtime spelling. `usize` maps to
+   `uintptr_t` everywhere else in this compiler -- correct for sv0's own
+   runtime representation -- but every sv0c-emitted C file `#include`s
+   <string.h>/<stdlib.h>/<stdio.h> via sv0_runtime.h, which already
+   declare real libc functions using `size_t`. A `usize`-returning
+   extern_c redeclaration of e.g. `strlen` (`uintptr_t strlen(...)`)
+   textually CONFLICTS with <string.h>'s own `size_t strlen(...)` even
+   though the two typedefs are the same width on every real platform --
+   `error: conflicting types for 'strlen'`, confirmed by actually
+   compiling the emitted C (sv0-strings SS-203), not assumed. Mirrors
+   megatu_cty_of_root exactly except for that one leaf substitution, so a
+   pointee (`*const usize`) also gets the exact-ABI spelling recursively,
+   not just a top-level return/param. */
+fn megatu_cty_of_root_extern_c(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                      pp: Vec<i32>, source: string, starts: Vec<i32>,
+                      ends: Vec<i32>, it: Vec<i32>, id1: Vec<i32>) -> string {
+    if root < 0 {
+        return "void";
+    }
+    if vec_get(ptt, root) == 6 {
+        return "void";
+    }
+    if vec_get(ptt, root) == 0 {
+        let ppstart: i32 = vec_get(ptd1, root);
+        let segc: i32 = vec_get(ptd2, root);
+        if segc <= 0 {
+            return "int";
+        }
+        let name_tok: i32 = vec_get(pp, ppstart + segc - 1);
+        let nm: string = handle_to_str(name_tok, source, starts, ends);
+        if string_eq(nm, "usize") { return "size_t"; }
+        /* `byte` maps to `uint8_t` everywhere else (sv0's own runtime
+           representation), but every real libc string/byte-buffer function
+           this module exists to bind (strlen and its neighbors) declares
+           its pointee as `char`, not `unsigned char` -- `const uint8_t *`
+           vs `<string.h>`'s own `const char *` is ALSO a conflicting-types
+           error, on top of the size_t one, confirmed the same way. */
+        if string_eq(nm, "byte") { return "char"; }
+        let prim: string = ast_ty_to_c_string(nm);
+        if !string_eq(prim, "int") {
+            return prim;
+        }
+        if megatu_is_user_type(nm, it, id1, source, starts, ends) {
+            return nm;
+        }
+        return "int";
+    }
+    if vec_get(ptt, root) == 8 {
+        let inner_const: string = megatu_cty_of_root_extern_c(vec_get(ptd1, root), ptt, ptd1,
+                                                      ptd2, pp, source, starts, ends,
+                                                      it, id1);
+        return string_concat("const ", string_concat(inner_const, " *"));
+    }
+    if vec_get(ptt, root) == 9 {
+        let inner_mut: string = megatu_cty_of_root_extern_c(vec_get(ptd1, root), ptt, ptd1,
+                                                    ptd2, pp, source, starts, ends,
+                                                    it, id1);
+        return string_concat(inner_mut, " *");
+    }
+    return "int";
+}
+
+/* extern_c twin of megatu_param_list, using megatu_cty_of_root_extern_c
+   for each parameter's type instead of megatu_cty_of_root. */
+fn megatu_param_list_extern_c(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
+                     id5: Vec<i32>, fpn: Vec<i32>,
+                     fpt: Vec<i32>, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                     pp: Vec<i32>, source: string, starts: Vec<i32>,
+                     ends: Vec<i32>) -> string {
+    if item_i < 0 { return "void"; }
+    let pc: i32 = vec_get(id3, item_i);
+    if pc == 0 { return "void"; }
+    let base: i32 = vec_get(id5, item_i);
+    let mut out: string = "";
+    let mut k: i32 = 0;
+    while k < pc {
+        if k > 0 {
+            out = string_concat(out, ", ");
+        }
+        let nt: i32 = vec_get(fpn, base + k);
+        let nm: string = handle_to_str(nt, source, starts, ends);
+        let cty: string = megatu_cty_of_root_extern_c(vec_get(fpt, base + k),
+                                             ptt, ptd1, ptd2, pp,
+                                             source, starts, ends, it, id1);
+        out = string_concat(out, string_concat(string_concat(cty, " "), nm));
+        k = k + 1;
+    }
+    return out;
+}
+
 /* Seed a fresh (handle -> is_float) tyenv from a function's own parameters,
    mirroring megatu_param_list's iteration — see the tyenv doc comment near
    megatu_tyenv_push. Call once per function before emitting its body. */
@@ -747,7 +838,8 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                                               eit_nt, eit_base, eit_cnt, eit_cats,
                                               tyenv_st, sit_nt, sit_base, sit_cnt,
                                               sit_field_name, sit_field_cat,
-                                              it, id1, id2, frt, ptt, ptd1, ptd2, pp);
+                                              it, id1, id2, frt, ptt, ptd1, ptd2, pp,
+                                              id3, id5, fpt);
         if string_eq(fn_name, "main") {
             /* NEX-016 (~/Documents/project-specs/sv0c-runtime-executable/SPEC.md
                S14.3): a recognized zero-param, i32/unit-returning main gets
@@ -808,10 +900,10 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
             let ehas_ret: i32 = eidv - (eidv / 2) * 2;
             let mut eret_name: string = "void";
             if ehas_ret != 0 {
-                eret_name = megatu_cty_of_root(vec_get(frt, ei), ptt, ptd1, ptd2,
+                eret_name = megatu_cty_of_root_extern_c(vec_get(frt, ei), ptt, ptd1, ptd2,
                                                pp, source, starts, ends, it, id1);
             }
-            let epstr: string = megatu_param_list(ei, it, id1, id3, id5, fpn,
+            let epstr: string = megatu_param_list_extern_c(ei, it, id1, id3, id5, fpn,
                                                   fpt, ptt, ptd1, ptd2, pp,
                                                   source, starts, ends);
             let eproto: string = string_concat(eret_name,
@@ -1840,6 +1932,50 @@ fn megatu_emit_call_args(args: Vec<i32>, source: string, starts: Vec<i32>, ends:
     return out;
 }
 
+/* FFI-016: a call to an `#[extern_c]` fn (item_i's own tag == 8) whose
+   parameter is a `byte` pointer (mapped to `char *` in the prototype --
+   megatu_cty_of_root_extern_c) passed an ordinary sv0 `*const byte`
+   argument (mapped to `uint8_t *` everywhere else) triggers a real
+   `-Wpointer-sign` warning at every such call site -- `unsigned char *`
+   and `char *` are genuinely different C types, not just differently-
+   spelled aliases of the same one (unlike usize/uintptr_t vs size_t,
+   which ARE the same underlying type on every real platform and so never
+   warn on assignment). An explicit per-argument cast to the callee's own
+   extern_c-mapped parameter type is correct (same bit representation)
+   and silences it -- confirmed via NEX-049b's full-corpus warning report,
+   not assumed. Falls back to the plain, uncast emission for a non-
+   extern_c callee or an arg-count mismatch (defensive; never crashes on
+   a shape this wasn't designed for). */
+fn megatu_emit_call_args_typed(args: Vec<i32>, item_i: i32, it: Vec<i32>, id1: Vec<i32>,
+                               id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>,
+                               ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                               pp: Vec<i32>, source: string, starts: Vec<i32>,
+                               ends: Vec<i32>, sidx: Vec<i32>) -> string {
+    let count: i32 = vec_len(args);
+    if count == 0 { return ""; }
+    let is_extern: bool = if item_i >= 0 { vec_get(it, item_i) == 8 } else { false };
+    let pc: i32 = if is_extern { vec_get(id3, item_i) } else { 0 };
+    if is_extern != true { return megatu_emit_call_args(args, source, starts, ends, sidx); }
+    if pc != count { return megatu_emit_call_args(args, source, starts, ends, sidx); }
+    let base: i32 = vec_get(id5, item_i);
+    let mut out: string = "";
+    let mut idx: i32 = 0;
+    while idx < count {
+        if idx > 0 {
+            out = string_concat(out, ", ");
+        }
+        let bv: Box<codegen_Value> = vec_get(args, idx);
+        let v: codegen_Value = box_deref(bv);
+        let arg_text: string = megatu_emit_value(v, source, starts, ends, sidx);
+        let pcty: string = megatu_cty_of_root_extern_c(vec_get(fpt, base + idx),
+                                ptt, ptd1, ptd2, pp, source, starts, ends, it, id1);
+        out = string_concat(out, string_concat("(", string_concat(pcty,
+                string_concat(")", arg_text))));
+        idx = idx + 1;
+    }
+    return out;
+}
+
 fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                      source: string, starts: Vec<i32>, ends: Vec<i32>,
                      sidx: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>,
@@ -1848,7 +1984,8 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                      tyenv_st: Vec<i32>, sit_nt: Vec<i32>, sit_base: Vec<i32>,
                      sit_cnt: Vec<i32>, sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                      it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
-                     ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>) -> string {
+                     ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>,
+                     id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>) -> string {
     match ins {
         codegen_Instr::Nop => { return ""; },
         codegen_Instr::DeclVar(h) => {
@@ -1914,10 +2051,10 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "if (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
             let f: string = string_concat(d, indent);
             let g: string = string_concat(f, "} else {\n");
-            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
             let j: string = string_concat(h, indent);
             return string_concat(j, "}\n");
         },
@@ -1927,14 +2064,14 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "while (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
             let f: string = string_concat(d, indent);
             return string_concat(f, "}\n");
         },
         codegen_Instr::BlockInstr(body) => {
             let deeper: string = string_concat(indent, "  ");
             let a: string = string_concat(indent, "{\n");
-            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
             let c: string = string_concat(b, indent);
             return string_concat(c, "}\n");
         },
@@ -1945,7 +2082,11 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             return string_concat(indent, "continue;\n");
         },
         codegen_Instr::Call(dst_h, fn_h, args, rt_h) => {
-            let mut arg_str: string = megatu_emit_call_args(args, source, starts, ends, sidx);
+            let call_item_i: i32 = if fn_h >= 0 {
+                megatu_find_fn_item_by_name_text(it, id1, source, starts, ends, fn_h)
+            } else { 0 - 1 };
+            let mut arg_str: string = megatu_emit_call_args_typed(args, call_item_i,
+                it, id1, id3, id5, fpt, ptt, ptd1, ptd2, pp, source, starts, ends, sidx);
             /* box_deref lowers to a Call to builtin 13; sv0__box_deref_raw(h, T)
                takes the target C type as a second argument. Default `int` (values
                are int handles), but a typed box_deref (rt_h set — a `let x: T =
@@ -2074,7 +2215,8 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
                       tyenv_st: Vec<i32>, sit_nt: Vec<i32>, sit_base: Vec<i32>,
                       sit_cnt: Vec<i32>, sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                       it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
-                      ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>) -> string {
+                      ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>,
+                      id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>) -> string {
     let count: i32 = vec_len(instrs);
     if count == 0 { return ""; }
     let mut out: string = "";
@@ -2082,7 +2224,7 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
     while idx < count {
         let bh: Box<codegen_Instr> = vec_get(instrs, idx);
         let ins: codegen_Instr = box_deref(bh);
-        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp));
+        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
         idx = idx + 1;
     }
     return out;

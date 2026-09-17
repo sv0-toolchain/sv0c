@@ -11,3 +11,4 @@ test/behavior/cases/ffi_extern_c_decl_parses.sv0
 test/behavior/cases/ffi_extern_c_signature_valid.sv0
 test/behavior/cases/ffi_extern_c_call_libc.sv0
 test/behavior/cases/ffi_extern_c_identical_redecl_ok.sv0
+test/behavior/cases/ffi_extern_c_size_t_mapping.sv0

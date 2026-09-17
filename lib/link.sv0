@@ -266,6 +266,88 @@ fn link_u15_reserved_c_name(nm: string) -> bool {
     return link_u15_set_has(set, nm);
 }
 
+/* FFI-016: `#[extern_c]` declarations intentionally bind the literal
+   reserved C symbol (the whole point of a real exact-ABI FFI call), so
+   SS-U18's collision-avoidance mangling above must never touch them --
+   mangling would silently rename what lowering emits as the actual linked
+   C symbol, breaking the binding (discovered via sv0-strings SS-203:
+   `#[extern_c] fn strlen(...)` sharing a project with an ordinary,
+   already-correctly-mangled `strings_c23::strlen`). Find the col-0 start
+   of the line containing position `i`. */
+fn link_u15_line_start(src: string, i: i32) -> i32 {
+    let mut s: i32 = i;
+    while s > 0 {
+        if string_char_at(src, s - 1) == 10 { break; }
+        s = s - 1;
+    }
+    return s;
+}
+
+/* Trimmed text of the nearest non-blank line strictly above the line that
+   starts at `i`, or "" if none (start of file / every line above is
+   blank). Mirrors FFI-011's own "skip blank lines, then look at the one
+   real line above" doc-comment-detection convention. */
+fn link_u15_prev_nonblank_line(src: string, i: i32) -> string {
+    let mut end: i32 = i - 1;
+    while end >= 0 {
+        let start: i32 = link_u15_line_start(src, end);
+        let line: string = link_u15_trim(string_substr(src, start, end - start));
+        if string_len(line) > 0 { return line; }
+        end = start - 1;
+    }
+    return "";
+}
+
+/* True when the top-level `fn`/`pub fn` definition line starting at `i`
+   is immediately preceded (across blank lines) by an `#[extern_c]` (or
+   the reserved-for-later `#[extern_c(...)]`) attribute line -- the same
+   shape FFI-011's own lint (scripts/verify_extern_c_caller_obligations.py)
+   detects, just read from source text instead of Python. */
+fn link_u15_line_is_extern_c_decl(src: string, i: i32) -> bool {
+    let line: string = link_u15_prev_nonblank_line(src, i);
+    if string_len(line) < 10 { return false; }
+    return string_eq(string_substr(line, 0, 10), "#[extern_c");
+}
+
+/* "<modid>#<name>\n"-framed set of every `#[extern_c]`-declared name in
+   `listing`, across every module -- the cross-file half link_u15_mangle_
+   source needs to also exempt a QUALIFIED call site (`module::name`) or a
+   `use`-imported bare call, not just the declaration's own definition
+   line (which link_u15_line_is_extern_c_decl alone can answer, since a
+   definition is always in the same file being mangled). Same "\n"-framed
+   pair shape as link_u15_collision_set's own seen_pairs. */
+fn link_u15_extern_decl_pairs(listing: string) -> string {
+    let llen: i32 = string_len(listing);
+    let mut pairs: string = "\n";
+    let mut p: i32 = 0;
+    while p < llen {
+        let nl: i32 = listing_find_newline(listing, p);
+        let lsz: i32 = nl - p;
+        if lsz > 0 {
+            let src: string = parse_file(string_substr(listing, p, lsz));
+            let modid: string = link_u15_module_id(src);
+            let slen: i32 = string_len(src);
+            let mut i: i32 = 0;
+            while i < slen {
+                if link_u15_line_at_col0(src, i) {
+                    let nm: string = link_u15_line_def_name(src, i);
+                    if string_len(nm) > 0 {
+                        if link_u15_line_is_extern_c_decl(src, i) {
+                            let pair: string = string_concat(modid, string_concat("#", nm));
+                            if link_u15_set_has(pairs, pair) != true {
+                                pairs = string_concat(pairs, string_concat(pair, "\n"));
+                            }
+                        }
+                    }
+                }
+                i = i + 1;
+            }
+        }
+        p = nl + 1;
+    }
+    return pairs;
+}
+
 /* names defined at top level in two or more distinct modules of the listing
    (or matching a reserved C library identifier), as "\n"-framed set text
    ("\n" when there is nothing to mangle). */
@@ -288,15 +370,18 @@ fn link_u15_collision_set(listing: string) -> string {
                     let nm: string = link_u15_line_def_name(src, i);
                     if string_len(nm) > 0 {
                         let pair: string = string_concat(modid, string_concat("#", nm));
-                        if link_u15_reserved_c_name(nm) {
-                            if link_u15_set_has(collide, nm) != true {
-                                collide = string_concat(collide, string_concat(nm, "\n"));
-                            }
-                        }
-                        if link_u15_set_has(seen_names, nm) {
-                            if link_u15_set_has(seen_pairs, pair) != true {
+                        let is_extern: bool = link_u15_line_is_extern_c_decl(src, i);
+                        if is_extern != true {
+                            if link_u15_reserved_c_name(nm) {
                                 if link_u15_set_has(collide, nm) != true {
                                     collide = string_concat(collide, string_concat(nm, "\n"));
+                                }
+                            }
+                            if link_u15_set_has(seen_names, nm) {
+                                if link_u15_set_has(seen_pairs, pair) != true {
+                                    if link_u15_set_has(collide, nm) != true {
+                                        collide = string_concat(collide, string_concat(nm, "\n"));
+                                    }
                                 }
                             }
                         }
@@ -343,7 +428,7 @@ fn link_u15_prev_sig2(src: string, i: i32) -> i32 {
 }
 
 /* rewrite `src` so every collision-set name is module-prefixed. */
-fn link_u15_mangle_source(src: string, collide: string) -> string {
+fn link_u15_mangle_source(src: string, collide: string, extern_pairs: string) -> string {
     if string_len(collide) <= 1 { return src; }
     let modid: string = link_u15_module_id(src);
     let n: i32 = string_len(src);
@@ -457,8 +542,18 @@ fn link_u15_mangle_source(src: string, collide: string) -> string {
                         while m < n { if link_u15_is_ident_char(string_char_at(src, m)) { m = m + 1; } else { break; } }
                         let q: string = string_substr(src, qs, m - qs);
                         if link_u15_set_has(collide, q) {
-                            rep = string_concat(w, string_concat("__", q));
-                            consumed = m;
+                            /* FFI-016: `w::q` where `q` is an #[extern_c]
+                               declaration in module `w` -- leave bare `q`,
+                               never `w__q`, since lowering emits the literal
+                               reserved name as the real linked C symbol. */
+                            let epair: string = string_concat(w, string_concat("#", q));
+                            if link_u15_set_has(extern_pairs, epair) {
+                                rep = q;
+                                consumed = m;
+                            } else {
+                                rep = string_concat(w, string_concat("__", q));
+                                consumed = m;
+                            }
                         }
                     } else {
                         let is_path_tail: bool = if pc == 58 { pc2 == 58 } else { false };
@@ -466,11 +561,33 @@ fn link_u15_mangle_source(src: string, collide: string) -> string {
                             /* tail of a non-collision `P::w` -- leave */
                         } else {
                             if link_u15_set_has(collide, w) {
+                                /* FFI-016: this occurrence is the
+                                   extern-C declaration's own definition
+                                   name -- never mangle it, regardless of
+                                   `collide` (an unrelated ordinary
+                                   same-named fn elsewhere, e.g. sv0-strings'
+                                   own strings_c23::strlen, is what put `w`
+                                   in `collide` in the first place). */
+                                let line_start: i32 = link_u15_line_start(src, start);
+                                let def_name: string = link_u15_line_def_name(src, line_start);
+                                let is_own_extern_def: bool = if string_eq(def_name, w) {
+                                    link_u15_line_is_extern_c_decl(src, line_start)
+                                } else { false };
                                 let tgt: string = link_u15_use_target(src, w);
-                                if string_len(tgt) > 0 {
-                                    rep = string_concat(tgt, string_concat("__", w));
+                                let use_epair: string = string_concat(tgt, string_concat("#", w));
+                                if is_own_extern_def {
+                                    /* leave `rep = w` */
                                 } else {
-                                    rep = string_concat(modid, string_concat("__", w));
+                                    if string_len(tgt) > 0 {
+                                        if link_u15_set_has(extern_pairs, use_epair) {
+                                            /* leave `rep = w` -- bare call to
+                                               a `use`-imported extern_c fn */
+                                        } else {
+                                            rep = string_concat(tgt, string_concat("__", w));
+                                        }
+                                    } else {
+                                        rep = string_concat(modid, string_concat("__", w));
+                                    }
                                 }
                             }
                         }
@@ -495,6 +612,7 @@ fn link_u15_mangle_source(src: string, collide: string) -> string {
 
 fn link_project_concat_sources_from_listing(listing: string) -> string {
     let collide: string = link_u15_collision_set(listing);
+    let extern_pairs: string = link_u15_extern_decl_pairs(listing);
     let len: i32 = string_len(listing);
     let mut p: i32 = 0;
     let mut out: string = "";
@@ -504,7 +622,7 @@ fn link_project_concat_sources_from_listing(listing: string) -> string {
         let lsz: i32 = nl - p;
         if lsz > 0 {
             let path: string = string_substr(listing, p, lsz);
-            let src: string = link_u15_mangle_source(parse_file(path), collide);
+            let src: string = link_u15_mangle_source(parse_file(path), collide, extern_pairs);
             if first {
                 out = src;
                 first = false;
@@ -3295,6 +3413,45 @@ fn test_link_u15_symbol_mangle() -> i32 {
     return 0;
 }
 
+/* FFI-016: `#[extern_c]` declarations must never be mangled -- the whole
+   point is binding the literal reserved C symbol. Discovered via
+   sv0-strings SS-203: `#[extern_c] fn strlen(...)` coexisting with an
+   ORDINARY, correctly-mangled `strings_c23::strlen` in the same project
+   (the realistic case -- a safe façade reusing a libc name for
+   readability, plus a real exact-ABI binding of that same name). */
+fn test_link_u15_extern_c_not_mangled() -> i32 {
+    let pe: string = "/tmp/sv0_u15_extern.sv0";
+    write_file(pe, "module strings_unsafe_abi;\n/// obligation\n#[extern_c]\nfn strlen(s: i32) -> i32;\n");
+    let pc: string = "/tmp/sv0_u15_c23.sv0";
+    write_file(pc, "module strings_c23;\npub fn strlen(x: i32) -> i32 { return x; }\n");
+    let pm: string = "/tmp/sv0_u15_extern_main.sv0";
+    write_file(pm, "use strings_unsafe_abi::strlen;\nfn main() -> i32 { return strlen(strings_c23::strlen(0)); }\n");
+    let mut listing: string = pe;
+    listing = string_concat(listing, "\n");
+    listing = string_concat(listing, pc);
+    listing = string_concat(listing, "\n");
+    listing = string_concat(listing, pm);
+    listing = string_concat(listing, "\n");
+
+    /* the extern_c declaration's own reserved name is excluded from collide */
+    let extern_pairs: string = link_u15_extern_decl_pairs(listing);
+    if link_u15_set_has(extern_pairs, "strings_unsafe_abi#strlen") != true { return 1; }
+
+    let merged: string = link_project_concat_sources_from_listing(listing);
+    /* the extern_c declaration itself stays literally `strlen` */
+    if link_u15_contains(merged, "fn strlen(s: i32) -> i32;") != true { return 2; }
+    /* the ordinary strings_c23::strlen is still correctly mangled -- the
+       fix must not weaken the pre-existing, legitimate collision case */
+    if link_u15_contains(merged, "fn strings_c23__strlen(") != true { return 3; }
+    /* the `use`-imported bare call resolves to the literal extern symbol,
+       not a mangled synonym that would never link */
+    if link_u15_contains(merged, "return strlen(strings_c23__strlen(0))") != true { return 4; }
+    /* never produces a mangled form of the extern_c name anywhere */
+    if link_u15_contains(merged, "strings_unsafe_abi__strlen") != false { return 5; }
+
+    return 0;
+}
+
 fn test_source_defines_project_entry() -> i32 {
     if source_defines_project_entry("fn main() -> i32 { return 0; }") != true { return 1; }
     if source_defines_project_entry("fn add(x: i32) -> i32 { return x; }\nfn main() -> i32 { return 0; }") != true { return 2; }
@@ -4707,6 +4864,8 @@ fn main() -> i32 {
     if r21b2 != 0 { return 246 + r21b2; }
     let r21u15: i32 = test_link_u15_symbol_mangle();
     if r21u15 != 0 { return 500 + r21u15; }
+    let r21u16: i32 = test_link_u15_extern_c_not_mangled();
+    if r21u16 != 0 { return 520 + r21u16; }
     let r21b2a: i32 = test_listing_count_nonempty_paths();
     if r21b2a != 0 { return 247 + r21b2a; }
     let r21b2b: i32 = test_source_defines_project_entry();
