@@ -75,6 +75,7 @@ static int fn_table_param_type(int fn_param_offsets, int fn_param_types_flat, in
 static int fn_table_lookup_str(int fn_names, const char* source, int starts, int ends, const char* name_str);
 static int extern_fn_signature_eq(int fn_ret_types, int fn_param_counts, int fn_param_offsets, int fn_param_types_flat, int a, int b);
 static int extern_fn_manifest_conflict(int fn_names, int fn_param_counts, int fn_ret_types, int fn_param_offsets, int fn_param_types_flat, int fn_is_extern, const char* source, int starts, int ends);
+static int program_uses_ffi_features(int it, int pty_tt, int body_et);
 static int VS_UNIT(void);
 static int VS_TUPLE(void);
 static int VS_STRUCT(void);
@@ -251,6 +252,10 @@ static int test_register_all_item_fns_extern_fn(void);
 static int test_extern_fn_manifest_conflict_mismatch(void);
 static int test_extern_fn_manifest_conflict_silent_on_identical_redecl(void);
 static int test_extern_fn_manifest_conflict_ignores_non_extern_rows(void);
+static int test_program_uses_ffi_features_clean_program(void);
+static int test_program_uses_ffi_features_extern_item(void);
+static int test_program_uses_ffi_features_ptr_type(void);
+static int test_program_uses_ffi_features_unsafe_block(void);
 static int test_scan_enum_variant_shapes(void);
 static int test_init_struct_defs(void);
 static int test_init_enum_defs(void);
@@ -1314,6 +1319,48 @@ static int extern_fn_manifest_conflict(int fn_names, int fn_param_counts, int fn
   }
   int _sv0t15 = (0 - 1);
   return _sv0t15;
+}
+
+static int program_uses_ffi_features(int it, int pty_tt, int body_et) {
+  int _sv0t0 = sv0_vec_len(it);
+  int n = _sv0t0;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(it, i);
+    if ((_sv0t1 == 8)) {
+      return 1;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t2 = sv0_vec_len(pty_tt);
+  int m = _sv0t2;
+  int j = 0;
+  while ((j < m)) {
+    int _sv0t3 = sv0_vec_get(pty_tt, j);
+    int tt = _sv0t3;
+    if ((tt == 8)) {
+      return 1;
+    } else {
+    }
+    if ((tt == 9)) {
+      return 1;
+    } else {
+    }
+    j = (j + 1);
+  }
+  int _sv0t4 = sv0_vec_len(body_et);
+  int k = _sv0t4;
+  int x = 0;
+  while ((x < k)) {
+    int _sv0t5 = sv0_vec_get(body_et, x);
+    if ((_sv0t5 == 34)) {
+      return 1;
+    } else {
+    }
+    x = (x + 1);
+  }
+  return 0;
 }
 
 static int VS_UNIT(void) {
@@ -10468,6 +10515,90 @@ static int test_extern_fn_manifest_conflict_ignores_non_extern_rows(void) {
   return 0;
 }
 
+static int test_program_uses_ffi_features_clean_program(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(it, 1);
+  int _sv0t1 = sv0_vec_new();
+  int ptt = _sv0t1;
+  sv0_vec_push(ptt, 1);
+  sv0_vec_push(ptt, 2);
+  sv0_vec_push(ptt, 3);
+  int _sv0t2 = sv0_vec_new();
+  int bet = _sv0t2;
+  sv0_vec_push(bet, 5);
+  sv0_vec_push(bet, 12);
+  sv0_vec_push(bet, 20);
+  int _sv0t3 = program_uses_ffi_features(it, ptt, bet);
+  if ((_sv0t3 != 0)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_program_uses_ffi_features_extern_item(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  sv0_vec_push(it, 0);
+  sv0_vec_push(it, 8);
+  int _sv0t1 = sv0_vec_new();
+  int ptt = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int bet = _sv0t2;
+  int _sv0t3 = program_uses_ffi_features(it, ptt, bet);
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int test_program_uses_ffi_features_ptr_type(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  sv0_vec_push(it, 0);
+  int _sv0t1 = sv0_vec_new();
+  int ptt_const = _sv0t1;
+  sv0_vec_push(ptt_const, 1);
+  sv0_vec_push(ptt_const, 8);
+  int _sv0t2 = sv0_vec_new();
+  int bet = _sv0t2;
+  int _sv0t3 = program_uses_ffi_features(it, ptt_const, bet);
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_new();
+  int ptt_mut = _sv0t4;
+  sv0_vec_push(ptt_mut, 9);
+  int _sv0t5 = program_uses_ffi_features(it, ptt_mut, bet);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_program_uses_ffi_features_unsafe_block(void) {
+  int _sv0t0 = sv0_vec_new();
+  int it = _sv0t0;
+  sv0_vec_push(it, 0);
+  int _sv0t1 = sv0_vec_new();
+  int ptt = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int bet = _sv0t2;
+  sv0_vec_push(bet, 5);
+  sv0_vec_push(bet, 34);
+  int _sv0t3 = program_uses_ffi_features(it, ptt, bet);
+  if ((_sv0t3 != 1)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
 static int test_scan_enum_variant_shapes(void) {
   int _sv0t0 = sv0_vec_new();
   int tt = _sv0t0;
@@ -13692,6 +13823,34 @@ int main(void) {
   if ((r85 != 0)) {
     int _sv0t176 = (880 + r85);
     return _sv0t176;
+  } else {
+  }
+  int _sv0t177 = test_program_uses_ffi_features_clean_program();
+  int r86 = _sv0t177;
+  if ((r86 != 0)) {
+    int _sv0t178 = (890 + r86);
+    return _sv0t178;
+  } else {
+  }
+  int _sv0t179 = test_program_uses_ffi_features_extern_item();
+  int r87 = _sv0t179;
+  if ((r87 != 0)) {
+    int _sv0t180 = (900 + r87);
+    return _sv0t180;
+  } else {
+  }
+  int _sv0t181 = test_program_uses_ffi_features_ptr_type();
+  int r88 = _sv0t181;
+  if ((r88 != 0)) {
+    int _sv0t182 = (910 + r88);
+    return _sv0t182;
+  } else {
+  }
+  int _sv0t183 = test_program_uses_ffi_features_unsafe_block();
+  int r89 = _sv0t183;
+  if ((r89 != 0)) {
+    int _sv0t184 = (920 + r89);
+    return _sv0t184;
   } else {
   }
   return 0;

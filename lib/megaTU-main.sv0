@@ -34,6 +34,7 @@ fn megatu_diag_code_str(code: i32) -> string {
     if code == 550 { return "E0550"; }
     if code == 551 { return "E0551"; }
     if code == 552 { return "E0552"; }
+    if code == 553 { return "E0553"; }
     return "E0000";
 }
 
@@ -54,6 +55,7 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 550 { return "raw pointer dereference outside an `unsafe` block"; }
     if code == 551 { return "no C ABI mapping for this type in an `#[extern_c]` signature"; }
     if code == 552 { return "conflicting `#[extern_c]` declaration for this C symbol"; }
+    if code == 553 { return "raw pointers, `unsafe` blocks, and `#[extern_c]` declarations are not supported on the VM backend"; }
     return "error";
 }
 

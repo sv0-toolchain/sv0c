@@ -1,0 +1,13 @@
+# FFI-014 (Epic E): programs that legally use raw pointers, `unsafe` blocks,
+# or `#[extern_c]` declarations. Each of these already compiles + runs on
+# the native C backend (see test/behavior/manifest.txt); the native VM
+# emitter (build/sv0-megatu-vm-native) must instead refuse them with a
+# stable E0553 diagnostic and exit 7 -- never a crash, never silently wrong
+# bytecode. Paths relative to sv0c/.
+test/behavior/cases/ffi_ptr_create_and_pass.sv0
+test/behavior/cases/ffi_unsafe_block_transparent.sv0
+test/behavior/cases/ffi_unsafe_deref_gated.sv0
+test/behavior/cases/ffi_extern_c_decl_parses.sv0
+test/behavior/cases/ffi_extern_c_signature_valid.sv0
+test/behavior/cases/ffi_extern_c_call_libc.sv0
+test/behavior/cases/ffi_extern_c_identical_redecl_ok.sv0
