@@ -1,0 +1,26 @@
+/* SS-U13 (sv0-strings task/sv0-strings-checklist.Rmd, sv0-strings own
+   docs/BUGS.md #1): `Enum::Variant { field: value, .. }` struct-variant
+   construction -- patterns and tuple-variant construction already
+   worked; only the struct-variant literal EXPRESSION was unimplemented
+   (`E0301`). Two constructions of the same variant, fields declared in
+   DECLARATION order for the first and REVERSED (out-of-declaration-order
+   named-field) for the second -- proves fields are stored by their real
+   declared slot, not textual/positional order in the literal. Both
+   round-trip through a struct-variant match pattern. Exits 42. */
+enum E { D { a: i32, b: i32 }, U }
+
+fn main() -> i32 {
+    let x: E = E::D { a: 10, b: 32 };
+    let s1: i32 = match x {
+        E::D { a, b } => a + b,
+        E::U => 0,
+    };
+    let y: E = E::D { b: 32, a: 10 };
+    let s2: i32 = match y {
+        E::D { a, b } => a + b,
+        E::U => 0,
+    };
+    if s1 != 42 { return 1; }
+    if s2 != 42 { return 2; }
+    return 42;
+}

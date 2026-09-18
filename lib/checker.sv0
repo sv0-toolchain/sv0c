@@ -5271,6 +5271,31 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
         return TY_UNIT();
     }
     if tag == 24 {
+        /* SS-U13: `Enum::Variant { field: value }` -- a 2-segment
+           ExprStruct path -- is enum struct-variant construction, not an
+           ordinary struct literal. Mirrors synth_expr_call_simple's own
+           ppc==2 handling for a tuple-variant CALL (`Enum::Variant(x)`)
+           exactly: resolve via resolve_ctor_path_ty (same function; it
+           already accepts a VSStruct-shaped variant, returning TY_FN --
+           this call site doesn't care WHICH non-negative ctor_ty comes
+           back, only that the path resolved, exactly like the tuple-call
+           precedent does) and type the fully-applied construction as
+           TY_ENUM. A 1-segment path (ordinary `StructName { .. }`) is
+           unchanged -- still TY_INT, still field-traversal-deferred,
+           zero behavior change for existing structs. */
+        let pps_s24: i32 = vec_get(ed1, idx);
+        let ppc_s24: i32 = vec_get(ed2, idx);
+        if ppc_s24 == 2 {
+            let seg1_s24: i32 = vec_get(pp, pps_s24);
+            let seg2_s24: i32 = vec_get(pp, pps_s24 + 1);
+            let ctor_ty_s24: i32 = resolve_ctor_path_ty(edef_names,
+                                        edef_variant_offsets,
+                                        edef_variant_counts,
+                                        edef_vnames_flat, edef_vshapes_flat,
+                                        source, starts, ends,
+                                        seg1_s24, seg2_s24);
+            if ctor_ty_s24 >= 0 { return TY_ENUM(); }
+        }
         return TY_INT();
     }
     if tag == 25 {

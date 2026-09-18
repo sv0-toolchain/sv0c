@@ -1324,9 +1324,26 @@ fn resolve_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_push(spath, vec_get(pp, spps + sk));
             sk = sk + 1;
         }
-        let sps: string = path_join_vec(source, starts, ends, spath);
-        if res_type_exists(mod_tys, sps, source, starts, ends) != true {
-            return 301;
+        /* SS-U13: `Enum::Variant { field: value }` (enum struct-variant
+           construction) is a 2-segment path whose FULL joined text
+           ("Enum::Variant") is never a registered type name -- only bare
+           struct/enum names are. Mirrors resolve_pat_shape's own tag-4
+           (PatStruct) handling of the identical shape: for a 2-segment
+           path, accept when the FIRST segment alone is a known type (the
+           enum); this is the coarse existence pass only -- synth_expr
+           validates the variant itself via resolve_ctor_path_ty. A
+           1-segment path (ordinary `StructName { .. }`) keeps checking
+           the full (single-segment) joined string exactly as before. */
+        if sppc >= 2 {
+            let seg0: string = tok_str(source, starts, ends, vec_get(spath, 0));
+            if res_type_exists(mod_tys, seg0, source, starts, ends) != true {
+                return 301;
+            }
+        } else {
+            let sps: string = path_join_vec(source, starts, ends, spath);
+            if res_type_exists(mod_tys, sps, source, starts, ends) != true {
+                return 301;
+            }
         }
         let mut sfi: i32 = 0;
         while sfi < sfc {

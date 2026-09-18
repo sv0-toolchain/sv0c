@@ -1,0 +1,17 @@
+/* SS-U13: struct-variant construction NOT in a `let` -- directly as a
+   function-call argument (the general lower_expr_to_value / delegated
+   lower_tag_struct path, not the let-init "construct directly into the
+   named variable" special case exercised by
+   enum_struct_variant_construct.sv0). Exits 42. */
+enum E { D { a: i32, b: i32 }, U }
+
+fn sum(e: E) -> i32 {
+    return match e {
+        E::D { a, b } => a + b,
+        E::U => 0,
+    };
+}
+
+fn main() -> i32 {
+    return sum(E::D { a: 15, b: 27 });
+}

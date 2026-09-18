@@ -568,6 +568,182 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     return Value::VUnit;
 }
 
+/* ── lower_tag_struct (ExprStruct, tag 24) ──────────────────────
+   SS-U13: split out of lower_expr_to_value's own tag==24 arm as a
+   dedicated delegate function -- mirrors lower_tag_call (tag 4) and
+   lower_tag_block (tag 9), the two OTHER large per-tag bodies that are
+   NOT inlined directly into lower_expr_to_value's own already-enormous
+   dispatch chain. A prior SS-U13 prototype added enum struct-variant
+   construction INLINE to tag==24 right here and hit `sv0 panic: vec:
+   index out of bounds` self-hosting lowering.sv0 with itself (BUGS.md
+   #1); the KC-006 comment nearby independently records the identical
+   panic from a SIMPLER (nullary-ctor) inline addition to this same
+   spot. Two independent attempts at inline growth here, in different
+   shapes, both self-host-panicking is a real signal about THIS
+   function's own size/complexity under self-hosting, not a defect in
+   either attempted construction feature -- delegating avoids growing
+   lower_expr_to_value's own body at all, the same way tags 4 and 9
+   already do.
+
+   Handles BOTH shapes ExprStruct's own path can have:
+   - 1-segment `StructName { field: value, ... }`: ordinary struct
+     construction, UNCHANGED from the pre-split inline code -- DeclNamed
+     by the (only) segment, StoreField each field BY NAME.
+   - 2-segment `Enum::Variant { field: value, ... }`: enum struct-variant
+     construction (the actual SS-U13 feature). DeclNamed by the FIRST
+     segment (the enum type -- `Mod::Struct` 1-segment precedent used the
+     LAST segment, which for a 2-segment path is the field-bearing name,
+     wrong here; mirrors expr_init_cty/match_scrut_cty, which already
+     both return the first segment for tag 24 unconditionally), then a
+     tag StoreField (sentinel -1, matching every other enum-ctor site)
+     followed by one payload-slot StoreField per field. Fields are
+     addressed by POSITIONAL slot (`0-10-pi`, the same sentinel encoding
+     every other enum payload access uses), not by name -- one enum
+     type's C representation shares one payload-slot layout across every
+     variant, keyed by declaration order, not per-variant field names.
+     The slot for each field comes from lower_pat_struct_field_payload_index
+     against the variant's own DEFINITION-site name token (resolved via
+     the new enum_variant_def_tok_lookup_str, not a call-site token --
+     unlike the pattern-matching side, which only has a call/pattern-site
+     token available and therefore has to fall back to textual field
+     order "the common case" instead; construction can do the more
+     correct thing directly here since the real definition token is one
+     lookup away). Falls back to textual order only if that lookup ever
+     fails, matching the pattern-side's own fallback exactly rather than
+     leaving a field unstored. No zero-init of unused payload slots for
+     other variants of the same enum -- the ALREADY-WORKING tuple-variant
+     construction above (cppc==2 in lower_tag_call) doesn't do that
+     either, so it is evidently not required for a clean, self-hosting-
+     safe build; only the fully-empty nullary-ctor case (KC-006) needed
+     it, for a different reason (an enum-only-wide-from-OTHER-variants
+     "may be used uninitialized" GCC warning that never applies here
+     since real values are always stored into every field this literal
+     names). */
+fn lower_tag_struct(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                    ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                    tok_tags: Vec<i32>,
+                    idx: i32, ctr: Vec<i32>,
+                    out_instrs: Vec<i32>,
+                    enum_names: Vec<i32>,
+                    enum_tag_offsets: Vec<i32>,
+                    enum_tag_counts: Vec<i32>,
+                    enum_tags_flat: Vec<i32>,
+                    fn_ctx: Vec<i32>,
+                    builtin_map: Vec<i32>, lit_sf_names: Vec<i32>,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>,
+                    item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>, item_d3: Vec<i32>, item_d4: Vec<i32>,
+                    item_field_counts: Vec<i32>,
+                    enum_vnames_flat: Vec<i32>, enum_max_payloads: Vec<i32>, item_fn_row: i32,
+                    match_env_inherit: Vec<i32>, import_aliases: Vec<i32>) -> Value {
+    let pps_s: i32 = vec_get(ed1, idx);
+    let ppc_s: i32 = vec_get(ed2, idx);
+    let fc_s: i32 = vec_get(ed3, idx);
+    let sf0: i32 = vec_get(ed4, idx);
+    if ppc_s < 1 {
+        return Value::VUnit;
+    }
+    if fc_s <= 0 {
+        return Value::VUnit;
+    }
+    if ppc_s == 2 {
+        let en_tok_s24: i32 = vec_get(pp, pps_s);
+        let vn_tok_s24: i32 = vec_get(pp, pps_s + 1);
+        /* enum_tag_lookup_str unconditionally resolves both tokens to
+           strings (handle_to_str -> starts[tok]/ends[tok]) before it
+           even looks at enum_names, so it is only safe to call when both
+           tokens are genuine, in-bounds source positions. Every REAL
+           2-segment ExprStruct path satisfies that (pp entries always
+           come from the real parser, starts/ends always sized for the
+           whole file) -- this guard exists for the pre-existing
+           test_lower_expr_struct_qualified_path self-test, which hand-
+           builds a `Mod::Struct { .. }` (ordinary qualified-struct, not
+           enum) fixture with deliberately minimal starts/ends arrays;
+           out-of-range tokens there previously reached
+           enum_tag_lookup_str unconditionally and crashed with a real
+           `vec: index out of bounds` panic (confirmed by reproducing it
+           directly, not assumed). An out-of-range token here can only
+           mean "not a real, checked enum-variant path" (a synthetic
+           fixture, or a genuine ordinary qualified-struct path with no
+           token to speak of), so falling through to the ordinary-struct
+           code below is correct either way, not just a crash-avoidance
+           shortcut. */
+        let toks_ok_s24: bool = if en_tok_s24 >= 0 {
+            if en_tok_s24 < vec_len(starts) {
+                if vn_tok_s24 >= 0 { vn_tok_s24 < vec_len(starts) } else { false }
+            } else { false }
+        } else { false };
+        let k_s24: i32 = if toks_ok_s24 {
+            enum_tag_lookup_str(enum_names, enum_tags_flat,
+                                enum_tag_offsets, enum_tag_counts,
+                                en_tok_s24, vn_tok_s24, source, starts, ends)
+        } else { 0 - 2 };
+        if k_s24 >= 0 {
+            let t_e24: i32 = ctr_fresh(ctr);
+            vec_push(out_instrs, box_new(Instr::DeclNamed(en_tok_s24, t_e24)));
+            let tag_e24: Expr = Expr::Literal(box_new(Value::VInt(k_s24)));
+            vec_push(out_instrs, box_new(Instr::StoreField(t_e24, 0 - 1,
+                                                            box_new(tag_e24))));
+            let def_tok_e24: i32 = enum_variant_def_tok_lookup_str(
+                enum_names, enum_tags_flat, enum_tag_offsets,
+                enum_tag_counts, en_tok_s24, vn_tok_s24,
+                source, starts, ends);
+            let mut fi_e24: i32 = 0;
+            while fi_e24 < fc_s {
+                let ch_e24: i32 = vec_get(lit_sf_names, sf0 + fi_e24 * 2 + 1);
+                let fv_e24: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                    tok_tags, ch_e24, ctr, out_instrs, enum_names,
+                    enum_tag_offsets, enum_tag_counts, enum_tags_flat,
+                    fn_ctx, builtin_map, lit_sf_names, source, starts,
+                    ends, item_tags, item_names, item_d2, item_d3,
+                    item_d4, item_field_counts, enum_vnames_flat,
+                    enum_max_payloads, item_fn_row, match_env_inherit,
+                    import_aliases);
+                let fnm_e24: i32 = vec_get(lit_sf_names, sf0 + fi_e24 * 2);
+                let mut pi_e24: i32 = 0 - 1;
+                if def_tok_e24 >= 0 {
+                    pi_e24 = lower_pat_struct_field_payload_index(tok_tags,
+                        source, starts, ends, def_tok_e24, fc_s, fnm_e24);
+                }
+                if pi_e24 < 0 { pi_e24 = fi_e24; }
+                let pay_e24: i32 = 0 - 10 - pi_e24;
+                vec_push(out_instrs, box_new(Instr::StoreField(t_e24, pay_e24,
+                                             box_new(value_to_expr(fv_e24)))));
+                fi_e24 = fi_e24 + 1;
+            }
+            return Value::VVar(t_e24);
+        }
+    }
+    /* `pp[pps_s .. pps_s+ppc_s)` holds path segment token indices.
+       Single-seg matches SML `hd path`. For `Mod::Struct { ... }`,
+       use the **last** segment as the struct typename for DeclNamed. */
+    let sty_idx: i32 = pps_s + ppc_s - 1;
+    let sty_tok: i32 = vec_get(pp, sty_idx);
+    let t_s: i32 = ctr_fresh(ctr);
+    let decl_s: Instr = Instr::DeclNamed(sty_tok, t_s);
+    vec_push(out_instrs, box_new(decl_s));
+    /* lit_sf_names is stride-2 per field: [name_tok, value_root]. sf0 is the
+       stride-2 base (fc_before). Read the value root directly rather than
+       assuming the fc_s value expressions are contiguous before the ExprStruct
+       node — they are not when a field value is itself a field access / call. */
+    let mut fi_s: i32 = 0;
+    while fi_s < fc_s {
+        let ch_s: i32 = vec_get(lit_sf_names, sf0 + fi_s * 2 + 1);
+        let fv_s: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                              tok_tags, ch_s, ctr,
+                                              out_instrs, enum_names,
+                                              enum_tag_offsets,
+                                              enum_tag_counts,
+                                              enum_tags_flat, fn_ctx,
+                                              builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        let fe_s: Expr = value_to_expr(fv_s);
+        let fnm_s: i32 = vec_get(lit_sf_names, sf0 + fi_s * 2);
+        let stf_s: Instr = Instr::StoreField(t_s, fnm_s, box_new(fe_s));
+        vec_push(out_instrs, box_new(stf_s));
+        fi_s = fi_s + 1;
+    }
+    return Value::VVar(t_s);
+}
+
 /* Resolve the arena index of block statement `si`. Statement nodes are not
    contiguous; parse_block records an ordered index list in pp with its offset
    (+1) in the block's d4 (parser.sv0 block_stmt_sidecar_push). d4 == 0 → no
@@ -642,27 +818,94 @@ fn lower_tag_block(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 if vec_get(et, init_idx) == 24 {
                     let sppc: i32 = vec_get(ed2, init_idx);
                     let fc_lb: i32 = vec_get(ed3, init_idx);
-                    if sppc >= 1 {
+                    let spps_lb: i32 = vec_get(ed1, init_idx);
+                    /* SS-U13: `let x = Enum::Variant { field: value, .. };`
+                       -- construct directly into name_tok exactly like the
+                       ordinary-struct branch below, but with the enum's
+                       tag + positional payload-slot StoreFields (mirrors
+                       lower_tag_struct's own ppc_s==2 branch, which see
+                       for the full rationale -- this copy exists because
+                       a let-bound init is constructed directly into the
+                       let variable rather than a fresh temp, an
+                       optimization this function's own header comment
+                       already documents for the ordinary-struct case). */
+                    if sppc == 2 {
                         if fc_lb > 0 {
-                            let sty_tok: i32 = vec_get(pp,
-                                vec_get(ed1, init_idx) + sppc - 1);
-                            vec_push(out_instrs, box_new(Instr::DeclNamed(sty_tok, name_tok)));
-                            let_declared = 1;
-                            let sf0_lb: i32 = vec_get(ed4, init_idx);
-                            let mut fi_lb: i32 = 0;
-                            while fi_lb < fc_lb {
-                                let ch_lb: i32 = vec_get(lit_sf_names, sf0_lb + fi_lb * 2 + 1);
-                                let fv_lb: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
-                                    tok_tags, ch_lb, ctr, out_instrs, enum_names, enum_tag_offsets,
-                                    enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
-                                    source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
-                                    item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-                                let fnm_lb: i32 = vec_get(lit_sf_names, sf0_lb + fi_lb * 2);
-                                vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fnm_lb,
-                                                            box_new(value_to_expr(fv_lb)))));
-                                fi_lb = fi_lb + 1;
+                            let en_tok_lb: i32 = vec_get(pp, spps_lb);
+                            let vn_tok_lb: i32 = vec_get(pp, spps_lb + 1);
+                            /* Bounds guard: see lower_tag_struct's own
+                               identical guard for the full rationale --
+                               enum_tag_lookup_str unconditionally
+                               dereferences starts/ends by token, which is
+                               only safe for genuine in-bounds source
+                               tokens. */
+                            let toks_ok_lb2: bool = if en_tok_lb >= 0 {
+                                if en_tok_lb < vec_len(starts) {
+                                    if vn_tok_lb >= 0 { vn_tok_lb < vec_len(starts) } else { false }
+                                } else { false }
+                            } else { false };
+                            let k_lb2: i32 = if toks_ok_lb2 {
+                                enum_tag_lookup_str(enum_names,
+                                    enum_tags_flat, enum_tag_offsets,
+                                    enum_tag_counts, en_tok_lb, vn_tok_lb,
+                                    source, starts, ends)
+                            } else { 0 - 2 };
+                            if k_lb2 >= 0 {
+                                vec_push(out_instrs, box_new(Instr::DeclNamed(en_tok_lb, name_tok)));
+                                let_declared = 1;
+                                vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1,
+                                    box_new(Expr::Literal(box_new(Value::VInt(k_lb2)))))));
+                                let def_tok_lb: i32 = enum_variant_def_tok_lookup_str(
+                                    enum_names, enum_tags_flat, enum_tag_offsets,
+                                    enum_tag_counts, en_tok_lb, vn_tok_lb,
+                                    source, starts, ends);
+                                let sf0_lb2: i32 = vec_get(ed4, init_idx);
+                                let mut fi_lb2: i32 = 0;
+                                while fi_lb2 < fc_lb {
+                                    let ch_lb2: i32 = vec_get(lit_sf_names, sf0_lb2 + fi_lb2 * 2 + 1);
+                                    let fv_lb2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                        tok_tags, ch_lb2, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                        enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                        source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                        item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                                    let fnm_lb2: i32 = vec_get(lit_sf_names, sf0_lb2 + fi_lb2 * 2);
+                                    let mut pi_lb2: i32 = 0 - 1;
+                                    if def_tok_lb >= 0 {
+                                        pi_lb2 = lower_pat_struct_field_payload_index(tok_tags,
+                                            source, starts, ends, def_tok_lb, fc_lb, fnm_lb2);
+                                    }
+                                    if pi_lb2 < 0 { pi_lb2 = fi_lb2; }
+                                    let pay_lb2: i32 = 0 - 10 - pi_lb2;
+                                    vec_push(out_instrs, box_new(Instr::StoreField(name_tok, pay_lb2,
+                                                                box_new(value_to_expr(fv_lb2)))));
+                                    fi_lb2 = fi_lb2 + 1;
+                                }
+                                init_handled = 1;
                             }
-                            init_handled = 1;
+                        }
+                    } else {
+                        if sppc >= 1 {
+                            if fc_lb > 0 {
+                                let sty_tok: i32 = vec_get(pp,
+                                    spps_lb + sppc - 1);
+                                vec_push(out_instrs, box_new(Instr::DeclNamed(sty_tok, name_tok)));
+                                let_declared = 1;
+                                let sf0_lb: i32 = vec_get(ed4, init_idx);
+                                let mut fi_lb: i32 = 0;
+                                while fi_lb < fc_lb {
+                                    let ch_lb: i32 = vec_get(lit_sf_names, sf0_lb + fi_lb * 2 + 1);
+                                    let fv_lb: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                        tok_tags, ch_lb, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                        enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                        source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                        item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                                    let fnm_lb: i32 = vec_get(lit_sf_names, sf0_lb + fi_lb * 2);
+                                    vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fnm_lb,
+                                                                box_new(value_to_expr(fv_lb)))));
+                                    fi_lb = fi_lb + 1;
+                                }
+                                init_handled = 1;
+                            }
                         }
                     }
                 }
@@ -1950,45 +2193,15 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                               enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     }
     if tag == 24 {
-        let pps_s: i32 = vec_get(ed1, idx);
-        let ppc_s: i32 = vec_get(ed2, idx);
-        let fc_s: i32 = vec_get(ed3, idx);
-        let sf0: i32 = vec_get(ed4, idx);
-        if ppc_s < 1 {
-            return Value::VUnit;
-        }
-        if fc_s <= 0 {
-            return Value::VUnit;
-        }
-        /* `pp[pps_s .. pps_s+ppc_s)` holds path segment token indices.
-           Single-seg matches SML `hd path`. For `Mod::Struct { ... }`,
-           use the **last** segment as the struct typename for DeclNamed. */
-        let sty_idx: i32 = pps_s + ppc_s - 1;
-        let sty_tok: i32 = vec_get(pp, sty_idx);
-        let t_s: i32 = ctr_fresh(ctr);
-        let decl_s: Instr = Instr::DeclNamed(sty_tok, t_s);
-        vec_push(out_instrs, box_new(decl_s));
-        /* lit_sf_names is stride-2 per field: [name_tok, value_root]. sf0 is the
-           stride-2 base (fc_before). Read the value root directly rather than
-           assuming the fc_s value expressions are contiguous before the ExprStruct
-           node — they are not when a field value is itself a field access / call. */
-        let mut fi_s: i32 = 0;
-        while fi_s < fc_s {
-            let ch_s: i32 = vec_get(lit_sf_names, sf0 + fi_s * 2 + 1);
-            let fv_s: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
-                                                  tok_tags, ch_s, ctr,
-                                                  out_instrs, enum_names,
-                                                  enum_tag_offsets,
-                                                  enum_tag_counts,
-                                                  enum_tags_flat, fn_ctx,
-                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-            let fe_s: Expr = value_to_expr(fv_s);
-            let fnm_s: i32 = vec_get(lit_sf_names, sf0 + fi_s * 2);
-            let stf_s: Instr = Instr::StoreField(t_s, fnm_s, box_new(fe_s));
-            vec_push(out_instrs, box_new(stf_s));
-            fi_s = fi_s + 1;
-        }
-        return Value::VVar(t_s);
+        return lower_tag_struct(et, ed1, ed2, ed3, ed4, pp, tok_tags,
+                                idx, ctr, out_instrs, enum_names,
+                                enum_tag_offsets, enum_tag_counts,
+                                enum_tags_flat, fn_ctx, builtin_map,
+                                lit_sf_names, source, starts, ends,
+                                item_tags, item_names, item_d2, item_d3,
+                                item_d4, item_field_counts,
+                                enum_vnames_flat, enum_max_payloads,
+                                item_fn_row, match_env_inherit, import_aliases);
     }
     if tag == 25 {
         let elem_count: i32 = vec_get(ed2, idx);
@@ -3598,34 +3811,92 @@ fn lower_stmt(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if vec_get(et, init_idx) == 24 {
                 let sppc: i32 = vec_get(ed2, init_idx);
                 let fc_ls: i32 = vec_get(ed3, init_idx);
-                if sppc >= 1 {
+                let spps_ls: i32 = vec_get(ed1, init_idx);
+                /* SS-U13: `let x = Enum::Variant { field: value, .. };` at
+                   fn-body top level -- same enum-ctor branch as
+                   lower_tag_block's identical copy (nested blocks); see
+                   that copy's comment, and lower_tag_struct's own
+                   ppc_s==2 branch, for the full rationale. */
+                if sppc == 2 {
                     if fc_ls > 0 {
-                        let sty_tok: i32 = vec_get(pp,
-                            vec_get(ed1, init_idx) + sppc - 1);
-                        let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
-                        vec_push(out_instrs, box_new(decl_n));
-                        let_declared = 1;
-                        /* Construct the struct DIRECTLY into the let var (SML
-                           StmtLet ExprStruct: `[DeclNamed(sn,x)] @ per-field
-                           StoreField(x,fname,ei)`) — not into a fresh temp that is
-                           then copied, which SML never does and which costs a full
-                           struct-width of extra locals. Fields interleave
-                           spill-then-store, matching SML `pi @ [StoreField]`. */
-                        let sf0_ls: i32 = vec_get(ed4, init_idx);
-                        let mut fi_ls: i32 = 0;
-                        while fi_ls < fc_ls {
-                            let ch_ls: i32 = vec_get(lit_sf_names, sf0_ls + fi_ls * 2 + 1);
-                            let fv_ls: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
-                                tok_tags, ch_ls, ctr, out_instrs, enum_names, enum_tag_offsets,
-                                enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
-                                source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
-                                item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-                            let fnm_ls: i32 = vec_get(lit_sf_names, sf0_ls + fi_ls * 2);
-                            vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fnm_ls,
-                                                        box_new(value_to_expr(fv_ls)))));
-                            fi_ls = fi_ls + 1;
+                        let en_tok_ls: i32 = vec_get(pp, spps_ls);
+                        let vn_tok_ls: i32 = vec_get(pp, spps_ls + 1);
+                        /* Bounds guard: see lower_tag_struct's own
+                           identical guard for the full rationale. */
+                        let toks_ok_ls2: bool = if en_tok_ls >= 0 {
+                            if en_tok_ls < vec_len(starts) {
+                                if vn_tok_ls >= 0 { vn_tok_ls < vec_len(starts) } else { false }
+                            } else { false }
+                        } else { false };
+                        let k_ls2: i32 = if toks_ok_ls2 {
+                            enum_tag_lookup_str(enum_names,
+                                enum_tags_flat, enum_tag_offsets,
+                                enum_tag_counts, en_tok_ls, vn_tok_ls,
+                                source, starts, ends)
+                        } else { 0 - 2 };
+                        if k_ls2 >= 0 {
+                            vec_push(out_instrs, box_new(Instr::DeclNamed(en_tok_ls, name_tok)));
+                            let_declared = 1;
+                            vec_push(out_instrs, box_new(Instr::StoreField(name_tok, 0 - 1,
+                                box_new(Expr::Literal(box_new(Value::VInt(k_ls2)))))));
+                            let def_tok_ls: i32 = enum_variant_def_tok_lookup_str(
+                                enum_names, enum_tags_flat, enum_tag_offsets,
+                                enum_tag_counts, en_tok_ls, vn_tok_ls,
+                                source, starts, ends);
+                            let sf0_ls2: i32 = vec_get(ed4, init_idx);
+                            let mut fi_ls2: i32 = 0;
+                            while fi_ls2 < fc_ls {
+                                let ch_ls2: i32 = vec_get(lit_sf_names, sf0_ls2 + fi_ls2 * 2 + 1);
+                                let fv_ls2: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                    tok_tags, ch_ls2, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                    enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                    source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                    item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                                let fnm_ls2: i32 = vec_get(lit_sf_names, sf0_ls2 + fi_ls2 * 2);
+                                let mut pi_ls2: i32 = 0 - 1;
+                                if def_tok_ls >= 0 {
+                                    pi_ls2 = lower_pat_struct_field_payload_index(tok_tags,
+                                        source, starts, ends, def_tok_ls, fc_ls, fnm_ls2);
+                                }
+                                if pi_ls2 < 0 { pi_ls2 = fi_ls2; }
+                                let pay_ls2: i32 = 0 - 10 - pi_ls2;
+                                vec_push(out_instrs, box_new(Instr::StoreField(name_tok, pay_ls2,
+                                                            box_new(value_to_expr(fv_ls2)))));
+                                fi_ls2 = fi_ls2 + 1;
+                            }
+                            init_handled = 1;
                         }
-                        init_handled = 1;
+                    }
+                } else {
+                    if sppc >= 1 {
+                        if fc_ls > 0 {
+                            let sty_tok: i32 = vec_get(pp,
+                                spps_ls + sppc - 1);
+                            let decl_n: Instr = Instr::DeclNamed(sty_tok, name_tok);
+                            vec_push(out_instrs, box_new(decl_n));
+                            let_declared = 1;
+                            /* Construct the struct DIRECTLY into the let var (SML
+                               StmtLet ExprStruct: `[DeclNamed(sn,x)] @ per-field
+                               StoreField(x,fname,ei)`) — not into a fresh temp that is
+                               then copied, which SML never does and which costs a full
+                               struct-width of extra locals. Fields interleave
+                               spill-then-store, matching SML `pi @ [StoreField]`. */
+                            let sf0_ls: i32 = vec_get(ed4, init_idx);
+                            let mut fi_ls: i32 = 0;
+                            while fi_ls < fc_ls {
+                                let ch_ls: i32 = vec_get(lit_sf_names, sf0_ls + fi_ls * 2 + 1);
+                                let fv_ls: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                    tok_tags, ch_ls, ctr, out_instrs, enum_names, enum_tag_offsets,
+                                    enum_tag_counts, enum_tags_flat, fn_ctx, builtin_map, lit_sf_names,
+                                    source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4,
+                                    item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                                let fnm_ls: i32 = vec_get(lit_sf_names, sf0_ls + fi_ls * 2);
+                                vec_push(out_instrs, box_new(Instr::StoreField(name_tok, fnm_ls,
+                                                            box_new(value_to_expr(fv_ls)))));
+                                fi_ls = fi_ls + 1;
+                            }
+                            init_handled = 1;
+                        }
                     }
                 }
             }
@@ -5719,6 +5990,49 @@ fn enum_tag_lookup_str(enum_names: Vec<i32>, enum_tags_flat: Vec<i32>,
             return 0 - 1;
         }
         ei = ei + 1;
+    }
+    return 0 - 2;
+}
+
+/* SS-U13: sibling of enum_tag_lookup_str, returning the variant's
+   DEFINITION-site name token (enum_tags_flat[flat_idx], the token
+   recorded when the enum's own item was registered) instead of its tag.
+   Needed for struct-variant CONSTRUCTION field-name -> payload-slot
+   resolution (lower_pat_struct_field_payload_index scans forward from
+   the variant name token for a `{ name: type, ... }` shape -- it needs
+   the real declaration token, not a call-site token; the pattern-side
+   caller has only a call/pattern-site token available and falls back to
+   textual field order for exactly that reason -- this lets construction
+   avoid that same fallback, since the real definition token is
+   available here). Returns -1 (variant not found) or -2 (enum not
+   found), matching enum_tag_lookup_str's own not-found convention. */
+fn enum_variant_def_tok_lookup_str(enum_names: Vec<i32>, enum_tags_flat: Vec<i32>,
+                       enum_tag_offsets: Vec<i32>, enum_tag_counts: Vec<i32>,
+                       enum_name: i32, variant_name: i32,
+                       source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let want_e2: string = handle_to_str(enum_name, source, starts, ends);
+    let want_v2: string = handle_to_str(variant_name, source, starts, ends);
+    let n2: i32 = vec_len(enum_names);
+    let mut ei2: i32 = 0;
+    while ei2 < n2 {
+        let e_nm2: string = handle_to_str(vec_get(enum_names, ei2),
+                                         source, starts, ends);
+        if string_eq(e_nm2, want_e2) {
+            let offset2: i32 = vec_get(enum_tag_offsets, ei2);
+            let count2: i32 = vec_get(enum_tag_counts, ei2);
+            let mut vi2: i32 = 0;
+            while vi2 < count2 {
+                let flat_idx2: i32 = offset2 + vi2 * 2;
+                let v_nm2: string = handle_to_str(vec_get(enum_tags_flat, flat_idx2),
+                                                 source, starts, ends);
+                if string_eq(v_nm2, want_v2) {
+                    return vec_get(enum_tags_flat, flat_idx2);
+                }
+                vi2 = vi2 + 1;
+            }
+            return 0 - 1;
+        }
+        ei2 = ei2 + 1;
     }
     return 0 - 2;
 }
