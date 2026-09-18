@@ -1568,6 +1568,27 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 let opps: i32 = vec_get(ed1, operand_idx);
                 let oppc: i32 = vec_get(ed2, operand_idx);
                 if oppc == 1 {
+                    /* SS-U12 prerequisite: on the VM target, an immutable
+                       `&x` of a plain local is representationally
+                       transparent -- VAddrOf's single "base slot offset"
+                       word is only meaningful WITHIN the current frame
+                       (the mechanism no_alias/&mut actually need); passed
+                       as an ordinary argument to another function it is a
+                       meaningless number, silently wrong rather than a
+                       crash (confirmed: a &Foo field-access test emitted
+                       clean bytecode and ran to completion, but returned
+                       the wrong value). Nothing in the existing corpus
+                       exercises a working immutable `&scalar`/`&struct`
+                       VAddrOf on the VM (the one real hit is an
+                       EXPECT-FAIL fixture), so this is a narrow, low-risk
+                       correction, not a behavior change to anything
+                       relied upon. The C backend is UNCHANGED -- it keeps
+                       real address-of (Value::VAddrOf), which the new
+                       struct-ref parameter/prologue fix (megaTU-main.sv0)
+                       depends on. */
+                    if lower_vm_target() == 1 {
+                        return Value::VVar(vec_get(pp, opps));
+                    }
                     return Value::VAddrOf(vec_get(pp, opps));
                 }
             }

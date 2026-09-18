@@ -1,0 +1,52 @@
+// SS-U12 prerequisite: `&StructType` (immutable reference) function
+// parameters, return types, and let-annotations now lower correctly on
+// both backends.
+//
+// C backend: a struct value is a flat, real C value (its own typedef),
+// not a handle like Vec/slice/string/Box -- so `&Foo` needs a genuine C
+// pointer. Before this fix the parameter lowered to plain `int` while the
+// call site passed a real `&x` pointer: a compile error
+// (`incompatible pointer to integer conversion`), not a runtime bug.
+//
+// VM backend: two distinct bugs, both fixed. (1) the struct-ref param's
+// type resolved to "unknown", so field access on it panicked with
+// `sv0 panic: vec: index out of bounds`. (2) once that no longer
+// panicked, `&x` lowered to a single "base slot offset in the CALLER's
+// frame" word -- meaningless when passed to a different function, so the
+// callee read garbage instead of `x`'s real fields. Immutable `&x` of a
+// plain local is now representationally transparent on the VM (matching
+// how slice borrows already work); `&mut StructType` is NOT covered by
+// either backend's fix -- a narrower, separate residual.
+//
+// Both backends. Expected exit: 42.
+
+struct Point {
+    x: usize,
+    y: usize,
+}
+
+fn sum_ref(p: &Point) -> usize {
+    return p.x + p.y;
+}
+
+fn scaled_ref(p: &Point, factor: usize) -> usize {
+    let s: usize = sum_ref(p);
+    return s * factor;
+}
+
+fn main() -> i32 {
+    let a: Point = Point { x: 3, y: 4 };
+    let b: Point = Point { x: 10, y: 20 };
+
+    let sa: usize = sum_ref(&a);   // 7
+    let sb: usize = sum_ref(&b);   // 30
+
+    // pass a struct-ref through an intermediate fn call
+    let scaled: usize = scaled_ref(&a, 5);  // 35
+
+    // re-borrow the same local twice
+    let sa2: usize = sum_ref(&a);  // 7
+
+    let total: usize = sa + sb + scaled + sa2;  // 7 + 30 + 35 + 7 = 79
+    return total - 37;  // 42
+}

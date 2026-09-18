@@ -530,6 +530,25 @@ fn megatu_type_root_name_tok(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>,
         }
         return vec_get(pp, vec_get(ptd1, root) + segc - 1);
     }
+    /* SS-U12 prerequisite: TyRef (tag 1, `&T`) unwraps to its referent's own
+       leaf name token. The VM has no separate pointer representation for a
+       struct (every local is a flat, width-many-words slot, unlike the C
+       backend's real pointers) -- an immutable `&Foo` local is stored and
+       field-accessed exactly like a plain `Foo` local, so treating the two
+       identically here is correct, not a shortcut. Before this, ANY TyRef
+       fell through to -1 ("unknown type"), which made width_of_cty default
+       to scalar width 1 and record_field_layout register no fields at all
+       -- a `&Foo` param whose body then accessed a field crashed with
+       `sv0 panic: vec: index out of bounds` (confirmed: a `&Foo` param
+       that is never field-accessed does NOT crash, isolating this exactly
+       to the missing struct/field classification, not the reference
+       itself). TyRefMut (tag 2, `&mut Foo`) is deliberately NOT unwrapped
+       here -- same narrower residual as the C-backend fix (megatu_cty_of_root),
+       since a flat by-value VM slot cannot express real mutation-through-
+       reference; out of scope for the immutable-borrow case this targets. */
+    if vec_get(ptt, root) == 1 {
+        return megatu_type_root_name_tok(vec_get(ptd1, root), ptt, ptd1, ptd2, pp);
+    }
     return 0 - 1;
 }
 
@@ -555,6 +574,50 @@ fn megatu_is_user_type(nm: string, it: Vec<i32>, id1: Vec<i32>,
         i = i + 1;
     }
     return false;
+}
+
+/* SS-U12 prerequisite: real `&StructType` parameters/return types/let
+   annotations. A struct value is a flat, real C value (its own typedef,
+   "raw passthrough" per megatu_ty_name), NOT a handle like Vec/slice/
+   string/Box -- so `&Foo` genuinely needs a C pointer, unlike `&mut
+   [byte]` or `&string`, which already correctly fall through to plain
+   "int" because the referent is already indirect. Before this, TyRef of
+   ANY referent fell through to "int" unconditionally (confirmed live:
+   the checker/resolver accept `f: &Foo` silently, but the C backend
+   emitted `f` as plain `int` while the call site passed a real `&x`
+   pointer -- a genuine `incompatible pointer to integer conversion`
+   compile error, not merely a missed optimization).
+   Returns the struct/enum type name if `ty_root` is `TyRef(TyName(N))`
+   for a user-declared struct or enum `N`; "" otherwise (not a struct
+   ref -- primitives, Vec/slice/string/Box referents, or TyRefMut, all
+   keep the pre-existing "int" fallback unchanged). TyRefMut (`&mut
+   Foo`) is deliberately NOT covered here -- still falls through to
+   "int", a narrower, documented residual gap (the mutation-propagation
+   side needs different codegen, out of scope for the immutable-borrow
+   case this fix targets). */
+fn megatu_struct_ref_type_name(ty_root: i32, ptt: Vec<i32>, ptd1: Vec<i32>,
+                               ptd2: Vec<i32>, pp: Vec<i32>, source: string,
+                               starts: Vec<i32>, ends: Vec<i32>,
+                               it: Vec<i32>, id1: Vec<i32>) -> string {
+    if ty_root < 0 { return ""; }
+    if vec_get(ptt, ty_root) != 1 { return ""; }
+    let inner: i32 = vec_get(ptd1, ty_root);
+    if inner < 0 { return ""; }
+    if vec_get(ptt, inner) != 0 { return ""; }
+    let ppstart: i32 = vec_get(ptd1, inner);
+    let segc: i32 = vec_get(ptd2, inner);
+    if segc <= 0 { return ""; }
+    let name_tok: i32 = vec_get(pp, ppstart + segc - 1);
+    let nm: string = handle_to_str(name_tok, source, starts, ends);
+    if megatu_is_user_type(nm, it, id1, source, starts, ends) { return nm; }
+    return "";
+}
+
+/* The C-level parameter name a struct-ref parameter's real pointer
+   carries (renamed with a suffix so the dereferenced local can keep the
+   ORIGINAL name -- see megatu_ref_param_prologue). */
+fn megatu_struct_ref_param_cname(nm: string) -> string {
+    return string_concat(nm, "__sv0ref");
 }
 
 /* Resolve a type-arena root (parser pty_tt/ptd1/ptd2 arena) to its C type string.
@@ -610,6 +673,20 @@ fn megatu_cty_of_root(root: i32, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
                                                     it, id1);
         return string_concat(inner_mut, " *");
     }
+    /* TyRef (tag 1): a reference to a struct/enum needs a real C pointer
+       (SS-U12 prerequisite -- see megatu_struct_ref_type_name). A
+       reference to anything else (Vec/slice/string/Box, already handle-
+       based) keeps the pre-existing "int" fallback -- unchanged. TyRefMut
+       (tag 2, `&mut Foo`) is NOT handled here; still "int", a documented
+       residual. */
+    if vec_get(ptt, root) == 1 {
+        let sname: string = megatu_struct_ref_type_name(root, ptt, ptd1, ptd2,
+            pp, source, starts, ends, it, id1);
+        if !string_eq(sname, "") {
+            return string_concat("const ", string_concat(sname, " *"));
+        }
+        return "int";
+    }
     return "int";
 }
 
@@ -635,11 +712,55 @@ fn megatu_param_list(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
             out = string_concat(out, ", ");
         }
         let nt: i32 = vec_get(fpn, base + k);
-        let nm: string = handle_to_str(nt, source, starts, ends);
+        let mut nm: string = handle_to_str(nt, source, starts, ends);
         let cty: string = megatu_cty_of_root(vec_get(fpt, base + k),
                                              ptt, ptd1, ptd2, pp,
                                              source, starts, ends, it, id1);
+        /* SS-U12 prerequisite: a struct-ref param's true C name carries
+           the pointer; the original name is reintroduced as a
+           dereferenced local by megatu_ref_param_prologue. */
+        let sref_name: string = megatu_struct_ref_type_name(vec_get(fpt, base + k),
+            ptt, ptd1, ptd2, pp, source, starts, ends, it, id1);
+        if !string_eq(sref_name, "") {
+            nm = megatu_struct_ref_param_cname(nm);
+        }
         out = string_concat(out, string_concat(string_concat(cty, " "), nm));
+        k = k + 1;
+    }
+    return out;
+}
+
+/* Companion to megatu_param_list (SS-U12 prerequisite): for each
+   struct-ref parameter, emits `  <TypeName> <name> = *<name>__sv0ref;\n`
+   -- a one-time dereference at function entry that reintroduces the
+   parameter's ORIGINAL name as an ordinary local holding a full copy of
+   the struct. This lets the body's own `.field`-access codegen
+   (megatu_emit_instrs) stay completely unchanged: it already expects a
+   parameter name to resolve to a plain struct value, exactly as it did
+   before this fix, and has no idea the true C parameter is now a
+   pointer under a different name. */
+fn megatu_ref_param_prologue(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
+                             id5: Vec<i32>, fpn: Vec<i32>,
+                             fpt: Vec<i32>, ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                             pp: Vec<i32>, source: string, starts: Vec<i32>,
+                             ends: Vec<i32>) -> string {
+    if item_i < 0 { return ""; }
+    let pc: i32 = vec_get(id3, item_i);
+    if pc == 0 { return ""; }
+    let base: i32 = vec_get(id5, item_i);
+    let mut out: string = "";
+    let mut k: i32 = 0;
+    while k < pc {
+        let nt: i32 = vec_get(fpn, base + k);
+        let nm: string = handle_to_str(nt, source, starts, ends);
+        let sref_name: string = megatu_struct_ref_type_name(vec_get(fpt, base + k),
+            ptt, ptd1, ptd2, pp, source, starts, ends, it, id1);
+        if !string_eq(sref_name, "") {
+            let line: string = string_concat("  ", string_concat(sref_name,
+                string_concat(" ", string_concat(nm, string_concat(" = *",
+                string_concat(megatu_struct_ref_param_cname(nm), ";\n"))))));
+            out = string_concat(out, line);
+        }
         k = k + 1;
     }
     return out;
@@ -832,7 +953,7 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
         megatu_seed_param_tyenv(item_i, it, id1, id3, id5, fpn, fpt,
                                 ptt, ptd1, ptd2, pp, source, starts, ends,
                                 tyenv_h, tyenv_f, tyenv_e, eit_nt, tyenv_st, sit_nt);
-        let body: string = megatu_emit_instrs(instrs, "  ", ret_name,
+        let body_raw: string = megatu_emit_instrs(instrs, "  ", ret_name,
                                               source, starts, ends, sidx,
                                               tyenv_h, tyenv_f, tyenv_e,
                                               eit_nt, eit_base, eit_cnt, eit_cats,
@@ -840,6 +961,11 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                                               sit_field_name, sit_field_cat,
                                               it, id1, id2, frt, ptt, ptd1, ptd2, pp,
                                               id3, id5, fpt);
+        /* SS-U12 prerequisite: prepend the struct-ref dereference
+           prologue (empty string, no-op, for a fn with no such params). */
+        let ref_prologue: string = megatu_ref_param_prologue(item_i, it, id1, id3,
+            id5, fpn, fpt, ptt, ptd1, ptd2, pp, source, starts, ends);
+        let body: string = string_concat(ref_prologue, body_raw);
         if string_eq(fn_name, "main") {
             /* NEX-016 (~/Documents/project-specs/sv0c-runtime-executable/SPEC.md
                S14.3): a recognized zero-param, i32/unit-returning main gets
@@ -1950,6 +2076,64 @@ fn megatu_emit_call_args(args: Vec<i32>, source: string, starts: Vec<i32>, ends:
    not assumed. Falls back to the plain, uncast emission for a non-
    extern_c callee or an arg-count mismatch (defensive; never crashes on
    a shape this wasn't designed for). */
+/* SS-U12 prerequisite: an ordinary (non-extern) call whose callee param K
+   is declared &StructType, passed a BARE variable argument (not an
+   explicit `&expr` in source -- codegen_Value::VVar, tag 3, not VAddrOf,
+   tag 7), needs its emission wrapped in a fresh address-of. Mirrors the
+   C-backend struct-ref parameter fix (megatu_struct_ref_type_name /
+   megatu_ref_param_prologue): a &StructType-typed LOCAL is itself already
+   a received reference, dereferenced once at ITS OWN function's entry
+   into a plain value (megatu_ref_param_prologue) -- at the C level it is
+   indistinguishable from an owned struct value, so passing it on to
+   another &StructType parameter needs a fresh `&`, exactly the way the
+   original owning scope's `&a` would. An argument that IS already an
+   explicit `&expr` (VAddrOf) is left untouched -- double-wrapping it
+   would emit `&(&a)`, wrong. Confirmed necessary by a real repro: a fn
+   receiving `p: &Point` and calling another `&Point`-taking fn as
+   `other(p)` (the ordinary, idiomatic way to pass an already-borrowed
+   reference along -- NOT `other(&p)`, which would be `&&Point`) hit a
+   genuine `passing 'Point' to parameter of incompatible type 'const
+   Point *'` compile error before this fix. */
+fn megatu_emit_call_args_structref(args: Vec<i32>, item_i: i32, it: Vec<i32>, id1: Vec<i32>,
+                                   id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>,
+                                   ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
+                                   pp: Vec<i32>, source: string, starts: Vec<i32>,
+                                   ends: Vec<i32>, sidx: Vec<i32>) -> string {
+    let count: i32 = vec_len(args);
+    if count == 0 { return ""; }
+    let pc: i32 = if item_i >= 0 { vec_get(id3, item_i) } else { 0 };
+    let base: i32 = if item_i >= 0 { vec_get(id5, item_i) } else { 0 };
+    let mut out: string = "";
+    let mut idx: i32 = 0;
+    while idx < count {
+        if idx > 0 {
+            out = string_concat(out, ", ");
+        }
+        let bv: Box<codegen_Value> = vec_get(args, idx);
+        let v: codegen_Value = box_deref(bv);
+        let mut needs_wrap: bool = false;
+        if item_i >= 0 {
+            if idx < pc {
+                let sname: string = megatu_struct_ref_type_name(vec_get(fpt, base + idx),
+                    ptt, ptd1, ptd2, pp, source, starts, ends, it, id1);
+                if !string_eq(sname, "") {
+                    if codegen_value_tag(v) == 3 {
+                        needs_wrap = true;
+                    }
+                }
+            }
+        }
+        let arg_text: string = megatu_emit_value(v, source, starts, ends, sidx);
+        if needs_wrap {
+            out = string_concat(out, string_concat("(&", string_concat(arg_text, ")")));
+        } else {
+            out = string_concat(out, arg_text);
+        }
+        idx = idx + 1;
+    }
+    return out;
+}
+
 fn megatu_emit_call_args_typed(args: Vec<i32>, item_i: i32, it: Vec<i32>, id1: Vec<i32>,
                                id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>,
                                ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>,
@@ -1959,7 +2143,10 @@ fn megatu_emit_call_args_typed(args: Vec<i32>, item_i: i32, it: Vec<i32>, id1: V
     if count == 0 { return ""; }
     let is_extern: bool = if item_i >= 0 { vec_get(it, item_i) == 8 } else { false };
     let pc: i32 = if is_extern { vec_get(id3, item_i) } else { 0 };
-    if is_extern != true { return megatu_emit_call_args(args, source, starts, ends, sidx); }
+    if is_extern != true {
+        return megatu_emit_call_args_structref(args, item_i, it, id1, id3, id5,
+            fpt, ptt, ptd1, ptd2, pp, source, starts, ends, sidx);
+    }
     if pc != count { return megatu_emit_call_args(args, source, starts, ends, sidx); }
     let base: i32 = vec_get(id5, item_i);
     let mut out: string = "";
