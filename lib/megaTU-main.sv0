@@ -1270,6 +1270,10 @@ fn megatu_builtin_name(bid: i32) -> string {
        int handle, so megatu_builtin_ret_cty's default "int" is correct. */
     if bid == 35 { return "sv0_str_from_byte_slice"; }
     if bid == 36 { return "sv0_str_byte_view"; }
+    /* SS-U11: fill_explicit -> a non-elidable store loop (sv0doc
+       memory-model/ownership.md §6.5, BYTE-010). Void, so no
+       megatu_builtin_ret_cty entry needed either. */
+    if bid == 37 { return "sv0_fill_explicit"; }
     return "sv0_unknown_builtin";
 }
 

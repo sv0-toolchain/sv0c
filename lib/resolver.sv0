@@ -144,6 +144,11 @@ fn is_intrinsic(name: string) -> bool {
        strings_text::from_utf8 / as_bytes. */
     if string_eq(name, "string_from_bytes") { return true; }
     if string_eq(name, "string_byte_view") { return true; }
+    /* SS-U11: fill_explicit(dst: &mut [byte], value: byte) -> () — a
+       non-elidable store primitive (sv0doc memory-model/ownership.md
+       §6.5, BYTE-010). Must be a compiler intrinsic, not a plain library
+       function: the non-elision guarantee attaches to the call site. */
+    if string_eq(name, "fill_explicit") { return true; }
     return false;
 }
 
@@ -173,6 +178,7 @@ fn intrinsic_arity(name: string) -> i32 {
     if string_eq(name, "slice_len") { return 1; }
     if string_eq(name, "string_from_bytes") { return 1; }
     if string_eq(name, "string_byte_view") { return 1; }
+    if string_eq(name, "fill_explicit") { return 2; }
     return 0 - 1;
 }
 
@@ -1757,6 +1763,7 @@ fn test_is_intrinsic() -> i32 {
     if is_intrinsic("box_deref") != true { return 3; }
     if is_intrinsic("foo") != false { return 4; }
     if is_intrinsic("main") != false { return 5; }
+    if is_intrinsic("fill_explicit") != true { return 6; }
     return 0;
 }
 
@@ -1766,6 +1773,7 @@ fn test_intrinsic_arity() -> i32 {
     if intrinsic_arity("vec_new") != 0 { return 3; }
     if intrinsic_arity("string_substr") != 3 { return 4; }
     if intrinsic_arity("unknown") != 0 - 1 { return 5; }
+    if intrinsic_arity("fill_explicit") != 2 { return 6; }
     return 0;
 }
 

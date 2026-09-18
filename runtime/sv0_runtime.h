@@ -381,6 +381,33 @@ static inline void sv0_idx_set(int32_t h, int32_t idx, intptr_t val) {
     sv0_vec_set(h, idx, val);
 }
 
+/* SS-U11: fill_explicit(dst: &mut [byte], value: byte) -> () — sets every
+ * element of `dst` to `value`, exactly like `sv0_idx_set` in a loop, but
+ * with a BACKEND-ENFORCED guarantee (sv0doc memory-model/ownership.md
+ * §6.5, BYTE-010) that a conforming build SHALL NOT remove these stores
+ * as dead code even when `dst` is provably unread afterward.
+ *
+ * Mechanism: a volatile-qualified pointer. The C standard defines access
+ * through a volatile lvalue as an observable side effect a conforming
+ * compiler may not optimize away, coalesce, or reorder past another
+ * observable side effect — the same property C23 `memset_explicit` /
+ * POSIX `explicit_bzero` provide over plain `memset`, achieved here
+ * without depending on either being available on every target toolchain
+ * in the CI matrix. Slice elements are `intptr_t` words (this bootstrap
+ * runtime's `Vec<T>`/slice representation, sv0doc §2.2.1), not raw
+ * packed bytes, so this stores through a `volatile intptr_t *`, not a
+ * `volatile uint8_t *`. */
+static inline void sv0_fill_explicit(int32_t sh, int32_t value) {
+  sv0_slice s = sv0_slice_table[sh & ~SV0_SLICE_TAG];
+  volatile intptr_t *p = (volatile intptr_t *)s.data;
+  int32_t n = s.len;
+  int32_t i = 0;
+  while (i < n) {
+    p[i] = (intptr_t)value;
+    i = i + 1;
+  }
+}
+
 /* SS-U16: string <-> byte-slice bridges for strings_text::from_utf8 /
  * as_bytes. A `&[byte]` slice stores its elements as `intptr_t` words
  * (sv0_slice.data); an sv0_str stores packed uint8_t. Neither can alias the

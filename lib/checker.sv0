@@ -4181,6 +4181,10 @@ fn builtin_fn_lookup(name_str: string) -> i32 {
        as_bytes (lowering builtins 35/36). */
     if string_eq(name_str, "string_from_bytes") { return 19; }
     if string_eq(name_str, "string_byte_view") { return 20; }
+    /* SS-U11: fill_explicit(dst: &mut [byte], value: byte) -> () —
+       compiler intrinsic, non-elidable-store guarantee (sv0doc
+       memory-model/ownership.md §6.5, lowering builtin id 37). */
+    if string_eq(name_str, "fill_explicit") { return 21; }
     return 0 - 1;
 }
 
@@ -4188,6 +4192,7 @@ fn builtin_fn_ret_type(bid: i32) -> i32 {
     if bid == 18 { return TY_INT(); }
     if bid == 19 { return TY_STRING(); }
     if bid == 20 { return TY_SLICE(); }
+    if bid == 21 { return TY_UNIT(); }
     if bid == 0 { return TY_UNIT(); }
     if bid == 1 { return TY_INT(); }
     if bid == 2 { return TY_BOOL(); }
@@ -4213,6 +4218,7 @@ fn builtin_fn_param_count(bid: i32) -> i32 {
     if bid == 18 { return 1; }
     if bid == 19 { return 1; }
     if bid == 20 { return 1; }
+    if bid == 21 { return 2; }
     if bid == 0 { return 1; }
     if bid == 1 { return 1; }
     if bid == 2 { return 2; }
@@ -4238,6 +4244,10 @@ fn builtin_fn_param_type(bid: i32, idx: i32) -> i32 {
     if bid == 18 { return TY_VAR(); }
     if bid == 19 { return TY_VAR(); }
     if bid == 20 { return TY_STRING(); }
+    if bid == 21 {
+        if idx == 0 { return TY_VAR(); }
+        return TY_INT();
+    }
     if bid == 0 { return TY_STRING(); }
     if bid == 1 { return TY_STRING(); }
     if bid == 2 { return TY_STRING(); }
@@ -7198,6 +7208,12 @@ fn test_builtin_fn_lookup() -> i32 {
     if builtin_fn_ret_type(20) != TY_SLICE() { return 27; }
     if builtin_fn_param_count(19) != 1 { return 28; }
     if builtin_fn_param_type(20, 0) != TY_STRING() { return 29; }
+    /* SS-U11 */
+    if builtin_fn_lookup("fill_explicit") != 21 { return 30; }
+    if builtin_fn_ret_type(21) != TY_UNIT() { return 31; }
+    if builtin_fn_param_count(21) != 2 { return 32; }
+    if builtin_fn_param_type(21, 0) != TY_VAR() { return 33; }
+    if builtin_fn_param_type(21, 1) != TY_INT() { return 34; }
     return 0;
 }
 

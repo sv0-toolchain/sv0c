@@ -330,6 +330,11 @@ static int is_intrinsic(const char* name) {
     return 1;
   } else {
   }
+  int _sv0t25 = sv0_string_eq(name, "fill_explicit");
+  if (_sv0t25) {
+    return 1;
+  } else {
+  }
   return 0;
 }
 
@@ -459,8 +464,13 @@ static int intrinsic_arity(const char* name) {
     return 1;
   } else {
   }
-  int _sv0t25 = (0 - 1);
-  return _sv0t25;
+  int _sv0t25 = sv0_string_eq(name, "fill_explicit");
+  if (_sv0t25) {
+    return 2;
+  } else {
+  }
+  int _sv0t26 = (0 - 1);
+  return _sv0t26;
 }
 
 static int intrinsic_count(void) {
@@ -2463,6 +2473,11 @@ static int test_is_intrinsic(void) {
     return 5;
   } else {
   }
+  int _sv0t5 = is_intrinsic("fill_explicit");
+  if ((_sv0t5 != 1)) {
+    return 6;
+  } else {
+  }
   return 0;
 }
 
@@ -2491,6 +2506,11 @@ static int test_intrinsic_arity(void) {
   int _sv0t5 = (0 - 1);
   if ((_sv0t4 != _sv0t5)) {
     return 5;
+  } else {
+  }
+  int _sv0t6 = intrinsic_arity("fill_explicit");
+  if ((_sv0t6 != 2)) {
+    return 6;
   } else {
   }
   return 0;

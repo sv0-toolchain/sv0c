@@ -135,3 +135,4 @@ test/behavior/cases/ffi_extern_c_identical_redecl_ok.sv0|7|native
 test/behavior/cases/ffi_extern_c_size_t_mapping.sv0|42|native
 test/behavior/cases/enum_struct_variant_construct.sv0|42|native
 test/behavior/cases/enum_struct_variant_construct_nested.sv0|42|native
+test/behavior/cases/fill_explicit_intrinsic.sv0|42|native

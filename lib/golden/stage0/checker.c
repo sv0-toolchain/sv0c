@@ -5620,8 +5620,13 @@ static int builtin_fn_lookup(const char* name_str) {
     return 20;
   } else {
   }
-  int _sv0t21 = (0 - 1);
-  return _sv0t21;
+  int _sv0t21 = sv0_string_eq(name_str, "fill_explicit");
+  if (_sv0t21) {
+    return 21;
+  } else {
+  }
+  int _sv0t22 = (0 - 1);
+  return _sv0t22;
 }
 
 static int builtin_fn_ret_type(int bid) {
@@ -5640,98 +5645,103 @@ static int builtin_fn_ret_type(int bid) {
     return _sv0t2;
   } else {
   }
-  if ((bid == 0)) {
+  if ((bid == 21)) {
     int _sv0t3 = TY_UNIT();
     return _sv0t3;
   } else {
   }
-  if ((bid == 1)) {
-    int _sv0t4 = TY_INT();
+  if ((bid == 0)) {
+    int _sv0t4 = TY_UNIT();
     return _sv0t4;
   } else {
   }
-  if ((bid == 2)) {
-    int _sv0t5 = TY_BOOL();
+  if ((bid == 1)) {
+    int _sv0t5 = TY_INT();
     return _sv0t5;
   } else {
   }
-  if ((bid == 3)) {
-    int _sv0t6 = TY_STRING();
+  if ((bid == 2)) {
+    int _sv0t6 = TY_BOOL();
     return _sv0t6;
   } else {
   }
-  if ((bid == 4)) {
-    int _sv0t7 = TY_INT();
+  if ((bid == 3)) {
+    int _sv0t7 = TY_STRING();
     return _sv0t7;
   } else {
   }
-  if ((bid == 5)) {
-    int _sv0t8 = TY_STRING();
+  if ((bid == 4)) {
+    int _sv0t8 = TY_INT();
     return _sv0t8;
   } else {
   }
-  if ((bid == 6)) {
-    int _sv0t9 = TY_NAMED();
+  if ((bid == 5)) {
+    int _sv0t9 = TY_STRING();
     return _sv0t9;
   } else {
   }
-  if ((bid == 7)) {
-    int _sv0t10 = TY_UNIT();
+  if ((bid == 6)) {
+    int _sv0t10 = TY_NAMED();
     return _sv0t10;
   } else {
   }
-  if ((bid == 8)) {
-    int _sv0t11 = TY_INT();
+  if ((bid == 7)) {
+    int _sv0t11 = TY_UNIT();
     return _sv0t11;
   } else {
   }
-  if ((bid == 9)) {
-    int _sv0t12 = TY_VAR();
+  if ((bid == 8)) {
+    int _sv0t12 = TY_INT();
     return _sv0t12;
   } else {
   }
-  if ((bid == 10)) {
-    int _sv0t13 = TY_UNIT();
+  if ((bid == 9)) {
+    int _sv0t13 = TY_VAR();
     return _sv0t13;
   } else {
   }
-  if ((bid == 11)) {
-    int _sv0t14 = TY_NAMED();
+  if ((bid == 10)) {
+    int _sv0t14 = TY_UNIT();
     return _sv0t14;
   } else {
   }
-  if ((bid == 12)) {
-    int _sv0t15 = TY_VAR();
+  if ((bid == 11)) {
+    int _sv0t15 = TY_NAMED();
     return _sv0t15;
   } else {
   }
-  if ((bid == 13)) {
-    int _sv0t16 = TY_STRING();
+  if ((bid == 12)) {
+    int _sv0t16 = TY_VAR();
     return _sv0t16;
   } else {
   }
-  if ((bid == 14)) {
-    int _sv0t17 = TY_UNIT();
+  if ((bid == 13)) {
+    int _sv0t17 = TY_STRING();
     return _sv0t17;
   } else {
   }
-  if ((bid == 15)) {
-    int _sv0t18 = TY_STRING();
+  if ((bid == 14)) {
+    int _sv0t18 = TY_UNIT();
     return _sv0t18;
   } else {
   }
-  if ((bid == 16)) {
-    int _sv0t19 = TY_UNIT();
+  if ((bid == 15)) {
+    int _sv0t19 = TY_STRING();
     return _sv0t19;
   } else {
   }
-  if ((bid == 17)) {
-    int _sv0t20 = TY_STRING();
+  if ((bid == 16)) {
+    int _sv0t20 = TY_UNIT();
     return _sv0t20;
   } else {
   }
-  int _sv0t21 = (0 - 1);
-  return _sv0t21;
+  if ((bid == 17)) {
+    int _sv0t21 = TY_STRING();
+    return _sv0t21;
+  } else {
+  }
+  int _sv0t22 = (0 - 1);
+  return _sv0t22;
 }
 
 static int builtin_fn_param_count(int bid) {
@@ -5745,6 +5755,10 @@ static int builtin_fn_param_count(int bid) {
   }
   if ((bid == 20)) {
     return 1;
+  } else {
+  }
+  if ((bid == 21)) {
+    return 2;
   } else {
   }
   if ((bid == 0)) {
@@ -5839,37 +5853,37 @@ static int builtin_fn_param_type(int bid, int idx) {
     return _sv0t2;
   } else {
   }
-  if ((bid == 0)) {
-    int _sv0t3 = TY_STRING();
-    return _sv0t3;
-  } else {
-  }
-  if ((bid == 1)) {
-    int _sv0t4 = TY_STRING();
+  if ((bid == 21)) {
+    if ((idx == 0)) {
+      int _sv0t3 = TY_VAR();
+      return _sv0t3;
+    } else {
+    }
+    int _sv0t4 = TY_INT();
     return _sv0t4;
   } else {
   }
-  if ((bid == 2)) {
+  if ((bid == 0)) {
     int _sv0t5 = TY_STRING();
     return _sv0t5;
   } else {
   }
-  if ((bid == 3)) {
+  if ((bid == 1)) {
     int _sv0t6 = TY_STRING();
     return _sv0t6;
   } else {
   }
-  if ((bid == 4)) {
-    if ((idx == 0)) {
-      int _sv0t7 = TY_STRING();
-      return _sv0t7;
-    } else {
-    }
-    int _sv0t8 = TY_INT();
+  if ((bid == 2)) {
+    int _sv0t7 = TY_STRING();
+    return _sv0t7;
+  } else {
+  }
+  if ((bid == 3)) {
+    int _sv0t8 = TY_STRING();
     return _sv0t8;
   } else {
   }
-  if ((bid == 5)) {
+  if ((bid == 4)) {
     if ((idx == 0)) {
       int _sv0t9 = TY_STRING();
       return _sv0t9;
@@ -5879,93 +5893,103 @@ static int builtin_fn_param_type(int bid, int idx) {
     return _sv0t10;
   } else {
   }
-  if ((bid == 7)) {
+  if ((bid == 5)) {
     if ((idx == 0)) {
-      int _sv0t11 = TY_NAMED();
+      int _sv0t11 = TY_STRING();
       return _sv0t11;
     } else {
     }
-    int _sv0t12 = TY_VAR();
+    int _sv0t12 = TY_INT();
     return _sv0t12;
   } else {
   }
-  if ((bid == 8)) {
-    int _sv0t13 = TY_NAMED();
-    return _sv0t13;
-  } else {
-  }
-  if ((bid == 9)) {
+  if ((bid == 7)) {
     if ((idx == 0)) {
-      int _sv0t14 = TY_NAMED();
-      return _sv0t14;
+      int _sv0t13 = TY_NAMED();
+      return _sv0t13;
     } else {
     }
-    int _sv0t15 = TY_INT();
+    int _sv0t14 = TY_VAR();
+    return _sv0t14;
+  } else {
+  }
+  if ((bid == 8)) {
+    int _sv0t15 = TY_NAMED();
     return _sv0t15;
   } else {
   }
-  if ((bid == 10)) {
+  if ((bid == 9)) {
     if ((idx == 0)) {
       int _sv0t16 = TY_NAMED();
       return _sv0t16;
     } else {
     }
-    if ((idx == 1)) {
-      int _sv0t17 = TY_INT();
-      return _sv0t17;
+    int _sv0t17 = TY_INT();
+    return _sv0t17;
+  } else {
+  }
+  if ((bid == 10)) {
+    if ((idx == 0)) {
+      int _sv0t18 = TY_NAMED();
+      return _sv0t18;
     } else {
     }
-    int _sv0t18 = TY_VAR();
-    return _sv0t18;
-  } else {
-  }
-  if ((bid == 11)) {
-    int _sv0t19 = TY_VAR();
-    return _sv0t19;
-  } else {
-  }
-  if ((bid == 12)) {
-    int _sv0t20 = TY_NAMED();
+    if ((idx == 1)) {
+      int _sv0t19 = TY_INT();
+      return _sv0t19;
+    } else {
+    }
+    int _sv0t20 = TY_VAR();
     return _sv0t20;
   } else {
   }
-  if ((bid == 13)) {
-    int _sv0t21 = TY_STRING();
+  if ((bid == 11)) {
+    int _sv0t21 = TY_VAR();
     return _sv0t21;
   } else {
   }
-  if ((bid == 14)) {
-    if ((idx == 0)) {
-      int _sv0t22 = TY_STRING();
-      return _sv0t22;
-    } else {
-    }
+  if ((bid == 12)) {
+    int _sv0t22 = TY_NAMED();
+    return _sv0t22;
+  } else {
+  }
+  if ((bid == 13)) {
     int _sv0t23 = TY_STRING();
     return _sv0t23;
   } else {
   }
+  if ((bid == 14)) {
+    if ((idx == 0)) {
+      int _sv0t24 = TY_STRING();
+      return _sv0t24;
+    } else {
+    }
+    int _sv0t25 = TY_STRING();
+    return _sv0t25;
+  } else {
+  }
   if ((bid == 15)) {
-    int _sv0t24 = TY_STRING();
-    return _sv0t24;
+    int _sv0t26 = TY_STRING();
+    return _sv0t26;
   } else {
   }
   if ((bid == 16)) {
     if ((idx == 0)) {
-      int _sv0t25 = TY_STRING();
-      return _sv0t25;
+      int _sv0t27 = TY_STRING();
+      return _sv0t27;
     } else {
     }
-    int _sv0t26 = TY_NAMED();
-    return _sv0t26;
+    int _sv0t28 = TY_NAMED();
+    return _sv0t28;
   } else {
   }
   if ((bid == 17)) {
-    int _sv0t27 = TY_STRING();
-    return _sv0t27;
+    int _sv0t29 = TY_STRING();
+    return _sv0t29;
   } else {
   }
-  int _sv0t28 = (0 - 1);
-  return _sv0t28;
+  int _sv0t30 = (0 - 1);
+  return _sv0t30;
 }
 
 static int resolve_fn_call(int fn_names, const char* source, int starts, int ends, const char* name_str, int is_builtin_out) {
@@ -11171,6 +11195,34 @@ static int test_builtin_fn_lookup(void) {
   int _sv0t44 = TY_STRING();
   if ((_sv0t43 != _sv0t44)) {
     return 29;
+  } else {
+  }
+  int _sv0t45 = builtin_fn_lookup("fill_explicit");
+  if ((_sv0t45 != 21)) {
+    return 30;
+  } else {
+  }
+  int _sv0t46 = builtin_fn_ret_type(21);
+  int _sv0t47 = TY_UNIT();
+  if ((_sv0t46 != _sv0t47)) {
+    return 31;
+  } else {
+  }
+  int _sv0t48 = builtin_fn_param_count(21);
+  if ((_sv0t48 != 2)) {
+    return 32;
+  } else {
+  }
+  int _sv0t49 = builtin_fn_param_type(21, 0);
+  int _sv0t50 = TY_VAR();
+  if ((_sv0t49 != _sv0t50)) {
+    return 33;
+  } else {
+  }
+  int _sv0t51 = builtin_fn_param_type(21, 1);
+  int _sv0t52 = TY_INT();
+  if ((_sv0t51 != _sv0t52)) {
+    return 34;
   } else {
   }
   return 0;

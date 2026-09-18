@@ -23,3 +23,4 @@ sv0c/test/behavior/cases/wide_shift.sv0
 sv0c/test/behavior/cases/vm_exit_wide_return.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct_nested.sv0
+sv0c/test/behavior/cases/fill_explicit_intrinsic.sv0

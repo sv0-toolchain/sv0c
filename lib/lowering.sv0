@@ -527,6 +527,7 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if bid == 11 { is_void = 1; }
             if bid == 16 { is_void = 1; }
             if bid == 18 { is_void = 1; }
+            if bid == 37 { is_void = 1; }
             let fn_sentinel: i32 = 0 - bid;
             if is_void == 1 {
                 let vc: Instr = Instr::Call(0, fn_sentinel, arg_vals, 0);
@@ -4437,6 +4438,9 @@ fn build_builtin_map_classify(s: string) -> i32 {
        as_bytes. 35 -> sv0_str_from_byte_slice, 36 -> sv0_str_byte_view. */
     if string_eq(s, "string_from_bytes") { return 35; }
     if string_eq(s, "string_byte_view") { return 36; }
+    /* SS-U11: fill_explicit -> sv0_fill_explicit (id 37; void, non-elidable
+       store guarantee, sv0doc memory-model/ownership.md §6.5). */
+    if string_eq(s, "fill_explicit") { return 37; }
     return 0;
 }
 

@@ -1,0 +1,28 @@
+// SS-U11 (sv0-strings Track U): fill_explicit(dst: &mut [byte], value: byte)
+// -> () is a compiler intrinsic, not a plain function — it must set every
+// element like an ordinary fill AND carry a backend-enforced non-elision
+// guarantee (sv0doc memory-model/ownership.md §6.5, BYTE-010; lowering
+// builtin id 37 -> C runtime sv0_fill_explicit / VM CALL_BUILTIN 37).
+//
+// This fixture only proves the observable behavior (correctness of the
+// fill) is identical to an ordinary loop -- it cannot itself prove
+// non-elision under optimization (that is a source-inspection property:
+// the emitted C calls sv0_fill_explicit through a volatile pointer). Both
+// backends: native C and native VM. Expected exit: 42.
+
+fn main() -> i32 {
+    let mut a: [byte; 5] = [1, 2, 3, 4, 5];
+
+    // full-range fill
+    fill_explicit(&mut a[..], 9);
+    let full: i32 = a[0] + a[1] + a[2] + a[3] + a[4]; // 9*5 = 45
+
+    // sub-range fill leaves the rest untouched
+    let mut b: [byte; 5] = [1, 2, 3, 4, 5];
+    fill_explicit(&mut b[1..4], 7);
+    // b = 1 7 7 7 5
+    let sub: i32 = b[0] + b[1] + b[2] + b[3] + b[4]; // 1+7+7+7+5 = 27
+
+    // full - sub = 18; want exit 42, so + 24
+    return (full - sub) + 24; // 18 + 24 = 42
+}
