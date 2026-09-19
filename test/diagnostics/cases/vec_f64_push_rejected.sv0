@@ -1,0 +1,8 @@
+// E0447: an f64 pushed into a Vec would be silently truncated (element slots
+// are integer-sized); the checker refuses it instead of compiling wrong code.
+fn main() -> i32 {
+    let v: Vec<i32> = vec_new();
+    let x: f64 = 1.5;
+    vec_push(v, x);
+    return 0;
+}

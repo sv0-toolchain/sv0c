@@ -2738,6 +2738,21 @@ fn check_body_let_unknown_type(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
         let st: i32 = block_stmt_index(bpp, sfirst, sidecar, si);
         if vec_get(bet, st) == 27 {
             let lannot: i32 = vec_get(bed2, st);
+            /* E0447: `Vec<f64>` / `Vec<f32>` / `[f64; N]` / `[f32; N]` annotation. */
+            if tok_text_eq(source, starts, ends, lannot, "Vec") {
+                if tok_text_eq(source, starts, ends, lannot + 1, "<") {
+                    if tok_is_float_type_name(source, starts, ends, lannot + 2) {
+                        vec_push(diag_sink, 447);
+                        vec_push(diag_sink, lannot);
+                    }
+                }
+            }
+            if tok_text_eq(source, starts, ends, lannot, "[") {
+                if tok_is_float_type_name(source, starts, ends, lannot + 1) {
+                    vec_push(diag_sink, 447);
+                    vec_push(diag_sink, lannot);
+                }
+            }
             /* Only a bare identifier annotation head is an unknown-type candidate.
                A tuple/paren type head (`(i32, i32)`, token `(`) is handled by the
                E0446 tuple check — skip it here so we don't shadow that code. */
@@ -3061,6 +3076,120 @@ fn find_multi_element_tuple(bet: Vec<i32>, bed2: Vec<i32>) -> i32 {
    that itself contains further nested sub-expressions pushing extra
    nodes; real block statements (tag 9/34) DO use the sidecar correctly,
    since that's where local pointer `let`s are actually declared. */
+/* E0447 (BUGS.md sv0-mathlib #20): every Vec / array / slice element slot is an
+   integer-sized word, so an f64 / f32 element was silently truncated by the C
+   backend and rejected by the VM. Until typed element slots exist, refuse the
+   three ways an f64 can enter a collection instead of compiling wrong code:
+   `vec_push(v, <float>)`, `vec_set(v, i, <float>)`, and an array literal of
+   float literals. A `let x: Vec<f64>` / `[f64; N]` annotation is refused in
+   check_body_let_unknown_type. */
+fn tok_text_eq(source: string, starts: Vec<i32>, ends: Vec<i32>,
+               t: i32, want: string) -> bool {
+    if t < 0 { return false; }
+    if t >= vec_len(starts) { return false; }
+    let s0: i32 = vec_get(starts, t);
+    let e0: i32 = vec_get(ends, t);
+    if e0 <= s0 { return false; }
+    return string_eq(string_substr(source, s0, e0 - s0), want);
+}
+
+fn tok_is_float_type_name(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                          t: i32) -> bool {
+    if tok_text_eq(source, starts, ends, t, "f64") { return true; }
+    return tok_text_eq(source, starts, ends, t, "f32");
+}
+
+/* Call node `idx` (ExprCall, tag 4): push E0447 if it is a vec_push / vec_set
+   whose element argument is a float. */
+fn check_vec_float_element(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                           ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>,
+                           env_names: Vec<i32>, env_types: Vec<i32>,
+                           env_muts: Vec<i32>,
+                           edef_names: Vec<i32>,
+                           edef_variant_offsets: Vec<i32>,
+                           edef_variant_counts: Vec<i32>,
+                           edef_vnames_flat: Vec<i32>,
+                           edef_vshapes_flat: Vec<i32>,
+                           fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
+                           ret_ty: i32, loop_depth: i32,
+                           idx: i32, diag_sink: Vec<i32>) -> i32 {
+    let callee: i32 = vec_get(ed1, idx);
+    if callee < 0 { return 0; }
+    if vec_get(et, callee) != 1 { return 0; }
+    if vec_get(ed2, callee) != 1 { return 0; }
+    let ctok: i32 = vec_get(pp, vec_get(ed1, callee));
+    let ac: i32 = vec_get(ed3, idx);
+    let mut elem_pos: i32 = 0 - 1;
+    if tok_text_eq(source, starts, ends, ctok, "vec_push") {
+        if ac == 2 { elem_pos = 1; }
+    }
+    if tok_text_eq(source, starts, ends, ctok, "vec_set") {
+        if ac == 3 { elem_pos = 2; }
+    }
+    if elem_pos < 0 { return 0; }
+    let ety: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                              source, starts, ends,
+                              env_names, env_types, env_muts,
+                              edef_names, edef_variant_offsets,
+                              edef_variant_counts,
+                              edef_vnames_flat, edef_vshapes_flat,
+                              fn_names, fn_ret_types,
+                              ret_ty, loop_depth,
+                              block_stmt_index(pp, vec_get(ed2, idx), vec_get(ed4, idx), elem_pos));
+    if ety == TY_FLOAT() {
+        vec_push(diag_sink, 447);
+        vec_push(diag_sink, ctok);
+    }
+    return 0;
+}
+
+/* Array literal node `idx` (ExprArray, tag 26): elements are the `count` nodes
+   just before it (children before parent). That window is exactly the elements
+   only when every one is a single literal leaf (tag 0), so only that shape is
+   inspected; push E0447 if any element is a float literal. */
+fn check_array_float_literal(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                             ed3: Vec<i32>, ed4: Vec<i32>, pp: Vec<i32>,
+                             source: string, starts: Vec<i32>, ends: Vec<i32>,
+                             env_names: Vec<i32>, env_types: Vec<i32>,
+                             env_muts: Vec<i32>,
+                             edef_names: Vec<i32>,
+                             edef_variant_offsets: Vec<i32>,
+                             edef_variant_counts: Vec<i32>,
+                             edef_vnames_flat: Vec<i32>,
+                             edef_vshapes_flat: Vec<i32>,
+                             fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
+                             ret_ty: i32, loop_depth: i32,
+                             idx: i32, diag_sink: Vec<i32>) -> i32 {
+    let count: i32 = vec_get(ed2, idx);
+    if count < 1 { return 0; }
+    if idx - count < 0 { return 0; }
+    let mut k: i32 = 0;
+    while k < count {
+        if vec_get(et, idx - count + k) != 0 { return 0; }
+        k = k + 1;
+    }
+    k = 0;
+    while k < count {
+        let ety: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
+                                  source, starts, ends,
+                                  env_names, env_types, env_muts,
+                                  edef_names, edef_variant_offsets,
+                                  edef_variant_counts,
+                                  edef_vnames_flat, edef_vshapes_flat,
+                                  fn_names, fn_ret_types,
+                                  ret_ty, loop_depth,
+                                  idx - count + k);
+        if ety == TY_FLOAT() {
+            vec_push(diag_sink, 447);
+            vec_push(diag_sink, expr_span_tok(et, ed1, pp, idx - count + k));
+            return 0;
+        }
+        k = k + 1;
+    }
+    return 0;
+}
+
 fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                      ed4: Vec<i32>, pp: Vec<i32>,
                      source: string, starts: Vec<i32>, ends: Vec<i32>,
@@ -3137,6 +3266,12 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
                                  in_unsafe, vec_get(ed1, idx), diag_sink);
+        let _vf4: i32 = check_vec_float_element(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 idx, diag_sink);
         let mut ai4: i32 = 0;
         while ai4 < ac4 {
             let _a4: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3455,11 +3590,17 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
         return 0;
     }
     if tag == 26 {
-        /* ExprArray: not traversed, same rationale as ExprStruct above --
-           synth_expr's own tag==26 is "simplified, element traversal
+        /* ExprArray: elements are not traversed, same rationale as ExprStruct
+           above -- synth_expr's own tag==26 is "simplified, element traversal
            deferred" too, and element indices here have the identical
-           only-valid-for-leaf-elements shortcut risk. */
-        return 0;
+           only-valid-for-leaf-elements shortcut risk. The one thing checked is
+           the all-literal-leaves shape, for float elements (E0447). */
+        return check_array_float_literal(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
+                                 env_names, env_types, env_muts,
+                                 edef_names, edef_variant_offsets, edef_variant_counts,
+                                 edef_vnames_flat, edef_vshapes_flat,
+                                 fn_names, fn_ret_types, ret_ty, loop_depth,
+                                 idx, diag_sink);
     }
     if tag == 34 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,

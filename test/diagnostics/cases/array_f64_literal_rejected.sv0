@@ -1,0 +1,6 @@
+// E0447: an array literal of floats lowers to vec_push of each element, which
+// truncates them; refused like vec_push (see vec_f64_push_rejected.sv0).
+fn main() -> i32 {
+    let a = [1.5, 2.25, 0.5];
+    return 0;
+}

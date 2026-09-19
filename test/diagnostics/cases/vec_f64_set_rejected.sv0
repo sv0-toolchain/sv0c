@@ -1,0 +1,7 @@
+// E0447: vec_set with a float element (see vec_f64_push_rejected.sv0).
+fn main() -> i32 {
+    let v: Vec<i32> = vec_new();
+    vec_push(v, 1);
+    vec_set(v, 0, 2.5);
+    return 0;
+}

@@ -57,3 +57,7 @@ test/diagnostics/cases/extern_c_unsafe_abi_type_rejected.sv0|E0551|native
 # FFI-013: the ABI manifest, wired -- two #[extern_c] declarations for the
 # same C symbol with differing signatures. native only.
 test/diagnostics/cases/extern_c_conflicting_redeclaration.sv0|E0552|native
+test/diagnostics/cases/vec_f64_push_rejected.sv0|E0447|native
+test/diagnostics/cases/vec_f64_set_rejected.sv0|E0447|native
+test/diagnostics/cases/vec_f64_annotation_rejected.sv0|E0447|native
+test/diagnostics/cases/array_f64_literal_rejected.sv0|E0447|native

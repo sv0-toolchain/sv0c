@@ -31,6 +31,7 @@ fn megatu_diag_code_str(code: i32) -> string {
     if code == 409 { return "E0409"; }
     if code == 429 { return "E0429"; }
     if code == 446 { return "E0446"; }
+    if code == 447 { return "E0447"; }
     if code == 550 { return "E0550"; }
     if code == 551 { return "E0551"; }
     if code == 552 { return "E0552"; }
@@ -52,6 +53,7 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 323 { return "conflicting borrow of a slice source"; }
     if code == 429 { return "no such field"; }
     if code == 446 { return "multi-element tuples are not supported in this slice"; }
+    if code == 447 { return "f64/f32 elements are not supported in a Vec, array, or slice (element slots are integer-sized; the value would be silently truncated)"; }
     if code == 550 { return "raw pointer dereference outside an `unsafe` block"; }
     if code == 551 { return "no C ABI mapping for this type in an `#[extern_c]` signature"; }
     if code == 552 { return "conflicting `#[extern_c]` declaration for this C symbol"; }
