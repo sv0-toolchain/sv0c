@@ -1,0 +1,5 @@
+/* A nested entry point (as a `test/` directory would hold). Dropped from the
+ * project's translation unit when a root entry exists. */
+fn main() -> i32 {
+    return 7;
+}

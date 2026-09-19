@@ -1,0 +1,51 @@
+// BUGS.md #21 / #22: a binop or compare whose operand is read straight from a
+// struct field (no local copy) must pick the typed opcode for the FIELD's
+// declared type on the native VM. It defaulted to the 32-bit integer one:
+// f64 fields aborted with "arithmetic on non-int", i64 fields wrapped at 32
+// bits, and u64 fields compared signed. A call returning u64 also lost its
+// unsigned category. The C backend was always right. Expected exit: 42.
+
+struct Pair { hi: f64, lo: f64 }
+struct Wide { a: i64, b: i64 }
+struct Uns { x: u64, y: u64 }
+
+fn mk_pair(x: f64, y: f64) -> Pair { return Pair { hi: x, lo: y }; }
+fn mk_wide() -> Wide { return Wide { a: 3000000000, b: 5000000000 }; }
+// u64 values above 2^63, built without a >i64 literal (C warns on those).
+fn mk_uns() -> Uns {
+    let one: u64 = 1;
+    let x: u64 = one << 63;
+    return Uns { x: x, y: 5 };
+}
+fn big() -> u64 {
+    let zero: u64 = 0;
+    return zero - 1;
+}
+
+fn main() -> i32 {
+    // f64 fields
+    let p: Pair = mk_pair(1.5, 2.5);
+    let q: Pair = mk_pair(0.25, 4.0);
+    let s: f64 = p.lo + q.lo;
+    if s != 6.5 { return 10; }
+    if p.hi * q.hi != 0.375 { return 11; }
+    if !(p.hi < q.lo) { return 12; }
+
+    // i64 fields: the sum exceeds 32 bits
+    let w: Wide = mk_wide();
+    let t: i64 = w.a + w.b;
+    if t != 8000000000 { return 13; }
+    if w.b - w.a != 2000000000 { return 14; }
+    if !(w.b > w.a) { return 15; }
+
+    // u64 fields above 2^63: unsigned compare, both field-vs-field and
+    // field-vs-call (either operand order)
+    let u: Uns = mk_uns();
+    if !(u.x >= u.y) { return 16; }
+    if u.x < u.y { return 17; }
+    if u.x >= big() { return 18; }
+    if !(u.x < big()) { return 19; }
+    if big() <= u.x { return 20; }
+    if !(big() > u.y) { return 21; }
+    return 42;
+}

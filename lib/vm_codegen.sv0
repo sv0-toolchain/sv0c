@@ -165,6 +165,14 @@ fn cty_cat_of_handle(cty_h: i32, source: string,
        forms (2^64-1 must not read as Int64 -1). */
     if string_eq(s, "u64") { return 3; }
     if string_eq(s, "usize") { return 3; }
+    /* Category 4 = u32. It stays an i32 BIT PATTERN in the cell (so add / sub /
+       mul / shl / bitwise keep the wrapping 32-bit opcodes and the i32
+       round-trip trick `let u: u32 = a; ... let o: i32 = u;` still works), but
+       anything that must see the unsigned VALUE (compare, div, rem, `>>`, and
+       widening to i64 / u64 / f64) zero-extends the operand first
+       (emit_u32_zext). As plain i32 (category 0) a value above 2^31 - 1 read
+       as negative and disagreed with the C backend (BUGS.md #22). */
+    if string_eq(s, "u32") { return 4; }
     return 0;
 }
 
@@ -192,17 +200,31 @@ fn index_of_field(fields: Vec<i32>, field_name: i32) -> i32 {
     return 0 - 1;
 }
 
+/* `fields_flat` runs are stride 2: (field name handle, field category) per
+   field. The category is the same 0/1/2/3 the slot env uses (int / float /
+   i64 / u64), so an operand read straight from a struct field
+   (`a.lo + b.lo`) picks the right typed opcode instead of defaulting to the
+   32-bit integer one. Returns the field INDEX (not the word offset). */
 fn index_of_field_range(fields_flat: Vec<i32>, start: i32,
                         count: i32, name: i32,
                         source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     let mut i: i32 = 0;
     while i < count {
-        if slot_name_eq(vec_get(fields_flat, start + i), name, source, starts, ends) {
+        if slot_name_eq(vec_get(fields_flat, start + 2 * i), name, source, starts, ends) {
             return i;
         }
         i = i + 1;
     }
     return 0 - 1;
+}
+
+/* Category of field `idx` in a run written by record_field_layout; 0 if the
+   run is short (synthetic tests) or the index is out of range. */
+fn field_cat_at(fields_flat: Vec<i32>, start: i32, idx: i32) -> i32 {
+    if idx < 0 { return 0; }
+    let p: i32 = start + 2 * idx + 1;
+    if p >= vec_len(fields_flat) { return 0; }
+    return vec_get(fields_flat, p);
 }
 
 /* ── enum field names ───────────────────────────────────────── */
@@ -703,7 +725,8 @@ fn record_field_layout(cty: i32,
             let sbase: i32 = vec_get(struct_field_starts, k);
             let mut j: i32 = 0;
             while j < fcount {
-                vec_push(env_fields_flat, vec_get(struct_fields_flat, sbase + j));
+                vec_push(env_fields_flat, vec_get(struct_fields_flat, sbase + 2 * j));
+                vec_push(env_fields_flat, vec_get(struct_fields_flat, sbase + 2 * j + 1));
                 j = j + 1;
             }
             return fstart;
@@ -716,6 +739,7 @@ fn record_field_layout(cty: i32,
 fn struct_fields_build(item_tags: Vec<i32>, item_field_counts: Vec<i32>,
                        item_field_bases: Vec<i32>,
                        struct_field_name_toks: Vec<i32>,
+                       struct_field_cats: Vec<i32>,
                        out_fields_flat: Vec<i32>,
                        out_field_starts: Vec<i32>) -> i32 {
     let n: i32 = vec_len(item_tags);
@@ -728,6 +752,11 @@ fn struct_fields_build(item_tags: Vec<i32>, item_field_counts: Vec<i32>,
             let mut k: i32 = 0;
             while k < fc {
                 vec_push(out_fields_flat, vec_get(struct_field_name_toks, base + k));
+                let mut fcat: i32 = 0;
+                if base + k < vec_len(struct_field_cats) {
+                    fcat = vec_get(struct_field_cats, base + k);
+                }
+                vec_push(out_fields_flat, fcat);
                 k = k + 1;
             }
         }
@@ -878,6 +907,19 @@ fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
         if tag == 17 { return 42; }
         return binop_tag_to_insn(tag);
     }
+    /* u32 (cat 4): the operands were zero-extended by the caller
+       (u32_operand_needs_zext), so div / rem / ordered compares / `>>` take
+       the unsigned wide opcodes; everything else is the 32-bit form. */
+    if cat == 4 {
+        if tag == 3 { return 38; }
+        if tag == 4 { return 39; }
+        if tag == 7 { return 70; }
+        if tag == 8 { return 71; }
+        if tag == 9 { return 72; }
+        if tag == 10 { return 73; }
+        if tag == 17 { return 42; }
+        return binop_tag_to_insn(tag);
+    }
     return binop_tag_to_insn(tag);
 }
 
@@ -908,17 +950,84 @@ fn combine_cat(a: i32, b: i32) -> i32 {
     if b == 3 { return 3; }
     if a == 2 { return 2; }
     if b == 2 { return 2; }
+    /* u32 (4) yields to any wider category, and beats plain int. */
+    if a == 4 { return 4; }
+    if b == 4 { return 4; }
     return 0;
+}
+
+/* Zero-extend the u32 on top of the stack: PUSH_I64 4294967296; MOD_U64. The
+   i32 bit pattern sign-extends into the wide op, and the unsigned remainder by
+   2^32 leaves the value in [0, 2^32) (-1 -> 4294967295). Pushes 4 words. */
+fn emit_u32_zext(out: Vec<i32>) -> i32 {
+    vec_push(out, 5);
+    vec_push(out, 0);
+    vec_push(out, 1);
+    vec_push(out, 39);
+    return 4;
+}
+
+/* Does a category-4 (u32) operand need zero-extension before this binop?
+   `opcat` is the operand's own category, `bcat` the combined category the op
+   is emitted in, `tag` the binop tag. Wide / float ops always want the
+   unsigned value; within u32 only compares (5-10), div (3), rem (4) and
+   `>>` (17) do -- add / sub / mul / shl / bitwise are identical on the bit
+   pattern. */
+fn u32_operand_needs_zext(opcat: i32, bcat: i32, tag: i32) -> bool {
+    if opcat != 4 { return false; }
+    if bcat == 1 { return true; }
+    if bcat == 2 { return true; }
+    if bcat == 3 { return true; }
+    if bcat != 4 { return false; }
+    if tag >= 5 {
+        if tag <= 10 { return true; }
+    }
+    if tag == 3 { return true; }
+    if tag == 4 { return true; }
+    if tag == 17 { return true; }
+    return false;
 }
 
 /* Category of one IR Value operand. VFloat/VIntWide are self-identifying;
    a VVar resolves through the slot env's env_cats; a VMember (struct-field
-   access) is category 0 for now — struct-field category tracking is a
-   VMF-006 follow-on, and sv0-mathlib's field-to-local workaround
-   (BUGS.md #13/#16/#19) already sidesteps it. */
+   access) resolves through the slot's field layout (member_cat) to the
+   field's declared category. */
+fn member_cat(bv: Box<Value>, f: i32,
+              env_names: Vec<i32>, env_bases: Vec<i32>,
+              env_widths: Vec<i32>, env_field_starts: Vec<i32>,
+              env_fields_flat: Vec<i32>,
+              source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    if f < 0 { return 0; }
+    let base_v: Value = box_deref(bv);
+    match base_v {
+        Value::VVar(x) => {
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
+                                      source, starts, ends);
+            if si < 0 { return 0; }
+            if si >= vec_len(env_field_starts) { return 0; }
+            let fs: i32 = vec_get(env_field_starts, si);
+            let w: i32 = slot_width(env_widths, si);
+            let idx: i32 = index_of_field_range(env_fields_flat, fs, w, f,
+                                                source, starts, ends);
+            return field_cat_at(env_fields_flat, fs, idx);
+        },
+        Value::VInt(n) => { return 0; },
+        Value::VBoolTrue => { return 0; },
+        Value::VBoolFalse => { return 0; },
+        Value::VUnit => { return 0; },
+        Value::VString(sv) => { return 0; },
+        Value::VMember(bv2, f2) => { return 0; },
+        Value::VAddrOf(h2) => { return 0; },
+        Value::VFloat(h2) => { return 0; },
+        Value::VIntWide(h2) => { return 0; },
+    }
+    return 0;
+}
+
 fn operand_cat(v: Value,
                env_names: Vec<i32>, env_bases: Vec<i32>,
                env_widths: Vec<i32>, env_cats: Vec<i32>,
+               env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
                source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     match v {
         Value::VFloat(h) => { return 1; },
@@ -933,7 +1042,11 @@ fn operand_cat(v: Value,
         Value::VBoolFalse => { return 0; },
         Value::VUnit => { return 0; },
         Value::VString(s) => { return 0; },
-        Value::VMember(bv, f) => { return 0; },
+        Value::VMember(bv, f) => {
+            return member_cat(bv, f, env_names, env_bases, env_widths,
+                              env_field_starts, env_fields_flat,
+                              source, starts, ends);
+        },
         Value::VAddrOf(x) => { return 0; },
     }
     return 0;
@@ -944,17 +1057,20 @@ fn operand_cat(v: Value,
    binops pick ADD_F64/ADD_I64 -- exactly what megaTU-main's megatu_expr_category
    does for the C backend. Arith binops (tags 0-4) / unops combine the operand
    categories; comparisons + logic (5-12) yield bool (0); bitwise/shift (13-17)
-   combine (i64 stays i64). FieldAccess is 0 (struct-field category still
-   deferred; sv0-mathlib copies fields to locals first). */
+   combine (i64 stays i64). FieldAccess reads the field's declared category
+   from the slot's stride-2 field layout (member_cat), so a binop straight on
+   struct fields (`a.lo + b.lo`, `q.x >= q.y`) picks ADD_F64 / the unsigned
+   compare like a binop on locals does. */
 fn expr_cat(e: Expr,
             env_names: Vec<i32>, env_bases: Vec<i32>,
             env_widths: Vec<i32>, env_cats: Vec<i32>,
+            env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
             source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     match e {
         Expr::Literal(bv) => {
             let lv: Value = box_deref(bv);
             return operand_cat(lv, env_names, env_bases, env_widths,
-                               env_cats, source, starts, ends);
+                               env_cats, env_field_starts, env_fields_flat, source, starts, ends);
         },
         Expr::Load(x) => {
             let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
@@ -968,18 +1084,22 @@ fn expr_cat(e: Expr,
             let v1: Value = box_deref(bv1);
             let v2: Value = box_deref(bv2);
             let c1: i32 = operand_cat(v1, env_names, env_bases,
-                                      env_widths, env_cats, source, starts, ends);
+                                      env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
             let c2: i32 = operand_cat(v2, env_names, env_bases,
-                                      env_widths, env_cats, source, starts, ends);
+                                      env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
             return combine_cat(c1, c2);
         },
         Expr::Unop(tag, bv) => {
             if tag == 1 { return 0; }
             let uv: Value = box_deref(bv);
             return operand_cat(uv, env_names, env_bases, env_widths,
-                               env_cats, source, starts, ends);
+                               env_cats, env_field_starts, env_fields_flat, source, starts, ends);
         },
-        Expr::FieldAccess(bv, f) => { return 0; },
+        Expr::FieldAccess(bv, f) => {
+            return member_cat(bv, f, env_names, env_bases, env_widths,
+                              env_field_starts, env_fields_flat,
+                              source, starts, ends);
+        },
     }
     return 0;
 }
@@ -1768,14 +1888,17 @@ fn emit_expr(e: Expr,
             let v1: Value = box_deref(bv1);
             let v2: Value = box_deref(bv2);
             let c1: i32 = operand_cat(v1, env_names, env_bases, env_widths,
-                                      env_cats, source, starts, ends);
+                                      env_cats, env_field_starts, env_fields_flat, source, starts, ends);
             let c2: i32 = operand_cat(v2, env_names, env_bases, env_widths,
-                                      env_cats, source, starts, ends);
-            let n1: i32 = emit_value(v1, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+                                      env_cats, env_field_starts, env_fields_flat, source, starts, ends);
+            let bcat: i32 = combine_cat(c1, c2);
+            let mut n1: i32 = emit_value(v1, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n1 < 0 { return 0 - 1; }
-            let n2: i32 = emit_value(v2, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+            if u32_operand_needs_zext(c1, bcat, op_h) { n1 = n1 + emit_u32_zext(out); }
+            let mut n2: i32 = emit_value(v2, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n2 < 0 { return 0 - 1; }
-            let opc: i32 = binop_tag_to_insn_typed(op_h, combine_cat(c1, c2));
+            if u32_operand_needs_zext(c2, bcat, op_h) { n2 = n2 + emit_u32_zext(out); }
+            let opc: i32 = binop_tag_to_insn_typed(op_h, bcat);
             if opc < 0 { return 0 - 1; }
             vec_push(out, opc);
             return n1 + n2 + 1;
@@ -1783,7 +1906,7 @@ fn emit_expr(e: Expr,
         Expr::Unop(op_h, bv) => {
             let v: Value = box_deref(bv);
             let c: i32 = operand_cat(v, env_names, env_bases, env_widths,
-                                     env_cats, source, starts, ends);
+                                     env_cats, env_field_starts, env_fields_flat, source, starts, ends);
             let n: i32 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n < 0 { return 0 - 1; }
             let opc: i32 = unop_tag_to_insn_typed(op_h, c);
@@ -2489,7 +2612,7 @@ fn scan_instr_env(ins: Instr,
         Instr::Assign(x, be) => {
             let ae: Expr = box_deref(be);
             let acat: i32 = expr_cat(ae, env_names, env_bases,
-                                     env_widths, env_cats, source, starts, ends);
+                                     env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
             return ensure_var_cat(x, acat, env_names, env_bases, env_widths,
                                   env_cats, env_field_starts, next_slot,
                                   source, starts, ends);
@@ -2571,7 +2694,7 @@ fn scan_instr_env(ins: Instr,
                when a typed value lands in it (match-result temps, `let mut`). */
             let se: Expr = box_deref(be);
             let scat: i32 = expr_cat(se, env_names, env_bases,
-                                     env_widths, env_cats, source, starts, ends);
+                                     env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
             if scat != 0 {
                 let ssi: i32 = lookup_slot(env_names, env_bases, env_widths, x,
                                            source, starts, ends);
@@ -2792,6 +2915,7 @@ fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
                 item_variant_max_payload: Vec<i32>,
                 item_field_bases: Vec<i32>,
                 struct_field_name_toks: Vec<i32>,
+                struct_field_cats: Vec<i32>,
                 block_labels: Vec<i32>,
                 block_param_names: Vec<i32>,
                 block_param_ctys: Vec<i32>,
@@ -2806,7 +2930,7 @@ fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
     let sff: Vec<i32> = vec_new();
     let sfs: Vec<i32> = vec_new();
     struct_fields_build(item_tags, item_field_counts, item_field_bases,
-                        struct_field_name_toks, sff, sfs);
+                        struct_field_name_toks, struct_field_cats, sff, sfs);
     let enn: Vec<i32> = vec_new();
     let enw: Vec<i32> = vec_new();
     enum_layouts_build(item_tags, item_names, item_field_counts,
@@ -3808,7 +3932,7 @@ fn test_emit_store_field() -> i32 {
     vec_push(starts, 0); vec_push(ends, 1);
     vec_push(en, 50); vec_push(eb, 0); vec_push(ew, 3);
     vec_push(efs, 0);
-    vec_push(eff, 100); vec_push(eff, 200); vec_push(eff, 300);
+    vec_push(eff, 100); vec_push(eff, 0); vec_push(eff, 200); vec_push(eff, 0); vec_push(eff, 300); vec_push(eff, 0);
     let out1: Vec<i32> = vec_new();
     let sf1: Instr = Instr::StoreField(50, 100,
                          box_new(Expr::Literal(box_new(Value::VInt(7)))));
@@ -3838,8 +3962,8 @@ fn test_emit_store_field() -> i32 {
     if vec_get(out3, 2) != 97 { return 12; }
     if vec_get(out3, 3) != 2 { return 13; }
     vec_push(en, 60); vec_push(eb, 3); vec_push(ew, 2);
-    vec_push(efs, 3);
-    vec_push(eff, 400); vec_push(eff, 500);
+    vec_push(efs, 6);
+    vec_push(eff, 400); vec_push(eff, 0); vec_push(eff, 500); vec_push(eff, 0);
     let out4: Vec<i32> = vec_new();
     let sf4: Instr = Instr::StoreField(60, 500,
                          box_new(Expr::Literal(box_new(Value::VInt(1)))));
@@ -4370,7 +4494,7 @@ fn emit_program_1fn(source: string, starts: Vec<i32>,
     vec_push(bpc, pc);
     let bi: Vec<i32> = vec_new();
     vec_push(bi, ins);
-    return emit_program(it, in2, ifc, ivp, vec_new(), vec_new(), bl, bpn, bpc, bi,
+    return emit_program(it, in2, ifc, ivp, vec_new(), vec_new(), vec_new(), bl, bpn, bpc, bi,
                          vec_new(), source, starts, ends, pool, ft);
 }
 
@@ -4645,15 +4769,67 @@ fn test_typed_opcode_select() -> i32 {
     let en: Vec<i32> = vec_new();
     let eb: Vec<i32> = vec_new();
     let ew: Vec<i32> = vec_new();
-    if operand_cat(Value::VFloat(0), en, eb, ew, ec, "", vec_new(), vec_new()) != 1 { return 60; }
-    if operand_cat(Value::VIntWide(0), en, eb, ew, ec, "", vec_new(), vec_new()) != 2 { return 61; }
-    if operand_cat(Value::VInt(7), en, eb, ew, ec, "", vec_new(), vec_new()) != 0 { return 62; }
+    if operand_cat(Value::VFloat(0), en, eb, ew, ec, vec_new(), vec_new(), "", vec_new(), vec_new()) != 1 { return 60; }
+    if operand_cat(Value::VIntWide(0), en, eb, ew, ec, vec_new(), vec_new(), "", vec_new(), vec_new()) != 2 { return 61; }
+    if operand_cat(Value::VInt(7), en, eb, ew, ec, vec_new(), vec_new(), "", vec_new(), vec_new()) != 0 { return 62; }
     vec_push(en, 50);
     vec_push(eb, 0);
     vec_push(ew, 1);
     let ec2: Vec<i32> = vec_new();
     vec_push(ec2, 1);
-    if operand_cat(Value::VVar(50), en, eb, ew, ec2, "", vec_new(), vec_new()) != 1 { return 63; }
+    if operand_cat(Value::VVar(50), en, eb, ew, ec2, vec_new(), vec_new(), "", vec_new(), vec_new()) != 1 { return 63; }
+    /* struct-field operands: slot 50 is a struct with fields (name 7: f64,
+       name 8: u64, name 9: i32); a VMember resolves to the field's category */
+    let ffs: Vec<i32> = vec_new();
+    vec_push(ffs, 7);
+    vec_push(ffs, 1);
+    vec_push(ffs, 8);
+    vec_push(ffs, 3);
+    vec_push(ffs, 9);
+    vec_push(ffs, 0);
+    let fst: Vec<i32> = vec_new();
+    vec_push(fst, 0);
+    let ew3: Vec<i32> = vec_new();
+    vec_push(ew3, 3);
+    let ec3: Vec<i32> = vec_new();
+    vec_push(ec3, 0);
+    let mv7: Value = Value::VMember(box_new(Value::VVar(50)), 7);
+    let mv8: Value = Value::VMember(box_new(Value::VVar(50)), 8);
+    let mv9: Value = Value::VMember(box_new(Value::VVar(50)), 9);
+    let mv_missing: Value = Value::VMember(box_new(Value::VVar(50)), 99);
+    if operand_cat(mv7, en, eb, ew3, ec3, fst, ffs, "", vec_new(), vec_new()) != 1 { return 64; }
+    if operand_cat(mv8, en, eb, ew3, ec3, fst, ffs, "", vec_new(), vec_new()) != 3 { return 65; }
+    if operand_cat(mv9, en, eb, ew3, ec3, fst, ffs, "", vec_new(), vec_new()) != 0 { return 66; }
+    if operand_cat(mv_missing, en, eb, ew3, ec3, fst, ffs, "", vec_new(), vec_new()) != 0 { return 67; }
+    if operand_cat(mv7, en, eb, ew3, ec3, vec_new(), vec_new(), "", vec_new(), vec_new()) != 0 { return 68; }
+    if field_cat_at(ffs, 0, 1) != 3 { return 69; }
+    if field_cat_at(ffs, 0, 5) != 0 { return 70; }
+    /* u32 (category 4): combine / opcode selection / zero-extension */
+    if combine_cat(4, 0) != 4 { return 71; }
+    if combine_cat(0, 4) != 4 { return 72; }
+    if combine_cat(4, 3) != 3 { return 73; }
+    if combine_cat(4, 2) != 2 { return 74; }
+    if combine_cat(4, 1) != 1 { return 75; }
+    if binop_tag_to_insn_typed(3, 4) != 38 { return 76; }
+    if binop_tag_to_insn_typed(4, 4) != 39 { return 77; }
+    if binop_tag_to_insn_typed(10, 4) != 73 { return 78; }
+    if binop_tag_to_insn_typed(17, 4) != 42 { return 79; }
+    if binop_tag_to_insn_typed(1, 4) != binop_tag_to_insn(1) { return 80; }
+    if unop_tag_to_insn_typed(0, 4) != 21 { return 81; }
+    if u32_operand_needs_zext(4, 4, 10) != true { return 82; }
+    if u32_operand_needs_zext(4, 4, 3) != true { return 83; }
+    if u32_operand_needs_zext(4, 4, 0) != false { return 84; }
+    if u32_operand_needs_zext(4, 4, 16) != false { return 85; }
+    if u32_operand_needs_zext(4, 3, 0) != true { return 86; }
+    if u32_operand_needs_zext(4, 1, 0) != true { return 87; }
+    if u32_operand_needs_zext(0, 4, 10) != false { return 88; }
+    if u32_operand_needs_zext(3, 3, 10) != false { return 89; }
+    let wout: Vec<i32> = vec_new();
+    if emit_u32_zext(wout) != 4 { return 90; }
+    if vec_len(wout) != 4 { return 91; }
+    if vec_get(wout, 0) != 5 { return 92; }
+    if vec_get(wout, 2) != 1 { return 93; }
+    if vec_get(wout, 3) != 39 { return 94; }
     return 0;
 }
 

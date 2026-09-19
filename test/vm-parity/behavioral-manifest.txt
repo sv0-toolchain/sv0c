@@ -14,6 +14,7 @@ sv0c/test/integration/int_min/int_min.sv0
 sv0c/test/integration/contracts/contracts.sv0
 --project sv0c/test/integration/modules_diamond
 --project sv0c/test/integration/modules_generic_carrier
+--project sv0c/test/integration/project_root_entry
 --project sv0-mathlib
 sv0c/test/behavior/cases/slice_construct_index.sv0
 sv0c/test/behavior/cases/slice_mut_reslice.sv0
@@ -21,6 +22,8 @@ sv0c/test/behavior/cases/string_embedded_nul.sv0
 sv0c/test/behavior/cases/u64_unsigned_compare.sv0
 sv0c/test/behavior/cases/wide_shift.sv0
 sv0c/test/behavior/cases/vm_exit_wide_return.sv0
+sv0c/test/behavior/cases/u32_wrap.sv0
+sv0c/test/behavior/cases/struct_field_operands.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct_nested.sv0
 sv0c/test/behavior/cases/fill_explicit_intrinsic.sv0

@@ -1,0 +1,8 @@
+/* The project's one entry point. A `fn main` in a subdirectory (a test or
+ * example entry) is a separate program and must not replace this one: the
+ * project runs to exit 42, not the nested file's 7. */
+fn helper() -> i32 { return 40; }
+
+fn main() -> i32 {
+    return helper() + 2;
+}

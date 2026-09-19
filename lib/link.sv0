@@ -744,6 +744,37 @@ fn link_listing_root_entry_count(listing: string, dir: string) -> i32 {
     return count;
 }
 
+/* When the project directory has exactly one entry file directly in it, that
+   is THE program; a `fn main` in a subdirectory (a test or example entry
+   point, which the E0302 message tells users to put there) is a separate
+   program. Concatenating it into the same translation unit left several
+   `fn main`s, and the compiler kept an arbitrary one, so the root entry
+   silently did not run (BUGS.md #22: sv0-mathlib's gates executed a test's
+   main). Returns `listing` without any non-direct-child file that defines an
+   entry. Same newline-separated path format as `listing`. */
+fn link_listing_drop_nested_entries(listing: string, dir: string) -> string {
+    let len: i32 = string_len(listing);
+    let mut p: i32 = 0;
+    let mut out: string = "";
+    while p < len {
+        let nl: i32 = listing_find_newline(listing, p);
+        let lsz: i32 = nl - p;
+        if lsz > 0 {
+            let path: string = string_substr(listing, p, lsz);
+            let mut keep: bool = true;
+            if link_path_is_direct_child(path, dir) != true {
+                if source_defines_project_entry(parse_file(path)) { keep = false; }
+            }
+            if keep {
+                out = string_concat(out, path);
+                out = string_concat(out, "\n");
+            }
+        }
+        p = nl + 1;
+    }
+    return out;
+}
+
 fn link_dup_entry_message() -> string {
     return "sv0c error: E0302: project defines more than one entry point (top-level `fn main`) directly in the project directory; keep exactly one entry file there and move any test entry points into a subdirectory\n";
 }
@@ -754,9 +785,14 @@ fn link_dup_entry_message() -> string {
 
 fn link_project_concat_sources_from_dir(dir: string) -> string {
     let listing: string = link_project_dir(dir);
-    if link_listing_root_entry_count(listing, dir) > 1 {
+    let root_entries: i32 = link_listing_root_entry_count(listing, dir);
+    if root_entries > 1 {
         write_file("/dev/stderr", link_dup_entry_message());
         return "";
+    }
+    if root_entries == 1 {
+        return link_project_concat_sources_from_listing(
+            link_listing_drop_nested_entries(listing, dir));
     }
     return link_project_concat_sources_from_listing(listing);
 }
@@ -3419,6 +3455,46 @@ fn test_link_u15_symbol_mangle() -> i32 {
    ORDINARY, correctly-mangled `strings_c23::strlen` in the same project
    (the realistic case -- a safe façade reusing a libc name for
    readability, plus a real exact-ABI binding of that same name). */
+/* A root entry file plus a nested test entry point: the nested file is dropped
+   from the listing; with no root entry (or a nested file that is not an
+   entry) nothing is dropped. */
+fn test_link_drop_nested_entries() -> i32 {
+    /* No mkdir in the bootstrap runtime, so "nested" is a path spelled through
+       `/tmp/.`: it names a real file under /tmp but its containing directory
+       string is `/tmp/.`, not `/tmp`, so it is not a direct child of `/tmp`. */
+    let d: string = "/tmp";
+    let root: string = "/tmp/sv0_nested_entry_root.sv0";
+    let helper: string = "/tmp/sv0_nested_entry_helper.sv0";
+    let nested: string = "/tmp/./sv0_nested_entry_t.sv0";
+    write_file(root, "fn main() -> i32 { return 42; }\n");
+    write_file(helper, "fn helper() -> i32 { return 1; }\n");
+    write_file(nested, "fn main() -> i32 { return 7; }\n");
+    let mut listing: string = string_concat(helper, "\n");
+    listing = string_concat(listing, string_concat(nested, "\n"));
+    listing = string_concat(listing, string_concat(root, "\n"));
+    if link_listing_root_entry_count(listing, d) != 1 { return 1; }
+    let kept: string = link_listing_drop_nested_entries(listing, d);
+    let want: string = string_concat(helper, string_concat("\n", string_concat(root, "\n")));
+    if string_eq(kept, want) != true { return 2; }
+    /* the source concat of the filtered listing has exactly one entry */
+    let cat: string = link_project_concat_sources_from_listing(kept);
+    if source_defines_project_entry(cat) != true { return 3; }
+    let mut mains: i32 = 0;
+    let n: i32 = string_len(cat);
+    let mut i: i32 = 0;
+    while i + 7 <= n {
+        if string_eq(string_substr(cat, i, 7), "fn main") { mains = mains + 1; }
+        i = i + 1;
+    }
+    if mains != 1 { return 4; }
+    /* no root entry: the caller (link_project_concat_sources_from_dir) does
+       not filter at all, so a lone nested entry (the test runners' staging
+       layout) stays the program; here we only check the count it keys on. */
+    let no_root: string = string_concat(helper, string_concat("\n", string_concat(nested, "\n")));
+    if link_listing_root_entry_count(no_root, d) != 0 { return 5; }
+    return 0;
+}
+
 fn test_link_u15_extern_c_not_mangled() -> i32 {
     let pe: string = "/tmp/sv0_u15_extern.sv0";
     write_file(pe, "module strings_unsafe_abi;\n/// obligation\n#[extern_c]\nfn strlen(s: i32) -> i32;\n");
@@ -4866,6 +4942,8 @@ fn main() -> i32 {
     if r21u15 != 0 { return 500 + r21u15; }
     let r21u16: i32 = test_link_u15_extern_c_not_mangled();
     if r21u16 != 0 { return 520 + r21u16; }
+    let r21nest: i32 = test_link_drop_nested_entries();
+    if r21nest != 0 { return 540 + r21nest; }
     let r21b2a: i32 = test_listing_count_nonempty_paths();
     if r21b2a != 0 { return 247 + r21b2a; }
     let r21b2b: i32 = test_source_defines_project_entry();

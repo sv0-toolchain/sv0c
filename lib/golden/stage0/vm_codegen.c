@@ -35,6 +35,7 @@ static int width_of_cty_scalar(const char* cty);
 static int width_of_cty_simple(const char* cty);
 static int index_of_field(int fields, int field_name);
 static int index_of_field_range(int fields_flat, int start, int count, int name, const char* source, int starts, int ends);
+static int field_cat_at(int fields_flat, int start, int idx);
 static int enum_field_count(int width);
 static int enum_field_names(int width);
 static int binop_to_insn(const char* op);
@@ -75,7 +76,7 @@ static int patch_continue_jumps(int instrs, int from_pos, int target_abs);
 static int patch_break_jumps(int instrs, int from_pos, int target_abs);
 static int struct_layouts_build(int item_tags, int item_names, int item_field_counts, int out_names, int out_field_counts);
 static int record_field_layout(int cty, int structs_names, int structs_field_counts, int struct_fields_flat, int struct_field_starts, const char* source, int starts, int ends, int env_fields_flat);
-static int struct_fields_build(int item_tags, int item_field_counts, int item_field_bases, int struct_field_name_toks, int out_fields_flat, int out_field_starts);
+static int struct_fields_build(int item_tags, int item_field_counts, int item_field_bases, int struct_field_name_toks, int struct_field_cats, int out_fields_flat, int out_field_starts);
 static int enum_layouts_build(int item_tags, int item_names, int item_variant_counts, int item_variant_max_payload, int out_names, int out_widths);
 static int binop_tag_to_insn(int tag);
 static int unop_tag_to_insn(int tag);
@@ -83,8 +84,11 @@ static int binop_tag_to_insn_typed(int tag, int cat);
 static int unop_tag_to_insn_typed(int tag, int cat);
 static int slot_cat(int env_cats, int idx);
 static int combine_cat(int a, int b);
-static int operand_cat(Value v, int env_names, int env_bases, int env_widths, int env_cats, const char* source, int starts, int ends);
-static int expr_cat(Expr e, int env_names, int env_bases, int env_widths, int env_cats, const char* source, int starts, int ends);
+static int emit_u32_zext(int out);
+static int u32_operand_needs_zext(int opcat, int bcat, int tag);
+static int member_cat(int bv, int f, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends);
+static int operand_cat(Value v, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends);
+static int expr_cat(Expr e, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends);
 static int binop_handle_to_insn(int op_h, const char* source, int starts, int ends);
 static int unop_handle_to_insn(int op_h, const char* source, int starts, int ends);
 static const char* handle_to_str(int h, const char* source, int starts, int ends);
@@ -135,7 +139,7 @@ static int compute_arity(int param_ctys, int structs_names, int structs_field_co
 static int emit_fn(int label, int param_names, int param_ctys, int instrs, int structs_names, int structs_field_counts, int enums_names, int enums_widths, int structs_fields_flat, int structs_field_starts, int pool, int blabels, int bretcats, const char* source, int starts, int ends, int fn_names, int ft_entries);
 static int is_main_label(int label, const char* source, int starts, int ends);
 static int build_func_order(int block_labels, const char* source, int starts, int ends, int order);
-static int emit_program(int item_tags, int item_names, int item_field_counts, int item_variant_max_payload, int item_field_bases, int struct_field_name_toks, int block_labels, int block_param_names, int block_param_ctys, int block_instrs, int block_ret_cats, const char* source, int starts, int ends, int out_pool, int out_ft);
+static int emit_program(int item_tags, int item_names, int item_field_counts, int item_variant_max_payload, int item_field_bases, int struct_field_name_toks, int struct_field_cats, int block_labels, int block_param_names, int block_param_ctys, int block_instrs, int block_ret_cats, const char* source, int starts, int ends, int out_pool, int out_ft);
 static int test_variant_slots(void);
 static int test_cty_classify(void);
 static int test_width_of_cty(void);
@@ -350,6 +354,11 @@ static int cty_cat_of_handle(int cty_h, const char* source, int starts, int ends
     return 3;
   } else {
   }
+  int _sv0t8 = sv0_string_eq(s, "u32");
+  if (_sv0t8) {
+    return 4;
+  } else {
+  }
   return 0;
 }
 
@@ -390,16 +399,34 @@ static int index_of_field(int fields, int field_name) {
 static int index_of_field_range(int fields_flat, int start, int count, int name, const char* source, int starts, int ends) {
   int i = 0;
   while ((i < count)) {
-    int _sv0t0 = (start + i);
-    int _sv0t1 = sv0_vec_get(fields_flat, _sv0t0);
-    int _sv0t2 = slot_name_eq(_sv0t1, name, source, starts, ends);
-    if (_sv0t2) {
+    int _sv0t0 = (2 * i);
+    int _sv0t1 = (start + _sv0t0);
+    int _sv0t2 = sv0_vec_get(fields_flat, _sv0t1);
+    int _sv0t3 = slot_name_eq(_sv0t2, name, source, starts, ends);
+    if (_sv0t3) {
       return i;
     } else {
     }
     i = (i + 1);
   }
-  int _sv0t3 = (0 - 1);
+  int _sv0t4 = (0 - 1);
+  return _sv0t4;
+}
+
+static int field_cat_at(int fields_flat, int start, int idx) {
+  if ((idx < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = (2 * idx);
+  int _sv0t1 = (start + _sv0t0);
+  int p = (_sv0t1 + 1);
+  int _sv0t2 = sv0_vec_len(fields_flat);
+  if ((p >= _sv0t2)) {
+    return 0;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(fields_flat, p);
   return _sv0t3;
 }
 
@@ -1325,9 +1352,15 @@ static int record_field_layout(int cty, int structs_names, int structs_field_cou
       int sbase = _sv0t6;
       int j = 0;
       while ((j < fcount)) {
-        int _sv0t7 = (sbase + j);
-        int _sv0t8 = sv0_vec_get(struct_fields_flat, _sv0t7);
-        sv0_vec_push(env_fields_flat, _sv0t8);
+        int _sv0t7 = (2 * j);
+        int _sv0t8 = (sbase + _sv0t7);
+        int _sv0t9 = sv0_vec_get(struct_fields_flat, _sv0t8);
+        sv0_vec_push(env_fields_flat, _sv0t9);
+        int _sv0t10 = (2 * j);
+        int _sv0t11 = (sbase + _sv0t10);
+        int _sv0t12 = (_sv0t11 + 1);
+        int _sv0t13 = sv0_vec_get(struct_fields_flat, _sv0t12);
+        sv0_vec_push(env_fields_flat, _sv0t13);
         j = (j + 1);
       }
       return fstart;
@@ -1338,7 +1371,7 @@ static int record_field_layout(int cty, int structs_names, int structs_field_cou
   return 0;
 }
 
-static int struct_fields_build(int item_tags, int item_field_counts, int item_field_bases, int struct_field_name_toks, int out_fields_flat, int out_field_starts) {
+static int struct_fields_build(int item_tags, int item_field_counts, int item_field_bases, int struct_field_name_toks, int struct_field_cats, int out_fields_flat, int out_field_starts) {
   int _sv0t0 = sv0_vec_len(item_tags);
   int n = _sv0t0;
   int i = 0;
@@ -1356,14 +1389,24 @@ static int struct_fields_build(int item_tags, int item_field_counts, int item_fi
         int _sv0t5 = (base + k);
         int _sv0t6 = sv0_vec_get(struct_field_name_toks, _sv0t5);
         sv0_vec_push(out_fields_flat, _sv0t6);
+        int fcat = 0;
+        int _sv0t7 = (base + k);
+        int _sv0t8 = sv0_vec_len(struct_field_cats);
+        if ((_sv0t7 < _sv0t8)) {
+          int _sv0t9 = (base + k);
+          int _sv0t10 = sv0_vec_get(struct_field_cats, _sv0t9);
+          fcat = _sv0t10;
+        } else {
+        }
+        sv0_vec_push(out_fields_flat, fcat);
         k = (k + 1);
       }
     } else {
     }
     i = (i + 1);
   }
-  int _sv0t7 = sv0_vec_len(out_field_starts);
-  return _sv0t7;
+  int _sv0t11 = sv0_vec_len(out_field_starts);
+  return _sv0t11;
 }
 
 static int enum_layouts_build(int item_tags, int item_names, int item_variant_counts, int item_variant_max_payload, int out_names, int out_widths) {
@@ -1591,8 +1634,41 @@ static int binop_tag_to_insn_typed(int tag, int cat) {
     return _sv0t4;
   } else {
   }
-  int _sv0t5 = binop_tag_to_insn(tag);
-  return _sv0t5;
+  if ((cat == 4)) {
+    if ((tag == 3)) {
+      return 38;
+    } else {
+    }
+    if ((tag == 4)) {
+      return 39;
+    } else {
+    }
+    if ((tag == 7)) {
+      return 70;
+    } else {
+    }
+    if ((tag == 8)) {
+      return 71;
+    } else {
+    }
+    if ((tag == 9)) {
+      return 72;
+    } else {
+    }
+    if ((tag == 10)) {
+      return 73;
+    } else {
+    }
+    if ((tag == 17)) {
+      return 42;
+    } else {
+    }
+    int _sv0t5 = binop_tag_to_insn(tag);
+    return _sv0t5;
+  } else {
+  }
+  int _sv0t6 = binop_tag_to_insn(tag);
+  return _sv0t6;
 }
 
 static int unop_tag_to_insn_typed(int tag, int cat) {
@@ -1651,10 +1727,165 @@ static int combine_cat(int a, int b) {
     return 2;
   } else {
   }
+  if ((a == 4)) {
+    return 4;
+  } else {
+  }
+  if ((b == 4)) {
+    return 4;
+  } else {
+  }
   return 0;
 }
 
-static int operand_cat(Value v, int env_names, int env_bases, int env_widths, int env_cats, const char* source, int starts, int ends) {
+static int emit_u32_zext(int out) {
+  sv0_vec_push(out, 5);
+  sv0_vec_push(out, 0);
+  sv0_vec_push(out, 1);
+  sv0_vec_push(out, 39);
+  return 4;
+}
+
+static int u32_operand_needs_zext(int opcat, int bcat, int tag) {
+  if ((opcat != 4)) {
+    return 0;
+  } else {
+  }
+  if ((bcat == 1)) {
+    return 1;
+  } else {
+  }
+  if ((bcat == 2)) {
+    return 1;
+  } else {
+  }
+  if ((bcat == 3)) {
+    return 1;
+  } else {
+  }
+  if ((bcat != 4)) {
+    return 0;
+  } else {
+  }
+  if ((tag >= 5)) {
+    if ((tag <= 10)) {
+      return 1;
+    } else {
+    }
+  } else {
+  }
+  if ((tag == 3)) {
+    return 1;
+  } else {
+  }
+  if ((tag == 4)) {
+    return 1;
+  } else {
+  }
+  if ((tag == 17)) {
+    return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int member_cat(int bv, int f, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
+  if ((f < 0)) {
+    return 0;
+  } else {
+  }
+  Value _sv0t0;
+  int _sv0t1 = sv0_box_load(bv, 0);
+  _sv0t0.tag = _sv0t1;
+  int _sv0t2 = sv0_box_load(bv, 1);
+  _sv0t0.p0 = _sv0t2;
+  int _sv0t3 = sv0_box_load(bv, 2);
+  _sv0t0.p1 = _sv0t3;
+  Value base_v;
+  base_v.tag = (_sv0t0).tag;
+  base_v.p0 = (_sv0t0).p0;
+  base_v.p1 = (_sv0t0).p1;
+  int _sv0t4;
+  if ((base_v.tag == 3)) {
+    int x = base_v.p0;
+    int _sv0t5 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
+    int si = _sv0t5;
+    if ((si < 0)) {
+      return 0;
+    } else {
+    }
+    int _sv0t6 = sv0_vec_len(env_field_starts);
+    if ((si >= _sv0t6)) {
+      return 0;
+    } else {
+    }
+    int _sv0t7 = sv0_vec_get(env_field_starts, si);
+    int fs = _sv0t7;
+    int _sv0t8 = slot_width(env_widths, si);
+    int w = _sv0t8;
+    int _sv0t9 = index_of_field_range(env_fields_flat, fs, w, f, source, starts, ends);
+    int idx = _sv0t9;
+    int _sv0t10 = field_cat_at(env_fields_flat, fs, idx);
+    return _sv0t10;
+    _sv0t4 = 0;
+  } else {
+    if ((base_v.tag == 0)) {
+      int n = base_v.p0;
+      return 0;
+      _sv0t4 = 0;
+    } else {
+      if ((base_v.tag == 1)) {
+        return 0;
+        _sv0t4 = 0;
+      } else {
+        if ((base_v.tag == 2)) {
+          return 0;
+          _sv0t4 = 0;
+        } else {
+          if ((base_v.tag == 4)) {
+            return 0;
+            _sv0t4 = 0;
+          } else {
+            if ((base_v.tag == 5)) {
+              int sv = base_v.p0;
+              return 0;
+              _sv0t4 = 0;
+            } else {
+              if ((base_v.tag == 6)) {
+                int bv2 = base_v.p0;
+                int f2 = base_v.p1;
+                return 0;
+                _sv0t4 = 0;
+              } else {
+                if ((base_v.tag == 7)) {
+                  int h2 = base_v.p0;
+                  return 0;
+                  _sv0t4 = 0;
+                } else {
+                  if ((base_v.tag == 8)) {
+                    int h2 = base_v.p0;
+                    return 0;
+                    _sv0t4 = 0;
+                  } else {
+                    if ((base_v.tag == 9)) {
+                      int h2 = base_v.p0;
+                      return 0;
+                      _sv0t4 = 0;
+                    } else {
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+static int operand_cat(Value v, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
   int _sv0t0;
   if ((v.tag == 8)) {
     int h = v.p0;
@@ -1668,10 +1899,10 @@ static int operand_cat(Value v, int env_names, int env_bases, int env_widths, in
     } else {
       if ((v.tag == 3)) {
         int x = v.p0;
-        int _sv0t1 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
-        int si = _sv0t1;
-        int _sv0t2 = slot_cat(env_cats, si);
-        return _sv0t2;
+        int _sv0t2 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
+        int si = _sv0t2;
+        int _sv0t3 = slot_cat(env_cats, si);
+        return _sv0t3;
         _sv0t0 = 0;
       } else {
         if ((v.tag == 0)) {
@@ -1699,7 +1930,8 @@ static int operand_cat(Value v, int env_names, int env_bases, int env_widths, in
                   if ((v.tag == 6)) {
                     int bv = v.p0;
                     int f = v.p1;
-                    return 0;
+                    int _sv0t1 = member_cat(bv, f, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, source, starts, ends);
+                    return _sv0t1;
                     _sv0t0 = 0;
                   } else {
                     if ((v.tag == 7)) {
@@ -1720,31 +1952,31 @@ static int operand_cat(Value v, int env_names, int env_bases, int env_widths, in
   return 0;
 }
 
-static int expr_cat(Expr e, int env_names, int env_bases, int env_widths, int env_cats, const char* source, int starts, int ends) {
+static int expr_cat(Expr e, int env_names, int env_bases, int env_widths, int env_cats, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends) {
   int _sv0t0;
   if ((e.tag == 0)) {
     int bv = e.p0;
-    Value _sv0t19;
-    int _sv0t20 = sv0_box_load(bv, 0);
-    _sv0t19.tag = _sv0t20;
-    int _sv0t21 = sv0_box_load(bv, 1);
-    _sv0t19.p0 = _sv0t21;
-    int _sv0t22 = sv0_box_load(bv, 2);
-    _sv0t19.p1 = _sv0t22;
+    Value _sv0t20;
+    int _sv0t21 = sv0_box_load(bv, 0);
+    _sv0t20.tag = _sv0t21;
+    int _sv0t22 = sv0_box_load(bv, 1);
+    _sv0t20.p0 = _sv0t22;
+    int _sv0t23 = sv0_box_load(bv, 2);
+    _sv0t20.p1 = _sv0t23;
     Value lv;
-    lv.tag = (_sv0t19).tag;
-    lv.p0 = (_sv0t19).p0;
-    lv.p1 = (_sv0t19).p1;
-    int _sv0t23 = operand_cat(lv, env_names, env_bases, env_widths, env_cats, source, starts, ends);
-    return _sv0t23;
+    lv.tag = (_sv0t20).tag;
+    lv.p0 = (_sv0t20).p0;
+    lv.p1 = (_sv0t20).p1;
+    int _sv0t24 = operand_cat(lv, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
+    return _sv0t24;
     _sv0t0 = 0;
   } else {
     if ((e.tag == 1)) {
       int x = e.p0;
-      int _sv0t17 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
-      int si = _sv0t17;
-      int _sv0t18 = slot_cat(env_cats, si);
-      return _sv0t18;
+      int _sv0t18 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
+      int si = _sv0t18;
+      int _sv0t19 = slot_cat(env_cats, si);
+      return _sv0t19;
       _sv0t0 = 0;
     } else {
       if ((e.tag == 2)) {
@@ -1758,34 +1990,34 @@ static int expr_cat(Expr e, int env_names, int env_bases, int env_widths, int en
           }
         } else {
         }
-        Value _sv0t6;
-        int _sv0t7 = sv0_box_load(bv1, 0);
-        _sv0t6.tag = _sv0t7;
-        int _sv0t8 = sv0_box_load(bv1, 1);
-        _sv0t6.p0 = _sv0t8;
-        int _sv0t9 = sv0_box_load(bv1, 2);
-        _sv0t6.p1 = _sv0t9;
+        Value _sv0t7;
+        int _sv0t8 = sv0_box_load(bv1, 0);
+        _sv0t7.tag = _sv0t8;
+        int _sv0t9 = sv0_box_load(bv1, 1);
+        _sv0t7.p0 = _sv0t9;
+        int _sv0t10 = sv0_box_load(bv1, 2);
+        _sv0t7.p1 = _sv0t10;
         Value v1;
-        v1.tag = (_sv0t6).tag;
-        v1.p0 = (_sv0t6).p0;
-        v1.p1 = (_sv0t6).p1;
-        Value _sv0t10;
-        int _sv0t11 = sv0_box_load(bv2, 0);
-        _sv0t10.tag = _sv0t11;
-        int _sv0t12 = sv0_box_load(bv2, 1);
-        _sv0t10.p0 = _sv0t12;
-        int _sv0t13 = sv0_box_load(bv2, 2);
-        _sv0t10.p1 = _sv0t13;
+        v1.tag = (_sv0t7).tag;
+        v1.p0 = (_sv0t7).p0;
+        v1.p1 = (_sv0t7).p1;
+        Value _sv0t11;
+        int _sv0t12 = sv0_box_load(bv2, 0);
+        _sv0t11.tag = _sv0t12;
+        int _sv0t13 = sv0_box_load(bv2, 1);
+        _sv0t11.p0 = _sv0t13;
+        int _sv0t14 = sv0_box_load(bv2, 2);
+        _sv0t11.p1 = _sv0t14;
         Value v2;
-        v2.tag = (_sv0t10).tag;
-        v2.p0 = (_sv0t10).p0;
-        v2.p1 = (_sv0t10).p1;
-        int _sv0t14 = operand_cat(v1, env_names, env_bases, env_widths, env_cats, source, starts, ends);
-        int c1 = _sv0t14;
-        int _sv0t15 = operand_cat(v2, env_names, env_bases, env_widths, env_cats, source, starts, ends);
-        int c2 = _sv0t15;
-        int _sv0t16 = combine_cat(c1, c2);
-        return _sv0t16;
+        v2.tag = (_sv0t11).tag;
+        v2.p0 = (_sv0t11).p0;
+        v2.p1 = (_sv0t11).p1;
+        int _sv0t15 = operand_cat(v1, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
+        int c1 = _sv0t15;
+        int _sv0t16 = operand_cat(v2, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
+        int c2 = _sv0t16;
+        int _sv0t17 = combine_cat(c1, c2);
+        return _sv0t17;
         _sv0t0 = 0;
       } else {
         if ((e.tag == 3)) {
@@ -1795,25 +2027,26 @@ static int expr_cat(Expr e, int env_names, int env_bases, int env_widths, int en
             return 0;
           } else {
           }
-          Value _sv0t1;
-          int _sv0t2 = sv0_box_load(bv, 0);
-          _sv0t1.tag = _sv0t2;
-          int _sv0t3 = sv0_box_load(bv, 1);
-          _sv0t1.p0 = _sv0t3;
-          int _sv0t4 = sv0_box_load(bv, 2);
-          _sv0t1.p1 = _sv0t4;
+          Value _sv0t2;
+          int _sv0t3 = sv0_box_load(bv, 0);
+          _sv0t2.tag = _sv0t3;
+          int _sv0t4 = sv0_box_load(bv, 1);
+          _sv0t2.p0 = _sv0t4;
+          int _sv0t5 = sv0_box_load(bv, 2);
+          _sv0t2.p1 = _sv0t5;
           Value uv;
-          uv.tag = (_sv0t1).tag;
-          uv.p0 = (_sv0t1).p0;
-          uv.p1 = (_sv0t1).p1;
-          int _sv0t5 = operand_cat(uv, env_names, env_bases, env_widths, env_cats, source, starts, ends);
-          return _sv0t5;
+          uv.tag = (_sv0t2).tag;
+          uv.p0 = (_sv0t2).p0;
+          uv.p1 = (_sv0t2).p1;
+          int _sv0t6 = operand_cat(uv, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
+          return _sv0t6;
           _sv0t0 = 0;
         } else {
           if ((e.tag == 4)) {
             int bv = e.p0;
             int f = e.p1;
-            return 0;
+            int _sv0t1 = member_cat(bv, f, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, source, starts, ends);
+            return _sv0t1;
             _sv0t0 = 0;
           } else {
           }
@@ -3019,43 +3252,43 @@ static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int e
   int _sv0t0;
   if ((e.tag == 0)) {
     int bv = e.p0;
-    Value _sv0t51;
-    int _sv0t52 = sv0_box_load(bv, 0);
-    _sv0t51.tag = _sv0t52;
-    int _sv0t53 = sv0_box_load(bv, 1);
-    _sv0t51.p0 = _sv0t53;
-    int _sv0t54 = sv0_box_load(bv, 2);
-    _sv0t51.p1 = _sv0t54;
+    Value _sv0t55;
+    int _sv0t56 = sv0_box_load(bv, 0);
+    _sv0t55.tag = _sv0t56;
+    int _sv0t57 = sv0_box_load(bv, 1);
+    _sv0t55.p0 = _sv0t57;
+    int _sv0t58 = sv0_box_load(bv, 2);
+    _sv0t55.p1 = _sv0t58;
     Value v;
-    v.tag = (_sv0t51).tag;
-    v.p0 = (_sv0t51).p0;
-    v.p1 = (_sv0t51).p1;
-    int _sv0t55 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
-    return _sv0t55;
+    v.tag = (_sv0t55).tag;
+    v.p0 = (_sv0t55).p0;
+    v.p1 = (_sv0t55).p1;
+    int _sv0t59 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+    return _sv0t59;
     _sv0t0 = 0;
   } else {
     if ((e.tag == 1)) {
       int x = e.p0;
-      int _sv0t45 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
-      int si = _sv0t45;
+      int _sv0t49 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
+      int si = _sv0t49;
       if ((si < 0)) {
-        int _sv0t46 = (0 - 1);
-        return _sv0t46;
+        int _sv0t50 = (0 - 1);
+        return _sv0t50;
       } else {
       }
-      int _sv0t47 = slot_base(env_bases, si);
-      int base = _sv0t47;
-      int _sv0t48 = slot_width(env_widths, si);
-      int width = _sv0t48;
+      int _sv0t51 = slot_base(env_bases, si);
+      int base = _sv0t51;
+      int _sv0t52 = slot_width(env_widths, si);
+      int width = _sv0t52;
       int k = 0;
       while ((k < width)) {
         sv0_vec_push(out, 96);
-        int _sv0t49 = (base + k);
-        sv0_vec_push(out, _sv0t49);
+        int _sv0t53 = (base + k);
+        sv0_vec_push(out, _sv0t53);
         k = (k + 1);
       }
-      int _sv0t50 = (width * 2);
-      return _sv0t50;
+      int _sv0t54 = (width * 2);
+      return _sv0t54;
       _sv0t0 = 0;
     } else {
       if ((e.tag == 2)) {
@@ -3084,36 +3317,49 @@ static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int e
         v2.tag = (_sv0t30).tag;
         v2.p0 = (_sv0t30).p0;
         v2.p1 = (_sv0t30).p1;
-        int _sv0t34 = operand_cat(v1, env_names, env_bases, env_widths, env_cats, source, starts, ends);
+        int _sv0t34 = operand_cat(v1, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
         int c1 = _sv0t34;
-        int _sv0t35 = operand_cat(v2, env_names, env_bases, env_widths, env_cats, source, starts, ends);
+        int _sv0t35 = operand_cat(v2, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
         int c2 = _sv0t35;
-        int _sv0t36 = emit_value(v1, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
-        int n1 = _sv0t36;
+        int _sv0t36 = combine_cat(c1, c2);
+        int bcat = _sv0t36;
+        int _sv0t37 = emit_value(v1, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+        int n1 = _sv0t37;
         if ((n1 < 0)) {
-          int _sv0t37 = (0 - 1);
-          return _sv0t37;
+          int _sv0t38 = (0 - 1);
+          return _sv0t38;
         } else {
         }
-        int _sv0t38 = emit_value(v2, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
-        int n2 = _sv0t38;
+        int _sv0t39 = u32_operand_needs_zext(c1, bcat, op_h);
+        if (_sv0t39) {
+          int _sv0t40 = emit_u32_zext(out);
+          n1 = (n1 + _sv0t40);
+        } else {
+        }
+        int _sv0t41 = emit_value(v2, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
+        int n2 = _sv0t41;
         if ((n2 < 0)) {
-          int _sv0t39 = (0 - 1);
-          return _sv0t39;
-        } else {
-        }
-        int _sv0t40 = combine_cat(c1, c2);
-        int _sv0t41 = binop_tag_to_insn_typed(op_h, _sv0t40);
-        int opc = _sv0t41;
-        if ((opc < 0)) {
           int _sv0t42 = (0 - 1);
           return _sv0t42;
         } else {
         }
+        int _sv0t43 = u32_operand_needs_zext(c2, bcat, op_h);
+        if (_sv0t43) {
+          int _sv0t44 = emit_u32_zext(out);
+          n2 = (n2 + _sv0t44);
+        } else {
+        }
+        int _sv0t45 = binop_tag_to_insn_typed(op_h, bcat);
+        int opc = _sv0t45;
+        if ((opc < 0)) {
+          int _sv0t46 = (0 - 1);
+          return _sv0t46;
+        } else {
+        }
         sv0_vec_push(out, opc);
-        int _sv0t43 = (n1 + n2);
-        int _sv0t44 = (_sv0t43 + 1);
-        return _sv0t44;
+        int _sv0t47 = (n1 + n2);
+        int _sv0t48 = (_sv0t47 + 1);
+        return _sv0t48;
         _sv0t0 = 0;
       } else {
         if ((e.tag == 3)) {
@@ -3130,7 +3376,7 @@ static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int e
           v.tag = (_sv0t17).tag;
           v.p0 = (_sv0t17).p0;
           v.p1 = (_sv0t17).p1;
-          int _sv0t21 = operand_cat(v, env_names, env_bases, env_widths, env_cats, source, starts, ends);
+          int _sv0t21 = operand_cat(v, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
           int c = _sv0t21;
           int _sv0t22 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
           int n = _sv0t22;
@@ -3242,8 +3488,8 @@ static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int e
       }
     }
   }
-  int _sv0t56 = (0 - 1);
-  return _sv0t56;
+  int _sv0t60 = (0 - 1);
+  return _sv0t60;
 }
 
 static int vec_append(int dst, int src) {
@@ -4315,7 +4561,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
         ae.p0 = (_sv0t24).p0;
         ae.p1 = (_sv0t24).p1;
         ae.p2 = (_sv0t24).p2;
-        int _sv0t29 = expr_cat(ae, env_names, env_bases, env_widths, env_cats, source, starts, ends);
+        int _sv0t29 = expr_cat(ae, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
         int acat = _sv0t29;
         int _sv0t30 = ensure_var_cat(x, acat, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
         return _sv0t30;
@@ -4415,7 +4661,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
                     se.p0 = (_sv0t1).p0;
                     se.p1 = (_sv0t1).p1;
                     se.p2 = (_sv0t1).p2;
-                    int _sv0t6 = expr_cat(se, env_names, env_bases, env_widths, env_cats, source, starts, ends);
+                    int _sv0t6 = expr_cat(se, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
                     int scat = _sv0t6;
                     if ((scat != 0)) {
                       int _sv0t7 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
@@ -4631,7 +4877,7 @@ static int build_func_order(int block_labels, const char* source, int starts, in
   return _sv0t3;
 }
 
-static int emit_program(int item_tags, int item_names, int item_field_counts, int item_variant_max_payload, int item_field_bases, int struct_field_name_toks, int block_labels, int block_param_names, int block_param_ctys, int block_instrs, int block_ret_cats, const char* source, int starts, int ends, int out_pool, int out_ft) {
+static int emit_program(int item_tags, int item_names, int item_field_counts, int item_variant_max_payload, int item_field_bases, int struct_field_name_toks, int struct_field_cats, int block_labels, int block_param_names, int block_param_ctys, int block_instrs, int block_ret_cats, const char* source, int starts, int ends, int out_pool, int out_ft) {
   int _sv0t0 = sv0_vec_new();
   int sn = _sv0t0;
   int _sv0t1 = sv0_vec_new();
@@ -4641,7 +4887,7 @@ static int emit_program(int item_tags, int item_names, int item_field_counts, in
   int sff = _sv0t3;
   int _sv0t4 = sv0_vec_new();
   int sfs = _sv0t4;
-  int _sv0t5 = struct_fields_build(item_tags, item_field_counts, item_field_bases, struct_field_name_toks, sff, sfs);
+  int _sv0t5 = struct_fields_build(item_tags, item_field_counts, item_field_bases, struct_field_name_toks, struct_field_cats, sff, sfs);
   int _sv0t6 = sv0_vec_new();
   int enn = _sv0t6;
   int _sv0t7 = sv0_vec_new();
@@ -8219,8 +8465,11 @@ static int test_emit_store_field(void) {
   sv0_vec_push(ew, 3);
   sv0_vec_push(efs, 0);
   sv0_vec_push(eff, 100);
+  sv0_vec_push(eff, 0);
   sv0_vec_push(eff, 200);
+  sv0_vec_push(eff, 0);
   sv0_vec_push(eff, 300);
+  sv0_vec_push(eff, 0);
   int _sv0t10 = sv0_vec_new();
   int out1 = _sv0t10;
   Instr sf1;
@@ -8357,9 +8606,11 @@ static int test_emit_store_field(void) {
   sv0_vec_push(en, 60);
   sv0_vec_push(eb, 3);
   sv0_vec_push(ew, 2);
-  sv0_vec_push(efs, 3);
+  sv0_vec_push(efs, 6);
   sv0_vec_push(eff, 400);
+  sv0_vec_push(eff, 0);
   sv0_vec_push(eff, 500);
+  sv0_vec_push(eff, 0);
   int _sv0t38 = sv0_vec_new();
   int out4 = _sv0t38;
   Instr sf4;
@@ -9895,8 +10146,9 @@ static int emit_program_1fn(const char* source, int starts, int ends, int lab, i
   int _sv0t8 = sv0_vec_new();
   int _sv0t9 = sv0_vec_new();
   int _sv0t10 = sv0_vec_new();
-  int _sv0t11 = emit_program(it, in2, ifc, ivp, _sv0t8, _sv0t9, bl, bpn, bpc, bi, _sv0t10, source, starts, ends, pool, ft);
-  return _sv0t11;
+  int _sv0t11 = sv0_vec_new();
+  int _sv0t12 = emit_program(it, in2, ifc, ivp, _sv0t8, _sv0t9, _sv0t10, bl, bpn, bpc, bi, _sv0t11, source, starts, ends, pool, ft);
+  return _sv0t12;
 }
 
 static int test_emit_program(void) {
@@ -10738,45 +10990,284 @@ static int test_typed_opcode_select(void) {
   _sv0t38.p0 = 0;
   int _sv0t39 = sv0_vec_new();
   int _sv0t40 = sv0_vec_new();
-  int _sv0t41 = operand_cat(_sv0t38, en, eb, ew, ec, "", _sv0t39, _sv0t40);
-  if ((_sv0t41 != 1)) {
+  int _sv0t41 = sv0_vec_new();
+  int _sv0t42 = sv0_vec_new();
+  int _sv0t43 = operand_cat(_sv0t38, en, eb, ew, ec, _sv0t39, _sv0t40, "", _sv0t41, _sv0t42);
+  if ((_sv0t43 != 1)) {
     return 60;
   } else {
   }
-  Value _sv0t42;
-  _sv0t42.tag = 9;
-  _sv0t42.p0 = 0;
-  int _sv0t43 = sv0_vec_new();
-  int _sv0t44 = sv0_vec_new();
-  int _sv0t45 = operand_cat(_sv0t42, en, eb, ew, ec, "", _sv0t43, _sv0t44);
-  if ((_sv0t45 != 2)) {
+  Value _sv0t44;
+  _sv0t44.tag = 9;
+  _sv0t44.p0 = 0;
+  int _sv0t45 = sv0_vec_new();
+  int _sv0t46 = sv0_vec_new();
+  int _sv0t47 = sv0_vec_new();
+  int _sv0t48 = sv0_vec_new();
+  int _sv0t49 = operand_cat(_sv0t44, en, eb, ew, ec, _sv0t45, _sv0t46, "", _sv0t47, _sv0t48);
+  if ((_sv0t49 != 2)) {
     return 61;
   } else {
   }
-  Value _sv0t46;
-  _sv0t46.tag = 0;
-  _sv0t46.p0 = 7;
-  int _sv0t47 = sv0_vec_new();
-  int _sv0t48 = sv0_vec_new();
-  int _sv0t49 = operand_cat(_sv0t46, en, eb, ew, ec, "", _sv0t47, _sv0t48);
-  if ((_sv0t49 != 0)) {
+  Value _sv0t50;
+  _sv0t50.tag = 0;
+  _sv0t50.p0 = 7;
+  int _sv0t51 = sv0_vec_new();
+  int _sv0t52 = sv0_vec_new();
+  int _sv0t53 = sv0_vec_new();
+  int _sv0t54 = sv0_vec_new();
+  int _sv0t55 = operand_cat(_sv0t50, en, eb, ew, ec, _sv0t51, _sv0t52, "", _sv0t53, _sv0t54);
+  if ((_sv0t55 != 0)) {
     return 62;
   } else {
   }
   sv0_vec_push(en, 50);
   sv0_vec_push(eb, 0);
   sv0_vec_push(ew, 1);
-  int _sv0t50 = sv0_vec_new();
-  int ec2 = _sv0t50;
+  int _sv0t56 = sv0_vec_new();
+  int ec2 = _sv0t56;
   sv0_vec_push(ec2, 1);
-  Value _sv0t51;
-  _sv0t51.tag = 3;
-  _sv0t51.p0 = 50;
-  int _sv0t52 = sv0_vec_new();
-  int _sv0t53 = sv0_vec_new();
-  int _sv0t54 = operand_cat(_sv0t51, en, eb, ew, ec2, "", _sv0t52, _sv0t53);
-  if ((_sv0t54 != 1)) {
+  Value _sv0t57;
+  _sv0t57.tag = 3;
+  _sv0t57.p0 = 50;
+  int _sv0t58 = sv0_vec_new();
+  int _sv0t59 = sv0_vec_new();
+  int _sv0t60 = sv0_vec_new();
+  int _sv0t61 = sv0_vec_new();
+  int _sv0t62 = operand_cat(_sv0t57, en, eb, ew, ec2, _sv0t58, _sv0t59, "", _sv0t60, _sv0t61);
+  if ((_sv0t62 != 1)) {
     return 63;
+  } else {
+  }
+  int _sv0t63 = sv0_vec_new();
+  int ffs = _sv0t63;
+  sv0_vec_push(ffs, 7);
+  sv0_vec_push(ffs, 1);
+  sv0_vec_push(ffs, 8);
+  sv0_vec_push(ffs, 3);
+  sv0_vec_push(ffs, 9);
+  sv0_vec_push(ffs, 0);
+  int _sv0t64 = sv0_vec_new();
+  int fst = _sv0t64;
+  sv0_vec_push(fst, 0);
+  int _sv0t65 = sv0_vec_new();
+  int ew3 = _sv0t65;
+  sv0_vec_push(ew3, 3);
+  int _sv0t66 = sv0_vec_new();
+  int ec3 = _sv0t66;
+  sv0_vec_push(ec3, 0);
+  Value mv7;
+  Value _sv0t67;
+  _sv0t67.tag = 3;
+  _sv0t67.p0 = 50;
+  int _sv0t68 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t68, 0, _sv0t67.tag);
+  sv0_box_store(_sv0t68, 1, _sv0t67.p0);
+  sv0_box_store(_sv0t68, 2, _sv0t67.p1);
+  mv7.tag = 6;
+  mv7.p0 = _sv0t68;
+  mv7.p1 = 7;
+  Value mv8;
+  Value _sv0t69;
+  _sv0t69.tag = 3;
+  _sv0t69.p0 = 50;
+  int _sv0t70 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t70, 0, _sv0t69.tag);
+  sv0_box_store(_sv0t70, 1, _sv0t69.p0);
+  sv0_box_store(_sv0t70, 2, _sv0t69.p1);
+  mv8.tag = 6;
+  mv8.p0 = _sv0t70;
+  mv8.p1 = 8;
+  Value mv9;
+  Value _sv0t71;
+  _sv0t71.tag = 3;
+  _sv0t71.p0 = 50;
+  int _sv0t72 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t72, 0, _sv0t71.tag);
+  sv0_box_store(_sv0t72, 1, _sv0t71.p0);
+  sv0_box_store(_sv0t72, 2, _sv0t71.p1);
+  mv9.tag = 6;
+  mv9.p0 = _sv0t72;
+  mv9.p1 = 9;
+  Value mv_missing;
+  Value _sv0t73;
+  _sv0t73.tag = 3;
+  _sv0t73.p0 = 50;
+  int _sv0t74 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t74, 0, _sv0t73.tag);
+  sv0_box_store(_sv0t74, 1, _sv0t73.p0);
+  sv0_box_store(_sv0t74, 2, _sv0t73.p1);
+  mv_missing.tag = 6;
+  mv_missing.p0 = _sv0t74;
+  mv_missing.p1 = 99;
+  int _sv0t75 = sv0_vec_new();
+  int _sv0t76 = sv0_vec_new();
+  int _sv0t77 = operand_cat(mv7, en, eb, ew3, ec3, fst, ffs, "", _sv0t75, _sv0t76);
+  if ((_sv0t77 != 1)) {
+    return 64;
+  } else {
+  }
+  int _sv0t78 = sv0_vec_new();
+  int _sv0t79 = sv0_vec_new();
+  int _sv0t80 = operand_cat(mv8, en, eb, ew3, ec3, fst, ffs, "", _sv0t78, _sv0t79);
+  if ((_sv0t80 != 3)) {
+    return 65;
+  } else {
+  }
+  int _sv0t81 = sv0_vec_new();
+  int _sv0t82 = sv0_vec_new();
+  int _sv0t83 = operand_cat(mv9, en, eb, ew3, ec3, fst, ffs, "", _sv0t81, _sv0t82);
+  if ((_sv0t83 != 0)) {
+    return 66;
+  } else {
+  }
+  int _sv0t84 = sv0_vec_new();
+  int _sv0t85 = sv0_vec_new();
+  int _sv0t86 = operand_cat(mv_missing, en, eb, ew3, ec3, fst, ffs, "", _sv0t84, _sv0t85);
+  if ((_sv0t86 != 0)) {
+    return 67;
+  } else {
+  }
+  int _sv0t87 = sv0_vec_new();
+  int _sv0t88 = sv0_vec_new();
+  int _sv0t89 = sv0_vec_new();
+  int _sv0t90 = sv0_vec_new();
+  int _sv0t91 = operand_cat(mv7, en, eb, ew3, ec3, _sv0t87, _sv0t88, "", _sv0t89, _sv0t90);
+  if ((_sv0t91 != 0)) {
+    return 68;
+  } else {
+  }
+  int _sv0t92 = field_cat_at(ffs, 0, 1);
+  if ((_sv0t92 != 3)) {
+    return 69;
+  } else {
+  }
+  int _sv0t93 = field_cat_at(ffs, 0, 5);
+  if ((_sv0t93 != 0)) {
+    return 70;
+  } else {
+  }
+  int _sv0t94 = combine_cat(4, 0);
+  if ((_sv0t94 != 4)) {
+    return 71;
+  } else {
+  }
+  int _sv0t95 = combine_cat(0, 4);
+  if ((_sv0t95 != 4)) {
+    return 72;
+  } else {
+  }
+  int _sv0t96 = combine_cat(4, 3);
+  if ((_sv0t96 != 3)) {
+    return 73;
+  } else {
+  }
+  int _sv0t97 = combine_cat(4, 2);
+  if ((_sv0t97 != 2)) {
+    return 74;
+  } else {
+  }
+  int _sv0t98 = combine_cat(4, 1);
+  if ((_sv0t98 != 1)) {
+    return 75;
+  } else {
+  }
+  int _sv0t99 = binop_tag_to_insn_typed(3, 4);
+  if ((_sv0t99 != 38)) {
+    return 76;
+  } else {
+  }
+  int _sv0t100 = binop_tag_to_insn_typed(4, 4);
+  if ((_sv0t100 != 39)) {
+    return 77;
+  } else {
+  }
+  int _sv0t101 = binop_tag_to_insn_typed(10, 4);
+  if ((_sv0t101 != 73)) {
+    return 78;
+  } else {
+  }
+  int _sv0t102 = binop_tag_to_insn_typed(17, 4);
+  if ((_sv0t102 != 42)) {
+    return 79;
+  } else {
+  }
+  int _sv0t103 = binop_tag_to_insn_typed(1, 4);
+  int _sv0t104 = binop_tag_to_insn(1);
+  if ((_sv0t103 != _sv0t104)) {
+    return 80;
+  } else {
+  }
+  int _sv0t105 = unop_tag_to_insn_typed(0, 4);
+  if ((_sv0t105 != 21)) {
+    return 81;
+  } else {
+  }
+  int _sv0t106 = u32_operand_needs_zext(4, 4, 10);
+  if ((_sv0t106 != 1)) {
+    return 82;
+  } else {
+  }
+  int _sv0t107 = u32_operand_needs_zext(4, 4, 3);
+  if ((_sv0t107 != 1)) {
+    return 83;
+  } else {
+  }
+  int _sv0t108 = u32_operand_needs_zext(4, 4, 0);
+  if ((_sv0t108 != 0)) {
+    return 84;
+  } else {
+  }
+  int _sv0t109 = u32_operand_needs_zext(4, 4, 16);
+  if ((_sv0t109 != 0)) {
+    return 85;
+  } else {
+  }
+  int _sv0t110 = u32_operand_needs_zext(4, 3, 0);
+  if ((_sv0t110 != 1)) {
+    return 86;
+  } else {
+  }
+  int _sv0t111 = u32_operand_needs_zext(4, 1, 0);
+  if ((_sv0t111 != 1)) {
+    return 87;
+  } else {
+  }
+  int _sv0t112 = u32_operand_needs_zext(0, 4, 10);
+  if ((_sv0t112 != 0)) {
+    return 88;
+  } else {
+  }
+  int _sv0t113 = u32_operand_needs_zext(3, 3, 10);
+  if ((_sv0t113 != 0)) {
+    return 89;
+  } else {
+  }
+  int _sv0t114 = sv0_vec_new();
+  int wout = _sv0t114;
+  int _sv0t115 = emit_u32_zext(wout);
+  if ((_sv0t115 != 4)) {
+    return 90;
+  } else {
+  }
+  int _sv0t116 = sv0_vec_len(wout);
+  if ((_sv0t116 != 4)) {
+    return 91;
+  } else {
+  }
+  int _sv0t117 = sv0_vec_get(wout, 0);
+  if ((_sv0t117 != 5)) {
+    return 92;
+  } else {
+  }
+  int _sv0t118 = sv0_vec_get(wout, 2);
+  if ((_sv0t118 != 1)) {
+    return 93;
+  } else {
+  }
+  int _sv0t119 = sv0_vec_get(wout, 3);
+  if ((_sv0t119 != 39)) {
+    return 94;
   } else {
   }
   return 0;
