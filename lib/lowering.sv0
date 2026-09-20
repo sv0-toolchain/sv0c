@@ -1867,7 +1867,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let mut arg_ix: Vec<i32> = vec_new();
         vec_push(arg_ix, box_new(v_o));
         vec_push(arg_ix, box_new(v_i));
-        let idx_get_fn_h: i32 = 0 - 32;
+        let idx_get_fn_h: i32 = 0 - lower_index_bid(builtin_map, lower_index_base_tok(et, ed1, ed2, pp, ob), 32, 41);
         let call_ix: Instr = Instr::Call(t_ix, idx_get_fn_h, arg_ix, 0);
         vec_push(out_instrs, box_new(call_ix));
         return Value::VVar(t_ix);
@@ -1884,6 +1884,8 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let fn_new: i32 = 0 - bid_new;
         let ins_new: Instr = Instr::Call(t_ar, fn_new, args_new, 0);
         vec_push(out_instrs, box_new(ins_new));
+        let mut push_bid_ar: i32 = 8;
+        if lower_array_lit_is_f64(et, ed1, ed2, ed3, pp, tok_tags, builtin_map, idx) { push_bid_ar = 38; }
         let mut ak_ar: i32 = 0;
         loop {
             if ak_ar >= elem_count_ar { break; }
@@ -1898,7 +1900,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let mut args_push: Vec<i32> = vec_new();
             vec_push(args_push, box_new(Value::VVar(t_ar)));
             vec_push(args_push, box_new(v_el));
-            let bid_push: i32 = 8;
+            let bid_push: i32 = push_bid_ar;
             let fn_push: i32 = 0 - bid_push;
             let ins_push: Instr = Instr::Call(0, fn_push, args_push, 0);
             vec_push(out_instrs, box_new(ins_push));
@@ -2095,7 +2097,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_push(a_iset, box_new(v_base));
             vec_push(a_iset, box_new(v_ixe));
             vec_push(a_iset, box_new(v_rhs_s));
-            vec_push(out_instrs, box_new(Instr::Call(0, 0 - 33, a_iset, 0)));
+            vec_push(out_instrs, box_new(Instr::Call(0, 0 - lower_index_bid(builtin_map, lower_index_base_tok(et, ed1, ed2, pp, base_c), 33, 42), a_iset, 0)));
             return Value::VUnit;
         }
         /* SML ExprAssign: Store(x, <rhs as Ir.expr>) via lowerExprWithInstrs —
@@ -4436,6 +4438,9 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
        2 = the name is declared both as Vec<f64> and as something else in the
            same scope (ambiguous: refused),
        0 = otherwise (ordinary word-sized vec).
+     an identifier directly followed by `[` (`a[i]`, `s.field[i]`): 1 = the
+       array / slice is an f64 one, 2 = ambiguous, 0 = otherwise;
+     the `[` of an array literal initializing an f64 array: 4;
      typed vec_push_f64 / vec_get_f64 / vec_set_f64:
        3 = the vec is declared only as an explicit Vec<T> with T != f64,
        0 = otherwise.
@@ -4491,6 +4496,17 @@ fn lower_vecf_type_kind(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
     let mut q: i32 = p;
     if lower_vecf_tag_at(tok_tags, q) == 27 { q = q + 1; }
     if lower_vecf_tag_at(tok_tags, q) == 77 { q = q + 1; }
+    if lower_vecf_tag_at(tok_tags, q) == 10 {
+        /* `[f64; N]` / `[f64]` (array / slice of f64), any other `[T ..]`. */
+        if lower_vecf_tag_at(tok_tags, q + 1) == 5 {
+            if lower_vecf_text_is(source, starts, ends, q + 1, "f64") {
+                let c2: i32 = lower_vecf_tag_at(tok_tags, q + 2);
+                if c2 == 11 { return 1; }
+                if c2 == 13 { return 1; }
+            }
+        }
+        return 3;
+    }
     if lower_vecf_tag_at(tok_tags, q) != 5 { return 2; }
     if lower_vecf_text_is(source, starts, ends, q, "Vec") != true { return 2; }
     if lower_vecf_tag_at(tok_tags, q + 1) != 38 { return 2; }
@@ -4684,7 +4700,8 @@ fn lower_vecf_collect_params(tok_tags: Vec<i32>, source: string, starts: Vec<i32
 fn lower_vecf_collect_lets(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
                         ends: Vec<i32>, lo: i32, hi: i32,
                         rnames: Vec<i32>, rkinds: Vec<i32>,
-                        names: Vec<i32>, kinds: Vec<i32>) -> i32 {
+                        names: Vec<i32>, kinds: Vec<i32>,
+                        map: Vec<i32>) -> i32 {
     let mut i: i32 = lo;
     while i < hi {
         if vec_get(tok_tags, i) == 71 {
@@ -4697,6 +4714,9 @@ fn lower_vecf_collect_lets(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
                     kind = lower_vecf_type_kind(tok_tags, source, starts, ends, p + 2);
                 }
                 if nt == 35 {
+                    if lower_vecf_tag_at(tok_tags, p + 2) == 10 {
+                        if lower_vecf_tag_at(tok_tags, p + 3) == 1 { kind = 1; }
+                    }
                     if lower_vecf_tag_at(tok_tags, p + 2) == 5 {
                         if lower_vecf_tag_at(tok_tags, p + 3) == 6 {
                             if lower_vecf_lookup(rnames, rkinds, source, starts, ends, p + 2) == 1 {
@@ -4710,6 +4730,37 @@ fn lower_vecf_collect_lets(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
                 }
                 vec_push(names, p);
                 vec_push(kinds, kind);
+                /* An array literal initializer of an f64 array: mark its `[`. */
+                if kind == 1 {
+                    let mut eq: i32 = 0 - 1;
+                    if nt == 35 { eq = p + 1; }
+                    if nt == 14 {
+                        let mut q: i32 = p + 2;
+                        let mut bd: i32 = 0;
+                        while q < hi {
+                            let u: i32 = vec_get(tok_tags, q);
+                            if u == 10 { bd = bd + 1; }
+                            if u == 11 { bd = bd - 1; }
+                            if u == 35 {
+                                if bd == 0 {
+                                    eq = q;
+                                    break;
+                                }
+                            }
+                            if u == 13 {
+                                if bd == 0 { break; }
+                            }
+                            q = q + 1;
+                        }
+                    }
+                    if eq >= 0 {
+                        if lower_vecf_tag_at(tok_tags, eq + 1) == 10 {
+                            if lower_vecf_tag_at(tok_tags, eq + 2) != 11 {
+                                vec_set(map, eq + 1, 4);
+                            }
+                        }
+                    }
+                }
             }
         }
         i = i + 1;
@@ -5040,7 +5091,7 @@ fn lower_vecf_site_map(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
                 let kinds: Vec<i32> = vec_new();
                 let _p: i32 = lower_vecf_collect_params(tok_tags, source, starts, ends, i, names, kinds);
                 let _l: i32 = lower_vecf_collect_lets(tok_tags, source, starts, ends, i, hi,
-                                                   rnames, rkinds, names, kinds);
+                                                   rnames, rkinds, names, kinds, map);
                 let fopen: i32 = lower_vecf_params_open(tok_tags, i);
                 let mut body_lo: i32 = i;
                 let mut retkind: i32 = 2;
@@ -5059,6 +5110,17 @@ fn lower_vecf_site_map(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
                 let mut s: i32 = i;
                 while s < hi {
                     if vec_get(tok_tags, s) == 5 {
+                        /* `a[i]` / `s.field[i]`: element access on an f64 array/slice. */
+                        if lower_vecf_tag_at(tok_tags, s + 1) == 10 {
+                            let mut icode: i32 = 0;
+                            if lower_vecf_tag_at(tok_tags, s - 1) == 16 {
+                                icode = lower_vecf_lookup(fnames, fkinds, source, starts, ends, s);
+                            } else {
+                                icode = lower_vecf_lookup(names, kinds, source, starts, ends, s);
+                            }
+                            if icode == 1 { vec_set(map, s, 1); }
+                            if icode == 2 { vec_set(map, s, 2); }
+                        }
                         if lower_vecf_tag_at(tok_tags, s + 1) == 6 {
                             let ak: i32 = lower_vecf_accessor_kind(source, starts, ends, s);
                             if ak != 0 {
@@ -5105,20 +5167,77 @@ fn lower_vecf_site_map(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
     return map;
 }
 
+/* Base identifier token of an index expression's object: a path's only
+   segment, or a field access's field name (`s.data[i]`). -1 otherwise. */
+fn lower_index_base_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>,
+                        ob: i32) -> i32 {
+    if ob < 0 { return 0 - 1; }
+    if ob >= vec_len(et) { return 0 - 1; }
+    let t: i32 = vec_get(et, ob);
+    if t == 1 {
+        let pps: i32 = vec_get(ed1, ob);
+        if pps < 0 { return 0 - 1; }
+        if pps >= vec_len(pp) { return 0 - 1; }
+        return vec_get(pp, pps);
+    }
+    if t == 6 { return vec_get(ed2, ob); }
+    return 0 - 1;
+}
+
+/* Builtin id for an element access whose base token is `tok`: the f64 form
+   when the scanner marked it (builtin_map 41), else `plain`. */
+fn lower_index_bid(builtin_map: Vec<i32>, tok: i32, plain: i32, f64_bid: i32) -> i32 {
+    if tok < 0 { return plain; }
+    if tok >= vec_len(builtin_map) { return plain; }
+    if vec_get(builtin_map, tok) == 41 { return f64_bid; }
+    return plain;
+}
+
+/* True when the array literal `idx` (ExprArray) initializes an f64 array: the
+   scanner marked its `[` (builtin_map 44). The `[` is found from the leftmost
+   token of the first element, skipping any `(` / unary `-` before it. */
+fn lower_array_lit_is_f64(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
+                          pp: Vec<i32>, tok_tags: Vec<i32>, builtin_map: Vec<i32>,
+                          idx: i32) -> bool {
+    let count: i32 = vec_get(ed2, idx);
+    if count < 1 { return false; }
+    let first: i32 = expr_any_tok(et, ed1, ed2, ed3, pp, idx - count);
+    if first < 1 { return false; }
+    let mut b: i32 = first - 1;
+    while b >= 0 {
+        let u: i32 = vec_get(tok_tags, b);
+        if u == 6 { b = b - 1; }
+        else { if u == 23 { b = b - 1; } else { break; } }
+    }
+    if b < 0 { return false; }
+    if b >= vec_len(builtin_map) { return false; }
+    if vec_get(tok_tags, b) != 10 { return false; }
+    return vec_get(builtin_map, b) == 44;
+}
+
 /* Retarget generic vec accessor call sites whose vec is a declared Vec<f64>
    (site map value 1) to the f64 accessors: vec_push 8 -> 38, vec_get 10 ->
    39, vec_set 11 -> 40. Every other site keeps its word-sized id. */
-fn lower_vecf_apply(bm: Vec<i32>, sites: Vec<i32>) -> i32 {
+fn lower_vecf_apply(bm: Vec<i32>, sites: Vec<i32>, tok_tags: Vec<i32>) -> i32 {
     let n: i32 = vec_len(bm);
     let mut i: i32 = 0;
     while i < n {
         if i < vec_len(sites) {
-            if vec_get(sites, i) == 1 {
+            let sv: i32 = vec_get(sites, i);
+            if sv == 1 {
                 let b: i32 = vec_get(bm, i);
                 if b == 8 { vec_set(bm, i, 38); }
                 if b == 10 { vec_set(bm, i, 39); }
                 if b == 11 { vec_set(bm, i, 40); }
+                /* an identifier directly followed by `[`: f64 element access */
+                if b == 0 {
+                    if i + 1 < vec_len(tok_tags) {
+                        if vec_get(tok_tags, i + 1) == 10 { vec_set(bm, i, 41); }
+                    }
+                }
             }
+            /* the `[` of an f64 array literal */
+            if sv == 4 { vec_set(bm, i, 44); }
         }
         i = i + 1;
     }
@@ -5436,7 +5555,7 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
     if has_body_arenas > 0 {
         builtin_map = build_builtin_map(tok_tags, source, starts, ends);
         let vecf_sites: Vec<i32> = lower_vecf_site_map(tok_tags, source, starts, ends);
-        let _va: i32 = lower_vecf_apply(builtin_map, vecf_sites);
+        let _va: i32 = lower_vecf_apply(builtin_map, vecf_sites, tok_tags);
     }
     let fn_ctx: Vec<i32> = vec_new();
     let n: i32 = vec_len(item_tags);
@@ -11142,343 +11261,6 @@ fn test_lower_match_env_clone_scrut_roundtrip() -> i32 {
     return 0;
 }
 
-fn test_lower_vecf_case_param_f64() -> i32 {
-    let src: string = "fn f(v: Vec<f64>) -> f64 { return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
-    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
-    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
-    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
-    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
-    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
-    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
-    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 12); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 3); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 7); vec_push(st, 46); vec_push(en, 47);
-    vec_push(tags, 13); vec_push(st, 47); vec_push(en, 48);
-    vec_push(tags, 9); vec_push(st, 49); vec_push(en, 50);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 22 { return 1; }
-    if vec_get(m, 14) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case_let_f64() -> i32 {
-    let src: string = "fn f() -> f64 { let v: Vec<f64> = vec_new(); vec_push(v, 1.5); return 0.0; }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
-    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
-    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
-    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 14); vec_push(st, 21); vec_push(en, 22);
-    vec_push(tags, 5); vec_push(st, 23); vec_push(en, 26);
-    vec_push(tags, 38); vec_push(st, 26); vec_push(en, 27);
-    vec_push(tags, 5); vec_push(st, 27); vec_push(en, 30);
-    vec_push(tags, 39); vec_push(st, 30); vec_push(en, 31);
-    vec_push(tags, 35); vec_push(st, 32); vec_push(en, 33);
-    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
-    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
-    vec_push(tags, 7); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 13); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 5); vec_push(st, 45); vec_push(en, 53);
-    vec_push(tags, 6); vec_push(st, 53); vec_push(en, 54);
-    vec_push(tags, 5); vec_push(st, 54); vec_push(en, 55);
-    vec_push(tags, 12); vec_push(st, 55); vec_push(en, 56);
-    vec_push(tags, 3); vec_push(st, 57); vec_push(en, 60);
-    vec_push(tags, 7); vec_push(st, 60); vec_push(en, 61);
-    vec_push(tags, 13); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 85); vec_push(st, 63); vec_push(en, 69);
-    vec_push(tags, 3); vec_push(st, 70); vec_push(en, 73);
-    vec_push(tags, 13); vec_push(st, 73); vec_push(en, 74);
-    vec_push(tags, 9); vec_push(st, 75); vec_push(en, 76);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 30 { return 1; }
-    if vec_get(m, 19) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case_ambiguous() -> i32 {
-    let src: string = "fn f() -> i32 { let v: Vec<f64> = vec_new(); let v: Vec<i32> = vec_new(); return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
-    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
-    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
-    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 14); vec_push(st, 21); vec_push(en, 22);
-    vec_push(tags, 5); vec_push(st, 23); vec_push(en, 26);
-    vec_push(tags, 38); vec_push(st, 26); vec_push(en, 27);
-    vec_push(tags, 5); vec_push(st, 27); vec_push(en, 30);
-    vec_push(tags, 39); vec_push(st, 30); vec_push(en, 31);
-    vec_push(tags, 35); vec_push(st, 32); vec_push(en, 33);
-    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
-    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
-    vec_push(tags, 7); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 13); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 71); vec_push(st, 45); vec_push(en, 48);
-    vec_push(tags, 5); vec_push(st, 49); vec_push(en, 50);
-    vec_push(tags, 14); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 5); vec_push(st, 52); vec_push(en, 55);
-    vec_push(tags, 38); vec_push(st, 55); vec_push(en, 56);
-    vec_push(tags, 5); vec_push(st, 56); vec_push(en, 59);
-    vec_push(tags, 39); vec_push(st, 59); vec_push(en, 60);
-    vec_push(tags, 35); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 5); vec_push(st, 63); vec_push(en, 70);
-    vec_push(tags, 6); vec_push(st, 70); vec_push(en, 71);
-    vec_push(tags, 7); vec_push(st, 71); vec_push(en, 72);
-    vec_push(tags, 13); vec_push(st, 72); vec_push(en, 73);
-    vec_push(tags, 85); vec_push(st, 74); vec_push(en, 80);
-    vec_push(tags, 5); vec_push(st, 81); vec_push(en, 88);
-    vec_push(tags, 6); vec_push(st, 88); vec_push(en, 89);
-    vec_push(tags, 5); vec_push(st, 89); vec_push(en, 90);
-    vec_push(tags, 12); vec_push(st, 90); vec_push(en, 91);
-    vec_push(tags, 3); vec_push(st, 92); vec_push(en, 93);
-    vec_push(tags, 7); vec_push(st, 93); vec_push(en, 94);
-    vec_push(tags, 13); vec_push(st, 94); vec_push(en, 95);
-    vec_push(tags, 9); vec_push(st, 96); vec_push(en, 97);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 40 { return 1; }
-    if vec_get(m, 32) != 2 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case_typed_on_int() -> i32 {
-    let src: string = "fn f(v: Vec<i32>) -> i32 { return vec_get_f64(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
-    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
-    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
-    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
-    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
-    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 45);
-    vec_push(tags, 6); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 5); vec_push(st, 46); vec_push(en, 47);
-    vec_push(tags, 12); vec_push(st, 47); vec_push(en, 48);
-    vec_push(tags, 3); vec_push(st, 49); vec_push(en, 50);
-    vec_push(tags, 7); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 13); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 9); vec_push(st, 53); vec_push(en, 54);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 22 { return 1; }
-    if vec_get(m, 14) != 3 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case_struct_field() -> i32 {
-    let src: string = "struct B { d: Vec<f64>, n: i32 } fn f(b: B) -> f64 { return vec_get(b.d, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 89); vec_push(st, 0); vec_push(en, 6);
-    vec_push(tags, 5); vec_push(st, 7); vec_push(en, 8);
-    vec_push(tags, 8); vec_push(st, 9); vec_push(en, 10);
-    vec_push(tags, 5); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 14); vec_push(st, 12); vec_push(en, 13);
-    vec_push(tags, 5); vec_push(st, 14); vec_push(en, 17);
-    vec_push(tags, 38); vec_push(st, 17); vec_push(en, 18);
-    vec_push(tags, 5); vec_push(st, 18); vec_push(en, 21);
-    vec_push(tags, 39); vec_push(st, 21); vec_push(en, 22);
-    vec_push(tags, 12); vec_push(st, 22); vec_push(en, 23);
-    vec_push(tags, 5); vec_push(st, 24); vec_push(en, 25);
-    vec_push(tags, 14); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 5); vec_push(st, 27); vec_push(en, 30);
-    vec_push(tags, 9); vec_push(st, 31); vec_push(en, 32);
-    vec_push(tags, 65); vec_push(st, 33); vec_push(en, 35);
-    vec_push(tags, 5); vec_push(st, 36); vec_push(en, 37);
-    vec_push(tags, 6); vec_push(st, 37); vec_push(en, 38);
-    vec_push(tags, 5); vec_push(st, 38); vec_push(en, 39);
-    vec_push(tags, 14); vec_push(st, 39); vec_push(en, 40);
-    vec_push(tags, 5); vec_push(st, 41); vec_push(en, 42);
-    vec_push(tags, 7); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 19); vec_push(st, 44); vec_push(en, 46);
-    vec_push(tags, 5); vec_push(st, 47); vec_push(en, 50);
-    vec_push(tags, 8); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 85); vec_push(st, 53); vec_push(en, 59);
-    vec_push(tags, 5); vec_push(st, 60); vec_push(en, 67);
-    vec_push(tags, 6); vec_push(st, 67); vec_push(en, 68);
-    vec_push(tags, 5); vec_push(st, 68); vec_push(en, 69);
-    vec_push(tags, 16); vec_push(st, 69); vec_push(en, 70);
-    vec_push(tags, 5); vec_push(st, 70); vec_push(en, 71);
-    vec_push(tags, 12); vec_push(st, 71); vec_push(en, 72);
-    vec_push(tags, 3); vec_push(st, 73); vec_push(en, 74);
-    vec_push(tags, 7); vec_push(st, 74); vec_push(en, 75);
-    vec_push(tags, 13); vec_push(st, 75); vec_push(en, 76);
-    vec_push(tags, 9); vec_push(st, 77); vec_push(en, 78);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 35 { return 1; }
-    if vec_get(m, 25) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case_fn_return() -> i32 {
-    let src: string = "fn m() -> Vec<f64> { return vec_new(); } fn f() -> f64 { let w = m(); return vec_get(w, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
-    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
-    vec_push(tags, 38); vec_push(st, 13); vec_push(en, 14);
-    vec_push(tags, 5); vec_push(st, 14); vec_push(en, 17);
-    vec_push(tags, 39); vec_push(st, 17); vec_push(en, 18);
-    vec_push(tags, 8); vec_push(st, 19); vec_push(en, 20);
-    vec_push(tags, 85); vec_push(st, 21); vec_push(en, 27);
-    vec_push(tags, 5); vec_push(st, 28); vec_push(en, 35);
-    vec_push(tags, 6); vec_push(st, 35); vec_push(en, 36);
-    vec_push(tags, 7); vec_push(st, 36); vec_push(en, 37);
-    vec_push(tags, 13); vec_push(st, 37); vec_push(en, 38);
-    vec_push(tags, 9); vec_push(st, 39); vec_push(en, 40);
-    vec_push(tags, 65); vec_push(st, 41); vec_push(en, 43);
-    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 6); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 7); vec_push(st, 46); vec_push(en, 47);
-    vec_push(tags, 19); vec_push(st, 48); vec_push(en, 50);
-    vec_push(tags, 5); vec_push(st, 51); vec_push(en, 54);
-    vec_push(tags, 8); vec_push(st, 55); vec_push(en, 56);
-    vec_push(tags, 71); vec_push(st, 57); vec_push(en, 60);
-    vec_push(tags, 5); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 35); vec_push(st, 63); vec_push(en, 64);
-    vec_push(tags, 5); vec_push(st, 65); vec_push(en, 66);
-    vec_push(tags, 6); vec_push(st, 66); vec_push(en, 67);
-    vec_push(tags, 7); vec_push(st, 67); vec_push(en, 68);
-    vec_push(tags, 13); vec_push(st, 68); vec_push(en, 69);
-    vec_push(tags, 85); vec_push(st, 70); vec_push(en, 76);
-    vec_push(tags, 5); vec_push(st, 77); vec_push(en, 84);
-    vec_push(tags, 6); vec_push(st, 84); vec_push(en, 85);
-    vec_push(tags, 5); vec_push(st, 85); vec_push(en, 86);
-    vec_push(tags, 12); vec_push(st, 86); vec_push(en, 87);
-    vec_push(tags, 3); vec_push(st, 88); vec_push(en, 89);
-    vec_push(tags, 7); vec_push(st, 89); vec_push(en, 90);
-    vec_push(tags, 13); vec_push(st, 90); vec_push(en, 91);
-    vec_push(tags, 9); vec_push(st, 92); vec_push(en, 93);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 39 { return 1; }
-    if vec_get(m, 31) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case_word_vec() -> i32 {
-    let src: string = "fn f(v: Vec<i32>) -> i32 { return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
-    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
-    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
-    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
-    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
-    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
-    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
-    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 12); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 3); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 7); vec_push(st, 46); vec_push(en, 47);
-    vec_push(tags, 13); vec_push(st, 47); vec_push(en, 48);
-    vec_push(tags, 9); vec_push(st, 49); vec_push(en, 50);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 22 { return 1; }
-    if vec_get(m, 14) != 0 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case_two_fns() -> i32 {
-    let src: string = "fn a(v: Vec<f64>) -> i32 { return 0; } fn b(v: Vec<i32>) -> i32 { return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
-    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
-    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
-    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
-    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
-    vec_push(tags, 3); vec_push(st, 34); vec_push(en, 35);
-    vec_push(tags, 13); vec_push(st, 35); vec_push(en, 36);
-    vec_push(tags, 9); vec_push(st, 37); vec_push(en, 38);
-    vec_push(tags, 65); vec_push(st, 39); vec_push(en, 41);
-    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 14); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 5); vec_push(st, 47); vec_push(en, 50);
-    vec_push(tags, 38); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 5); vec_push(st, 51); vec_push(en, 54);
-    vec_push(tags, 39); vec_push(st, 54); vec_push(en, 55);
-    vec_push(tags, 7); vec_push(st, 55); vec_push(en, 56);
-    vec_push(tags, 19); vec_push(st, 57); vec_push(en, 59);
-    vec_push(tags, 5); vec_push(st, 60); vec_push(en, 63);
-    vec_push(tags, 8); vec_push(st, 64); vec_push(en, 65);
-    vec_push(tags, 85); vec_push(st, 66); vec_push(en, 72);
-    vec_push(tags, 5); vec_push(st, 73); vec_push(en, 80);
-    vec_push(tags, 6); vec_push(st, 80); vec_push(en, 81);
-    vec_push(tags, 5); vec_push(st, 81); vec_push(en, 82);
-    vec_push(tags, 12); vec_push(st, 82); vec_push(en, 83);
-    vec_push(tags, 3); vec_push(st, 84); vec_push(en, 85);
-    vec_push(tags, 7); vec_push(st, 85); vec_push(en, 86);
-    vec_push(tags, 13); vec_push(st, 86); vec_push(en, 87);
-    vec_push(tags, 9); vec_push(st, 88); vec_push(en, 89);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 39 { return 1; }
-    if vec_get(m, 31) != 0 { return 2; }
-    return 0;
-}
-
 fn test_lower_vecf_lookup_kinds() -> i32 {
     let src: string = "v v";
     let st: Vec<i32> = vec_new();
@@ -11508,552 +11290,165 @@ fn test_lower_vecf_lookup_kinds() -> i32 {
 }
 
 
-fn test_lower_vecf_case2_fresh_float() -> i32 {
-    let src: string = "fn f() -> f64 { let v = vec_new(); vec_push(v, 1.5); return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
-    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
-    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
-    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 35); vec_push(st, 22); vec_push(en, 23);
-    vec_push(tags, 5); vec_push(st, 24); vec_push(en, 31);
-    vec_push(tags, 6); vec_push(st, 31); vec_push(en, 32);
-    vec_push(tags, 7); vec_push(st, 32); vec_push(en, 33);
-    vec_push(tags, 13); vec_push(st, 33); vec_push(en, 34);
-    vec_push(tags, 5); vec_push(st, 35); vec_push(en, 43);
-    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 12); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 1); vec_push(st, 47); vec_push(en, 50);
-    vec_push(tags, 7); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 13); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 85); vec_push(st, 53); vec_push(en, 59);
-    vec_push(tags, 5); vec_push(st, 60); vec_push(en, 67);
-    vec_push(tags, 6); vec_push(st, 67); vec_push(en, 68);
-    vec_push(tags, 5); vec_push(st, 68); vec_push(en, 69);
-    vec_push(tags, 12); vec_push(st, 69); vec_push(en, 70);
-    vec_push(tags, 0); vec_push(st, 71); vec_push(en, 72);
-    vec_push(tags, 7); vec_push(st, 72); vec_push(en, 73);
-    vec_push(tags, 13); vec_push(st, 73); vec_push(en, 74);
-    vec_push(tags, 9); vec_push(st, 75); vec_push(en, 76);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 30 { return 1; }
-    if vec_get(m, 22) != 1 { return 2; }
+
+/* ── test support: a tiny lexer standing in for the real one ───────────── */
+fn lower_vecf_test_lex(src: string, tags: Vec<i32>, st: Vec<i32>, en: Vec<i32>) -> i32 {
+    let n: i32 = string_len(src);
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(src, i);
+        if c == 32 {
+            i = i + 1;
+        } else {
+            let mut j: i32 = i + 1;
+            let mut tag: i32 = 0 - 1;
+            let alpha: bool = (c >= 97 && c <= 122) || (c >= 65 && c <= 90) || c == 95;
+            if alpha {
+                while j < n {
+                    let d: i32 = string_char_at(src, j);
+                    if (d >= 97 && d <= 122) || (d >= 65 && d <= 90) || d == 95 || (d >= 48 && d <= 57) { j = j + 1; } else { break; }
+                }
+                tag = 5;
+                let w: string = string_substr(src, i, j - i);
+                if string_eq(w, "fn") { tag = 65; }
+                if string_eq(w, "struct") { tag = 89; }
+                if string_eq(w, "let") { tag = 71; }
+                if string_eq(w, "mut") { tag = 77; }
+                if string_eq(w, "return") { tag = 85; }
+            } else {
+                if c >= 48 && c <= 57 {
+                    let mut fl: bool = false;
+                    while j < n {
+                        let d: i32 = string_char_at(src, j);
+                        if d == 46 { fl = true; j = j + 1; }
+                        else { if (d >= 48 && d <= 57) || (d >= 97 && d <= 122) { j = j + 1; } else { break; } }
+                    }
+                    if fl { tag = 1; } else { tag = 0; }
+                } else {
+                    if c == 45 {
+                        if j < n {
+                            if string_char_at(src, j) == 62 { tag = 19; j = j + 1; } else { tag = 23; }
+                        }
+                    }
+                    if c == 40 { tag = 6; }
+                    if c == 41 { tag = 7; }
+                    if c == 123 { tag = 8; }
+                    if c == 125 { tag = 9; }
+                    if c == 91 { tag = 10; }
+                    if c == 93 { tag = 11; }
+                    if c == 44 { tag = 12; }
+                    if c == 59 { tag = 13; }
+                    if c == 58 { tag = 14; }
+                    if c == 46 { tag = 16; }
+                    if c == 61 { tag = 35; }
+                    if c == 60 { tag = 38; }
+                    if c == 62 { tag = 39; }
+                    if c == 38 { tag = 27; }
+                }
+            }
+            vec_push(tags, tag);
+            vec_push(st, i);
+            vec_push(en, j);
+            i = j;
+        }
+    }
     return 0;
 }
 
-fn test_lower_vecf_case2_fresh_int() -> i32 {
-    let src: string = "fn f() -> i32 { let v = vec_new(); vec_push(v, 2); return vec_get(v, 0); }";
+/* Site-map value at the `occ`-th token whose text is `want`:
+   mode 0 = that ident (followed by `(`), 1 = ident followed by `[`,
+   2 = the token after it, 3 = ident followed by `[` and preceded by `.`. */
+fn lower_vecf_test_site(src: string, want: string, occ: i32, mode: i32, expect: i32) -> i32 {
     let tags: Vec<i32> = vec_new();
     let st: Vec<i32> = vec_new();
     let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
-    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
-    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
-    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 35); vec_push(st, 22); vec_push(en, 23);
-    vec_push(tags, 5); vec_push(st, 24); vec_push(en, 31);
-    vec_push(tags, 6); vec_push(st, 31); vec_push(en, 32);
-    vec_push(tags, 7); vec_push(st, 32); vec_push(en, 33);
-    vec_push(tags, 13); vec_push(st, 33); vec_push(en, 34);
-    vec_push(tags, 5); vec_push(st, 35); vec_push(en, 43);
-    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 12); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 0); vec_push(st, 47); vec_push(en, 48);
-    vec_push(tags, 7); vec_push(st, 48); vec_push(en, 49);
-    vec_push(tags, 13); vec_push(st, 49); vec_push(en, 50);
-    vec_push(tags, 85); vec_push(st, 51); vec_push(en, 57);
-    vec_push(tags, 5); vec_push(st, 58); vec_push(en, 65);
-    vec_push(tags, 6); vec_push(st, 65); vec_push(en, 66);
-    vec_push(tags, 5); vec_push(st, 66); vec_push(en, 67);
-    vec_push(tags, 12); vec_push(st, 67); vec_push(en, 68);
-    vec_push(tags, 0); vec_push(st, 69); vec_push(en, 70);
-    vec_push(tags, 7); vec_push(st, 70); vec_push(en, 71);
-    vec_push(tags, 13); vec_push(st, 71); vec_push(en, 72);
-    vec_push(tags, 9); vec_push(st, 73); vec_push(en, 74);
+    let _l: i32 = lower_vecf_test_lex(src, tags, st, en);
     let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 30 { return 1; }
-    if vec_get(m, 22) != 0 { return 2; }
-    return 0;
+    let mut seen: i32 = 0;
+    let mut k: i32 = 0;
+    while k < vec_len(tags) {
+        if lower_vecf_text_is(src, st, en, k, want) {
+            let mut hit: bool = false;
+            if mode == 0 { if lower_vecf_tag_at(tags, k + 1) == 6 { hit = true; } }
+            if mode == 1 { if lower_vecf_tag_at(tags, k + 1) == 10 { hit = true; } }
+            if mode == 2 { hit = true; }
+            if mode == 3 {
+                if lower_vecf_tag_at(tags, k + 1) == 10 {
+                    if lower_vecf_tag_at(tags, k - 1) == 16 { hit = true; }
+                }
+            }
+            if hit {
+                if seen == occ {
+                    let mut at: i32 = k;
+                    if mode == 2 { at = k + 1; }
+                    if vec_get(m, at) != expect { return 1000 + vec_get(m, at); }
+                    return 0;
+                }
+                seen = seen + 1;
+            }
+        }
+        k = k + 1;
+    }
+    return 999;
 }
 
-fn test_lower_vecf_case2_fresh_conflict() -> i32 {
-    let src: string = "fn f() -> i32 { let v = vec_new(); vec_push(v, 1.5); vec_push(v, 2); return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
-    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
-    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
-    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 35); vec_push(st, 22); vec_push(en, 23);
-    vec_push(tags, 5); vec_push(st, 24); vec_push(en, 31);
-    vec_push(tags, 6); vec_push(st, 31); vec_push(en, 32);
-    vec_push(tags, 7); vec_push(st, 32); vec_push(en, 33);
-    vec_push(tags, 13); vec_push(st, 33); vec_push(en, 34);
-    vec_push(tags, 5); vec_push(st, 35); vec_push(en, 43);
-    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 12); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 1); vec_push(st, 47); vec_push(en, 50);
-    vec_push(tags, 7); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 13); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 5); vec_push(st, 53); vec_push(en, 61);
-    vec_push(tags, 6); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 5); vec_push(st, 62); vec_push(en, 63);
-    vec_push(tags, 12); vec_push(st, 63); vec_push(en, 64);
-    vec_push(tags, 0); vec_push(st, 65); vec_push(en, 66);
-    vec_push(tags, 7); vec_push(st, 66); vec_push(en, 67);
-    vec_push(tags, 13); vec_push(st, 67); vec_push(en, 68);
-    vec_push(tags, 85); vec_push(st, 69); vec_push(en, 75);
-    vec_push(tags, 5); vec_push(st, 76); vec_push(en, 83);
-    vec_push(tags, 6); vec_push(st, 83); vec_push(en, 84);
-    vec_push(tags, 5); vec_push(st, 84); vec_push(en, 85);
-    vec_push(tags, 12); vec_push(st, 85); vec_push(en, 86);
-    vec_push(tags, 0); vec_push(st, 87); vec_push(en, 88);
-    vec_push(tags, 7); vec_push(st, 88); vec_push(en, 89);
-    vec_push(tags, 13); vec_push(st, 89); vec_push(en, 90);
-    vec_push(tags, 9); vec_push(st, 91); vec_push(en, 92);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 37 { return 1; }
-    if vec_get(m, 29) != 2 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_annot_read() -> i32 {
-    let src: string = "fn f(x: f64) -> f64 { let v = vec_new(); vec_push(v, x); let y: f64 = vec_get(v, 0); return y; }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 7); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 19); vec_push(st, 13); vec_push(en, 15);
-    vec_push(tags, 5); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 8); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 71); vec_push(st, 22); vec_push(en, 25);
-    vec_push(tags, 5); vec_push(st, 26); vec_push(en, 27);
-    vec_push(tags, 35); vec_push(st, 28); vec_push(en, 29);
-    vec_push(tags, 5); vec_push(st, 30); vec_push(en, 37);
-    vec_push(tags, 6); vec_push(st, 37); vec_push(en, 38);
-    vec_push(tags, 7); vec_push(st, 38); vec_push(en, 39);
-    vec_push(tags, 13); vec_push(st, 39); vec_push(en, 40);
-    vec_push(tags, 5); vec_push(st, 41); vec_push(en, 49);
-    vec_push(tags, 6); vec_push(st, 49); vec_push(en, 50);
-    vec_push(tags, 5); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 12); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 5); vec_push(st, 53); vec_push(en, 54);
-    vec_push(tags, 7); vec_push(st, 54); vec_push(en, 55);
-    vec_push(tags, 13); vec_push(st, 55); vec_push(en, 56);
-    vec_push(tags, 71); vec_push(st, 57); vec_push(en, 60);
-    vec_push(tags, 5); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 14); vec_push(st, 62); vec_push(en, 63);
-    vec_push(tags, 5); vec_push(st, 64); vec_push(en, 67);
-    vec_push(tags, 35); vec_push(st, 68); vec_push(en, 69);
-    vec_push(tags, 5); vec_push(st, 70); vec_push(en, 77);
-    vec_push(tags, 6); vec_push(st, 77); vec_push(en, 78);
-    vec_push(tags, 5); vec_push(st, 78); vec_push(en, 79);
-    vec_push(tags, 12); vec_push(st, 79); vec_push(en, 80);
-    vec_push(tags, 0); vec_push(st, 81); vec_push(en, 82);
-    vec_push(tags, 7); vec_push(st, 82); vec_push(en, 83);
-    vec_push(tags, 13); vec_push(st, 83); vec_push(en, 84);
-    vec_push(tags, 85); vec_push(st, 85); vec_push(en, 91);
-    vec_push(tags, 5); vec_push(st, 92); vec_push(en, 93);
-    vec_push(tags, 13); vec_push(st, 93); vec_push(en, 94);
-    vec_push(tags, 9); vec_push(st, 95); vec_push(en, 96);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 40 { return 1; }
-    if vec_get(m, 17) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_set_lit() -> i32 {
-    let src: string = "fn f() -> i32 { let v = vec_new(); vec_push(v, 0); vec_set(v, 0, 2.5); return 0; }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
-    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
-    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
-    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 35); vec_push(st, 22); vec_push(en, 23);
-    vec_push(tags, 5); vec_push(st, 24); vec_push(en, 31);
-    vec_push(tags, 6); vec_push(st, 31); vec_push(en, 32);
-    vec_push(tags, 7); vec_push(st, 32); vec_push(en, 33);
-    vec_push(tags, 13); vec_push(st, 33); vec_push(en, 34);
-    vec_push(tags, 5); vec_push(st, 35); vec_push(en, 43);
-    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 12); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 0); vec_push(st, 47); vec_push(en, 48);
-    vec_push(tags, 7); vec_push(st, 48); vec_push(en, 49);
-    vec_push(tags, 13); vec_push(st, 49); vec_push(en, 50);
-    vec_push(tags, 5); vec_push(st, 51); vec_push(en, 58);
-    vec_push(tags, 6); vec_push(st, 58); vec_push(en, 59);
-    vec_push(tags, 5); vec_push(st, 59); vec_push(en, 60);
-    vec_push(tags, 12); vec_push(st, 60); vec_push(en, 61);
-    vec_push(tags, 0); vec_push(st, 62); vec_push(en, 63);
-    vec_push(tags, 12); vec_push(st, 63); vec_push(en, 64);
-    vec_push(tags, 1); vec_push(st, 65); vec_push(en, 68);
-    vec_push(tags, 7); vec_push(st, 68); vec_push(en, 69);
-    vec_push(tags, 13); vec_push(st, 69); vec_push(en, 70);
-    vec_push(tags, 85); vec_push(st, 71); vec_push(en, 77);
-    vec_push(tags, 0); vec_push(st, 78); vec_push(en, 79);
-    vec_push(tags, 13); vec_push(st, 79); vec_push(en, 80);
-    vec_push(tags, 9); vec_push(st, 81); vec_push(en, 82);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 34 { return 1; }
-    if vec_get(m, 14) != 2 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_arg() -> i32 {
-    let src: string = "fn g(w: Vec<f64>) -> i32 { return 0; } fn f() -> i32 { let v = vec_new(); let n = g(v); return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
-    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
-    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
-    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
-    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
-    vec_push(tags, 0); vec_push(st, 34); vec_push(en, 35);
-    vec_push(tags, 13); vec_push(st, 35); vec_push(en, 36);
-    vec_push(tags, 9); vec_push(st, 37); vec_push(en, 38);
-    vec_push(tags, 65); vec_push(st, 39); vec_push(en, 41);
-    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 7); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 19); vec_push(st, 46); vec_push(en, 48);
-    vec_push(tags, 5); vec_push(st, 49); vec_push(en, 52);
-    vec_push(tags, 8); vec_push(st, 53); vec_push(en, 54);
-    vec_push(tags, 71); vec_push(st, 55); vec_push(en, 58);
-    vec_push(tags, 5); vec_push(st, 59); vec_push(en, 60);
-    vec_push(tags, 35); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 5); vec_push(st, 63); vec_push(en, 70);
-    vec_push(tags, 6); vec_push(st, 70); vec_push(en, 71);
-    vec_push(tags, 7); vec_push(st, 71); vec_push(en, 72);
-    vec_push(tags, 13); vec_push(st, 72); vec_push(en, 73);
-    vec_push(tags, 71); vec_push(st, 74); vec_push(en, 77);
-    vec_push(tags, 5); vec_push(st, 78); vec_push(en, 79);
-    vec_push(tags, 35); vec_push(st, 80); vec_push(en, 81);
-    vec_push(tags, 5); vec_push(st, 82); vec_push(en, 83);
-    vec_push(tags, 6); vec_push(st, 83); vec_push(en, 84);
-    vec_push(tags, 5); vec_push(st, 84); vec_push(en, 85);
-    vec_push(tags, 7); vec_push(st, 85); vec_push(en, 86);
-    vec_push(tags, 13); vec_push(st, 86); vec_push(en, 87);
-    vec_push(tags, 85); vec_push(st, 88); vec_push(en, 94);
-    vec_push(tags, 5); vec_push(st, 95); vec_push(en, 102);
-    vec_push(tags, 6); vec_push(st, 102); vec_push(en, 103);
-    vec_push(tags, 5); vec_push(st, 103); vec_push(en, 104);
-    vec_push(tags, 12); vec_push(st, 104); vec_push(en, 105);
-    vec_push(tags, 0); vec_push(st, 106); vec_push(en, 107);
-    vec_push(tags, 7); vec_push(st, 107); vec_push(en, 108);
-    vec_push(tags, 13); vec_push(st, 108); vec_push(en, 109);
-    vec_push(tags, 9); vec_push(st, 110); vec_push(en, 111);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 48 { return 1; }
-    if vec_get(m, 40) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_arg_second() -> i32 {
-    let src: string = "fn g(k: i32, w: Vec<f64>) -> i32 { return 0; } fn f() -> i32 { let v = vec_new(); let n = g(3, v); return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 12); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 5); vec_push(st, 13); vec_push(en, 14);
-    vec_push(tags, 14); vec_push(st, 14); vec_push(en, 15);
-    vec_push(tags, 5); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 38); vec_push(st, 19); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 23);
-    vec_push(tags, 39); vec_push(st, 23); vec_push(en, 24);
-    vec_push(tags, 7); vec_push(st, 24); vec_push(en, 25);
-    vec_push(tags, 19); vec_push(st, 26); vec_push(en, 28);
-    vec_push(tags, 5); vec_push(st, 29); vec_push(en, 32);
-    vec_push(tags, 8); vec_push(st, 33); vec_push(en, 34);
-    vec_push(tags, 85); vec_push(st, 35); vec_push(en, 41);
-    vec_push(tags, 0); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 13); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 9); vec_push(st, 45); vec_push(en, 46);
-    vec_push(tags, 65); vec_push(st, 47); vec_push(en, 49);
-    vec_push(tags, 5); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 6); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 7); vec_push(st, 52); vec_push(en, 53);
-    vec_push(tags, 19); vec_push(st, 54); vec_push(en, 56);
-    vec_push(tags, 5); vec_push(st, 57); vec_push(en, 60);
-    vec_push(tags, 8); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 71); vec_push(st, 63); vec_push(en, 66);
-    vec_push(tags, 5); vec_push(st, 67); vec_push(en, 68);
-    vec_push(tags, 35); vec_push(st, 69); vec_push(en, 70);
-    vec_push(tags, 5); vec_push(st, 71); vec_push(en, 78);
-    vec_push(tags, 6); vec_push(st, 78); vec_push(en, 79);
-    vec_push(tags, 7); vec_push(st, 79); vec_push(en, 80);
-    vec_push(tags, 13); vec_push(st, 80); vec_push(en, 81);
-    vec_push(tags, 71); vec_push(st, 82); vec_push(en, 85);
-    vec_push(tags, 5); vec_push(st, 86); vec_push(en, 87);
-    vec_push(tags, 35); vec_push(st, 88); vec_push(en, 89);
-    vec_push(tags, 5); vec_push(st, 90); vec_push(en, 91);
-    vec_push(tags, 6); vec_push(st, 91); vec_push(en, 92);
-    vec_push(tags, 0); vec_push(st, 92); vec_push(en, 93);
-    vec_push(tags, 12); vec_push(st, 93); vec_push(en, 94);
-    vec_push(tags, 5); vec_push(st, 95); vec_push(en, 96);
-    vec_push(tags, 7); vec_push(st, 96); vec_push(en, 97);
-    vec_push(tags, 13); vec_push(st, 97); vec_push(en, 98);
-    vec_push(tags, 85); vec_push(st, 99); vec_push(en, 105);
-    vec_push(tags, 5); vec_push(st, 106); vec_push(en, 113);
-    vec_push(tags, 6); vec_push(st, 113); vec_push(en, 114);
-    vec_push(tags, 5); vec_push(st, 114); vec_push(en, 115);
-    vec_push(tags, 12); vec_push(st, 115); vec_push(en, 116);
-    vec_push(tags, 0); vec_push(st, 117); vec_push(en, 118);
-    vec_push(tags, 7); vec_push(st, 118); vec_push(en, 119);
-    vec_push(tags, 13); vec_push(st, 119); vec_push(en, 120);
-    vec_push(tags, 9); vec_push(st, 121); vec_push(en, 122);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 54 { return 1; }
-    if vec_get(m, 46) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_arg_int_vec() -> i32 {
-    let src: string = "fn g(w: Vec<i32>) -> i32 { return 0; } fn f() -> i32 { let v = vec_new(); let n = g(v); return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
-    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
-    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
-    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
-    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
-    vec_push(tags, 0); vec_push(st, 34); vec_push(en, 35);
-    vec_push(tags, 13); vec_push(st, 35); vec_push(en, 36);
-    vec_push(tags, 9); vec_push(st, 37); vec_push(en, 38);
-    vec_push(tags, 65); vec_push(st, 39); vec_push(en, 41);
-    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 7); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 19); vec_push(st, 46); vec_push(en, 48);
-    vec_push(tags, 5); vec_push(st, 49); vec_push(en, 52);
-    vec_push(tags, 8); vec_push(st, 53); vec_push(en, 54);
-    vec_push(tags, 71); vec_push(st, 55); vec_push(en, 58);
-    vec_push(tags, 5); vec_push(st, 59); vec_push(en, 60);
-    vec_push(tags, 35); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 5); vec_push(st, 63); vec_push(en, 70);
-    vec_push(tags, 6); vec_push(st, 70); vec_push(en, 71);
-    vec_push(tags, 7); vec_push(st, 71); vec_push(en, 72);
-    vec_push(tags, 13); vec_push(st, 72); vec_push(en, 73);
-    vec_push(tags, 71); vec_push(st, 74); vec_push(en, 77);
-    vec_push(tags, 5); vec_push(st, 78); vec_push(en, 79);
-    vec_push(tags, 35); vec_push(st, 80); vec_push(en, 81);
-    vec_push(tags, 5); vec_push(st, 82); vec_push(en, 83);
-    vec_push(tags, 6); vec_push(st, 83); vec_push(en, 84);
-    vec_push(tags, 5); vec_push(st, 84); vec_push(en, 85);
-    vec_push(tags, 7); vec_push(st, 85); vec_push(en, 86);
-    vec_push(tags, 13); vec_push(st, 86); vec_push(en, 87);
-    vec_push(tags, 85); vec_push(st, 88); vec_push(en, 94);
-    vec_push(tags, 5); vec_push(st, 95); vec_push(en, 102);
-    vec_push(tags, 6); vec_push(st, 102); vec_push(en, 103);
-    vec_push(tags, 5); vec_push(st, 103); vec_push(en, 104);
-    vec_push(tags, 12); vec_push(st, 104); vec_push(en, 105);
-    vec_push(tags, 0); vec_push(st, 106); vec_push(en, 107);
-    vec_push(tags, 7); vec_push(st, 107); vec_push(en, 108);
-    vec_push(tags, 13); vec_push(st, 108); vec_push(en, 109);
-    vec_push(tags, 9); vec_push(st, 110); vec_push(en, 111);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 48 { return 1; }
-    if vec_get(m, 40) != 0 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_return() -> i32 {
-    let src: string = "fn f(x: f64) -> Vec<f64> { let v = vec_new(); vec_push(v, x); return v; }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 7); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 19); vec_push(st, 13); vec_push(en, 15);
-    vec_push(tags, 5); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 38); vec_push(st, 19); vec_push(en, 20);
-    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 23);
-    vec_push(tags, 39); vec_push(st, 23); vec_push(en, 24);
-    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
-    vec_push(tags, 71); vec_push(st, 27); vec_push(en, 30);
-    vec_push(tags, 5); vec_push(st, 31); vec_push(en, 32);
-    vec_push(tags, 35); vec_push(st, 33); vec_push(en, 34);
-    vec_push(tags, 5); vec_push(st, 35); vec_push(en, 42);
-    vec_push(tags, 6); vec_push(st, 42); vec_push(en, 43);
-    vec_push(tags, 7); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 13); vec_push(st, 44); vec_push(en, 45);
-    vec_push(tags, 5); vec_push(st, 46); vec_push(en, 54);
-    vec_push(tags, 6); vec_push(st, 54); vec_push(en, 55);
-    vec_push(tags, 5); vec_push(st, 55); vec_push(en, 56);
-    vec_push(tags, 12); vec_push(st, 56); vec_push(en, 57);
-    vec_push(tags, 5); vec_push(st, 58); vec_push(en, 59);
-    vec_push(tags, 7); vec_push(st, 59); vec_push(en, 60);
-    vec_push(tags, 13); vec_push(st, 60); vec_push(en, 61);
-    vec_push(tags, 85); vec_push(st, 62); vec_push(en, 68);
-    vec_push(tags, 5); vec_push(st, 69); vec_push(en, 70);
-    vec_push(tags, 13); vec_push(st, 70); vec_push(en, 71);
-    vec_push(tags, 9); vec_push(st, 72); vec_push(en, 73);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 31 { return 1; }
-    if vec_get(m, 20) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_field() -> i32 {
-    let src: string = "struct B { d: Vec<f64> } fn f(x: f64) -> B { let v = vec_new(); vec_push(v, x); return B { d: v }; }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 89); vec_push(st, 0); vec_push(en, 6);
-    vec_push(tags, 5); vec_push(st, 7); vec_push(en, 8);
-    vec_push(tags, 8); vec_push(st, 9); vec_push(en, 10);
-    vec_push(tags, 5); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 14); vec_push(st, 12); vec_push(en, 13);
-    vec_push(tags, 5); vec_push(st, 14); vec_push(en, 17);
-    vec_push(tags, 38); vec_push(st, 17); vec_push(en, 18);
-    vec_push(tags, 5); vec_push(st, 18); vec_push(en, 21);
-    vec_push(tags, 39); vec_push(st, 21); vec_push(en, 22);
-    vec_push(tags, 9); vec_push(st, 23); vec_push(en, 24);
-    vec_push(tags, 65); vec_push(st, 25); vec_push(en, 27);
-    vec_push(tags, 5); vec_push(st, 28); vec_push(en, 29);
-    vec_push(tags, 6); vec_push(st, 29); vec_push(en, 30);
-    vec_push(tags, 5); vec_push(st, 30); vec_push(en, 31);
-    vec_push(tags, 14); vec_push(st, 31); vec_push(en, 32);
-    vec_push(tags, 5); vec_push(st, 33); vec_push(en, 36);
-    vec_push(tags, 7); vec_push(st, 36); vec_push(en, 37);
-    vec_push(tags, 19); vec_push(st, 38); vec_push(en, 40);
-    vec_push(tags, 5); vec_push(st, 41); vec_push(en, 42);
-    vec_push(tags, 8); vec_push(st, 43); vec_push(en, 44);
-    vec_push(tags, 71); vec_push(st, 45); vec_push(en, 48);
-    vec_push(tags, 5); vec_push(st, 49); vec_push(en, 50);
-    vec_push(tags, 35); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 5); vec_push(st, 53); vec_push(en, 60);
-    vec_push(tags, 6); vec_push(st, 60); vec_push(en, 61);
-    vec_push(tags, 7); vec_push(st, 61); vec_push(en, 62);
-    vec_push(tags, 13); vec_push(st, 62); vec_push(en, 63);
-    vec_push(tags, 5); vec_push(st, 64); vec_push(en, 72);
-    vec_push(tags, 6); vec_push(st, 72); vec_push(en, 73);
-    vec_push(tags, 5); vec_push(st, 73); vec_push(en, 74);
-    vec_push(tags, 12); vec_push(st, 74); vec_push(en, 75);
-    vec_push(tags, 5); vec_push(st, 76); vec_push(en, 77);
-    vec_push(tags, 7); vec_push(st, 77); vec_push(en, 78);
-    vec_push(tags, 13); vec_push(st, 78); vec_push(en, 79);
-    vec_push(tags, 85); vec_push(st, 80); vec_push(en, 86);
-    vec_push(tags, 5); vec_push(st, 87); vec_push(en, 88);
-    vec_push(tags, 8); vec_push(st, 89); vec_push(en, 90);
-    vec_push(tags, 5); vec_push(st, 91); vec_push(en, 92);
-    vec_push(tags, 14); vec_push(st, 92); vec_push(en, 93);
-    vec_push(tags, 5); vec_push(st, 94); vec_push(en, 95);
-    vec_push(tags, 9); vec_push(st, 96); vec_push(en, 97);
-    vec_push(tags, 13); vec_push(st, 97); vec_push(en, 98);
-    vec_push(tags, 9); vec_push(st, 99); vec_push(en, 100);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 43 { return 1; }
-    if vec_get(m, 27) != 1 { return 2; }
-    return 0;
-}
-
-fn test_lower_vecf_case2_fresh_untyped() -> i32 {
-    let src: string = "fn f(x: i32) -> i32 { let v = vec_new(); vec_push(v, x); return vec_get(v, 0); }";
-    let tags: Vec<i32> = vec_new();
-    let st: Vec<i32> = vec_new();
-    let en: Vec<i32> = vec_new();
-    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
-    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
-    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
-    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
-    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
-    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
-    vec_push(tags, 7); vec_push(st, 11); vec_push(en, 12);
-    vec_push(tags, 19); vec_push(st, 13); vec_push(en, 15);
-    vec_push(tags, 5); vec_push(st, 16); vec_push(en, 19);
-    vec_push(tags, 8); vec_push(st, 20); vec_push(en, 21);
-    vec_push(tags, 71); vec_push(st, 22); vec_push(en, 25);
-    vec_push(tags, 5); vec_push(st, 26); vec_push(en, 27);
-    vec_push(tags, 35); vec_push(st, 28); vec_push(en, 29);
-    vec_push(tags, 5); vec_push(st, 30); vec_push(en, 37);
-    vec_push(tags, 6); vec_push(st, 37); vec_push(en, 38);
-    vec_push(tags, 7); vec_push(st, 38); vec_push(en, 39);
-    vec_push(tags, 13); vec_push(st, 39); vec_push(en, 40);
-    vec_push(tags, 5); vec_push(st, 41); vec_push(en, 49);
-    vec_push(tags, 6); vec_push(st, 49); vec_push(en, 50);
-    vec_push(tags, 5); vec_push(st, 50); vec_push(en, 51);
-    vec_push(tags, 12); vec_push(st, 51); vec_push(en, 52);
-    vec_push(tags, 5); vec_push(st, 53); vec_push(en, 54);
-    vec_push(tags, 7); vec_push(st, 54); vec_push(en, 55);
-    vec_push(tags, 13); vec_push(st, 55); vec_push(en, 56);
-    vec_push(tags, 85); vec_push(st, 57); vec_push(en, 63);
-    vec_push(tags, 5); vec_push(st, 64); vec_push(en, 71);
-    vec_push(tags, 6); vec_push(st, 71); vec_push(en, 72);
-    vec_push(tags, 5); vec_push(st, 72); vec_push(en, 73);
-    vec_push(tags, 12); vec_push(st, 73); vec_push(en, 74);
-    vec_push(tags, 0); vec_push(st, 75); vec_push(en, 76);
-    vec_push(tags, 7); vec_push(st, 76); vec_push(en, 77);
-    vec_push(tags, 13); vec_push(st, 77); vec_push(en, 78);
-    vec_push(tags, 9); vec_push(st, 79); vec_push(en, 80);
-    let m: Vec<i32> = lower_vecf_site_map(tags, src, st, en);
-    if vec_len(m) != 33 { return 1; }
-    if vec_get(m, 25) != 0 { return 2; }
+fn test_lower_vecf_site_table() -> i32 {
+    let r0: i32 = lower_vecf_test_site("fn f(v: Vec<f64>) -> f64 { return vec_get(v, 0); }", "vec_get", 0, 0, 1);
+    if r0 != 0 { return 1; }
+    let r1: i32 = lower_vecf_test_site("fn f() -> f64 { let v: Vec<f64> = vec_new(); vec_push(v, 1.5); return 0.0; }", "vec_push", 0, 0, 1);
+    if r1 != 0 { return 2; }
+    let r2: i32 = lower_vecf_test_site("fn f() -> i32 { let v: Vec<f64> = vec_new(); let v: Vec<i32> = vec_new(); return vec_get(v, 0); }", "vec_get", 0, 0, 2);
+    if r2 != 0 { return 3; }
+    let r3: i32 = lower_vecf_test_site("fn f(v: Vec<i32>) -> i32 { return vec_get_f64(v, 0); }", "vec_get_f64", 0, 0, 3);
+    if r3 != 0 { return 4; }
+    let r4: i32 = lower_vecf_test_site("struct B { d: Vec<f64>, n: i32 } fn f(b: B) -> f64 { return vec_get(b.d, 0); }", "vec_get", 0, 0, 1);
+    if r4 != 0 { return 5; }
+    let r5: i32 = lower_vecf_test_site("fn m() -> Vec<f64> { return vec_new(); } fn f() -> f64 { let w = m(); return vec_get(w, 0); }", "vec_get", 0, 0, 1);
+    if r5 != 0 { return 6; }
+    let r6: i32 = lower_vecf_test_site("fn f(v: Vec<i32>) -> i32 { return vec_get(v, 0); }", "vec_get", 0, 0, 0);
+    if r6 != 0 { return 7; }
+    let r7: i32 = lower_vecf_test_site("fn a(v: Vec<f64>) -> i32 { return 0; } fn b(v: Vec<i32>) -> i32 { return vec_get(v, 0); }", "vec_get", 0, 0, 0);
+    if r7 != 0 { return 8; }
+    let r8: i32 = lower_vecf_test_site("fn f() -> f64 { let v = vec_new(); vec_push(v, 1.5); return vec_get(v, 0); }", "vec_get", 0, 0, 1);
+    if r8 != 0 { return 9; }
+    let r9: i32 = lower_vecf_test_site("fn f() -> i32 { let v = vec_new(); vec_push(v, 2); return vec_get(v, 0); }", "vec_get", 0, 0, 0);
+    if r9 != 0 { return 10; }
+    let r10: i32 = lower_vecf_test_site("fn f() -> i32 { let v = vec_new(); vec_push(v, 1.5); vec_push(v, 2); return vec_get(v, 0); }", "vec_get", 0, 0, 2);
+    if r10 != 0 { return 11; }
+    let r11: i32 = lower_vecf_test_site("fn f(x: f64) -> f64 { let v = vec_new(); vec_push(v, x); let y: f64 = vec_get(v, 0); return y; }", "vec_push", 0, 0, 1);
+    if r11 != 0 { return 12; }
+    let r12: i32 = lower_vecf_test_site("fn f() -> i32 { let v = vec_new(); vec_push(v, 0); vec_set(v, 0, 2.5); return 0; }", "vec_push", 0, 0, 2);
+    if r12 != 0 { return 13; }
+    let r13: i32 = lower_vecf_test_site("fn g(w: Vec<f64>) -> i32 { return 0; } fn f() -> i32 { let v = vec_new(); let n = g(v); return vec_get(v, 0); }", "vec_get", 0, 0, 1);
+    if r13 != 0 { return 14; }
+    let r14: i32 = lower_vecf_test_site("fn g(k: i32, w: Vec<f64>) -> i32 { return 0; } fn f() -> i32 { let v = vec_new(); let n = g(3, v); return vec_get(v, 0); }", "vec_get", 0, 0, 1);
+    if r14 != 0 { return 15; }
+    let r15: i32 = lower_vecf_test_site("fn g(w: Vec<i32>) -> i32 { return 0; } fn f() -> i32 { let v = vec_new(); let n = g(v); return vec_get(v, 0); }", "vec_get", 0, 0, 0);
+    if r15 != 0 { return 16; }
+    let r16: i32 = lower_vecf_test_site("fn f(x: f64) -> Vec<f64> { let v = vec_new(); vec_push(v, x); return v; }", "vec_push", 0, 0, 1);
+    if r16 != 0 { return 17; }
+    let r17: i32 = lower_vecf_test_site("struct B { d: Vec<f64> } fn f(x: f64) -> B { let v = vec_new(); vec_push(v, x); return B { d: v }; }", "vec_push", 0, 0, 1);
+    if r17 != 0 { return 18; }
+    let r18: i32 = lower_vecf_test_site("fn f(x: i32) -> i32 { let v = vec_new(); vec_push(v, x); return vec_get(v, 0); }", "vec_get", 0, 0, 0);
+    if r18 != 0 { return 19; }
+    let r19: i32 = lower_vecf_test_site("fn f(s: &[f64]) -> f64 { return s[0]; }", "s", 0, 1, 1);
+    if r19 != 0 { return 20; }
+    let r20: i32 = lower_vecf_test_site("fn f() -> f64 { let a: [f64; 3] = [1.0, 2.0, 3.0]; return a[1]; }", "a", 0, 1, 1);
+    if r20 != 0 { return 21; }
+    let r21: i32 = lower_vecf_test_site("fn f() -> f64 { let a: [f64; 3] = [1.0, 2.0, 3.0]; return a[1]; }", "=", 0, 2, 4);
+    if r21 != 0 { return 22; }
+    let r22: i32 = lower_vecf_test_site("fn f() -> f64 { let b = [0.5, 1.5]; return b[0]; }", "b", 0, 1, 1);
+    if r22 != 0 { return 23; }
+    let r23: i32 = lower_vecf_test_site("fn f() -> f64 { let b = [0.5, 1.5]; return b[0]; }", "=", 0, 2, 4);
+    if r23 != 0 { return 24; }
+    let r24: i32 = lower_vecf_test_site("fn f(n: [i32; 3]) -> i32 { return n[0]; }", "n", 0, 1, 0);
+    if r24 != 0 { return 25; }
+    let r25: i32 = lower_vecf_test_site("fn f() -> i32 { let n = [1, 2]; return n[0]; }", "=", 0, 2, 0);
+    if r25 != 0 { return 26; }
+    let r26: i32 = lower_vecf_test_site("struct P { v: [f64; 2] } fn f(p: P) -> f64 { return p.v[0]; }", "v", 0, 3, 1);
+    if r26 != 0 { return 27; }
+    let r27: i32 = lower_vecf_test_site("fn f(s: &mut [f64]) -> i32 { s[0] = 1.0; return 0; }", "s", 0, 1, 1);
+    if r27 != 0 { return 28; }
     return 0;
 }
 
@@ -12234,45 +11629,9 @@ fn main() -> i32 {
     if r70h != 0 { return 958 + r70h; }
     let r71: i32 = test_build_builtin_map();
     if r71 != 0 { return 960 + r71; }
-    let rv0: i32 = test_lower_vecf_case_param_f64();
-    if rv0 != 0 { return 970 + 0 + rv0; }
-    let rv1: i32 = test_lower_vecf_case_let_f64();
-    if rv1 != 0 { return 970 + 10 + rv1; }
-    let rv2: i32 = test_lower_vecf_case_ambiguous();
-    if rv2 != 0 { return 970 + 20 + rv2; }
-    let rv3: i32 = test_lower_vecf_case_typed_on_int();
-    if rv3 != 0 { return 970 + 30 + rv3; }
-    let rv4: i32 = test_lower_vecf_case_struct_field();
-    if rv4 != 0 { return 970 + 40 + rv4; }
-    let rv5: i32 = test_lower_vecf_case_fn_return();
-    if rv5 != 0 { return 970 + 50 + rv5; }
-    let rv6: i32 = test_lower_vecf_case_word_vec();
-    if rv6 != 0 { return 970 + 60 + rv6; }
-    let rv7: i32 = test_lower_vecf_case_two_fns();
-    if rv7 != 0 { return 970 + 70 + rv7; }
     let rv8: i32 = test_lower_vecf_lookup_kinds();
     if rv8 != 0 { return 970 + 80 + rv8; }
-    let rw0: i32 = test_lower_vecf_case2_fresh_float();
-    if rw0 != 0 { return 1000 + 0 + rw0; }
-    let rw1: i32 = test_lower_vecf_case2_fresh_int();
-    if rw1 != 0 { return 1000 + 10 + rw1; }
-    let rw2: i32 = test_lower_vecf_case2_fresh_conflict();
-    if rw2 != 0 { return 1000 + 20 + rw2; }
-    let rw3: i32 = test_lower_vecf_case2_fresh_annot_read();
-    if rw3 != 0 { return 1000 + 30 + rw3; }
-    let rw4: i32 = test_lower_vecf_case2_fresh_set_lit();
-    if rw4 != 0 { return 1000 + 40 + rw4; }
-    let rw5: i32 = test_lower_vecf_case2_fresh_arg();
-    if rw5 != 0 { return 1000 + 50 + rw5; }
-    let rw6: i32 = test_lower_vecf_case2_fresh_arg_second();
-    if rw6 != 0 { return 1000 + 60 + rw6; }
-    let rw7: i32 = test_lower_vecf_case2_fresh_arg_int_vec();
-    if rw7 != 0 { return 1000 + 70 + rw7; }
-    let rw8: i32 = test_lower_vecf_case2_fresh_return();
-    if rw8 != 0 { return 1000 + 80 + rw8; }
-    let rw9: i32 = test_lower_vecf_case2_fresh_field();
-    if rw9 != 0 { return 1000 + 90 + rw9; }
-    let rw10: i32 = test_lower_vecf_case2_fresh_untyped();
-    if rw10 != 0 { return 1000 + 100 + rw10; }
+    let rt: i32 = test_lower_vecf_site_table();
+    if rt != 0 { return 1200 + rt; }
     return 0;
 }

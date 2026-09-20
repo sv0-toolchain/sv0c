@@ -56,9 +56,9 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 323 { return "conflicting borrow of a slice source"; }
     if code == 429 { return "no such field"; }
     if code == 446 { return "multi-element tuples are not supported in this slice"; }
-    if code == 447 { return "vec_push / vec_set / array literals store integer-sized elements and would silently truncate an f64; declare the vec as Vec<f64> (parameter, let annotation, or struct field) so the f64 accessors are selected, or use vec_push_f64 / vec_set_f64"; }
+    if code == 447 { return "vec_push / vec_set / array literals / element stores use integer-sized slots and would silently truncate an f64; declare the vec, array or slice as f64 (Vec<f64>, [f64; N], &[f64]) so the f64 accessors are selected, or use vec_push_f64 / vec_set_f64"; }
     if code == 451 { return "ambiguous vec element type: this name is declared or used both as a Vec<f64> and as a word-sized Vec in the same function"; }
-    if code == 452 { return "a Vec<f64> element must be an f64"; }
+    if code == 452 { return "an element of an f64 Vec, array or slice must be an f64"; }
     if code == 453 { return "vec_push_f64 / vec_get_f64 / vec_set_f64 used on a Vec whose declared element type is not f64"; }
     if code == 550 { return "raw pointer dereference outside an `unsafe` block"; }
     if code == 551 { return "no C ABI mapping for this type in an `#[extern_c]` signature"; }
@@ -1412,6 +1412,9 @@ fn megatu_builtin_name(bid: i32) -> string {
     if bid == 38 { return "sv0_vec_push_f64"; }
     if bid == 39 { return "sv0_vec_get_f64"; }
     if bid == 40 { return "sv0_vec_set_f64"; }
+    /* f64 forms of the `e[i]` / `e[i] = v` sugar (41 get -> double, 42 set). */
+    if bid == 41 { return "sv0_idx_get_f64"; }
+    if bid == 42 { return "sv0_idx_set_f64"; }
     return "sv0_unknown_builtin";
 }
 
@@ -1421,6 +1424,7 @@ fn megatu_builtin_name(bid: i32) -> string {
    everything else — no more const char* result temps. */
 fn megatu_builtin_ret_cty(bid: i32) -> string {
     if bid == 39 { return "double"; }
+    if bid == 41 { return "double"; }
     return "int";
 }
 

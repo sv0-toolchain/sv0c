@@ -1,0 +1,6 @@
+// E0447: floats in an array that is declared as an i32 array would be
+// truncated by the word-sized element stores, so they are refused.
+fn main() -> i32 {
+    let a: [i32; 3] = [1.5, 2.25, 0.5];
+    return 0;
+}

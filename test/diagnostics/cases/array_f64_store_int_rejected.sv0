@@ -1,0 +1,6 @@
+// E0452: an integer literal stored into an f64 array element.
+fn main() -> i32 {
+    let a: [f64; 2] = [1.5, 2.5];
+    a[0] = 3;
+    return 0;
+}

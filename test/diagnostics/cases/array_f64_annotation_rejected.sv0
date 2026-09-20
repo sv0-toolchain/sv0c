@@ -1,6 +1,0 @@
-// E0447: a `[f64; N]` annotation (arrays have no f64 form; use a Vec<f64> with
-// vec_push_f64 / vec_get_f64 / vec_set_f64).
-fn main() -> i32 {
-    let a: [f64; 3] = [1, 2, 3];
-    return 0;
-}

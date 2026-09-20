@@ -2679,6 +2679,7 @@ fn scan_instr_env(ins: Instr,
             /* vec_get_f64 (lowering builtin id 39) returns a double. */
             if fn_h < 0 {
                 if 0 - fn_h == 39 { rcat = 1; }
+                if 0 - fn_h == 41 { rcat = 1; }
             }
             if rcat == 0 {
                 if slot_handle_in_range(fn_h, starts) == true {

@@ -413,6 +413,16 @@ static inline void sv0_idx_set(int32_t h, int32_t idx, intptr_t val) {
     sv0_vec_set(h, idx, val);
 }
 
+/* f64-element forms of the `e[i]` / `e[i] = v` sugar: same word slot, the
+   double's bits stored exactly (see sv0_vec_get_f64 / sv0_vec_set_f64). */
+static inline double sv0_idx_get_f64(int32_t h, int32_t idx) {
+  return sv0__f64_from_bits(sv0_idx_get(h, idx));
+}
+
+static inline void sv0_idx_set_f64(int32_t h, int32_t idx, double x) {
+  sv0_idx_set(h, idx, sv0__f64_bits(x));
+}
+
 /* SS-U11: fill_explicit(dst: &mut [byte], value: byte) -> () — sets every
  * element of `dst` to `value`, exactly like `sv0_idx_set` in a loop, but
  * with a BACKEND-ENFORCED guarantee (sv0doc memory-model/ownership.md

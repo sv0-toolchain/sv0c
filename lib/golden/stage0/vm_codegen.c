@@ -4647,47 +4647,47 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
   int _sv0t0;
   if ((ins.tag == 1)) {
     int x = ins.p0;
-    int _sv0t36 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
-    return _sv0t36;
+    int _sv0t37 = ensure_var_int(x, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
+    return _sv0t37;
     _sv0t0 = 0;
   } else {
     if ((ins.tag == 2)) {
       int cty = ins.p0;
       int x = ins.p1;
-      int _sv0t32 = width_of_cty(cty, structs_names, structs_field_counts, enums_names, enums_widths, source, starts, ends);
-      int w = _sv0t32;
+      int _sv0t33 = width_of_cty(cty, structs_names, structs_field_counts, enums_names, enums_widths, source, starts, ends);
+      int w = _sv0t33;
       sv0_vec_push(env_names, x);
       sv0_vec_push(env_bases, next_slot);
       sv0_vec_push(env_widths, w);
-      int _sv0t33 = cty_cat_of_handle(cty, source, starts, ends);
-      sv0_vec_push(env_cats, _sv0t33);
-      int _sv0t34 = record_field_layout(cty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
-      sv0_vec_push(env_field_starts, _sv0t34);
-      int _sv0t35 = (next_slot + w);
-      return _sv0t35;
+      int _sv0t34 = cty_cat_of_handle(cty, source, starts, ends);
+      sv0_vec_push(env_cats, _sv0t34);
+      int _sv0t35 = record_field_layout(cty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+      sv0_vec_push(env_field_starts, _sv0t35);
+      int _sv0t36 = (next_slot + w);
+      return _sv0t36;
       _sv0t0 = 0;
     } else {
       if ((ins.tag == 3)) {
         int x = ins.p0;
         int be = ins.p1;
-        Expr _sv0t25;
-        int _sv0t26 = sv0_box_load(be, 0);
-        _sv0t25.tag = _sv0t26;
-        int _sv0t27 = sv0_box_load(be, 1);
-        _sv0t25.p0 = _sv0t27;
-        int _sv0t28 = sv0_box_load(be, 2);
-        _sv0t25.p1 = _sv0t28;
-        int _sv0t29 = sv0_box_load(be, 3);
-        _sv0t25.p2 = _sv0t29;
+        Expr _sv0t26;
+        int _sv0t27 = sv0_box_load(be, 0);
+        _sv0t26.tag = _sv0t27;
+        int _sv0t28 = sv0_box_load(be, 1);
+        _sv0t26.p0 = _sv0t28;
+        int _sv0t29 = sv0_box_load(be, 2);
+        _sv0t26.p1 = _sv0t29;
+        int _sv0t30 = sv0_box_load(be, 3);
+        _sv0t26.p2 = _sv0t30;
         Expr ae;
-        ae.tag = (_sv0t25).tag;
-        ae.p0 = (_sv0t25).p0;
-        ae.p1 = (_sv0t25).p1;
-        ae.p2 = (_sv0t25).p2;
-        int _sv0t30 = expr_cat(ae, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
-        int acat = _sv0t30;
-        int _sv0t31 = ensure_var_cat(x, acat, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
-        return _sv0t31;
+        ae.tag = (_sv0t26).tag;
+        ae.p0 = (_sv0t26).p0;
+        ae.p1 = (_sv0t26).p1;
+        ae.p2 = (_sv0t26).p2;
+        int _sv0t31 = expr_cat(ae, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
+        int acat = _sv0t31;
+        int _sv0t32 = ensure_var_cat(x, acat, env_names, env_bases, env_widths, env_cats, env_field_starts, next_slot, source, starts, ends);
+        return _sv0t32;
         _sv0t0 = 0;
       } else {
         if ((ins.tag == 11)) {
@@ -4721,18 +4721,23 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
               rcat = 1;
             } else {
             }
+            int _sv0t19 = (0 - fn_h);
+            if ((_sv0t19 == 41)) {
+              rcat = 1;
+            } else {
+            }
           } else {
           }
           if ((rcat == 0)) {
-            int _sv0t19 = slot_handle_in_range(fn_h, starts);
-            if ((_sv0t19 == 1)) {
-              int _sv0t20 = index_of_fn(fn_h, blabels, source, starts, ends);
-              int cidx = _sv0t20;
+            int _sv0t20 = slot_handle_in_range(fn_h, starts);
+            if ((_sv0t20 == 1)) {
+              int _sv0t21 = index_of_fn(fn_h, blabels, source, starts, ends);
+              int cidx = _sv0t21;
               if ((cidx >= 0)) {
-                int _sv0t21 = sv0_vec_len(bretcats);
-                if ((cidx < _sv0t21)) {
-                  int _sv0t22 = sv0_vec_get(bretcats, cidx);
-                  rcat = _sv0t22;
+                int _sv0t22 = sv0_vec_len(bretcats);
+                if ((cidx < _sv0t22)) {
+                  int _sv0t23 = sv0_vec_get(bretcats, cidx);
+                  rcat = _sv0t23;
                 } else {
                 }
               } else {
@@ -4742,10 +4747,10 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
           } else {
           }
           sv0_vec_push(env_cats, rcat);
-          int _sv0t23 = record_field_layout(rty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
-          sv0_vec_push(env_field_starts, _sv0t23);
-          int _sv0t24 = (next_slot + w);
-          return _sv0t24;
+          int _sv0t24 = record_field_layout(rty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+          sv0_vec_push(env_field_starts, _sv0t24);
+          int _sv0t25 = (next_slot + w);
+          return _sv0t25;
           _sv0t0 = 0;
         } else {
           if ((ins.tag == 6)) {
