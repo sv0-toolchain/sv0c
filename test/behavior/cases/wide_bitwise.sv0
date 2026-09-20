@@ -1,0 +1,41 @@
+// i64/u64 `&` `|` `^` must keep all 64 bits on the native VM. The polymorphic
+// BIT_AND/OR/XOR narrow both operands to 32 bits, so a value past bit 31 lost
+// its high half (the C backend was always right); AND_I64/OR_I64/XOR_I64
+// (opcodes 43-45) fix it. Expected exit: 42 (native only -- 64-bit literals).
+
+fn main() -> i32 {
+    let a: u64 = 1099511627781;   // 2^40 + 5
+    let b: u64 = 1099511627779;   // 2^40 + 3
+    if (a & b) != 1099511627777 { return 10; }
+    if (a | b) != 1099511627783 { return 11; }
+    if (a ^ b) != 6 { return 12; }
+
+    // high bit set: unsigned, and a mask built from a shift
+    let one: u64 = 1;
+    let hi: u64 = one << 63;
+    let all: u64 = hi | (hi - 1);
+    if (all & hi) != hi { return 13; }
+    if (all ^ hi) != hi - 1 { return 14; }
+    if !((hi | 1) > hi) { return 15; }
+
+    // signed 64-bit, including a negative operand
+    let s: i64 = 1099511627776;
+    if (s | 1) != 1099511627777 { return 16; }
+    if (s & 1099511627777) != s { return 17; }
+    let neg: i64 = 0 - 2;
+    if (neg & 3) != 2 { return 18; }
+    if (neg ^ 1) != (0 - 1) { return 19; }
+
+    // extracting a byte from above bit 32 (the usual reason to want this)
+    let word: u64 = 1311768467294899695;   // 0x1234567890ABCDEF
+    if ((word >> 32) & 255) != 120 { return 20; }
+    if ((word >> 8) & 255) != 205 { return 21; }
+
+    // 32-bit and mixed operands are unaffected
+    let x: i32 = 12;
+    if (x & 10) != 8 { return 22; }
+    let u: u32 = 4026531840;
+    if (u & 4278190080) != 4026531840 { return 23; }
+    if (a & 1) != 1 { return 24; }
+    return 42;
+}

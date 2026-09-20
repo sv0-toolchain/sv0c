@@ -60,6 +60,12 @@ fn OP_MOD_U64() -> i32 { return 39; }
 fn OP_SHL_I64() -> i32 { return 40; }
 fn OP_SHR_I64() -> i32 { return 41; }
 fn OP_SHR_U64() -> i32 { return 42; }
+/* Wide (64-bit) bitwise. The polymorphic OP_BIT_AND/OR/XOR (88/89/90) narrow
+   both operands to 32 bits, so an i64/u64 value past bit 31 lost its high
+   half; these keep all 64. */
+fn OP_AND_I64() -> i32 { return 43; }
+fn OP_OR_I64() -> i32 { return 44; }
+fn OP_XOR_I64() -> i32 { return 45; }
 
 fn OP_ADD_F64() -> i32 { return 48; }
 fn OP_SUB_F64() -> i32 { return 49; }
@@ -132,7 +138,7 @@ fn insn_encoded_size(opc: i32) -> i32 {
         if opc <= 21 { return 1; }
     }
     if opc >= 32 {
-        if opc <= 42 { return 1; }
+        if opc <= 45 { return 1; }
     }
     if opc >= 48 {
         if opc <= 52 { return 1; }
@@ -202,7 +208,7 @@ fn is_arithmetic_opcode(opc: i32) -> bool {
         if opc <= 21 { return true; }
     }
     if opc >= 32 {
-        if opc <= 42 { return true; }
+        if opc <= 45 { return true; }
     }
     if opc >= 48 {
         if opc <= 52 { return true; }
@@ -586,7 +592,7 @@ fn encode_insn_at(instrs: Vec<i32>, idx: i32, out: Vec<i32>) -> i32 {
         if opc <= 21 { return idx + 1; }
     }
     if opc >= 32 {
-        if opc <= 42 { return idx + 1; }
+        if opc <= 45 { return idx + 1; }
     }
     if opc >= 48 {
         if opc <= 52 { return idx + 1; }
@@ -729,7 +735,7 @@ fn decode_insn_at(buf: Vec<i32>, pos: i32, out: Vec<i32>) -> i32 {
         if opc <= 21 { return pos + 1; }
     }
     if opc >= 32 {
-        if opc <= 42 { return pos + 1; }
+        if opc <= 45 { return pos + 1; }
     }
     if opc >= 48 {
         if opc <= 52 { return pos + 1; }
@@ -1031,6 +1037,9 @@ fn test_insn_sizes() -> i32 {
     if insn_encoded_size(73) != 1 { return 83; }
     if insn_encoded_size(40) != 1 { return 84; }
     if insn_encoded_size(42) != 1 { return 85; }
+    if insn_encoded_size(43) != 1 { return 150; }
+    if insn_encoded_size(45) != 1 { return 151; }
+    if insn_encoded_size(46) == 1 { return 152; }
     if insn_encoded_size(64) != 1 { return 9; }
     if insn_encoded_size(96) != 5 { return 10; }
     if insn_encoded_size(112) != 5 { return 11; }
@@ -1055,7 +1064,9 @@ fn test_opcode_classify() -> i32 {
     if is_arithmetic_opcode(64) != false { return 10; }
     if is_arithmetic_opcode(40) != true { return 100; }
     if is_arithmetic_opcode(42) != true { return 101; }
-    if is_arithmetic_opcode(43) != false { return 102; }
+    if is_arithmetic_opcode(43) != true { return 153; }
+    if is_arithmetic_opcode(45) != true { return 154; }
+    if is_arithmetic_opcode(46) != false { return 102; }
     if is_compare_opcode(64) != true { return 11; }
     if is_compare_opcode(69) != true { return 12; }
     if is_logic_opcode(80) != true { return 13; }

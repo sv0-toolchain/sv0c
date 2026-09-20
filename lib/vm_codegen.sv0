@@ -864,9 +864,8 @@ fn unop_tag_to_insn(tag: i32) -> i32 {
    for category 1. i64/u64 shifts (tags 16-17) take the wide 64-bit shift
    opcodes 40-42 (SS-U14 residual #1): SHL is width-only, i64 right-shift is
    arithmetic, u64 right-shift is logical. i64/u64 bitwise AND/OR/XOR (tags
-   13-15) still fall back to the 32-bit opcodes — the .sv0b set has no wide
-   bitwise variants and sv0vm's wide-int bitwise support is a separate item
-   (VMF-011/012). */
+   13-15) take the wide AND_I64 / OR_I64 / XOR_I64 opcodes 43-45 (the
+   polymorphic 32-bit ones dropped the high half). */
 fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
     if cat == 1 {
         if tag == 0 { return 48; }
@@ -886,6 +885,10 @@ fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
         /* SS-U14 residual #1: wide shifts. i64 `>>` is arithmetic. */
         if tag == 16 { return 40; }
         if tag == 17 { return 41; }
+        /* wide bitwise (tags 13-15): AND_I64 / OR_I64 / XOR_I64 */
+        if tag == 13 { return 43; }
+        if tag == 14 { return 44; }
+        if tag == 15 { return 45; }
         return binop_tag_to_insn(tag);
     }
     /* SS-U14: cat 3 = unsigned wide. add/sub/mul reuse the I64 opcodes
@@ -905,6 +908,9 @@ fn binop_tag_to_insn_typed(tag: i32, cat: i32) -> i32 {
         /* SS-U14 residual #1: wide shifts. u64 `>>` is logical. */
         if tag == 16 { return 40; }
         if tag == 17 { return 42; }
+        if tag == 13 { return 43; }
+        if tag == 14 { return 44; }
+        if tag == 15 { return 45; }
         return binop_tag_to_insn(tag);
     }
     /* u32 (cat 4): the operands were zero-extended by the caller
@@ -4781,12 +4787,13 @@ fn test_typed_opcode_select() -> i32 {
     if binop_tag_to_insn_typed(4, 2) != 36 { return 32; }
     if binop_tag_to_insn_typed(8, 2) != 67 { return 33; }
     /* SS-U14 residual #1: wide shifts. cat 2 (i64): SHL 40, SHR arith 41.
-       cat 3 (u64): SHL 40, SHR logical 42. bitwise AND (13) still 88. */
+       cat 3 (u64): SHL 40, SHR logical 42. bitwise AND (13) is now the wide
+       AND_I64 (43) for cat 2/3; cat 0 stays the 32-bit 88. */
     if binop_tag_to_insn_typed(16, 2) != 40 { return 34; }
     if binop_tag_to_insn_typed(17, 2) != 41 { return 35; }
     if binop_tag_to_insn_typed(16, 3) != 40 { return 36; }
     if binop_tag_to_insn_typed(17, 3) != 42 { return 37; }
-    if binop_tag_to_insn_typed(13, 2) != 88 { return 38; }
+    if binop_tag_to_insn_typed(13, 2) != 43 { return 38; }
     /* unop typed: neg picks NEG_F64 / NEG_I64 / NEG_I32; not stays 82 */
     if unop_tag_to_insn_typed(0, 0) != 21 { return 40; }
     if unop_tag_to_insn_typed(0, 1) != 52 { return 41; }
@@ -4851,6 +4858,11 @@ fn test_typed_opcode_select() -> i32 {
     if binop_tag_to_insn_typed(10, 4) != 73 { return 78; }
     if binop_tag_to_insn_typed(17, 4) != 42 { return 79; }
     if binop_tag_to_insn_typed(1, 4) != binop_tag_to_insn(1) { return 80; }
+    if binop_tag_to_insn_typed(13, 2) != 43 { return 102; }
+    if binop_tag_to_insn_typed(14, 3) != 44 { return 103; }
+    if binop_tag_to_insn_typed(15, 2) != 45 { return 104; }
+    if binop_tag_to_insn_typed(13, 0) != binop_tag_to_insn(13) { return 105; }
+    if binop_tag_to_insn_typed(13, 4) != binop_tag_to_insn(13) { return 106; }
     if unop_tag_to_insn_typed(0, 4) != 21 { return 81; }
     if u32_operand_needs_zext(4, 4, 10) != true { return 82; }
     if u32_operand_needs_zext(4, 4, 3) != true { return 83; }
