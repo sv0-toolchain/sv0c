@@ -131,6 +131,7 @@ test/behavior/cases/wide_shift_temps.sv0|42|native
 test/behavior/cases/wide_bitwise.sv0|42|native
 test/behavior/cases/vec_f64.sv0|42|native
 test/behavior/cases/vec_f64_generic.sv0|42|native
+test/behavior/cases/let_infer_wide.sv0|42|native
 test/behavior/cases/ffi_ptr_create_and_pass.sv0|7|native
 test/behavior/cases/ffi_unsafe_block_transparent.sv0|8
 test/behavior/cases/ffi_unsafe_deref_gated.sv0|5|native

@@ -2427,6 +2427,53 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
     return "";
 }
 
+/* Unannotated `let x = <init>;` lowers to `DeclVar(x)` immediately followed by
+   `Store(x, init)`. DeclVar carries no type, so x used to be declared `int`
+   whatever the init was (`let a = 2.5;` truncated). When the very next
+   instruction is the initializing Store, type x from the stored expression
+   with the same megatu_expr_cty the Assign temps use. Returns the category
+   (1 double, 2 int64_t, 3 uint64_t, 4 uint32_t) when it is not plain int,
+   else -1 (keep the default `int`). The contract `result` slot is excluded:
+   it is typed from the fn return type. */
+fn megatu_declvar_init_cat(instrs: Vec<i32>, idx: i32, source: string,
+                           starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>,
+                           tyenv_h: Vec<i32>, tyenv_f: Vec<i32>, tyenv_e: Vec<i32>,
+                           eit_base: Vec<i32>, eit_cnt: Vec<i32>, eit_cats: Vec<i32>,
+                           tyenv_st: Vec<i32>, sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                           sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>) -> i32 {
+    if idx + 1 >= vec_len(instrs) { return 0 - 1; }
+    let bh: Box<codegen_Instr> = vec_get(instrs, idx);
+    let ins: codegen_Instr = box_deref(bh);
+    match ins {
+        codegen_Instr::DeclVar(h) => {
+            if string_eq(megatu_val_name(h, source, starts, ends, sidx), "result") { return 0 - 1; }
+            let nb: Box<codegen_Instr> = vec_get(instrs, idx + 1);
+            let nx: codegen_Instr = box_deref(nb);
+            match nx {
+                codegen_Instr::Store(h2, be) => {
+                    if h2 != h { return 0 - 1; }
+                    let e: codegen_Expr = box_deref(be);
+                    let cat: i32 = megatu_expr_cty(e, tyenv_h, tyenv_f, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
+                    if cat > 0 { return cat; }
+                    return 0 - 1;
+                },
+                _ => { return 0 - 1; },
+            }
+        },
+        _ => { return 0 - 1; },
+    }
+}
+
+/* Handle of the DeclVar at instrs[idx] (-1 if it is another instruction). */
+fn megatu_declvar_handle(instrs: Vec<i32>, idx: i32) -> i32 {
+    let bh: Box<codegen_Instr> = vec_get(instrs, idx);
+    let ins: codegen_Instr = box_deref(bh);
+    match ins {
+        codegen_Instr::DeclVar(h) => { return h; },
+        _ => { return 0 - 1; },
+    }
+}
+
 fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
                       source: string, starts: Vec<i32>, ends: Vec<i32>,
                       sidx: Vec<i32>, tyenv_h: Vec<i32>, tyenv_f: Vec<i32>,
@@ -2444,6 +2491,17 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
     while idx < count {
         let bh: Box<codegen_Instr> = vec_get(instrs, idx);
         let ins: codegen_Instr = box_deref(bh);
+        let dcat: i32 = megatu_declvar_init_cat(instrs, idx, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat);
+        if dcat > 0 {
+            let dh: i32 = megatu_declvar_handle(instrs, idx);
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, dh, dcat, 0 - 1, 0 - 1);
+            let d1: string = string_concat(indent, megatu_cty_of_category(dcat));
+            let d2: string = string_concat(d1, " ");
+            let d3: string = string_concat(d2, megatu_val_name(dh, source, starts, ends, sidx));
+            out = string_concat(out, string_concat(d3, ";\n"));
+            idx = idx + 1;
+            continue;
+        }
         out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
         idx = idx + 1;
     }

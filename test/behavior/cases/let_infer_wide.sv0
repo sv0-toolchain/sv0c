@@ -1,0 +1,62 @@
+// Unannotated `let x = <init>;` takes the init's type, not a default `int`:
+// float literals and arithmetic, f64 calls, wide integers (i64/u64/u32),
+// values read from struct fields and from a declared Vec<f64>, and lets
+// inside nested blocks. Each of these used to declare a C `int` and silently
+// truncate. Expected exit: 42.
+
+struct P {
+    x: f64,
+    big: i64,
+}
+
+fn half() -> f64 { return 0.5; }
+
+fn widen(a: i64) -> i64 { return a * 3; }
+
+fn main() -> i32 {
+    let a = 2.5;
+    let b = half();
+    let c = a * 2.0;
+    if a != 2.5 { return 1; }
+    if b != 0.5 { return 2; }
+    if c != 5.0 { return 3; }
+
+    let base: i64 = 3000000000;
+    let d = base + base;
+    if d != 6000000000 { return 4; }
+    let e = widen(base);
+    if e != 9000000000 { return 5; }
+
+    let one: u64 = 1;
+    let f = one << 40;
+    if f != 1099511627776 { return 6; }
+
+    let p: P = P { x: 1.25, big: base };
+    let g = p.x;
+    let h = p.big;
+    if g != 1.25 { return 7; }
+    if h != 3000000000 { return 8; }
+
+    let v: Vec<f64> = vec_new();
+    vec_push(v, 0.75);
+    let i = vec_get(v, 0);
+    if i != 0.75 { return 9; }
+
+    // nested block and loop bodies
+    let mut acc: f64 = 0.0;
+    let mut k: i32 = 0;
+    while k < 3 {
+        let step = 0.25;
+        let scaled = step * 2.0;
+        acc = acc + scaled;
+        k = k + 1;
+    }
+    if acc != 1.5 { return 10; }
+
+    // plain int and bool lets are unchanged
+    let n = vec_len(v);
+    let ok = n == 1;
+    if ok != true { return 11; }
+    let m = n + 41;
+    return m;
+}
