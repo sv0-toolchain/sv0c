@@ -1,0 +1,24 @@
+// A shift has the type of its LEFT operand alone. The C backend typed the
+// temp holding an inline shift `int`, so `(one << 63) + one` on a u64 came out
+// as 0 + 1 and `(one << 40) / (one << 20)` lost the high bits. (The values
+// here go through temps: nothing is assigned straight from the shift.)
+// Expected exit: 42 (native only -- needs 64-bit literals/shifts).
+
+fn main() -> i32 {
+    let one: u64 = 1;
+    let y: u64 = 5;
+
+    // inline shift feeding another op
+    let x: u64 = (one << 63) + one;
+    if !(x >= y) { return 10; }
+    if x - (one << 63) != 1 { return 11; }
+
+    // quotient of two inline shifts
+    if (one << 40) / (one << 20) != 1048576 { return 12; }
+    if ((one << 62) >> 61) != 2 { return 13; }
+
+    // signed wide: the shifted value must stay 64-bit
+    let s: i64 = 1;
+    if (s << 40) + s != 1099511627777 { return 14; }
+    return 42;
+}

@@ -43,6 +43,15 @@ fn main() -> i32 {
     let hi_bits: u32 = 4026531840;
     if (hi_bits >> 28) != 15 { return 25; }
 
+    // bitwise with the high bit set stays unsigned (the C backend typed these
+    // temps `int`, so the result went negative); a literal above 2^31 - 1 is
+    // a wide constant, and the value is the same as the 32-bit operation
+    if (big & 4294967295) != big { return 26; }
+    if (top | 1) != 2147483649 { return 27; }
+    if (max_u32() ^ big) != 1294967295 { return 28; }
+    let mask: u32 = 65535;
+    if (big & mask) != 24064 { return 30; }
+
     // ordinary small values are unaffected
     let a: u32 = 40;
     let b: u32 = 2;

@@ -84,6 +84,8 @@ static int binop_tag_to_insn_typed(int tag, int cat);
 static int unop_tag_to_insn_typed(int tag, int cat);
 static int slot_cat(int env_cats, int idx);
 static int combine_cat(int a, int b);
+static int value_is_wide_literal(Value v);
+static int binop_emit_cat(int tag, int c1, int c2, Value v1, Value v2);
 static int emit_u32_zext(int out);
 static int u32_operand_needs_zext(int opcat, int bcat, int tag);
 static int member_cat(int bv, int f, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends);
@@ -1738,6 +1740,103 @@ static int combine_cat(int a, int b) {
   return 0;
 }
 
+static int value_is_wide_literal(Value v) {
+  int _sv0t0;
+  if ((v.tag == 9)) {
+    int h = v.p0;
+    return 1;
+    _sv0t0 = 0;
+  } else {
+    if ((v.tag == 0)) {
+      int n = v.p0;
+      return 0;
+      _sv0t0 = 0;
+    } else {
+      if ((v.tag == 1)) {
+        return 0;
+        _sv0t0 = 0;
+      } else {
+        if ((v.tag == 2)) {
+          return 0;
+          _sv0t0 = 0;
+        } else {
+          if ((v.tag == 3)) {
+            int x = v.p0;
+            return 0;
+            _sv0t0 = 0;
+          } else {
+            if ((v.tag == 4)) {
+              return 0;
+              _sv0t0 = 0;
+            } else {
+              if ((v.tag == 5)) {
+                int sv = v.p0;
+                return 0;
+                _sv0t0 = 0;
+              } else {
+                if ((v.tag == 6)) {
+                  int bv = v.p0;
+                  int f = v.p1;
+                  return 0;
+                  _sv0t0 = 0;
+                } else {
+                  if ((v.tag == 7)) {
+                    int x = v.p0;
+                    return 0;
+                    _sv0t0 = 0;
+                  } else {
+                    if ((v.tag == 8)) {
+                      int h = v.p0;
+                      return 0;
+                      _sv0t0 = 0;
+                    } else {
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+static int binop_emit_cat(int tag, int c1, int c2, Value v1, Value v2) {
+  int _sv0t0 = combine_cat(c1, c2);
+  int c = _sv0t0;
+  if ((tag < 13)) {
+    return c;
+  } else {
+  }
+  if ((tag > 15)) {
+    return c;
+  } else {
+  }
+  if ((c != 2)) {
+    return c;
+  } else {
+  }
+  if ((c1 == 4)) {
+    int _sv0t1 = value_is_wide_literal(v2);
+    if (_sv0t1) {
+      return 4;
+    } else {
+    }
+  } else {
+  }
+  if ((c2 == 4)) {
+    int _sv0t2 = value_is_wide_literal(v1);
+    if (_sv0t2) {
+      return 4;
+    } else {
+    }
+  } else {
+  }
+  return c;
+}
+
 static int emit_u32_zext(int out) {
   sv0_vec_push(out, 5);
   sv0_vec_push(out, 0);
@@ -2016,7 +2115,7 @@ static int expr_cat(Expr e, int env_names, int env_bases, int env_widths, int en
         int c1 = _sv0t15;
         int _sv0t16 = operand_cat(v2, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
         int c2 = _sv0t16;
-        int _sv0t17 = combine_cat(c1, c2);
+        int _sv0t17 = binop_emit_cat(tag, c1, c2, v1, v2);
         return _sv0t17;
         _sv0t0 = 0;
       } else {
@@ -3321,7 +3420,7 @@ static int emit_expr(Expr e, int env_names, int env_bases, int env_widths, int e
         int c1 = _sv0t34;
         int _sv0t35 = operand_cat(v2, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
         int c2 = _sv0t35;
-        int _sv0t36 = combine_cat(c1, c2);
+        int _sv0t36 = binop_emit_cat(op_h, c1, c2, v1, v2);
         int bcat = _sv0t36;
         int _sv0t37 = emit_value(v1, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
         int n1 = _sv0t37;
@@ -11243,30 +11342,101 @@ static int test_typed_opcode_select(void) {
     return 89;
   } else {
   }
-  int _sv0t114 = sv0_vec_new();
-  int wout = _sv0t114;
-  int _sv0t115 = emit_u32_zext(wout);
-  if ((_sv0t115 != 4)) {
+  Value _sv0t114;
+  _sv0t114.tag = 9;
+  _sv0t114.p0 = 0;
+  int _sv0t115 = value_is_wide_literal(_sv0t114);
+  if ((_sv0t115 != 1)) {
+    return 95;
+  } else {
+  }
+  Value _sv0t116;
+  _sv0t116.tag = 0;
+  _sv0t116.p0 = 7;
+  int _sv0t117 = value_is_wide_literal(_sv0t116);
+  if ((_sv0t117 != 0)) {
+    return 96;
+  } else {
+  }
+  Value _sv0t118;
+  _sv0t118.tag = 3;
+  _sv0t118.p0 = 1;
+  Value _sv0t119;
+  _sv0t119.tag = 9;
+  _sv0t119.p0 = 0;
+  int _sv0t120 = binop_emit_cat(13, 4, 2, _sv0t118, _sv0t119);
+  if ((_sv0t120 != 4)) {
+    return 97;
+  } else {
+  }
+  Value _sv0t121;
+  _sv0t121.tag = 9;
+  _sv0t121.p0 = 0;
+  Value _sv0t122;
+  _sv0t122.tag = 3;
+  _sv0t122.p0 = 1;
+  int _sv0t123 = binop_emit_cat(15, 2, 4, _sv0t121, _sv0t122);
+  if ((_sv0t123 != 4)) {
+    return 98;
+  } else {
+  }
+  Value _sv0t124;
+  _sv0t124.tag = 3;
+  _sv0t124.p0 = 1;
+  Value _sv0t125;
+  _sv0t125.tag = 3;
+  _sv0t125.p0 = 2;
+  int _sv0t126 = binop_emit_cat(13, 4, 2, _sv0t124, _sv0t125);
+  if ((_sv0t126 != 2)) {
+    return 99;
+  } else {
+  }
+  Value _sv0t127;
+  _sv0t127.tag = 3;
+  _sv0t127.p0 = 1;
+  Value _sv0t128;
+  _sv0t128.tag = 9;
+  _sv0t128.p0 = 0;
+  int _sv0t129 = binop_emit_cat(0, 4, 2, _sv0t127, _sv0t128);
+  if ((_sv0t129 != 2)) {
+    return 100;
+  } else {
+  }
+  Value _sv0t130;
+  _sv0t130.tag = 3;
+  _sv0t130.p0 = 1;
+  Value _sv0t131;
+  _sv0t131.tag = 9;
+  _sv0t131.p0 = 0;
+  int _sv0t132 = binop_emit_cat(16, 4, 2, _sv0t130, _sv0t131);
+  if ((_sv0t132 != 2)) {
+    return 101;
+  } else {
+  }
+  int _sv0t133 = sv0_vec_new();
+  int wout = _sv0t133;
+  int _sv0t134 = emit_u32_zext(wout);
+  if ((_sv0t134 != 4)) {
     return 90;
   } else {
   }
-  int _sv0t116 = sv0_vec_len(wout);
-  if ((_sv0t116 != 4)) {
+  int _sv0t135 = sv0_vec_len(wout);
+  if ((_sv0t135 != 4)) {
     return 91;
   } else {
   }
-  int _sv0t117 = sv0_vec_get(wout, 0);
-  if ((_sv0t117 != 5)) {
+  int _sv0t136 = sv0_vec_get(wout, 0);
+  if ((_sv0t136 != 5)) {
     return 92;
   } else {
   }
-  int _sv0t118 = sv0_vec_get(wout, 2);
-  if ((_sv0t118 != 1)) {
+  int _sv0t137 = sv0_vec_get(wout, 2);
+  if ((_sv0t137 != 1)) {
     return 93;
   } else {
   }
-  int _sv0t119 = sv0_vec_get(wout, 3);
-  if ((_sv0t119 != 39)) {
+  int _sv0t138 = sv0_vec_get(wout, 3);
+  if ((_sv0t138 != 39)) {
     return 94;
   } else {
   }

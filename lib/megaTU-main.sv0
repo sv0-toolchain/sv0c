@@ -1537,6 +1537,11 @@ fn megatu_cty_category(cty: string) -> i32 {
        cty_cat_of_handle already does this). */
     if string_eq(cty, "uint64_t") { return 3; }
     if string_eq(cty, "uintptr_t") { return 3; }
+    /* Category 4 = uint32_t (same code the enum payload slots already use), so
+       a temp over u32 operands is declared `uint32_t`, not `int`: an `int`
+       temp turned 3000000000 negative and `_t != 2147483649` compared a
+       sign-extended value. */
+    if string_eq(cty, "uint32_t") { return 4; }
     return 0;
 }
 
@@ -1811,6 +1816,10 @@ fn megatu_cty_max(a: i32, b: i32) -> i32 {
     if b == 3 { return 3; }
     if a == 2 { return 2; }
     if b == 2 { return 2; }
+    /* u32 yields to any wider category, and beats plain int (C's usual
+       arithmetic conversions). */
+    if a == 4 { return 4; }
+    if b == 4 { return 4; }
     return 0;
 }
 
@@ -1829,17 +1838,23 @@ fn megatu_expr_cty(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
             return megatu_tyenv_lookup_cty(h, tyenv_h, tyenv_c, source, starts, ends);
         },
         codegen_Expr::Binop(op_h, bv1, bv2) => {
-            /* Comparison (5..10)/logical (11..12)/bitwise (13..17) ops always
-               produce an int-flavored (0/1) result regardless of operand
-               type — only arithmetic (0..4: + - * / %) propagates the
-               operand's category (matches checker.sv0's is_arith_binop fix
-               for the same reason). Without this, `a == b` on two f64
-               operands got typed "double" — harmless in C (an int-valued
-               double still works in `if`/`||`), but not what it should be. */
+            /* Comparison (5..10) and logical (11..12) ops always produce an
+               int-flavored (0/1) result regardless of operand type. Arithmetic
+               (0..4) and bitwise (13..15: & | ^) take C's usual-arithmetic-
+               conversion type of the two operands. A shift (16..17) has the
+               type of its LEFT operand alone (the count does not widen it) --
+               typing these `int` truncated `one << 63` on a u64 and turned a
+               u32 bitwise result negative. */
             if op_h < 0 { return 0; }
-            if op_h > 4 { return 0; }
+            if op_h >= 5 {
+                if op_h <= 12 { return 0; }
+            }
+            if op_h > 17 { return 0; }
             let v1: codegen_Value = box_deref(bv1);
             let v2: codegen_Value = box_deref(bv2);
+            if op_h >= 16 {
+                return megatu_value_cty(v1, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
+            }
             return megatu_cty_max(megatu_value_cty(v1, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends),
                                   megatu_value_cty(v2, tyenv_h, tyenv_c, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends));
         },
@@ -1859,6 +1874,7 @@ fn megatu_cty_of_category(category: i32) -> string {
     if category == 1 { return "double"; }
     if category == 2 { return "int64_t"; }
     if category == 3 { return "uint64_t"; }
+    if category == 4 { return "uint32_t"; }
     return "int";
 }
 
