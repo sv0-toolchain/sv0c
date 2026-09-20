@@ -1,0 +1,9 @@
+// E0451: the same name is declared both as Vec<f64> and as another type in one
+// function, so the generic vec_get cannot tell which accessor to use.
+fn main() -> i32 {
+    let v: Vec<f64> = vec_new();
+    vec_push(v, 1.5);
+    let v: Vec<i32> = vec_new();
+    let x: f64 = vec_get(v, 0);
+    return 0;
+}

@@ -3069,6 +3069,411 @@ fn find_multi_element_tuple(bet: Vec<i32>, bed2: Vec<i32>) -> i32 {
    that itself contains further nested sub-expressions pushing extra
    nodes; real block statements (tag 9/34) DO use the sidecar correctly,
    since that's where local pointer `let`s are actually declared. */
+/* ── Vec element-type inference (token scan) ─────────────────────────────
+   `Vec<T>` is an untyped handle to the checker and to lowering, so the
+   element type of `vec_push(v, x)` / `vec_get(v, i)` / `vec_set(v, i, x)` is
+   recovered from DECLARATIONS instead: a parameter `v: Vec<f64>`, a `let`
+   annotation `let v: Vec<f64> = ..`, a `let v = f(..)` where `f` is declared
+   `-> Vec<f64>`, or a struct field `data: Vec<f64>` reached as `s.data`.
+   `chk_vecf_site_map` returns one entry per token; the entry at the CALLEE
+   token of a vec accessor call is:
+     generic vec_push / vec_get / vec_set:
+       1 = the vec is a Vec<f64> (select the f64 accessor),
+       2 = the name is declared both as Vec<f64> and as something else in the
+           same scope (ambiguous: refused),
+       0 = otherwise (ordinary word-sized vec).
+     typed vec_push_f64 / vec_get_f64 / vec_set_f64:
+       3 = the vec is declared only as an explicit Vec<T> with T != f64,
+       0 = otherwise.
+   Scope = one fn (params + `let`s); struct fields are program-wide by field
+   name. Only a bare `name` or `name.field` first argument is resolved. This
+   is a token scan (same style as scan_struct_field_names): it is mirrored in
+   checker.sv0 (diagnostics) and lowering.sv0 (accessor selection) and the
+   two copies must stay identical. */
+
+fn chk_vecf_tag_at(tok_tags: Vec<i32>, i: i32) -> i32 {
+    if i < 0 { return 0 - 1; }
+    if i >= vec_len(tok_tags) { return 0 - 1; }
+    return vec_get(tok_tags, i);
+}
+
+fn chk_vecf_text_is(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                   t: i32, want: string) -> bool {
+    if t < 0 { return false; }
+    if t >= vec_len(starts) { return false; }
+    if t >= vec_len(ends) { return false; }
+    let s0: i32 = vec_get(starts, t);
+    let e0: i32 = vec_get(ends, t);
+    if e0 - s0 != string_len(want) { return false; }
+    return string_eq(string_substr(source, s0, e0 - s0), want);
+}
+
+fn chk_vecf_same_text(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                     a: i32, b: i32) -> bool {
+    if a < 0 { return false; }
+    if b < 0 { return false; }
+    if a >= vec_len(starts) { return false; }
+    if b >= vec_len(starts) { return false; }
+    if a >= vec_len(ends) { return false; }
+    if b >= vec_len(ends) { return false; }
+    let la: i32 = vec_get(ends, a) - vec_get(starts, a);
+    let lb: i32 = vec_get(ends, b) - vec_get(starts, b);
+    if la != lb { return false; }
+    if la <= 0 { return false; }
+    return string_eq(string_substr(source, vec_get(starts, a), la),
+                     string_substr(source, vec_get(starts, b), lb));
+}
+
+/* Kind of the type starting at token `p` (just after a `:`):
+   1 = Vec<f64>, 3 = Vec<other>, 2 = anything else. Leading `&` / `mut` skipped. */
+fn chk_vecf_type_kind(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
+                     ends: Vec<i32>, p: i32) -> i32 {
+    let mut q: i32 = p;
+    if chk_vecf_tag_at(tok_tags, q) == 27 { q = q + 1; }
+    if chk_vecf_tag_at(tok_tags, q) == 77 { q = q + 1; }
+    if chk_vecf_tag_at(tok_tags, q) != 5 { return 2; }
+    if chk_vecf_text_is(source, starts, ends, q, "Vec") != true { return 2; }
+    if chk_vecf_tag_at(tok_tags, q + 1) != 38 { return 2; }
+    if chk_vecf_tag_at(tok_tags, q + 2) == 5 {
+        if chk_vecf_text_is(source, starts, ends, q + 2, "f64") {
+            let close: i32 = chk_vecf_tag_at(tok_tags, q + 3);
+            if close == 39 { return 1; }
+            if close == 41 { return 1; }
+        }
+    }
+    return 3;
+}
+
+/* Resolve `name_tok` against a (names, kinds) table by identifier text:
+   0 = no entry / only non-Vec-f64 entries, 1 = every entry is Vec<f64>,
+   2 = Vec<f64> mixed with other entries, 3 = every entry is Vec<non-f64>. */
+fn chk_vecf_lookup(names: Vec<i32>, kinds: Vec<i32>, source: string,
+                  starts: Vec<i32>, ends: Vec<i32>, name_tok: i32) -> i32 {
+    let mut n1: i32 = 0;
+    let mut n3: i32 = 0;
+    let mut no: i32 = 0;
+    let mut i: i32 = 0;
+    let n: i32 = vec_len(names);
+    while i < n {
+        if chk_vecf_same_text(source, starts, ends, vec_get(names, i), name_tok) {
+            let k: i32 = vec_get(kinds, i);
+            if k == 1 { n1 = n1 + 1; }
+            if k == 3 { n3 = n3 + 1; }
+            if k == 2 { no = no + 1; }
+        }
+        i = i + 1;
+    }
+    if n1 > 0 {
+        if n3 + no > 0 { return 2; }
+        return 1;
+    }
+    if n3 > 0 {
+        if no == 0 { return 3; }
+    }
+    return 0;
+}
+
+/* Struct field declarations: `struct` keyword at `i`. Appends one (field
+   name token, kind) per field. Returns the index to resume scanning at. */
+fn chk_vecf_collect_struct(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
+                          ends: Vec<i32>, i: i32,
+                          fnames: Vec<i32>, fkinds: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(tok_tags);
+    let mut p: i32 = i + 1;
+    while p < n {
+        let t0: i32 = vec_get(tok_tags, p);
+        if t0 == 8 { break; }
+        if t0 == 13 { return p + 1; }
+        p = p + 1;
+    }
+    if p >= n { return n; }
+    p = p + 1;
+    let mut depth: i32 = 1;
+    let mut at_start: bool = true;
+    while p < n {
+        if depth <= 0 { return p; }
+        let t: i32 = vec_get(tok_tags, p);
+        if t == 8 { depth = depth + 1; at_start = false; }
+        if t == 9 { depth = depth - 1; }
+        if depth == 1 {
+            if t == 12 { at_start = true; }
+            if at_start {
+                if t == 5 {
+                    at_start = false;
+                    if chk_vecf_tag_at(tok_tags, p + 1) == 14 {
+                        vec_push(fnames, p);
+                        vec_push(fkinds, chk_vecf_type_kind(tok_tags, source, starts, ends, p + 2));
+                    }
+                }
+            }
+        }
+        p = p + 1;
+    }
+    return n;
+}
+
+/* Index of the `(` that opens the parameter list of the fn whose `fn`
+   keyword is at `i` (skipping a `<..>` generic list), or -1. */
+fn chk_vecf_params_open(tok_tags: Vec<i32>, i: i32) -> i32 {
+    let mut p: i32 = i + 2;
+    if chk_vecf_tag_at(tok_tags, p) == 38 {
+        let mut d: i32 = 0;
+        while p < vec_len(tok_tags) {
+            let t: i32 = vec_get(tok_tags, p);
+            if t == 38 { d = d + 1; }
+            if t == 39 { d = d - 1; }
+            p = p + 1;
+            if d == 0 { break; }
+        }
+    }
+    if chk_vecf_tag_at(tok_tags, p) != 6 { return 0 - 1; }
+    return p;
+}
+
+/* Index of the `)` matching the `(` at `open`, or -1. */
+fn chk_vecf_close_paren(tok_tags: Vec<i32>, open: i32) -> i32 {
+    let mut d: i32 = 0;
+    let mut p: i32 = open;
+    let n: i32 = vec_len(tok_tags);
+    while p < n {
+        let t: i32 = vec_get(tok_tags, p);
+        if t == 6 { d = d + 1; }
+        if t == 7 {
+            d = d - 1;
+            if d == 0 { return p; }
+        }
+        p = p + 1;
+    }
+    return 0 - 1;
+}
+
+/* One past the end of the fn starting at `fn` token `i` (its closing `}`, or
+   the `;` of a bodyless declaration). */
+fn chk_vecf_fn_end(tok_tags: Vec<i32>, i: i32) -> i32 {
+    let n: i32 = vec_len(tok_tags);
+    let open: i32 = chk_vecf_params_open(tok_tags, i);
+    if open < 0 { return i + 1; }
+    let close: i32 = chk_vecf_close_paren(tok_tags, open);
+    if close < 0 { return n; }
+    let mut p: i32 = close + 1;
+    while p < n {
+        let t: i32 = vec_get(tok_tags, p);
+        if t == 13 { return p + 1; }
+        if t == 8 {
+            let mut depth: i32 = 1;
+            p = p + 1;
+            while p < n {
+                let u: i32 = vec_get(tok_tags, p);
+                if u == 8 { depth = depth + 1; }
+                if u == 9 {
+                    depth = depth - 1;
+                    if depth == 0 { return p + 1; }
+                }
+                p = p + 1;
+            }
+            return n;
+        }
+        if t == 6 {
+            let c2: i32 = chk_vecf_close_paren(tok_tags, p);
+            if c2 < 0 { return n; }
+            p = c2;
+        }
+        p = p + 1;
+    }
+    return n;
+}
+
+/* Parameter declarations of the fn at `fn` token `i`. */
+fn chk_vecf_collect_params(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
+                          ends: Vec<i32>, i: i32,
+                          names: Vec<i32>, kinds: Vec<i32>) -> i32 {
+    let open: i32 = chk_vecf_params_open(tok_tags, i);
+    if open < 0 { return 0; }
+    let close: i32 = chk_vecf_close_paren(tok_tags, open);
+    if close < 0 { return 0; }
+    let mut p: i32 = open + 1;
+    let mut pd: i32 = 1;
+    let mut at_start: bool = true;
+    while p < close {
+        let t: i32 = vec_get(tok_tags, p);
+        if t == 6 { pd = pd + 1; }
+        if t == 7 { pd = pd - 1; }
+        if pd == 1 {
+            if t == 12 { at_start = true; }
+            if at_start {
+                if t == 5 {
+                    at_start = false;
+                    if chk_vecf_tag_at(tok_tags, p + 1) == 14 {
+                        vec_push(names, p);
+                        vec_push(kinds, chk_vecf_type_kind(tok_tags, source, starts, ends, p + 2));
+                    }
+                }
+            }
+        }
+        p = p + 1;
+    }
+    return 0;
+}
+
+/* `let` declarations in [lo, hi). An annotation decides the kind; an
+   unannotated `let v = f(..)` is a Vec<f64> when `f` is declared
+   `-> Vec<f64>`; every other `let` binds a non-Vec-f64 (kind 2). */
+fn chk_vecf_collect_lets(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
+                        ends: Vec<i32>, lo: i32, hi: i32,
+                        rnames: Vec<i32>, rkinds: Vec<i32>,
+                        names: Vec<i32>, kinds: Vec<i32>) -> i32 {
+    let mut i: i32 = lo;
+    while i < hi {
+        if vec_get(tok_tags, i) == 71 {
+            let mut p: i32 = i + 1;
+            if chk_vecf_tag_at(tok_tags, p) == 77 { p = p + 1; }
+            if chk_vecf_tag_at(tok_tags, p) == 5 {
+                let mut kind: i32 = 2;
+                let nt: i32 = chk_vecf_tag_at(tok_tags, p + 1);
+                if nt == 14 {
+                    kind = chk_vecf_type_kind(tok_tags, source, starts, ends, p + 2);
+                }
+                if nt == 35 {
+                    if chk_vecf_tag_at(tok_tags, p + 2) == 5 {
+                        if chk_vecf_tag_at(tok_tags, p + 3) == 6 {
+                            if chk_vecf_lookup(rnames, rkinds, source, starts, ends, p + 2) == 1 {
+                                kind = 1;
+                            }
+                        }
+                    }
+                }
+                vec_push(names, p);
+                vec_push(kinds, kind);
+            }
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+/* 1 = generic vec_push/vec_get/vec_set, 2 = typed *_f64 accessor, 0 = other. */
+fn chk_vecf_accessor_kind(source: string, starts: Vec<i32>, ends: Vec<i32>, t: i32) -> i32 {
+    if t < 0 { return 0; }
+    if t >= vec_len(starts) { return 0; }
+    if t >= vec_len(ends) { return 0; }
+    let len: i32 = vec_get(ends, t) - vec_get(starts, t);
+    if len != 7 {
+        if len != 8 {
+            if len != 11 {
+                if len != 12 { return 0; }
+            }
+        }
+    }
+    if chk_vecf_text_is(source, starts, ends, t, "vec_push") { return 1; }
+    if chk_vecf_text_is(source, starts, ends, t, "vec_get") { return 1; }
+    if chk_vecf_text_is(source, starts, ends, t, "vec_set") { return 1; }
+    if chk_vecf_text_is(source, starts, ends, t, "vec_push_f64") { return 2; }
+    if chk_vecf_text_is(source, starts, ends, t, "vec_get_f64") { return 2; }
+    if chk_vecf_text_is(source, starts, ends, t, "vec_set_f64") { return 2; }
+    return 0;
+}
+
+fn chk_vecf_site_map(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
+                    ends: Vec<i32>) -> Vec<i32> {
+    let n: i32 = vec_len(tok_tags);
+    let map: Vec<i32> = vec_new();
+    let mut z: i32 = 0;
+    while z < n {
+        vec_push(map, 0);
+        z = z + 1;
+    }
+    if vec_len(starts) < n { return map; }
+    if vec_len(ends) < n { return map; }
+    /* Pass 1 (program-wide): struct fields and fn return types. */
+    let fnames: Vec<i32> = vec_new();
+    let fkinds: Vec<i32> = vec_new();
+    let rnames: Vec<i32> = vec_new();
+    let rkinds: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < n {
+        let t: i32 = vec_get(tok_tags, i);
+        if t == 89 {
+            i = chk_vecf_collect_struct(tok_tags, source, starts, ends, i, fnames, fkinds);
+        } else {
+            if t == 65 {
+                if chk_vecf_tag_at(tok_tags, i + 1) == 5 {
+                    let open: i32 = chk_vecf_params_open(tok_tags, i);
+                    if open >= 0 {
+                        let close: i32 = chk_vecf_close_paren(tok_tags, open);
+                        if close >= 0 {
+                            if chk_vecf_tag_at(tok_tags, close + 1) == 19 {
+                                vec_push(rnames, i + 1);
+                                vec_push(rkinds, chk_vecf_type_kind(tok_tags, source, starts, ends, close + 2));
+                            }
+                        }
+                    }
+                }
+            }
+            i = i + 1;
+        }
+    }
+    /* Pass 2 (per fn): locals, then the accessor call sites. */
+    i = 0;
+    while i < n {
+        let ft: i32 = vec_get(tok_tags, i);
+        let mut advance: i32 = i + 1;
+        if ft == 65 {
+            if chk_vecf_tag_at(tok_tags, i + 1) == 5 {
+                let hi: i32 = chk_vecf_fn_end(tok_tags, i);
+                let names: Vec<i32> = vec_new();
+                let kinds: Vec<i32> = vec_new();
+                let _p: i32 = chk_vecf_collect_params(tok_tags, source, starts, ends, i, names, kinds);
+                let _l: i32 = chk_vecf_collect_lets(tok_tags, source, starts, ends, i, hi,
+                                                   rnames, rkinds, names, kinds);
+                let mut s: i32 = i;
+                while s < hi {
+                    if vec_get(tok_tags, s) == 5 {
+                        if chk_vecf_tag_at(tok_tags, s + 1) == 6 {
+                            let ak: i32 = chk_vecf_accessor_kind(source, starts, ends, s);
+                            if ak != 0 {
+                                let a0: i32 = s + 2;
+                                let mut code: i32 = 0;
+                                if chk_vecf_tag_at(tok_tags, a0) == 5 {
+                                    let nx: i32 = chk_vecf_tag_at(tok_tags, a0 + 1);
+                                    if nx == 12 {
+                                        code = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
+                                    }
+                                    if nx == 7 {
+                                        code = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
+                                    }
+                                    if nx == 16 {
+                                        if chk_vecf_tag_at(tok_tags, a0 + 2) == 5 {
+                                            let nx2: i32 = chk_vecf_tag_at(tok_tags, a0 + 3);
+                                            if nx2 == 12 {
+                                                code = chk_vecf_lookup(fnames, fkinds, source, starts, ends, a0 + 2);
+                                            }
+                                            if nx2 == 7 {
+                                                code = chk_vecf_lookup(fnames, fkinds, source, starts, ends, a0 + 2);
+                                            }
+                                        }
+                                    }
+                                }
+                                if ak == 1 {
+                                    if code == 1 { vec_set(map, s, 1); }
+                                    if code == 2 { vec_set(map, s, 2); }
+                                }
+                                if ak == 2 {
+                                    if code == 3 { vec_set(map, s, 3); }
+                                }
+                            }
+                        }
+                    }
+                    s = s + 1;
+                }
+                advance = hi;
+                if advance <= i { advance = i + 1; }
+            }
+        }
+        i = advance;
+    }
+    return map;
+}
+
 /* E0447 (BUGS.md sv0-mathlib #20): the generic vec_push / vec_set and array
    literals store integer-sized words, so an f64 element was silently
    truncated by the C backend and rejected by the VM. f64 elements have their
@@ -3107,13 +3512,30 @@ fn check_vec_float_element(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                            edef_vshapes_flat: Vec<i32>,
                            fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
                            ret_ty: i32, loop_depth: i32,
-                           idx: i32, diag_sink: Vec<i32>) -> i32 {
+                           idx: i32, vecf_sites: Vec<i32>,
+                           diag_sink: Vec<i32>) -> i32 {
     let callee: i32 = vec_get(ed1, idx);
     if callee < 0 { return 0; }
     if vec_get(et, callee) != 1 { return 0; }
     if vec_get(ed2, callee) != 1 { return 0; }
     let ctok: i32 = vec_get(pp, vec_get(ed1, callee));
     let ac: i32 = vec_get(ed3, idx);
+    let mut site: i32 = 0;
+    if ctok >= 0 {
+        if ctok < vec_len(vecf_sites) { site = vec_get(vecf_sites, ctok); }
+    }
+    /* Typed accessor on a vec declared as Vec<T> with T != f64. */
+    if site == 3 {
+        vec_push(diag_sink, 453);
+        vec_push(diag_sink, ctok);
+        return 0;
+    }
+    /* Generic accessor on a name declared both as Vec<f64> and as another type. */
+    if site == 2 {
+        vec_push(diag_sink, 451);
+        vec_push(diag_sink, ctok);
+        return 0;
+    }
     let mut elem_pos: i32 = 0 - 1;
     if tok_text_eq(source, starts, ends, ctok, "vec_push") {
         if ac == 2 { elem_pos = 1; }
@@ -3131,6 +3553,19 @@ fn check_vec_float_element(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                               fn_names, fn_ret_types,
                               ret_ty, loop_depth,
                               block_stmt_index(pp, vec_get(ed2, idx), vec_get(ed4, idx), elem_pos));
+    if site == 1 {
+        /* A Vec<f64> (declared): the element must be an f64. TY_VAR (an
+           untyped builtin result) is let through, as everywhere else. */
+        if ety != TY_FLOAT() {
+            if ety != TY_VAR() {
+                if ety != TY_UNKNOWN() {
+                    vec_push(diag_sink, 452);
+                    vec_push(diag_sink, ctok);
+                }
+            }
+        }
+        return 0;
+    }
     if ety == TY_FLOAT() {
         vec_push(diag_sink, 447);
         vec_push(diag_sink, ctok);
@@ -3196,6 +3631,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                      fn_names: Vec<i32>, fn_ret_types: Vec<i32>,
                      ret_ty: i32, loop_depth: i32,
                      in_unsafe: i32, idx: i32,
+                     vecf_sites: Vec<i32>,
                      diag_sink: Vec<i32>) -> i32 {
     if idx < 0 { return 0; }
     let tag: i32 = vec_get(et, idx);
@@ -3224,7 +3660,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, operand_idx, diag_sink);
+                                 in_unsafe, operand_idx, vecf_sites, diag_sink);
     }
     if tag == 3 {
         let _l3: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3232,13 +3668,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+                                 in_unsafe, vec_get(ed2, idx), vecf_sites, diag_sink);
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed3, idx), diag_sink);
+                                 in_unsafe, vec_get(ed3, idx), vecf_sites, diag_sink);
     }
     if tag == 4 {
         /* ExprCall: d1=callee, d2=args_first, d3=args_count, d4=args_sidecar
@@ -3259,13 +3695,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
         let _vf4: i32 = check_vec_float_element(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 idx, diag_sink);
+                                 idx, vecf_sites, diag_sink);
         let mut ai4: i32 = 0;
         while ai4 < ac4 {
             let _a4: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3273,7 +3709,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                      edef_names, edef_variant_offsets, edef_variant_counts,
                                      edef_vnames_flat, edef_vshapes_flat,
                                      fn_names, fn_ret_types, ret_ty, loop_depth,
-                                     in_unsafe, block_stmt_index(pp, af4, sc4, ai4), diag_sink);
+                                     in_unsafe, block_stmt_index(pp, af4, sc4, ai4), vecf_sites, diag_sink);
             ai4 = ai4 + 1;
         }
         return 0;
@@ -3290,7 +3726,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
         let mut ai5: i32 = 0;
         while ai5 < mc_ac {
             let _a5: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3298,7 +3734,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                      edef_names, edef_variant_offsets, edef_variant_counts,
                                      edef_vnames_flat, edef_vshapes_flat,
                                      fn_names, fn_ret_types, ret_ty, loop_depth,
-                                     in_unsafe, block_stmt_index(pp, 0, mc_sc, ai5), diag_sink);
+                                     in_unsafe, block_stmt_index(pp, 0, mc_sc, ai5), vecf_sites, diag_sink);
             ai5 = ai5 + 1;
         }
         return 0;
@@ -3309,7 +3745,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 7 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3317,7 +3753,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 8 {
         let _o8: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3325,13 +3761,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+                                 in_unsafe, vec_get(ed2, idx), vecf_sites, diag_sink);
     }
     if tag == 9 {
         let sf9: i32 = vec_get(ed1, idx);
@@ -3353,7 +3789,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                              edef_names, edef_variant_offsets, edef_variant_counts,
                                              edef_vnames_flat, edef_vshapes_flat,
                                              fn_names, fn_ret_types, ret_ty, loop_depth,
-                                             in_unsafe, init9, diag_sink);
+                                             in_unsafe, init9, vecf_sites, diag_sink);
                     let ty9: i32 = synth_expr(et, ed1, ed2, ed3, ed4, pp,
                                               source, starts, ends,
                                               env_names, env_types, env_muts,
@@ -3375,7 +3811,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                          edef_names, edef_variant_offsets, edef_variant_counts,
                                          edef_vnames_flat, edef_vshapes_flat,
                                          fn_names, fn_ret_types, ret_ty, loop_depth,
-                                         in_unsafe, e9, diag_sink);
+                                         in_unsafe, e9, vecf_sites, diag_sink);
             }
             si9 = si9 + 1;
         }
@@ -3384,7 +3820,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, tail9, diag_sink);
+                                 in_unsafe, tail9, vecf_sites, diag_sink);
         let _rst9: i32 = env_scope_restore(env_names, env_mark9);
         return r9;
     }
@@ -3394,13 +3830,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
         let _t10: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+                                 in_unsafe, vec_get(ed2, idx), vecf_sites, diag_sink);
         let else10: i32 = vec_get(ed3, idx);
         if else10 >= 0 {
             return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3408,7 +3844,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                      edef_names, edef_variant_offsets, edef_variant_counts,
                                      edef_vnames_flat, edef_vshapes_flat,
                                      fn_names, fn_ret_types, ret_ty, loop_depth,
-                                     in_unsafe, else10, diag_sink);
+                                     in_unsafe, else10, vecf_sites, diag_sink);
         }
         return 0;
     }
@@ -3425,7 +3861,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, scrut11, diag_sink);
+                                 in_unsafe, scrut11, vecf_sites, diag_sink);
         let mut ami11: i32 = 0;
         while ami11 < arms_c11 {
             let arm11: i32 = block_stmt_index(pp, arms_f11, arms_sc11, ami11);
@@ -3437,14 +3873,14 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                          edef_names, edef_variant_offsets, edef_variant_counts,
                                          edef_vnames_flat, edef_vshapes_flat,
                                          fn_names, fn_ret_types, ret_ty, loop_depth,
-                                         in_unsafe, guard11, diag_sink);
+                                         in_unsafe, guard11, vecf_sites, diag_sink);
             }
             let _b11: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                      env_names, env_types, env_muts,
                                      edef_names, edef_variant_offsets, edef_variant_counts,
                                      edef_vnames_flat, edef_vshapes_flat,
                                      fn_names, fn_ret_types, ret_ty, loop_depth,
-                                     in_unsafe, body11, diag_sink);
+                                     in_unsafe, body11, vecf_sites, diag_sink);
             ami11 = ami11 + 1;
         }
         return 0;
@@ -3455,13 +3891,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth + 1,
-                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+                                 in_unsafe, vec_get(ed2, idx), vecf_sites, diag_sink);
     }
     if tag == 13 {
         let _it13: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3469,13 +3905,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+                                 in_unsafe, vec_get(ed2, idx), vecf_sites, diag_sink);
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth + 1,
-                                 in_unsafe, vec_get(ed3, idx), diag_sink);
+                                 in_unsafe, vec_get(ed3, idx), vecf_sites, diag_sink);
     }
     if tag == 14 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3483,7 +3919,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth + 1,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 15 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3491,7 +3927,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 16 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3499,7 +3935,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 18 {
         let _l18: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3507,13 +3943,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+                                 in_unsafe, vec_get(ed2, idx), vecf_sites, diag_sink);
     }
     if tag == 19 {
         let _l19: i32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3521,13 +3957,13 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed2, idx), diag_sink);
+                                 in_unsafe, vec_get(ed2, idx), vecf_sites, diag_sink);
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
                                  env_names, env_types, env_muts,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed3, idx), diag_sink);
+                                 in_unsafe, vec_get(ed3, idx), vecf_sites, diag_sink);
     }
     if tag == 20 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3535,7 +3971,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 22 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3543,7 +3979,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 23 {
         return check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends,
@@ -3551,7 +3987,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 in_unsafe, vec_get(ed1, idx), diag_sink);
+                                 in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     if tag == 24 {
         /* ExprStruct field values: NOT traversed. synth_expr's own tag==24
@@ -3579,7 +4015,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                      edef_names, edef_variant_offsets, edef_variant_counts,
                                      edef_vnames_flat, edef_vshapes_flat,
                                      fn_names, fn_ret_types, ret_ty, loop_depth,
-                                     in_unsafe, vec_get(ed1, idx), diag_sink);
+                                     in_unsafe, vec_get(ed1, idx), vecf_sites, diag_sink);
         }
         return 0;
     }
@@ -3602,7 +4038,7 @@ fn check_unsafe_gate(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
                                  edef_names, edef_variant_offsets, edef_variant_counts,
                                  edef_vnames_flat, edef_vshapes_flat,
                                  fn_names, fn_ret_types, ret_ty, loop_depth,
-                                 1, vec_get(ed1, idx), diag_sink);
+                                 1, vec_get(ed1, idx), vecf_sites, diag_sink);
     }
     return 0;
 }
@@ -3654,6 +4090,7 @@ fn check_program(
     body_ed3: Vec<i32>, body_ed4: Vec<i32>,
     type_params: Vec<i32>, tp_limit: i32,
     diag_sink: Vec<i32>) -> i32 {
+    let vecf_sites: Vec<i32> = chk_vecf_site_map(tok_tags, source, starts, ends);
     let struct_names: Vec<i32> = vec_new();
     let enum_names: Vec<i32> = vec_new();
     let nitems: i32 = vec_len(it);
@@ -3848,7 +4285,7 @@ fn check_program(
                                 edef_variant_counts,
                                 edef_vnames_flat, edef_vshapes_flat,
                                 fn_names, fn_ret_types,
-                                ret_ty, 0, 0, body_root_idx, diag_sink);
+                                ret_ty, 0, 0, body_root_idx, vecf_sites, diag_sink);
             /* BH-8 (Slice 5): unknown type in a `let x: T` annotation → E0301. */
             let _rut: i32 = check_body_let_unknown_type(body_et, body_ed1,
                                 body_ed2, body_ed4, bpp, body_root_idx,
@@ -8534,7 +8971,7 @@ fn unsafe_gate_deref_fixture(in_unsafe: i32) -> Vec<i32> {
                                     en, ety, em,
                                     edn, edvo, edvc, edvn, edvs,
                                     tfn, tfrt,
-                                    TY_INT(), 0, in_unsafe, 1, diag_sink);
+                                    TY_INT(), 0, in_unsafe, 1, vec_new(), diag_sink);
     return diag_sink;
 }
 
@@ -8593,6 +9030,371 @@ fn test_named_only_ty_basic() -> i32 {
     if named_only_ty(sn, en, 7) != 1 { return 1; }
     if named_only_ty(sn, en, 9) != 2 { return 2; }
     if named_only_ty(sn, en, 99) != 0 { return 3; }
+    return 0;
+}
+
+fn test_chk_vecf_case_param_f64() -> i32 {
+    let src: string = "fn f(v: Vec<f64>) -> f64 { return vec_get(v, 0); }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
+    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
+    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
+    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
+    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
+    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
+    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
+    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
+    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
+    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
+    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
+    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
+    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
+    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
+    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
+    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
+    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
+    vec_push(tags, 12); vec_push(st, 43); vec_push(en, 44);
+    vec_push(tags, 3); vec_push(st, 45); vec_push(en, 46);
+    vec_push(tags, 7); vec_push(st, 46); vec_push(en, 47);
+    vec_push(tags, 13); vec_push(st, 47); vec_push(en, 48);
+    vec_push(tags, 9); vec_push(st, 49); vec_push(en, 50);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 22 { return 1; }
+    if vec_get(m, 14) != 1 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_case_let_f64() -> i32 {
+    let src: string = "fn f() -> f64 { let v: Vec<f64> = vec_new(); vec_push(v, 1.5); return 0.0; }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
+    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
+    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
+    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
+    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
+    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
+    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
+    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
+    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
+    vec_push(tags, 14); vec_push(st, 21); vec_push(en, 22);
+    vec_push(tags, 5); vec_push(st, 23); vec_push(en, 26);
+    vec_push(tags, 38); vec_push(st, 26); vec_push(en, 27);
+    vec_push(tags, 5); vec_push(st, 27); vec_push(en, 30);
+    vec_push(tags, 39); vec_push(st, 30); vec_push(en, 31);
+    vec_push(tags, 35); vec_push(st, 32); vec_push(en, 33);
+    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
+    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
+    vec_push(tags, 7); vec_push(st, 42); vec_push(en, 43);
+    vec_push(tags, 13); vec_push(st, 43); vec_push(en, 44);
+    vec_push(tags, 5); vec_push(st, 45); vec_push(en, 53);
+    vec_push(tags, 6); vec_push(st, 53); vec_push(en, 54);
+    vec_push(tags, 5); vec_push(st, 54); vec_push(en, 55);
+    vec_push(tags, 12); vec_push(st, 55); vec_push(en, 56);
+    vec_push(tags, 3); vec_push(st, 57); vec_push(en, 60);
+    vec_push(tags, 7); vec_push(st, 60); vec_push(en, 61);
+    vec_push(tags, 13); vec_push(st, 61); vec_push(en, 62);
+    vec_push(tags, 85); vec_push(st, 63); vec_push(en, 69);
+    vec_push(tags, 3); vec_push(st, 70); vec_push(en, 73);
+    vec_push(tags, 13); vec_push(st, 73); vec_push(en, 74);
+    vec_push(tags, 9); vec_push(st, 75); vec_push(en, 76);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 30 { return 1; }
+    if vec_get(m, 19) != 1 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_case_ambiguous() -> i32 {
+    let src: string = "fn f() -> i32 { let v: Vec<f64> = vec_new(); let v: Vec<i32> = vec_new(); return vec_get(v, 0); }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
+    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
+    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
+    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
+    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
+    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
+    vec_push(tags, 8); vec_push(st, 14); vec_push(en, 15);
+    vec_push(tags, 71); vec_push(st, 16); vec_push(en, 19);
+    vec_push(tags, 5); vec_push(st, 20); vec_push(en, 21);
+    vec_push(tags, 14); vec_push(st, 21); vec_push(en, 22);
+    vec_push(tags, 5); vec_push(st, 23); vec_push(en, 26);
+    vec_push(tags, 38); vec_push(st, 26); vec_push(en, 27);
+    vec_push(tags, 5); vec_push(st, 27); vec_push(en, 30);
+    vec_push(tags, 39); vec_push(st, 30); vec_push(en, 31);
+    vec_push(tags, 35); vec_push(st, 32); vec_push(en, 33);
+    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
+    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
+    vec_push(tags, 7); vec_push(st, 42); vec_push(en, 43);
+    vec_push(tags, 13); vec_push(st, 43); vec_push(en, 44);
+    vec_push(tags, 71); vec_push(st, 45); vec_push(en, 48);
+    vec_push(tags, 5); vec_push(st, 49); vec_push(en, 50);
+    vec_push(tags, 14); vec_push(st, 50); vec_push(en, 51);
+    vec_push(tags, 5); vec_push(st, 52); vec_push(en, 55);
+    vec_push(tags, 38); vec_push(st, 55); vec_push(en, 56);
+    vec_push(tags, 5); vec_push(st, 56); vec_push(en, 59);
+    vec_push(tags, 39); vec_push(st, 59); vec_push(en, 60);
+    vec_push(tags, 35); vec_push(st, 61); vec_push(en, 62);
+    vec_push(tags, 5); vec_push(st, 63); vec_push(en, 70);
+    vec_push(tags, 6); vec_push(st, 70); vec_push(en, 71);
+    vec_push(tags, 7); vec_push(st, 71); vec_push(en, 72);
+    vec_push(tags, 13); vec_push(st, 72); vec_push(en, 73);
+    vec_push(tags, 85); vec_push(st, 74); vec_push(en, 80);
+    vec_push(tags, 5); vec_push(st, 81); vec_push(en, 88);
+    vec_push(tags, 6); vec_push(st, 88); vec_push(en, 89);
+    vec_push(tags, 5); vec_push(st, 89); vec_push(en, 90);
+    vec_push(tags, 12); vec_push(st, 90); vec_push(en, 91);
+    vec_push(tags, 3); vec_push(st, 92); vec_push(en, 93);
+    vec_push(tags, 7); vec_push(st, 93); vec_push(en, 94);
+    vec_push(tags, 13); vec_push(st, 94); vec_push(en, 95);
+    vec_push(tags, 9); vec_push(st, 96); vec_push(en, 97);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 40 { return 1; }
+    if vec_get(m, 32) != 2 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_case_typed_on_int() -> i32 {
+    let src: string = "fn f(v: Vec<i32>) -> i32 { return vec_get_f64(v, 0); }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
+    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
+    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
+    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
+    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
+    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
+    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
+    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
+    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
+    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
+    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
+    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
+    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
+    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
+    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 45);
+    vec_push(tags, 6); vec_push(st, 45); vec_push(en, 46);
+    vec_push(tags, 5); vec_push(st, 46); vec_push(en, 47);
+    vec_push(tags, 12); vec_push(st, 47); vec_push(en, 48);
+    vec_push(tags, 3); vec_push(st, 49); vec_push(en, 50);
+    vec_push(tags, 7); vec_push(st, 50); vec_push(en, 51);
+    vec_push(tags, 13); vec_push(st, 51); vec_push(en, 52);
+    vec_push(tags, 9); vec_push(st, 53); vec_push(en, 54);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 22 { return 1; }
+    if vec_get(m, 14) != 3 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_case_struct_field() -> i32 {
+    let src: string = "struct B { d: Vec<f64>, n: i32 } fn f(b: B) -> f64 { return vec_get(b.d, 0); }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 89); vec_push(st, 0); vec_push(en, 6);
+    vec_push(tags, 5); vec_push(st, 7); vec_push(en, 8);
+    vec_push(tags, 8); vec_push(st, 9); vec_push(en, 10);
+    vec_push(tags, 5); vec_push(st, 11); vec_push(en, 12);
+    vec_push(tags, 14); vec_push(st, 12); vec_push(en, 13);
+    vec_push(tags, 5); vec_push(st, 14); vec_push(en, 17);
+    vec_push(tags, 38); vec_push(st, 17); vec_push(en, 18);
+    vec_push(tags, 5); vec_push(st, 18); vec_push(en, 21);
+    vec_push(tags, 39); vec_push(st, 21); vec_push(en, 22);
+    vec_push(tags, 12); vec_push(st, 22); vec_push(en, 23);
+    vec_push(tags, 5); vec_push(st, 24); vec_push(en, 25);
+    vec_push(tags, 14); vec_push(st, 25); vec_push(en, 26);
+    vec_push(tags, 5); vec_push(st, 27); vec_push(en, 30);
+    vec_push(tags, 9); vec_push(st, 31); vec_push(en, 32);
+    vec_push(tags, 65); vec_push(st, 33); vec_push(en, 35);
+    vec_push(tags, 5); vec_push(st, 36); vec_push(en, 37);
+    vec_push(tags, 6); vec_push(st, 37); vec_push(en, 38);
+    vec_push(tags, 5); vec_push(st, 38); vec_push(en, 39);
+    vec_push(tags, 14); vec_push(st, 39); vec_push(en, 40);
+    vec_push(tags, 5); vec_push(st, 41); vec_push(en, 42);
+    vec_push(tags, 7); vec_push(st, 42); vec_push(en, 43);
+    vec_push(tags, 19); vec_push(st, 44); vec_push(en, 46);
+    vec_push(tags, 5); vec_push(st, 47); vec_push(en, 50);
+    vec_push(tags, 8); vec_push(st, 51); vec_push(en, 52);
+    vec_push(tags, 85); vec_push(st, 53); vec_push(en, 59);
+    vec_push(tags, 5); vec_push(st, 60); vec_push(en, 67);
+    vec_push(tags, 6); vec_push(st, 67); vec_push(en, 68);
+    vec_push(tags, 5); vec_push(st, 68); vec_push(en, 69);
+    vec_push(tags, 16); vec_push(st, 69); vec_push(en, 70);
+    vec_push(tags, 5); vec_push(st, 70); vec_push(en, 71);
+    vec_push(tags, 12); vec_push(st, 71); vec_push(en, 72);
+    vec_push(tags, 3); vec_push(st, 73); vec_push(en, 74);
+    vec_push(tags, 7); vec_push(st, 74); vec_push(en, 75);
+    vec_push(tags, 13); vec_push(st, 75); vec_push(en, 76);
+    vec_push(tags, 9); vec_push(st, 77); vec_push(en, 78);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 35 { return 1; }
+    if vec_get(m, 25) != 1 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_case_fn_return() -> i32 {
+    let src: string = "fn m() -> Vec<f64> { return vec_new(); } fn f() -> f64 { let w = m(); return vec_get(w, 0); }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
+    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
+    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
+    vec_push(tags, 7); vec_push(st, 5); vec_push(en, 6);
+    vec_push(tags, 19); vec_push(st, 7); vec_push(en, 9);
+    vec_push(tags, 5); vec_push(st, 10); vec_push(en, 13);
+    vec_push(tags, 38); vec_push(st, 13); vec_push(en, 14);
+    vec_push(tags, 5); vec_push(st, 14); vec_push(en, 17);
+    vec_push(tags, 39); vec_push(st, 17); vec_push(en, 18);
+    vec_push(tags, 8); vec_push(st, 19); vec_push(en, 20);
+    vec_push(tags, 85); vec_push(st, 21); vec_push(en, 27);
+    vec_push(tags, 5); vec_push(st, 28); vec_push(en, 35);
+    vec_push(tags, 6); vec_push(st, 35); vec_push(en, 36);
+    vec_push(tags, 7); vec_push(st, 36); vec_push(en, 37);
+    vec_push(tags, 13); vec_push(st, 37); vec_push(en, 38);
+    vec_push(tags, 9); vec_push(st, 39); vec_push(en, 40);
+    vec_push(tags, 65); vec_push(st, 41); vec_push(en, 43);
+    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
+    vec_push(tags, 6); vec_push(st, 45); vec_push(en, 46);
+    vec_push(tags, 7); vec_push(st, 46); vec_push(en, 47);
+    vec_push(tags, 19); vec_push(st, 48); vec_push(en, 50);
+    vec_push(tags, 5); vec_push(st, 51); vec_push(en, 54);
+    vec_push(tags, 8); vec_push(st, 55); vec_push(en, 56);
+    vec_push(tags, 71); vec_push(st, 57); vec_push(en, 60);
+    vec_push(tags, 5); vec_push(st, 61); vec_push(en, 62);
+    vec_push(tags, 35); vec_push(st, 63); vec_push(en, 64);
+    vec_push(tags, 5); vec_push(st, 65); vec_push(en, 66);
+    vec_push(tags, 6); vec_push(st, 66); vec_push(en, 67);
+    vec_push(tags, 7); vec_push(st, 67); vec_push(en, 68);
+    vec_push(tags, 13); vec_push(st, 68); vec_push(en, 69);
+    vec_push(tags, 85); vec_push(st, 70); vec_push(en, 76);
+    vec_push(tags, 5); vec_push(st, 77); vec_push(en, 84);
+    vec_push(tags, 6); vec_push(st, 84); vec_push(en, 85);
+    vec_push(tags, 5); vec_push(st, 85); vec_push(en, 86);
+    vec_push(tags, 12); vec_push(st, 86); vec_push(en, 87);
+    vec_push(tags, 3); vec_push(st, 88); vec_push(en, 89);
+    vec_push(tags, 7); vec_push(st, 89); vec_push(en, 90);
+    vec_push(tags, 13); vec_push(st, 90); vec_push(en, 91);
+    vec_push(tags, 9); vec_push(st, 92); vec_push(en, 93);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 39 { return 1; }
+    if vec_get(m, 31) != 1 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_case_word_vec() -> i32 {
+    let src: string = "fn f(v: Vec<i32>) -> i32 { return vec_get(v, 0); }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
+    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
+    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
+    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
+    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
+    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
+    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
+    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
+    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
+    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
+    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
+    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
+    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
+    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
+    vec_push(tags, 5); vec_push(st, 34); vec_push(en, 41);
+    vec_push(tags, 6); vec_push(st, 41); vec_push(en, 42);
+    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
+    vec_push(tags, 12); vec_push(st, 43); vec_push(en, 44);
+    vec_push(tags, 3); vec_push(st, 45); vec_push(en, 46);
+    vec_push(tags, 7); vec_push(st, 46); vec_push(en, 47);
+    vec_push(tags, 13); vec_push(st, 47); vec_push(en, 48);
+    vec_push(tags, 9); vec_push(st, 49); vec_push(en, 50);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 22 { return 1; }
+    if vec_get(m, 14) != 0 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_case_two_fns() -> i32 {
+    let src: string = "fn a(v: Vec<f64>) -> i32 { return 0; } fn b(v: Vec<i32>) -> i32 { return vec_get(v, 0); }";
+    let tags: Vec<i32> = vec_new();
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(tags, 65); vec_push(st, 0); vec_push(en, 2);
+    vec_push(tags, 5); vec_push(st, 3); vec_push(en, 4);
+    vec_push(tags, 6); vec_push(st, 4); vec_push(en, 5);
+    vec_push(tags, 5); vec_push(st, 5); vec_push(en, 6);
+    vec_push(tags, 14); vec_push(st, 6); vec_push(en, 7);
+    vec_push(tags, 5); vec_push(st, 8); vec_push(en, 11);
+    vec_push(tags, 38); vec_push(st, 11); vec_push(en, 12);
+    vec_push(tags, 5); vec_push(st, 12); vec_push(en, 15);
+    vec_push(tags, 39); vec_push(st, 15); vec_push(en, 16);
+    vec_push(tags, 7); vec_push(st, 16); vec_push(en, 17);
+    vec_push(tags, 19); vec_push(st, 18); vec_push(en, 20);
+    vec_push(tags, 5); vec_push(st, 21); vec_push(en, 24);
+    vec_push(tags, 8); vec_push(st, 25); vec_push(en, 26);
+    vec_push(tags, 85); vec_push(st, 27); vec_push(en, 33);
+    vec_push(tags, 3); vec_push(st, 34); vec_push(en, 35);
+    vec_push(tags, 13); vec_push(st, 35); vec_push(en, 36);
+    vec_push(tags, 9); vec_push(st, 37); vec_push(en, 38);
+    vec_push(tags, 65); vec_push(st, 39); vec_push(en, 41);
+    vec_push(tags, 5); vec_push(st, 42); vec_push(en, 43);
+    vec_push(tags, 6); vec_push(st, 43); vec_push(en, 44);
+    vec_push(tags, 5); vec_push(st, 44); vec_push(en, 45);
+    vec_push(tags, 14); vec_push(st, 45); vec_push(en, 46);
+    vec_push(tags, 5); vec_push(st, 47); vec_push(en, 50);
+    vec_push(tags, 38); vec_push(st, 50); vec_push(en, 51);
+    vec_push(tags, 5); vec_push(st, 51); vec_push(en, 54);
+    vec_push(tags, 39); vec_push(st, 54); vec_push(en, 55);
+    vec_push(tags, 7); vec_push(st, 55); vec_push(en, 56);
+    vec_push(tags, 19); vec_push(st, 57); vec_push(en, 59);
+    vec_push(tags, 5); vec_push(st, 60); vec_push(en, 63);
+    vec_push(tags, 8); vec_push(st, 64); vec_push(en, 65);
+    vec_push(tags, 85); vec_push(st, 66); vec_push(en, 72);
+    vec_push(tags, 5); vec_push(st, 73); vec_push(en, 80);
+    vec_push(tags, 6); vec_push(st, 80); vec_push(en, 81);
+    vec_push(tags, 5); vec_push(st, 81); vec_push(en, 82);
+    vec_push(tags, 12); vec_push(st, 82); vec_push(en, 83);
+    vec_push(tags, 3); vec_push(st, 84); vec_push(en, 85);
+    vec_push(tags, 7); vec_push(st, 85); vec_push(en, 86);
+    vec_push(tags, 13); vec_push(st, 86); vec_push(en, 87);
+    vec_push(tags, 9); vec_push(st, 88); vec_push(en, 89);
+    let m: Vec<i32> = chk_vecf_site_map(tags, src, st, en);
+    if vec_len(m) != 39 { return 1; }
+    if vec_get(m, 31) != 0 { return 2; }
+    return 0;
+}
+
+fn test_chk_vecf_lookup_kinds() -> i32 {
+    let src: string = "v v";
+    let st: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    vec_push(st, 0); vec_push(en, 1);
+    vec_push(st, 2); vec_push(en, 3);
+    let names: Vec<i32> = vec_new();
+    let kinds: Vec<i32> = vec_new();
+    vec_push(names, 0);
+    vec_push(kinds, 1);
+    if chk_vecf_lookup(names, kinds, src, st, en, 1) != 1 { return 1; }
+    vec_push(names, 1);
+    vec_push(kinds, 2);
+    if chk_vecf_lookup(names, kinds, src, st, en, 1) != 2 { return 2; }
+    let n3: Vec<i32> = vec_new();
+    let k3: Vec<i32> = vec_new();
+    vec_push(n3, 0); vec_push(k3, 3);
+    vec_push(n3, 1); vec_push(k3, 3);
+    if chk_vecf_lookup(n3, k3, src, st, en, 1) != 3 { return 3; }
+    let n2: Vec<i32> = vec_new();
+    let k2: Vec<i32> = vec_new();
+    vec_push(n2, 0); vec_push(k2, 2);
+    if chk_vecf_lookup(n2, k2, src, st, en, 1) != 0 { return 4; }
+    let empty: Vec<i32> = vec_new();
+    if chk_vecf_lookup(empty, empty, src, st, en, 1) != 0 { return 5; }
     return 0;
 }
 
@@ -8783,5 +9585,23 @@ fn main() -> i32 {
     if r88 != 0 { return 910 + r88; }
     let r89: i32 = test_program_uses_ffi_features_unsafe_block();
     if r89 != 0 { return 920 + r89; }
+    let rv0: i32 = test_chk_vecf_case_param_f64();
+    if rv0 != 0 { return 930 + 0 + rv0; }
+    let rv1: i32 = test_chk_vecf_case_let_f64();
+    if rv1 != 0 { return 930 + 10 + rv1; }
+    let rv2: i32 = test_chk_vecf_case_ambiguous();
+    if rv2 != 0 { return 930 + 20 + rv2; }
+    let rv3: i32 = test_chk_vecf_case_typed_on_int();
+    if rv3 != 0 { return 930 + 30 + rv3; }
+    let rv4: i32 = test_chk_vecf_case_struct_field();
+    if rv4 != 0 { return 930 + 40 + rv4; }
+    let rv5: i32 = test_chk_vecf_case_fn_return();
+    if rv5 != 0 { return 930 + 50 + rv5; }
+    let rv6: i32 = test_chk_vecf_case_word_vec();
+    if rv6 != 0 { return 930 + 60 + rv6; }
+    let rv7: i32 = test_chk_vecf_case_two_fns();
+    if rv7 != 0 { return 930 + 70 + rv7; }
+    let rv8: i32 = test_chk_vecf_lookup_kinds();
+    if rv8 != 0 { return 930 + 80 + rv8; }
     return 0;
 }

@@ -1,0 +1,8 @@
+// E0453: the f64 accessors read raw storage, so using one on a vec declared
+// Vec<i32> would return garbage; it is refused.
+fn main() -> i32 {
+    let v: Vec<i32> = vec_new();
+    vec_push(v, 3);
+    let x: f64 = vec_get_f64(v, 0);
+    return 0;
+}

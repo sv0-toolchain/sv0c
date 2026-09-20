@@ -32,6 +32,9 @@ fn megatu_diag_code_str(code: i32) -> string {
     if code == 429 { return "E0429"; }
     if code == 446 { return "E0446"; }
     if code == 447 { return "E0447"; }
+    if code == 451 { return "E0451"; }
+    if code == 452 { return "E0452"; }
+    if code == 453 { return "E0453"; }
     if code == 550 { return "E0550"; }
     if code == 551 { return "E0551"; }
     if code == 552 { return "E0552"; }
@@ -53,7 +56,10 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 323 { return "conflicting borrow of a slice source"; }
     if code == 429 { return "no such field"; }
     if code == 446 { return "multi-element tuples are not supported in this slice"; }
-    if code == 447 { return "vec_push / vec_set / array literals store integer-sized elements and would silently truncate an f64; use vec_push_f64 / vec_get_f64 / vec_set_f64 on a Vec<f64>"; }
+    if code == 447 { return "vec_push / vec_set / array literals store integer-sized elements and would silently truncate an f64; declare the vec as Vec<f64> (parameter, let annotation, or struct field) so the f64 accessors are selected, or use vec_push_f64 / vec_set_f64"; }
+    if code == 451 { return "ambiguous vec element type: this name is declared both as Vec<f64> and as another type in the same function"; }
+    if code == 452 { return "a Vec<f64> element must be an f64"; }
+    if code == 453 { return "vec_push_f64 / vec_get_f64 / vec_set_f64 used on a Vec whose declared element type is not f64"; }
     if code == 550 { return "raw pointer dereference outside an `unsafe` block"; }
     if code == 551 { return "no C ABI mapping for this type in an `#[extern_c]` signature"; }
     if code == 552 { return "conflicting `#[extern_c]` declaration for this C symbol"; }

@@ -1,0 +1,6 @@
+// E0452: an element pushed to a declared Vec<f64> must be an f64.
+fn main() -> i32 {
+    let v: Vec<f64> = vec_new();
+    vec_push(v, 3);
+    return 0;
+}

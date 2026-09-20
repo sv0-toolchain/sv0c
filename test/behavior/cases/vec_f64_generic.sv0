@@ -1,0 +1,85 @@
+// Generic vec_push / vec_get / vec_set on a declared Vec<f64> select the f64
+// accessors: the element type is recovered from a parameter annotation, a
+// `let` annotation, a `let v = f(..)` whose callee is declared `-> Vec<f64>`,
+// or a struct field `data: Vec<f64>` reached as `s.data`. Word-sized vecs
+// keep the plain accessors, and the typed _f64 forms still work alongside.
+// Expected exit: 42.
+
+struct Bag {
+    data: Vec<f64>,
+    count: i32,
+}
+
+fn make() -> Vec<f64> {
+    let v: Vec<f64> = vec_new();
+    vec_push(v, 2.5);
+    vec_push(v, 0.5);
+    return v;
+}
+
+fn sum(xs: Vec<f64>) -> f64 {
+    let mut s: f64 = 0.0;
+    let mut i: i32 = 0;
+    while i < vec_len(xs) {
+        let x: f64 = vec_get(xs, i);
+        s = s + x;
+        i = i + 1;
+    }
+    return s;
+}
+
+// insertion sort using only the generic get/set
+fn sort(xs: Vec<f64>) -> i32 {
+    let n: i32 = vec_len(xs);
+    let mut i: i32 = 1;
+    while i < n {
+        let key: f64 = vec_get(xs, i);
+        let mut j: i32 = i - 1;
+        let mut going: bool = true;
+        while going {
+            if j < 0 {
+                going = false;
+            } else {
+                let cur: f64 = vec_get(xs, j);
+                if cur > key {
+                    vec_set(xs, j + 1, cur);
+                    j = j - 1;
+                } else {
+                    going = false;
+                }
+            }
+        }
+        vec_set(xs, j + 1, key);
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn main() -> i32 {
+    let a = make();
+    vec_push(a, 0.125);
+    vec_set(a, 0, 4.0);
+    let sorted: i32 = sort(a);
+    if sorted != 0 { return 7; }
+    let lo: f64 = vec_get(a, 0);
+    if lo != 0.125 { return 1; }
+    if sum(a) != 4.625 { return 2; }
+
+    let bag: Bag = Bag { data: make(), count: 2 };
+    vec_push(bag.data, 8.0);
+    let last: f64 = vec_get(bag.data, 2);
+    if last != 8.0 { return 3; }
+
+    // typed accessors on the same handle agree bit for bit
+    let mixed: f64 = vec_get_f64(bag.data, 0);
+    if mixed != 2.5 { return 4; }
+
+    // word-sized vecs are untouched
+    let ints: Vec<i32> = vec_new();
+    vec_push(ints, 7);
+    vec_push(ints, 9);
+    vec_set(ints, 0, 11);
+    if vec_get(ints, 0) != 11 { return 5; }
+    if vec_get(ints, 1) != 9 { return 6; }
+    return 42;
+}

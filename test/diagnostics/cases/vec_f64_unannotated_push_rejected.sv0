@@ -1,0 +1,7 @@
+// E0447: with no visible Vec<f64> declaration the generic vec_push cannot know
+// the element is a double, so a float element is still refused.
+fn main() -> i32 {
+    let v = vec_new();
+    vec_push(v, 2.5);
+    return 0;
+}

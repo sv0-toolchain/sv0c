@@ -162,11 +162,24 @@ static int tok_in_list(const char* source, int starts, int ends, int list, int t
 static int check_body_slice_borrow(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int param_name_toks, const char* source, int starts, int ends, int diag_sink);
 static int check_body_field_access(int bet, int bed1, int bed2, int bed3, int bed4, int bpp, int body_root, int param_name_toks, int param_tyname_toks, int sdef_names, int sdef_field_offsets, int sdef_field_counts, int sdef_fnames_flat, const char* source, int starts, int ends, int diag_sink);
 static int find_multi_element_tuple(int bet, int bed2);
+static int chk_vecf_tag_at(int tok_tags, int i);
+static int chk_vecf_text_is(const char* source, int starts, int ends, int t, const char* want);
+static int chk_vecf_same_text(const char* source, int starts, int ends, int a, int b);
+static int chk_vecf_type_kind(int tok_tags, const char* source, int starts, int ends, int p);
+static int chk_vecf_lookup(int names, int kinds, const char* source, int starts, int ends, int name_tok);
+static int chk_vecf_collect_struct(int tok_tags, const char* source, int starts, int ends, int i, int fnames, int fkinds);
+static int chk_vecf_params_open(int tok_tags, int i);
+static int chk_vecf_close_paren(int tok_tags, int open);
+static int chk_vecf_fn_end(int tok_tags, int i);
+static int chk_vecf_collect_params(int tok_tags, const char* source, int starts, int ends, int i, int names, int kinds);
+static int chk_vecf_collect_lets(int tok_tags, const char* source, int starts, int ends, int lo, int hi, int rnames, int rkinds, int names, int kinds);
+static int chk_vecf_accessor_kind(const char* source, int starts, int ends, int t);
+static int chk_vecf_site_map(int tok_tags, const char* source, int starts, int ends);
 static int tok_text_eq(const char* source, int starts, int ends, int t, const char* want);
 static int tok_is_float_type_name(const char* source, int starts, int ends, int t);
-static int check_vec_float_element(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int idx, int diag_sink);
+static int check_vec_float_element(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int idx, int vecf_sites, int diag_sink);
 static int check_array_float_literal(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int idx, int diag_sink);
-static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int in_unsafe, int idx, int diag_sink);
+static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int in_unsafe, int idx, int vecf_sites, int diag_sink);
 static int check_extern_fn_signature(int param_types, int param_count, int ret_tag, int has_ret, int name_pos, int diag_sink);
 static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit, int diag_sink);
 static int contract_expr_new(void);
@@ -293,6 +306,15 @@ static int test_check_extern_fn_signature_flags_bad_param(void);
 static int test_check_extern_fn_signature_flags_bad_return(void);
 static int test_check_extern_fn_signature_silent_on_all_safe(void);
 static int test_named_only_ty_basic(void);
+static int test_chk_vecf_case_param_f64(void);
+static int test_chk_vecf_case_let_f64(void);
+static int test_chk_vecf_case_ambiguous(void);
+static int test_chk_vecf_case_typed_on_int(void);
+static int test_chk_vecf_case_struct_field(void);
+static int test_chk_vecf_case_fn_return(void);
+static int test_chk_vecf_case_word_vec(void);
+static int test_chk_vecf_case_two_fns(void);
+static int test_chk_vecf_lookup_kinds(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -4554,6 +4576,752 @@ static int find_multi_element_tuple(int bet, int bed2) {
   return _sv0t3;
 }
 
+static int chk_vecf_tag_at(int tok_tags, int i) {
+  if ((i < 0)) {
+    int _sv0t0 = (0 - 1);
+    return _sv0t0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(tok_tags);
+  if ((i >= _sv0t1)) {
+    int _sv0t2 = (0 - 1);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_get(tok_tags, i);
+  return _sv0t3;
+}
+
+static int chk_vecf_text_is(const char* source, int starts, int ends, int t, const char* want) {
+  if ((t < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(starts);
+  if ((t >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(ends);
+  if ((t >= _sv0t1)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(starts, t);
+  int s0 = _sv0t2;
+  int _sv0t3 = sv0_vec_get(ends, t);
+  int e0 = _sv0t3;
+  int _sv0t4 = (e0 - s0);
+  int _sv0t5 = sv0_string_len(want);
+  if ((_sv0t4 != _sv0t5)) {
+    return 0;
+  } else {
+  }
+  int _sv0t6 = (e0 - s0);
+  const char* _sv0t7 = sv0_string_substr(source, s0, _sv0t6);
+  int _sv0t8 = sv0_string_eq(_sv0t7, want);
+  return _sv0t8;
+}
+
+static int chk_vecf_same_text(const char* source, int starts, int ends, int a, int b) {
+  if ((a < 0)) {
+    return 0;
+  } else {
+  }
+  if ((b < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(starts);
+  if ((a >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(starts);
+  if ((b >= _sv0t1)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_len(ends);
+  if ((a >= _sv0t2)) {
+    return 0;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(ends);
+  if ((b >= _sv0t3)) {
+    return 0;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_get(ends, a);
+  int _sv0t5 = sv0_vec_get(starts, a);
+  int la = (_sv0t4 - _sv0t5);
+  int _sv0t6 = sv0_vec_get(ends, b);
+  int _sv0t7 = sv0_vec_get(starts, b);
+  int lb = (_sv0t6 - _sv0t7);
+  if ((la != lb)) {
+    return 0;
+  } else {
+  }
+  if ((la <= 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(starts, a);
+  const char* _sv0t9 = sv0_string_substr(source, _sv0t8, la);
+  int _sv0t10 = sv0_vec_get(starts, b);
+  const char* _sv0t11 = sv0_string_substr(source, _sv0t10, lb);
+  int _sv0t12 = sv0_string_eq(_sv0t9, _sv0t11);
+  return _sv0t12;
+}
+
+static int chk_vecf_type_kind(int tok_tags, const char* source, int starts, int ends, int p) {
+  int q = p;
+  int _sv0t0 = chk_vecf_tag_at(tok_tags, q);
+  if ((_sv0t0 == 27)) {
+    q = (q + 1);
+  } else {
+  }
+  int _sv0t1 = chk_vecf_tag_at(tok_tags, q);
+  if ((_sv0t1 == 77)) {
+    q = (q + 1);
+  } else {
+  }
+  int _sv0t2 = chk_vecf_tag_at(tok_tags, q);
+  if ((_sv0t2 != 5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t3 = chk_vecf_text_is(source, starts, ends, q, "Vec");
+  if ((_sv0t3 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t4 = (q + 1);
+  int _sv0t5 = chk_vecf_tag_at(tok_tags, _sv0t4);
+  if ((_sv0t5 != 38)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = (q + 2);
+  int _sv0t7 = chk_vecf_tag_at(tok_tags, _sv0t6);
+  if ((_sv0t7 == 5)) {
+    int _sv0t8 = (q + 2);
+    int _sv0t9 = chk_vecf_text_is(source, starts, ends, _sv0t8, "f64");
+    if (_sv0t9) {
+      int _sv0t10 = (q + 3);
+      int _sv0t11 = chk_vecf_tag_at(tok_tags, _sv0t10);
+      int close = _sv0t11;
+      if ((close == 39)) {
+        return 1;
+      } else {
+      }
+      if ((close == 41)) {
+        return 1;
+      } else {
+      }
+    } else {
+    }
+  } else {
+  }
+  return 3;
+}
+
+static int chk_vecf_lookup(int names, int kinds, const char* source, int starts, int ends, int name_tok) {
+  int n1 = 0;
+  int n3 = 0;
+  int no = 0;
+  int i = 0;
+  int _sv0t0 = sv0_vec_len(names);
+  int n = _sv0t0;
+  while ((i < n)) {
+    int _sv0t1 = sv0_vec_get(names, i);
+    int _sv0t2 = chk_vecf_same_text(source, starts, ends, _sv0t1, name_tok);
+    if (_sv0t2) {
+      int _sv0t3 = sv0_vec_get(kinds, i);
+      int k = _sv0t3;
+      if ((k == 1)) {
+        n1 = (n1 + 1);
+      } else {
+      }
+      if ((k == 3)) {
+        n3 = (n3 + 1);
+      } else {
+      }
+      if ((k == 2)) {
+        no = (no + 1);
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  if ((n1 > 0)) {
+    int _sv0t4 = (n3 + no);
+    if ((_sv0t4 > 0)) {
+      return 2;
+    } else {
+    }
+    return 1;
+  } else {
+  }
+  if ((n3 > 0)) {
+    if ((no == 0)) {
+      return 3;
+    } else {
+    }
+  } else {
+  }
+  return 0;
+}
+
+static int chk_vecf_collect_struct(int tok_tags, const char* source, int starts, int ends, int i, int fnames, int fkinds) {
+  int _sv0t0 = sv0_vec_len(tok_tags);
+  int n = _sv0t0;
+  int p = (i + 1);
+  while ((p < n)) {
+    int _sv0t1 = sv0_vec_get(tok_tags, p);
+    int t0 = _sv0t1;
+    if ((t0 == 8)) {
+      break;
+    } else {
+    }
+    if ((t0 == 13)) {
+      int _sv0t2 = (p + 1);
+      return _sv0t2;
+    } else {
+    }
+    p = (p + 1);
+  }
+  if ((p >= n)) {
+    return n;
+  } else {
+  }
+  p = (p + 1);
+  int depth = 1;
+  int at_start = 1;
+  while ((p < n)) {
+    if ((depth <= 0)) {
+      return p;
+    } else {
+    }
+    int _sv0t3 = sv0_vec_get(tok_tags, p);
+    int t = _sv0t3;
+    if ((t == 8)) {
+      depth = (depth + 1);
+      at_start = 0;
+    } else {
+    }
+    if ((t == 9)) {
+      depth = (depth - 1);
+    } else {
+    }
+    if ((depth == 1)) {
+      if ((t == 12)) {
+        at_start = 1;
+      } else {
+      }
+      if (at_start) {
+        if ((t == 5)) {
+          at_start = 0;
+          int _sv0t4 = (p + 1);
+          int _sv0t5 = chk_vecf_tag_at(tok_tags, _sv0t4);
+          if ((_sv0t5 == 14)) {
+            sv0_vec_push(fnames, p);
+            int _sv0t6 = (p + 2);
+            int _sv0t7 = chk_vecf_type_kind(tok_tags, source, starts, ends, _sv0t6);
+            sv0_vec_push(fkinds, _sv0t7);
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    p = (p + 1);
+  }
+  return n;
+}
+
+static int chk_vecf_params_open(int tok_tags, int i) {
+  int p = (i + 2);
+  int _sv0t0 = chk_vecf_tag_at(tok_tags, p);
+  if ((_sv0t0 == 38)) {
+    int d = 0;
+    while (1) {
+      int _sv0t1 = sv0_vec_len(tok_tags);
+      int _sv0t3 = (p < _sv0t1);
+      if ((!_sv0t3)) {
+        break;
+      } else {
+      }
+      int _sv0t2 = sv0_vec_get(tok_tags, p);
+      int t = _sv0t2;
+      if ((t == 38)) {
+        d = (d + 1);
+      } else {
+      }
+      if ((t == 39)) {
+        d = (d - 1);
+      } else {
+      }
+      p = (p + 1);
+      if ((d == 0)) {
+        break;
+      } else {
+      }
+    }
+  } else {
+  }
+  int _sv0t4 = chk_vecf_tag_at(tok_tags, p);
+  if ((_sv0t4 != 6)) {
+    int _sv0t5 = (0 - 1);
+    return _sv0t5;
+  } else {
+  }
+  return p;
+}
+
+static int chk_vecf_close_paren(int tok_tags, int open) {
+  int d = 0;
+  int p = open;
+  int _sv0t0 = sv0_vec_len(tok_tags);
+  int n = _sv0t0;
+  while ((p < n)) {
+    int _sv0t1 = sv0_vec_get(tok_tags, p);
+    int t = _sv0t1;
+    if ((t == 6)) {
+      d = (d + 1);
+    } else {
+    }
+    if ((t == 7)) {
+      d = (d - 1);
+      if ((d == 0)) {
+        return p;
+      } else {
+      }
+    } else {
+    }
+    p = (p + 1);
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
+}
+
+static int chk_vecf_fn_end(int tok_tags, int i) {
+  int _sv0t0 = sv0_vec_len(tok_tags);
+  int n = _sv0t0;
+  int _sv0t1 = chk_vecf_params_open(tok_tags, i);
+  int open = _sv0t1;
+  if ((open < 0)) {
+    int _sv0t2 = (i + 1);
+    return _sv0t2;
+  } else {
+  }
+  int _sv0t3 = chk_vecf_close_paren(tok_tags, open);
+  int close = _sv0t3;
+  if ((close < 0)) {
+    return n;
+  } else {
+  }
+  int p = (close + 1);
+  while ((p < n)) {
+    int _sv0t4 = sv0_vec_get(tok_tags, p);
+    int t = _sv0t4;
+    if ((t == 13)) {
+      int _sv0t5 = (p + 1);
+      return _sv0t5;
+    } else {
+    }
+    if ((t == 8)) {
+      int depth = 1;
+      p = (p + 1);
+      while ((p < n)) {
+        int _sv0t6 = sv0_vec_get(tok_tags, p);
+        int u = _sv0t6;
+        if ((u == 8)) {
+          depth = (depth + 1);
+        } else {
+        }
+        if ((u == 9)) {
+          depth = (depth - 1);
+          if ((depth == 0)) {
+            int _sv0t7 = (p + 1);
+            return _sv0t7;
+          } else {
+          }
+        } else {
+        }
+        p = (p + 1);
+      }
+      return n;
+    } else {
+    }
+    if ((t == 6)) {
+      int _sv0t8 = chk_vecf_close_paren(tok_tags, p);
+      int c2 = _sv0t8;
+      if ((c2 < 0)) {
+        return n;
+      } else {
+      }
+      p = c2;
+    } else {
+    }
+    p = (p + 1);
+  }
+  return n;
+}
+
+static int chk_vecf_collect_params(int tok_tags, const char* source, int starts, int ends, int i, int names, int kinds) {
+  int _sv0t0 = chk_vecf_params_open(tok_tags, i);
+  int open = _sv0t0;
+  if ((open < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = chk_vecf_close_paren(tok_tags, open);
+  int close = _sv0t1;
+  if ((close < 0)) {
+    return 0;
+  } else {
+  }
+  int p = (open + 1);
+  int pd = 1;
+  int at_start = 1;
+  while ((p < close)) {
+    int _sv0t2 = sv0_vec_get(tok_tags, p);
+    int t = _sv0t2;
+    if ((t == 6)) {
+      pd = (pd + 1);
+    } else {
+    }
+    if ((t == 7)) {
+      pd = (pd - 1);
+    } else {
+    }
+    if ((pd == 1)) {
+      if ((t == 12)) {
+        at_start = 1;
+      } else {
+      }
+      if (at_start) {
+        if ((t == 5)) {
+          at_start = 0;
+          int _sv0t3 = (p + 1);
+          int _sv0t4 = chk_vecf_tag_at(tok_tags, _sv0t3);
+          if ((_sv0t4 == 14)) {
+            sv0_vec_push(names, p);
+            int _sv0t5 = (p + 2);
+            int _sv0t6 = chk_vecf_type_kind(tok_tags, source, starts, ends, _sv0t5);
+            sv0_vec_push(kinds, _sv0t6);
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    p = (p + 1);
+  }
+  return 0;
+}
+
+static int chk_vecf_collect_lets(int tok_tags, const char* source, int starts, int ends, int lo, int hi, int rnames, int rkinds, int names, int kinds) {
+  int i = lo;
+  while ((i < hi)) {
+    int _sv0t0 = sv0_vec_get(tok_tags, i);
+    if ((_sv0t0 == 71)) {
+      int p = (i + 1);
+      int _sv0t1 = chk_vecf_tag_at(tok_tags, p);
+      if ((_sv0t1 == 77)) {
+        p = (p + 1);
+      } else {
+      }
+      int _sv0t2 = chk_vecf_tag_at(tok_tags, p);
+      if ((_sv0t2 == 5)) {
+        int kind = 2;
+        int _sv0t3 = (p + 1);
+        int _sv0t4 = chk_vecf_tag_at(tok_tags, _sv0t3);
+        int nt = _sv0t4;
+        if ((nt == 14)) {
+          int _sv0t5 = (p + 2);
+          int _sv0t6 = chk_vecf_type_kind(tok_tags, source, starts, ends, _sv0t5);
+          kind = _sv0t6;
+        } else {
+        }
+        if ((nt == 35)) {
+          int _sv0t7 = (p + 2);
+          int _sv0t8 = chk_vecf_tag_at(tok_tags, _sv0t7);
+          if ((_sv0t8 == 5)) {
+            int _sv0t9 = (p + 3);
+            int _sv0t10 = chk_vecf_tag_at(tok_tags, _sv0t9);
+            if ((_sv0t10 == 6)) {
+              int _sv0t11 = (p + 2);
+              int _sv0t12 = chk_vecf_lookup(rnames, rkinds, source, starts, ends, _sv0t11);
+              if ((_sv0t12 == 1)) {
+                kind = 1;
+              } else {
+              }
+            } else {
+            }
+          } else {
+          }
+        } else {
+        }
+        sv0_vec_push(names, p);
+        sv0_vec_push(kinds, kind);
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  return 0;
+}
+
+static int chk_vecf_accessor_kind(const char* source, int starts, int ends, int t) {
+  if ((t < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(starts);
+  if ((t >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_len(ends);
+  if ((t >= _sv0t1)) {
+    return 0;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(ends, t);
+  int _sv0t3 = sv0_vec_get(starts, t);
+  int len = (_sv0t2 - _sv0t3);
+  if ((len != 7)) {
+    if ((len != 8)) {
+      if ((len != 11)) {
+        if ((len != 12)) {
+          return 0;
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+  } else {
+  }
+  int _sv0t4 = chk_vecf_text_is(source, starts, ends, t, "vec_push");
+  if (_sv0t4) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = chk_vecf_text_is(source, starts, ends, t, "vec_get");
+  if (_sv0t5) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = chk_vecf_text_is(source, starts, ends, t, "vec_set");
+  if (_sv0t6) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = chk_vecf_text_is(source, starts, ends, t, "vec_push_f64");
+  if (_sv0t7) {
+    return 2;
+  } else {
+  }
+  int _sv0t8 = chk_vecf_text_is(source, starts, ends, t, "vec_get_f64");
+  if (_sv0t8) {
+    return 2;
+  } else {
+  }
+  int _sv0t9 = chk_vecf_text_is(source, starts, ends, t, "vec_set_f64");
+  if (_sv0t9) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int chk_vecf_site_map(int tok_tags, const char* source, int starts, int ends) {
+  int _sv0t0 = sv0_vec_len(tok_tags);
+  int n = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int map = _sv0t1;
+  int z = 0;
+  while ((z < n)) {
+    sv0_vec_push(map, 0);
+    z = (z + 1);
+  }
+  int _sv0t2 = sv0_vec_len(starts);
+  if ((_sv0t2 < n)) {
+    return map;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_len(ends);
+  if ((_sv0t3 < n)) {
+    return map;
+  } else {
+  }
+  int _sv0t4 = sv0_vec_new();
+  int fnames = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int fkinds = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int rnames = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int rkinds = _sv0t7;
+  int i = 0;
+  while ((i < n)) {
+    int _sv0t8 = sv0_vec_get(tok_tags, i);
+    int t = _sv0t8;
+    if ((t == 89)) {
+      int _sv0t9 = chk_vecf_collect_struct(tok_tags, source, starts, ends, i, fnames, fkinds);
+      i = _sv0t9;
+    } else {
+      if ((t == 65)) {
+        int _sv0t10 = (i + 1);
+        int _sv0t11 = chk_vecf_tag_at(tok_tags, _sv0t10);
+        if ((_sv0t11 == 5)) {
+          int _sv0t12 = chk_vecf_params_open(tok_tags, i);
+          int open = _sv0t12;
+          if ((open >= 0)) {
+            int _sv0t13 = chk_vecf_close_paren(tok_tags, open);
+            int close = _sv0t13;
+            if ((close >= 0)) {
+              int _sv0t14 = (close + 1);
+              int _sv0t15 = chk_vecf_tag_at(tok_tags, _sv0t14);
+              if ((_sv0t15 == 19)) {
+                int _sv0t16 = (i + 1);
+                sv0_vec_push(rnames, _sv0t16);
+                int _sv0t17 = (close + 2);
+                int _sv0t18 = chk_vecf_type_kind(tok_tags, source, starts, ends, _sv0t17);
+                sv0_vec_push(rkinds, _sv0t18);
+              } else {
+              }
+            } else {
+            }
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+      i = (i + 1);
+    }
+  }
+  i = 0;
+  while ((i < n)) {
+    int _sv0t19 = sv0_vec_get(tok_tags, i);
+    int ft = _sv0t19;
+    int advance = (i + 1);
+    if ((ft == 65)) {
+      int _sv0t20 = (i + 1);
+      int _sv0t21 = chk_vecf_tag_at(tok_tags, _sv0t20);
+      if ((_sv0t21 == 5)) {
+        int _sv0t22 = chk_vecf_fn_end(tok_tags, i);
+        int hi = _sv0t22;
+        int _sv0t23 = sv0_vec_new();
+        int names = _sv0t23;
+        int _sv0t24 = sv0_vec_new();
+        int kinds = _sv0t24;
+        int _sv0t25 = chk_vecf_collect_params(tok_tags, source, starts, ends, i, names, kinds);
+        int _p = _sv0t25;
+        int _sv0t26 = chk_vecf_collect_lets(tok_tags, source, starts, ends, i, hi, rnames, rkinds, names, kinds);
+        int _l = _sv0t26;
+        int s = i;
+        while ((s < hi)) {
+          int _sv0t27 = sv0_vec_get(tok_tags, s);
+          if ((_sv0t27 == 5)) {
+            int _sv0t28 = (s + 1);
+            int _sv0t29 = chk_vecf_tag_at(tok_tags, _sv0t28);
+            if ((_sv0t29 == 6)) {
+              int _sv0t30 = chk_vecf_accessor_kind(source, starts, ends, s);
+              int ak = _sv0t30;
+              if ((ak != 0)) {
+                int a0 = (s + 2);
+                int code = 0;
+                int _sv0t31 = chk_vecf_tag_at(tok_tags, a0);
+                if ((_sv0t31 == 5)) {
+                  int _sv0t32 = (a0 + 1);
+                  int _sv0t33 = chk_vecf_tag_at(tok_tags, _sv0t32);
+                  int nx = _sv0t33;
+                  if ((nx == 12)) {
+                    int _sv0t34 = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
+                    code = _sv0t34;
+                  } else {
+                  }
+                  if ((nx == 7)) {
+                    int _sv0t35 = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
+                    code = _sv0t35;
+                  } else {
+                  }
+                  if ((nx == 16)) {
+                    int _sv0t36 = (a0 + 2);
+                    int _sv0t37 = chk_vecf_tag_at(tok_tags, _sv0t36);
+                    if ((_sv0t37 == 5)) {
+                      int _sv0t38 = (a0 + 3);
+                      int _sv0t39 = chk_vecf_tag_at(tok_tags, _sv0t38);
+                      int nx2 = _sv0t39;
+                      if ((nx2 == 12)) {
+                        int _sv0t40 = (a0 + 2);
+                        int _sv0t41 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, _sv0t40);
+                        code = _sv0t41;
+                      } else {
+                      }
+                      if ((nx2 == 7)) {
+                        int _sv0t42 = (a0 + 2);
+                        int _sv0t43 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, _sv0t42);
+                        code = _sv0t43;
+                      } else {
+                      }
+                    } else {
+                    }
+                  } else {
+                  }
+                } else {
+                }
+                if ((ak == 1)) {
+                  if ((code == 1)) {
+                    sv0_vec_set(map, s, 1);
+                  } else {
+                  }
+                  if ((code == 2)) {
+                    sv0_vec_set(map, s, 2);
+                  } else {
+                  }
+                } else {
+                }
+                if ((ak == 2)) {
+                  if ((code == 3)) {
+                    sv0_vec_set(map, s, 3);
+                  } else {
+                  }
+                } else {
+                }
+              } else {
+              }
+            } else {
+            }
+          } else {
+          }
+          s = (s + 1);
+        }
+        advance = hi;
+        if ((advance <= i)) {
+          advance = (i + 1);
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    i = advance;
+  }
+  return map;
+}
+
 static int tok_text_eq(const char* source, int starts, int ends, int t, const char* want) {
   if ((t < 0)) {
     return 0;
@@ -4588,7 +5356,7 @@ static int tok_is_float_type_name(const char* source, int starts, int ends, int 
   return _sv0t1;
 }
 
-static int check_vec_float_element(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int idx, int diag_sink) {
+static int check_vec_float_element(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int idx, int vecf_sites, int diag_sink) {
   int _sv0t0 = sv0_vec_get(ed1, idx);
   int callee = _sv0t0;
   if ((callee < 0)) {
@@ -4610,17 +5378,39 @@ static int check_vec_float_element(int et, int ed1, int ed2, int ed3, int ed4, i
   int ctok = _sv0t4;
   int _sv0t5 = sv0_vec_get(ed3, idx);
   int ac = _sv0t5;
+  int site = 0;
+  if ((ctok >= 0)) {
+    int _sv0t6 = sv0_vec_len(vecf_sites);
+    if ((ctok < _sv0t6)) {
+      int _sv0t7 = sv0_vec_get(vecf_sites, ctok);
+      site = _sv0t7;
+    } else {
+    }
+  } else {
+  }
+  if ((site == 3)) {
+    sv0_vec_push(diag_sink, 453);
+    sv0_vec_push(diag_sink, ctok);
+    return 0;
+  } else {
+  }
+  if ((site == 2)) {
+    sv0_vec_push(diag_sink, 451);
+    sv0_vec_push(diag_sink, ctok);
+    return 0;
+  } else {
+  }
   int elem_pos = (0 - 1);
-  int _sv0t6 = tok_text_eq(source, starts, ends, ctok, "vec_push");
-  if (_sv0t6) {
+  int _sv0t8 = tok_text_eq(source, starts, ends, ctok, "vec_push");
+  if (_sv0t8) {
     if ((ac == 2)) {
       elem_pos = 1;
     } else {
     }
   } else {
   }
-  int _sv0t7 = tok_text_eq(source, starts, ends, ctok, "vec_set");
-  if (_sv0t7) {
+  int _sv0t9 = tok_text_eq(source, starts, ends, ctok, "vec_set");
+  if (_sv0t9) {
     if ((ac == 3)) {
       elem_pos = 2;
     } else {
@@ -4631,13 +5421,31 @@ static int check_vec_float_element(int et, int ed1, int ed2, int ed3, int ed4, i
     return 0;
   } else {
   }
-  int _sv0t8 = sv0_vec_get(ed2, idx);
-  int _sv0t9 = sv0_vec_get(ed4, idx);
-  int _sv0t10 = block_stmt_index(pp, _sv0t8, _sv0t9, elem_pos);
-  int _sv0t11 = synth_expr(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, _sv0t10);
-  int ety = _sv0t11;
-  int _sv0t12 = TY_FLOAT();
-  if ((ety == _sv0t12)) {
+  int _sv0t10 = sv0_vec_get(ed2, idx);
+  int _sv0t11 = sv0_vec_get(ed4, idx);
+  int _sv0t12 = block_stmt_index(pp, _sv0t10, _sv0t11, elem_pos);
+  int _sv0t13 = synth_expr(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, _sv0t12);
+  int ety = _sv0t13;
+  if ((site == 1)) {
+    int _sv0t14 = TY_FLOAT();
+    if ((ety != _sv0t14)) {
+      int _sv0t15 = TY_VAR();
+      if ((ety != _sv0t15)) {
+        int _sv0t16 = TY_UNKNOWN();
+        if ((ety != _sv0t16)) {
+          sv0_vec_push(diag_sink, 452);
+          sv0_vec_push(diag_sink, ctok);
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    return 0;
+  } else {
+  }
+  int _sv0t17 = TY_FLOAT();
+  if ((ety == _sv0t17)) {
     sv0_vec_push(diag_sink, 447);
     sv0_vec_push(diag_sink, ctok);
   } else {
@@ -4689,7 +5497,7 @@ static int check_array_float_literal(int et, int ed1, int ed2, int ed3, int ed4,
   return 0;
 }
 
-static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int in_unsafe, int idx, int diag_sink) {
+static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp, const char* source, int starts, int ends, int env_names, int env_types, int env_muts, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int fn_names, int fn_ret_types, int ret_ty, int loop_depth, int in_unsafe, int idx, int vecf_sites, int diag_sink) {
   if ((idx < 0)) {
     return 0;
   } else {
@@ -4731,16 +5539,16 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
       }
     } else {
     }
-    int _sv0t8 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, operand_idx, diag_sink);
+    int _sv0t8 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, operand_idx, vecf_sites, diag_sink);
     return _sv0t8;
   } else {
   }
   if ((tag == 3)) {
     int _sv0t9 = sv0_vec_get(ed2, idx);
-    int _sv0t10 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t9, diag_sink);
+    int _sv0t10 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t9, vecf_sites, diag_sink);
     int _l3 = _sv0t10;
     int _sv0t11 = sv0_vec_get(ed3, idx);
-    int _sv0t12 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t11, diag_sink);
+    int _sv0t12 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t11, vecf_sites, diag_sink);
     return _sv0t12;
   } else {
   }
@@ -4752,14 +5560,14 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
     int _sv0t15 = sv0_vec_get(ed4, idx);
     int sc4 = _sv0t15;
     int _sv0t16 = sv0_vec_get(ed1, idx);
-    int _sv0t17 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t16, diag_sink);
+    int _sv0t17 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t16, vecf_sites, diag_sink);
     int _c4 = _sv0t17;
-    int _sv0t18 = check_vec_float_element(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, idx, diag_sink);
+    int _sv0t18 = check_vec_float_element(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, idx, vecf_sites, diag_sink);
     int _vf4 = _sv0t18;
     int ai4 = 0;
     while ((ai4 < ac4)) {
       int _sv0t19 = block_stmt_index(pp, af4, sc4, ai4);
-      int _sv0t20 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t19, diag_sink);
+      int _sv0t20 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t19, vecf_sites, diag_sink);
       int _a4 = _sv0t20;
       ai4 = (ai4 + 1);
     }
@@ -4772,12 +5580,12 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
     int _sv0t22 = sv0_vec_get(ed4, idx);
     int mc_sc = _sv0t22;
     int _sv0t23 = sv0_vec_get(ed1, idx);
-    int _sv0t24 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t23, diag_sink);
+    int _sv0t24 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t23, vecf_sites, diag_sink);
     int _mo5 = _sv0t24;
     int ai5 = 0;
     while ((ai5 < mc_ac)) {
       int _sv0t25 = block_stmt_index(pp, 0, mc_sc, ai5);
-      int _sv0t26 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t25, diag_sink);
+      int _sv0t26 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t25, vecf_sites, diag_sink);
       int _a5 = _sv0t26;
       ai5 = (ai5 + 1);
     }
@@ -4786,22 +5594,22 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
   }
   if ((tag == 6)) {
     int _sv0t27 = sv0_vec_get(ed1, idx);
-    int _sv0t28 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t27, diag_sink);
+    int _sv0t28 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t27, vecf_sites, diag_sink);
     return _sv0t28;
   } else {
   }
   if ((tag == 7)) {
     int _sv0t29 = sv0_vec_get(ed1, idx);
-    int _sv0t30 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t29, diag_sink);
+    int _sv0t30 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t29, vecf_sites, diag_sink);
     return _sv0t30;
   } else {
   }
   if ((tag == 8)) {
     int _sv0t31 = sv0_vec_get(ed1, idx);
-    int _sv0t32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t31, diag_sink);
+    int _sv0t32 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t31, vecf_sites, diag_sink);
     int _o8 = _sv0t32;
     int _sv0t33 = sv0_vec_get(ed2, idx);
-    int _sv0t34 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t33, diag_sink);
+    int _sv0t34 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t33, vecf_sites, diag_sink);
     return _sv0t34;
   } else {
   }
@@ -4830,7 +5638,7 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
         int _sv0t44 = sv0_vec_get(ed4, st9);
         int ismut9 = _sv0t44;
         if ((init9 >= 0)) {
-          int _sv0t45 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, init9, diag_sink);
+          int _sv0t45 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, init9, vecf_sites, diag_sink);
           int _i9 = _sv0t45;
           int _sv0t46 = synth_expr(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, init9);
           int ty9 = _sv0t46;
@@ -4845,13 +5653,13 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
       if ((stag9 == 28)) {
         int _sv0t48 = sv0_vec_get(ed1, st9);
         int e9 = _sv0t48;
-        int _sv0t49 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, e9, diag_sink);
+        int _sv0t49 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, e9, vecf_sites, diag_sink);
         int _s9 = _sv0t49;
       } else {
       }
       si9 = (si9 + 1);
     }
-    int _sv0t50 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, tail9, diag_sink);
+    int _sv0t50 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, tail9, vecf_sites, diag_sink);
     int r9 = _sv0t50;
     int _sv0t51 = env_scope_restore(env_names, env_mark9);
     int _rst9 = _sv0t51;
@@ -4860,15 +5668,15 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
   }
   if ((tag == 10)) {
     int _sv0t52 = sv0_vec_get(ed1, idx);
-    int _sv0t53 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t52, diag_sink);
+    int _sv0t53 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t52, vecf_sites, diag_sink);
     int _c10 = _sv0t53;
     int _sv0t54 = sv0_vec_get(ed2, idx);
-    int _sv0t55 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t54, diag_sink);
+    int _sv0t55 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t54, vecf_sites, diag_sink);
     int _t10 = _sv0t55;
     int _sv0t56 = sv0_vec_get(ed3, idx);
     int else10 = _sv0t56;
     if ((else10 >= 0)) {
-      int _sv0t57 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, else10, diag_sink);
+      int _sv0t57 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, else10, vecf_sites, diag_sink);
       return _sv0t57;
     } else {
     }
@@ -4884,7 +5692,7 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
     int arms_c11 = _sv0t60;
     int _sv0t61 = sv0_vec_get(ed4, idx);
     int arms_sc11 = _sv0t61;
-    int _sv0t62 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, scrut11, diag_sink);
+    int _sv0t62 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, scrut11, vecf_sites, diag_sink);
     int _s11 = _sv0t62;
     int ami11 = 0;
     while ((ami11 < arms_c11)) {
@@ -4895,11 +5703,11 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
       int _sv0t65 = sv0_vec_get(ed4, arm11);
       int body11 = _sv0t65;
       if ((guard11 >= 0)) {
-        int _sv0t66 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, guard11, diag_sink);
+        int _sv0t66 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, guard11, vecf_sites, diag_sink);
         int _g11 = _sv0t66;
       } else {
       }
-      int _sv0t67 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, body11, diag_sink);
+      int _sv0t67 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, body11, vecf_sites, diag_sink);
       int _b11 = _sv0t67;
       ami11 = (ami11 + 1);
     }
@@ -4908,76 +5716,76 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
   }
   if ((tag == 12)) {
     int _sv0t68 = sv0_vec_get(ed1, idx);
-    int _sv0t69 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t68, diag_sink);
+    int _sv0t69 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t68, vecf_sites, diag_sink);
     int _c12 = _sv0t69;
     int _sv0t70 = (loop_depth + 1);
     int _sv0t71 = sv0_vec_get(ed2, idx);
-    int _sv0t72 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, _sv0t70, in_unsafe, _sv0t71, diag_sink);
+    int _sv0t72 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, _sv0t70, in_unsafe, _sv0t71, vecf_sites, diag_sink);
     return _sv0t72;
   } else {
   }
   if ((tag == 13)) {
     int _sv0t73 = sv0_vec_get(ed2, idx);
-    int _sv0t74 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t73, diag_sink);
+    int _sv0t74 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t73, vecf_sites, diag_sink);
     int _it13 = _sv0t74;
     int _sv0t75 = (loop_depth + 1);
     int _sv0t76 = sv0_vec_get(ed3, idx);
-    int _sv0t77 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, _sv0t75, in_unsafe, _sv0t76, diag_sink);
+    int _sv0t77 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, _sv0t75, in_unsafe, _sv0t76, vecf_sites, diag_sink);
     return _sv0t77;
   } else {
   }
   if ((tag == 14)) {
     int _sv0t78 = (loop_depth + 1);
     int _sv0t79 = sv0_vec_get(ed1, idx);
-    int _sv0t80 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, _sv0t78, in_unsafe, _sv0t79, diag_sink);
+    int _sv0t80 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, _sv0t78, in_unsafe, _sv0t79, vecf_sites, diag_sink);
     return _sv0t80;
   } else {
   }
   if ((tag == 15)) {
     int _sv0t81 = sv0_vec_get(ed1, idx);
-    int _sv0t82 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t81, diag_sink);
+    int _sv0t82 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t81, vecf_sites, diag_sink);
     return _sv0t82;
   } else {
   }
   if ((tag == 16)) {
     int _sv0t83 = sv0_vec_get(ed1, idx);
-    int _sv0t84 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t83, diag_sink);
+    int _sv0t84 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t83, vecf_sites, diag_sink);
     return _sv0t84;
   } else {
   }
   if ((tag == 18)) {
     int _sv0t85 = sv0_vec_get(ed1, idx);
-    int _sv0t86 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t85, diag_sink);
+    int _sv0t86 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t85, vecf_sites, diag_sink);
     int _l18 = _sv0t86;
     int _sv0t87 = sv0_vec_get(ed2, idx);
-    int _sv0t88 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t87, diag_sink);
+    int _sv0t88 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t87, vecf_sites, diag_sink);
     return _sv0t88;
   } else {
   }
   if ((tag == 19)) {
     int _sv0t89 = sv0_vec_get(ed2, idx);
-    int _sv0t90 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t89, diag_sink);
+    int _sv0t90 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t89, vecf_sites, diag_sink);
     int _l19 = _sv0t90;
     int _sv0t91 = sv0_vec_get(ed3, idx);
-    int _sv0t92 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t91, diag_sink);
+    int _sv0t92 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t91, vecf_sites, diag_sink);
     return _sv0t92;
   } else {
   }
   if ((tag == 20)) {
     int _sv0t93 = sv0_vec_get(ed1, idx);
-    int _sv0t94 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t93, diag_sink);
+    int _sv0t94 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t93, vecf_sites, diag_sink);
     return _sv0t94;
   } else {
   }
   if ((tag == 22)) {
     int _sv0t95 = sv0_vec_get(ed1, idx);
-    int _sv0t96 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t95, diag_sink);
+    int _sv0t96 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t95, vecf_sites, diag_sink);
     return _sv0t96;
   } else {
   }
   if ((tag == 23)) {
     int _sv0t97 = sv0_vec_get(ed1, idx);
-    int _sv0t98 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t97, diag_sink);
+    int _sv0t98 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t97, vecf_sites, diag_sink);
     return _sv0t98;
   } else {
   }
@@ -4990,7 +5798,7 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
     int tc25 = _sv0t99;
     if ((tc25 == 1)) {
       int _sv0t100 = sv0_vec_get(ed1, idx);
-      int _sv0t101 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t100, diag_sink);
+      int _sv0t101 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, in_unsafe, _sv0t100, vecf_sites, diag_sink);
       return _sv0t101;
     } else {
     }
@@ -5004,7 +5812,7 @@ static int check_unsafe_gate(int et, int ed1, int ed2, int ed3, int ed4, int pp,
   }
   if ((tag == 34)) {
     int _sv0t103 = sv0_vec_get(ed1, idx);
-    int _sv0t104 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, 1, _sv0t103, diag_sink);
+    int _sv0t104 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, env_names, env_types, env_muts, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, loop_depth, 1, _sv0t103, vecf_sites, diag_sink);
     return _sv0t104;
   } else {
   }
@@ -5037,251 +5845,253 @@ static int check_extern_fn_signature(int param_types, int param_count, int ret_t
 }
 
 static int check_program(int tok_tags, const char* source, int starts, int ends, int pp, int it, int id1, int id2, int id3, int id4, int id5, int fn_param_name_toks, int fn_param_ty_root, int fn_ret_ty_root_by_item, int pty_tt, int pty_td1, int pty_td2, int pty_td3, int body_et, int body_ed1, int body_ed2, int body_ed3, int body_ed4, int type_params, int tp_limit, int diag_sink) {
-  int _sv0t0 = sv0_vec_new();
-  int struct_names = _sv0t0;
+  int _sv0t0 = chk_vecf_site_map(tok_tags, source, starts, ends);
+  int vecf_sites = _sv0t0;
   int _sv0t1 = sv0_vec_new();
-  int enum_names = _sv0t1;
-  int _sv0t2 = sv0_vec_len(it);
-  int nitems = _sv0t2;
+  int struct_names = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int enum_names = _sv0t2;
+  int _sv0t3 = sv0_vec_len(it);
+  int nitems = _sv0t3;
   int ni = 0;
   while ((ni < nitems)) {
-    int _sv0t3 = sv0_vec_get(it, ni);
-    int tg = _sv0t3;
+    int _sv0t4 = sv0_vec_get(it, ni);
+    int tg = _sv0t4;
     if ((tg == 1)) {
-      int _sv0t4 = sv0_vec_get(id1, ni);
-      sv0_vec_push(struct_names, _sv0t4);
+      int _sv0t5 = sv0_vec_get(id1, ni);
+      sv0_vec_push(struct_names, _sv0t5);
     } else {
     }
     if ((tg == 2)) {
-      int _sv0t5 = sv0_vec_get(id1, ni);
-      sv0_vec_push(enum_names, _sv0t5);
+      int _sv0t6 = sv0_vec_get(id1, ni);
+      sv0_vec_push(enum_names, _sv0t6);
     } else {
     }
     ni = (ni + 1);
   }
-  int _sv0t6 = struct_enum_name_clash_str(source, starts, ends, struct_names, enum_names);
-  int clash_se = _sv0t6;
-  int _sv0t7 = (0 - 1);
-  if ((clash_se != _sv0t7)) {
-    int _sv0t8 = (0 - 1);
-    return _sv0t8;
+  int _sv0t7 = struct_enum_name_clash_str(source, starts, ends, struct_names, enum_names);
+  int clash_se = _sv0t7;
+  int _sv0t8 = (0 - 1);
+  if ((clash_se != _sv0t8)) {
+    int _sv0t9 = (0 - 1);
+    return _sv0t9;
   } else {
   }
-  int _sv0t9 = sv0_vec_new();
-  int sdef_names = _sv0t9;
   int _sv0t10 = sv0_vec_new();
-  int sdef_field_offsets = _sv0t10;
+  int sdef_names = _sv0t10;
   int _sv0t11 = sv0_vec_new();
-  int sdef_field_counts = _sv0t11;
+  int sdef_field_offsets = _sv0t11;
   int _sv0t12 = sv0_vec_new();
-  int sdef_fnames_flat = _sv0t12;
+  int sdef_field_counts = _sv0t12;
   int _sv0t13 = sv0_vec_new();
-  int sdef_ftypes_flat = _sv0t13;
-  int _sv0t14 = init_struct_defs(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, it, id1, id2, sdef_names, sdef_field_offsets, sdef_field_counts, sdef_fnames_flat, sdef_ftypes_flat);
-  int _sc = _sv0t14;
-  int _sv0t15 = sv0_vec_new();
-  int edef_names = _sv0t15;
+  int sdef_fnames_flat = _sv0t13;
+  int _sv0t14 = sv0_vec_new();
+  int sdef_ftypes_flat = _sv0t14;
+  int _sv0t15 = init_struct_defs(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, it, id1, id2, sdef_names, sdef_field_offsets, sdef_field_counts, sdef_fnames_flat, sdef_ftypes_flat);
+  int _sc = _sv0t15;
   int _sv0t16 = sv0_vec_new();
-  int edef_variant_offsets = _sv0t16;
+  int edef_names = _sv0t16;
   int _sv0t17 = sv0_vec_new();
-  int edef_variant_counts = _sv0t17;
+  int edef_variant_offsets = _sv0t17;
   int _sv0t18 = sv0_vec_new();
-  int edef_vnames_flat = _sv0t18;
+  int edef_variant_counts = _sv0t18;
   int _sv0t19 = sv0_vec_new();
-  int edef_vshapes_flat = _sv0t19;
-  int _sv0t20 = init_enum_defs(tok_tags, source, starts, ends, it, id1, id2, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat);
-  int _ec = _sv0t20;
+  int edef_vnames_flat = _sv0t19;
+  int _sv0t20 = sv0_vec_new();
+  int edef_vshapes_flat = _sv0t20;
+  int _sv0t21 = init_enum_defs(tok_tags, source, starts, ends, it, id1, id2, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat);
+  int _ec = _sv0t21;
   if ((_ec < 0)) {
-    int _sv0t21 = (0 - 1);
-    return _sv0t21;
+    int _sv0t22 = (0 - 1);
+    return _sv0t22;
   } else {
   }
-  int _sv0t22 = sv0_vec_new();
-  int fn_names = _sv0t22;
   int _sv0t23 = sv0_vec_new();
-  int fn_param_counts = _sv0t23;
+  int fn_names = _sv0t23;
   int _sv0t24 = sv0_vec_new();
-  int fn_ret_types = _sv0t24;
+  int fn_param_counts = _sv0t24;
   int _sv0t25 = sv0_vec_new();
-  int fn_param_offsets = _sv0t25;
+  int fn_ret_types = _sv0t25;
   int _sv0t26 = sv0_vec_new();
-  int fn_param_types_flat = _sv0t26;
+  int fn_param_offsets = _sv0t26;
   int _sv0t27 = sv0_vec_new();
-  int fn_is_extern = _sv0t27;
-  int _sv0t28 = register_all_item_fns(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, it, id1, id2, id3, id5, fn_param_ty_root, fn_ret_ty_root_by_item, pty_tt, pty_td1, pty_td2, pty_td3, pp, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, fn_is_extern);
-  int _fc = _sv0t28;
-  int _sv0t29 = extern_fn_manifest_conflict(fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, fn_is_extern, source, starts, ends);
-  int extern_conflict = _sv0t29;
+  int fn_param_types_flat = _sv0t27;
+  int _sv0t28 = sv0_vec_new();
+  int fn_is_extern = _sv0t28;
+  int _sv0t29 = register_all_item_fns(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, it, id1, id2, id3, id5, fn_param_ty_root, fn_ret_ty_root_by_item, pty_tt, pty_td1, pty_td2, pty_td3, pp, fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, fn_is_extern);
+  int _fc = _sv0t29;
+  int _sv0t30 = extern_fn_manifest_conflict(fn_names, fn_param_counts, fn_ret_types, fn_param_offsets, fn_param_types_flat, fn_is_extern, source, starts, ends);
+  int extern_conflict = _sv0t30;
   if ((extern_conflict >= 0)) {
     sv0_vec_push(diag_sink, 552);
-    int _sv0t30 = sv0_vec_get(fn_names, extern_conflict);
-    sv0_vec_push(diag_sink, _sv0t30);
-    int _sv0t31 = (0 - 1);
-    return _sv0t31;
+    int _sv0t31 = sv0_vec_get(fn_names, extern_conflict);
+    sv0_vec_push(diag_sink, _sv0t31);
+    int _sv0t32 = (0 - 1);
+    return _sv0t32;
   } else {
   }
-  int _sv0t32 = sv0_vec_new();
-  int mod_env_names = _sv0t32;
   int _sv0t33 = sv0_vec_new();
-  int mod_env_types = _sv0t33;
+  int mod_env_names = _sv0t33;
   int _sv0t34 = sv0_vec_new();
-  int mod_env_muts = _sv0t34;
+  int mod_env_types = _sv0t34;
   int _sv0t35 = sv0_vec_new();
-  int aliases = _sv0t35;
+  int mod_env_muts = _sv0t35;
   int _sv0t36 = sv0_vec_new();
-  int alias_targets = _sv0t36;
-  int _sv0t37 = build_mod_env(source, starts, ends, pp, it, id1, id2, id3, id4, fn_names, fn_ret_types, sdef_names, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, mod_env_names, mod_env_types, mod_env_muts, aliases, alias_targets);
-  int br = _sv0t37;
+  int aliases = _sv0t36;
+  int _sv0t37 = sv0_vec_new();
+  int alias_targets = _sv0t37;
+  int _sv0t38 = build_mod_env(source, starts, ends, pp, it, id1, id2, id3, id4, fn_names, fn_ret_types, sdef_names, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, mod_env_names, mod_env_types, mod_env_muts, aliases, alias_targets);
+  int br = _sv0t38;
   if ((br != 0)) {
-    int _sv0t38 = (0 - 1);
-    return _sv0t38;
+    int _sv0t39 = (0 - 1);
+    return _sv0t39;
   } else {
   }
   int bpp = pp;
   int ii = 0;
   while ((ii < nitems)) {
-    int _sv0t39 = sv0_vec_get(it, ii);
-    if ((_sv0t39 == 0)) {
-      int _sv0t40 = sv0_vec_get(id2, ii);
-      int id2v = _sv0t40;
-      int _sv0t41 = (id2v % 2);
-      if ((_sv0t41 == 0)) {
-        int _sv0t42 = (id2v / 2);
-        if ((_sv0t42 > 0)) {
+    int _sv0t40 = sv0_vec_get(it, ii);
+    if ((_sv0t40 == 0)) {
+      int _sv0t41 = sv0_vec_get(id2, ii);
+      int id2v = _sv0t41;
+      int _sv0t42 = (id2v % 2);
+      if ((_sv0t42 == 0)) {
+        int _sv0t43 = (id2v / 2);
+        if ((_sv0t43 > 0)) {
           sv0_vec_push(diag_sink, 409);
-          int _sv0t43 = sv0_vec_get(id1, ii);
-          sv0_vec_push(diag_sink, _sv0t43);
+          int _sv0t44 = sv0_vec_get(id1, ii);
+          sv0_vec_push(diag_sink, _sv0t44);
         } else {
         }
       } else {
       }
-      int _sv0t44 = sv0_vec_get(id1, ii);
-      int name_pos = _sv0t44;
-      int _sv0t45 = sv0_vec_get(id3, ii);
-      int param_count = _sv0t45;
-      int _sv0t46 = sv0_vec_get(id4, ii);
-      int body_root_idx = _sv0t46;
-      int _sv0t47 = sv0_vec_get(id5, ii);
-      int pbase = _sv0t47;
-      int _sv0t48 = sv0_vec_new();
-      int param_types = _sv0t48;
-      int _sv0t49 = scan_fn_param_type_tags_arena(fn_param_ty_root, pbase, param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, param_types);
-      int rpt = _sv0t49;
+      int _sv0t45 = sv0_vec_get(id1, ii);
+      int name_pos = _sv0t45;
+      int _sv0t46 = sv0_vec_get(id3, ii);
+      int param_count = _sv0t46;
+      int _sv0t47 = sv0_vec_get(id4, ii);
+      int body_root_idx = _sv0t47;
+      int _sv0t48 = sv0_vec_get(id5, ii);
+      int pbase = _sv0t48;
+      int _sv0t49 = sv0_vec_new();
+      int param_types = _sv0t49;
+      int _sv0t50 = scan_fn_param_type_tags_arena(fn_param_ty_root, pbase, param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, param_types);
+      int rpt = _sv0t50;
       if ((rpt < 0)) {
-        int _sv0t50 = (0 - 1);
-        return _sv0t50;
+        int _sv0t51 = (0 - 1);
+        return _sv0t51;
       } else {
       }
-      int _sv0t51 = sv0_vec_new();
-      int param_name_pos = _sv0t51;
       int _sv0t52 = sv0_vec_new();
-      int param_muts = _sv0t52;
-      int _sv0t53 = scan_fn_param_names_arena(fn_param_name_toks, pbase, param_count, tok_tags, param_name_pos, param_muts);
-      int rpn = _sv0t53;
+      int param_name_pos = _sv0t52;
+      int _sv0t53 = sv0_vec_new();
+      int param_muts = _sv0t53;
+      int _sv0t54 = scan_fn_param_names_arena(fn_param_name_toks, pbase, param_count, tok_tags, param_name_pos, param_muts);
+      int rpn = _sv0t54;
       if ((rpn < 0)) {
-        int _sv0t54 = (0 - 1);
-        return _sv0t54;
+        int _sv0t55 = (0 - 1);
+        return _sv0t55;
       } else {
       }
-      int _sv0t55 = fn_table_lookup(fn_names, name_pos);
-      int fidx = _sv0t55;
+      int _sv0t56 = fn_table_lookup(fn_names, name_pos);
+      int fidx = _sv0t56;
       if ((fidx < 0)) {
-        int _sv0t56 = (0 - 1);
-        return _sv0t56;
+        int _sv0t57 = (0 - 1);
+        return _sv0t57;
       } else {
       }
-      int _sv0t57 = fn_table_ret_type(fn_ret_types, fidx);
-      int ret_ty = _sv0t57;
-      int _sv0t58 = check_fn_body(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, source, starts, ends, mod_env_names, mod_env_types, mod_env_muts, param_name_pos, param_types, param_muts, param_count, ret_ty, body_root_idx, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, diag_sink);
-      int chk = _sv0t58;
-      int _sv0t59 = sv0_vec_new();
-      int param_tyname_toks = _sv0t59;
-      int _sv0t60 = scan_param_tyname_toks(fn_param_ty_root, pbase, param_count, pty_tt, pty_td1, pty_td3, pp, param_tyname_toks);
-      int _ptn = _sv0t60;
-      int _sv0t61 = check_body_field_access(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, body_root_idx, param_name_pos, param_tyname_toks, sdef_names, sdef_field_offsets, sdef_field_counts, sdef_fnames_flat, source, starts, ends, diag_sink);
-      int _rfa = _sv0t61;
-      int _sv0t62 = check_body_slice_borrow(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, body_root_idx, param_name_pos, source, starts, ends, diag_sink);
-      int _rsb = _sv0t62;
-      int _sv0t63 = sv0_vec_new();
-      int ug_env_n = _sv0t63;
+      int _sv0t58 = fn_table_ret_type(fn_ret_types, fidx);
+      int ret_ty = _sv0t58;
+      int _sv0t59 = check_fn_body(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, source, starts, ends, mod_env_names, mod_env_types, mod_env_muts, param_name_pos, param_types, param_muts, param_count, ret_ty, body_root_idx, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, diag_sink);
+      int chk = _sv0t59;
+      int _sv0t60 = sv0_vec_new();
+      int param_tyname_toks = _sv0t60;
+      int _sv0t61 = scan_param_tyname_toks(fn_param_ty_root, pbase, param_count, pty_tt, pty_td1, pty_td3, pp, param_tyname_toks);
+      int _ptn = _sv0t61;
+      int _sv0t62 = check_body_field_access(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, body_root_idx, param_name_pos, param_tyname_toks, sdef_names, sdef_field_offsets, sdef_field_counts, sdef_fnames_flat, source, starts, ends, diag_sink);
+      int _rfa = _sv0t62;
+      int _sv0t63 = check_body_slice_borrow(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, body_root_idx, param_name_pos, source, starts, ends, diag_sink);
+      int _rsb = _sv0t63;
       int _sv0t64 = sv0_vec_new();
-      int ug_env_t = _sv0t64;
+      int ug_env_n = _sv0t64;
       int _sv0t65 = sv0_vec_new();
-      int ug_env_m = _sv0t65;
-      int _sv0t66 = sv0_vec_len(mod_env_names);
-      int ug_me_len = _sv0t66;
+      int ug_env_t = _sv0t65;
+      int _sv0t66 = sv0_vec_new();
+      int ug_env_m = _sv0t66;
+      int _sv0t67 = sv0_vec_len(mod_env_names);
+      int ug_me_len = _sv0t67;
       int ug_j = 0;
       while ((ug_j < ug_me_len)) {
-        int _sv0t67 = sv0_vec_get(mod_env_names, ug_j);
-        sv0_vec_push(ug_env_n, _sv0t67);
-        int _sv0t68 = sv0_vec_get(mod_env_types, ug_j);
-        sv0_vec_push(ug_env_t, _sv0t68);
-        int _sv0t69 = sv0_vec_get(mod_env_muts, ug_j);
-        sv0_vec_push(ug_env_m, _sv0t69);
+        int _sv0t68 = sv0_vec_get(mod_env_names, ug_j);
+        sv0_vec_push(ug_env_n, _sv0t68);
+        int _sv0t69 = sv0_vec_get(mod_env_types, ug_j);
+        sv0_vec_push(ug_env_t, _sv0t69);
+        int _sv0t70 = sv0_vec_get(mod_env_muts, ug_j);
+        sv0_vec_push(ug_env_m, _sv0t70);
         ug_j = (ug_j + 1);
       }
       int ug_pi = 0;
       while ((ug_pi < param_count)) {
-        int _sv0t70 = sv0_vec_get(param_name_pos, ug_pi);
-        int _sv0t71 = sv0_vec_get(param_types, ug_pi);
-        int _sv0t72 = sv0_vec_get(param_muts, ug_pi);
-        int _sv0t73 = env_extend(ug_env_n, ug_env_t, ug_env_m, _sv0t70, _sv0t71, _sv0t72);
+        int _sv0t71 = sv0_vec_get(param_name_pos, ug_pi);
+        int _sv0t72 = sv0_vec_get(param_types, ug_pi);
+        int _sv0t73 = sv0_vec_get(param_muts, ug_pi);
+        int _sv0t74 = env_extend(ug_env_n, ug_env_t, ug_env_m, _sv0t71, _sv0t72, _sv0t73);
         ug_pi = (ug_pi + 1);
       }
-      int _sv0t74 = check_unsafe_gate(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, source, starts, ends, ug_env_n, ug_env_t, ug_env_m, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, 0, 0, body_root_idx, diag_sink);
-      int _rug = _sv0t74;
-      int _sv0t75 = check_body_let_unknown_type(body_et, body_ed1, body_ed2, body_ed4, bpp, body_root_idx, struct_names, enum_names, type_params, tp_limit, tok_tags, source, starts, ends, diag_sink);
-      int _rut = _sv0t75;
+      int _sv0t75 = check_unsafe_gate(body_et, body_ed1, body_ed2, body_ed3, body_ed4, bpp, source, starts, ends, ug_env_n, ug_env_t, ug_env_m, edef_names, edef_variant_offsets, edef_variant_counts, edef_vnames_flat, edef_vshapes_flat, fn_names, fn_ret_types, ret_ty, 0, 0, body_root_idx, vecf_sites, diag_sink);
+      int _rug = _sv0t75;
+      int _sv0t76 = check_body_let_unknown_type(body_et, body_ed1, body_ed2, body_ed4, bpp, body_root_idx, struct_names, enum_names, type_params, tp_limit, tok_tags, source, starts, ends, diag_sink);
+      int _rut = _sv0t76;
       if ((chk != 0)) {
-        int _sv0t76 = sv0_vec_len(diag_sink);
-        if ((_sv0t76 == 0)) {
-          int _sv0t77 = find_multi_element_tuple(body_et, body_ed2);
-          int tup_i = _sv0t77;
+        int _sv0t77 = sv0_vec_len(diag_sink);
+        if ((_sv0t77 == 0)) {
+          int _sv0t78 = find_multi_element_tuple(body_et, body_ed2);
+          int tup_i = _sv0t78;
           if ((tup_i >= 0)) {
             sv0_vec_push(diag_sink, 446);
-            int _sv0t78 = expr_span_tok(body_et, body_ed1, bpp, tup_i);
-            sv0_vec_push(diag_sink, _sv0t78);
+            int _sv0t79 = expr_span_tok(body_et, body_ed1, bpp, tup_i);
+            sv0_vec_push(diag_sink, _sv0t79);
           } else {
           }
         } else {
         }
-        int _sv0t79 = (0 - 1);
-        return _sv0t79;
+        int _sv0t80 = (0 - 1);
+        return _sv0t80;
       } else {
       }
     } else {
     }
-    int _sv0t80 = sv0_vec_get(it, ii);
-    if ((_sv0t80 == 8)) {
-      int _sv0t81 = sv0_vec_get(id1, ii);
-      int ext_name_pos = _sv0t81;
-      int _sv0t82 = sv0_vec_get(id3, ii);
-      int ext_param_count = _sv0t82;
-      int _sv0t83 = sv0_vec_get(id5, ii);
-      int ext_pbase = _sv0t83;
-      int _sv0t84 = sv0_vec_new();
-      int ext_param_types = _sv0t84;
-      int _sv0t85 = scan_fn_param_type_tags_arena(fn_param_ty_root, ext_pbase, ext_param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, ext_param_types);
-      int ext_rpt = _sv0t85;
+    int _sv0t81 = sv0_vec_get(it, ii);
+    if ((_sv0t81 == 8)) {
+      int _sv0t82 = sv0_vec_get(id1, ii);
+      int ext_name_pos = _sv0t82;
+      int _sv0t83 = sv0_vec_get(id3, ii);
+      int ext_param_count = _sv0t83;
+      int _sv0t84 = sv0_vec_get(id5, ii);
+      int ext_pbase = _sv0t84;
+      int _sv0t85 = sv0_vec_new();
+      int ext_param_types = _sv0t85;
+      int _sv0t86 = scan_fn_param_type_tags_arena(fn_param_ty_root, ext_pbase, ext_param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, ext_param_types);
+      int ext_rpt = _sv0t86;
       if ((ext_rpt < 0)) {
-        int _sv0t86 = (0 - 1);
-        return _sv0t86;
+        int _sv0t87 = (0 - 1);
+        return _sv0t87;
       } else {
       }
-      int _sv0t87 = sv0_vec_get(id2, ii);
-      int ext_has_ret = (_sv0t87 % 2);
-      int _sv0t88 = scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item, ii, ext_has_ret, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit);
-      int ext_ret_tag = _sv0t88;
-      int _sv0t89 = check_extern_fn_signature(ext_param_types, ext_param_count, ext_ret_tag, ext_has_ret, ext_name_pos, diag_sink);
-      int _cefs = _sv0t89;
+      int _sv0t88 = sv0_vec_get(id2, ii);
+      int ext_has_ret = (_sv0t88 % 2);
+      int _sv0t89 = scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item, ii, ext_has_ret, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit);
+      int ext_ret_tag = _sv0t89;
+      int _sv0t90 = check_extern_fn_signature(ext_param_types, ext_param_count, ext_ret_tag, ext_has_ret, ext_name_pos, diag_sink);
+      int _cefs = _sv0t90;
     } else {
     }
     ii = (ii + 1);
   }
-  int _sv0t90 = sv0_vec_len(diag_sink);
-  if ((_sv0t90 > 0)) {
-    int _sv0t91 = (0 - 1);
-    return _sv0t91;
+  int _sv0t91 = sv0_vec_len(diag_sink);
+  if ((_sv0t91 > 0)) {
+    int _sv0t92 = (0 - 1);
+    return _sv0t92;
   } else {
   }
   return 0;
@@ -13423,8 +14233,9 @@ static int unsafe_gate_deref_fixture(int in_unsafe) {
   int _sv0t20 = sv0_vec_new();
   int diag_sink = _sv0t20;
   int _sv0t21 = TY_INT();
-  int _sv0t22 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, en, ety, em, edn, edvo, edvc, edvn, edvs, tfn, tfrt, _sv0t21, 0, in_unsafe, 1, diag_sink);
-  int _r = _sv0t22;
+  int _sv0t22 = sv0_vec_new();
+  int _sv0t23 = check_unsafe_gate(et, ed1, ed2, ed3, ed4, pp, source, starts, ends, en, ety, em, edn, edvo, edvc, edvn, edvs, tfn, tfrt, _sv0t21, 0, in_unsafe, 1, _sv0t22, diag_sink);
+  int _r = _sv0t23;
   return diag_sink;
 }
 
@@ -13554,6 +14365,1008 @@ static int test_named_only_ty_basic(void) {
   int _sv0t4 = named_only_ty(sn, en, 99);
   if ((_sv0t4 != 0)) {
     return 3;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_param_f64(void) {
+  const char* src;
+  src = "fn f(v: Vec<f64>) -> f64 { return vec_get(v, 0); }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 3);
+  sv0_vec_push(en, 4);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 6);
+  sv0_vec_push(en, 7);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 8);
+  sv0_vec_push(en, 11);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 11);
+  sv0_vec_push(en, 12);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 12);
+  sv0_vec_push(en, 15);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 15);
+  sv0_vec_push(en, 16);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 16);
+  sv0_vec_push(en, 17);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 18);
+  sv0_vec_push(en, 20);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 24);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 25);
+  sv0_vec_push(en, 26);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 27);
+  sv0_vec_push(en, 33);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 34);
+  sv0_vec_push(en, 41);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 41);
+  sv0_vec_push(en, 42);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 42);
+  sv0_vec_push(en, 43);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 43);
+  sv0_vec_push(en, 44);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 45);
+  sv0_vec_push(en, 46);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 46);
+  sv0_vec_push(en, 47);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 47);
+  sv0_vec_push(en, 48);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 49);
+  sv0_vec_push(en, 50);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 22)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 14);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_let_f64(void) {
+  const char* src;
+  src = "fn f() -> f64 { let v: Vec<f64> = vec_new(); vec_push(v, 1.5); return 0.0; }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 3);
+  sv0_vec_push(en, 4);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 7);
+  sv0_vec_push(en, 9);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 10);
+  sv0_vec_push(en, 13);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 14);
+  sv0_vec_push(en, 15);
+  sv0_vec_push(tags, 71);
+  sv0_vec_push(st, 16);
+  sv0_vec_push(en, 19);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 20);
+  sv0_vec_push(en, 21);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 22);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 23);
+  sv0_vec_push(en, 26);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 26);
+  sv0_vec_push(en, 27);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 27);
+  sv0_vec_push(en, 30);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 30);
+  sv0_vec_push(en, 31);
+  sv0_vec_push(tags, 35);
+  sv0_vec_push(st, 32);
+  sv0_vec_push(en, 33);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 34);
+  sv0_vec_push(en, 41);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 41);
+  sv0_vec_push(en, 42);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 42);
+  sv0_vec_push(en, 43);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 43);
+  sv0_vec_push(en, 44);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 45);
+  sv0_vec_push(en, 53);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 53);
+  sv0_vec_push(en, 54);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 54);
+  sv0_vec_push(en, 55);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 55);
+  sv0_vec_push(en, 56);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 57);
+  sv0_vec_push(en, 60);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 60);
+  sv0_vec_push(en, 61);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 61);
+  sv0_vec_push(en, 62);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 63);
+  sv0_vec_push(en, 69);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 70);
+  sv0_vec_push(en, 73);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 73);
+  sv0_vec_push(en, 74);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 75);
+  sv0_vec_push(en, 76);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 30)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 19);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_ambiguous(void) {
+  const char* src;
+  src = "fn f() -> i32 { let v: Vec<f64> = vec_new(); let v: Vec<i32> = vec_new(); return vec_get(v, 0); }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 3);
+  sv0_vec_push(en, 4);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 7);
+  sv0_vec_push(en, 9);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 10);
+  sv0_vec_push(en, 13);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 14);
+  sv0_vec_push(en, 15);
+  sv0_vec_push(tags, 71);
+  sv0_vec_push(st, 16);
+  sv0_vec_push(en, 19);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 20);
+  sv0_vec_push(en, 21);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 22);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 23);
+  sv0_vec_push(en, 26);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 26);
+  sv0_vec_push(en, 27);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 27);
+  sv0_vec_push(en, 30);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 30);
+  sv0_vec_push(en, 31);
+  sv0_vec_push(tags, 35);
+  sv0_vec_push(st, 32);
+  sv0_vec_push(en, 33);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 34);
+  sv0_vec_push(en, 41);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 41);
+  sv0_vec_push(en, 42);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 42);
+  sv0_vec_push(en, 43);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 43);
+  sv0_vec_push(en, 44);
+  sv0_vec_push(tags, 71);
+  sv0_vec_push(st, 45);
+  sv0_vec_push(en, 48);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 49);
+  sv0_vec_push(en, 50);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 50);
+  sv0_vec_push(en, 51);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 52);
+  sv0_vec_push(en, 55);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 55);
+  sv0_vec_push(en, 56);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 56);
+  sv0_vec_push(en, 59);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 59);
+  sv0_vec_push(en, 60);
+  sv0_vec_push(tags, 35);
+  sv0_vec_push(st, 61);
+  sv0_vec_push(en, 62);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 63);
+  sv0_vec_push(en, 70);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 70);
+  sv0_vec_push(en, 71);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 71);
+  sv0_vec_push(en, 72);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 72);
+  sv0_vec_push(en, 73);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 74);
+  sv0_vec_push(en, 80);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 81);
+  sv0_vec_push(en, 88);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 88);
+  sv0_vec_push(en, 89);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 89);
+  sv0_vec_push(en, 90);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 90);
+  sv0_vec_push(en, 91);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 92);
+  sv0_vec_push(en, 93);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 93);
+  sv0_vec_push(en, 94);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 94);
+  sv0_vec_push(en, 95);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 96);
+  sv0_vec_push(en, 97);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 40)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 32);
+  if ((_sv0t5 != 2)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_typed_on_int(void) {
+  const char* src;
+  src = "fn f(v: Vec<i32>) -> i32 { return vec_get_f64(v, 0); }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 3);
+  sv0_vec_push(en, 4);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 6);
+  sv0_vec_push(en, 7);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 8);
+  sv0_vec_push(en, 11);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 11);
+  sv0_vec_push(en, 12);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 12);
+  sv0_vec_push(en, 15);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 15);
+  sv0_vec_push(en, 16);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 16);
+  sv0_vec_push(en, 17);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 18);
+  sv0_vec_push(en, 20);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 24);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 25);
+  sv0_vec_push(en, 26);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 27);
+  sv0_vec_push(en, 33);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 34);
+  sv0_vec_push(en, 45);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 45);
+  sv0_vec_push(en, 46);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 46);
+  sv0_vec_push(en, 47);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 47);
+  sv0_vec_push(en, 48);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 49);
+  sv0_vec_push(en, 50);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 50);
+  sv0_vec_push(en, 51);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 51);
+  sv0_vec_push(en, 52);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 53);
+  sv0_vec_push(en, 54);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 22)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 14);
+  if ((_sv0t5 != 3)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_struct_field(void) {
+  const char* src;
+  src = "struct B { d: Vec<f64>, n: i32 } fn f(b: B) -> f64 { return vec_get(b.d, 0); }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 89);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 7);
+  sv0_vec_push(en, 8);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 9);
+  sv0_vec_push(en, 10);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 11);
+  sv0_vec_push(en, 12);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 12);
+  sv0_vec_push(en, 13);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 14);
+  sv0_vec_push(en, 17);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 17);
+  sv0_vec_push(en, 18);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 18);
+  sv0_vec_push(en, 21);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 22);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 22);
+  sv0_vec_push(en, 23);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 24);
+  sv0_vec_push(en, 25);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 25);
+  sv0_vec_push(en, 26);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 27);
+  sv0_vec_push(en, 30);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 31);
+  sv0_vec_push(en, 32);
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 33);
+  sv0_vec_push(en, 35);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 36);
+  sv0_vec_push(en, 37);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 37);
+  sv0_vec_push(en, 38);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 38);
+  sv0_vec_push(en, 39);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 39);
+  sv0_vec_push(en, 40);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 41);
+  sv0_vec_push(en, 42);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 42);
+  sv0_vec_push(en, 43);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 44);
+  sv0_vec_push(en, 46);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 47);
+  sv0_vec_push(en, 50);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 51);
+  sv0_vec_push(en, 52);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 53);
+  sv0_vec_push(en, 59);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 60);
+  sv0_vec_push(en, 67);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 67);
+  sv0_vec_push(en, 68);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 68);
+  sv0_vec_push(en, 69);
+  sv0_vec_push(tags, 16);
+  sv0_vec_push(st, 69);
+  sv0_vec_push(en, 70);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 70);
+  sv0_vec_push(en, 71);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 71);
+  sv0_vec_push(en, 72);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 73);
+  sv0_vec_push(en, 74);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 74);
+  sv0_vec_push(en, 75);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 75);
+  sv0_vec_push(en, 76);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 77);
+  sv0_vec_push(en, 78);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 35)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 25);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_fn_return(void) {
+  const char* src;
+  src = "fn m() -> Vec<f64> { return vec_new(); } fn f() -> f64 { let w = m(); return vec_get(w, 0); }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 3);
+  sv0_vec_push(en, 4);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 7);
+  sv0_vec_push(en, 9);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 10);
+  sv0_vec_push(en, 13);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 13);
+  sv0_vec_push(en, 14);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 14);
+  sv0_vec_push(en, 17);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 17);
+  sv0_vec_push(en, 18);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 19);
+  sv0_vec_push(en, 20);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 27);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 28);
+  sv0_vec_push(en, 35);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 35);
+  sv0_vec_push(en, 36);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 36);
+  sv0_vec_push(en, 37);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 37);
+  sv0_vec_push(en, 38);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 39);
+  sv0_vec_push(en, 40);
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 41);
+  sv0_vec_push(en, 43);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 44);
+  sv0_vec_push(en, 45);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 45);
+  sv0_vec_push(en, 46);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 46);
+  sv0_vec_push(en, 47);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 48);
+  sv0_vec_push(en, 50);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 51);
+  sv0_vec_push(en, 54);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 55);
+  sv0_vec_push(en, 56);
+  sv0_vec_push(tags, 71);
+  sv0_vec_push(st, 57);
+  sv0_vec_push(en, 60);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 61);
+  sv0_vec_push(en, 62);
+  sv0_vec_push(tags, 35);
+  sv0_vec_push(st, 63);
+  sv0_vec_push(en, 64);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 65);
+  sv0_vec_push(en, 66);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 66);
+  sv0_vec_push(en, 67);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 67);
+  sv0_vec_push(en, 68);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 68);
+  sv0_vec_push(en, 69);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 70);
+  sv0_vec_push(en, 76);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 77);
+  sv0_vec_push(en, 84);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 84);
+  sv0_vec_push(en, 85);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 85);
+  sv0_vec_push(en, 86);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 86);
+  sv0_vec_push(en, 87);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 88);
+  sv0_vec_push(en, 89);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 89);
+  sv0_vec_push(en, 90);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 90);
+  sv0_vec_push(en, 91);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 92);
+  sv0_vec_push(en, 93);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 39)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 31);
+  if ((_sv0t5 != 1)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_word_vec(void) {
+  const char* src;
+  src = "fn f(v: Vec<i32>) -> i32 { return vec_get(v, 0); }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 3);
+  sv0_vec_push(en, 4);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 6);
+  sv0_vec_push(en, 7);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 8);
+  sv0_vec_push(en, 11);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 11);
+  sv0_vec_push(en, 12);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 12);
+  sv0_vec_push(en, 15);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 15);
+  sv0_vec_push(en, 16);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 16);
+  sv0_vec_push(en, 17);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 18);
+  sv0_vec_push(en, 20);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 24);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 25);
+  sv0_vec_push(en, 26);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 27);
+  sv0_vec_push(en, 33);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 34);
+  sv0_vec_push(en, 41);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 41);
+  sv0_vec_push(en, 42);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 42);
+  sv0_vec_push(en, 43);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 43);
+  sv0_vec_push(en, 44);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 45);
+  sv0_vec_push(en, 46);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 46);
+  sv0_vec_push(en, 47);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 47);
+  sv0_vec_push(en, 48);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 49);
+  sv0_vec_push(en, 50);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 22)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 14);
+  if ((_sv0t5 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_case_two_fns(void) {
+  const char* src;
+  src = "fn a(v: Vec<f64>) -> i32 { return 0; } fn b(v: Vec<i32>) -> i32 { return vec_get(v, 0); }";
+  int _sv0t0 = sv0_vec_new();
+  int tags = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int st = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int en = _sv0t2;
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 2);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 3);
+  sv0_vec_push(en, 4);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 4);
+  sv0_vec_push(en, 5);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 5);
+  sv0_vec_push(en, 6);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 6);
+  sv0_vec_push(en, 7);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 8);
+  sv0_vec_push(en, 11);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 11);
+  sv0_vec_push(en, 12);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 12);
+  sv0_vec_push(en, 15);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 15);
+  sv0_vec_push(en, 16);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 16);
+  sv0_vec_push(en, 17);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 18);
+  sv0_vec_push(en, 20);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 21);
+  sv0_vec_push(en, 24);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 25);
+  sv0_vec_push(en, 26);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 27);
+  sv0_vec_push(en, 33);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 34);
+  sv0_vec_push(en, 35);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 35);
+  sv0_vec_push(en, 36);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 37);
+  sv0_vec_push(en, 38);
+  sv0_vec_push(tags, 65);
+  sv0_vec_push(st, 39);
+  sv0_vec_push(en, 41);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 42);
+  sv0_vec_push(en, 43);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 43);
+  sv0_vec_push(en, 44);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 44);
+  sv0_vec_push(en, 45);
+  sv0_vec_push(tags, 14);
+  sv0_vec_push(st, 45);
+  sv0_vec_push(en, 46);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 47);
+  sv0_vec_push(en, 50);
+  sv0_vec_push(tags, 38);
+  sv0_vec_push(st, 50);
+  sv0_vec_push(en, 51);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 51);
+  sv0_vec_push(en, 54);
+  sv0_vec_push(tags, 39);
+  sv0_vec_push(st, 54);
+  sv0_vec_push(en, 55);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 55);
+  sv0_vec_push(en, 56);
+  sv0_vec_push(tags, 19);
+  sv0_vec_push(st, 57);
+  sv0_vec_push(en, 59);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 60);
+  sv0_vec_push(en, 63);
+  sv0_vec_push(tags, 8);
+  sv0_vec_push(st, 64);
+  sv0_vec_push(en, 65);
+  sv0_vec_push(tags, 85);
+  sv0_vec_push(st, 66);
+  sv0_vec_push(en, 72);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 73);
+  sv0_vec_push(en, 80);
+  sv0_vec_push(tags, 6);
+  sv0_vec_push(st, 80);
+  sv0_vec_push(en, 81);
+  sv0_vec_push(tags, 5);
+  sv0_vec_push(st, 81);
+  sv0_vec_push(en, 82);
+  sv0_vec_push(tags, 12);
+  sv0_vec_push(st, 82);
+  sv0_vec_push(en, 83);
+  sv0_vec_push(tags, 3);
+  sv0_vec_push(st, 84);
+  sv0_vec_push(en, 85);
+  sv0_vec_push(tags, 7);
+  sv0_vec_push(st, 85);
+  sv0_vec_push(en, 86);
+  sv0_vec_push(tags, 13);
+  sv0_vec_push(st, 86);
+  sv0_vec_push(en, 87);
+  sv0_vec_push(tags, 9);
+  sv0_vec_push(st, 88);
+  sv0_vec_push(en, 89);
+  int _sv0t3 = chk_vecf_site_map(tags, src, st, en);
+  int m = _sv0t3;
+  int _sv0t4 = sv0_vec_len(m);
+  if ((_sv0t4 != 39)) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_get(m, 31);
+  if ((_sv0t5 != 0)) {
+    return 2;
+  } else {
+  }
+  return 0;
+}
+
+static int test_chk_vecf_lookup_kinds(void) {
+  const char* src;
+  src = "v v";
+  int _sv0t0 = sv0_vec_new();
+  int st = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int en = _sv0t1;
+  sv0_vec_push(st, 0);
+  sv0_vec_push(en, 1);
+  sv0_vec_push(st, 2);
+  sv0_vec_push(en, 3);
+  int _sv0t2 = sv0_vec_new();
+  int names = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int kinds = _sv0t3;
+  sv0_vec_push(names, 0);
+  sv0_vec_push(kinds, 1);
+  int _sv0t4 = chk_vecf_lookup(names, kinds, src, st, en, 1);
+  if ((_sv0t4 != 1)) {
+    return 1;
+  } else {
+  }
+  sv0_vec_push(names, 1);
+  sv0_vec_push(kinds, 2);
+  int _sv0t5 = chk_vecf_lookup(names, kinds, src, st, en, 1);
+  if ((_sv0t5 != 2)) {
+    return 2;
+  } else {
+  }
+  int _sv0t6 = sv0_vec_new();
+  int n3 = _sv0t6;
+  int _sv0t7 = sv0_vec_new();
+  int k3 = _sv0t7;
+  sv0_vec_push(n3, 0);
+  sv0_vec_push(k3, 3);
+  sv0_vec_push(n3, 1);
+  sv0_vec_push(k3, 3);
+  int _sv0t8 = chk_vecf_lookup(n3, k3, src, st, en, 1);
+  if ((_sv0t8 != 3)) {
+    return 3;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_new();
+  int n2 = _sv0t9;
+  int _sv0t10 = sv0_vec_new();
+  int k2 = _sv0t10;
+  sv0_vec_push(n2, 0);
+  sv0_vec_push(k2, 2);
+  int _sv0t11 = chk_vecf_lookup(n2, k2, src, st, en, 1);
+  if ((_sv0t11 != 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t12 = sv0_vec_new();
+  int empty = _sv0t12;
+  int _sv0t13 = chk_vecf_lookup(empty, empty, src, st, en, 1);
+  if ((_sv0t13 != 0)) {
+    return 5;
   } else {
   }
   return 0;
@@ -14208,6 +16021,78 @@ int main(void) {
   if ((r89 != 0)) {
     int _sv0t184 = (920 + r89);
     return _sv0t184;
+  } else {
+  }
+  int _sv0t185 = test_chk_vecf_case_param_f64();
+  int rv0 = _sv0t185;
+  if ((rv0 != 0)) {
+    int _sv0t186 = (930 + 0);
+    int _sv0t187 = (_sv0t186 + rv0);
+    return _sv0t187;
+  } else {
+  }
+  int _sv0t188 = test_chk_vecf_case_let_f64();
+  int rv1 = _sv0t188;
+  if ((rv1 != 0)) {
+    int _sv0t189 = (930 + 10);
+    int _sv0t190 = (_sv0t189 + rv1);
+    return _sv0t190;
+  } else {
+  }
+  int _sv0t191 = test_chk_vecf_case_ambiguous();
+  int rv2 = _sv0t191;
+  if ((rv2 != 0)) {
+    int _sv0t192 = (930 + 20);
+    int _sv0t193 = (_sv0t192 + rv2);
+    return _sv0t193;
+  } else {
+  }
+  int _sv0t194 = test_chk_vecf_case_typed_on_int();
+  int rv3 = _sv0t194;
+  if ((rv3 != 0)) {
+    int _sv0t195 = (930 + 30);
+    int _sv0t196 = (_sv0t195 + rv3);
+    return _sv0t196;
+  } else {
+  }
+  int _sv0t197 = test_chk_vecf_case_struct_field();
+  int rv4 = _sv0t197;
+  if ((rv4 != 0)) {
+    int _sv0t198 = (930 + 40);
+    int _sv0t199 = (_sv0t198 + rv4);
+    return _sv0t199;
+  } else {
+  }
+  int _sv0t200 = test_chk_vecf_case_fn_return();
+  int rv5 = _sv0t200;
+  if ((rv5 != 0)) {
+    int _sv0t201 = (930 + 50);
+    int _sv0t202 = (_sv0t201 + rv5);
+    return _sv0t202;
+  } else {
+  }
+  int _sv0t203 = test_chk_vecf_case_word_vec();
+  int rv6 = _sv0t203;
+  if ((rv6 != 0)) {
+    int _sv0t204 = (930 + 60);
+    int _sv0t205 = (_sv0t204 + rv6);
+    return _sv0t205;
+  } else {
+  }
+  int _sv0t206 = test_chk_vecf_case_two_fns();
+  int rv7 = _sv0t206;
+  if ((rv7 != 0)) {
+    int _sv0t207 = (930 + 70);
+    int _sv0t208 = (_sv0t207 + rv7);
+    return _sv0t208;
+  } else {
+  }
+  int _sv0t209 = test_chk_vecf_lookup_kinds();
+  int rv8 = _sv0t209;
+  if ((rv8 != 0)) {
+    int _sv0t210 = (930 + 80);
+    int _sv0t211 = (_sv0t210 + rv8);
+    return _sv0t211;
   } else {
   }
   return 0;
