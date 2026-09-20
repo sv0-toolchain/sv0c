@@ -1,0 +1,71 @@
+// Unannotated `let v = vec_new();` locals are typed from how they are used:
+// a float literal element, `let x: f64 = vec_get(v, ..)`, being passed to a
+// fn whose parameter is a Vec<f64>, `return v;` in a fn declared
+// `-> Vec<f64>`, or `field: v` in a struct literal. A vec used only with
+// integers stays word-sized. Expected exit: 42.
+
+struct Bag {
+    data: Vec<f64>,
+    n: i32,
+}
+
+fn total(xs: Vec<f64>) -> f64 {
+    let mut s: f64 = 0.0;
+    let mut i: i32 = 0;
+    while i < vec_len(xs) {
+        let x: f64 = vec_get(xs, i);
+        s = s + x;
+        i = i + 1;
+    }
+    return s;
+}
+
+fn from_return(x: f64) -> Vec<f64> {
+    let v = vec_new();
+    vec_push(v, x);
+    vec_push(v, x * 2.0);
+    return v;
+}
+
+fn boxed(x: f64) -> Bag {
+    let v = vec_new();
+    vec_push(v, x);
+    return Bag { data: v, n: 1 };
+}
+
+fn main() -> i32 {
+    // float literal element
+    let a = vec_new();
+    vec_push(a, 1.5);
+    vec_push(a, 2.5);
+    vec_set(a, 0, 4.5);
+    let a0: f64 = vec_get(a, 0);
+    if a0 != 4.5 { return 1; }
+
+    // passed to a Vec<f64> parameter (no float literal anywhere)
+    let b = vec_new();
+    let seed: f64 = 0.25;
+    vec_push(b, seed);
+    vec_push(b, seed + seed);
+    if total(b) != 0.75 { return 2; }
+
+    // typed read decides
+    let c = vec_new();
+    let cv: f64 = 3.5;
+    vec_push(c, cv);
+    let c0: f64 = vec_get(c, 0);
+    if c0 != 3.5 { return 3; }
+
+    // return type / struct field decide
+    let r = from_return(1.25);
+    if total(r) != 3.75 { return 4; }
+    let bag: Bag = boxed(6.5);
+    let bv: f64 = vec_get(bag.data, 0);
+    if bv != 6.5 { return 5; }
+
+    // word-sized vec is untouched
+    let w = vec_new();
+    vec_push(w, 40);
+    vec_push(w, 2);
+    return vec_get(w, 0) + vec_get(w, 1);
+}

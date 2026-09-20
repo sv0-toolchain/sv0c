@@ -1,0 +1,9 @@
+// E0451: an unannotated `vec_new()` local is used as both a Vec<f64> (float
+// element) and a word-sized vec (integer element), so its element type is
+// ambiguous.
+fn main() -> i32 {
+    let v = vec_new();
+    vec_push(v, 2.5);
+    vec_push(v, 3);
+    return 0;
+}

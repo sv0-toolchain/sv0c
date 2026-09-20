@@ -61,7 +61,8 @@ test/diagnostics/cases/vec_f64_push_rejected.sv0|E0447|native
 test/diagnostics/cases/vec_f64_set_rejected.sv0|E0447|native
 test/diagnostics/cases/array_f64_annotation_rejected.sv0|E0447|native
 test/diagnostics/cases/array_f64_literal_rejected.sv0|E0447|native
-test/diagnostics/cases/vec_f64_unannotated_push_rejected.sv0|E0447|native
+test/diagnostics/cases/vec_f64_unresolvable_push_rejected.sv0|E0447|native
+test/diagnostics/cases/vec_f64_fresh_conflict.sv0|E0451|native
 test/diagnostics/cases/vec_f64_ambiguous.sv0|E0451|native
 test/diagnostics/cases/vec_f64_int_element.sv0|E0452|native
 test/diagnostics/cases/vec_f64_typed_on_int_vec.sv0|E0453|native
