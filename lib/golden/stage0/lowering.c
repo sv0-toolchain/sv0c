@@ -12978,9 +12978,13 @@ static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, 
     int _sv0t1 = (foff + i);
     int _sv0t2 = sv0_vec_get(ftypes, _sv0t1);
     int th = _sv0t2;
-    const char* _sv0t3 = handle_to_str(th, source, starts, ends);
     const char* tname;
-    tname = _sv0t3;
+    tname = "int";
+    if ((th >= 0)) {
+      const char* _sv0t3 = handle_to_str(th, source, starts, ends);
+      tname = _sv0t3;
+    } else {
+    }
     const char* _sv0t4 = ast_ty_to_c_string_with_user(tname, th, sn, en);
     const char* cty;
     cty = _sv0t4;

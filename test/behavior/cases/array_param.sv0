@@ -1,0 +1,23 @@
+// Array-typed parameters, returns and struct fields. `[T; N]` used to resolve
+// to an unknown type, so indexing an array parameter failed with no message
+// (exit 4) and a struct with an array field crashed the compiler (vec index out
+// of bounds). An array is an int handle (like an array literal), so a callee
+// mutates the caller's array through it. Expected exit: 42.
+
+struct H { grid: [i32; 2], n: i32 }
+fn sumf(a: [f64; 3]) -> f64 { return a[0] + a[1] + a[2]; }
+fn bump(a: [i32; 2]) -> i32 { a[0] = a[0] + 1; return a[0]; }
+fn ret() -> [i32; 2] { let r: [i32; 2] = [5, 6]; return r; }
+fn main() -> i32 {
+    let f: [f64; 3] = [1.5, 2.5, 3.0];
+    if sumf(f) != 7.0 { return 1; }
+    let a: [i32; 2] = [40, 2];
+    let x: i32 = bump(a);
+    if x != 41 { return 2; }
+    if a[0] != 41 { return 3; }
+    let r = ret();
+    if r[1] != 6 { return 4; }
+    let h: H = H { grid: [7, 8], n: 1 };
+    if h.grid[1] != 8 { return 5; }
+    return a[0] + a[1] - 1;
+}

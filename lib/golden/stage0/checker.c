@@ -319,6 +319,7 @@ static int test_chk_vecf_lookup_kinds(void);
 static int chk_vecf_test_lex(const char* src, int tags, int st, int en);
 static int chk_vecf_test_site(const char* src, const char* want, int occ, int mode, int expect);
 static int test_chk_vecf_site_table(void);
+static int test_scan_type_tag_at_array(void);
 
 static int BINOP_ARITH(void) {
   return 0;
@@ -2805,32 +2806,57 @@ static int scan_type_tag_at(int tok_tags, const char* source, int starts, int en
     return p;
   } else {
   }
+  if ((t == 10)) {
+    int adepth = 1;
+    int ap = (pos + 1);
+    while ((adepth > 0)) {
+      int _sv0t36 = sv0_vec_len(tok_tags);
+      if ((ap >= _sv0t36)) {
+        break;
+      } else {
+      }
+      int _sv0t37 = sv0_vec_get(tok_tags, ap);
+      int au = _sv0t37;
+      if ((au == 10)) {
+        adepth = (adepth + 1);
+      } else {
+      }
+      if ((au == 11)) {
+        adepth = (adepth - 1);
+      } else {
+      }
+      ap = (ap + 1);
+    }
+    sv0_vec_push(out_tag, 0);
+    return ap;
+  } else {
+  }
   if ((t == 27)) {
-    int _sv0t36 = (pos + 1);
-    int _sv0t37 = sv0_vec_get(tok_tags, _sv0t36);
-    if ((_sv0t37 == 77)) {
-      int _sv0t38 = sv0_vec_new();
-      int inner_out = _sv0t38;
-      int _sv0t39 = (pos + 2);
-      int _sv0t40 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t39, inner_out);
-      int p = _sv0t40;
+    int _sv0t38 = (pos + 1);
+    int _sv0t39 = sv0_vec_get(tok_tags, _sv0t38);
+    if ((_sv0t39 == 77)) {
+      int _sv0t40 = sv0_vec_new();
+      int inner_out = _sv0t40;
+      int _sv0t41 = (pos + 2);
+      int _sv0t42 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t41, inner_out);
+      int p = _sv0t42;
       sv0_vec_push(out_tag, 13);
       return p;
     } else {
     }
-    int _sv0t41 = sv0_vec_new();
-    int inner_out = _sv0t41;
-    int _sv0t42 = (pos + 1);
-    int _sv0t43 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t42, inner_out);
-    int p = _sv0t43;
+    int _sv0t43 = sv0_vec_new();
+    int inner_out = _sv0t43;
+    int _sv0t44 = (pos + 1);
+    int _sv0t45 = scan_type_tag_at(tok_tags, source, starts, ends, struct_names, enum_names, type_params, tp_limit, _sv0t44, inner_out);
+    int p = _sv0t45;
     sv0_vec_push(out_tag, 12);
     return p;
   } else {
   }
-  int _sv0t44 = (0 - 1);
-  sv0_vec_push(out_tag, _sv0t44);
-  int _sv0t45 = (pos + 1);
-  return _sv0t45;
+  int _sv0t46 = (0 - 1);
+  sv0_vec_push(out_tag, _sv0t46);
+  int _sv0t47 = (pos + 1);
+  return _sv0t47;
 }
 
 static int pty_root_to_type_tag(int pty_tt, int pty_td1, int pty_td2, int pty_td3, int pp, int root, const char* source, int starts, int ends, int struct_names, int enum_names, int type_params, int tp_limit) {
@@ -2868,7 +2894,7 @@ static int pty_root_to_type_tag(int pty_tt, int pty_td1, int pty_td2, int pty_td
   } else {
   }
   if ((tag == 3)) {
-    int _sv0t8 = (0 - 1);
+    int _sv0t8 = TY_INT();
     return _sv0t8;
   } else {
   }
@@ -11443,7 +11469,7 @@ static int test_pty_root_to_type_tag(void) {
   } else {
   }
   int _sv0t21 = pty_root_to_type_tag(tt, td1, td2, td3, pp, 10, source, starts, ends, sn, en, tp, 2);
-  int _sv0t22 = (0 - 1);
+  int _sv0t22 = TY_INT();
   if ((_sv0t21 != _sv0t22)) {
     return 11;
   } else {
@@ -15660,6 +15686,61 @@ static int test_chk_vecf_site_table(void) {
   return 0;
 }
 
+static int test_scan_type_tag_at_array(void) {
+  const char* source;
+  source = "[ i32 ; 3 ] ,";
+  int _sv0t0 = sv0_vec_new();
+  int tt = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int starts = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ends = _sv0t2;
+  sv0_vec_push(tt, 10);
+  sv0_vec_push(starts, 0);
+  sv0_vec_push(ends, 1);
+  sv0_vec_push(tt, 5);
+  sv0_vec_push(starts, 2);
+  sv0_vec_push(ends, 5);
+  sv0_vec_push(tt, 13);
+  sv0_vec_push(starts, 6);
+  sv0_vec_push(ends, 7);
+  sv0_vec_push(tt, 0);
+  sv0_vec_push(starts, 8);
+  sv0_vec_push(ends, 9);
+  sv0_vec_push(tt, 11);
+  sv0_vec_push(starts, 10);
+  sv0_vec_push(ends, 11);
+  sv0_vec_push(tt, 12);
+  sv0_vec_push(starts, 12);
+  sv0_vec_push(ends, 13);
+  int _sv0t3 = sv0_vec_new();
+  int sn = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int en = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int tp = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int out = _sv0t6;
+  int _sv0t7 = scan_type_tag_at(tt, source, starts, ends, sn, en, tp, 0, 0, out);
+  int next = _sv0t7;
+  if ((next != 5)) {
+    return 1;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_len(out);
+  if ((_sv0t8 != 1)) {
+    return 2;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(out, 0);
+  int _sv0t10 = TY_INT();
+  if ((_sv0t9 != _sv0t10)) {
+    return 3;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_binop_class();
   int r1 = _sv0t0;
@@ -16324,6 +16405,13 @@ int main(void) {
   if ((rt != 0)) {
     int _sv0t189 = (1200 + rt);
     return _sv0t189;
+  } else {
+  }
+  int _sv0t190 = test_scan_type_tag_at_array();
+  int rar = _sv0t190;
+  if ((rar != 0)) {
+    int _sv0t191 = (1300 + rar);
+    return _sv0t191;
   } else {
   }
   return 0;

@@ -402,7 +402,8 @@ fn main() -> i32 {
             while fk < fc2 {
                 let fname2: i32 = vec_get(sf_names, sf_off + fk);
                 let ftype_tok: i32 = vec_get(sf_types, sf_off + fk);
-                let fcty: string = megatu_ty_name(ftype_tok, source, starts, ends);
+                let mut fcty: string = "int";
+                if ftype_tok >= 0 { fcty = megatu_ty_name(ftype_tok, source, starts, ends); }
                 vec_push(sit_field_name, fname2);
                 vec_push(sit_field_cat, megatu_cty_category(fcty));
                 fk = fk + 1;

@@ -1670,6 +1670,21 @@ fn scan_type_tag_at(tok_tags: Vec<i32>, source: string,
         vec_push(out_tag, 14);
         return p;
     }
+    if t == 10 {
+        /* `[T; N]` array type: skip to the matching `]`; an array is an int
+           handle (see pty_root_to_type_tag's TyArray). */
+        let mut adepth: i32 = 1;
+        let mut ap: i32 = pos + 1;
+        while adepth > 0 {
+            if ap >= vec_len(tok_tags) { break; }
+            let au: i32 = vec_get(tok_tags, ap);
+            if au == 10 { adepth = adepth + 1; }
+            if au == 11 { adepth = adepth - 1; }
+            ap = ap + 1;
+        }
+        vec_push(out_tag, 0);
+        return ap;
+    }
     if t == 27 {
         if vec_get(tok_tags, pos + 1) == 77 {
             let inner_out: Vec<i32> = vec_new();
@@ -1708,7 +1723,8 @@ fn scan_type_tag_at(tok_tags: Vec<i32>, source: string,
    scan_type_tag_at exactly (string compare vs struct/enum names, so it
    is mangle-robust): a type with type args (`Vec<i32>`) → TY_NAMED(15);
    a bare name → primitive / TY_STRUCT(6) / TY_ENUM(7) / TY_VAR(16) / -1.
-   TyArray/TySlice → -1 (scan_type_tag_at has no bracket case either). */
+   TyArray → TY_INT (an array is an int handle, like an array literal);
+   TySlice → -1 (a bare slice type only occurs behind `&`, which is TY_REF). */
 
 fn pty_root_to_type_tag(pty_tt: Vec<i32>, pty_td1: Vec<i32>,
                         pty_td2: Vec<i32>, pty_td3: Vec<i32>,
@@ -1724,7 +1740,11 @@ fn pty_root_to_type_tag(pty_tt: Vec<i32>, pty_td1: Vec<i32>,
     if tag == 1 { return TY_REF(); }
     if tag == 2 { return TY_REFMUT(); }
     if tag == 5 { return TY_TUPLE(); }
-    if tag == 3 { return 0 - 1; }
+    /* TyArray: an array is a Vec-style int handle (an array literal
+       synthesizes TY_INT), so an array-typed parameter, field or return has
+       the same type. It used to resolve to -1 (unknown), which made any
+       `a[i]` on an array parameter a silent checker failure. */
+    if tag == 3 { return TY_INT(); }
     if tag == 4 { return 0 - 1; }
     /* TyPtr/TyPtrMut (tags 8/9, FFI-004): pty_root_to_type_tag feeds the
        fn-signature table (scan_fn_param_type_tags_arena / item_fn_ret_ty_tag's
@@ -7419,7 +7439,7 @@ fn test_pty_root_to_type_tag() -> i32 {
     if pty_root_to_type_tag(tt, td1, td2, td3, pp, 7, source, starts, ends, sn, en, tp, 2) != 13 { return 8; }
     if pty_root_to_type_tag(tt, td1, td2, td3, pp, 8, source, starts, ends, sn, en, tp, 2) != 14 { return 9; }
     if pty_root_to_type_tag(tt, td1, td2, td3, pp, 9, source, starts, ends, sn, en, tp, 2) != 2 { return 10; }
-    if pty_root_to_type_tag(tt, td1, td2, td3, pp, 10, source, starts, ends, sn, en, tp, 2) != 0 - 1 { return 11; }
+    if pty_root_to_type_tag(tt, td1, td2, td3, pp, 10, source, starts, ends, sn, en, tp, 2) != TY_INT() { return 11; }
     if pty_root_to_type_tag(tt, td1, td2, td3, pp, 0 - 1, source, starts, ends, sn, en, tp, 2) != 0 - 1 { return 12; }
     return 0;
 }
@@ -9658,6 +9678,31 @@ fn test_chk_vecf_site_table() -> i32 {
     return 0;
 }
 
+/* `[T; N]` (token scan): consumes through the matching `]` and is an int
+   handle (TY_INT), like an array literal. */
+fn test_scan_type_tag_at_array() -> i32 {
+    let source: string = "[ i32 ; 3 ] ,";
+    let tt: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    vec_push(tt, 10); vec_push(starts, 0); vec_push(ends, 1);
+    vec_push(tt, 5); vec_push(starts, 2); vec_push(ends, 5);
+    vec_push(tt, 13); vec_push(starts, 6); vec_push(ends, 7);
+    vec_push(tt, 0); vec_push(starts, 8); vec_push(ends, 9);
+    vec_push(tt, 11); vec_push(starts, 10); vec_push(ends, 11);
+    vec_push(tt, 12); vec_push(starts, 12); vec_push(ends, 13);
+    let sn: Vec<i32> = vec_new();
+    let en: Vec<i32> = vec_new();
+    let tp: Vec<i32> = vec_new();
+    let out: Vec<i32> = vec_new();
+    let next: i32 = scan_type_tag_at(tt, source, starts, ends, sn, en, tp, 0, 0, out);
+    if next != 5 { return 1; }
+    if vec_len(out) != 1 { return 2; }
+    if vec_get(out, 0) != TY_INT() { return 3; }
+    return 0;
+}
+
+
 fn main() -> i32 {
     let r1: i32 = test_binop_class();
     if r1 != 0 { return r1; }
@@ -9849,5 +9894,7 @@ fn main() -> i32 {
     if rv8 != 0 { return 930 + 80 + rv8; }
     let rt: i32 = test_chk_vecf_site_table();
     if rt != 0 { return 1200 + rt; }
+    let rar: i32 = test_scan_type_tag_at_array();
+    if rar != 0 { return 1300 + rar; }
     return 0;
 }

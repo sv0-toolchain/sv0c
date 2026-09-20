@@ -7361,7 +7361,11 @@ fn emit_struct_td(name_h: i32,
     let mut i: i32 = 0;
     while i < fcount {
         let th: i32 = vec_get(ftypes, foff + i);
-        let tname: string = handle_to_str(th, source, starts, ends);
+        /* A field type with no name token (an array `[T; N]`, a tuple, ...) is
+           -1: arrays and the other unnamed types are int handles here, so it is
+           `int`, not an out-of-bounds token read. */
+        let mut tname: string = "int";
+        if th >= 0 { tname = handle_to_str(th, source, starts, ends); }
         let mut cty: string = ast_ty_to_c_string_with_user(tname, th, sn, en);
         /* Composed-compiler fallback: a field whose type is a user struct/enum
            resolves to int under handle-equality (def-vs-use token mismatch); match
