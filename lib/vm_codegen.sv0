@@ -2676,6 +2676,10 @@ fn scan_instr_env(ins: Instr,
                go through DeclNamed instead, so this only matters for f64/i64
                scalar returns -- e.g. `tan_f64 = sin_f64(x) / cos_f64(x)`. */
             let mut rcat: i32 = cty_cat_of_handle(rty, source, starts, ends);
+            /* vec_get_f64 (lowering builtin id 39) returns a double. */
+            if fn_h < 0 {
+                if 0 - fn_h == 39 { rcat = 1; }
+            }
             if rcat == 0 {
                 if slot_handle_in_range(fn_h, starts) == true {
                     let cidx: i32 = index_of_fn(fn_h, blabels, source, starts, ends);

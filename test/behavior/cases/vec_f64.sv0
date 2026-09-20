@@ -1,0 +1,118 @@
+// f64 elements in a Vec (BUGS.md sv0-mathlib #20). The generic vec_push /
+// vec_get / vec_set store integer-sized words and truncate a double; the
+// _f64 accessors store the bits exactly on an ordinary Vec handle (vec_new /
+// vec_len are shared). The C backend used to silently store 1.5 as 1 and the
+// VM rejected it. Expected exit: 42.
+
+fn sum(xs: Vec<f64>) -> f64 {
+    let mut s: f64 = 0.0;
+    let mut i: i32 = 0;
+    while i < vec_len(xs) {
+        let x: f64 = vec_get_f64(xs, i);
+        s = s + x;
+        i = i + 1;
+    }
+    return s;
+}
+
+fn make() -> Vec<f64> {
+    let v: Vec<f64> = vec_new();
+    vec_push_f64(v, 2.5);
+    vec_push_f64(v, 0.5);
+    return v;
+}
+
+// in-place insertion sort using only get/set
+fn sort(xs: Vec<f64>) -> i32 {
+    let n: i32 = vec_len(xs);
+    let mut i: i32 = 1;
+    while i < n {
+        let key: f64 = vec_get_f64(xs, i);
+        let mut j: i32 = i - 1;
+        let mut going: bool = true;
+        while going {
+            if j < 0 {
+                going = false;
+            } else {
+                let cur: f64 = vec_get_f64(xs, j);
+                if cur > key {
+                    vec_set_f64(xs, j + 1, cur);
+                    j = j - 1;
+                } else {
+                    going = false;
+                }
+            }
+        }
+        vec_set_f64(xs, j + 1, key);
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn main() -> i32 {
+    // basic push / get / set / len, exact values
+    let v: Vec<f64> = vec_new();
+    vec_push_f64(v, 1.5);
+    vec_push_f64(v, 2.25);
+    vec_push_f64(v, 0.1);
+    vec_set_f64(v, 2, 0.5);
+    if vec_len(v) != 3 { return 10; }
+    if vec_get_f64(v, 0) != 1.5 { return 11; }
+    if vec_get_f64(v, 2) != 0.5 { return 12; }
+    if sum(v) != 4.25 { return 13; }
+
+    // not truncated: 0.1 stays 0.1 (not 0), and arithmetic on it is real
+    let w: Vec<f64> = vec_new();
+    vec_push_f64(w, 0.1);
+    vec_push_f64(w, 0.2);
+    if vec_get_f64(w, 0) != 0.1 { return 14; }
+    if vec_get_f64(w, 0) + vec_get_f64(w, 1) == 0.3 { return 15; }
+    if !(vec_get_f64(w, 0) + vec_get_f64(w, 1) > 0.3) { return 16; }
+
+    // a Vec<f64> returned from a function
+    let m: Vec<f64> = make();
+    if vec_len(m) != 2 { return 17; }
+    if sum(m) != 3.0 { return 18; }
+
+    // special values survive bit-for-bit
+    let sp: Vec<f64> = vec_new();
+    let zero: f64 = 0.0;
+    let negzero: f64 = zero * (0.0 - 1.0);
+    let nan: f64 = zero / zero;
+    let inf: f64 = 1.0 / zero;
+    vec_push_f64(sp, negzero);
+    vec_push_f64(sp, nan);
+    vec_push_f64(sp, inf);
+    let nz: f64 = vec_get_f64(sp, 0);
+    if 1.0 / nz != 0.0 - inf { return 20; }
+    let bn: f64 = vec_get_f64(sp, 1);
+    if bn == bn { return 21; }
+    if vec_get_f64(sp, 2) != inf { return 22; }
+
+    // sorting (many get/set) leaves a sorted, intact multiset
+    let xs: Vec<f64> = vec_new();
+    vec_push_f64(xs, 3.5);
+    vec_push_f64(xs, 0.0 - 2.0);
+    vec_push_f64(xs, 9.25);
+    vec_push_f64(xs, 0.125);
+    vec_push_f64(xs, 3.5);
+    let r: i32 = sort(xs);
+    if vec_get_f64(xs, 0) != 0.0 - 2.0 { return 30; }
+    if vec_get_f64(xs, 1) != 0.125 { return 31; }
+    if vec_get_f64(xs, 2) != 3.5 { return 32; }
+    if vec_get_f64(xs, 3) != 3.5 { return 33; }
+    if vec_get_f64(xs, 4) != 9.25 { return 34; }
+    if sum(xs) != 14.375 { return 35; }
+
+    // a longer run: the running sum of k * 0.5 for k in 0..200
+    let big: Vec<f64> = vec_new();
+    let mut k: i32 = 0;
+    while k < 200 {
+        let kf: f64 = k;
+        vec_push_f64(big, kf * 0.5);
+        k = k + 1;
+    }
+    if vec_len(big) != 200 { return 40; }
+    if sum(big) != 9950.0 { return 41; }
+    return 42;
+}

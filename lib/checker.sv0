@@ -2738,15 +2738,8 @@ fn check_body_let_unknown_type(bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>,
         let st: i32 = block_stmt_index(bpp, sfirst, sidecar, si);
         if vec_get(bet, st) == 27 {
             let lannot: i32 = vec_get(bed2, st);
-            /* E0447: `Vec<f64>` / `Vec<f32>` / `[f64; N]` / `[f32; N]` annotation. */
-            if tok_text_eq(source, starts, ends, lannot, "Vec") {
-                if tok_text_eq(source, starts, ends, lannot + 1, "<") {
-                    if tok_is_float_type_name(source, starts, ends, lannot + 2) {
-                        vec_push(diag_sink, 447);
-                        vec_push(diag_sink, lannot);
-                    }
-                }
-            }
+            /* E0447: `[f64; N]` / `[f32; N]` annotation (no f64 array form;
+               `Vec<f64>` is fine -- use vec_push_f64 etc.). */
             if tok_text_eq(source, starts, ends, lannot, "[") {
                 if tok_is_float_type_name(source, starts, ends, lannot + 1) {
                     vec_push(diag_sink, 447);
@@ -3076,13 +3069,14 @@ fn find_multi_element_tuple(bet: Vec<i32>, bed2: Vec<i32>) -> i32 {
    that itself contains further nested sub-expressions pushing extra
    nodes; real block statements (tag 9/34) DO use the sidecar correctly,
    since that's where local pointer `let`s are actually declared. */
-/* E0447 (BUGS.md sv0-mathlib #20): every Vec / array / slice element slot is an
-   integer-sized word, so an f64 / f32 element was silently truncated by the C
-   backend and rejected by the VM. Until typed element slots exist, refuse the
-   three ways an f64 can enter a collection instead of compiling wrong code:
-   `vec_push(v, <float>)`, `vec_set(v, i, <float>)`, and an array literal of
-   float literals. A `let x: Vec<f64>` / `[f64; N]` annotation is refused in
-   check_body_let_unknown_type. */
+/* E0447 (BUGS.md sv0-mathlib #20): the generic vec_push / vec_set and array
+   literals store integer-sized words, so an f64 element was silently
+   truncated by the C backend and rejected by the VM. f64 elements have their
+   own typed accessors (vec_push_f64 / vec_get_f64 / vec_set_f64, bit-exact,
+   on an ordinary Vec handle), so a float given to the integer accessors, or
+   an array literal of float literals, is refused instead of compiled wrong.
+   A `[f64; N]` annotation is refused in check_body_let_unknown_type (arrays
+   have no f64 form); `Vec<f64>` is a valid annotation. */
 fn tok_text_eq(source: string, starts: Vec<i32>, ends: Vec<i32>,
                t: i32, want: string) -> bool {
     if t < 0 { return false; }
@@ -4326,6 +4320,10 @@ fn builtin_fn_lookup(name_str: string) -> i32 {
        compiler intrinsic, non-elidable-store guarantee (sv0doc
        memory-model/ownership.md §6.5, lowering builtin id 37). */
     if string_eq(name_str, "fill_explicit") { return 21; }
+    /* f64-element vec access (typed slots): the handle is an ordinary vec. */
+    if string_eq(name_str, "vec_push_f64") { return 22; }
+    if string_eq(name_str, "vec_get_f64") { return 23; }
+    if string_eq(name_str, "vec_set_f64") { return 24; }
     return 0 - 1;
 }
 
@@ -4334,6 +4332,9 @@ fn builtin_fn_ret_type(bid: i32) -> i32 {
     if bid == 19 { return TY_STRING(); }
     if bid == 20 { return TY_SLICE(); }
     if bid == 21 { return TY_UNIT(); }
+    if bid == 22 { return TY_UNIT(); }
+    if bid == 23 { return TY_FLOAT(); }
+    if bid == 24 { return TY_UNIT(); }
     if bid == 0 { return TY_UNIT(); }
     if bid == 1 { return TY_INT(); }
     if bid == 2 { return TY_BOOL(); }
@@ -4360,6 +4361,9 @@ fn builtin_fn_param_count(bid: i32) -> i32 {
     if bid == 19 { return 1; }
     if bid == 20 { return 1; }
     if bid == 21 { return 2; }
+    if bid == 22 { return 2; }
+    if bid == 23 { return 2; }
+    if bid == 24 { return 3; }
     if bid == 0 { return 1; }
     if bid == 1 { return 1; }
     if bid == 2 { return 2; }
@@ -4388,6 +4392,19 @@ fn builtin_fn_param_type(bid: i32, idx: i32) -> i32 {
     if bid == 21 {
         if idx == 0 { return TY_VAR(); }
         return TY_INT();
+    }
+    if bid == 22 {
+        if idx == 0 { return TY_NAMED(); }
+        return TY_FLOAT();
+    }
+    if bid == 23 {
+        if idx == 0 { return TY_NAMED(); }
+        return TY_INT();
+    }
+    if bid == 24 {
+        if idx == 0 { return TY_NAMED(); }
+        if idx == 1 { return TY_INT(); }
+        return TY_FLOAT();
     }
     if bid == 0 { return TY_STRING(); }
     if bid == 1 { return TY_STRING(); }
@@ -7322,6 +7339,16 @@ fn test_builtin_fn_lookup() -> i32 {
     if builtin_fn_lookup("string_len") != 1 { return 2; }
     if builtin_fn_lookup("vec_new") != 6 { return 3; }
     if builtin_fn_lookup("vec_get") != 9 { return 4; }
+    if builtin_fn_lookup("vec_push_f64") != 22 { return 40; }
+    if builtin_fn_lookup("vec_get_f64") != 23 { return 41; }
+    if builtin_fn_lookup("vec_set_f64") != 24 { return 42; }
+    if builtin_fn_ret_type(23) != TY_FLOAT() { return 43; }
+    if builtin_fn_ret_type(22) != TY_UNIT() { return 44; }
+    if builtin_fn_param_count(24) != 3 { return 45; }
+    if builtin_fn_param_type(22, 1) != TY_FLOAT() { return 46; }
+    if builtin_fn_param_type(24, 1) != TY_INT() { return 47; }
+    if builtin_fn_param_type(24, 2) != TY_FLOAT() { return 48; }
+    if builtin_fn_param_type(23, 0) != TY_NAMED() { return 49; }
     if builtin_fn_lookup("box_deref") != 12 { return 5; }
     if builtin_fn_lookup("unknown") != 0 - 1 { return 6; }
     if builtin_fn_ret_type(0) != TY_UNIT() { return 7; }

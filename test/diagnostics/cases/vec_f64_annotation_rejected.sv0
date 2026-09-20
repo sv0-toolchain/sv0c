@@ -1,5 +1,0 @@
-// E0447: a `Vec<f64>` annotation (its elements cannot be stored faithfully).
-fn main() -> i32 {
-    let v: Vec<f64> = vec_new();
-    return vec_len(v);
-}

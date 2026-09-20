@@ -280,58 +280,73 @@ static int is_intrinsic(const char* name) {
     return 1;
   } else {
   }
-  int _sv0t15 = sv0_string_eq(name, "box_new");
+  int _sv0t15 = sv0_string_eq(name, "vec_push_f64");
   if (_sv0t15) {
     return 1;
   } else {
   }
-  int _sv0t16 = sv0_string_eq(name, "box_deref");
+  int _sv0t16 = sv0_string_eq(name, "vec_get_f64");
   if (_sv0t16) {
     return 1;
   } else {
   }
-  int _sv0t17 = sv0_string_eq(name, "read_file");
+  int _sv0t17 = sv0_string_eq(name, "vec_set_f64");
   if (_sv0t17) {
     return 1;
   } else {
   }
-  int _sv0t18 = sv0_string_eq(name, "write_file");
+  int _sv0t18 = sv0_string_eq(name, "box_new");
   if (_sv0t18) {
     return 1;
   } else {
   }
-  int _sv0t19 = sv0_string_eq(name, "read_dir");
+  int _sv0t19 = sv0_string_eq(name, "box_deref");
   if (_sv0t19) {
     return 1;
   } else {
   }
-  int _sv0t20 = sv0_string_eq(name, "write_bytes");
+  int _sv0t20 = sv0_string_eq(name, "read_file");
   if (_sv0t20) {
     return 1;
   } else {
   }
-  int _sv0t21 = sv0_string_eq(name, "getenv");
+  int _sv0t21 = sv0_string_eq(name, "write_file");
   if (_sv0t21) {
     return 1;
   } else {
   }
-  int _sv0t22 = sv0_string_eq(name, "slice_len");
+  int _sv0t22 = sv0_string_eq(name, "read_dir");
   if (_sv0t22) {
     return 1;
   } else {
   }
-  int _sv0t23 = sv0_string_eq(name, "string_from_bytes");
+  int _sv0t23 = sv0_string_eq(name, "write_bytes");
   if (_sv0t23) {
     return 1;
   } else {
   }
-  int _sv0t24 = sv0_string_eq(name, "string_byte_view");
+  int _sv0t24 = sv0_string_eq(name, "getenv");
   if (_sv0t24) {
     return 1;
   } else {
   }
-  int _sv0t25 = sv0_string_eq(name, "fill_explicit");
+  int _sv0t25 = sv0_string_eq(name, "slice_len");
   if (_sv0t25) {
+    return 1;
+  } else {
+  }
+  int _sv0t26 = sv0_string_eq(name, "string_from_bytes");
+  if (_sv0t26) {
+    return 1;
+  } else {
+  }
+  int _sv0t27 = sv0_string_eq(name, "string_byte_view");
+  if (_sv0t27) {
+    return 1;
+  } else {
+  }
+  int _sv0t28 = sv0_string_eq(name, "fill_explicit");
+  if (_sv0t28) {
     return 1;
   } else {
   }
@@ -414,63 +429,78 @@ static int intrinsic_arity(const char* name) {
     return 3;
   } else {
   }
-  int _sv0t15 = sv0_string_eq(name, "box_new");
+  int _sv0t15 = sv0_string_eq(name, "vec_push_f64");
   if (_sv0t15) {
-    return 1;
-  } else {
-  }
-  int _sv0t16 = sv0_string_eq(name, "box_deref");
-  if (_sv0t16) {
-    return 1;
-  } else {
-  }
-  int _sv0t17 = sv0_string_eq(name, "read_file");
-  if (_sv0t17) {
-    return 1;
-  } else {
-  }
-  int _sv0t18 = sv0_string_eq(name, "write_file");
-  if (_sv0t18) {
     return 2;
   } else {
   }
-  int _sv0t19 = sv0_string_eq(name, "read_dir");
+  int _sv0t16 = sv0_string_eq(name, "vec_get_f64");
+  if (_sv0t16) {
+    return 2;
+  } else {
+  }
+  int _sv0t17 = sv0_string_eq(name, "vec_set_f64");
+  if (_sv0t17) {
+    return 3;
+  } else {
+  }
+  int _sv0t18 = sv0_string_eq(name, "box_new");
+  if (_sv0t18) {
+    return 1;
+  } else {
+  }
+  int _sv0t19 = sv0_string_eq(name, "box_deref");
   if (_sv0t19) {
     return 1;
   } else {
   }
-  int _sv0t20 = sv0_string_eq(name, "write_bytes");
+  int _sv0t20 = sv0_string_eq(name, "read_file");
   if (_sv0t20) {
-    return 2;
-  } else {
-  }
-  int _sv0t21 = sv0_string_eq(name, "getenv");
-  if (_sv0t21) {
     return 1;
   } else {
   }
-  int _sv0t22 = sv0_string_eq(name, "slice_len");
+  int _sv0t21 = sv0_string_eq(name, "write_file");
+  if (_sv0t21) {
+    return 2;
+  } else {
+  }
+  int _sv0t22 = sv0_string_eq(name, "read_dir");
   if (_sv0t22) {
     return 1;
   } else {
   }
-  int _sv0t23 = sv0_string_eq(name, "string_from_bytes");
+  int _sv0t23 = sv0_string_eq(name, "write_bytes");
   if (_sv0t23) {
-    return 1;
+    return 2;
   } else {
   }
-  int _sv0t24 = sv0_string_eq(name, "string_byte_view");
+  int _sv0t24 = sv0_string_eq(name, "getenv");
   if (_sv0t24) {
     return 1;
   } else {
   }
-  int _sv0t25 = sv0_string_eq(name, "fill_explicit");
+  int _sv0t25 = sv0_string_eq(name, "slice_len");
   if (_sv0t25) {
+    return 1;
+  } else {
+  }
+  int _sv0t26 = sv0_string_eq(name, "string_from_bytes");
+  if (_sv0t26) {
+    return 1;
+  } else {
+  }
+  int _sv0t27 = sv0_string_eq(name, "string_byte_view");
+  if (_sv0t27) {
+    return 1;
+  } else {
+  }
+  int _sv0t28 = sv0_string_eq(name, "fill_explicit");
+  if (_sv0t28) {
     return 2;
   } else {
   }
-  int _sv0t26 = (0 - 1);
-  return _sv0t26;
+  int _sv0t29 = (0 - 1);
+  return _sv0t29;
 }
 
 static int intrinsic_count(void) {
@@ -529,6 +559,21 @@ static int is_vec_intrinsic(const char* name) {
   }
   int _sv0t4 = sv0_string_eq(name, "vec_set");
   if (_sv0t4) {
+    return 1;
+  } else {
+  }
+  int _sv0t5 = sv0_string_eq(name, "vec_push_f64");
+  if (_sv0t5) {
+    return 1;
+  } else {
+  }
+  int _sv0t6 = sv0_string_eq(name, "vec_get_f64");
+  if (_sv0t6) {
+    return 1;
+  } else {
+  }
+  int _sv0t7 = sv0_string_eq(name, "vec_set_f64");
+  if (_sv0t7) {
     return 1;
   } else {
   }
@@ -2542,23 +2587,38 @@ static int test_intrinsic_classify(void) {
     return 5;
   } else {
   }
-  int _sv0t5 = is_vec_intrinsic("println");
-  if ((_sv0t5 != 0)) {
-    return 6;
-  } else {
-  }
-  int _sv0t6 = is_box_intrinsic("box_new");
-  if ((_sv0t6 != 1)) {
+  int _sv0t5 = is_vec_intrinsic("vec_get_f64");
+  if ((_sv0t5 != 1)) {
     return 7;
   } else {
   }
-  int _sv0t7 = is_box_intrinsic("vec_new");
-  if ((_sv0t7 != 0)) {
+  int _sv0t6 = is_intrinsic("vec_push_f64");
+  if ((_sv0t6 != 1)) {
     return 8;
   } else {
   }
-  int _sv0t8 = intrinsic_count();
-  if ((_sv0t8 != 17)) {
+  int _sv0t7 = intrinsic_arity("vec_set_f64");
+  if ((_sv0t7 != 3)) {
+    return 9;
+  } else {
+  }
+  int _sv0t8 = is_vec_intrinsic("println");
+  if ((_sv0t8 != 0)) {
+    return 6;
+  } else {
+  }
+  int _sv0t9 = is_box_intrinsic("box_new");
+  if ((_sv0t9 != 1)) {
+    return 7;
+  } else {
+  }
+  int _sv0t10 = is_box_intrinsic("vec_new");
+  if ((_sv0t10 != 0)) {
+    return 8;
+  } else {
+  }
+  int _sv0t11 = intrinsic_count();
+  if ((_sv0t11 != 17)) {
     return 9;
   } else {
   }

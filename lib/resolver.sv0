@@ -126,6 +126,11 @@ fn is_intrinsic(name: string) -> bool {
     if string_eq(name, "vec_len") { return true; }
     if string_eq(name, "vec_get") { return true; }
     if string_eq(name, "vec_set") { return true; }
+    /* f64-element vec builtins (typed slots): the handle is an ordinary vec
+       (vec_new / vec_len work on it); only the element access differs. */
+    if string_eq(name, "vec_push_f64") { return true; }
+    if string_eq(name, "vec_get_f64") { return true; }
+    if string_eq(name, "vec_set_f64") { return true; }
     if string_eq(name, "box_new") { return true; }
     if string_eq(name, "box_deref") { return true; }
     /* Host I/O builtins (lowering build_builtin_map IDs 15-18); used by the
@@ -168,6 +173,9 @@ fn intrinsic_arity(name: string) -> i32 {
     if string_eq(name, "vec_len") { return 1; }
     if string_eq(name, "vec_get") { return 2; }
     if string_eq(name, "vec_set") { return 3; }
+    if string_eq(name, "vec_push_f64") { return 2; }
+    if string_eq(name, "vec_get_f64") { return 2; }
+    if string_eq(name, "vec_set_f64") { return 3; }
     if string_eq(name, "box_new") { return 1; }
     if string_eq(name, "box_deref") { return 1; }
     if string_eq(name, "read_file") { return 1; }
@@ -206,6 +214,9 @@ fn is_vec_intrinsic(name: string) -> bool {
     if string_eq(name, "vec_len") { return true; }
     if string_eq(name, "vec_get") { return true; }
     if string_eq(name, "vec_set") { return true; }
+    if string_eq(name, "vec_push_f64") { return true; }
+    if string_eq(name, "vec_get_f64") { return true; }
+    if string_eq(name, "vec_set_f64") { return true; }
     return false;
 }
 
@@ -1783,6 +1794,9 @@ fn test_intrinsic_classify() -> i32 {
     if is_string_intrinsic("println") != false { return 3; }
     if is_vec_intrinsic("vec_new") != true { return 4; }
     if is_vec_intrinsic("vec_set") != true { return 5; }
+    if is_vec_intrinsic("vec_get_f64") != true { return 7; }
+    if is_intrinsic("vec_push_f64") != true { return 8; }
+    if intrinsic_arity("vec_set_f64") != 3 { return 9; }
     if is_vec_intrinsic("println") != false { return 6; }
     if is_box_intrinsic("box_new") != true { return 7; }
     if is_box_intrinsic("vec_new") != false { return 8; }

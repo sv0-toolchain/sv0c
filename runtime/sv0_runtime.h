@@ -275,6 +275,38 @@ static inline void sv0_vec_set(int32_t h, int32_t idx, intptr_t val) {
   sv0_vec_table[h].data[idx] = val;
 }
 
+/* f64 elements (vec_push_f64 / vec_get_f64 / vec_set_f64): the double's 64 bits
+   are stored bit-exact (NaN payloads and -0.0 included) in the vec's ordinary
+   word slots, so vec_len, slices and the handle table are shared with integer
+   vecs. The generic sv0_vec_push/get/set would convert the VALUE and truncate a
+   double; these never do. Needs a 64-bit word. */
+_Static_assert(sizeof(intptr_t) >= sizeof(double),
+               "f64 vec elements need a 64-bit intptr_t");
+
+static inline intptr_t sv0__f64_bits(double d) {
+  intptr_t w = 0;
+  memcpy(&w, &d, sizeof d);
+  return w;
+}
+
+static inline double sv0__f64_from_bits(intptr_t w) {
+  double d;
+  memcpy(&d, &w, sizeof d);
+  return d;
+}
+
+static inline void sv0_vec_push_f64(int32_t h, double x) {
+  sv0_vec_push(h, sv0__f64_bits(x));
+}
+
+static inline double sv0_vec_get_f64(int32_t h, int32_t idx) {
+  return sv0__f64_from_bits(sv0_vec_get(h, idx));
+}
+
+static inline void sv0_vec_set_f64(int32_t h, int32_t idx, double x) {
+  sv0_vec_set(h, idx, sv0__f64_bits(x));
+}
+
 /* Slice `&[T]` / `&mut [T]` (SS-U03b, sv0-strings Track U).
  *
  * `sv0doc/type-system/rules.md` §2.2.1 (`T-SLICE-ABI-001`) is the normative

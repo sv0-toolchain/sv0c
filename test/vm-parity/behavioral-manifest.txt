@@ -26,6 +26,7 @@ sv0c/test/behavior/cases/u32_wrap.sv0
 sv0c/test/behavior/cases/struct_field_operands.sv0
 sv0c/test/behavior/cases/wide_shift_temps.sv0
 sv0c/test/behavior/cases/wide_bitwise.sv0
+sv0c/test/behavior/cases/vec_f64.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct_nested.sv0
 sv0c/test/behavior/cases/fill_explicit_intrinsic.sv0

@@ -1232,6 +1232,14 @@ static Value lower_tag_call(int et, int ed1, int ed2, int ed3, int ed4, int pp, 
         is_void = 1;
       } else {
       }
+      if ((bid == 38)) {
+        is_void = 1;
+      } else {
+      }
+      if ((bid == 40)) {
+        is_void = 1;
+      } else {
+      }
       int fn_sentinel = (0 - bid);
       if ((is_void == 1)) {
         Instr vc;
@@ -7880,6 +7888,21 @@ static int build_builtin_map_classify(const char* s) {
   int _sv0t22 = sv0_string_eq(s, "fill_explicit");
   if (_sv0t22) {
     return 37;
+  } else {
+  }
+  int _sv0t23 = sv0_string_eq(s, "vec_push_f64");
+  if (_sv0t23) {
+    return 38;
+  } else {
+  }
+  int _sv0t24 = sv0_string_eq(s, "vec_get_f64");
+  if (_sv0t24) {
+    return 39;
+  } else {
+  }
+  int _sv0t25 = sv0_string_eq(s, "vec_set_f64");
+  if (_sv0t25) {
+    return 40;
   } else {
   }
   return 0;

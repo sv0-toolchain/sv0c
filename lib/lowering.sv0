@@ -528,6 +528,8 @@ fn lower_tag_call(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             if bid == 16 { is_void = 1; }
             if bid == 18 { is_void = 1; }
             if bid == 37 { is_void = 1; }
+            if bid == 38 { is_void = 1; }
+            if bid == 40 { is_void = 1; }
             let fn_sentinel: i32 = 0 - bid;
             if is_void == 1 {
                 let vc: Instr = Instr::Call(0, fn_sentinel, arg_vals, 0);
@@ -4462,6 +4464,11 @@ fn build_builtin_map_classify(s: string) -> i32 {
     /* SS-U11: fill_explicit -> sv0_fill_explicit (id 37; void, non-elidable
        store guarantee, sv0doc memory-model/ownership.md §6.5). */
     if string_eq(s, "fill_explicit") { return 37; }
+    /* f64-element vec access: 38 push, 39 get (returns double), 40 set. The
+       handle is an ordinary vec; elements are stored bit-exact. */
+    if string_eq(s, "vec_push_f64") { return 38; }
+    if string_eq(s, "vec_get_f64") { return 39; }
+    if string_eq(s, "vec_set_f64") { return 40; }
     return 0;
 }
 
