@@ -134,6 +134,7 @@ test/behavior/cases/vec_f64_generic.sv0|42|native
 test/behavior/cases/vec_f64_infer.sv0|42|native
 test/behavior/cases/array_f64.sv0|42|native
 test/behavior/cases/array_param.sv0|42|native
+test/behavior/cases/place_assign.sv0|42|native
 test/behavior/cases/let_infer_wide.sv0|42|native
 test/behavior/cases/ffi_ptr_create_and_pass.sv0|7|native
 test/behavior/cases/ffi_unsafe_block_transparent.sv0|8

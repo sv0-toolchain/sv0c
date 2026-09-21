@@ -2128,6 +2128,46 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let op_tag: i32 = vec_get(ed1, idx);
         let lhs_idx2: i32 = vec_get(ed2, idx);
         let rhs_idx2: i32 = vec_get(ed3, idx);
+        /* `e[i] op= v` — element read-modify-write through the universal
+           accessors (get 32 / set 33, or the f64 forms 41 / 42 when the
+           scanner marked the base). Base and index are lowered ONCE into
+           values and reused by the get and the set. */
+        if vec_get(et, lhs_idx2) == 8 {
+            let base_ca: i32 = vec_get(ed1, lhs_idx2);
+            let ixe_ca: i32 = vec_get(ed2, lhs_idx2);
+            let v_base_a: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                     tok_tags, base_ca, ctr,
+                                                     out_instrs, enum_names,
+                                                     enum_tag_offsets, enum_tag_counts,
+                                                     enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let v_ixe_a: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                     tok_tags, ixe_ca, ctr,
+                                                     out_instrs, enum_names,
+                                                     enum_tag_offsets, enum_tag_counts,
+                                                     enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let v_rhs_a: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                     tok_tags, rhs_idx2, ctr,
+                                                     out_instrs, enum_names,
+                                                     enum_tag_offsets, enum_tag_counts,
+                                                     enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let btok_a: i32 = lower_index_base_tok(et, ed1, ed2, pp, base_ca);
+            let get_bid_a: i32 = lower_index_bid(builtin_map, btok_a, 32, 41);
+            let set_bid_a: i32 = lower_index_bid(builtin_map, btok_a, 33, 42);
+            let t_cur_a: i32 = ctr_fresh(ctr);
+            let mut a_get_a: Vec<i32> = vec_new();
+            vec_push(a_get_a, box_new(v_base_a));
+            vec_push(a_get_a, box_new(v_ixe_a));
+            vec_push(out_instrs, box_new(Instr::Call(t_cur_a, 0 - get_bid_a, a_get_a, 0)));
+            let t_new_a: i32 = ctr_fresh(ctr);
+            let bin_a: Expr = Expr::Binop(op_tag, box_new(Value::VVar(t_cur_a)), box_new(v_rhs_a));
+            vec_push(out_instrs, box_new(Instr::Assign(t_new_a, box_new(bin_a))));
+            let mut a_set_a: Vec<i32> = vec_new();
+            vec_push(a_set_a, box_new(v_base_a));
+            vec_push(a_set_a, box_new(v_ixe_a));
+            vec_push(a_set_a, box_new(Value::VVar(t_new_a)));
+            vec_push(out_instrs, box_new(Instr::Call(0, 0 - set_bid_a, a_set_a, 0)));
+            return Value::VUnit;
+        }
         let mut aout2: Vec<i32> = vec_new();
         let cls2: i32 = classify_assign_lhs_arena(et, ed1, ed2, pp, lhs_idx2,
                                                    aout2);
@@ -5135,13 +5175,33 @@ fn lower_vecf_site_map(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
                                         code = lower_vecf_lookup(names, kinds, source, starts, ends, a0);
                                     }
                                     if nx == 16 {
-                                        if lower_vecf_tag_at(tok_tags, a0 + 2) == 5 {
-                                            let nx2: i32 = lower_vecf_tag_at(tok_tags, a0 + 3);
+                                        /* `a.b.c`: the LAST field names the vec */
+                                        let mut fq: i32 = a0;
+                                        while lower_vecf_tag_at(tok_tags, fq + 1) == 16 {
+                                            if lower_vecf_tag_at(tok_tags, fq + 2) != 5 { break; }
+                                            fq = fq + 2;
+                                        }
+                                        let nx2: i32 = lower_vecf_tag_at(tok_tags, fq + 1);
+                                        if fq != a0 {
                                             if nx2 == 12 {
-                                                code = lower_vecf_lookup(fnames, fkinds, source, starts, ends, a0 + 2);
+                                                code = lower_vecf_lookup(fnames, fkinds, source, starts, ends, fq);
                                             }
                                             if nx2 == 7 {
-                                                code = lower_vecf_lookup(fnames, fkinds, source, starts, ends, a0 + 2);
+                                                code = lower_vecf_lookup(fnames, fkinds, source, starts, ends, fq);
+                                            }
+                                        }
+                                    }
+                                    if nx == 6 {
+                                        /* `f(..)`: the vec is the call's result; its element
+                                           type is the callee's declared return type */
+                                        let cc: i32 = lower_vecf_close_paren(tok_tags, a0 + 1);
+                                        if cc > 0 {
+                                            let nx3: i32 = lower_vecf_tag_at(tok_tags, cc + 1);
+                                            if nx3 == 12 {
+                                                code = lower_vecf_lookup(rnames, rkinds, source, starts, ends, a0);
+                                            }
+                                            if nx3 == 7 {
+                                                code = lower_vecf_lookup(rnames, rkinds, source, starts, ends, a0);
                                             }
                                         }
                                     }
@@ -11453,6 +11513,16 @@ fn test_lower_vecf_site_table() -> i32 {
     if r26 != 0 { return 27; }
     let r27: i32 = lower_vecf_test_site("fn f(s: &mut [f64]) -> i32 { s[0] = 1.0; return 0; }", "s", 0, 1, 1);
     if r27 != 0 { return 28; }
+    let rc0: i32 = lower_vecf_test_site("struct A { v: Vec<f64> } struct B { a: A } fn f(b: B) -> f64 { return vec_get(b.a.v, 0); }", "vec_get", 0, 0, 1);
+    if rc0 != 0 { return 100; }
+    let rc1: i32 = lower_vecf_test_site("fn m() -> Vec<f64> { return vec_new(); } fn f() -> f64 { return vec_get(m(), 0); }", "vec_get", 0, 0, 1);
+    if rc1 != 0 { return 101; }
+    let rc2: i32 = lower_vecf_test_site("fn m() -> Vec<i32> { return vec_new(); } fn f() -> i32 { return vec_get(m(), 0); }", "vec_get", 0, 0, 0);
+    if rc2 != 0 { return 102; }
+    let rc3: i32 = lower_vecf_test_site("fn m(k: i32) -> Vec<f64> { return vec_new(); } fn f(x: Vec<i32>) -> f64 { return vec_get(m(vec_len(x)), 0); }", "vec_get", 0, 0, 1);
+    if rc3 != 0 { return 103; }
+    let rc4: i32 = lower_vecf_test_site("fn m() -> Vec<i32> { return vec_new(); } fn f() -> f64 { return vec_get_f64(m(), 0); }", "vec_get_f64", 0, 0, 3);
+    if rc4 != 0 { return 104; }
     return 0;
 }
 

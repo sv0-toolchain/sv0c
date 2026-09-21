@@ -2676,28 +2676,47 @@ fn parse_assign_target_op_pos(tags: Vec<i32>, pos: i32, out: Vec<i32>) -> i32 {
     return op_pos;
 }
 
-/* Peek-only: does the token stream at `pos` look like `ident [ … ] =`
-   (an element-assignment target)? Returns the position of the `=`, or -1.
-   Bracket-depth counted so nested `a[b[c]] = …` is handled. No arena
-   touched — try_assign_stmt must stay a clean no-op on non-match. */
+/* Peek-only: does the token stream at `pos` look like an element-assignment
+   target followed by an assignment operator: `ident` then any chain of
+   `.field` / `[ … ]` segments whose LAST segment is an index (`a[i] = v`,
+   `s.v[i] += v`, `a[i][j] = v`)? Returns the position of the assignment
+   operator (`=` or a compound `op=`), or -1. Bracket-depth counted so nested
+   `a[b[c]] = …` is handled. No arena touched — try_assign_stmt must stay a
+   clean no-op on non-match. */
 fn scan_index_assign_eq(tags: Vec<i32>, pos: i32) -> i32 {
     if ps_peek(tags, pos) != 5 { return 0 - 1; }
-    if ps_peek(tags, pos + 1) != 10 { return 0 - 1; }
     let mut k: i32 = pos + 1;
-    let mut depth: i32 = 0;
+    let mut last_index: bool = false;
     let mut done: bool = false;
     while done != true {
         let t: i32 = ps_peek(tags, k);
         if t == 97 { return 0 - 1; }
-        if t == 10 { depth = depth + 1; }
-        if t == 11 {
-            depth = depth - 1;
-            if depth == 0 {
-                if ps_peek(tags, k + 1) == 35 { return k + 1; }
-                return 0 - 1;
+        if t == 16 {
+            if ps_peek(tags, k + 1) != 5 { return 0 - 1; }
+            k = k + 2;
+            last_index = false;
+        } else {
+            if t == 10 {
+                let mut depth: i32 = 0;
+                let mut inner_done: bool = false;
+                while inner_done != true {
+                    let u: i32 = ps_peek(tags, k);
+                    if u == 97 { return 0 - 1; }
+                    if u == 10 { depth = depth + 1; }
+                    if u == 11 {
+                        depth = depth - 1;
+                        if depth == 0 { inner_done = true; }
+                    }
+                    k = k + 1;
+                }
+                last_index = true;
+            } else {
+                done = true;
             }
         }
-        k = k + 1;
+    }
+    if last_index {
+        if is_assign_tok(ps_peek(tags, k)) { return k; }
     }
     return 0 - 1;
 }
@@ -2718,18 +2737,28 @@ fn try_assign_stmt(tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
         if vec_get(et, lhs_i) == 8 {
             /* reject a range LHS (`a[1..3] = …` is not assignable) */
             if vec_get(et, vec_get(ed2, lhs_i)) != 21 {
-                if ps_peek(tags, lp) == 35 {
+                let aop: i32 = ps_peek(tags, lp);
+                if is_assign_tok(aop) {
                     let per: i32 = parse_expr_sf(tags, starts, ends, source,
                                                 lp + 1, et, ed1, ed2, ed3, ed4,
                                                 pp, sf_names, 1);
                     if per < 0 { return 0 - 1; }
                     let rhs_i: i32 = vec_len(et) - 1;
                     if ps_peek(tags, per) != 13 { return 0 - 1; }
-                    vec_push(et, 18);
-                    vec_push(ed1, lhs_i);
-                    vec_push(ed2, rhs_i);
-                    vec_push(ed3, 0);
-                    vec_push(ed4, 0);
+                    if aop == 35 {
+                        vec_push(et, 18);
+                        vec_push(ed1, lhs_i);
+                        vec_push(ed2, rhs_i);
+                        vec_push(ed3, 0);
+                        vec_push(ed4, 0);
+                    } else {
+                        /* compound `e[i] op= v`: ExprAssignOp d1=binop d2=lhs d3=rhs */
+                        vec_push(et, 19);
+                        vec_push(ed1, assign_binop(aop));
+                        vec_push(ed2, lhs_i);
+                        vec_push(ed3, rhs_i);
+                        vec_push(ed4, 0);
+                    }
                     let aidx: i32 = vec_len(et) - 1;
                     vec_push(et, 28);
                     vec_push(ed1, aidx);
@@ -7091,6 +7120,123 @@ fn test_parse_extern_c_fn_with_body_rejected() -> i32 {
     return 0;
 }
 
+/* `place[i] = v` / `place[i] op= v`: the element-assignment scan accepts an
+   ident followed by any `.field` / `[ .. ]` chain that ENDS in an index. */
+fn parser_scan_case(spec_tags: Vec<i32>, expect: i32) -> i32 {
+    if scan_index_assign_eq(spec_tags, 0) != expect { return 1; }
+    return 0;
+}
+
+fn test_scan_index_assign_places() -> i32 {
+    let t0: Vec<i32> = vec_new();
+    vec_push(t0, 5);
+    vec_push(t0, 10);
+    vec_push(t0, 0);
+    vec_push(t0, 11);
+    vec_push(t0, 44);
+    vec_push(t0, 0);
+    vec_push(t0, 13);
+    vec_push(t0, 97);
+    if parser_scan_case(t0, 4) != 0 { return 1; }
+    let t1: Vec<i32> = vec_new();
+    vec_push(t1, 5);
+    vec_push(t1, 16);
+    vec_push(t1, 5);
+    vec_push(t1, 10);
+    vec_push(t1, 0);
+    vec_push(t1, 11);
+    vec_push(t1, 35);
+    vec_push(t1, 0);
+    vec_push(t1, 13);
+    vec_push(t1, 97);
+    if parser_scan_case(t1, 6) != 0 { return 2; }
+    let t2: Vec<i32> = vec_new();
+    vec_push(t2, 5);
+    vec_push(t2, 10);
+    vec_push(t2, 0);
+    vec_push(t2, 11);
+    vec_push(t2, 10);
+    vec_push(t2, 0);
+    vec_push(t2, 11);
+    vec_push(t2, 35);
+    vec_push(t2, 0);
+    vec_push(t2, 13);
+    vec_push(t2, 97);
+    if parser_scan_case(t2, 7) != 0 { return 3; }
+    let t3: Vec<i32> = vec_new();
+    vec_push(t3, 5);
+    vec_push(t3, 16);
+    vec_push(t3, 5);
+    vec_push(t3, 35);
+    vec_push(t3, 0);
+    vec_push(t3, 13);
+    vec_push(t3, 97);
+    if parser_scan_case(t3, 0 - 1) != 0 { return 4; }
+    let t4: Vec<i32> = vec_new();
+    vec_push(t4, 5);
+    vec_push(t4, 10);
+    vec_push(t4, 0);
+    vec_push(t4, 11);
+    vec_push(t4, 16);
+    vec_push(t4, 5);
+    vec_push(t4, 35);
+    vec_push(t4, 0);
+    vec_push(t4, 13);
+    vec_push(t4, 97);
+    if parser_scan_case(t4, 0 - 1) != 0 { return 5; }
+    let t5: Vec<i32> = vec_new();
+    vec_push(t5, 5);
+    vec_push(t5, 10);
+    vec_push(t5, 0);
+    vec_push(t5, 11);
+    vec_push(t5, 40);
+    vec_push(t5, 0);
+    vec_push(t5, 13);
+    vec_push(t5, 97);
+    if parser_scan_case(t5, 0 - 1) != 0 { return 6; }
+    let t6: Vec<i32> = vec_new();
+    vec_push(t6, 5);
+    vec_push(t6, 6);
+    vec_push(t6, 5);
+    vec_push(t6, 7);
+    vec_push(t6, 10);
+    vec_push(t6, 0);
+    vec_push(t6, 11);
+    vec_push(t6, 35);
+    vec_push(t6, 0);
+    vec_push(t6, 13);
+    vec_push(t6, 97);
+    if parser_scan_case(t6, 0 - 1) != 0 { return 7; }
+    let t7: Vec<i32> = vec_new();
+    vec_push(t7, 5);
+    vec_push(t7, 10);
+    vec_push(t7, 5);
+    vec_push(t7, 10);
+    vec_push(t7, 0);
+    vec_push(t7, 11);
+    vec_push(t7, 11);
+    vec_push(t7, 35);
+    vec_push(t7, 0);
+    vec_push(t7, 13);
+    vec_push(t7, 97);
+    if parser_scan_case(t7, 7) != 0 { return 8; }
+    let t8: Vec<i32> = vec_new();
+    vec_push(t8, 5);
+    vec_push(t8, 16);
+    vec_push(t8, 5);
+    vec_push(t8, 16);
+    vec_push(t8, 5);
+    vec_push(t8, 10);
+    vec_push(t8, 0);
+    vec_push(t8, 11);
+    vec_push(t8, 46);
+    vec_push(t8, 0);
+    vec_push(t8, 13);
+    vec_push(t8, 97);
+    if parser_scan_case(t8, 8) != 0 { return 9; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r0: i32 = test_item_fn_id2_pack_roundtrip();
     if r0 != 0 { return 2000 + r0; }
@@ -7266,5 +7412,7 @@ fn main() -> i32 {
     if r83 != 0 { return 940 + r83; }
     let r84: i32 = test_parse_extern_c_fn_with_body_rejected();
     if r84 != 0 { return 950 + r84; }
+    let rpl: i32 = test_scan_index_assign_places();
+    if rpl != 0 { return 1400 + rpl; }
     return 0;
 }

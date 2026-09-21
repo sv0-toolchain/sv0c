@@ -1,0 +1,7 @@
+// E0447: a float compound-assigned into an integer array element would be
+// truncated when the result is stored back.
+fn main() -> i32 {
+    let n: [i32; 2] = [1, 2];
+    n[0] += 1.5;
+    return 0;
+}
