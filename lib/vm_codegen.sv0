@@ -111,6 +111,21 @@ fn is_scalar_cty(cty: string) -> bool {
     return false;
 }
 
+/* A struct's entry in `structs_field_counts` is its FIELD COUNT (< 4096), plus
+   its width in words shifted left 12 when a field is itself a struct (a nested
+   struct value takes its own width, so width != count). The vector is shared
+   by every emit function, so the width rides in the same word: a plain count
+   decodes to itself. */
+fn struct_packed_count(v: i32) -> i32 {
+    if v < 4096 { return v; }
+    return v & 4095;
+}
+
+fn struct_packed_width(v: i32) -> i32 {
+    if v < 4096 { return v; }
+    return v >> 12;
+}
+
 /* widthOfCty with Vec-based struct/enum layouts.
    structs_names: Vec of struct name handles
    structs_field_counts: Vec of field counts (parallel)
@@ -130,7 +145,7 @@ fn width_of_cty(cty_handle: i32,
     let mut si: i32 = 0;
     while si < sn {
         if slot_name_eq(vec_get(structs_names, si), cty_handle, source, starts, ends) {
-            return vec_get(structs_field_counts, si);
+            return struct_packed_width(vec_get(structs_field_counts, si));
         }
         si = si + 1;
     }
@@ -224,7 +239,7 @@ fn field_cat_at(fields_flat: Vec<i32>, start: i32, idx: i32) -> i32 {
     if idx < 0 { return 0; }
     let p: i32 = start + 2 * idx + 1;
     if p >= vec_len(fields_flat) { return 0; }
-    return vec_get(fields_flat, p);
+    return vec_get(fields_flat, p) & 15;
 }
 
 /* ── enum field names ───────────────────────────────────────── */
@@ -708,6 +723,136 @@ fn struct_layouts_build(item_tags: Vec<i32>, item_names: Vec<i32>,
    string — decl/use tokens differ), appends its field-name tokens to `env_fields_
    flat`, and returns the start index (the value stored in env_field_starts for
    this slot). A scalar/enum/unknown cty records nothing and returns 0. */
+/* Nested struct layouts. The global struct table (struct_fields_flat, stride 2)
+   holds (name, category | (struct index + 1) << 4) per field: the bits above the
+   category name the field's own struct type when it is a user struct.
+   A local's per-slot run (env_fields_flat) is EXPANDED for nested structs:
+       header pair (T, HDR_MAGIC)        <- immediately before the run start
+       one (name, cat4 | HASSUB << 4 | width_words << 5) pair per field, and for a
+       struct-valued field a sub-run header pair (T_sub, HDR_MAGIC) followed by its
+       fields' pairs (recursively).
+   T counts every pair after the header, nested ones included. A struct with no
+   struct-typed field keeps the original headerless, one-word-per-field run. */
+fn run_hdr_magic() -> i32 { return 0 - 7777; }
+
+fn field_raw_sty(raw: i32) -> i32 {
+    return ((raw >> 4) & 4095) - 1;
+}
+
+/* Width in words of struct `k` (leaf words; a nested struct field contributes
+   its own width). depth bounds a (malformed) self-containing struct. */
+fn struct_width_rec(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
+                    field_starts: Vec<i32>, depth: i32) -> i32 {
+    if k < 0 { return 1; }
+    if k >= vec_len(field_starts) { return 1; }
+    let cnt: i32 = struct_packed_count(vec_get(counts_raw, k));
+    if depth > 12 { return cnt; }
+    let base: i32 = vec_get(field_starts, k);
+    let mut w: i32 = 0;
+    let mut j: i32 = 0;
+    while j < cnt {
+        let sty: i32 = field_raw_sty(vec_get(fields_flat, base + 2 * j + 1));
+        if sty >= 0 {
+            w = w + struct_width_rec(sty, counts_raw, fields_flat, field_starts, depth + 1);
+        } else {
+            w = w + 1;
+        }
+        j = j + 1;
+    }
+    return w;
+}
+
+/* Pairs in the expanded run of struct `k` (header excluded). */
+fn struct_run_pairs(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
+                    field_starts: Vec<i32>, depth: i32) -> i32 {
+    if k < 0 { return 0; }
+    if k >= vec_len(field_starts) { return 0; }
+    let cnt: i32 = struct_packed_count(vec_get(counts_raw, k));
+    if depth > 12 { return cnt; }
+    let base: i32 = vec_get(field_starts, k);
+    let mut n: i32 = 0;
+    let mut j: i32 = 0;
+    while j < cnt {
+        let sty: i32 = field_raw_sty(vec_get(fields_flat, base + 2 * j + 1));
+        n = n + 1;
+        if sty >= 0 {
+            n = n + 1 + struct_run_pairs(sty, counts_raw, fields_flat, field_starts, depth + 1);
+        }
+        j = j + 1;
+    }
+    return n;
+}
+
+/* Append the fields' pairs of struct `k` (no header) to `out`. */
+fn struct_run_write(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
+                    field_starts: Vec<i32>, out: Vec<i32>, depth: i32) -> i32 {
+    if k < 0 { return 0; }
+    if k >= vec_len(field_starts) { return 0; }
+    let cnt: i32 = struct_packed_count(vec_get(counts_raw, k));
+    let base: i32 = vec_get(field_starts, k);
+    let mut j: i32 = 0;
+    while j < cnt {
+        let name: i32 = vec_get(fields_flat, base + 2 * j);
+        let raw: i32 = vec_get(fields_flat, base + 2 * j + 1);
+        let sty: i32 = field_raw_sty(raw);
+        if sty >= 0 {
+            if depth <= 12 {
+                let w: i32 = struct_width_rec(sty, counts_raw, fields_flat, field_starts, depth + 1);
+                vec_push(out, name);
+                vec_push(out, (raw & 15) | 16 | (w << 5));
+                vec_push(out, struct_run_pairs(sty, counts_raw, fields_flat, field_starts, depth + 1));
+                vec_push(out, run_hdr_magic());
+                let _r: i32 = struct_run_write(sty, counts_raw, fields_flat, field_starts, out, depth + 1);
+            } else {
+                vec_push(out, name);
+                vec_push(out, raw & 15);
+            }
+        } else {
+            vec_push(out, name);
+            vec_push(out, raw & 15);
+        }
+        j = j + 1;
+    }
+    return 0;
+}
+
+/* True when some field of struct `k` is itself a user struct. */
+fn struct_has_nested(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
+                     field_starts: Vec<i32>) -> bool {
+    if k < 0 { return false; }
+    if k >= vec_len(field_starts) { return false; }
+    let cnt: i32 = struct_packed_count(vec_get(counts_raw, k));
+    let base: i32 = vec_get(field_starts, k);
+    let mut j: i32 = 0;
+    while j < cnt {
+        if field_raw_sty(vec_get(fields_flat, base + 2 * j + 1)) >= 0 { return true; }
+        j = j + 1;
+    }
+    return false;
+}
+
+/* Pack each struct's width into its `counts` entry (see struct_packed_width)
+   once the whole struct table is built. Structs without a struct-typed field
+   are left as a plain count. */
+fn struct_widths_pack(counts: Vec<i32>, fields_flat: Vec<i32>, field_starts: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(counts);
+    let ws: Vec<i32> = vec_new();
+    let mut k: i32 = 0;
+    while k < n {
+        vec_push(ws, struct_width_rec(k, counts, fields_flat, field_starts, 0));
+        k = k + 1;
+    }
+    k = 0;
+    while k < n {
+        let c: i32 = vec_get(counts, k);
+        if vec_get(ws, k) != c {
+            vec_set(counts, k, c | (vec_get(ws, k) << 12));
+        }
+        k = k + 1;
+    }
+    return n;
+}
+
 fn record_field_layout(cty: i32,
                        structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
                        struct_fields_flat: Vec<i32>, struct_field_starts: Vec<i32>,
@@ -720,13 +865,22 @@ fn record_field_layout(cty: i32,
             /* struct_field_starts is built parallel to structs_names in real emit;
                a synthetic test may leave it short, so guard before indexing. */
             if k >= vec_len(struct_field_starts) { return 0; }
+            if struct_has_nested(k, structs_field_counts, struct_fields_flat, struct_field_starts) {
+                vec_push(env_fields_flat,
+                         struct_run_pairs(k, structs_field_counts, struct_fields_flat, struct_field_starts, 0));
+                vec_push(env_fields_flat, run_hdr_magic());
+                let nstart: i32 = vec_len(env_fields_flat);
+                let _w: i32 = struct_run_write(k, structs_field_counts, struct_fields_flat,
+                                               struct_field_starts, env_fields_flat, 0);
+                return nstart;
+            }
             let fstart: i32 = vec_len(env_fields_flat);
-            let fcount: i32 = vec_get(structs_field_counts, k);
+            let fcount: i32 = struct_packed_count(vec_get(structs_field_counts, k));
             let sbase: i32 = vec_get(struct_field_starts, k);
             let mut j: i32 = 0;
             while j < fcount {
                 vec_push(env_fields_flat, vec_get(struct_fields_flat, sbase + 2 * j));
-                vec_push(env_fields_flat, vec_get(struct_fields_flat, sbase + 2 * j + 1));
+                vec_push(env_fields_flat, vec_get(struct_fields_flat, sbase + 2 * j + 1) & 15);
                 j = j + 1;
             }
             return fstart;
@@ -734,6 +888,21 @@ fn record_field_layout(cty: i32,
         k = k + 1;
     }
     return 0;
+}
+
+/* Copy the run of `t` pairs starting at element `rs` of `flat` (a field of a
+   nested struct, being given its own slot) as a fresh run with a header.
+   Returns the new run's start. */
+fn run_copy(flat: Vec<i32>, rs: i32, t: i32) -> i32 {
+    vec_push(flat, t);
+    vec_push(flat, run_hdr_magic());
+    let nstart: i32 = vec_len(flat);
+    let mut i: i32 = 0;
+    while i < 2 * t {
+        vec_push(flat, vec_get(flat, rs + i));
+        i = i + 1;
+    }
+    return nstart;
 }
 
 fn struct_fields_build(item_tags: Vec<i32>, item_field_counts: Vec<i32>,
@@ -1034,36 +1203,127 @@ fn u32_operand_needs_zext(opcat: i32, bcat: i32, tag: i32) -> bool {
    a VVar resolves through the slot env's env_cats; a VMember (struct-field
    access) resolves through the slot's field layout (member_cat) to the
    field's declared category. */
+/* Resolve a (possibly nested) member value `v` to its place in a local: writes
+   [slot index, word offset from the slot base, run start, run pairs, width in
+   words, category (low 4 bits), 1 if the member is itself a struct value] into
+   `out` (seven entries) and returns 0, or -1 when it cannot be resolved (the
+   caller falls back to the original one-word-per-field lookup). A struct local
+   itself resolves to its own run. */
+fn locate_member(v: Value,
+                 env_names: Vec<i32>, env_bases: Vec<i32>,
+                 env_widths: Vec<i32>, env_field_starts: Vec<i32>,
+                 env_fields_flat: Vec<i32>,
+                 source: string, starts: Vec<i32>, ends: Vec<i32>,
+                 out: Vec<i32>) -> i32 {
+    match v {
+        Value::VVar(x) => {
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
+                                      source, starts, ends);
+            if si < 0 { return 0 - 1; }
+            return locate_local(si, env_widths, env_field_starts, env_fields_flat, out);
+        },
+        Value::VAddrOf(x) => {
+            let si2: i32 = lookup_slot(env_names, env_bases, env_widths, x,
+                                       source, starts, ends);
+            if si2 < 0 { return 0 - 1; }
+            return locate_local(si2, env_widths, env_field_starts, env_fields_flat, out);
+        },
+        Value::VMember(bv, f) => {
+            if f < 0 { return 0 - 1; }
+            let inner: Value = box_deref(bv);
+            let li: i32 = locate_member(inner, env_names, env_bases, env_widths,
+                                        env_field_starts, env_fields_flat,
+                                        source, starts, ends, out);
+            if li < 0 { return 0 - 1; }
+            let off0: i32 = vec_get(out, 1);
+            let rs: i32 = vec_get(out, 2);
+            let t: i32 = vec_get(out, 3);
+            let mut p: i32 = 0;
+            let mut acc: i32 = 0;
+            while p < t {
+                let e: i32 = rs + 2 * p;
+                if e + 1 >= vec_len(env_fields_flat) { return 0 - 1; }
+                let name: i32 = vec_get(env_fields_flat, e);
+                let raw: i32 = vec_get(env_fields_flat, e + 1);
+                let mut ew: i32 = raw >> 5;
+                if ew < 1 { ew = 1; }
+                let hs: i32 = (raw >> 4) & 1;
+                if slot_name_eq(name, f, source, starts, ends) {
+                    vec_set(out, 1, off0 + acc);
+                    vec_set(out, 4, ew);
+                    vec_set(out, 5, raw & 15);
+                    vec_set(out, 6, hs);
+                    if hs == 1 {
+                        if e + 3 >= vec_len(env_fields_flat) { return 0 - 1; }
+                        vec_set(out, 2, e + 4);
+                        vec_set(out, 3, vec_get(env_fields_flat, e + 2));
+                    } else {
+                        vec_set(out, 2, e);
+                        vec_set(out, 3, 0);
+                    }
+                    return 0;
+                }
+                acc = acc + ew;
+                if hs == 1 {
+                    if e + 3 >= vec_len(env_fields_flat) { return 0 - 1; }
+                    p = p + 2 + vec_get(env_fields_flat, e + 2);
+                } else {
+                    p = p + 1;
+                }
+            }
+            return 0 - 1;
+        },
+        _ => { return 0 - 1; },
+    }
+}
+
+/* The seven-entry description of a whole local (see locate_member). */
+fn locate_local(si: i32, env_widths: Vec<i32>, env_field_starts: Vec<i32>,
+                env_fields_flat: Vec<i32>, out: Vec<i32>) -> i32 {
+    let w: i32 = slot_width(env_widths, si);
+    let mut fs: i32 = 0;
+    if si < vec_len(env_field_starts) { fs = vec_get(env_field_starts, si); }
+    let mut t: i32 = w;
+    if fs >= 2 {
+        if fs - 1 < vec_len(env_fields_flat) {
+            if vec_get(env_fields_flat, fs - 1) == run_hdr_magic() {
+                t = vec_get(env_fields_flat, fs - 2);
+            }
+        }
+    }
+    vec_set(out, 0, si);
+    vec_set(out, 1, 0);
+    vec_set(out, 2, fs);
+    vec_set(out, 3, t);
+    vec_set(out, 4, w);
+    vec_set(out, 5, 0);
+    vec_set(out, 6, 1);
+    return 0;
+}
+
+fn locate_out_new() -> Vec<i32> {
+    let o: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < 7 {
+        vec_push(o, 0);
+        i = i + 1;
+    }
+    return o;
+}
+
 fn member_cat(bv: Box<Value>, f: i32,
               env_names: Vec<i32>, env_bases: Vec<i32>,
               env_widths: Vec<i32>, env_field_starts: Vec<i32>,
               env_fields_flat: Vec<i32>,
               source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
     if f < 0 { return 0; }
-    let base_v: Value = box_deref(bv);
-    match base_v {
-        Value::VVar(x) => {
-            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
-                                      source, starts, ends);
-            if si < 0 { return 0; }
-            if si >= vec_len(env_field_starts) { return 0; }
-            let fs: i32 = vec_get(env_field_starts, si);
-            let w: i32 = slot_width(env_widths, si);
-            let idx: i32 = index_of_field_range(env_fields_flat, fs, w, f,
-                                                source, starts, ends);
-            return field_cat_at(env_fields_flat, fs, idx);
-        },
-        Value::VInt(n) => { return 0; },
-        Value::VBoolTrue => { return 0; },
-        Value::VBoolFalse => { return 0; },
-        Value::VUnit => { return 0; },
-        Value::VString(sv) => { return 0; },
-        Value::VMember(bv2, f2) => { return 0; },
-        Value::VAddrOf(h2) => { return 0; },
-        Value::VFloat(h2) => { return 0; },
-        Value::VIntWide(h2) => { return 0; },
-    }
-    return 0;
+    let mv: Value = Value::VMember(bv, f);
+    let lo: Vec<i32> = locate_out_new();
+    let r: i32 = locate_member(mv, env_names, env_bases, env_widths,
+                               env_field_starts, env_fields_flat,
+                               source, starts, ends, lo);
+    if r < 0 { return 0; }
+    return vec_get(lo, 5);
 }
 
 fn operand_cat(v: Value,
@@ -1842,6 +2102,24 @@ fn emit_value(v: Value,
             return width * 2;
         },
         Value::VMember(bv, f) => {
+            /* A (possibly nested, possibly struct-valued) field: push its words. */
+            if f >= 0 {
+                let lo: Vec<i32> = locate_out_new();
+                let lr: i32 = locate_member(v, env_names, env_bases, env_widths,
+                                            env_field_starts, env_fields_flat,
+                                            source, starts, ends, lo);
+                if lr >= 0 {
+                    let lbase: i32 = slot_base(env_bases, vec_get(lo, 0));
+                    let lw: i32 = vec_get(lo, 4);
+                    let mut lk: i32 = 0;
+                    while lk < lw {
+                        vec_push(out, 96);
+                        vec_push(out, lbase + vec_get(lo, 1) + lk);
+                        lk = lk + 1;
+                    }
+                    return lw * 2;
+                }
+            }
             let base_v: Value = box_deref(bv);
             match base_v {
                 Value::VVar(x) => {
@@ -1959,6 +2237,24 @@ fn emit_expr(e: Expr,
             return n;
         },
         Expr::FieldAccess(bv, f) => {
+            if f >= 0 {
+                let fv: Value = Value::VMember(bv, f);
+                let flo: Vec<i32> = locate_out_new();
+                let flr: i32 = locate_member(fv, env_names, env_bases, env_widths,
+                                             env_field_starts, env_fields_flat,
+                                             source, starts, ends, flo);
+                if flr >= 0 {
+                    let fbase: i32 = slot_base(env_bases, vec_get(flo, 0));
+                    let fw: i32 = vec_get(flo, 4);
+                    let mut fk: i32 = 0;
+                    while fk < fw {
+                        vec_push(out, 96);
+                        vec_push(out, fbase + vec_get(flo, 1) + fk);
+                        fk = fk + 1;
+                    }
+                    return fw * 2;
+                }
+            }
             let base_v: Value = box_deref(bv);
             match base_v {
                 Value::VVar(x) => {
@@ -2208,6 +2504,27 @@ fn emit_instr(ins: Instr,
             if si < 0 { return 0 - 1; }
             let b0: i32 = slot_base(env_bases, si);
             let w: i32 = slot_width(env_widths, si);
+            /* A named field: resolve through the (nested-aware) layout. A
+               struct-valued field stores all of its words (top of stack is the
+               last word). */
+            if fh >= 0 {
+                let slo: Vec<i32> = locate_out_new();
+                let sm: Value = Value::VMember(box_new(Value::VVar(bh)), fh);
+                let slr: i32 = locate_member(sm, env_names, env_bases, env_widths,
+                                             env_field_starts, env_fields_flat,
+                                             source, starts, ends, slo);
+                if slr >= 0 {
+                    let sw: i32 = vec_get(slo, 4);
+                    let sb: i32 = b0 + vec_get(slo, 1);
+                    let mut sk: i32 = 0;
+                    while sk < sw {
+                        vec_push(out, 97);
+                        vec_push(out, sb + sw - 1 - sk);
+                        sk = sk + 1;
+                    }
+                    return ne + sw * 2;
+                }
+            }
             let mut off: i32 = member_offset_from_field(w, fh);
             if fh >= 0 {
                 if si < vec_len(env_field_starts) {
@@ -2370,8 +2687,12 @@ fn emit_instr(ins: Instr,
             while ai < nargs_vec {
                 let bv: Box<Value> = vec_get(args, ai);
                 let v: Value = box_deref(bv);
-                let w: i32 = emit_ret_width(v, env_names, env_bases,
-                                            env_widths, source, starts, ends);
+                let mut w: i32 = emit_ret_width(v, env_names, env_bases,
+                                                env_widths, source, starts, ends);
+                let mw: i32 = member_arg_width(v, env_names, env_bases, env_widths,
+                                               env_field_starts, env_fields_flat,
+                                               source, starts, ends);
+                if mw >= 0 { w = mw; }
                 nargs_total = nargs_total + w;
                 let nv: i32 = emit_value(v, env_names, env_bases,
                                          env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
@@ -2432,7 +2753,11 @@ fn emit_instr(ins: Instr,
         },
         Instr::ReturnVal(bv) => {
             let v: Value = box_deref(bv);
-            let w: i32 = emit_ret_width(v, env_names, env_bases, env_widths, source, starts, ends);
+            let mut w: i32 = emit_ret_width(v, env_names, env_bases, env_widths, source, starts, ends);
+            let mw: i32 = member_arg_width(v, env_names, env_bases, env_widths,
+                                           env_field_starts, env_fields_flat,
+                                           source, starts, ends);
+            if mw >= 0 { w = mw; }
             let n: i32 = emit_value(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, pool, source, starts, ends, out);
             if n < 0 { return 0 - 1; }
             vec_push(out, 118);
@@ -2614,6 +2939,104 @@ fn ensure_var_cat(name: i32, cat: i32,
     return next_slot + 1;
 }
 
+/* Width in words of a struct-valued member argument (`sum(t.s)`), or -1 when
+   `v` is not a resolvable named member. */
+fn member_arg_width(v: Value,
+                    env_names: Vec<i32>, env_bases: Vec<i32>,
+                    env_widths: Vec<i32>, env_field_starts: Vec<i32>,
+                    env_fields_flat: Vec<i32>,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    match v {
+        Value::VMember(b, f) => {
+            if f < 0 { return 0 - 1; }
+            let lo: Vec<i32> = locate_out_new();
+            let r: i32 = locate_member(v, env_names, env_bases, env_widths,
+                                       env_field_starts, env_fields_flat,
+                                       source, starts, ends, lo);
+            if r < 0 { return 0 - 1; }
+            return vec_get(lo, 4);
+        },
+        _ => { return 0 - 1; },
+    }
+}
+
+/* Is expression `e` a struct-valued member read (`t.s`, `t.u.s`, a field whose
+   own type is a struct)? Fills `out` (see locate_member) and returns 0, else -1. */
+fn expr_struct_locate(e: Expr,
+                      env_names: Vec<i32>, env_bases: Vec<i32>,
+                      env_widths: Vec<i32>, env_field_starts: Vec<i32>,
+                      env_fields_flat: Vec<i32>,
+                      source: string, starts: Vec<i32>, ends: Vec<i32>,
+                      out: Vec<i32>) -> i32 {
+    match e {
+        Expr::Literal(bv) => {
+            let v: Value = box_deref(bv);
+            match v {
+                Value::VMember(b2, f2) => {
+                    if f2 < 0 { return 0 - 1; }
+                    let r: i32 = locate_member(v, env_names, env_bases, env_widths,
+                                               env_field_starts, env_fields_flat,
+                                               source, starts, ends, out);
+                    if r < 0 { return 0 - 1; }
+                    if vec_get(out, 6) == 1 { return 0; }
+                    return 0 - 1;
+                },
+                _ => { return 0 - 1; },
+            }
+        },
+        _ => { return 0 - 1; },
+    }
+}
+
+/* Give `x` a fresh slot the width of the located struct value, with its own
+   copy of the field run. Returns the next free slot. */
+fn alloc_struct_slot(x: i32, loc: Vec<i32>,
+                     env_names: Vec<i32>, env_bases: Vec<i32>,
+                     env_widths: Vec<i32>, env_cats: Vec<i32>,
+                     env_field_starts: Vec<i32>, env_fields_flat: Vec<i32>,
+                     next_slot: i32) -> i32 {
+    let w: i32 = vec_get(loc, 4);
+    vec_push(env_names, x);
+    vec_push(env_bases, next_slot);
+    vec_push(env_widths, w);
+    vec_push(env_cats, 0);
+    vec_push(env_field_starts,
+             run_copy(env_fields_flat, vec_get(loc, 2), vec_get(loc, 3)));
+    return next_slot + w;
+}
+
+/* `DeclVar(x)` immediately followed by `Store(x, <struct-valued member>)`
+   (`let z = t.s;`): fills `out` and returns x's handle, else -1. */
+fn declvar_struct_init(instrs: Vec<i32>, i: i32,
+                       env_names: Vec<i32>, env_bases: Vec<i32>,
+                       env_widths: Vec<i32>, env_field_starts: Vec<i32>,
+                       env_fields_flat: Vec<i32>,
+                       source: string, starts: Vec<i32>, ends: Vec<i32>,
+                       out: Vec<i32>) -> i32 {
+    if i + 1 >= vec_len(instrs) { return 0 - 1; }
+    let bh: Box<Instr> = vec_get(instrs, i);
+    let ins: Instr = box_deref(bh);
+    match ins {
+        Instr::DeclVar(x) => {
+            let nb: Box<Instr> = vec_get(instrs, i + 1);
+            let nx: Instr = box_deref(nb);
+            match nx {
+                Instr::Store(x2, be) => {
+                    if x2 != x { return 0 - 1; }
+                    let e: Expr = box_deref(be);
+                    let r: i32 = expr_struct_locate(e, env_names, env_bases, env_widths,
+                                                    env_field_starts, env_fields_flat,
+                                                    source, starts, ends, out);
+                    if r < 0 { return 0 - 1; }
+                    return x;
+                },
+                _ => { return 0 - 1; },
+            }
+        },
+        _ => { return 0 - 1; },
+    }
+}
+
 /* ── scan_instr_env (SML scanInstr) ──────────────────────────
    Walk one instruction for env-building (slot allocation).
    Handles DeclVar, DeclNamed, Assign, Call (with dest),
@@ -2653,6 +3076,19 @@ fn scan_instr_env(ins: Instr,
         },
         Instr::Assign(x, be) => {
             let ae: Expr = box_deref(be);
+            /* a struct-valued member initializer (`tmp = t.s`) gets a struct slot */
+            let aso: Vec<i32> = locate_out_new();
+            if expr_struct_locate(ae, env_names, env_bases, env_widths,
+                                  env_field_starts, env_fields_flat,
+                                  source, starts, ends, aso) >= 0 {
+                if lookup_slot(env_names, env_bases, env_widths, x,
+                               source, starts, ends) < 0 {
+                    return alloc_struct_slot(x, aso, env_names, env_bases, env_widths,
+                                             env_cats, env_field_starts, env_fields_flat,
+                                             next_slot);
+                }
+                return next_slot;
+            }
             let acat: i32 = expr_cat(ae, env_names, env_bases,
                                      env_widths, env_cats, env_field_starts, env_fields_flat, source, starts, ends);
             return ensure_var_cat(x, acat, env_names, env_bases, env_widths,
@@ -2781,6 +3217,20 @@ fn scan_instrs_env(instrs: Vec<i32>,
     let mut ns: i32 = next_slot;
     let mut i: i32 = 0;
     while i < n {
+        /* `let z = t.s;` : the DeclVar takes the struct's width */
+        let dso: Vec<i32> = locate_out_new();
+        let dvx: i32 = declvar_struct_init(instrs, i, env_names, env_bases, env_widths,
+                                           env_field_starts, env_fields_flat,
+                                           source, starts, ends, dso);
+        if dvx >= 0 {
+            if lookup_slot(env_names, env_bases, env_widths, dvx,
+                           source, starts, ends) < 0 {
+                ns = alloc_struct_slot(dvx, dso, env_names, env_bases, env_widths,
+                                       env_cats, env_field_starts, env_fields_flat, ns);
+            }
+            i = i + 1;
+            continue;
+        }
         let bh: Box<Instr> = vec_get(instrs, i);
         let ins: Instr = box_deref(bh);
         ns = scan_instr_env(ins, env_names, env_bases, env_widths,
@@ -2978,6 +3428,8 @@ fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
     let sfs: Vec<i32> = vec_new();
     struct_fields_build(item_tags, item_field_counts, item_field_bases,
                         struct_field_name_toks, struct_field_cats, sff, sfs);
+    /* nested struct fields: a struct's width is its leaf words, not its field count */
+    let _pk: i32 = struct_widths_pack(sfc, sff, sfs);
     let enn: Vec<i32> = vec_new();
     let enw: Vec<i32> = vec_new();
     enum_layouts_build(item_tags, item_names, item_field_counts,
@@ -4894,6 +5346,77 @@ fn test_typed_opcode_select() -> i32 {
     return 0;
 }
 
+/* Nested struct layout: S { a: i32, b: f64 }, T { s: S, k: i32 }. T's width is
+   S's 2 words + 1, its expanded run carries S's fields inline, and a chained
+   member `t.s.b` resolves to word offset 1 with category f64. */
+fn nested_struct_tables(sn: Vec<i32>, sfc: Vec<i32>, flat: Vec<i32>, fstarts: Vec<i32>) -> i32 {
+    vec_push(sn, 10); vec_push(sn, 20);
+    vec_push(sfc, 2); vec_push(sfc, 2);
+    /* S: (a=101, int) (b=102, f64); T: (s=201, struct #0 -> (0+1)<<4) (k=202, int) */
+    vec_push(flat, 101); vec_push(flat, 0);
+    vec_push(flat, 102); vec_push(flat, 1);
+    vec_push(flat, 201); vec_push(flat, 16);
+    vec_push(flat, 202); vec_push(flat, 0);
+    vec_push(fstarts, 0); vec_push(fstarts, 4);
+    return 0;
+}
+
+fn test_nested_struct_layout() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let sfc: Vec<i32> = vec_new();
+    let flat: Vec<i32> = vec_new();
+    let fstarts: Vec<i32> = vec_new();
+    let _t: i32 = nested_struct_tables(sn, sfc, flat, fstarts);
+    let _p: i32 = struct_widths_pack(sfc, flat, fstarts);
+    let en: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    if width_of_cty(10, sn, sfc, en, ew, "", vec_new(), vec_new()) != 2 { return 1; }
+    if width_of_cty(20, sn, sfc, en, ew, "", vec_new(), vec_new()) != 3 { return 2; }
+    if struct_packed_count(vec_get(sfc, 1)) != 2 { return 3; }
+    /* S has no struct field: its run stays the plain headerless one */
+    let env_flat: Vec<i32> = vec_new();
+    let fs_s: i32 = record_field_layout(10, sn, sfc, flat, fstarts, "", vec_new(), vec_new(), env_flat);
+    if fs_s != 0 { return 4; }
+    if vec_len(env_flat) != 4 { return 5; }
+    /* T's run: header (5 pairs, magic), s (with sub-run header) + a + b, k */
+    let fs_t: i32 = record_field_layout(20, sn, sfc, flat, fstarts, "", vec_new(), vec_new(), env_flat);
+    if fs_t != 6 { return 6; }
+    if vec_get(env_flat, fs_t - 2) != 5 { return 7; }
+    if vec_get(env_flat, fs_t - 1) != run_hdr_magic() { return 8; }
+    if vec_get(env_flat, fs_t) != 201 { return 9; }
+    if vec_get(env_flat, fs_t + 1) != (0 | 16 | (2 << 5)) { return 10; }
+    if vec_get(env_flat, fs_t + 2) != 2 { return 11; }
+    if vec_get(env_flat, fs_t + 4) != 101 { return 12; }
+    if vec_get(env_flat, fs_t + 8) != 202 { return 13; }
+    /* t.s.b: slot 0 holds T (3 words at base 0) */
+    let names: Vec<i32> = vec_new();
+    let bases: Vec<i32> = vec_new();
+    let widths: Vec<i32> = vec_new();
+    let fstarts_env: Vec<i32> = vec_new();
+    vec_push(names, 500); vec_push(bases, 0); vec_push(widths, 3); vec_push(fstarts_env, fs_t);
+    let lo: Vec<i32> = locate_out_new();
+    let tb: Value = Value::VMember(box_new(Value::VMember(box_new(Value::VVar(500)), 201)), 102);
+    if locate_member(tb, names, bases, widths, fstarts_env, env_flat, "", vec_new(), vec_new(), lo) < 0 { return 14; }
+    if vec_get(lo, 1) != 1 { return 15; }
+    if vec_get(lo, 4) != 1 { return 16; }
+    if vec_get(lo, 5) != 1 { return 17; }
+    /* t.k sits after S's two words */
+    let tk: Value = Value::VMember(box_new(Value::VVar(500)), 202);
+    if locate_member(tk, names, bases, widths, fstarts_env, env_flat, "", vec_new(), vec_new(), lo) < 0 { return 18; }
+    if vec_get(lo, 1) != 2 { return 19; }
+    /* t.s is a struct value: 2 words, with a sub-run of 2 pairs */
+    let ts: Value = Value::VMember(box_new(Value::VVar(500)), 201);
+    if locate_member(ts, names, bases, widths, fstarts_env, env_flat, "", vec_new(), vec_new(), lo) < 0 { return 20; }
+    if vec_get(lo, 4) != 2 { return 21; }
+    if vec_get(lo, 6) != 1 { return 22; }
+    if vec_get(lo, 3) != 2 { return 23; }
+    /* an unknown field does not resolve */
+    let tz: Value = Value::VMember(box_new(Value::VVar(500)), 999);
+    if locate_member(tz, names, bases, widths, fstarts_env, env_flat, "", vec_new(), vec_new(), lo) >= 0 { return 24; }
+    return 0;
+}
+
+
 fn main() -> i32 {
     let r1: i32 = test_variant_slots();
     if r1 != 0 { return r1; }
@@ -4983,5 +5506,7 @@ fn main() -> i32 {
     if r43 != 0 { return 760 + r43; }
     let r44: i32 = test_f64_bits();
     if r44 != 0 { return 780 + r44; }
+    let r45: i32 = test_nested_struct_layout();
+    if r45 != 0 { return 800 + r45; }
     return 0;
 }

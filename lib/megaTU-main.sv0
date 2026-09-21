@@ -412,6 +412,36 @@ fn main() -> i32 {
         }
         sti = sti + 1;
     }
+    /* Second pass (every struct is in sit_nt now, so a field may name a struct
+       declared later): a field whose type is a user struct records that struct's
+       index + 1 in the bits above the category, which is how a nested struct
+       value's layout is found (megatu_value_sty; the VM emitter's nested field
+       runs). Readers mask the category with & 15. */
+    let mut sti2: i32 = 0;
+    let mut sf_off2: i32 = 0;
+    let mut sit_i2: i32 = 0;
+    while sti2 < vec_len(it) {
+        if vec_get(it, sti2) == 1 {
+            let fc3: i32 = vec_get(ifc, sti2);
+            let cbase: i32 = vec_get(sit_base, sit_i2);
+            let mut fk3: i32 = 0;
+            while fk3 < fc3 {
+                let ftok3: i32 = vec_get(sf_types, sf_off2 + fk3);
+                if ftok3 >= 0 {
+                    let fcty3: string = megatu_ty_name(ftok3, source, starts, ends);
+                    let fsty3: i32 = megatu_struct_idx_of_cty(fcty3, sit_nt, source, starts, ends);
+                    if fsty3 >= 0 {
+                        vec_set(sit_field_cat, cbase + fk3,
+                                vec_get(sit_field_cat, cbase + fk3) | ((fsty3 + 1) << 4));
+                    }
+                }
+                fk3 = fk3 + 1;
+            }
+            sf_off2 = sf_off2 + fc3;
+            sit_i2 = sit_i2 + 1;
+        }
+        sti2 = sti2 + 1;
+    }
     let ob: Vec<i32> = vec_new();
     let osn: Vec<i32> = vec_new();
     let oso: Vec<i32> = vec_new();
@@ -1708,13 +1738,14 @@ fn megatu_tyenv_lookup_struct_idx(h: i32, tyenv_h: Vec<i32>, tyenv_st: Vec<i32>,
     return 0 - 1;
 }
 
-/* Resolve a struct field access's real category: `struct_idx` (from
-   tyenv_st) identifies which struct item the scrutinee is; scan that
-   struct's field range comparing FIELD NAME TEXT against `fh` (a
-   `.field` access's own token is a different source position than the
-   field's declaration, the same reason megatu_tyenv_lookup_cty needs a
-   text fallback) — BUGS.md #13. */
-fn megatu_struct_field_cty(struct_idx: i32, fh: i32,
+/* The RAW table entry for field `fh` of struct `struct_idx`: the category in
+   the low 4 bits, and (struct index + 1) of the field's own type in the bits
+   above when the field is itself a user struct (0 there means "not a struct").
+   `struct_idx` (from tyenv_st) identifies which struct item; the field range is
+   scanned comparing FIELD NAME TEXT against `fh` (a `.field` access's own
+   token is a different source position than the field's declaration, the same
+   reason megatu_tyenv_lookup_cty needs a text fallback) — BUGS.md #13. */
+fn megatu_struct_field_raw(struct_idx: i32, fh: i32,
                            sit_base: Vec<i32>, sit_cnt: Vec<i32>,
                            sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                            source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
@@ -1731,6 +1762,64 @@ fn megatu_struct_field_cty(struct_idx: i32, fh: i32,
         i = i + 1;
     }
     return 0;
+}
+
+/* A struct field's category (the low 4 bits of its table entry). */
+fn megatu_struct_field_cty(struct_idx: i32, fh: i32,
+                           sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                           sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    return megatu_struct_field_raw(struct_idx, fh, sit_base, sit_cnt,
+                                   sit_field_name, sit_field_cat,
+                                   source, starts, ends) & 15;
+}
+
+/* Struct index of the value `v` when it is itself a struct: a struct local /
+   temp (tyenv_st), or a field of a struct value whose own type is a struct
+   (`t.s`, `t.s.u`), else -1. */
+fn megatu_value_sty(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_st: Vec<i32>,
+                    sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                    sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    match v {
+        codegen_Value::VVar(h) => {
+            return megatu_tyenv_lookup_struct_idx(h, tyenv_h, tyenv_st, source, starts, ends);
+        },
+        codegen_Value::VAddrOf(h) => {
+            return megatu_tyenv_lookup_struct_idx(h, tyenv_h, tyenv_st, source, starts, ends);
+        },
+        codegen_Value::VMember(bv, fh) => {
+            if fh < 0 { return 0 - 1; }
+            let inner: codegen_Value = box_deref(bv);
+            let b: i32 = megatu_value_sty(inner, tyenv_h, tyenv_st, sit_base, sit_cnt,
+                                          sit_field_name, sit_field_cat, source, starts, ends);
+            if b < 0 { return 0 - 1; }
+            let raw: i32 = megatu_struct_field_raw(b, fh, sit_base, sit_cnt,
+                                                   sit_field_name, sit_field_cat,
+                                                   source, starts, ends);
+            return (raw >> 4) - 1;
+        },
+        _ => { return 0 - 1; },
+    }
+}
+
+/* Struct index of an IR expression's result, or -1: a plain struct-valued
+   value, or a copy of a struct local. */
+fn megatu_expr_sty(e: codegen_Expr, tyenv_h: Vec<i32>, tyenv_st: Vec<i32>,
+                   sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                   sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
+                   source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    match e {
+        codegen_Expr::Literal(bv) => {
+            let v: codegen_Value = box_deref(bv);
+            return megatu_value_sty(v, tyenv_h, tyenv_st, sit_base, sit_cnt,
+                                    sit_field_name, sit_field_cat, source, starts, ends);
+        },
+        codegen_Expr::Load(h) => {
+            return megatu_tyenv_lookup_struct_idx(h, tyenv_h, tyenv_st, source, starts, ends);
+        },
+        _ => { return 0 - 1; },
+    }
 }
 
 /* `bv`'s inner value handle when it's VVar/VAddrOf (the only scrutinee
@@ -1804,15 +1893,12 @@ fn megatu_value_cty(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_c: Vec<i32>,
                falling back to int. */
             if fh >= 0 {
                 let inner2: codegen_Value = box_deref(bv);
-                let ih2: i32 = megatu_value_scrutinee_handle(inner2);
-                if ih2 >= 0 {
-                    let sidx: i32 = megatu_tyenv_lookup_struct_idx(ih2, tyenv_h, tyenv_st,
-                                                                    source, starts, ends);
-                    if sidx >= 0 {
-                        return megatu_struct_field_cty(sidx, fh, sit_base, sit_cnt,
-                                                        sit_field_name, sit_field_cat,
-                                                        source, starts, ends);
-                    }
+                let sidx: i32 = megatu_value_sty(inner2, tyenv_h, tyenv_st, sit_base, sit_cnt,
+                                                 sit_field_name, sit_field_cat, source, starts, ends);
+                if sidx >= 0 {
+                    return megatu_struct_field_cty(sidx, fh, sit_base, sit_cnt,
+                                                    sit_field_name, sit_field_cat,
+                                                    source, starts, ends);
                 }
             }
             return 0;
@@ -2244,6 +2330,20 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
         },
         codegen_Instr::Assign(h, be) => {
             let e: codegen_Expr = box_deref(be);
+            /* A struct-valued initializer (a copy of a struct, or a struct field
+               that is itself a struct: `t.s`) declares the temp with that
+               struct's type. */
+            let asty: i32 = megatu_expr_sty(e, tyenv_h, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
+            if asty >= 0 {
+                let sname: string = handle_to_str(vec_get(sit_nt, asty), source, starts, ends);
+                megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, 0, 0 - 1, asty);
+                let sa: string = string_concat(indent, sname);
+                let sa2: string = string_concat(sa, " ");
+                let sb: string = string_concat(sa2, megatu_val_name(h, source, starts, ends, sidx));
+                let sc: string = string_concat(sb, " = ");
+                let sd: string = string_concat(sc, megatu_emit_expr(e, source, starts, ends, sidx));
+                return string_concat(sd, ";\n");
+            }
             let category: i32 = megatu_expr_cty(e, tyenv_h, tyenv_f, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, category, 0 - 1, 0 - 1);
             let cty: string = megatu_cty_of_category(category);
@@ -2469,6 +2569,35 @@ fn megatu_declvar_init_cat(instrs: Vec<i32>, idx: i32, source: string,
     }
 }
 
+/* Like megatu_declvar_init_cat, for a struct-valued initializer: returns the
+   struct index when the DeclVar at instrs[idx] is immediately followed by
+   `Store(x, <struct value>)` (`let z = t.s;`), else -1. */
+fn megatu_declvar_init_sty(instrs: Vec<i32>, idx: i32, source: string,
+                           starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>,
+                           tyenv_h: Vec<i32>, tyenv_st: Vec<i32>,
+                           sit_base: Vec<i32>, sit_cnt: Vec<i32>,
+                           sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>) -> i32 {
+    if idx + 1 >= vec_len(instrs) { return 0 - 1; }
+    let bh: Box<codegen_Instr> = vec_get(instrs, idx);
+    let ins: codegen_Instr = box_deref(bh);
+    match ins {
+        codegen_Instr::DeclVar(h) => {
+            if string_eq(megatu_val_name(h, source, starts, ends, sidx), "result") { return 0 - 1; }
+            let nb: Box<codegen_Instr> = vec_get(instrs, idx + 1);
+            let nx: codegen_Instr = box_deref(nb);
+            match nx {
+                codegen_Instr::Store(h2, be) => {
+                    if h2 != h { return 0 - 1; }
+                    let e: codegen_Expr = box_deref(be);
+                    return megatu_expr_sty(e, tyenv_h, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat, source, starts, ends);
+                },
+                _ => { return 0 - 1; },
+            }
+        },
+        _ => { return 0 - 1; },
+    }
+}
+
 /* Handle of the DeclVar at instrs[idx] (-1 if it is another instruction). */
 fn megatu_declvar_handle(instrs: Vec<i32>, idx: i32) -> i32 {
     let bh: Box<codegen_Instr> = vec_get(instrs, idx);
@@ -2497,6 +2626,17 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
         let bh: Box<codegen_Instr> = vec_get(instrs, idx);
         let ins: codegen_Instr = box_deref(bh);
         let dcat: i32 = megatu_declvar_init_cat(instrs, idx, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_base, eit_cnt, eit_cats, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat);
+        let dsty: i32 = megatu_declvar_init_sty(instrs, idx, source, starts, ends, sidx, tyenv_h, tyenv_st, sit_base, sit_cnt, sit_field_name, sit_field_cat);
+        if dsty >= 0 {
+            let dh2: i32 = megatu_declvar_handle(instrs, idx);
+            megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, dh2, 0, 0 - 1, dsty);
+            let e1: string = string_concat(indent, handle_to_str(vec_get(sit_nt, dsty), source, starts, ends));
+            let e2: string = string_concat(e1, " ");
+            let e3: string = string_concat(e2, megatu_val_name(dh2, source, starts, ends, sidx));
+            out = string_concat(out, string_concat(e3, ";\n"));
+            idx = idx + 1;
+            continue;
+        }
         if dcat > 0 {
             let dh: i32 = megatu_declvar_handle(instrs, idx);
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, dh, dcat, 0 - 1, 0 - 1);

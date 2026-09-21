@@ -1,0 +1,71 @@
+// Struct values nested in struct values, on both backends: construction from a
+// struct local, chained reads (`t.u.s.a`), chained stores and compound stores
+// (`t.u.s.a = v`, `t.u.k *= 2`, done as a read-modify-write through struct
+// temporaries), unannotated `let z = t.s;` copies (value semantics: writing the
+// copy does not touch the original), a whole-field store (`t.s = u`), a nested
+// struct passed to and returned from functions, and f64 fields inside a nested
+// struct. Expected exit: 42.
+
+struct S {
+    a: i32,
+    b: f64,
+}
+
+struct U {
+    s: S,
+    k: i32,
+}
+
+struct T {
+    u: U,
+    m: i32,
+}
+
+fn get(u: U) -> S {
+    return u.s;
+}
+
+fn total(u: U) -> f64 {
+    return u.s.b + 0.25;
+}
+
+fn build(n: i32) -> U {
+    let x: S = S { a: n, b: 1.5 };
+    let u: U = U { s: x, k: 3 };
+    u.s.a += 1;
+    u.s.b *= 2.0;
+    return u;
+}
+
+fn main() -> i32 {
+    let x: S = S { a: 1, b: 2.0 };
+    let u: U = U { s: x, k: 3 };
+    let t: T = T { u: u, m: 4 };
+    t.u.s.a = 10;
+    t.u.s.b += 0.5;
+    t.u.k *= 2;
+    t.m -= 1;
+    if t.u.s.a != 10 { return 1; }
+    if t.u.s.b != 2.5 { return 2; }
+    if t.u.k != 6 { return 3; }
+    if t.m != 3 { return 4; }
+    if x.a != 1 { return 5; }
+
+    // unannotated copies of a nested struct
+    let z = t.u.s;
+    z.a = 99;
+    if t.u.s.a != 10 { return 6; }
+    let w = t.u;
+    if w.k != 6 { return 7; }
+    t.u.s = z;
+    if t.u.s.a != 99 { return 8; }
+
+    // functions
+    let bu: U = build(9);
+    let g: S = get(bu);
+    if g.a != 10 { return 9; }
+    if g.b != 3.0 { return 10; }
+    if total(bu) != 3.25 { return 11; }
+    if total(t.u) != 2.75 { return 12; }
+    return t.u.s.a - 99 + t.u.k + t.m + 33;
+}

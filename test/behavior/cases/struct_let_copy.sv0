@@ -1,8 +1,8 @@
 // An annotated `let` of a user struct or enum type takes that type whatever the
 // initializer is: a field read out of another struct (`let y: S = t.s;`), a
 // copy of another local, or an enum copy. Before, only literals and calls of
-// user fns were recognized and everything else declared a C `int`. C backend
-// only: nested struct values are not laid out on the VM. Expected exit: 42.
+// user fns were recognized and everything else declared a C `int`. Expected
+// exit: 42.
 
 enum Color {
     Red,

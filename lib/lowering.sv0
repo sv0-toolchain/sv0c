@@ -2104,6 +2104,19 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_push(out_instrs, box_new(Instr::Call(0, 0 - lower_index_bid(builtin_map, lower_index_base_tok(et, ed1, ed2, pp, base_c), 33, 42), a_iset, 0)));
             return Value::VUnit;
         }
+        /* `a.b.c = v` — nested field place: read-modify-write through struct
+           temps (lower_nested_field_store). */
+        let chain18: Vec<i32> = vec_new();
+        let nbase18: i32 = lower_field_chain(et, ed1, ed2, pp, lhs_idx, chain18);
+        if nbase18 >= 0 {
+            let v_rhs_n18: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                       tok_tags, rhs_idx, ctr,
+                                                       out_instrs, enum_names,
+                                                       enum_tag_offsets, enum_tag_counts,
+                                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let _ns18: i32 = lower_nested_field_store(out_instrs, ctr, nbase18, chain18, 0 - 1, v_rhs_n18);
+            return Value::VUnit;
+        }
         /* SML ExprAssign: Store(x, <rhs as Ir.expr>) via lowerExprWithInstrs —
            a binop RHS is stored directly, not spilled through a temp. */
         let rhs_e: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp,
@@ -2170,6 +2183,19 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_push(a_set_a, box_new(v_ixe_a));
             vec_push(a_set_a, box_new(Value::VVar(t_new_a)));
             vec_push(out_instrs, box_new(Instr::Call(0, 0 - set_bid_a, a_set_a, 0)));
+            return Value::VUnit;
+        }
+        /* `a.b.c op= v` — nested field place (read-modify-write, see
+           lower_nested_field_store). */
+        let chain19: Vec<i32> = vec_new();
+        let nbase19: i32 = lower_field_chain(et, ed1, ed2, pp, lhs_idx2, chain19);
+        if nbase19 >= 0 {
+            let v_rhs_n: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
+                                                     tok_tags, rhs_idx2, ctr,
+                                                     out_instrs, enum_names,
+                                                     enum_tag_offsets, enum_tag_counts,
+                                                     enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let _ns19: i32 = lower_nested_field_store(out_instrs, ctr, nbase19, chain19, op_tag, v_rhs_n);
             return Value::VUnit;
         }
         let mut aout2: Vec<i32> = vec_new();
@@ -5272,6 +5298,88 @@ fn lower_vecf_site_map(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
         i = advance;
     }
     return map;
+}
+
+/* A nested field place `base.f1.f2...fn` (n >= 2, all fields): the base
+   variable's name token, with the field name tokens (in order) appended to
+   `chain`. -1 if the expression is not such a chain. */
+fn lower_field_chain(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, pp: Vec<i32>,
+                     lhs: i32, chain: Vec<i32>) -> i32 {
+    if lhs < 0 { return 0 - 1; }
+    if lhs >= vec_len(et) { return 0 - 1; }
+    if vec_get(et, lhs) != 6 { return 0 - 1; }
+    let obj: i32 = vec_get(ed1, lhs);
+    if obj < 0 { return 0 - 1; }
+    if obj >= vec_len(et) { return 0 - 1; }
+    if vec_get(et, obj) == 1 {
+        /* one field only: not a nested place */
+        return 0 - 1;
+    }
+    let mut rev: Vec<i32> = vec_new();
+    vec_push(rev, vec_get(ed2, lhs));
+    let mut cur: i32 = obj;
+    let mut guard: i32 = 0;
+    while guard < 64 {
+        if vec_get(et, cur) == 6 {
+            vec_push(rev, vec_get(ed2, cur));
+            cur = vec_get(ed1, cur);
+            if cur < 0 { return 0 - 1; }
+            if cur >= vec_len(et) { return 0 - 1; }
+        } else {
+            break;
+        }
+        guard = guard + 1;
+    }
+    if vec_get(et, cur) != 1 { return 0 - 1; }
+    let pps: i32 = vec_get(ed1, cur);
+    if pps < 0 { return 0 - 1; }
+    if pps >= vec_len(pp) { return 0 - 1; }
+    let mut r: i32 = vec_len(rev) - 1;
+    while r >= 0 {
+        vec_push(chain, vec_get(rev, r));
+        r = r - 1;
+    }
+    return vec_get(pp, pps);
+}
+
+/* `base.f1.f2...fn = rhs` (op_tag < 0) or `base.f1...fn op= rhs`, as a
+   read-modify-write through struct temporaries built from instructions that
+   already exist:
+       t1 = base.f1;  t2 = t1.f2; ... t_{n-1} = t_{n-2}.f_{n-1};
+       t_{n-1}.fn = (rhs | t_{n-1}.fn op rhs);
+       t_{n-2}.f_{n-1} = t_{n-1}; ... base.f1 = t1;
+   Structs are values, so writing the modified copy back is exactly the update.
+   The emitters type each temp from its struct-valued initializer. */
+fn lower_nested_field_store(out_instrs: Vec<i32>, ctr: Vec<i32>, base_tok: i32,
+                            chain: Vec<i32>, op_tag: i32, rhs: Value) -> i32 {
+    let n: i32 = vec_len(chain);
+    let temps: Vec<i32> = vec_new();
+    let mut owner: i32 = base_tok;
+    let mut i: i32 = 0;
+    while i < n - 1 {
+        let t: i32 = ctr_fresh(ctr);
+        let mem: Value = Value::VMember(box_new(Value::VVar(owner)), vec_get(chain, i));
+        vec_push(out_instrs, box_new(Instr::Assign(t, box_new(value_to_expr(mem)))));
+        vec_push(temps, t);
+        owner = t;
+        i = i + 1;
+    }
+    let fnl: i32 = vec_get(chain, n - 1);
+    let mut e: Expr = value_to_expr(rhs);
+    if op_tag >= 0 {
+        let cur: Value = Value::VMember(box_new(Value::VVar(owner)), fnl);
+        e = Expr::Binop(op_tag, box_new(cur), box_new(rhs));
+    }
+    vec_push(out_instrs, box_new(Instr::StoreField(owner, fnl, box_new(e))));
+    let mut w: i32 = n - 2;
+    while w >= 0 {
+        let mut up: i32 = base_tok;
+        if w > 0 { up = vec_get(temps, w - 1); }
+        let wb: Expr = Expr::Load(vec_get(temps, w));
+        vec_push(out_instrs, box_new(Instr::StoreField(up, vec_get(chain, w), box_new(wb))));
+        w = w - 1;
+    }
+    return 0;
 }
 
 /* Base identifier token of an index expression's object: a path's only
@@ -11649,6 +11757,37 @@ fn test_lower_vecf_site_table() -> i32 {
     return 0;
 }
 
+/* `base.f1.f2` nested field place: the base token and the field chain in order;
+   a one-field place is not nested (-1). */
+fn test_lower_field_chain() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(pp, 500);
+    /* node0: path (pps 0, 1 segment); node1: field(node0, 601); node2: field(node1, 602) */
+    vec_push(et, 1); vec_push(ed1, 0); vec_push(ed2, 1);
+    vec_push(et, 6); vec_push(ed1, 0); vec_push(ed2, 601);
+    vec_push(et, 6); vec_push(ed1, 1); vec_push(ed2, 602);
+    let chain: Vec<i32> = vec_new();
+    if lower_field_chain(et, ed1, ed2, pp, 2, chain) != 500 { return 1; }
+    if vec_len(chain) != 2 { return 2; }
+    if vec_get(chain, 0) != 601 { return 3; }
+    if vec_get(chain, 1) != 602 { return 4; }
+    let one: Vec<i32> = vec_new();
+    if lower_field_chain(et, ed1, ed2, pp, 1, one) != 0 - 1 { return 5; }
+    if vec_len(one) != 0 { return 6; }
+    if lower_field_chain(et, ed1, ed2, pp, 0, one) != 0 - 1 { return 7; }
+    /* the emitted read-modify-write for t.a.b = v: t1 = t.a; t1.b = v; t.a = t1 */
+    let out: Vec<i32> = vec_new();
+    let ctr: Vec<i32> = vec_new();
+    vec_push(ctr, 0);
+    let _s: i32 = lower_nested_field_store(out, ctr, 500, chain, 0 - 1, Value::VInt(7));
+    if vec_len(out) != 3 { return 8; }
+    return 0;
+}
+
+
 fn main() -> i32 {
     let r3: i32 = test_binop_to_c();
     if r3 != 0 { return 30 + r3; }
@@ -11830,5 +11969,7 @@ fn main() -> i32 {
     if rv8 != 0 { return 970 + 80 + rv8; }
     let rt: i32 = test_lower_vecf_site_table();
     if rt != 0 { return 1200 + rt; }
+    let rfc: i32 = test_lower_field_chain();
+    if rfc != 0 { return 1500 + rfc; }
     return 0;
 }
