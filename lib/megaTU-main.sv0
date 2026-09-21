@@ -433,6 +433,14 @@ fn main() -> i32 {
                     if fsty3 >= 0 {
                         vec_set(sit_field_cat, cbase + fk3,
                                 vec_get(sit_field_cat, cbase + fk3) | ((fsty3 + 1) << 4));
+                    } else {
+                        /* an enum-typed field: code 2048 + enum index + 1 (a struct
+                           is 1..2047), so the VM layout can size the field */
+                        let fen3: i32 = megatu_enum_idx_of_cty(fcty3, eit_nt, source, starts, ends);
+                        if fen3 >= 0 {
+                            vec_set(sit_field_cat, cbase + fk3,
+                                    vec_get(sit_field_cat, cbase + fk3) | ((2048 + fen3 + 1) << 4));
+                        }
                     }
                 }
                 fk3 = fk3 + 1;
@@ -1797,7 +1805,13 @@ fn megatu_value_sty(v: codegen_Value, tyenv_h: Vec<i32>, tyenv_st: Vec<i32>,
             let raw: i32 = megatu_struct_field_raw(b, fh, sit_base, sit_cnt,
                                                    sit_field_name, sit_field_cat,
                                                    source, starts, ends);
-            return (raw >> 4) - 1;
+            /* codes 1..2047 name a struct field's struct (index + 1); 2048+ is an
+               enum-typed field, which is not a struct value */
+            let code: i32 = (raw >> 4) & 4095;
+            if code >= 1 {
+                if code < 2048 { return code - 1; }
+            }
+            return 0 - 1;
         },
         _ => { return 0 - 1; },
     }

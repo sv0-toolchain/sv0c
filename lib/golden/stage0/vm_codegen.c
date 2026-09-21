@@ -79,12 +79,13 @@ static int patch_break_jumps(int instrs, int from_pos, int target_abs);
 static int struct_layouts_build(int item_tags, int item_names, int item_field_counts, int out_names, int out_field_counts);
 static int run_hdr_magic(void);
 static int field_raw_sty(int raw);
-static int struct_width_rec(int k, int counts_raw, int fields_flat, int field_starts, int depth);
+static int field_raw_enum(int raw);
+static int struct_width_rec(int k, int counts_raw, int fields_flat, int field_starts, int enum_widths, int depth);
 static int struct_run_pairs(int k, int counts_raw, int fields_flat, int field_starts, int depth);
-static int struct_run_write(int k, int counts_raw, int fields_flat, int field_starts, int out, int depth);
+static int struct_run_write(int k, int counts_raw, int fields_flat, int field_starts, int enum_widths, int out, int depth);
 static int struct_has_nested(int k, int counts_raw, int fields_flat, int field_starts);
-static int struct_widths_pack(int counts, int fields_flat, int field_starts);
-static int record_field_layout(int cty, int structs_names, int structs_field_counts, int struct_fields_flat, int struct_field_starts, const char* source, int starts, int ends, int env_fields_flat);
+static int struct_widths_pack(int counts, int fields_flat, int field_starts, int enum_widths);
+static int record_field_layout(int cty, int structs_names, int structs_field_counts, int struct_fields_flat, int struct_field_starts, int enums_widths, const char* source, int starts, int ends, int env_fields_flat);
 static int run_copy(int flat, int rs, int t);
 static int struct_fields_build(int item_tags, int item_field_counts, int item_field_bases, int struct_field_name_toks, int struct_field_cats, int out_fields_flat, int out_field_starts);
 static int enum_layouts_build(int item_tags, int item_names, int item_variant_counts, int item_variant_max_payload, int out_names, int out_widths);
@@ -210,6 +211,7 @@ static int test_wide_int_literal(void);
 static int test_typed_opcode_select(void);
 static int nested_struct_tables(int sn, int sfc, int flat, int fstarts);
 static int test_nested_struct_layout(void);
+static int test_enum_field_layout(void);
 
 static int variant_slots_unit(void) {
   return 0;
@@ -1379,12 +1381,32 @@ static int run_hdr_magic(void) {
 
 static int field_raw_sty(int raw) {
   int _sv0t0 = (raw >> 4);
-  int _sv0t1 = (_sv0t0 & 4095);
-  int _sv0t2 = (_sv0t1 - 1);
+  int code = (_sv0t0 & 4095);
+  if ((code >= 1)) {
+    if ((code < 2048)) {
+      int _sv0t1 = (code - 1);
+      return _sv0t1;
+    } else {
+    }
+  } else {
+  }
+  int _sv0t2 = (0 - 1);
   return _sv0t2;
 }
 
-static int struct_width_rec(int k, int counts_raw, int fields_flat, int field_starts, int depth) {
+static int field_raw_enum(int raw) {
+  int _sv0t0 = (raw >> 4);
+  int code = (_sv0t0 & 4095);
+  if ((code > 2048)) {
+    int _sv0t1 = (code - 2049);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = (0 - 1);
+  return _sv0t2;
+}
+
+static int struct_width_rec(int k, int counts_raw, int fields_flat, int field_starts, int enum_widths, int depth) {
   if ((k < 0)) {
     return 1;
   } else {
@@ -1410,14 +1432,27 @@ static int struct_width_rec(int k, int counts_raw, int fields_flat, int field_st
     int _sv0t5 = (base + _sv0t4);
     int _sv0t6 = (_sv0t5 + 1);
     int _sv0t7 = sv0_vec_get(fields_flat, _sv0t6);
-    int _sv0t8 = field_raw_sty(_sv0t7);
+    int rawj = _sv0t7;
+    int _sv0t8 = field_raw_sty(rawj);
     int sty = _sv0t8;
+    int _sv0t9 = field_raw_enum(rawj);
+    int eix = _sv0t9;
     if ((sty >= 0)) {
-      int _sv0t9 = (depth + 1);
-      int _sv0t10 = struct_width_rec(sty, counts_raw, fields_flat, field_starts, _sv0t9);
-      w = (w + _sv0t10);
+      int _sv0t10 = (depth + 1);
+      int _sv0t11 = struct_width_rec(sty, counts_raw, fields_flat, field_starts, enum_widths, _sv0t10);
+      w = (w + _sv0t11);
     } else {
-      w = (w + 1);
+      if ((eix >= 0)) {
+        int _sv0t12 = sv0_vec_len(enum_widths);
+        if ((eix < _sv0t12)) {
+          int _sv0t13 = sv0_vec_get(enum_widths, eix);
+          w = (w + _sv0t13);
+        } else {
+          w = (w + 1);
+        }
+      } else {
+        w = (w + 1);
+      }
     }
     j = (j + 1);
   }
@@ -1465,7 +1500,7 @@ static int struct_run_pairs(int k, int counts_raw, int fields_flat, int field_st
   return n;
 }
 
-static int struct_run_write(int k, int counts_raw, int fields_flat, int field_starts, int out, int depth) {
+static int struct_run_write(int k, int counts_raw, int fields_flat, int field_starts, int enum_widths, int out, int depth) {
   if ((k < 0)) {
     return 0;
   } else {
@@ -1493,34 +1528,50 @@ static int struct_run_write(int k, int counts_raw, int fields_flat, int field_st
     int raw = _sv0t10;
     int _sv0t11 = field_raw_sty(raw);
     int sty = _sv0t11;
+    int _sv0t12 = field_raw_enum(raw);
+    int eix = _sv0t12;
     if ((sty >= 0)) {
       if ((depth <= 12)) {
-        int _sv0t12 = (depth + 1);
-        int _sv0t13 = struct_width_rec(sty, counts_raw, fields_flat, field_starts, _sv0t12);
-        int w = _sv0t13;
+        int _sv0t13 = (depth + 1);
+        int _sv0t14 = struct_width_rec(sty, counts_raw, fields_flat, field_starts, enum_widths, _sv0t13);
+        int w = _sv0t14;
         sv0_vec_push(out, name);
-        int _sv0t14 = (raw & 15);
-        int _sv0t15 = (_sv0t14 | 16);
-        int _sv0t16 = (w << 5);
-        int _sv0t17 = (_sv0t15 | _sv0t16);
-        sv0_vec_push(out, _sv0t17);
-        int _sv0t18 = (depth + 1);
-        int _sv0t19 = struct_run_pairs(sty, counts_raw, fields_flat, field_starts, _sv0t18);
-        sv0_vec_push(out, _sv0t19);
-        int _sv0t20 = run_hdr_magic();
+        int _sv0t15 = (raw & 15);
+        int _sv0t16 = (_sv0t15 | 16);
+        int _sv0t17 = (w << 5);
+        int _sv0t18 = (_sv0t16 | _sv0t17);
+        sv0_vec_push(out, _sv0t18);
+        int _sv0t19 = (depth + 1);
+        int _sv0t20 = struct_run_pairs(sty, counts_raw, fields_flat, field_starts, _sv0t19);
         sv0_vec_push(out, _sv0t20);
-        int _sv0t21 = (depth + 1);
-        int _sv0t22 = struct_run_write(sty, counts_raw, fields_flat, field_starts, out, _sv0t21);
-        int _r = _sv0t22;
+        int _sv0t21 = run_hdr_magic();
+        sv0_vec_push(out, _sv0t21);
+        int _sv0t22 = (depth + 1);
+        int _sv0t23 = struct_run_write(sty, counts_raw, fields_flat, field_starts, enum_widths, out, _sv0t22);
+        int _r = _sv0t23;
       } else {
         sv0_vec_push(out, name);
-        int _sv0t23 = (raw & 15);
-        sv0_vec_push(out, _sv0t23);
+        int _sv0t24 = (raw & 15);
+        sv0_vec_push(out, _sv0t24);
       }
     } else {
       sv0_vec_push(out, name);
-      int _sv0t24 = (raw & 15);
-      sv0_vec_push(out, _sv0t24);
+      if ((eix >= 0)) {
+        int ew = 1;
+        int _sv0t25 = sv0_vec_len(enum_widths);
+        if ((eix < _sv0t25)) {
+          int _sv0t26 = sv0_vec_get(enum_widths, eix);
+          ew = _sv0t26;
+        } else {
+        }
+        int _sv0t27 = (raw & 15);
+        int _sv0t28 = (ew << 5);
+        int _sv0t29 = (_sv0t27 | _sv0t28);
+        sv0_vec_push(out, _sv0t29);
+      } else {
+        int _sv0t30 = (raw & 15);
+        sv0_vec_push(out, _sv0t30);
+      }
     }
     j = (j + 1);
   }
@@ -1548,8 +1599,14 @@ static int struct_has_nested(int k, int counts_raw, int fields_flat, int field_s
     int _sv0t5 = (base + _sv0t4);
     int _sv0t6 = (_sv0t5 + 1);
     int _sv0t7 = sv0_vec_get(fields_flat, _sv0t6);
-    int _sv0t8 = field_raw_sty(_sv0t7);
+    int rawn = _sv0t7;
+    int _sv0t8 = field_raw_sty(rawn);
     if ((_sv0t8 >= 0)) {
+      return 1;
+    } else {
+    }
+    int _sv0t9 = field_raw_enum(rawn);
+    if ((_sv0t9 >= 0)) {
       return 1;
     } else {
     }
@@ -1558,14 +1615,14 @@ static int struct_has_nested(int k, int counts_raw, int fields_flat, int field_s
   return 0;
 }
 
-static int struct_widths_pack(int counts, int fields_flat, int field_starts) {
+static int struct_widths_pack(int counts, int fields_flat, int field_starts, int enum_widths) {
   int _sv0t0 = sv0_vec_len(counts);
   int n = _sv0t0;
   int _sv0t1 = sv0_vec_new();
   int ws = _sv0t1;
   int k = 0;
   while ((k < n)) {
-    int _sv0t2 = struct_width_rec(k, counts, fields_flat, field_starts, 0);
+    int _sv0t2 = struct_width_rec(k, counts, fields_flat, field_starts, enum_widths, 0);
     sv0_vec_push(ws, _sv0t2);
     k = (k + 1);
   }
@@ -1586,7 +1643,7 @@ static int struct_widths_pack(int counts, int fields_flat, int field_starts) {
   return n;
 }
 
-static int record_field_layout(int cty, int structs_names, int structs_field_counts, int struct_fields_flat, int struct_field_starts, const char* source, int starts, int ends, int env_fields_flat) {
+static int record_field_layout(int cty, int structs_names, int structs_field_counts, int struct_fields_flat, int struct_field_starts, int enums_widths, const char* source, int starts, int ends, int env_fields_flat) {
   int _sv0t0 = sv0_vec_len(structs_names);
   int ns = _sv0t0;
   int k = 0;
@@ -1607,7 +1664,7 @@ static int record_field_layout(int cty, int structs_names, int structs_field_cou
         sv0_vec_push(env_fields_flat, _sv0t6);
         int _sv0t7 = sv0_vec_len(env_fields_flat);
         int nstart = _sv0t7;
-        int _sv0t8 = struct_run_write(k, structs_field_counts, struct_fields_flat, struct_field_starts, env_fields_flat, 0);
+        int _sv0t8 = struct_run_write(k, structs_field_counts, struct_fields_flat, struct_field_starts, enums_widths, env_fields_flat, 0);
         int _w = _sv0t8;
         return nstart;
       } else {
@@ -5410,7 +5467,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
       sv0_vec_push(env_widths, w);
       int _sv0t38 = cty_cat_of_handle(cty, source, starts, ends);
       sv0_vec_push(env_cats, _sv0t38);
-      int _sv0t39 = record_field_layout(cty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+      int _sv0t39 = record_field_layout(cty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, enums_widths, source, starts, ends, env_fields_flat);
       sv0_vec_push(env_field_starts, _sv0t39);
       int _sv0t40 = (next_slot + w);
       return _sv0t40;
@@ -5509,7 +5566,7 @@ static int scan_instr_env(Instr ins, int env_names, int env_bases, int env_width
           } else {
           }
           sv0_vec_push(env_cats, rcat);
-          int _sv0t24 = record_field_layout(rty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+          int _sv0t24 = record_field_layout(rty, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, enums_widths, source, starts, ends, env_fields_flat);
           sv0_vec_push(env_field_starts, _sv0t24);
           int _sv0t25 = (next_slot + w);
           return _sv0t25;
@@ -5700,7 +5757,7 @@ static int local_count_and_env(int param_names, int param_ctys, int instrs, int 
     sv0_vec_push(env_widths, w);
     int _sv0t4 = cty_cat_of_handle(pc, source, starts, ends);
     sv0_vec_push(env_cats, _sv0t4);
-    int _sv0t5 = record_field_layout(pc, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, source, starts, ends, env_fields_flat);
+    int _sv0t5 = record_field_layout(pc, structs_names, structs_field_counts, structs_fields_flat, structs_field_starts, enums_widths, source, starts, ends, env_fields_flat);
     sv0_vec_push(env_field_starts, _sv0t5);
     ns = (ns + w);
     pi = (pi + 1);
@@ -5803,13 +5860,13 @@ static int emit_program(int item_tags, int item_names, int item_field_counts, in
   int _sv0t4 = sv0_vec_new();
   int sfs = _sv0t4;
   int _sv0t5 = struct_fields_build(item_tags, item_field_counts, item_field_bases, struct_field_name_toks, struct_field_cats, sff, sfs);
-  int _sv0t6 = struct_widths_pack(sfc, sff, sfs);
-  int _pk = _sv0t6;
+  int _sv0t6 = sv0_vec_new();
+  int enn = _sv0t6;
   int _sv0t7 = sv0_vec_new();
-  int enn = _sv0t7;
-  int _sv0t8 = sv0_vec_new();
-  int enw = _sv0t8;
-  int _sv0t9 = enum_layouts_build(item_tags, item_names, item_field_counts, item_variant_max_payload, enn, enw);
+  int enw = _sv0t7;
+  int _sv0t8 = enum_layouts_build(item_tags, item_names, item_field_counts, item_variant_max_payload, enn, enw);
+  int _sv0t9 = struct_widths_pack(sfc, sff, sfs, enw);
+  int _pk = _sv0t9;
   int _sv0t10 = sv0_vec_new();
   int func_order = _sv0t10;
   int _sv0t11 = build_func_order(block_labels, source, starts, ends, func_order);
@@ -12317,12 +12374,12 @@ static int test_nested_struct_layout(void) {
   int fstarts = _sv0t3;
   int _sv0t4 = nested_struct_tables(sn, sfc, flat, fstarts);
   int _t = _sv0t4;
-  int _sv0t5 = struct_widths_pack(sfc, flat, fstarts);
-  int _p = _sv0t5;
+  int _sv0t5 = sv0_vec_new();
+  int en = _sv0t5;
   int _sv0t6 = sv0_vec_new();
-  int en = _sv0t6;
-  int _sv0t7 = sv0_vec_new();
-  int ew = _sv0t7;
+  int ew = _sv0t6;
+  int _sv0t7 = struct_widths_pack(sfc, flat, fstarts, ew);
+  int _p = _sv0t7;
   int _sv0t8 = sv0_vec_new();
   int _sv0t9 = sv0_vec_new();
   int _sv0t10 = width_of_cty(10, sn, sfc, en, ew, "", _sv0t8, _sv0t9);
@@ -12347,7 +12404,7 @@ static int test_nested_struct_layout(void) {
   int env_flat = _sv0t16;
   int _sv0t17 = sv0_vec_new();
   int _sv0t18 = sv0_vec_new();
-  int _sv0t19 = record_field_layout(10, sn, sfc, flat, fstarts, "", _sv0t17, _sv0t18, env_flat);
+  int _sv0t19 = record_field_layout(10, sn, sfc, flat, fstarts, ew, "", _sv0t17, _sv0t18, env_flat);
   int fs_s = _sv0t19;
   if ((fs_s != 0)) {
     return 4;
@@ -12360,7 +12417,7 @@ static int test_nested_struct_layout(void) {
   }
   int _sv0t21 = sv0_vec_new();
   int _sv0t22 = sv0_vec_new();
-  int _sv0t23 = record_field_layout(20, sn, sfc, flat, fstarts, "", _sv0t21, _sv0t22, env_flat);
+  int _sv0t23 = record_field_layout(20, sn, sfc, flat, fstarts, ew, "", _sv0t21, _sv0t22, env_flat);
   int fs_t = _sv0t23;
   if ((fs_t != 6)) {
     return 6;
@@ -12538,6 +12595,131 @@ static int test_nested_struct_layout(void) {
   int _sv0t74 = locate_member(tz, names, bases, widths, fstarts_env, env_flat, "", _sv0t72, _sv0t73, lo);
   if ((_sv0t74 >= 0)) {
     return 24;
+  } else {
+  }
+  return 0;
+}
+
+static int test_enum_field_layout(void) {
+  int _sv0t0 = sv0_vec_new();
+  int sn = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int sfc = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int flat = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int fstarts = _sv0t3;
+  sv0_vec_push(sn, 10);
+  sv0_vec_push(sfc, 2);
+  sv0_vec_push(flat, 301);
+  int _sv0t4 = (2049 << 4);
+  sv0_vec_push(flat, _sv0t4);
+  sv0_vec_push(flat, 302);
+  sv0_vec_push(flat, 0);
+  sv0_vec_push(fstarts, 0);
+  int _sv0t5 = sv0_vec_new();
+  int en = _sv0t5;
+  int _sv0t6 = sv0_vec_new();
+  int ew = _sv0t6;
+  sv0_vec_push(en, 90);
+  sv0_vec_push(ew, 3);
+  int _sv0t7 = struct_widths_pack(sfc, flat, fstarts, ew);
+  int _p = _sv0t7;
+  int _sv0t8 = sv0_vec_new();
+  int _sv0t9 = sv0_vec_new();
+  int _sv0t10 = width_of_cty(10, sn, sfc, en, ew, "", _sv0t8, _sv0t9);
+  if ((_sv0t10 != 4)) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int env_flat = _sv0t11;
+  int _sv0t12 = sv0_vec_new();
+  int _sv0t13 = sv0_vec_new();
+  int _sv0t14 = record_field_layout(10, sn, sfc, flat, fstarts, ew, "", _sv0t12, _sv0t13, env_flat);
+  int fs = _sv0t14;
+  int _sv0t15 = (fs - 1);
+  int _sv0t16 = sv0_vec_get(env_flat, _sv0t15);
+  int _sv0t17 = run_hdr_magic();
+  if ((_sv0t16 != _sv0t17)) {
+    return 2;
+  } else {
+  }
+  int _sv0t18 = (fs + 1);
+  int _sv0t19 = sv0_vec_get(env_flat, _sv0t18);
+  int _sv0t20 = (3 << 5);
+  if ((_sv0t19 != _sv0t20)) {
+    return 3;
+  } else {
+  }
+  int _sv0t21 = sv0_vec_new();
+  int names = _sv0t21;
+  int _sv0t22 = sv0_vec_new();
+  int bases = _sv0t22;
+  int _sv0t23 = sv0_vec_new();
+  int widths = _sv0t23;
+  int _sv0t24 = sv0_vec_new();
+  int fse = _sv0t24;
+  sv0_vec_push(names, 500);
+  sv0_vec_push(bases, 0);
+  sv0_vec_push(widths, 4);
+  sv0_vec_push(fse, fs);
+  int _sv0t25 = locate_out_new();
+  int lo = _sv0t25;
+  Value m_e;
+  Value _sv0t26;
+  _sv0t26.tag = 3;
+  _sv0t26.p0 = 500;
+  int _sv0t27 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t27, 0, _sv0t26.tag);
+  sv0_box_store(_sv0t27, 1, _sv0t26.p0);
+  sv0_box_store(_sv0t27, 2, _sv0t26.p1);
+  m_e.tag = 6;
+  m_e.p0 = _sv0t27;
+  m_e.p1 = 301;
+  int _sv0t28 = sv0_vec_new();
+  int _sv0t29 = sv0_vec_new();
+  int _sv0t30 = locate_member(m_e, names, bases, widths, fse, env_flat, "", _sv0t28, _sv0t29, lo);
+  if ((_sv0t30 < 0)) {
+    return 4;
+  } else {
+  }
+  int _sv0t31 = sv0_vec_get(lo, 1);
+  if ((_sv0t31 != 0)) {
+    return 5;
+  } else {
+  }
+  int _sv0t32 = sv0_vec_get(lo, 4);
+  if ((_sv0t32 != 3)) {
+    return 6;
+  } else {
+  }
+  int _sv0t33 = sv0_vec_get(lo, 6);
+  if ((_sv0t33 != 0)) {
+    return 7;
+  } else {
+  }
+  Value m_n;
+  Value _sv0t34;
+  _sv0t34.tag = 3;
+  _sv0t34.p0 = 500;
+  int _sv0t35 = sv0_box_alloc(3);
+  sv0_box_store(_sv0t35, 0, _sv0t34.tag);
+  sv0_box_store(_sv0t35, 1, _sv0t34.p0);
+  sv0_box_store(_sv0t35, 2, _sv0t34.p1);
+  m_n.tag = 6;
+  m_n.p0 = _sv0t35;
+  m_n.p1 = 302;
+  int _sv0t36 = sv0_vec_new();
+  int _sv0t37 = sv0_vec_new();
+  int _sv0t38 = locate_member(m_n, names, bases, widths, fse, env_flat, "", _sv0t36, _sv0t37, lo);
+  if ((_sv0t38 < 0)) {
+    return 8;
+  } else {
+  }
+  int _sv0t39 = sv0_vec_get(lo, 1);
+  if ((_sv0t39 != 3)) {
+    return 9;
   } else {
   }
   return 0;
@@ -12856,6 +13038,13 @@ int main(void) {
   if ((r45 != 0)) {
     int _sv0t88 = (800 + r45);
     return _sv0t88;
+  } else {
+  }
+  int _sv0t89 = test_enum_field_layout();
+  int r46 = _sv0t89;
+  if ((r46 != 0)) {
+    int _sv0t90 = (900 + r46);
+    return _sv0t90;
   } else {
   }
   return 0;

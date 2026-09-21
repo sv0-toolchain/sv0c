@@ -36,6 +36,7 @@ sv0c/test/behavior/cases/call_index.sv0
 sv0c/test/behavior/cases/struct_let_copy.sv0
 sv0c/test/behavior/cases/nested_struct.sv0
 sv0c/test/behavior/cases/struct_decl_order.sv0
+sv0c/test/behavior/cases/match_member.sv0
 sv0c/test/behavior/cases/let_infer_wide.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct_nested.sv0

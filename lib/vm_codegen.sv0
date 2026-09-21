@@ -736,13 +736,24 @@ fn struct_layouts_build(item_tags: Vec<i32>, item_names: Vec<i32>,
 fn run_hdr_magic() -> i32 { return 0 - 7777; }
 
 fn field_raw_sty(raw: i32) -> i32 {
-    return ((raw >> 4) & 4095) - 1;
+    let code: i32 = (raw >> 4) & 4095;
+    if code >= 1 {
+        if code < 2048 { return code - 1; }
+    }
+    return 0 - 1;
+}
+
+/* Index of the enum a field is typed as (code 2048 + index + 1), or -1. */
+fn field_raw_enum(raw: i32) -> i32 {
+    let code: i32 = (raw >> 4) & 4095;
+    if code > 2048 { return code - 2049; }
+    return 0 - 1;
 }
 
 /* Width in words of struct `k` (leaf words; a nested struct field contributes
    its own width). depth bounds a (malformed) self-containing struct. */
 fn struct_width_rec(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
-                    field_starts: Vec<i32>, depth: i32) -> i32 {
+                    field_starts: Vec<i32>, enum_widths: Vec<i32>, depth: i32) -> i32 {
     if k < 0 { return 1; }
     if k >= vec_len(field_starts) { return 1; }
     let cnt: i32 = struct_packed_count(vec_get(counts_raw, k));
@@ -751,11 +762,21 @@ fn struct_width_rec(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
     let mut w: i32 = 0;
     let mut j: i32 = 0;
     while j < cnt {
-        let sty: i32 = field_raw_sty(vec_get(fields_flat, base + 2 * j + 1));
+        let rawj: i32 = vec_get(fields_flat, base + 2 * j + 1);
+        let sty: i32 = field_raw_sty(rawj);
+        let eix: i32 = field_raw_enum(rawj);
         if sty >= 0 {
-            w = w + struct_width_rec(sty, counts_raw, fields_flat, field_starts, depth + 1);
+            w = w + struct_width_rec(sty, counts_raw, fields_flat, field_starts, enum_widths, depth + 1);
         } else {
-            w = w + 1;
+            if eix >= 0 {
+                if eix < vec_len(enum_widths) {
+                    w = w + vec_get(enum_widths, eix);
+                } else {
+                    w = w + 1;
+                }
+            } else {
+                w = w + 1;
+            }
         }
         j = j + 1;
     }
@@ -785,7 +806,8 @@ fn struct_run_pairs(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
 
 /* Append the fields' pairs of struct `k` (no header) to `out`. */
 fn struct_run_write(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
-                    field_starts: Vec<i32>, out: Vec<i32>, depth: i32) -> i32 {
+                    field_starts: Vec<i32>, enum_widths: Vec<i32>,
+                    out: Vec<i32>, depth: i32) -> i32 {
     if k < 0 { return 0; }
     if k >= vec_len(field_starts) { return 0; }
     let cnt: i32 = struct_packed_count(vec_get(counts_raw, k));
@@ -795,21 +817,29 @@ fn struct_run_write(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
         let name: i32 = vec_get(fields_flat, base + 2 * j);
         let raw: i32 = vec_get(fields_flat, base + 2 * j + 1);
         let sty: i32 = field_raw_sty(raw);
+        let eix: i32 = field_raw_enum(raw);
         if sty >= 0 {
             if depth <= 12 {
-                let w: i32 = struct_width_rec(sty, counts_raw, fields_flat, field_starts, depth + 1);
+                let w: i32 = struct_width_rec(sty, counts_raw, fields_flat, field_starts, enum_widths, depth + 1);
                 vec_push(out, name);
                 vec_push(out, (raw & 15) | 16 | (w << 5));
                 vec_push(out, struct_run_pairs(sty, counts_raw, fields_flat, field_starts, depth + 1));
                 vec_push(out, run_hdr_magic());
-                let _r: i32 = struct_run_write(sty, counts_raw, fields_flat, field_starts, out, depth + 1);
+                let _r: i32 = struct_run_write(sty, counts_raw, fields_flat, field_starts, enum_widths, out, depth + 1);
             } else {
                 vec_push(out, name);
                 vec_push(out, raw & 15);
             }
         } else {
             vec_push(out, name);
-            vec_push(out, raw & 15);
+            if eix >= 0 {
+                /* an enum-typed field occupies the enum's width, with no sub-run */
+                let mut ew: i32 = 1;
+                if eix < vec_len(enum_widths) { ew = vec_get(enum_widths, eix); }
+                vec_push(out, (raw & 15) | (ew << 5));
+            } else {
+                vec_push(out, raw & 15);
+            }
         }
         j = j + 1;
     }
@@ -825,7 +855,9 @@ fn struct_has_nested(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
     let base: i32 = vec_get(field_starts, k);
     let mut j: i32 = 0;
     while j < cnt {
-        if field_raw_sty(vec_get(fields_flat, base + 2 * j + 1)) >= 0 { return true; }
+        let rawn: i32 = vec_get(fields_flat, base + 2 * j + 1);
+        if field_raw_sty(rawn) >= 0 { return true; }
+        if field_raw_enum(rawn) >= 0 { return true; }
         j = j + 1;
     }
     return false;
@@ -834,12 +866,13 @@ fn struct_has_nested(k: i32, counts_raw: Vec<i32>, fields_flat: Vec<i32>,
 /* Pack each struct's width into its `counts` entry (see struct_packed_width)
    once the whole struct table is built. Structs without a struct-typed field
    are left as a plain count. */
-fn struct_widths_pack(counts: Vec<i32>, fields_flat: Vec<i32>, field_starts: Vec<i32>) -> i32 {
+fn struct_widths_pack(counts: Vec<i32>, fields_flat: Vec<i32>, field_starts: Vec<i32>,
+                      enum_widths: Vec<i32>) -> i32 {
     let n: i32 = vec_len(counts);
     let ws: Vec<i32> = vec_new();
     let mut k: i32 = 0;
     while k < n {
-        vec_push(ws, struct_width_rec(k, counts, fields_flat, field_starts, 0));
+        vec_push(ws, struct_width_rec(k, counts, fields_flat, field_starts, enum_widths, 0));
         k = k + 1;
     }
     k = 0;
@@ -856,6 +889,7 @@ fn struct_widths_pack(counts: Vec<i32>, fields_flat: Vec<i32>, field_starts: Vec
 fn record_field_layout(cty: i32,
                        structs_names: Vec<i32>, structs_field_counts: Vec<i32>,
                        struct_fields_flat: Vec<i32>, struct_field_starts: Vec<i32>,
+                       enums_widths: Vec<i32>,
                        source: string, starts: Vec<i32>, ends: Vec<i32>,
                        env_fields_flat: Vec<i32>) -> i32 {
     let ns: i32 = vec_len(structs_names);
@@ -871,7 +905,7 @@ fn record_field_layout(cty: i32,
                 vec_push(env_fields_flat, run_hdr_magic());
                 let nstart: i32 = vec_len(env_fields_flat);
                 let _w: i32 = struct_run_write(k, structs_field_counts, struct_fields_flat,
-                                               struct_field_starts, env_fields_flat, 0);
+                                               struct_field_starts, enums_widths, env_fields_flat, 0);
                 return nstart;
             }
             let fstart: i32 = vec_len(env_fields_flat);
@@ -3080,6 +3114,7 @@ fn scan_instr_env(ins: Instr,
             vec_push(env_field_starts,
                      record_field_layout(cty, structs_names, structs_field_counts,
                                          structs_fields_flat, structs_field_starts,
+                                         enums_widths,
                                          source, starts, ends, env_fields_flat));
             return next_slot + w;
         },
@@ -3140,6 +3175,7 @@ fn scan_instr_env(ins: Instr,
             vec_push(env_field_starts,
                      record_field_layout(rty, structs_names, structs_field_counts,
                                          structs_fields_flat, structs_field_starts,
+                                         enums_widths,
                                          source, starts, ends, env_fields_flat));
             return next_slot + w;
         },
@@ -3291,6 +3327,7 @@ fn local_count_and_env(param_names: Vec<i32>, param_ctys: Vec<i32>,
         vec_push(env_field_starts,
                  record_field_layout(pc, structs_names, structs_field_counts,
                                      structs_fields_flat, structs_field_starts,
+                                     enums_widths,
                                      source, starts, ends, env_fields_flat));
         ns = ns + w;
         pi = pi + 1;
@@ -3441,12 +3478,13 @@ fn emit_program(item_tags: Vec<i32>, item_names: Vec<i32>,
     let sfs: Vec<i32> = vec_new();
     struct_fields_build(item_tags, item_field_counts, item_field_bases,
                         struct_field_name_toks, struct_field_cats, sff, sfs);
-    /* nested struct fields: a struct's width is its leaf words, not its field count */
-    let _pk: i32 = struct_widths_pack(sfc, sff, sfs);
     let enn: Vec<i32> = vec_new();
     let enw: Vec<i32> = vec_new();
     enum_layouts_build(item_tags, item_names, item_field_counts,
                        item_variant_max_payload, enn, enw);
+    /* nested struct / enum fields: a struct's width is its leaf words (a struct
+       field its own width, an enum field the enum's), not its field count */
+    let _pk: i32 = struct_widths_pack(sfc, sff, sfs, enw);
     let func_order: Vec<i32> = vec_new();
     let fc: i32 = build_func_order(block_labels, source,
                                     starts, ends, func_order);
@@ -5380,19 +5418,19 @@ fn test_nested_struct_layout() -> i32 {
     let flat: Vec<i32> = vec_new();
     let fstarts: Vec<i32> = vec_new();
     let _t: i32 = nested_struct_tables(sn, sfc, flat, fstarts);
-    let _p: i32 = struct_widths_pack(sfc, flat, fstarts);
     let en: Vec<i32> = vec_new();
     let ew: Vec<i32> = vec_new();
+    let _p: i32 = struct_widths_pack(sfc, flat, fstarts, ew);
     if width_of_cty(10, sn, sfc, en, ew, "", vec_new(), vec_new()) != 2 { return 1; }
     if width_of_cty(20, sn, sfc, en, ew, "", vec_new(), vec_new()) != 3 { return 2; }
     if struct_packed_count(vec_get(sfc, 1)) != 2 { return 3; }
     /* S has no struct field: its run stays the plain headerless one */
     let env_flat: Vec<i32> = vec_new();
-    let fs_s: i32 = record_field_layout(10, sn, sfc, flat, fstarts, "", vec_new(), vec_new(), env_flat);
+    let fs_s: i32 = record_field_layout(10, sn, sfc, flat, fstarts, ew, "", vec_new(), vec_new(), env_flat);
     if fs_s != 0 { return 4; }
     if vec_len(env_flat) != 4 { return 5; }
     /* T's run: header (5 pairs, magic), s (with sub-run header) + a + b, k */
-    let fs_t: i32 = record_field_layout(20, sn, sfc, flat, fstarts, "", vec_new(), vec_new(), env_flat);
+    let fs_t: i32 = record_field_layout(20, sn, sfc, flat, fstarts, ew, "", vec_new(), vec_new(), env_flat);
     if fs_t != 6 { return 6; }
     if vec_get(env_flat, fs_t - 2) != 5 { return 7; }
     if vec_get(env_flat, fs_t - 1) != run_hdr_magic() { return 8; }
@@ -5426,6 +5464,47 @@ fn test_nested_struct_layout() -> i32 {
     /* an unknown field does not resolve */
     let tz: Value = Value::VMember(box_new(Value::VVar(500)), 999);
     if locate_member(tz, names, bases, widths, fstarts_env, env_flat, "", vec_new(), vec_new(), lo) >= 0 { return 24; }
+    return 0;
+}
+
+
+/* An enum-typed struct field takes the enum's width: E { e: Shape, n: i32 } with
+   Shape 3 words wide is 4 words, `n` sits at offset 3, and the field's run entry
+   carries the enum width (no sub-run). */
+fn test_enum_field_layout() -> i32 {
+    let sn: Vec<i32> = vec_new();
+    let sfc: Vec<i32> = vec_new();
+    let flat: Vec<i32> = vec_new();
+    let fstarts: Vec<i32> = vec_new();
+    vec_push(sn, 10);
+    vec_push(sfc, 2);
+    /* E: (e=301, enum #0 -> (2048 + 0 + 1) << 4) (n=302, int) */
+    vec_push(flat, 301); vec_push(flat, (2049 << 4));
+    vec_push(flat, 302); vec_push(flat, 0);
+    vec_push(fstarts, 0);
+    let en: Vec<i32> = vec_new();
+    let ew: Vec<i32> = vec_new();
+    vec_push(en, 90); vec_push(ew, 3);
+    let _p: i32 = struct_widths_pack(sfc, flat, fstarts, ew);
+    if width_of_cty(10, sn, sfc, en, ew, "", vec_new(), vec_new()) != 4 { return 1; }
+    let env_flat: Vec<i32> = vec_new();
+    let fs: i32 = record_field_layout(10, sn, sfc, flat, fstarts, ew, "", vec_new(), vec_new(), env_flat);
+    if vec_get(env_flat, fs - 1) != run_hdr_magic() { return 2; }
+    if vec_get(env_flat, fs + 1) != (3 << 5) { return 3; }
+    let names: Vec<i32> = vec_new();
+    let bases: Vec<i32> = vec_new();
+    let widths: Vec<i32> = vec_new();
+    let fse: Vec<i32> = vec_new();
+    vec_push(names, 500); vec_push(bases, 0); vec_push(widths, 4); vec_push(fse, fs);
+    let lo: Vec<i32> = locate_out_new();
+    let m_e: Value = Value::VMember(box_new(Value::VVar(500)), 301);
+    if locate_member(m_e, names, bases, widths, fse, env_flat, "", vec_new(), vec_new(), lo) < 0 { return 4; }
+    if vec_get(lo, 1) != 0 { return 5; }
+    if vec_get(lo, 4) != 3 { return 6; }
+    if vec_get(lo, 6) != 0 { return 7; }
+    let m_n: Value = Value::VMember(box_new(Value::VVar(500)), 302);
+    if locate_member(m_n, names, bases, widths, fse, env_flat, "", vec_new(), vec_new(), lo) < 0 { return 8; }
+    if vec_get(lo, 1) != 3 { return 9; }
     return 0;
 }
 
@@ -5521,5 +5600,7 @@ fn main() -> i32 {
     if r44 != 0 { return 780 + r44; }
     let r45: i32 = test_nested_struct_layout();
     if r45 != 0 { return 800 + r45; }
+    let r46: i32 = test_enum_field_layout();
+    if r46 != 0 { return 900 + r46; }
     return 0;
 }

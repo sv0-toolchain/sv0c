@@ -3739,9 +3739,13 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         match_env_inherit);
     let scrut_names_mt: Vec<i32> = vec_new();
     let scrut_ctys_mt: Vec<i32> = vec_new();
-    let sct: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, scrut_idx, pp,
+    let mut sct: i32 = match_scrut_cty(et, ed1, ed2, ed3, ed4, scrut_idx, pp,
         match_env, import_aliases,
         scrut_names_mt, scrut_ctys_mt, 0);
+    /* An untyped scrutinee (a struct member, ...): the arm patterns name it. */
+    if sct < 0 {
+        sct = lower_match_pat_type_tok(et, ed1, ed2, ed4, pp, arms_first, arm_count, arms_sidecar);
+    }
     let scrut_var: i32 = bind_scrut_var(et, ed1, ed2, ed3, ed4, pp,
                                          tok_tags, scrut_idx, ctr,
                                          out_instrs, enum_names,
@@ -3813,6 +3817,49 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             source, starts, ends,
                                             import_aliases);
     return Value::VVar(out);
+}
+
+/* The type named by the arm patterns of a match: the enum of the first
+   `Enum::Variant` / `Enum::Variant { .. }` pattern, or the struct of the first
+   `Struct { .. }` pattern. Returns that name's token, or -1. It types a
+   scrutinee whose own type is not otherwise known (a struct MEMBER,
+   `match h.shape { .. }`), where match_scrut_cty has nothing to go on. */
+fn lower_match_pat_type_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed4: Vec<i32>,
+                            pp: Vec<i32>, arms_first: i32, arm_count: i32,
+                            arms_sidecar: i32) -> i32 {
+    let mut ai: i32 = 0;
+    while ai < arm_count {
+        let arm_idx: i32 = block_stmt_index(pp, arms_first, arms_sidecar, ai);
+        if arm_idx >= 0 {
+            if vec_get(et, arm_idx) == 29 {
+                let pt: i32 = vec_get(ed1, arm_idx);
+                if pt == 4 {
+                    let pa: i32 = vec_get(ed2, arm_idx);
+                    if vec_get(et, pa) == 30 {
+                        let k: i32 = vec_get(ed4, pa);
+                        let segs: i32 = vec_get(ed2, pa);
+                        let ps: i32 = vec_get(ed1, pa);
+                        if k == 4 {
+                            if segs >= 1 { return vec_get(pp, ps); }
+                        }
+                    }
+                }
+                if pt == 5 {
+                    let pa5: i32 = vec_get(ed2, arm_idx);
+                    if vec_get(et, pa5) == 30 {
+                        let k5: i32 = vec_get(ed4, pa5);
+                        let segs5: i32 = vec_get(ed2, pa5);
+                        let ps5: i32 = vec_get(ed1, pa5);
+                        if k5 == 5 {
+                            if segs5 >= 2 { return vec_get(pp, ps5); }
+                        }
+                    }
+                }
+            }
+        }
+        ai = ai + 1;
+    }
+    return 0 - 1;
 }
 
 /* ── lower_return (SML lowerReturn) ─────────────────────────
