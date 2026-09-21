@@ -1,0 +1,14 @@
+// A call result can be indexed directly (`f()[i]`); its element type is the
+// callee's declared return type, including an f64 array or Vec<f64>. Expected
+// exit: 42.
+
+fn mk() -> [f64; 2] { let r: [f64; 2] = [1.5, 2.5]; return r; }
+fn mv() -> Vec<f64> { let v: Vec<f64> = vec_new(); vec_push(v, 4.5); return v; }
+fn mi() -> [i32; 2] { let r: [i32; 2] = [7, 9]; return r; }
+fn main() -> i32 {
+    if mk()[1] != 2.5 { return 1; }
+    if mv()[0] != 4.5 { return 2; }
+    let x: f64 = mk()[0] + mv()[0];
+    if x != 6.0 { return 3; }
+    return mi()[0] + mi()[1] + 26;
+}

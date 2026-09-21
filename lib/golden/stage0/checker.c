@@ -5021,6 +5021,27 @@ static int chk_vecf_fn_end(int tok_tags, int i) {
       p = c2;
     } else {
     }
+    if ((t == 10)) {
+      int bd = 0;
+      while ((p < n)) {
+        int _sv0t9 = sv0_vec_get(tok_tags, p);
+        int bu = _sv0t9;
+        if ((bu == 10)) {
+          bd = (bd + 1);
+        } else {
+        }
+        if ((bu == 11)) {
+          bd = (bd - 1);
+          if ((bd == 0)) {
+            break;
+          } else {
+          }
+        } else {
+        }
+        p = (p + 1);
+      }
+    } else {
+    }
     p = (p + 1);
   }
   return n;
@@ -5864,19 +5885,63 @@ static int chk_vecf_site_map(int tok_tags, const char* source, int starts, int e
         int s = i;
         while ((s < hi)) {
           int _sv0t43 = sv0_vec_get(tok_tags, s);
-          if ((_sv0t43 == 5)) {
-            int _sv0t44 = (s + 1);
+          if ((_sv0t43 == 10)) {
+            int _sv0t44 = (s - 1);
             int _sv0t45 = chk_vecf_tag_at(tok_tags, _sv0t44);
-            if ((_sv0t45 == 10)) {
-              int icode = 0;
-              int _sv0t46 = (s - 1);
-              int _sv0t47 = chk_vecf_tag_at(tok_tags, _sv0t46);
-              if ((_sv0t47 == 16)) {
-                int _sv0t48 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, s);
-                icode = _sv0t48;
+            if ((_sv0t45 == 7)) {
+              int bq = (s - 1);
+              int bd = 0;
+              int bopen = (0 - 1);
+              while ((bq >= i)) {
+                int _sv0t46 = sv0_vec_get(tok_tags, bq);
+                int bu = _sv0t46;
+                if ((bu == 7)) {
+                  bd = (bd + 1);
+                } else {
+                }
+                if ((bu == 6)) {
+                  bd = (bd - 1);
+                  if ((bd == 0)) {
+                    bopen = bq;
+                    break;
+                  } else {
+                  }
+                } else {
+                }
+                bq = (bq - 1);
+              }
+              if ((bopen >= 1)) {
+                int _sv0t47 = (bopen - 1);
+                int _sv0t48 = chk_vecf_tag_at(tok_tags, _sv0t47);
+                if ((_sv0t48 == 5)) {
+                  int _sv0t49 = (bopen - 1);
+                  int _sv0t50 = chk_vecf_lookup(rnames, rkinds, source, starts, ends, _sv0t49);
+                  if ((_sv0t50 == 1)) {
+                    sv0_vec_set(map, s, 5);
+                  } else {
+                  }
+                } else {
+                }
               } else {
-                int _sv0t49 = chk_vecf_lookup(names, kinds, source, starts, ends, s);
-                icode = _sv0t49;
+              }
+            } else {
+            }
+          } else {
+          }
+          int _sv0t51 = sv0_vec_get(tok_tags, s);
+          if ((_sv0t51 == 5)) {
+            int _sv0t52 = (s + 1);
+            int _sv0t53 = chk_vecf_tag_at(tok_tags, _sv0t52);
+            if ((_sv0t53 == 10)) {
+              int icode = 0;
+              int _sv0t54 = (s - 1);
+              int _sv0t55 = chk_vecf_tag_at(tok_tags, _sv0t54);
+              if ((_sv0t55 == 16)) {
+                int _sv0t56 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, s);
+                icode = _sv0t56;
+              } else {
+                int _sv0t57 = chk_vecf_lookup(names, kinds, source, starts, ends, s);
+                icode = _sv0t57;
               }
               if ((icode == 1)) {
                 sv0_vec_set(map, s, 1);
@@ -5888,59 +5953,59 @@ static int chk_vecf_site_map(int tok_tags, const char* source, int starts, int e
               }
             } else {
             }
-            int _sv0t50 = (s + 1);
-            int _sv0t51 = chk_vecf_tag_at(tok_tags, _sv0t50);
-            if ((_sv0t51 == 6)) {
-              int _sv0t52 = chk_vecf_accessor_kind(source, starts, ends, s);
-              int ak = _sv0t52;
+            int _sv0t58 = (s + 1);
+            int _sv0t59 = chk_vecf_tag_at(tok_tags, _sv0t58);
+            if ((_sv0t59 == 6)) {
+              int _sv0t60 = chk_vecf_accessor_kind(source, starts, ends, s);
+              int ak = _sv0t60;
               if ((ak != 0)) {
                 int a0 = (s + 2);
                 int code = 0;
-                int _sv0t53 = chk_vecf_tag_at(tok_tags, a0);
-                if ((_sv0t53 == 5)) {
-                  int _sv0t54 = (a0 + 1);
-                  int _sv0t55 = chk_vecf_tag_at(tok_tags, _sv0t54);
-                  int nx = _sv0t55;
+                int _sv0t61 = chk_vecf_tag_at(tok_tags, a0);
+                if ((_sv0t61 == 5)) {
+                  int _sv0t62 = (a0 + 1);
+                  int _sv0t63 = chk_vecf_tag_at(tok_tags, _sv0t62);
+                  int nx = _sv0t63;
                   if ((nx == 12)) {
-                    int _sv0t56 = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
-                    code = _sv0t56;
+                    int _sv0t64 = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
+                    code = _sv0t64;
                   } else {
                   }
                   if ((nx == 7)) {
-                    int _sv0t57 = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
-                    code = _sv0t57;
+                    int _sv0t65 = chk_vecf_lookup(names, kinds, source, starts, ends, a0);
+                    code = _sv0t65;
                   } else {
                   }
                   if ((nx == 16)) {
                     int fq = a0;
                     while (1) {
-                      int _sv0t58 = (fq + 1);
-                      int _sv0t59 = chk_vecf_tag_at(tok_tags, _sv0t58);
-                      int _sv0t62 = (_sv0t59 == 16);
-                      if ((!_sv0t62)) {
+                      int _sv0t66 = (fq + 1);
+                      int _sv0t67 = chk_vecf_tag_at(tok_tags, _sv0t66);
+                      int _sv0t70 = (_sv0t67 == 16);
+                      if ((!_sv0t70)) {
                         break;
                       } else {
                       }
-                      int _sv0t60 = (fq + 2);
-                      int _sv0t61 = chk_vecf_tag_at(tok_tags, _sv0t60);
-                      if ((_sv0t61 != 5)) {
+                      int _sv0t68 = (fq + 2);
+                      int _sv0t69 = chk_vecf_tag_at(tok_tags, _sv0t68);
+                      if ((_sv0t69 != 5)) {
                         break;
                       } else {
                       }
                       fq = (fq + 2);
                     }
-                    int _sv0t63 = (fq + 1);
-                    int _sv0t64 = chk_vecf_tag_at(tok_tags, _sv0t63);
-                    int nx2 = _sv0t64;
+                    int _sv0t71 = (fq + 1);
+                    int _sv0t72 = chk_vecf_tag_at(tok_tags, _sv0t71);
+                    int nx2 = _sv0t72;
                     if ((fq != a0)) {
                       if ((nx2 == 12)) {
-                        int _sv0t65 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, fq);
-                        code = _sv0t65;
+                        int _sv0t73 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, fq);
+                        code = _sv0t73;
                       } else {
                       }
                       if ((nx2 == 7)) {
-                        int _sv0t66 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, fq);
-                        code = _sv0t66;
+                        int _sv0t74 = chk_vecf_lookup(fnames, fkinds, source, starts, ends, fq);
+                        code = _sv0t74;
                       } else {
                       }
                     } else {
@@ -5948,21 +6013,21 @@ static int chk_vecf_site_map(int tok_tags, const char* source, int starts, int e
                   } else {
                   }
                   if ((nx == 6)) {
-                    int _sv0t67 = (a0 + 1);
-                    int _sv0t68 = chk_vecf_close_paren(tok_tags, _sv0t67);
-                    int cc = _sv0t68;
+                    int _sv0t75 = (a0 + 1);
+                    int _sv0t76 = chk_vecf_close_paren(tok_tags, _sv0t75);
+                    int cc = _sv0t76;
                     if ((cc > 0)) {
-                      int _sv0t69 = (cc + 1);
-                      int _sv0t70 = chk_vecf_tag_at(tok_tags, _sv0t69);
-                      int nx3 = _sv0t70;
+                      int _sv0t77 = (cc + 1);
+                      int _sv0t78 = chk_vecf_tag_at(tok_tags, _sv0t77);
+                      int nx3 = _sv0t78;
                       if ((nx3 == 12)) {
-                        int _sv0t71 = chk_vecf_lookup(rnames, rkinds, source, starts, ends, a0);
-                        code = _sv0t71;
+                        int _sv0t79 = chk_vecf_lookup(rnames, rkinds, source, starts, ends, a0);
+                        code = _sv0t79;
                       } else {
                       }
                       if ((nx3 == 7)) {
-                        int _sv0t72 = chk_vecf_lookup(rnames, rkinds, source, starts, ends, a0);
-                        code = _sv0t72;
+                        int _sv0t80 = chk_vecf_lookup(rnames, rkinds, source, starts, ends, a0);
+                        code = _sv0t80;
                       } else {
                       }
                     } else {
@@ -15751,6 +15816,30 @@ static int test_chk_vecf_site_table(void) {
   int rc4 = _sv0t32;
   if ((rc4 != 0)) {
     return 104;
+  } else {
+  }
+  int _sv0t33 = chk_vecf_test_site("fn mk() -> [f64; 2] { return vec_new(); } fn f() -> f64 { return mk()[0]; }", ")", 3, 2, 5);
+  int rd0 = _sv0t33;
+  if ((rd0 != 0)) {
+    return 120;
+  } else {
+  }
+  int _sv0t34 = chk_vecf_test_site("fn mk() -> Vec<f64> { return vec_new(); } fn f() -> f64 { return mk()[0]; }", ")", 3, 2, 5);
+  int rd1 = _sv0t34;
+  if ((rd1 != 0)) {
+    return 121;
+  } else {
+  }
+  int _sv0t35 = chk_vecf_test_site("fn mk() -> [i32; 2] { return vec_new(); } fn f() -> i32 { return mk()[0]; }", ")", 3, 2, 0);
+  int rd2 = _sv0t35;
+  if ((rd2 != 0)) {
+    return 122;
+  } else {
+  }
+  int _sv0t36 = chk_vecf_test_site("fn m() -> [f64; 2] { let r: [f64; 2] = [1.0, 2.0]; return r; }", "=", 0, 2, 4);
+  int rd3 = _sv0t36;
+  if ((rd3 != 0)) {
+    return 123;
   } else {
   }
   return 0;

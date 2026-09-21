@@ -3097,6 +3097,8 @@ fn find_multi_element_tuple(bet: Vec<i32>, bed2: Vec<i32>) -> i32 {
      an identifier directly followed by `[` (`a[i]`, `s.field[i]`): 1 = the
        array / slice is an f64 one, 2 = ambiguous, 0 = otherwise;
      the `[` of an array literal initializing an f64 array: 4;
+     the `[` indexing a call result whose fn is declared to return an f64 array
+       or Vec<f64> (`f(..)[i]`): 5;
      typed vec_push_f64 / vec_get_f64 / vec_set_f64:
        3 = the vec is declared only as an explicit Vec<T> with T != f64,
        0 = otherwise.
@@ -3312,6 +3314,19 @@ fn chk_vecf_fn_end(tok_tags: Vec<i32>, i: i32) -> i32 {
             let c2: i32 = chk_vecf_close_paren(tok_tags, p);
             if c2 < 0 { return n; }
             p = c2;
+        }
+        /* a `[T; N]` return type contains a `;`: skip the whole bracket group */
+        if t == 10 {
+            let mut bd: i32 = 0;
+            while p < n {
+                let bu: i32 = vec_get(tok_tags, p);
+                if bu == 10 { bd = bd + 1; }
+                if bu == 11 {
+                    bd = bd - 1;
+                    if bd == 0 { break; }
+                }
+                p = p + 1;
+            }
         }
         p = p + 1;
     }
@@ -3765,6 +3780,34 @@ fn chk_vecf_site_map(tok_tags: Vec<i32>, source: string, starts: Vec<i32>,
                                                     pfn_names, pfn_off, pfn_cnt, pkinds, retkind);
                 let mut s: i32 = i;
                 while s < hi {
+                    /* `f(..)[i]`: the `[` after a call whose declared return is an f64
+                       array / Vec<f64> (marked 5). */
+                    if vec_get(tok_tags, s) == 10 {
+                        if chk_vecf_tag_at(tok_tags, s - 1) == 7 {
+                            let mut bq: i32 = s - 1;
+                            let mut bd: i32 = 0;
+                            let mut bopen: i32 = 0 - 1;
+                            while bq >= i {
+                                let bu: i32 = vec_get(tok_tags, bq);
+                                if bu == 7 { bd = bd + 1; }
+                                if bu == 6 {
+                                    bd = bd - 1;
+                                    if bd == 0 {
+                                        bopen = bq;
+                                        break;
+                                    }
+                                }
+                                bq = bq - 1;
+                            }
+                            if bopen >= 1 {
+                                if chk_vecf_tag_at(tok_tags, bopen - 1) == 5 {
+                                    if chk_vecf_lookup(rnames, rkinds, source, starts, ends, bopen - 1) == 1 {
+                                        vec_set(map, s, 5);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if vec_get(tok_tags, s) == 5 {
                         /* `a[i]` / `s.field[i]`: element access on an f64 array/slice. */
                         if chk_vecf_tag_at(tok_tags, s + 1) == 10 {
@@ -9714,6 +9757,14 @@ fn test_chk_vecf_site_table() -> i32 {
     if rc3 != 0 { return 103; }
     let rc4: i32 = chk_vecf_test_site("fn m() -> Vec<i32> { return vec_new(); } fn f() -> f64 { return vec_get_f64(m(), 0); }", "vec_get_f64", 0, 0, 3);
     if rc4 != 0 { return 104; }
+    let rd0: i32 = chk_vecf_test_site("fn mk() -> [f64; 2] { return vec_new(); } fn f() -> f64 { return mk()[0]; }", ")", 3, 2, 5);
+    if rd0 != 0 { return 120; }
+    let rd1: i32 = chk_vecf_test_site("fn mk() -> Vec<f64> { return vec_new(); } fn f() -> f64 { return mk()[0]; }", ")", 3, 2, 5);
+    if rd1 != 0 { return 121; }
+    let rd2: i32 = chk_vecf_test_site("fn mk() -> [i32; 2] { return vec_new(); } fn f() -> i32 { return mk()[0]; }", ")", 3, 2, 0);
+    if rd2 != 0 { return 122; }
+    let rd3: i32 = chk_vecf_test_site("fn m() -> [f64; 2] { let r: [f64; 2] = [1.0, 2.0]; return r; }", "=", 0, 2, 4);
+    if rd3 != 0 { return 123; }
     return 0;
 }
 

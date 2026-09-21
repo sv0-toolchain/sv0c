@@ -1,0 +1,36 @@
+// An annotated `let` of a user struct or enum type takes that type whatever the
+// initializer is: a field read out of another struct (`let y: S = t.s;`), a
+// copy of another local, or an enum copy. Before, only literals and calls of
+// user fns were recognized and everything else declared a C `int`. C backend
+// only: nested struct values are not laid out on the VM. Expected exit: 42.
+
+enum Color {
+    Red,
+    Green,
+}
+
+struct S {
+    a: i32,
+    b: i32,
+}
+
+struct T {
+    s: S,
+    k: i32,
+}
+
+fn main() -> i32 {
+    let x: S = S { a: 10, b: 20 };
+    let t: T = T { s: x, k: 12 };
+    let y: S = t.s;
+    if y.a + y.b != 30 { return 1; }
+    let z: S = y;
+    if z.b != 20 { return 2; }
+    let c: Color = Color::Green;
+    let d: Color = c;
+    match d {
+        Color::Green => { return y.a + y.b + t.k; },
+        Color::Red => { return 3; },
+    }
+    return 4;
+}
