@@ -26,6 +26,11 @@ fn main() -> i32 {
     if y.a + y.b != 30 { return 1; }
     let z: S = y;
     if z.b != 20 { return 2; }
+    // an unannotated copy of a struct local is a value copy too
+    let z2 = z;
+    z2.a = 5;
+    if z.a != 10 { return 9; }
+    if z2.a != 5 { return 8; }
     let c: Color = Color::Green;
     let d: Color = c;
     match d {

@@ -2969,6 +2969,15 @@ fn expr_struct_locate(e: Expr,
                       source: string, starts: Vec<i32>, ends: Vec<i32>,
                       out: Vec<i32>) -> i32 {
     match e {
+        Expr::Load(x) => {
+            /* a copy of a struct local: only a slot that has a field layout */
+            let si: i32 = lookup_slot(env_names, env_bases, env_widths, x,
+                                      source, starts, ends);
+            if si < 0 { return 0 - 1; }
+            if si >= vec_len(env_field_starts) { return 0 - 1; }
+            if vec_get(env_field_starts, si) < 2 { return 0 - 1; }
+            return locate_local(si, env_widths, env_field_starts, env_fields_flat, out);
+        },
         Expr::Literal(bv) => {
             let v: Value = box_deref(bv);
             match v {
@@ -3343,6 +3352,10 @@ fn emit_fn(label: i32,
     let ec: Vec<i32> = vec_new();
     let efs: Vec<i32> = vec_new();
     let eff: Vec<i32> = vec_new();
+    /* Reserve the first pair: no real field run starts at element 0, so a
+       slot's field start of 0 means "no field layout" (a scalar or an enum). */
+    vec_push(eff, 0);
+    vec_push(eff, 0);
     let lc: i32 = local_count_and_env(param_names, param_ctys,
                                        instrs, en, eb, ew, ec, efs,
                                        structs_names, structs_field_counts,

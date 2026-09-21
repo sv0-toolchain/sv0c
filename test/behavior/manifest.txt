@@ -138,6 +138,7 @@ test/behavior/cases/place_assign.sv0|42|native
 test/behavior/cases/call_index.sv0|42|native
 test/behavior/cases/struct_let_copy.sv0|42|native
 test/behavior/cases/nested_struct.sv0|42|native
+test/behavior/cases/struct_decl_order.sv0|42|native
 test/behavior/cases/let_infer_wide.sv0|42|native
 test/behavior/cases/ffi_ptr_create_and_pass.sv0|7|native
 test/behavior/cases/ffi_unsafe_block_transparent.sv0|8

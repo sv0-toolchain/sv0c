@@ -1,0 +1,32 @@
+// A struct may use, by value, a struct or enum that is declared LATER in the
+// file: typedefs are emitted in dependency order (before, they were emitted in
+// source order and a forward reference was a C "unknown type name" error).
+// Expected exit: 42.
+
+struct Outer {
+    inner: Inner,
+    shape: Shape,
+    k: i32,
+}
+
+struct Inner {
+    a: i32,
+    b: i32,
+}
+
+enum Shape {
+    Circle(i32),
+    Square(i32),
+}
+
+fn main() -> i32 {
+    let i: Inner = Inner { a: 30, b: 4 };
+    let o: Outer = Outer { inner: i, shape: Shape::Square(6), k: 2 };
+    let sh: Shape = o.shape;
+    let mut extra: i32 = 0;
+    match sh {
+        Shape::Square(v) => { extra = v; },
+        Shape::Circle(v) => { extra = 100; },
+    }
+    return o.inner.a + o.inner.b + extra + o.k - 0;
+}

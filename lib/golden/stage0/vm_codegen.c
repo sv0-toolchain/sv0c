@@ -5192,58 +5192,84 @@ static int member_arg_width(Value v, int env_names, int env_bases, int env_width
 
 static int expr_struct_locate(Expr e, int env_names, int env_bases, int env_widths, int env_field_starts, int env_fields_flat, const char* source, int starts, int ends, int out) {
   int _sv0t0;
-  if ((e.tag == 0)) {
-    int bv = e.p0;
-    Value _sv0t2;
-    int _sv0t3 = sv0_box_load(bv, 0);
-    _sv0t2.tag = _sv0t3;
-    int _sv0t4 = sv0_box_load(bv, 1);
-    _sv0t2.p0 = _sv0t4;
-    int _sv0t5 = sv0_box_load(bv, 2);
-    _sv0t2.p1 = _sv0t5;
-    Value v;
-    v.tag = (_sv0t2).tag;
-    v.p0 = (_sv0t2).p0;
-    v.p1 = (_sv0t2).p1;
-    int _sv0t6;
-    if ((v.tag == 6)) {
-      int b2 = v.p0;
-      int f2 = v.p1;
-      if ((f2 < 0)) {
-        int _sv0t8 = (0 - 1);
-        return _sv0t8;
-      } else {
-      }
-      int _sv0t9 = locate_member(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, source, starts, ends, out);
-      int r = _sv0t9;
-      if ((r < 0)) {
-        int _sv0t10 = (0 - 1);
-        return _sv0t10;
-      } else {
-      }
-      int _sv0t11 = sv0_vec_get(out, 6);
-      if ((_sv0t11 == 1)) {
-        return 0;
-      } else {
-      }
-      int _sv0t12 = (0 - 1);
-      return _sv0t12;
-      _sv0t6 = 0;
+  if ((e.tag == 1)) {
+    int x = e.p0;
+    int _sv0t13 = lookup_slot(env_names, env_bases, env_widths, x, source, starts, ends);
+    int si = _sv0t13;
+    if ((si < 0)) {
+      int _sv0t14 = (0 - 1);
+      return _sv0t14;
     } else {
-      if (1) {
-        int _sv0t7 = (0 - 1);
-        return _sv0t7;
+    }
+    int _sv0t15 = sv0_vec_len(env_field_starts);
+    if ((si >= _sv0t15)) {
+      int _sv0t16 = (0 - 1);
+      return _sv0t16;
+    } else {
+    }
+    int _sv0t17 = sv0_vec_get(env_field_starts, si);
+    if ((_sv0t17 < 2)) {
+      int _sv0t18 = (0 - 1);
+      return _sv0t18;
+    } else {
+    }
+    int _sv0t19 = locate_local(si, env_widths, env_field_starts, env_fields_flat, out);
+    return _sv0t19;
+    _sv0t0 = 0;
+  } else {
+    if ((e.tag == 0)) {
+      int bv = e.p0;
+      Value _sv0t2;
+      int _sv0t3 = sv0_box_load(bv, 0);
+      _sv0t2.tag = _sv0t3;
+      int _sv0t4 = sv0_box_load(bv, 1);
+      _sv0t2.p0 = _sv0t4;
+      int _sv0t5 = sv0_box_load(bv, 2);
+      _sv0t2.p1 = _sv0t5;
+      Value v;
+      v.tag = (_sv0t2).tag;
+      v.p0 = (_sv0t2).p0;
+      v.p1 = (_sv0t2).p1;
+      int _sv0t6;
+      if ((v.tag == 6)) {
+        int b2 = v.p0;
+        int f2 = v.p1;
+        if ((f2 < 0)) {
+          int _sv0t8 = (0 - 1);
+          return _sv0t8;
+        } else {
+        }
+        int _sv0t9 = locate_member(v, env_names, env_bases, env_widths, env_field_starts, env_fields_flat, source, starts, ends, out);
+        int r = _sv0t9;
+        if ((r < 0)) {
+          int _sv0t10 = (0 - 1);
+          return _sv0t10;
+        } else {
+        }
+        int _sv0t11 = sv0_vec_get(out, 6);
+        if ((_sv0t11 == 1)) {
+          return 0;
+        } else {
+        }
+        int _sv0t12 = (0 - 1);
+        return _sv0t12;
         _sv0t6 = 0;
       } else {
+        if (1) {
+          int _sv0t7 = (0 - 1);
+          return _sv0t7;
+          _sv0t6 = 0;
+        } else {
+        }
       }
-    }
-    _sv0t0 = _sv0t6;
-  } else {
-    if (1) {
-      int _sv0t1 = (0 - 1);
-      return _sv0t1;
-      _sv0t0 = 0;
+      _sv0t0 = _sv0t6;
     } else {
+      if (1) {
+        int _sv0t1 = (0 - 1);
+        return _sv0t1;
+        _sv0t0 = 0;
+      } else {
+      }
     }
   }
   return _sv0t0;
@@ -5710,6 +5736,8 @@ static int emit_fn(int label, int param_names, int param_ctys, int instrs, int s
   int efs = _sv0t4;
   int _sv0t5 = sv0_vec_new();
   int eff = _sv0t5;
+  sv0_vec_push(eff, 0);
+  sv0_vec_push(eff, 0);
   int _sv0t6 = local_count_and_env(param_names, param_ctys, instrs, en, eb, ew, ec, efs, structs_names, structs_field_counts, enums_names, enums_widths, structs_fields_flat, structs_field_starts, eff, blabels, bretcats, source, starts, ends);
   int lc = _sv0t6;
   int _sv0t7 = sv0_vec_new();

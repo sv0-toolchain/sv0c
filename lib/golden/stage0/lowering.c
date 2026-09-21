@@ -204,6 +204,7 @@ static int build_enum_variants_data(int item_tags, int item_names, int item_fiel
 static int enum_payload_ty_name_to_category(const char* name);
 static int enum_slot_ctys_for_item(int vbase, int vcount, int max_payload, int evpv, int evptn, int payload_offset_by_variant, const char* source, int starts, int ends);
 static const char* collect_typedefs_str(int item_tags, int item_names, int item_field_counts, int item_vmax, int sf_names, int sf_types, const char* source, int starts, int ends, int sn, int en, int item_d3, int evpv, int evptn);
+static const char* lower_emit_all_enum_tds(int item_tags, int item_names, int item_field_counts, int item_vmax, const char* source, int starts, int ends, int item_d3, int evpv, int evptn);
 static int mentions_result(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp);
 static int first_result_path_handle(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp);
 static int all_old_names_expr(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp, int out);
@@ -13904,52 +13905,209 @@ static const char* collect_typedefs_str(int item_tags, int item_names, int item_
   const char* r;
   r = "";
   int i = 0;
-  int sf = 0;
+  int _sv0t1 = sv0_vec_new();
+  int sfbase = _sv0t1;
+  int sfacc = 0;
   while ((i < n)) {
-    int _sv0t1 = sv0_vec_get(item_tags, i);
-    int tag = _sv0t1;
-    int _sv0t2 = sv0_vec_get(item_field_counts, i);
-    int fc = _sv0t2;
-    if ((tag == 1)) {
-      int _sv0t3 = sv0_vec_get(item_names, i);
-      const char* _sv0t4 = emit_struct_td(_sv0t3, sf_names, sf_types, sf, fc, source, starts, ends, sn, en);
-      const char* td;
-      td = _sv0t4;
-      const char* _sv0t5 = sv0_string_concat(r, td);
-      r = _sv0t5;
-      sf = (sf + fc);
+    sv0_vec_push(sfbase, sfacc);
+    int _sv0t2 = sv0_vec_get(item_tags, i);
+    if ((_sv0t2 == 1)) {
+      int _sv0t3 = sv0_vec_get(item_field_counts, i);
+      sfacc = (sfacc + _sv0t3);
     } else {
     }
     i = (i + 1);
   }
-  int _sv0t6 = sv0_vec_new();
-  int payload_offset_by_variant = _sv0t6;
-  int _sv0t7 = sv0_vec_len(evpv);
-  int vn = _sv0t7;
+  int enums_first = 0;
+  int ci = 0;
+  while ((ci < n)) {
+    int _sv0t4 = sv0_vec_get(item_tags, ci);
+    if ((_sv0t4 == 1)) {
+      int cj = 0;
+      while (1) {
+        int _sv0t5 = sv0_vec_get(item_field_counts, ci);
+        int _sv0t11 = (cj < _sv0t5);
+        if ((!_sv0t11)) {
+          break;
+        } else {
+        }
+        int _sv0t6 = sv0_vec_get(sfbase, ci);
+        int _sv0t7 = (_sv0t6 + cj);
+        int _sv0t8 = sv0_vec_get(sf_types, _sv0t7);
+        int cth = _sv0t8;
+        if ((cth >= 0)) {
+          const char* _sv0t9 = handle_to_str(cth, source, starts, ends);
+          int _sv0t10 = lower_name_in_handle_list(_sv0t9, en, source, starts, ends);
+          if (_sv0t10) {
+            enums_first = 1;
+          } else {
+          }
+        } else {
+        }
+        cj = (cj + 1);
+      }
+    } else {
+    }
+    ci = (ci + 1);
+  }
+  const char* enum_r;
+  enum_r = "";
+  if (enums_first) {
+    const char* _sv0t12 = lower_emit_all_enum_tds(item_tags, item_names, item_field_counts, item_vmax, source, starts, ends, item_d3, evpv, evptn);
+    enum_r = _sv0t12;
+    const char* _sv0t13 = sv0_string_concat(r, enum_r);
+    r = _sv0t13;
+  } else {
+  }
+  int _sv0t14 = sv0_vec_new();
+  int done = _sv0t14;
+  int zi = 0;
+  while ((zi < n)) {
+    sv0_vec_push(done, 0);
+    zi = (zi + 1);
+  }
+  int pass = 0;
+  int progress = 1;
+  while (progress) {
+    progress = 0;
+    i = 0;
+    while ((i < n)) {
+      int _sv0t15 = sv0_vec_get(item_tags, i);
+      if ((_sv0t15 == 1)) {
+        int _sv0t16 = sv0_vec_get(done, i);
+        if ((_sv0t16 == 0)) {
+          int ready = 1;
+          int fj = 0;
+          while (1) {
+            int _sv0t17 = sv0_vec_get(item_field_counts, i);
+            int _sv0t27 = (fj < _sv0t17);
+            if ((!_sv0t27)) {
+              break;
+            } else {
+            }
+            int _sv0t18 = sv0_vec_get(sfbase, i);
+            int _sv0t19 = (_sv0t18 + fj);
+            int _sv0t20 = sv0_vec_get(sf_types, _sv0t19);
+            int fth = _sv0t20;
+            if ((fth >= 0)) {
+              const char* _sv0t21 = handle_to_str(fth, source, starts, ends);
+              const char* fname;
+              fname = _sv0t21;
+              int k2 = 0;
+              while ((k2 < n)) {
+                if ((k2 != i)) {
+                  int _sv0t22 = sv0_vec_get(item_tags, k2);
+                  if ((_sv0t22 == 1)) {
+                    int _sv0t23 = sv0_vec_get(done, k2);
+                    if ((_sv0t23 == 0)) {
+                      int _sv0t24 = sv0_vec_get(item_names, k2);
+                      const char* _sv0t25 = handle_to_str(_sv0t24, source, starts, ends);
+                      int _sv0t26 = sv0_string_eq(_sv0t25, fname);
+                      if (_sv0t26) {
+                        ready = 0;
+                      } else {
+                      }
+                    } else {
+                    }
+                  } else {
+                  }
+                } else {
+                }
+                k2 = (k2 + 1);
+              }
+            } else {
+            }
+            fj = (fj + 1);
+          }
+          if (ready) {
+            int _sv0t28 = sv0_vec_get(item_names, i);
+            int _sv0t29 = sv0_vec_get(sfbase, i);
+            int _sv0t30 = sv0_vec_get(item_field_counts, i);
+            const char* _sv0t31 = emit_struct_td(_sv0t28, sf_names, sf_types, _sv0t29, _sv0t30, source, starts, ends, sn, en);
+            const char* td;
+            td = _sv0t31;
+            const char* _sv0t32 = sv0_string_concat(r, td);
+            r = _sv0t32;
+            sv0_vec_set(done, i, 1);
+            progress = 1;
+          } else {
+          }
+        } else {
+        }
+      } else {
+      }
+      i = (i + 1);
+    }
+    pass = (pass + 1);
+    int _sv0t33 = (n + 1);
+    if ((pass > _sv0t33)) {
+      break;
+    } else {
+    }
+  }
+  i = 0;
+  while ((i < n)) {
+    int _sv0t34 = sv0_vec_get(item_tags, i);
+    if ((_sv0t34 == 1)) {
+      int _sv0t35 = sv0_vec_get(done, i);
+      if ((_sv0t35 == 0)) {
+        int _sv0t36 = sv0_vec_get(item_names, i);
+        int _sv0t37 = sv0_vec_get(sfbase, i);
+        int _sv0t38 = sv0_vec_get(item_field_counts, i);
+        const char* _sv0t39 = emit_struct_td(_sv0t36, sf_names, sf_types, _sv0t37, _sv0t38, source, starts, ends, sn, en);
+        const char* tdc;
+        tdc = _sv0t39;
+        const char* _sv0t40 = sv0_string_concat(r, tdc);
+        r = _sv0t40;
+      } else {
+      }
+    } else {
+    }
+    i = (i + 1);
+  }
+  if (enums_first) {
+    return r;
+  } else {
+  }
+  const char* _sv0t41 = lower_emit_all_enum_tds(item_tags, item_names, item_field_counts, item_vmax, source, starts, ends, item_d3, evpv, evptn);
+  const char* _sv0t42 = sv0_string_concat(r, _sv0t41);
+  return _sv0t42;
+}
+
+static const char* lower_emit_all_enum_tds(int item_tags, int item_names, int item_field_counts, int item_vmax, const char* source, int starts, int ends, int item_d3, int evpv, int evptn) {
+  int _sv0t0 = sv0_vec_len(item_tags);
+  int n = _sv0t0;
+  const char* r;
+  r = "";
+  int i = 0;
+  int _sv0t1 = sv0_vec_new();
+  int payload_offset_by_variant = _sv0t1;
+  int _sv0t2 = sv0_vec_len(evpv);
+  int vn = _sv0t2;
   int running = 0;
   int vi = 0;
   while ((vi < vn)) {
     sv0_vec_push(payload_offset_by_variant, running);
-    int _sv0t8 = sv0_vec_get(evpv, vi);
-    running = (running + _sv0t8);
+    int _sv0t3 = sv0_vec_get(evpv, vi);
+    running = (running + _sv0t3);
     vi = (vi + 1);
   }
   i = 0;
   while ((i < n)) {
-    int _sv0t9 = sv0_vec_get(item_tags, i);
-    if ((_sv0t9 == 2)) {
-      int _sv0t10 = sv0_vec_get(item_vmax, i);
-      int mp = _sv0t10;
-      int _sv0t11 = sv0_vec_get(item_d3, i);
-      int _sv0t12 = sv0_vec_get(item_field_counts, i);
-      int _sv0t13 = enum_slot_ctys_for_item(_sv0t11, _sv0t12, mp, evpv, evptn, payload_offset_by_variant, source, starts, ends);
-      int slot_cats = _sv0t13;
-      int _sv0t14 = sv0_vec_get(item_names, i);
-      const char* _sv0t15 = emit_enum_td(_sv0t14, mp, slot_cats, source, starts, ends);
+    int _sv0t4 = sv0_vec_get(item_tags, i);
+    if ((_sv0t4 == 2)) {
+      int _sv0t5 = sv0_vec_get(item_vmax, i);
+      int mp = _sv0t5;
+      int _sv0t6 = sv0_vec_get(item_d3, i);
+      int _sv0t7 = sv0_vec_get(item_field_counts, i);
+      int _sv0t8 = enum_slot_ctys_for_item(_sv0t6, _sv0t7, mp, evpv, evptn, payload_offset_by_variant, source, starts, ends);
+      int slot_cats = _sv0t8;
+      int _sv0t9 = sv0_vec_get(item_names, i);
+      const char* _sv0t10 = emit_enum_td(_sv0t9, mp, slot_cats, source, starts, ends);
       const char* td2;
-      td2 = _sv0t15;
-      const char* _sv0t16 = sv0_string_concat(r, td2);
-      r = _sv0t16;
+      td2 = _sv0t10;
+      const char* _sv0t11 = sv0_string_concat(r, td2);
+      r = _sv0t11;
     } else {
     }
     i = (i + 1);

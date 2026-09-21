@@ -7876,21 +7876,129 @@ fn collect_typedefs_str(item_tags: Vec<i32>, item_names: Vec<i32>,
     let n: i32 = vec_len(item_tags);
     let mut r: string = "";
     let mut i: i32 = 0;
-    let mut sf: i32 = 0;
+    /* Field-run base of each struct item (sf_names / sf_types are flat over
+       struct items in order). */
+    let sfbase: Vec<i32> = vec_new();
+    let mut sfacc: i32 = 0;
     while i < n {
-        let tag: i32 = vec_get(item_tags, i);
-        let fc: i32 = vec_get(item_field_counts, i);
-        if tag == 1 {
-            let td: string = emit_struct_td(vec_get(item_names, i),
-                                             sf_names, sf_types,
-                                             sf, fc,
-                                             source, starts, ends,
-                                             sn, en);
-            r = string_concat(r, td);
-            sf = sf + fc;
+        vec_push(sfbase, sfacc);
+        if vec_get(item_tags, i) == 1 { sfacc = sfacc + vec_get(item_field_counts, i); }
+        i = i + 1;
+    }
+    /* Struct typedefs: a struct whose field is another struct BY VALUE needs that
+       struct's typedef first, so structs are emitted in dependency order (source
+       order whenever nothing forces otherwise — a program without a forward
+       reference gets exactly the source-order output). A struct with an
+       enum-typed field needs the enum typedefs first, so they are emitted ahead
+       of the structs in that case only. */
+    let mut enums_first: bool = false;
+    let mut ci: i32 = 0;
+    while ci < n {
+        if vec_get(item_tags, ci) == 1 {
+            let mut cj: i32 = 0;
+            while cj < vec_get(item_field_counts, ci) {
+                let cth: i32 = vec_get(sf_types, vec_get(sfbase, ci) + cj);
+                if cth >= 0 {
+                    if lower_name_in_handle_list(handle_to_str(cth, source, starts, ends), en, source, starts, ends) {
+                        enums_first = true;
+                    }
+                }
+                cj = cj + 1;
+            }
+        }
+        ci = ci + 1;
+    }
+    let mut enum_r: string = "";
+    if enums_first {
+        enum_r = lower_emit_all_enum_tds(item_tags, item_names, item_field_counts, item_vmax,
+                                         source, starts, ends, item_d3, evpv, evptn);
+        r = string_concat(r, enum_r);
+    }
+    let done: Vec<i32> = vec_new();
+    let mut zi: i32 = 0;
+    while zi < n {
+        vec_push(done, 0);
+        zi = zi + 1;
+    }
+    let mut pass: i32 = 0;
+    let mut progress: bool = true;
+    while progress {
+        progress = false;
+        i = 0;
+        while i < n {
+            if vec_get(item_tags, i) == 1 {
+                if vec_get(done, i) == 0 {
+                    /* ready when every by-value struct field's struct is done */
+                    let mut ready: bool = true;
+                    let mut fj: i32 = 0;
+                    while fj < vec_get(item_field_counts, i) {
+                        let fth: i32 = vec_get(sf_types, vec_get(sfbase, i) + fj);
+                        if fth >= 0 {
+                            let fname: string = handle_to_str(fth, source, starts, ends);
+                            let mut k2: i32 = 0;
+                            while k2 < n {
+                                if k2 != i {
+                                    if vec_get(item_tags, k2) == 1 {
+                                        if vec_get(done, k2) == 0 {
+                                            if string_eq(handle_to_str(vec_get(item_names, k2), source, starts, ends), fname) {
+                                                ready = false;
+                                            }
+                                        }
+                                    }
+                                }
+                                k2 = k2 + 1;
+                            }
+                        }
+                        fj = fj + 1;
+                    }
+                    if ready {
+                        let td: string = emit_struct_td(vec_get(item_names, i),
+                                                         sf_names, sf_types,
+                                                         vec_get(sfbase, i), vec_get(item_field_counts, i),
+                                                         source, starts, ends,
+                                                         sn, en);
+                        r = string_concat(r, td);
+                        vec_set(done, i, 1);
+                        progress = true;
+                    }
+                }
+            }
+            i = i + 1;
+        }
+        pass = pass + 1;
+        if pass > n + 1 { break; }
+    }
+    /* anything still pending (a cycle, or a self reference): source order */
+    i = 0;
+    while i < n {
+        if vec_get(item_tags, i) == 1 {
+            if vec_get(done, i) == 0 {
+                let tdc: string = emit_struct_td(vec_get(item_names, i),
+                                                  sf_names, sf_types,
+                                                  vec_get(sfbase, i), vec_get(item_field_counts, i),
+                                                  source, starts, ends,
+                                                  sn, en);
+                r = string_concat(r, tdc);
+            }
         }
         i = i + 1;
     }
+    if enums_first {
+        return r;
+    }
+    return string_concat(r, lower_emit_all_enum_tds(item_tags, item_names, item_field_counts,
+                                                    item_vmax, source, starts, ends,
+                                                    item_d3, evpv, evptn));
+}
+
+/* The typedef text of every enum item (payload slot categories per item). */
+fn lower_emit_all_enum_tds(item_tags: Vec<i32>, item_names: Vec<i32>,
+                           item_field_counts: Vec<i32>, item_vmax: Vec<i32>,
+                           source: string, starts: Vec<i32>, ends: Vec<i32>,
+                           item_d3: Vec<i32>, evpv: Vec<i32>, evptn: Vec<i32>) -> string {
+    let n: i32 = vec_len(item_tags);
+    let mut r: string = "";
+    let mut i: i32 = 0;
     /* payload_offset_by_variant[v] = running sum of evpv[0..v) — locates
        variant v's own payload run inside the flat evptn array (slot 0
        resets per-variant; evptn does not). Computed once, up front, over
