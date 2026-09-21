@@ -8,7 +8,13 @@
 # negative contract-message sentinel as a token handle). Now byte-identical to
 # the SML --target=vm golden -- keeps the contract emit path guarded.
 test/integration/contracts/contracts.sv0
-lib/span.sv0
+# lib/span.sv0 is deliberately NOT byte-compared: CompileError has a struct-VALUE
+# field (`span: Span`), which the SML reference lays out as ONE word (its widthOfCty
+# is the field count) and the native emitter lays out as Span's real width. The native
+# layout is the correct one (see test/behavior/cases/nested_struct.sv0, gated by the
+# behavioral VM parity tier); span still builds, runs and passes its unit tests on the
+# VM in bootstrap-build. Same policy as tier 3 (README.md): a by-design divergence
+# from the frozen SML goldens is covered behaviorally, not by bytes.
 lexer/token.sv0
 lib/ast.sv0
 lib/bytecode.sv0
