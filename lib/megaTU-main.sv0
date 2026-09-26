@@ -235,7 +235,7 @@ fn megatu_cov_project_listing(dir: string) -> string {
 fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                    tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id4: Vec<i32>,
-                   pp: Vec<i32>) -> i32 {
+                   pp: Vec<i32>, bet: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>) -> i32 {
     if mode < 0 {
         write_file("/dev/stderr", "coverage: unknown mode in SV0_COVERAGE_REQUEST (want map, instrument or plan-dump)\n");
         return 9;
@@ -270,9 +270,35 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         write_file("/dev/stderr", "coverage: could not recover a function's span from its tokens\n");
         return 9;
     }
+    /* Regions and branches (CV-108): the token walk's statement count per
+       function body is checked against the AST body block. */
+    let body_stmts: Vec<i32> = vec_new();
+    let mut e: i32 = 0;
+    while e < vec_len(ent_item) {
+        let root: i32 = vec_get(id4, vec_get(ent_item, e));
+        let mut count: i32 = 0 - 1;
+        if vec_get(bet, root) == 9 {
+            count = vec_get(bed2, root);
+            if vec_get(bed3, root) >= 0 { count = count + 1; }
+        }
+        vec_push(body_stmts, count);
+        e = e + 1;
+    }
+    let cef: Vec<i32> = vec_new();
+    let cet: Vec<i32> = vec_new();
+    let rg: Vec<i32> = vec_new();
+    let br: Vec<i32> = vec_new();
+    let bad: i32 = cov_plan_regions(tags, ent_item, id1, body_stmts, cef, cet, rg, br);
+    if bad >= 0 {
+        write_file("/dev/stderr", string_concat(string_concat("coverage: could not plan the regions of function ",
+            cov_plan_line_at(qnames, bad)), " (unsupported statement or construct)\n"));
+        return 9;
+    }
     if mode == 3 {
-        write_file("/dev/stdout", cov_plan_dump(source, table, cstarts, clens, src_unit,
-            ent_source, ent_start, ent_end, ent_owner, qnames, pt_kind, pt_entity, pt_start, pt_end));
+        write_file("/dev/stdout", string_concat(cov_plan_dump(source, table, cstarts, clens, src_unit,
+            ent_source, ent_start, ent_end, ent_owner, qnames, pt_kind, pt_entity, pt_start, pt_end),
+            cov_plan_region_dump(source, starts, ends, cstarts, clens, src_unit, ent_source, rg, br, cef, cet,
+                vec_len(pt_kind))));
         return 0;
     }
     write_file("/dev/stderr", string_concat(string_concat("--coverage=", megatu_cov_mode_name(mode)),
@@ -415,7 +441,7 @@ fn main() -> i32 {
        so both backends share one plan. */
     if _cov_mode != 0 {
         return megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
-                               tags, starts, ends, it, id1, id2, id4, pp);
+                               tags, starts, ends, it, id1, id2, id4, pp, bet, bed2, bed3);
     }
 
     /* Phase 5: lower (real lowering.sv0) — parse arenas -> IR out_blocks; returns

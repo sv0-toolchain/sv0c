@@ -62,7 +62,7 @@ def run_plan(request: str, mode: str = "plan-dump") -> tuple[int, str, str, int,
 
 
 def parse_dump(text: str) -> dict:
-    out: dict = {"sources": [], "entities": [], "points": []}
+    out: dict = {"sources": [], "entities": [], "points": [], "outcome_points": [], "branches": [], "regions": []}
     for line in text.splitlines():
         f = line.split("\t")
         if f[0] == "source":
@@ -71,11 +71,53 @@ def parse_dump(text: str) -> dict:
             out["entities"].append({"entity_index": int(f[1]), "kind": f[2], "qualified_name": f[3],
                                     "source_index": int(f[4]), "span": span(f[5:11]), "owner": int(f[11])})
         elif f[0] == "point":
-            out["points"].append({"kind": f[2], "entity_index": int(f[3]), "semantic_discriminator": f[4],
-                                  "source_index": int(f[5]), "span": span(f[6:12])})
+            pt = {"kind": f[2], "entity_index": int(f[3]), "semantic_discriminator": f[4],
+                  "source_index": int(f[5]), "span": span(f[6:12])}
+            if f[2] == "branch_outcome":
+                pt["outcome_ordinal"] = int(f[12])
+                out["outcome_points"].append(pt)
+            else:
+                out["points"].append(pt)
+        elif f[0] == "branch":
+            out["branches"].append({"branch_index": int(f[1]), "kind": f[2], "entity_index": int(f[3]),
+                                    "source_index": int(f[4]), "span": span(f[5:11]), "outcomes": int(f[11]),
+                                    "names": f[12].split(",")})
+        elif f[0] == "region":
+            out["regions"].append({"region_index": int(f[1]), "kind": f[2], "entity_index": int(f[3]),
+                                   "source_index": int(f[4]), "span": span(f[5:11]),
+                                   "line_contributing": f[11] == "1",
+                                   "line_numbers": [int(x) for x in f[12].split(",") if x],
+                                   "terms": terms(f[13])})
         else:
             raise ValueError(f"unexpected dump line {line!r}")
     return out
+
+
+def terms(text: str) -> list[tuple[int, str]]:
+    out = []
+    for t in filter(None, text.split(",")):
+        coef, ref = t.split("*", 1)
+        out.append((int(coef), ref))
+    return sorted(out)
+
+
+def expected_regions(expected: dict) -> tuple[list, list]:
+    """Branches and regions of an expected map, with counter terms named like
+    the dump (entry:<entity>, branch:<branch index>:<ordinal>)."""
+    names = {p["point_id"]: f"entry:{p['entity_index']}" for p in expected["points"] if p["kind"] == "function_entry"}
+    branches = []
+    for b in expected["branches"]:
+        for o in b["outcomes"]:
+            names[o["point_id"]] = f"branch:{b['branch_index']}:{o['ordinal']}"
+        branches.append({"branch_index": b["branch_index"], "kind": b["kind"], "entity_index": b["entity_index"],
+                         "source_index": b["source_index"], "span": b["span"], "outcomes": len(b["outcomes"]),
+                         "names": [o["name"] for o in b["outcomes"]]})
+    regions = [{"region_index": r["region_index"], "kind": r["kind"], "entity_index": r["entity_index"],
+                "source_index": r["source_index"], "span": r["span"], "line_contributing": r["line_contributing"],
+                "line_numbers": r["line_numbers"],
+                "terms": sorted((t["coefficient"], names[t["point_id"]]) for t in r["counter_expression"]["terms"])}
+               for r in expected["regions"]]
+    return branches, regions
 
 
 def span(f: list[str]) -> dict:
@@ -122,6 +164,20 @@ def check_fixture(name: str, errors: list[str]) -> None:
         key=lambda p: p["entity_index"])
     if got["points"] != want_points:
         errors.append(f"{name}: function_entry points differ:\n    got  {got['points']}\n    want {want_points}")
+    want_outcomes = sorted(
+        ({"kind": p["kind"], "entity_index": p["entity_index"], "semantic_discriminator": p["semantic_discriminator"],
+          "source_index": p["source_index"], "span": p["span"], "outcome_ordinal": p["outcome_ordinal"]}
+         for p in expected["points"] if p["kind"] == "branch_outcome"),
+        key=lambda p: (p["span"]["start_byte"], p["outcome_ordinal"]))
+    got_outcomes = sorted(got["outcome_points"], key=lambda p: (p["span"]["start_byte"], p["outcome_ordinal"]))
+    if got_outcomes != want_outcomes:
+        errors.append(f"{name}: branch_outcome points differ:\n    got  {got_outcomes}\n    want {want_outcomes}")
+    want_branches, want_regions = expected_regions(expected)
+    if got["branches"] != want_branches:
+        errors.append(f"{name}: branches differ:\n    got  {got['branches']}\n    want {want_branches}")
+    if got["regions"] != want_regions:
+        diff = [(g, w) for g, w in zip(got["regions"], want_regions) if g != w][:3]
+        errors.append(f"{name}: regions differ ({len(got['regions'])} vs {len(want_regions)}); first: {diff}")
 
 
 # Synthetic programs: (name, files {path: text}, entry file or None for a
@@ -221,9 +277,31 @@ def check_refusals(tmp: Path, errors: list[str]) -> None:
             errors.append(f"mode {mode}: expected refusal 9 with {needle!r}, got native {rc} vm {vrc}: {err.strip()}")
 
 
+def check_constructs(errors: list[str]) -> None:
+    """constructs.sv0 (else-if, for, loop, while + loop_invariant, match with
+    block arms, break/continue, compound assignment, conditional expression,
+    tail expression) against the hand-reviewed constructs.expected."""
+    rc, out, err, vrc, vout = run_plan(str(HERE / "constructs.sv0"))
+    if rc != 0 or vrc != 0 or out != vout:
+        errors.append(f"constructs: plan-dump failed or backends differ (native {rc}, vm {vrc}): {err.strip()}")
+        return
+    got = []
+    for line in out.splitlines():
+        f = line.split("\t")
+        if f[0] == "branch":
+            got.append(f"branch {f[1]} {f[2]} {f[3]} {f[7]}:{f[8]}-{f[9]}:{f[10]} {f[11]} {f[12]}")
+        elif f[0] == "region":
+            got.append(f"region {f[2]} {f[3]} {f[7]}:{f[8]}-{f[9]}:{f[10]} {f[11]} {f[12]} {f[13]}")
+    want = [l for l in (HERE / "constructs.expected").read_text().splitlines() if l and not l.startswith("#")]
+    if got != want:
+        diff = [(g, w) for g, w in zip(got, want) if g != w][:3]
+        errors.append(f"constructs: plan differs ({len(got)} vs {len(want)} lines); first: {diff}")
+
+
 def main() -> int:
     ensure_built()
     errors: list[str] = []
+    check_constructs(errors)
     fixtures = sorted(p.parent.name for p in FIXTURES.glob("*/expected-map.json"))
     if len(fixtures) < 7:
         errors.append(f"expected the 7 sv0cov semantic fixtures under {FIXTURES}, found {fixtures}")

@@ -357,3 +357,703 @@ fn cov_plan_dump(source: string, table: string, cstarts: Vec<i32>, clens: Vec<i3
     }
     return out;
 }
+
+/* ── Regions and branches (CV-108) ─────────────────────────────────────────
+ *
+ * Regions and branch constructs come from a structural walk over each
+ * function body's tokens (sv0's statement grammar is small and the parser
+ * records no statement spans); the walk's statement count is checked against
+ * the AST body block, and anything it does not recognize fails closed.
+ *
+ * Side tables (flat, stride shown):
+ *   rg  (5): kind, entity, first token, last token, counter expression
+ *   br  (5): kind (1 if, 2 loop, 3 match, 4 conditional_expression: an
+ *            `if` nested in an expression), entity, first token, last
+ *            token, outcome count
+ *   cef (2): first term, term count  -- counter expressions over
+ *   cet (2): coefficient, point ref     entry and outcome points
+ * A point ref >= 0 is the function_entry of that entity; a ref < 0 is branch
+ * b's outcome k, encoded -(b * 1024 + k) - 1. Expression handle -1 is zero.
+ *
+ * Counters follow docs/planning-conventions.md: a region's counter is its
+ * position (the function entry, or the enclosing branch outcome); a loop
+ * condition counts body + exit; after a statement the position drops by the
+ * paths inside it that always leave: `return` leaves the function, `break`
+ * and `continue` leave the loop body (a loop absorbs them). The walk returns
+ * both amounts through `ret`: [returns, jumps, next token, statement count].
+ */
+
+fn cov_rg_kind_name(k: i32) -> string {
+    if k == 1 { return "assignment"; }
+    if k == 2 { return "branch_body"; }
+    if k == 3 { return "break"; }
+    if k == 5 { return "continue"; }
+    if k == 6 { return "expression"; }
+    if k == 7 { return "expression_statement"; }
+    if k == 8 { return "initializer"; }
+    if k == 9 { return "loop_body"; }
+    if k == 10 { return "match_arm"; }
+    if k == 11 { return "mutation"; }
+    if k == 12 { return "return"; }
+    return "call";
+}
+
+fn cov_br_kind_name(k: i32) -> string {
+    if k == 1 { return "if"; }
+    if k == 2 { return "loop"; }
+    if k == 4 { return "conditional_expression"; }
+    return "match";
+}
+
+/* Outcome k's name: true/false, body/exit, or arm:k (SPEC 16.3.6). */
+fn cov_outcome_name(kind: i32, k: i32) -> string {
+    if kind == 2 {
+        if k == 0 { return "body"; }
+        return "exit";
+    }
+    if kind == 3 { return string_concat("arm:", cov_src_itoa(k)); }
+    if k == 0 { return "true"; }
+    return "false";
+}
+
+fn cov_outcome_ref(b: i32, k: i32) -> i32 {
+    return 0 - (b * 1024 + k) - 1;
+}
+
+fn cov_ce_ref(cef: Vec<i32>, cet: Vec<i32>, r: i32) -> i32 {
+    let h: i32 = vec_len(cef) / 2;
+    vec_push(cef, vec_len(cet) / 2);
+    vec_push(cef, 1);
+    vec_push(cet, 1);
+    vec_push(cet, r);
+    return h;
+}
+
+/* sa * a + sb * b (either may be -1, the zero expression). */
+fn cov_ce_lin(cef: Vec<i32>, cet: Vec<i32>, a: i32, sa: i32, b: i32, sb: i32) -> i32 {
+    if a < 0 {
+        if b < 0 { return 0 - 1; }
+    }
+    let h: i32 = vec_len(cef) / 2;
+    let first: i32 = vec_len(cet) / 2;
+    let mut n: i32 = 0;
+    if a >= 0 {
+        let af: i32 = vec_get(cef, a * 2);
+        let al: i32 = vec_get(cef, a * 2 + 1);
+        let mut i: i32 = 0;
+        while i < al {
+            vec_push(cet, vec_get(cet, (af + i) * 2) * sa);
+            vec_push(cet, vec_get(cet, (af + i) * 2 + 1));
+            i = i + 1;
+        }
+        n = n + al;
+    }
+    if b >= 0 {
+        let bf: i32 = vec_get(cef, b * 2);
+        let bl: i32 = vec_get(cef, b * 2 + 1);
+        let mut j: i32 = 0;
+        while j < bl {
+            vec_push(cet, vec_get(cet, (bf + j) * 2) * sb);
+            vec_push(cet, vec_get(cet, (bf + j) * 2 + 1));
+            j = j + 1;
+        }
+        n = n + bl;
+    }
+    vec_push(cef, first);
+    vec_push(cef, n);
+    return h;
+}
+
+/* Index of the bracket closing the `(`, `[` or `{` at `open`, or -1. */
+fn cov_tok_close(tags: Vec<i32>, open: i32) -> i32 {
+    let n: i32 = vec_len(tags);
+    let mut depth: i32 = 0;
+    let mut i: i32 = open;
+    while i < n {
+        let t: i32 = vec_get(tags, i);
+        let opens: bool = if t == 6 { true } else { if t == 8 { true } else { t == 10 } };
+        let closes: bool = if t == 7 { true } else { if t == 9 { true } else { t == 11 } };
+        if opens { depth = depth + 1; }
+        if closes {
+            depth = depth - 1;
+            if depth == 0 { return i; }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* First token in [t, limit) with tag `want` outside any brackets, or -1. */
+fn cov_tok_find0(tags: Vec<i32>, t: i32, limit: i32, want: i32) -> i32 {
+    let mut depth: i32 = 0;
+    let mut i: i32 = t;
+    while i < limit {
+        let g: i32 = vec_get(tags, i);
+        if depth == 0 {
+            if g == want { return i; }
+        }
+        let opens: bool = if g == 6 { true } else { if g == 8 { true } else { g == 10 } };
+        let closes: bool = if g == 7 { true } else { if g == 9 { true } else { g == 11 } };
+        if opens { depth = depth + 1; }
+        if closes { depth = depth - 1; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* First `{` in [t, limit) outside parentheses and brackets (a body's
+   opening brace), or -1. */
+fn cov_tok_body_open(tags: Vec<i32>, t: i32, limit: i32) -> i32 {
+    let mut depth: i32 = 0;
+    let mut i: i32 = t;
+    while i < limit {
+        let g: i32 = vec_get(tags, i);
+        if depth == 0 {
+            if g == 8 { return i; }
+        }
+        if g == 6 { depth = depth + 1; }
+        if g == 10 { depth = depth + 1; }
+        if g == 7 { depth = depth - 1; }
+        if g == 11 { depth = depth - 1; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn cov_rg_push(rg: Vec<i32>, kind: i32, e: i32, first: i32, last: i32, ce: i32) -> i32 {
+    vec_push(rg, kind);
+    vec_push(rg, e);
+    vec_push(rg, first);
+    vec_push(rg, last);
+    vec_push(rg, ce);
+    return 0;
+}
+
+fn cov_is_construct(t: i32) -> bool {
+    if t == 68 { return true; }
+    if t == 96 { return true; }
+    if t == 74 { return true; }
+    if t == 66 { return true; }
+    return t == 72;
+}
+
+/* Walk the constructs inside expression tokens [t0, t1] at position p.
+   ret = [returns, jumps]. */
+fn cov_walk_expr(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
+                 e: i32, t0: i32, t1: i32, p: i32, ret: Vec<i32>) -> i32 {
+    let mut r: i32 = 0 - 1;
+    let mut j: i32 = 0 - 1;
+    let mut t: i32 = t0;
+    while t <= t1 {
+        let g: i32 = vec_get(tags, t);
+        if cov_is_construct(g) {
+            if cov_walk_construct(tags, cef, cet, rg, br, e, t, p, true, ret) < 0 { return 0 - 1; }
+            r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
+            j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
+            t = vec_get(ret, 2) + 1;
+        } else {
+            let mut block: bool = false;
+            if g == 8 {
+                /* A `{` after a name opens a struct literal; any other is a
+                   block expression, planned like any block at position p. */
+                let prev: i32 = if t > 0 { vec_get(tags, t - 1) } else { 0 };
+                if prev != 5 { block = true; }
+            }
+            if block {
+                if cov_walk_block(tags, cef, cet, rg, br, e, t, p, ret) < 0 { return 0 - 1; }
+                r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
+                j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
+                t = vec_get(ret, 2) + 1;
+            } else {
+                t = t + 1;
+            }
+        }
+    }
+    vec_set(ret, 0, r);
+    vec_set(ret, 1, j);
+    return 0;
+}
+
+/* Walk the block whose `{` is at `open`, at position p.
+   ret = [returns, jumps, closing token, statement count]. */
+fn cov_walk_block(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
+                  e: i32, open: i32, p: i32, ret: Vec<i32>) -> i32 {
+    let close: i32 = cov_tok_close(tags, open);
+    if close < 0 { return 0 - 1; }
+    let mut r: i32 = 0 - 1;
+    let mut j: i32 = 0 - 1;
+    let mut cur: i32 = p;
+    let mut count: i32 = 0;
+    let mut t: i32 = open + 1;
+    while t < close {
+        if cov_walk_stmt(tags, cef, cet, rg, br, e, t, close, cur, ret) < 0 { return 0 - 1; }
+        let sr: i32 = vec_get(ret, 0);
+        let sj: i32 = vec_get(ret, 1);
+        r = cov_ce_lin(cef, cet, r, 1, sr, 1);
+        j = cov_ce_lin(cef, cet, j, 1, sj, 1);
+        cur = cov_ce_lin(cef, cet, cur, 1, cov_ce_lin(cef, cet, sr, 1, sj, 1), 0 - 1);
+        t = vec_get(ret, 2);
+        count = count + 1;
+    }
+    vec_set(ret, 0, r);
+    vec_set(ret, 1, j);
+    vec_set(ret, 2, close);
+    vec_set(ret, 3, count);
+    return 0;
+}
+
+/* Walk the statement starting at token t inside a block closing at `close`.
+   ret = [returns, jumps, next token]. */
+fn cov_walk_stmt(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
+                 e: i32, t: i32, close: i32, p: i32, ret: Vec<i32>) -> i32 {
+    let g: i32 = vec_get(tags, t);
+    if cov_is_construct(g) {
+        if cov_walk_construct(tags, cef, cet, rg, br, e, t, p, false, ret) < 0 { return 0 - 1; }
+        let mut next: i32 = vec_get(ret, 2) + 1;
+        if next < close {
+            if vec_get(tags, next) == 13 { next = next + 1; }
+        }
+        vec_set(ret, 2, next);
+        return 0;
+    }
+    if g == 8 {
+        if cov_walk_block(tags, cef, cet, rg, br, e, t, p, ret) < 0 { return 0 - 1; }
+        let mut next2: i32 = vec_get(ret, 2) + 1;
+        if next2 < close {
+            if vec_get(tags, next2) == 13 { next2 = next2 + 1; }
+        }
+        vec_set(ret, 2, next2);
+        return 0;
+    }
+    let semi: i32 = cov_tok_find0(tags, t, close, 13);
+    if semi < 0 {
+        /* The block's tail expression. */
+        cov_rg_push(rg, 6, e, t, close - 1, p);
+        if cov_walk_expr(tags, cef, cet, rg, br, e, t, close - 1, p, ret) < 0 { return 0 - 1; }
+        vec_set(ret, 2, close);
+        return 0;
+    }
+    let mut kind: i32 = 7;
+    let mut inner: i32 = t;
+    if g == 71 { kind = 8; inner = t + 1; }
+    if g == 85 { kind = 12; inner = t + 1; }
+    if g == 57 { kind = 3; inner = t + 1; }
+    if g == 59 { kind = 5; inner = t + 1; }
+    if kind == 7 {
+        if cov_tok_find0(tags, t, semi, 35) >= 0 { kind = 1; }
+        let mut q: i32 = 44;
+        while q <= 51 {
+            if cov_tok_find0(tags, t, semi, q) >= 0 { kind = 11; }
+            q = q + 1;
+        }
+    }
+    cov_rg_push(rg, kind, e, t, semi, p);
+    if inner <= semi - 1 {
+        if cov_walk_expr(tags, cef, cet, rg, br, e, inner, semi - 1, p, ret) < 0 { return 0 - 1; }
+    } else {
+        vec_set(ret, 0, 0 - 1);
+        vec_set(ret, 1, 0 - 1);
+    }
+    /* return always leaves the function; break/continue leave the loop. */
+    if kind == 12 { vec_set(ret, 0, p); vec_set(ret, 1, 0 - 1); }
+    if kind == 3 { vec_set(ret, 0, 0 - 1); vec_set(ret, 1, p); }
+    if kind == 5 { vec_set(ret, 0, 0 - 1); vec_set(ret, 1, p); }
+    vec_set(ret, 2, semi + 1);
+    return 0;
+}
+
+fn cov_br_push(br: Vec<i32>, kind: i32, e: i32, first: i32) -> i32 {
+    let b: i32 = vec_len(br) / 5;
+    vec_push(br, kind);
+    vec_push(br, e);
+    vec_push(br, first);
+    vec_push(br, 0 - 1);
+    vec_push(br, 0);
+    return b;
+}
+
+/* Walk the if/while/for/loop/match construct whose keyword is at t, at
+   position p. ret = [returns, jumps, last token]. */
+fn cov_walk_construct(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
+                      e: i32, t: i32, p: i32, in_expr: bool, ret: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(tags);
+    let g: i32 = vec_get(tags, t);
+    if g == 68 {
+        let b: i32 = cov_br_push(br, if in_expr { 4 } else { 1 }, e, t);
+        vec_set(br, b * 5 + 4, 2);
+        let open: i32 = cov_tok_body_open(tags, t + 1, n);
+        if open <= t + 1 { return 0 - 1; }
+        cov_rg_push(rg, 6, e, t + 1, open - 1, p);
+        if cov_walk_expr(tags, cef, cet, rg, br, e, t + 1, open - 1, p, ret) < 0 { return 0 - 1; }
+        let mut r: i32 = vec_get(ret, 0);
+        let mut j: i32 = vec_get(ret, 1);
+        let tpos: i32 = cov_ce_ref(cef, cet, cov_outcome_ref(b, 0));
+        let body_close: i32 = cov_tok_close(tags, open);
+        if body_close < 0 { return 0 - 1; }
+        cov_rg_push(rg, 2, e, open, body_close, tpos);
+        if cov_walk_block(tags, cef, cet, rg, br, e, open, tpos, ret) < 0 { return 0 - 1; }
+        r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
+        j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
+        let mut last: i32 = body_close;
+        if body_close + 2 < n {
+            if vec_get(tags, body_close + 1) == 60 {
+                let fpos: i32 = cov_ce_ref(cef, cet, cov_outcome_ref(b, 1));
+                let et: i32 = body_close + 2;
+                if vec_get(tags, et) == 68 {
+                    if cov_walk_construct(tags, cef, cet, rg, br, e, et, fpos, in_expr, ret) < 0 { return 0 - 1; }
+                    last = vec_get(ret, 2);
+                } else {
+                    if vec_get(tags, et) != 8 { return 0 - 1; }
+                    let else_close: i32 = cov_tok_close(tags, et);
+                    if else_close < 0 { return 0 - 1; }
+                    cov_rg_push(rg, 2, e, et, else_close, fpos);
+                    if cov_walk_block(tags, cef, cet, rg, br, e, et, fpos, ret) < 0 { return 0 - 1; }
+                    last = else_close;
+                }
+                r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
+                j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
+            }
+        }
+        vec_set(br, b * 5 + 3, last);
+        vec_set(ret, 0, r);
+        vec_set(ret, 1, j);
+        vec_set(ret, 2, last);
+        return 0;
+    }
+    let is_loop: bool = if g == 96 { true } else { if g == 66 { true } else { g == 72 } };
+    if is_loop {
+        let b2: i32 = cov_br_push(br, 2, e, t);
+        vec_set(br, b2 * 5 + 4, 2);
+        let open2: i32 = cov_tok_body_open(tags, t + 1, n);
+        if open2 < 0 { return 0 - 1; }
+        let mut r2: i32 = 0 - 1;
+        if g == 96 {
+            /* while <cond> [loop_invariant(...)]* { ... }: the condition
+               counts every evaluation, body + exit. */
+            let mut cond_end: i32 = open2 - 1;
+            let inv: i32 = cov_tok_find0(tags, t + 1, open2, 73);
+            if inv >= 0 { cond_end = inv - 1; }
+            if cond_end < t + 1 { return 0 - 1; }
+            let both: i32 = cov_ce_lin(cef, cet, cov_ce_ref(cef, cet, cov_outcome_ref(b2, 0)), 1,
+                                       cov_ce_ref(cef, cet, cov_outcome_ref(b2, 1)), 1);
+            cov_rg_push(rg, 6, e, t + 1, cond_end, both);
+            if cov_walk_expr(tags, cef, cet, rg, br, e, t + 1, cond_end, both, ret) < 0 { return 0 - 1; }
+            r2 = vec_get(ret, 0);
+        }
+        if g == 66 {
+            /* for <pattern> in <iterable> { ... }: the iterable is evaluated
+               once per loop entry. */
+            let in_tok: i32 = cov_tok_find0(tags, t + 1, open2, 70);
+            if in_tok < 0 { return 0 - 1; }
+            if in_tok + 1 > open2 - 1 { return 0 - 1; }
+            cov_rg_push(rg, 6, e, in_tok + 1, open2 - 1, p);
+            if cov_walk_expr(tags, cef, cet, rg, br, e, in_tok + 1, open2 - 1, p, ret) < 0 { return 0 - 1; }
+            r2 = vec_get(ret, 0);
+        }
+        if g == 72 {
+            if open2 != t + 1 { return 0 - 1; }
+        }
+        let bpos: i32 = cov_ce_ref(cef, cet, cov_outcome_ref(b2, 0));
+        let close2: i32 = cov_tok_close(tags, open2);
+        if close2 < 0 { return 0 - 1; }
+        cov_rg_push(rg, 9, e, open2, close2, bpos);
+        if cov_walk_block(tags, cef, cet, rg, br, e, open2, bpos, ret) < 0 { return 0 - 1; }
+        r2 = cov_ce_lin(cef, cet, r2, 1, vec_get(ret, 0), 1);
+        vec_set(br, b2 * 5 + 3, close2);
+        vec_set(ret, 0, r2);
+        vec_set(ret, 1, 0 - 1);
+        vec_set(ret, 2, close2);
+        return 0;
+    }
+    if g == 74 {
+        let b3: i32 = cov_br_push(br, 3, e, t);
+        let open3: i32 = cov_tok_body_open(tags, t + 1, n);
+        if open3 <= t + 1 { return 0 - 1; }
+        if cov_walk_expr(tags, cef, cet, rg, br, e, t + 1, open3 - 1, p, ret) < 0 { return 0 - 1; }
+        let mut r3: i32 = vec_get(ret, 0);
+        let mut j3: i32 = vec_get(ret, 1);
+        let close3: i32 = cov_tok_close(tags, open3);
+        if close3 < 0 { return 0 - 1; }
+        let mut k: i32 = 0;
+        let mut a: i32 = open3 + 1;
+        while a < close3 {
+            if k >= 1024 { return 0 - 1; }
+            let arrow: i32 = cov_tok_find0(tags, a, close3, 20);
+            if arrow < 0 { return 0 - 1; }
+            let apos: i32 = cov_ce_ref(cef, cet, cov_outcome_ref(b3, k));
+            let rs: i32 = arrow + 1;
+            if rs >= close3 { return 0 - 1; }
+            let mut next: i32 = close3;
+            if vec_get(tags, rs) == 8 {
+                let rclose: i32 = cov_tok_close(tags, rs);
+                if rclose < 0 { return 0 - 1; }
+                cov_rg_push(rg, 10, e, rs, rclose, apos);
+                if cov_walk_block(tags, cef, cet, rg, br, e, rs, apos, ret) < 0 { return 0 - 1; }
+                next = rclose + 1;
+            } else {
+                let comma: i32 = cov_tok_find0(tags, rs, close3, 12);
+                let re: i32 = if comma >= 0 { comma } else { close3 };
+                cov_rg_push(rg, 10, e, rs, re - 1, apos);
+                if cov_walk_expr(tags, cef, cet, rg, br, e, rs, re - 1, apos, ret) < 0 { return 0 - 1; }
+                let rt: i32 = vec_get(tags, rs);
+                if rt == 85 { vec_set(ret, 0, apos); }
+                if rt == 57 { vec_set(ret, 1, apos); }
+                if rt == 59 { vec_set(ret, 1, apos); }
+                next = re;
+            }
+            r3 = cov_ce_lin(cef, cet, r3, 1, vec_get(ret, 0), 1);
+            j3 = cov_ce_lin(cef, cet, j3, 1, vec_get(ret, 1), 1);
+            if next < close3 {
+                if vec_get(tags, next) == 12 { next = next + 1; }
+            }
+            a = next;
+            k = k + 1;
+        }
+        if k == 0 { return 0 - 1; }
+        vec_set(br, b3 * 5 + 3, close3);
+        vec_set(br, b3 * 5 + 4, k);
+        vec_set(ret, 0, r3);
+        vec_set(ret, 1, j3);
+        vec_set(ret, 2, close3);
+        return 0;
+    }
+    return 0 - 1;
+}
+
+/* Plan regions and branches for every function entity. `body_stmts[e]` is
+   the AST body block's statement count (tail included) for the cross-check.
+   Returns the failing entity index, or -1 when every function planned. */
+fn cov_plan_regions(tags: Vec<i32>, ent_item: Vec<i32>, id1: Vec<i32>, body_stmts: Vec<i32>,
+                    cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>) -> i32 {
+    let ret: Vec<i32> = vec_new();
+    vec_push(ret, 0);
+    vec_push(ret, 0);
+    vec_push(ret, 0);
+    vec_push(ret, 0);
+    let ne: i32 = vec_len(ent_item);
+    let mut e: i32 = 0;
+    while e < ne {
+        let name_tok: i32 = vec_get(id1, vec_get(ent_item, e));
+        let open: i32 = cov_tok_body_open(tags, name_tok + 1, vec_len(tags));
+        if open < 0 { return e; }
+        let entry: i32 = cov_ce_ref(cef, cet, e);
+        if cov_walk_block(tags, cef, cet, rg, br, e, open, entry, ret) < 0 { return e; }
+        if vec_get(ret, 3) != vec_get(body_stmts, e) { return e; }
+        e = e + 1;
+    }
+    return 0 - 1;
+}
+
+/* Comma-separated lines (1-based) on which file bytes [fs, fe) of `text`
+   hold a non-whitespace byte. */
+fn cov_plan_line_numbers(text: string, fs: i32, fe: i32) -> string {
+    let mut line: i32 = cov_src_line(text, fs);
+    let mut last: i32 = 0;
+    let mut out: string = "";
+    let mut i: i32 = fs;
+    while i < fe {
+        let c: i32 = string_char_at(text, i);
+        if c == 10 {
+            line = line + 1;
+        } else {
+            let ws: bool = if c == 32 { true } else { if c == 9 { true } else { c == 13 } };
+            if ws != true {
+                if line != last {
+                    if last == 0 { out = cov_src_itoa(line); } else { out = string_concat(string_concat(out, ","), cov_src_itoa(line)); }
+                    last = line;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+/* Normalized terms of expression h: equal refs merged, zeros dropped,
+   sorted by ref; "+1*entry:<e>" / "-1*branch:<b>:<k>", comma-separated. */
+fn cov_plan_terms(cef: Vec<i32>, cet: Vec<i32>, h: i32) -> string {
+    if h < 0 { return ""; }
+    let first: i32 = vec_get(cef, h * 2);
+    let n: i32 = vec_get(cef, h * 2 + 1);
+    let refs: Vec<i32> = vec_new();
+    let coefs: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = vec_get(cet, (first + i) * 2);
+        let r: i32 = vec_get(cet, (first + i) * 2 + 1);
+        let mut k: i32 = 0;
+        let mut found: bool = false;
+        while k < vec_len(refs) {
+            if vec_get(refs, k) == r {
+                vec_set(coefs, k, vec_get(coefs, k) + c);
+                found = true;
+            }
+            k = k + 1;
+        }
+        if found != true {
+            /* insert keeping refs ascending */
+            vec_push(refs, r);
+            vec_push(coefs, c);
+            let mut m: i32 = vec_len(refs) - 1;
+            let mut moving: bool = true;
+            while moving {
+                if m == 0 {
+                    moving = false;
+                } else {
+                    if vec_get(refs, m - 1) > r {
+                        vec_set(refs, m, vec_get(refs, m - 1));
+                        vec_set(coefs, m, vec_get(coefs, m - 1));
+                        vec_set(refs, m - 1, r);
+                        vec_set(coefs, m - 1, c);
+                        m = m - 1;
+                    } else {
+                        moving = false;
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    let mut out: string = "";
+    let mut j: i32 = 0;
+    while j < vec_len(refs) {
+        let cj: i32 = vec_get(coefs, j);
+        if cj != 0 {
+            let rj: i32 = vec_get(refs, j);
+            let mut term: string = "";
+            if cj > 0 { term = string_concat("+", cov_src_itoa(cj)); } else { term = cov_src_itoa(cj); }
+            term = string_concat(term, "*");
+            if rj >= 0 {
+                term = string_concat(string_concat(term, "entry:"), cov_src_itoa(rj));
+            } else {
+                let enc: i32 = 0 - rj - 1;
+                term = string_concat(string_concat(term, "branch:"), cov_src_itoa(enc / 1024));
+                term = string_concat(string_concat(term, ":"), cov_src_itoa(enc % 1024));
+            }
+            if string_len(out) == 0 { out = term; } else { out = string_concat(string_concat(out, ","), term); }
+        }
+        j = j + 1;
+    }
+    return out;
+}
+
+/* region/branch dump lines (the plan-dump test hook):
+ *   branch  <index> <kind> <entity> <source> <span> <outcome count>
+ *           <outcome names, comma-separated>
+ *   point   <index> branch_outcome <entity> <branch kind> <source> <span>
+ *           <ordinal>
+ *   region  <index> <kind> <entity> <source> <span> <line_contributing 0|1>
+ *           <line numbers> <counter terms>
+ * Regions are ordered by source, span start, span end, then kind name. */
+fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
+                        cstarts: Vec<i32>, clens: Vec<i32>, src_unit: Vec<i32>,
+                        ent_source: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
+                        cef: Vec<i32>, cet: Vec<i32>, first_point: i32) -> string {
+    let mut out: string = "";
+    let nb: i32 = vec_len(br) / 5;
+    let mut b: i32 = 0;
+    while b < nb {
+        let be: i32 = vec_get(br, b * 5 + 1);
+        let sk: i32 = vec_get(ent_source, be);
+        let unit: i32 = vec_get(src_unit, sk);
+        out = string_concat(out, string_concat(string_concat("branch\t", cov_src_itoa(b)), "\t"));
+        out = string_concat(out, string_concat(cov_br_kind_name(vec_get(br, b * 5)), "\t"));
+        out = string_concat(out, string_concat(string_concat(cov_src_itoa(be), "\t"), string_concat(cov_src_itoa(sk), "\t")));
+        out = string_concat(out, cov_plan_span_text(source, cstarts, clens, unit,
+            vec_get(starts, vec_get(br, b * 5 + 2)), vec_get(ends, vec_get(br, b * 5 + 3))));
+        let nout: i32 = vec_get(br, b * 5 + 4);
+        out = string_concat(out, string_concat("\t", cov_src_itoa(nout)));
+        let mut names: string = "";
+        let mut k: i32 = 0;
+        while k < nout {
+            if k > 0 { names = string_concat(names, ","); }
+            names = string_concat(names, cov_outcome_name(vec_get(br, b * 5), k));
+            k = k + 1;
+        }
+        out = string_concat(out, string_concat(string_concat("\t", names), "\n"));
+        b = b + 1;
+    }
+    /* branch_outcome points (CV-109): one per outcome, discriminator = the
+       branch kind, span = the branch span; listed after the entry points. */
+    let mut pidx: i32 = first_point;
+    let mut ob: i32 = 0;
+    while ob < nb {
+        let obe: i32 = vec_get(br, ob * 5 + 1);
+        let osk: i32 = vec_get(ent_source, obe);
+        let ospan: string = cov_plan_span_text(source, cstarts, clens, vec_get(src_unit, osk),
+            vec_get(starts, vec_get(br, ob * 5 + 2)), vec_get(ends, vec_get(br, ob * 5 + 3)));
+        let mut ok: i32 = 0;
+        while ok < vec_get(br, ob * 5 + 4) {
+            out = string_concat(out, string_concat(string_concat("point\t", cov_src_itoa(pidx)), "\tbranch_outcome\t"));
+            out = string_concat(out, string_concat(cov_src_itoa(obe), "\t"));
+            out = string_concat(out, string_concat(cov_br_kind_name(vec_get(br, ob * 5)), "\t"));
+            out = string_concat(out, string_concat(string_concat(cov_src_itoa(osk), "\t"), ospan));
+            out = string_concat(out, string_concat(string_concat("\t", cov_src_itoa(ok)), "\n"));
+            pidx = pidx + 1;
+            ok = ok + 1;
+        }
+        ob = ob + 1;
+    }
+    let nr: i32 = vec_len(rg) / 5;
+    let order: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < nr {
+        vec_push(order, i);
+        let mut m: i32 = vec_len(order) - 1;
+        let mut moving: bool = true;
+        while moving {
+            if m == 0 {
+                moving = false;
+            } else {
+                let a: i32 = vec_get(order, m - 1);
+                let sa: i32 = vec_get(ent_source, vec_get(rg, a * 5 + 1));
+                let si: i32 = vec_get(ent_source, vec_get(rg, i * 5 + 1));
+                let fa: i32 = vec_get(rg, a * 5 + 2);
+                let fi: i32 = vec_get(rg, i * 5 + 2);
+                let la: i32 = vec_get(rg, a * 5 + 3);
+                let li: i32 = vec_get(rg, i * 5 + 3);
+                let mut after: bool = false;
+                if si < sa { after = true; }
+                if si == sa {
+                    if fi < fa { after = true; }
+                    if fi == fa {
+                        if li < la { after = true; }
+                        if li == la {
+                            if cov_plan_str_lt(cov_rg_kind_name(vec_get(rg, i * 5)), cov_rg_kind_name(vec_get(rg, a * 5))) { after = true; }
+                        }
+                    }
+                }
+                if after {
+                    vec_set(order, m, a);
+                    vec_set(order, m - 1, i);
+                    m = m - 1;
+                } else {
+                    moving = false;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    let mut x: i32 = 0;
+    while x < nr {
+        let r: i32 = vec_get(order, x);
+        let kind: i32 = vec_get(rg, r * 5);
+        let re: i32 = vec_get(rg, r * 5 + 1);
+        let sk2: i32 = vec_get(ent_source, re);
+        let unit2: i32 = vec_get(src_unit, sk2);
+        let s: i32 = vec_get(starts, vec_get(rg, r * 5 + 2));
+        let en: i32 = vec_get(ends, vec_get(rg, r * 5 + 3));
+        let base: i32 = vec_get(cstarts, unit2);
+        let text: string = string_substr(source, base, vec_get(clens, unit2));
+        let lc: bool = if kind == 2 { false } else { kind != 9 };
+        out = string_concat(out, string_concat(string_concat("region\t", cov_src_itoa(x)), "\t"));
+        out = string_concat(out, string_concat(cov_rg_kind_name(kind), "\t"));
+        out = string_concat(out, string_concat(string_concat(cov_src_itoa(re), "\t"), string_concat(cov_src_itoa(sk2), "\t")));
+        out = string_concat(out, cov_plan_span_text(source, cstarts, clens, unit2, s, en));
+        if lc { out = string_concat(out, "\t1\t"); } else { out = string_concat(out, "\t0\t"); }
+        out = string_concat(out, string_concat(cov_plan_line_numbers(text, s - base, en - base), "\t"));
+        out = string_concat(out, string_concat(cov_plan_terms(cef, cet, vec_get(rg, r * 5 + 4)), "\n"));
+        x = x + 1;
+    }
+    return out;
+}
