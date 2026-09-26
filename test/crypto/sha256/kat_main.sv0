@@ -1,0 +1,64 @@
+/* SHA-256 known-answer test (CV-103; sv0cov SPEC COV-MAP-004).
+ * Exit code 0 = every vector passes; otherwise the 1-based index of the first
+ * failing row of vectors.tsv. run_kat.py prepends lib/sha256.sv0 (the
+ * implementation, CV-104) the same way the mega-TU concatenates compiler
+ * modules, so this file only calls `sha256_hex(s: str) -> str`: lowercase
+ * hexadecimal SHA-256 of the bytes of `s`.
+ */
+
+fn repeat_str(s: str, n: i32) -> str {
+  let mut out = "";
+  let mut piece = s;
+  let mut k = n;
+  while k > 0 {
+    if k % 2 == 1 {
+      out = string_concat(out, piece);
+    };
+    k = k / 2;
+    if k > 0 {
+      piece = string_concat(piece, piece);
+    };
+  };
+  return out;
+}
+
+fn check(message: str, want: str) -> i32 {
+  if string_eq(sha256_hex(message), want) {
+    return 0;
+  };
+  return 1;
+}
+
+fn main() -> i32 {
+  if check("", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") != 0 {
+    return 1;
+  };
+  if check("abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") != 0 {
+    return 2;
+  };
+  if check("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1") != 0 {
+    return 3;
+  };
+  if check(repeat_str("a", 1000000), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0") != 0 {
+    return 4;
+  };
+  if check(repeat_str("a", 55), "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318") != 0 {
+    return 5;
+  };
+  if check(repeat_str("a", 56), "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a") != 0 {
+    return 6;
+  };
+  if check(repeat_str("a", 63), "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34") != 0 {
+    return 7;
+  };
+  if check(repeat_str("a", 64), "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb") != 0 {
+    return 8;
+  };
+  if check(repeat_str("a", 119), "31eba51c313a5c08226adf18d4a359cfdfd8d2e816b13f4af952f7ea6584dcfb") != 0 {
+    return 9;
+  };
+  if check(repeat_str("a", 120), "2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c") != 0 {
+    return 10;
+  };
+  return 0;
+}

@@ -1,0 +1,17 @@
+# SHA-256 known-answer vectors (CV-103). Columns: name, message, digest.
+# message forms: "text:<ascii>" or "repeat:<ascii>:<count>".
+# NIST: empty, abc, 448-bit, million-a are the FIPS 180-2 / NIST CSRC
+# "SHA-256 examples" (SHA256.pdf, one-block, two-block, long message).
+# Boundary rows (55..120 bytes of 'a') exercise every padding case around the
+# 64-byte block and 56-byte length-field boundaries; their digests were
+# computed with Python hashlib and are checked again by run_kat.py.
+empty	text:	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+abc	text:abc	ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+448-bit	text:abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq	248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1
+million-a	repeat:a:1000000	cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0
+a55	repeat:a:55	9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318
+a56	repeat:a:56	b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a
+a63	repeat:a:63	7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34
+a64	repeat:a:64	ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb
+a119	repeat:a:119	31eba51c313a5c08226adf18d4a359cfdfd8d2e816b13f4af952f7ea6584dcfb
+a120	repeat:a:120	2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c
