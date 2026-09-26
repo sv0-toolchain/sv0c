@@ -2,16 +2,16 @@
 
 
 static int sv0_user_main(void) {
-  int r;
-  r = 1;
+  int sv0u_r;
+  sv0u_r = 1;
   int _sv0t0 = 5;
   int _sv0t1 = 1;
   while ((_sv0t1 < _sv0t0)) {
-    int i = _sv0t1;
+    int sv0u_i = _sv0t1;
     _sv0t1 = (_sv0t1 + 1);
-    r = (r * i);
+    sv0u_r = (sv0u_r * sv0u_i);
   }
-  return r;
+  return sv0u_r;
 }
 
 int main(int argc, char **argv) {

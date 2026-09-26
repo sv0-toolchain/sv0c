@@ -1,0 +1,50 @@
+// User functions named like C library functions. The C backend emits every
+// user identifier with the `sv0u_` prefix, so none of these clash with the
+// declarations in the headers sv0_runtime.h includes (<stdlib.h>,
+// <stdio.h>, <string.h>, ...). Before the prefix, `fn abs` failed with
+// "static declaration of 'abs' follows non-static declaration".
+//
+// Both backends. Expected exit: 42.
+
+struct Buf {
+    len: i32,
+    cap: i32,
+}
+
+impl Buf {
+    fn free(self: Buf) -> i32 {
+        return self.cap - self.len;
+    }
+}
+
+fn abs(n: i32) -> i32 {
+    if n < 0 { return 0 - n; }
+    return n;
+}
+
+fn exit(code: i32) -> i32 { return code + 1; }
+fn strlen(n: i32) -> i32 { return n * 2; }
+fn printf(a: i32, b: i32) -> i32 { return a + b; }
+fn malloc(n: i32) -> i32 { return n; }
+fn signal(n: i32) -> i32 { return n - 1; }
+fn qsort(n: i32) -> i32 { return n; }
+fn memcpy(n: i32) -> i32 { return n; }
+fn getc(n: i32) -> i32 { return n; }
+
+// A struct-ref parameter named like a libc function.
+fn index(atoi: &Buf) -> i32 {
+    return atoi.len;
+}
+
+fn main() -> i32 {
+    let b: Buf = Buf { len: 3, cap: 10 };
+    let mut t: i32 = abs(0 - 5);              // 5
+    t = t + exit(1);                          // 7
+    t = t + strlen(3);                        // 13
+    t = t + printf(4, 5);                     // 22
+    t = t + malloc(2) + signal(3);            // 26
+    t = t + qsort(1) + memcpy(1) + getc(1);   // 29
+    t = t + b.free();                         // 36
+    t = t + index(&b) * 2;                    // 42
+    return t;
+}

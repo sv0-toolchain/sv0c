@@ -1,0 +1,35 @@
+// Locals, parameters, struct fields and functions named like C keywords or
+// macros from the runtime's C headers (`double`, `int`, `default`, `stdin`,
+// `EOF`, `NULL`, ...). The C backend prefixes every user identifier with
+// `sv0u_`, so the generated C stays valid.
+//
+// Both backends. Expected exit: 42.
+
+struct Opts {
+    default: i32,
+    switch: i32,
+    stdin: i32,
+    EOF: i32,
+}
+
+fn double(x: i32) -> i32 { return x * 2; }
+fn int(char: i32, long: i32) -> i32 { return char - long; }
+fn unsigned(register: i32) -> i32 { return register; }
+
+fn sum(o: Opts) -> i32 {
+    return o.default + o.switch + o.stdin + o.EOF;
+}
+
+fn main() -> i32 {
+    let o: Opts = Opts { default: 1, switch: 2, stdin: 3, EOF: 4 };
+    let short: i32 = double(3);        // 6
+    let NULL: i32 = int(10, 4);        // 6
+    let mut volatile: i32 = sum(o);    // 10
+    let mut goto: i32 = 0;
+    while goto < 3 {
+        volatile = volatile + unsigned(goto);   // 10 + 0 + 1 + 2 = 13
+        goto = goto + 1;
+    }
+    let BUFSIZ: i32 = short + NULL + volatile;  // 25
+    return BUFSIZ + 17;
+}

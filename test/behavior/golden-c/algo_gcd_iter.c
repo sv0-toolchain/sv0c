@@ -2,17 +2,17 @@
 
 
 static int sv0_user_main(void) {
-  int a;
-  a = 54;
-  int b;
-  b = 24;
-  while ((b != 0)) {
-    int t;
-    t = (a % b);
-    a = b;
-    b = t;
+  int sv0u_a;
+  sv0u_a = 54;
+  int sv0u_b;
+  sv0u_b = 24;
+  while ((sv0u_b != 0)) {
+    int sv0u_t;
+    sv0u_t = (sv0u_a % sv0u_b);
+    sv0u_a = sv0u_b;
+    sv0u_b = sv0u_t;
   }
-  return a;
+  return sv0u_a;
 }
 
 int main(int argc, char **argv) {

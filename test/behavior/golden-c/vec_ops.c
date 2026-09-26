@@ -3,12 +3,12 @@
 
 static int sv0_user_main(void) {
   int _sv0t0 = sv0_vec_new();
-  int v;
-  v = _sv0t0;
-  sv0_vec_push(v, 40);
-  sv0_vec_push(v, 2);
-  int _sv0t3 = sv0_vec_get(v, 0);
-  int _sv0t4 = sv0_vec_get(v, 1);
+  int sv0u_v;
+  sv0u_v = _sv0t0;
+  sv0_vec_push(sv0u_v, 40);
+  sv0_vec_push(sv0u_v, 2);
+  int _sv0t3 = sv0_vec_get(sv0u_v, 0);
+  int _sv0t4 = sv0_vec_get(sv0u_v, 1);
   int _sv0t5 = (_sv0t3 + _sv0t4);
   return _sv0t5;
 }

@@ -195,6 +195,7 @@ static int callee_fn_index_match_env(int env, int aliases, int name_h);
 static int scrut_local_lookup(int scrut_names, int name_h);
 static int param_ty_lookup(int param_names, int name_h);
 static const char* handle_to_str(int h, const char* source, int starts, int ends);
+static const char* lower_c_ident(const char* name);
 static int lower_ann_is_user_type(const char* name, int item_tags, int item_names, const char* source, int starts, int ends);
 static int lower_name_in_handle_list(const char* name, int list, const char* source, int starts, int ends);
 static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, int fcount, const char* source, int starts, int ends, int sn, int en);
@@ -13628,6 +13629,11 @@ static const char* handle_to_str(int h, const char* source, int starts, int ends
   return _sv0t3;
 }
 
+static const char* lower_c_ident(const char* name) {
+  const char* _sv0t0 = sv0_string_concat("sv0u_", name);
+  return _sv0t0;
+}
+
 static int lower_ann_is_user_type(const char* name, int item_tags, int item_names, const char* source, int starts, int ends) {
   int _sv0t0 = sv0_vec_len(item_tags);
   int n = _sv0t0;
@@ -13738,26 +13744,27 @@ static const char* emit_struct_td(int name_h, int fnames, int ftypes, int foff, 
     int _sv0t8 = (foff + i);
     int _sv0t9 = sv0_vec_get(fnames, _sv0t8);
     const char* _sv0t10 = handle_to_str(_sv0t9, source, starts, ends);
+    const char* _sv0t11 = lower_c_ident(_sv0t10);
     const char* fname;
-    fname = _sv0t10;
-    const char* _sv0t11 = sv0_string_concat(r, "  ");
-    r = _sv0t11;
-    const char* _sv0t12 = sv0_string_concat(r, cty);
+    fname = _sv0t11;
+    const char* _sv0t12 = sv0_string_concat(r, "  ");
     r = _sv0t12;
-    const char* _sv0t13 = sv0_string_concat(r, " ");
+    const char* _sv0t13 = sv0_string_concat(r, cty);
     r = _sv0t13;
-    const char* _sv0t14 = sv0_string_concat(r, fname);
+    const char* _sv0t14 = sv0_string_concat(r, " ");
     r = _sv0t14;
-    const char* _sv0t15 = sv0_string_concat(r, ";\n");
+    const char* _sv0t15 = sv0_string_concat(r, fname);
     r = _sv0t15;
+    const char* _sv0t16 = sv0_string_concat(r, ";\n");
+    r = _sv0t16;
     i = (i + 1);
   }
-  const char* _sv0t16 = sv0_string_concat(r, "} ");
-  r = _sv0t16;
-  const char* _sv0t17 = sv0_string_concat(r, name);
+  const char* _sv0t17 = sv0_string_concat(r, "} ");
   r = _sv0t17;
-  const char* _sv0t18 = sv0_string_concat(r, ";\n");
+  const char* _sv0t18 = sv0_string_concat(r, name);
   r = _sv0t18;
+  const char* _sv0t19 = sv0_string_concat(r, ";\n");
+  r = _sv0t19;
   return r;
 }
 
@@ -17010,7 +17017,7 @@ static int test_typedef_builders(void) {
   const char* _sv0t8 = emit_struct_td(0, fv, tv, 0, 2, src, st, nd, sn, en);
   const char* td;
   td = _sv0t8;
-  int _sv0t9 = sv0_string_eq(td, "typedef struct {\n  int x;\n  int y;\n} P;\n");
+  int _sv0t9 = sv0_string_eq(td, "typedef struct {\n  int sv0u_x;\n  int sv0u_y;\n} P;\n");
   if ((_sv0t9 != 1)) {
     return 2;
   } else {

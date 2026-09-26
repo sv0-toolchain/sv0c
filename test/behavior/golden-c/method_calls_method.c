@@ -1,28 +1,28 @@
 #include "sv0_runtime.h"
 
 typedef struct {
-  int v;
+  int sv0u_v;
 } N;
 
-static int dbl(N self);
-static int quad(N self);
+static int sv0u_dbl(N sv0u_self);
+static int sv0u_quad(N sv0u_self);
 
-static int dbl(N self) {
-  int _sv0t0 = (self.v * 2);
+static int sv0u_dbl(N sv0u_self) {
+  int _sv0t0 = (sv0u_self.sv0u_v * 2);
   return _sv0t0;
 }
 
-static int quad(N self) {
-  int _sv0t0 = dbl(self);
-  int _sv0t1 = dbl(self);
+static int sv0u_quad(N sv0u_self) {
+  int _sv0t0 = sv0u_dbl(sv0u_self);
+  int _sv0t1 = sv0u_dbl(sv0u_self);
   int _sv0t2 = (_sv0t0 + _sv0t1);
   return _sv0t2;
 }
 
 static int sv0_user_main(void) {
-  N n;
-  n.v = 3;
-  int _sv0t0 = quad(n);
+  N sv0u_n;
+  sv0u_n.sv0u_v = 3;
+  int _sv0t0 = sv0u_quad(sv0u_n);
   return _sv0t0;
 }
 

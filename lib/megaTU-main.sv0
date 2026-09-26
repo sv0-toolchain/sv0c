@@ -759,7 +759,7 @@ fn megatu_param_list(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<i32>,
             out = string_concat(out, ", ");
         }
         let nt: i32 = vec_get(fpn, base + k);
-        let mut nm: string = handle_to_str(nt, source, starts, ends);
+        let mut nm: string = lower_c_ident(handle_to_str(nt, source, starts, ends));
         let cty: string = megatu_cty_of_root(vec_get(fpt, base + k),
                                              ptt, ptd1, ptd2, pp,
                                              source, starts, ends, it, id1);
@@ -799,7 +799,7 @@ fn megatu_ref_param_prologue(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec<
     let mut k: i32 = 0;
     while k < pc {
         let nt: i32 = vec_get(fpn, base + k);
-        let nm: string = handle_to_str(nt, source, starts, ends);
+        let nm: string = lower_c_ident(handle_to_str(nt, source, starts, ends));
         let sref_name: string = megatu_struct_ref_type_name(vec_get(fpt, base + k),
             ptt, ptd1, ptd2, pp, source, starts, ends, it, id1);
         if !string_eq(sref_name, "") {
@@ -894,7 +894,7 @@ fn megatu_param_list_extern_c(item_i: i32, it: Vec<i32>, id1: Vec<i32>, id3: Vec
             out = string_concat(out, ", ");
         }
         let nt: i32 = vec_get(fpn, base + k);
-        let nm: string = handle_to_str(nt, source, starts, ends);
+        let nm: string = lower_c_ident(handle_to_str(nt, source, starts, ends));
         let cty: string = megatu_cty_of_root_extern_c(vec_get(fpt, base + k),
                                              ptt, ptd1, ptd2, pp,
                                              source, starts, ends, it, id1);
@@ -988,7 +988,7 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
         let pstr: string = megatu_param_list(item_i, it, id1, id3, id5, fpn,
                                              fpt, ptt, ptd1, ptd2, pp,
                                              source, starts, ends);
-        let sig: string = string_concat(fn_name,
+        let sig: string = string_concat(lower_c_ident(fn_name),
             string_concat("(", string_concat(pstr, ")")));
         /* Body via the source-aware emitter (not codegen's emit_instrs, whose
            name_of/op_of are test stubs): resolves var/temp names and operators
@@ -1371,6 +1371,16 @@ fn megatu_val_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>,
     return base;
 }
 
+/* C spelling of value handle `h`: a temp keeps its `_sv0t<n>` name, a user
+   identifier gets lower_c_ident's prefix. megatu_val_name stays the raw sv0
+   name for the callers that need it as data (contract messages, `result`). */
+fn megatu_c_name(h: i32, source: string, starts: Vec<i32>, ends: Vec<i32>,
+                 sidx: Vec<i32>) -> string {
+    let nm: string = megatu_val_name(h, source, starts, ends, sidx);
+    if h >= lower_temp_base() { return nm; }
+    return lower_c_ident(nm);
+}
+
 /* Resolve a struct/enum field handle to its C field name. Enum layout (see
    emit_enum_td / the enum-ctor lowering): the tag field is the sentinel -1 ->
    "tag", and payload i is the sentinel -10 - i -> "p<i>". Tuple projection
@@ -1394,7 +1404,7 @@ fn megatu_field_name(fh: i32, source: string, starts: Vec<i32>,
     if fh <= 0 - 10 {
         return string_concat("p", int_to_string(0 - 10 - fh));
     }
-    return handle_to_str(fh, source, starts, ends);
+    return lower_c_ident(handle_to_str(fh, source, starts, ends));
 }
 
 /* Builtin id (lowering build_builtin_map: println=1 … read_dir=17,
@@ -2083,7 +2093,7 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
         codegen_Value::VInt(i) => { return int_to_string(i); },
         codegen_Value::VBoolTrue => { return "1"; },
         codegen_Value::VBoolFalse => { return "0"; },
-        codegen_Value::VVar(h) => { return megatu_val_name(h, source, starts, ends, sidx); },
+        codegen_Value::VVar(h) => { return megatu_c_name(h, source, starts, ends, sidx); },
         codegen_Value::VUnit => { return "0"; },
         codegen_Value::VString(h) => {
             /* A string literal's handle is a source token whose text still includes
@@ -2117,7 +2127,7 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
             return string_concat(string_concat(prefix, ")."), field);
         },
         codegen_Value::VAddrOf(h) => {
-            return string_concat(string_concat("(&", megatu_val_name(h, source, starts, ends, sidx)), ")");
+            return string_concat(string_concat("(&", megatu_c_name(h, source, starts, ends, sidx)), ")");
         },
         codegen_Value::VFloat(h) => {
             /* h is the literal's own source token (see lowering.sv0's
@@ -2148,7 +2158,7 @@ fn megatu_emit_expr(e: codegen_Expr, source: string, starts: Vec<i32>, ends: Vec
             return megatu_emit_value(v, source, starts, ends, sidx);
         },
         codegen_Expr::Load(h) => {
-            return megatu_val_name(h, source, starts, ends, sidx);
+            return megatu_c_name(h, source, starts, ends, sidx);
         },
         codegen_Expr::Binop(op_h, bv1, bv2) => {
             let v1: codegen_Value = box_deref(bv1);
@@ -2328,7 +2338,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             if string_eq(nm, "result") { cty = ret_ty; }
             let a: string = string_concat(indent, cty);
             let a2: string = string_concat(a, " ");
-            let b: string = string_concat(a2, nm);
+            let b: string = string_concat(a2, megatu_c_name(h, source, starts, ends, sidx));
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, megatu_cty_category(cty), 0 - 1, 0 - 1);
             return string_concat(b, ";\n");
         },
@@ -2339,7 +2349,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, megatu_cty_category(cty), eidx, sidx2);
             let a: string = string_concat(indent, cty);
             let b: string = string_concat(a, " ");
-            let c: string = string_concat(b, megatu_val_name(h, source, starts, ends, sidx));
+            let c: string = string_concat(b, megatu_c_name(h, source, starts, ends, sidx));
             return string_concat(c, ";\n");
         },
         codegen_Instr::Assign(h, be) => {
@@ -2353,7 +2363,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                 megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, 0, 0 - 1, asty);
                 let sa: string = string_concat(indent, sname);
                 let sa2: string = string_concat(sa, " ");
-                let sb: string = string_concat(sa2, megatu_val_name(h, source, starts, ends, sidx));
+                let sb: string = string_concat(sa2, megatu_c_name(h, source, starts, ends, sidx));
                 let sc: string = string_concat(sb, " = ");
                 let sd: string = string_concat(sc, megatu_emit_expr(e, source, starts, ends, sidx));
                 return string_concat(sd, ";\n");
@@ -2363,21 +2373,21 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let cty: string = megatu_cty_of_category(category);
             let a: string = string_concat(indent, cty);
             let a2: string = string_concat(a, " ");
-            let b: string = string_concat(a2, megatu_val_name(h, source, starts, ends, sidx));
+            let b: string = string_concat(a2, megatu_c_name(h, source, starts, ends, sidx));
             let c: string = string_concat(b, " = ");
             let d: string = string_concat(c, megatu_emit_expr(e, source, starts, ends, sidx));
             return string_concat(d, ";\n");
         },
         codegen_Instr::Store(h, be) => {
             let e: codegen_Expr = box_deref(be);
-            let a: string = string_concat(indent, megatu_val_name(h, source, starts, ends, sidx));
+            let a: string = string_concat(indent, megatu_c_name(h, source, starts, ends, sidx));
             let b: string = string_concat(a, " = ");
             let c: string = string_concat(b, megatu_emit_expr(e, source, starts, ends, sidx));
             return string_concat(c, ";\n");
         },
         codegen_Instr::StoreField(bh, fh, be) => {
             let e: codegen_Expr = box_deref(be);
-            let a: string = string_concat(indent, megatu_val_name(bh, source, starts, ends, sidx));
+            let a: string = string_concat(indent, megatu_c_name(bh, source, starts, ends, sidx));
             let b: string = string_concat(a, ".");
             let c: string = string_concat(b, megatu_field_name(fh, source, starts, ends));
             let d: string = string_concat(c, " = ");
@@ -2447,7 +2457,13 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                the runtime C name `sv0_<builtin>`; a source fn resolves normally. */
             let mut fn_name: string = megatu_builtin_name(0 - fn_h);
             if fn_h >= 0 {
-                fn_name = megatu_val_name(fn_h, source, starts, ends, sidx);
+                fn_name = megatu_c_name(fn_h, source, starts, ends, sidx);
+                /* An `#[extern_c]` callee (item tag 8) is a real C symbol. */
+                if call_item_i >= 0 {
+                    if vec_get(it, call_item_i) == 8 {
+                        fn_name = megatu_val_name(fn_h, source, starts, ends, sidx);
+                    }
+                }
             }
             if dst_h == 0 {
                 let a: string = string_concat(indent, fn_name);
@@ -2497,7 +2513,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, dst_h, megatu_cty_category(ret_name), call_eidx, call_sidx);
             let a: string = string_concat(indent, ret_name);
             let b: string = string_concat(a, " ");
-            let c: string = string_concat(b, megatu_val_name(dst_h, source, starts, ends, sidx));
+            let c: string = string_concat(b, megatu_c_name(dst_h, source, starts, ends, sidx));
             let d: string = string_concat(c, " = ");
             let e: string = string_concat(d, fn_name);
             let f: string = string_concat(e, "(");
@@ -2539,7 +2555,7 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, h, megatu_cty_category(cty), 0 - 1, 0 - 1);
             let a2: string = string_concat(indent, cty);
             let b2: string = string_concat(a2, " ");
-            let c2: string = string_concat(b2, megatu_val_name(h, source, starts, ends, sidx));
+            let c2: string = string_concat(b2, megatu_c_name(h, source, starts, ends, sidx));
             return string_concat(c2, ";\n");
         },
     }
@@ -2646,7 +2662,7 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, dh2, 0, 0 - 1, dsty);
             let e1: string = string_concat(indent, handle_to_str(vec_get(sit_nt, dsty), source, starts, ends));
             let e2: string = string_concat(e1, " ");
-            let e3: string = string_concat(e2, megatu_val_name(dh2, source, starts, ends, sidx));
+            let e3: string = string_concat(e2, megatu_c_name(dh2, source, starts, ends, sidx));
             out = string_concat(out, string_concat(e3, ";\n"));
             idx = idx + 1;
             continue;
@@ -2656,7 +2672,7 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
             megatu_tyenv_push(tyenv_h, tyenv_f, tyenv_e, tyenv_st, dh, dcat, 0 - 1, 0 - 1);
             let d1: string = string_concat(indent, megatu_cty_of_category(dcat));
             let d2: string = string_concat(d1, " ");
-            let d3: string = string_concat(d2, megatu_val_name(dh, source, starts, ends, sidx));
+            let d3: string = string_concat(d2, megatu_c_name(dh, source, starts, ends, sidx));
             out = string_concat(out, string_concat(d3, ";\n"));
             idx = idx + 1;
             continue;

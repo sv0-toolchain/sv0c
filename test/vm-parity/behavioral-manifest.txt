@@ -42,3 +42,5 @@ sv0c/test/behavior/cases/enum_struct_variant_construct.sv0
 sv0c/test/behavior/cases/enum_struct_variant_construct_nested.sv0
 sv0c/test/behavior/cases/fill_explicit_intrinsic.sv0
 sv0c/test/behavior/cases/struct_ref_param.sv0
+sv0c/test/behavior/cases/c_name_libc_functions.sv0
+sv0c/test/behavior/cases/c_name_keywords_macros.sv0

@@ -7630,6 +7630,15 @@ fn handle_to_str(h: i32, source: string,
 
 /* ── emit_struct_td (SML emitStructTd) ──────────────────────── */
 
+/* C spelling of a user value identifier (function, local, parameter, struct
+   field). Every one gets the `sv0u_` prefix so no sv0 name can collide with a
+   C keyword or anything the runtime's C headers declare (`abs`, `double`,
+   `stdin`, ...); `sv0_`/`SV0_` stay the runtime's and `_sv0t` the temps'.
+   Type names and `#[extern_c]` symbols are not prefixed. */
+fn lower_c_ident(name: string) -> string {
+    return string_concat("sv0u_", name);
+}
+
 /* True if `name` (by TEXT) matches any handle in `list`. is_struct_cty/is_enum_cty
    compare by handle equality, which works in the SML pipeline (interned names share
    a handle) but not in the composed compiler (handles are token indices, so a field-
@@ -7709,7 +7718,7 @@ fn emit_struct_td(name_h: i32,
                 }
             }
         }
-        let fname: string = handle_to_str(vec_get(fnames, foff + i), source, starts, ends);
+        let fname: string = lower_c_ident(handle_to_str(vec_get(fnames, foff + i), source, starts, ends));
         r = string_concat(r, "  ");
         r = string_concat(r, cty);
         r = string_concat(r, " ");
@@ -9422,7 +9431,7 @@ fn test_typedef_builders() -> i32 {
     vec_push(fv, 1); vec_push(fv, 3);
     vec_push(tv, 2); vec_push(tv, 4);
     let td: string = emit_struct_td(0, fv, tv, 0, 2, src, st, nd, sn, en);
-    if string_eq(td, "typedef struct {\n  int x;\n  int y;\n} P;\n") != true { return 2; }
+    if string_eq(td, "typedef struct {\n  int sv0u_x;\n  int sv0u_y;\n} P;\n") != true { return 2; }
     let slot_cats0: Vec<i32> = vec_new();
     vec_push(slot_cats0, 0);
     let td2: string = emit_enum_td(5, 1, slot_cats0, src, st, nd);

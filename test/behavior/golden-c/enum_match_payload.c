@@ -7,16 +7,16 @@ typedef struct {
 
 
 static int sv0_user_main(void) {
-  E e;
-  e.tag = 0;
-  e.p0 = 41;
+  E sv0u_e;
+  sv0u_e.tag = 0;
+  sv0u_e.p0 = 41;
   int _sv0t0;
   _sv0t0 = 0;
-  if ((e.tag == 0)) {
-    int n = e.p0;
-    _sv0t0 = n;
+  if ((sv0u_e.tag == 0)) {
+    int sv0u_n = sv0u_e.p0;
+    _sv0t0 = sv0u_n;
   } else {
-    if ((e.tag == 1)) {
+    if ((sv0u_e.tag == 1)) {
       _sv0t0 = 0;
     } else {
     }
