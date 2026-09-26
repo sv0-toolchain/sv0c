@@ -1,0 +1,5 @@
+// E0418: an impl overriding a trait's default method (same name twice).
+struct Pt { x: i32 }
+trait Area { fn area(self: Pt) -> i32 { return 1; } }
+impl Area for Pt { fn area(self: Pt) -> i32 { return self.x; } }
+fn main() -> i32 { let p: Pt = Pt { x: 2 }; return p.area(); }

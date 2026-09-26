@@ -4602,6 +4602,33 @@ fn check_extern_fn_signature(param_types: Vec<i32>, param_count: i32,
     return 0;
 }
 
+/* Name token of the second of two function items with bodies (tag 0,
+   body root >= 0) whose names are spelled the same, or -1. */
+fn check_duplicate_fn_names(it: Vec<i32>, id1: Vec<i32>, id4: Vec<i32>,
+                            source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(it);
+    let mut i: i32 = 0;
+    while i < n {
+        let is_fn_i: bool = if vec_get(it, i) == 0 { vec_get(id4, i) >= 0 } else { false };
+        if is_fn_i {
+            let ti: i32 = vec_get(id1, i);
+            let name_i: string = string_substr(source, vec_get(starts, ti), vec_get(ends, ti) - vec_get(starts, ti));
+            let mut j: i32 = 0;
+            while j < i {
+                let is_fn_j: bool = if vec_get(it, j) == 0 { vec_get(id4, j) >= 0 } else { false };
+                if is_fn_j {
+                    let tj: i32 = vec_get(id1, j);
+                    let name_j: string = string_substr(source, vec_get(starts, tj), vec_get(ends, tj) - vec_get(starts, tj));
+                    if string_eq(name_i, name_j) { return ti; }
+                }
+                j = j + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
 fn check_program(
     tok_tags: Vec<i32>,
     source: string,
@@ -4687,6 +4714,17 @@ fn check_program(
         vec_push(diag_sink, vec_get(fn_names, extern_conflict));
         return 0 - 1;
     }
+    /* E0418: two functions with bodies share a name. Functions and methods
+       are emitted and called by bare name on both backends, so same-named
+       methods on different types (or an impl overriding a trait's default
+       method) produced conflicting C or silently called the wrong method on
+       the VM. Reject until method calls dispatch on the receiver type. */
+    let dup_fn: i32 = check_duplicate_fn_names(it, id1, id4, source, starts, ends);
+    if dup_fn >= 0 {
+        vec_push(diag_sink, 418);
+        vec_push(diag_sink, dup_fn);
+        return 0 - 1;
+    }
     let mod_env_names: Vec<i32> = vec_new();
     let mod_env_types: Vec<i32> = vec_new();
     let mod_env_muts: Vec<i32> = vec_new();
@@ -4744,7 +4782,12 @@ fn check_program(
             let fidx: i32 = fn_table_lookup(fn_names, name_pos);
             if fidx < 0 { return 0 - 1; }
             let ret_ty: i32 = fn_table_ret_type(fn_ret_types, fidx);
-            let chk: i32 = check_fn_body(body_et, body_ed1, body_ed2,
+            /* A bodyless trait method declaration (`fn f(self: T) -> i32;`,
+               body root -1) has only its signature, checked above; running
+               the body check on it failed with no diagnostic (bare exit 4). */
+            let mut chk: i32 = 0;
+            if body_root_idx >= 0 {
+                chk = check_fn_body(body_et, body_ed1, body_ed2,
                                           body_ed3, body_ed4, bpp,
                                           source, starts, ends,
                                           mod_env_names, mod_env_types,
@@ -4759,6 +4802,7 @@ fn check_program(
                                           edef_vshapes_flat,
                                           fn_names, fn_ret_types,
                                           diag_sink);
+            }
             /* BH-8d (Slice 3): flag `<param>.<field>` on a bare-struct parameter
                whose struct has no such field (E0429). Runs in check_program
                where the sdef_* struct tables + pty arena live, avoiding a deep

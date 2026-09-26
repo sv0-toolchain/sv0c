@@ -9,10 +9,10 @@ instead of C. This script:
 1. runs every hand-reviewed sv0cov semantic fixture
    (sv0cov/tests/fixtures/semantic/*) and compares the planned sources,
    entities, and function_entry points with the fixture's expected-map.json;
-2. runs small synthetic programs (inherent methods, trait default methods,
+2. runs small synthetic programs (inherent methods, trait impl methods,
+   trait default methods, bodyless trait methods (not entities),
    #[extern_c], `pub`, array parameters, contracts, `module` names, CRLF,
-   tabs, multibyte text, project source order). Trait impls and bodyless
-   trait methods do not pass the native checker yet, so they are not here against expectations
+   tabs, multibyte text, project source order) against expectations
    anchored to their source text, with lines/columns from a Python
    reference (LF lines, Unicode-scalar columns);
 3. requires the native compiler and the native VM emitter, which share the
@@ -131,8 +131,8 @@ SYNTHETIC = [
     ("methods-and-traits", {"main.sv0": (
         "/* café ☕ — multibyte text before the first item */\n"
         "struct Pt { x: i32 }\n\n"
-        "trait Area {\n    fn twice(self: Pt) -> i32 { return 2; }\n}\n\n"
-        "impl Area for Pt { }\n\n"
+        "trait Area {\n    fn sides(self: Pt) -> i32;\n    fn twice(self: Pt) -> i32 { return 2; }\n}\n\n"
+        "impl Area for Pt {\n    fn sides(self: Pt) -> i32 { return 4; }\n}\n\n"
         "impl Pt {\n    fn get(self: Pt) -> i32 { return self.x; }\n    fn bump(self: Pt) -> i32 {\n"
         "        return self.x + 1;\n    }\n}\n\n"
         "#[extern_c]\nfn abs(x: i32) -> i32;\n\n"
@@ -142,6 +142,7 @@ SYNTHETIC = [
         "    return p.get() + p.bump() + first([1, 2, 3]) + checked(1) + abs(0) - 7;\n}\n")},
      "main.sv0",
      [("Area::twice", "main.sv0", "fn twice", "return 2; }"),
+      ("Pt::sides", "main.sv0", "fn sides(self: Pt) -> i32 {", "return 4; }"),
       ("Pt::get", "main.sv0", "fn get", "self.x; }"),
       ("Pt::bump", "main.sv0", "fn bump", "+ 1;\n    }"),
       ("first", "main.sv0", "fn first", "a[0]; }"),

@@ -1,0 +1,7 @@
+// E0418: methods with the same name on different types. Calls dispatch by
+// bare name, so this used to fail in C or call the wrong method on the VM.
+struct Pt { x: i32 }
+struct Sq { s: i32 }
+impl Pt { fn area(self: Pt) -> i32 { return self.x; } }
+impl Sq { fn area(self: Sq) -> i32 { return self.s * self.s; } }
+fn main() -> i32 { let p: Pt = Pt { x: 2 }; let q: Sq = Sq { s: 3 }; return p.area() + q.area(); }

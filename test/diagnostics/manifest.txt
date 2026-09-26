@@ -69,3 +69,5 @@ test/diagnostics/cases/vec_f64_fresh_conflict.sv0|E0451|native
 test/diagnostics/cases/vec_f64_ambiguous.sv0|E0451|native
 test/diagnostics/cases/vec_f64_int_element.sv0|E0452|native
 test/diagnostics/cases/vec_f64_typed_on_int_vec.sv0|E0453|native
+test/diagnostics/cases/dup_method_names.sv0|E0418|native
+test/diagnostics/cases/dup_trait_default_override.sv0|E0418|native

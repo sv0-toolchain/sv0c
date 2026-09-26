@@ -10586,42 +10586,52 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
   }
   int i = 0;
   while ((i < n)) {
-    int _sv0t30 = sv0_vec_get(item_tags, i);
-    if ((_sv0t30 == 0)) {
-      int _sv0t31 = sv0_vec_get(item_names, i);
-      int label_h = _sv0t31;
+    int _sv0t32 = sv0_vec_get(item_tags, i);
+    int _sv0t30;
+    int _sv0t31;
+    if ((_sv0t32 == 0)) {
+      int _sv0t33 = sv0_vec_get(item_d4, i);
+      _sv0t31 = (_sv0t33 >= 0);
+    } else {
+      _sv0t31 = 0;
+    }
+    _sv0t30 = _sv0t31;
+    int has_body = _sv0t30;
+    if (has_body) {
+      int _sv0t34 = sv0_vec_get(item_names, i);
+      int label_h = _sv0t34;
       sv0_vec_push(out_block_labels, label_h);
-      int _sv0t32 = sv0_vec_get(item_d4, i);
-      int body_root = _sv0t32;
-      int _sv0t33 = sv0_vec_new();
-      int instrs = _sv0t33;
-      int _sv0t34 = sv0_vec_new();
-      int req_roots = _sv0t34;
-      int _sv0t35 = sv0_vec_new();
-      int ens_roots = _sv0t35;
-      int _sv0t36 = sv0_vec_len(fn_contract_base);
-      if ((i < _sv0t36)) {
-        int _sv0t37 = sv0_vec_get(fn_contract_base, i);
-        int cbase = _sv0t37;
+      int _sv0t35 = sv0_vec_get(item_d4, i);
+      int body_root = _sv0t35;
+      int _sv0t36 = sv0_vec_new();
+      int instrs = _sv0t36;
+      int _sv0t37 = sv0_vec_new();
+      int req_roots = _sv0t37;
+      int _sv0t38 = sv0_vec_new();
+      int ens_roots = _sv0t38;
+      int _sv0t39 = sv0_vec_len(fn_contract_base);
+      if ((i < _sv0t39)) {
+        int _sv0t40 = sv0_vec_get(fn_contract_base, i);
+        int cbase = _sv0t40;
         if ((cbase >= 0)) {
-          int _sv0t38 = sv0_vec_get(item_d2, i);
-          int ccount = (_sv0t38 / 2);
+          int _sv0t41 = sv0_vec_get(item_d2, i);
+          int ccount = (_sv0t41 / 2);
           int cj = 0;
           while ((cj < ccount)) {
-            int _sv0t39 = (cbase + cj);
-            int _sv0t40 = sv0_vec_get(fn_contract_root, _sv0t39);
-            int croot = _sv0t40;
-            int _sv0t41 = contract_kw_pos_of_root(body_et, body_ed1, body_ed2, body_ed3, body_pp, tok_tags, croot);
-            int kwpos = _sv0t41;
+            int _sv0t42 = (cbase + cj);
+            int _sv0t43 = sv0_vec_get(fn_contract_root, _sv0t42);
+            int croot = _sv0t43;
+            int _sv0t44 = contract_kw_pos_of_root(body_et, body_ed1, body_ed2, body_ed3, body_pp, tok_tags, croot);
+            int kwpos = _sv0t44;
             if ((kwpos >= 0)) {
-              int _sv0t42 = contract_is_advanced(tok_tags, kwpos);
-              if (_sv0t42) {
-                int _sv0t43 = sv0_vec_get(tok_tags, kwpos);
-                int _sv0t44 = lower_note_model_only(source, starts, kwpos, _sv0t43);
-                int _mo = _sv0t44;
+              int _sv0t45 = contract_is_advanced(tok_tags, kwpos);
+              if (_sv0t45) {
+                int _sv0t46 = sv0_vec_get(tok_tags, kwpos);
+                int _sv0t47 = lower_note_model_only(source, starts, kwpos, _sv0t46);
+                int _mo = _sv0t47;
               } else {
-                int _sv0t45 = sv0_vec_get(tok_tags, kwpos);
-                int ckind = _sv0t45;
+                int _sv0t48 = sv0_vec_get(tok_tags, kwpos);
+                int ckind = _sv0t48;
                 if ((ckind == 83)) {
                   if ((contract_mode != 2)) {
                     sv0_vec_push(req_roots, croot);
@@ -10635,11 +10645,11 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
                     } else {
                     }
                     if ((contract_mode == 1)) {
-                      int _sv0t46 = sv0_vec_get(starts, kwpos);
-                      int _sv0t47 = lower_line_of_pos(source, _sv0t46);
-                      int eline = _sv0t47;
-                      int _sv0t48 = lower_proven_has(proven_lines, eline);
-                      if (_sv0t48) {
+                      int _sv0t49 = sv0_vec_get(starts, kwpos);
+                      int _sv0t50 = lower_line_of_pos(source, _sv0t49);
+                      int eline = _sv0t50;
+                      int _sv0t51 = lower_proven_has(proven_lines, eline);
+                      if (_sv0t51) {
                         keep_ens = 0;
                       } else {
                       }
@@ -10663,24 +10673,24 @@ static const char* lower(int item_tags, int item_names, int item_d2, int item_d3
       }
       if ((has_body_arenas > 0)) {
         if ((body_root >= 0)) {
-          int _sv0t49 = sv0_vec_new();
-          int _sv0t50 = lower_fn(body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_pp, tok_tags, body_root, label_h, req_roots, ens_roots, instrs, out_enum_names, out_enum_tag_offsets, out_enum_tag_counts, out_enum_tag_flat, fn_ctx, builtin_map, body_sf, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, out_enum_max, i, _sv0t49, import_aliases);
-          int discard_lf = _sv0t50;
+          int _sv0t52 = sv0_vec_new();
+          int _sv0t53 = lower_fn(body_et, body_ed1, body_ed2, body_ed3, body_ed4, body_pp, tok_tags, body_root, label_h, req_roots, ens_roots, instrs, out_enum_names, out_enum_tag_offsets, out_enum_tag_counts, out_enum_tag_flat, fn_ctx, builtin_map, body_sf, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, out_enum_max, i, _sv0t52, import_aliases);
+          int discard_lf = _sv0t53;
         } else {
         }
       } else {
       }
-      int _sv0t51 = sv0_vec_new();
-      int params = _sv0t51;
+      int _sv0t54 = sv0_vec_new();
+      int params = _sv0t54;
       int ret_h = 9;
       sv0_vec_push(out_blocks, label_h);
       sv0_vec_push(out_blocks, ret_h);
-      int _sv0t52 = sv0_box_alloc(1);
-      sv0_box_store(_sv0t52, 0, params);
-      sv0_vec_push(out_blocks, _sv0t52);
-      int _sv0t53 = sv0_box_alloc(1);
-      sv0_box_store(_sv0t53, 0, instrs);
-      sv0_vec_push(out_blocks, _sv0t53);
+      int _sv0t55 = sv0_box_alloc(1);
+      sv0_box_store(_sv0t55, 0, params);
+      sv0_vec_push(out_blocks, _sv0t55);
+      int _sv0t56 = sv0_box_alloc(1);
+      sv0_box_store(_sv0t56, 0, instrs);
+      sv0_vec_push(out_blocks, _sv0t56);
     } else {
     }
     i = (i + 1);

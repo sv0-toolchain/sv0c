@@ -19,16 +19,16 @@ The script checks:
 - the seven hand-reviewed sv0cov semantic fixtures
   (`sv0cov/tests/fixtures/semantic/*`): sources, function entities, and
   `function_entry` points equal their `expected-map.json`;
-- synthetic programs anchored to their own text: inherent methods
-  (`Type::name`), trait default methods (`Trait::name`), `#[extern_c]`
-  declarations (not entities), `pub`, array parameters (a `;` inside the
-  signature), parenthesized contracts, a `module` name prefix, CRLF, tabs,
-  multibyte text, and project source order (sorted by logical path);
+- synthetic programs anchored to their own text: inherent and trait impl
+  methods (`Type::name`), trait default methods (`Trait::name`), bodyless
+  trait methods and `#[extern_c]` declarations (not entities), `pub`, array
+  parameters (a `;` inside the signature), parenthesized contracts, a
+  `module` name prefix, CRLF, tabs, multibyte text, and project source order
+  (sorted by logical path);
 - that the native compiler and the native VM emitter, which share the
   planner, print identical plans;
 - that coverage fails closed with exit 9 for an `include`d file (the
   compiled source is not the file's bytes), an unknown mode, and `map` /
   `instrument` (refused until map emission and hit placement land).
 
-`./scripts/sv0 test` runs it. Trait impls and bodyless trait methods do not
-pass the native checker yet, so they are not covered here.
+`./scripts/sv0 test` runs it.

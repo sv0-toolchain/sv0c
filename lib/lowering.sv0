@@ -5905,7 +5905,11 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
     }
     let mut i: i32 = 0;
     while i < n {
-        if vec_get(item_tags, i) == 0 {
+        /* A bodyless trait method declaration (body root -1) is a signature
+           only; lowering it emitted an empty function that collided with the
+           impl's definition of the same name. */
+        let has_body: bool = if vec_get(item_tags, i) == 0 { vec_get(item_d4, i) >= 0 } else { false };
+        if has_body {
             let label_h: i32 = vec_get(item_names, i);
             vec_push(out_block_labels, label_h);
             let body_root: i32 = vec_get(item_d4, i);
