@@ -18,7 +18,7 @@ legacy-bootstrap-heap: heap
 build:
 	echo 'CM.make "sources.cm"; OS.Process.exit OS.Process.success;' | $(SML)
 
-test:
+test: coverage-identifiers
 	mkdir -p build
 	echo 'CM.make "sources.cm"; use "test/test_runner.sml"; OS.Process.exit OS.Process.success;' | $(SML)
 
@@ -74,3 +74,9 @@ integration-vm:
 
 clean:
 	rm -rf .cm build
+
+# CV-102: opcode 119 and coverage identifiers agree with the sv0doc registry copy.
+.PHONY: coverage-identifiers
+coverage-identifiers:
+	python3 scripts/check_coverage_identifiers.py --selftest
+	python3 scripts/check_coverage_identifiers.py --repo sv0c
