@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """SHA-256 known-answer tests for the sv0 implementation (CV-103 / CV-104).
 
-Red until CV-104 adds ``sv0c/lib/sha256.sv0``. Not wired into ``./scripts/sv0
-test`` yet; CV-104 wires it in when the vectors pass.
+Runs in ``./scripts/sv0 test`` (with ``--differential``).
 
 Steps:
 1. ``vectors.tsv`` digests are recomputed with Python ``hashlib`` (the data
@@ -61,10 +60,40 @@ def check_data() -> list[str]:
     return errors
 
 
-def run(impl: Path, backend: str) -> int:
+ALPHABET = [chr(c) for c in range(0x20, 0x7F) if chr(c) not in '"\\{}'] + ["\u00e9", "\u00df", "\u65e5", "\u672c", "\u2713", "\U0001f600"]
+
+
+def differential_program(cases: int = 200, seed: int = 20260925) -> str:
+    """A KAT program over seeded pseudo-random UTF-8 messages, digests from hashlib."""
+    state = seed
+    lines = ["fn main() -> i32 {"]
+    for i in range(cases):
+        state = (state * 6364136223846793005 + 1442695040888963407) % (1 << 64)
+        length = (state >> 33) % 301
+        chars = []
+        for _ in range(length):
+            state = (state * 6364136223846793005 + 1442695040888963407) % (1 << 64)
+            chars.append(ALPHABET[(state >> 33) % len(ALPHABET)])
+        msg = "".join(chars)
+        digest = hashlib.sha256(msg.encode("utf-8")).hexdigest()
+        lines.append(f'  if string_eq(sha256_hex("{msg}"), "{digest}") {{\n  }} else {{\n    return {i + 1};\n  }};')
+    lines.append("  return 0;")
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+LONG_VECTOR = re.compile(r'  if check\(repeat_str\("a", 1000000\).*?\n  \};\n', re.S)
+
+
+def run(impl: Path, backend: str, program: bytes | None = None, vm_long: bool = False) -> int:
+    kat = (HERE / "kat_main.sv0").read_text()
+    native_prog = program if program is not None else kat.encode()
+    # The SML interpreter needs many minutes for the 15,626-block million-'a'
+    # vector, so the VM skips it unless asked (--vm-long); native always runs it.
+    vm_prog = program if program is not None else (kat if vm_long else LONG_VECTOR.sub("", kat, count=1)).encode()
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "main.sv0"
-        src.write_bytes(impl.read_bytes() + b"\n" + (HERE / "kat_main.sv0").read_bytes())
+        src.write_bytes(impl.read_bytes() + b"\n" + native_prog)
         status = 0
         if backend in ("native", "both"):
             exe = Path(tmp) / "kat"
@@ -76,6 +105,7 @@ def run(impl: Path, backend: str) -> int:
             print(f"native: exit {r.returncode}" + ("" if r.returncode == 0 else f" (first failing vector #{r.returncode})"))
             status |= r.returncode != 0
         if backend in ("vm", "both"):
+            src.write_bytes(impl.read_bytes() + b"\n" + vm_prog)
             sv0b = Path(tmp) / "kat.sv0b"
             c = subprocess.run([str(SV0), "vm-native-compile", str(src), str(sv0b)], capture_output=True, text=True)
             if c.returncode:
@@ -93,6 +123,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--impl", type=Path, default=DEFAULT_IMPL)
     ap.add_argument("--backend", choices=("native", "vm", "both"), default="both")
+    ap.add_argument("--vm-long", action="store_true", help="include the million-'a' vector on the VM (slow)")
+    ap.add_argument("--differential", action="store_true", help="also run 200 seeded random messages against hashlib")
+    ap.add_argument("--differential-backend", choices=("native", "vm", "both"), default="native")
     args = ap.parse_args()
     errors = check_data()
     for e in errors:
@@ -102,7 +135,11 @@ def main() -> int:
     if not args.impl.is_file():
         print(f"run_kat: RED — {args.impl.relative_to(ROOT) if args.impl.is_relative_to(ROOT) else args.impl} does not exist yet (CV-104)")
         return 1
-    return run(args.impl, args.backend)
+    status = run(args.impl, args.backend, vm_long=args.vm_long)
+    if args.differential:
+        print("differential (200 seeded UTF-8 messages vs hashlib):")
+        status |= run(args.impl, args.differential_backend, differential_program().encode("utf-8"))
+    return status
 
 
 if __name__ == "__main__":
