@@ -65,7 +65,8 @@ fn cov_src_pop(path: string) -> string {
 fn cov_src_logical_path(root: string, path: string) -> string {
     let mut rest: string = path;
     if string_len(root) > 0 {
-        let prefix: string = if string_char_at(root, string_len(root) - 1) == 47 { root } else { string_concat(root, "/") };
+        let mut prefix: string = root;
+        if string_char_at(root, string_len(root) - 1) != 47 { prefix = string_concat(root, "/"); }
         if cov_src_starts_with(path, prefix) {
             rest = string_substr(path, string_len(prefix), string_len(path) - string_len(prefix));
         } else {
@@ -99,7 +100,7 @@ fn cov_src_logical_path(root: string, path: string) -> string {
                 out = cov_src_pop(out);
                 depth = depth - 1;
             } else {
-                out = if depth == 0 { comp } else { string_concat(string_concat(out, "/"), comp) };
+                if depth == 0 { out = comp; } else { out = string_concat(string_concat(out, "/"), comp); }
                 depth = depth + 1;
             }
         }
@@ -220,7 +221,7 @@ fn cov_src_table_build(root: string, listing: string, starts: Vec<i32>, lens: Ve
             }
             let src: string = read_file(host);
             let row: string = string_concat(string_concat(logical, "\t"), cov_src_digest(src));
-            table = if count == 0 { row } else { string_concat(string_concat(table, "\n"), row) };
+            if count == 0 { table = row; } else { table = string_concat(string_concat(table, "\n"), row); }
             vec_push(starts, next);
             vec_push(lens, string_len(src));
             next = next + string_len(src) + 1;
@@ -241,7 +242,7 @@ fn cov_src_concat(listing: string) -> string {
         let e: i32 = cov_src_next_line(listing, p);
         if e > p {
             let src: string = read_file(string_substr(listing, p, e - p));
-            out = if first { src } else { string_concat(string_concat(out, "\n"), src) };
+            if first { out = src; } else { out = string_concat(string_concat(out, "\n"), src); }
             first = false;
         }
         p = e + 1;

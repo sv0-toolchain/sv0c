@@ -164,6 +164,120 @@ fn megatu_index_of(s: string, ch: i32, from: i32) -> i32 {
     return 0 - 1;
 }
 
+/* ── Coverage request (sv0cov CV-106/CV-107) ───────────────────────────────
+   The driver passes a non-off --coverage mode in SV0_COVERAGE_REQUEST as
+   "<mode>\n<map path>"; the CLI patches in build-sv0-megatu-*native.sh read it
+   into main's _cov_* locals through these helpers. */
+
+/* 0 = off (empty request), 1 = map, 2 = instrument, 3 = plan-dump (an
+   internal test hook that prints the plan instead of C), -1 = unknown. */
+fn megatu_cov_mode_of(req: string) -> i32 {
+    if string_len(req) == 0 { return 0; }
+    let nl: i32 = megatu_index_of(req, 10, 0);
+    let mut mode: string = req;
+    if nl >= 0 { mode = string_substr(req, 0, nl); }
+    if string_eq(mode, "map") { return 1; }
+    if string_eq(mode, "instrument") { return 2; }
+    if string_eq(mode, "plan-dump") { return 3; }
+    return 0 - 1;
+}
+
+fn megatu_cov_mode_name(mode: i32) -> string {
+    if mode == 1 { return "map"; }
+    if mode == 2 { return "instrument"; }
+    if mode == 3 { return "plan-dump"; }
+    return "off";
+}
+
+/* The source file of a file-mode request: `<src>`, `--disabled <src>`, or
+   `--verified <proof> <src>`. */
+fn megatu_cov_file_of(drv_c: string) -> string {
+    let n: i32 = string_len(drv_c);
+    if n >= 11 {
+        let head: string = string_substr(drv_c, 0, 11);
+        if string_eq(head, "--disabled ") { return string_substr(drv_c, 11, n - 11); }
+        if string_eq(head, "--verified ") {
+            let sp: i32 = megatu_index_of(drv_c, 32, 11);
+            if sp >= 0 { return string_substr(drv_c, sp + 1, n - sp - 1); }
+        }
+    }
+    return drv_c;
+}
+
+/* Directory part of a file path ("." when it has none). */
+fn megatu_cov_dir_of(path: string) -> string {
+    let mut i: i32 = string_len(path) - 1;
+    while i >= 0 {
+        if string_char_at(path, i) == 47 {
+            if i == 0 { return "/"; }
+            return string_substr(path, 0, i);
+        }
+        i = i - 1;
+    }
+    return ".";
+}
+
+/* The project file listing link_project_concat_sources_from_dir compiles. */
+fn megatu_cov_project_listing(dir: string) -> string {
+    let listing: string = link_project_dir(dir);
+    if link_listing_root_entry_count(listing, dir) == 1 {
+        return link_listing_drop_nested_entries(listing, dir);
+    }
+    return listing;
+}
+
+/* Plan coverage for the checked program (lib/coverage_plan.sv0) and act on
+   the mode. Returns main's exit code: 0 after a plan-dump (the plan on
+   stdout, no C), 9 for every refusal. map and instrument are refused after
+   planning until map emission (CV-110) and hit placement (CV-112) land. */
+fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
+                   tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                   it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id4: Vec<i32>,
+                   pp: Vec<i32>) -> i32 {
+    if mode < 0 {
+        write_file("/dev/stderr", "coverage: unknown mode in SV0_COVERAGE_REQUEST (want map, instrument or plan-dump)\n");
+        return 9;
+    }
+    let cstarts: Vec<i32> = vec_new();
+    let clens: Vec<i32> = vec_new();
+    let table: string = cov_src_table_build(root, listing, cstarts, clens);
+    if cov_src_is_error(table) {
+        write_file("/dev/stderr", string_concat(string_concat("coverage: source table: ",
+            string_substr(table, 1, string_len(table) - 1)), "\n"));
+        return 9;
+    }
+    if string_eq(cov_src_concat(listing), source) != true {
+        write_file("/dev/stderr", "coverage: the compiled source differs from the build's files (include expansion or cross-module name mangling); coverage does not support this build yet\n");
+        return 9;
+    }
+    let src_unit: Vec<i32> = vec_new();
+    cov_plan_sources(table, src_unit);
+    let ent_item: Vec<i32> = vec_new();
+    let ent_source: Vec<i32> = vec_new();
+    let ent_start: Vec<i32> = vec_new();
+    let ent_end: Vec<i32> = vec_new();
+    let ent_owner: Vec<i32> = vec_new();
+    let pt_kind: Vec<i32> = vec_new();
+    let pt_entity: Vec<i32> = vec_new();
+    let pt_start: Vec<i32> = vec_new();
+    let pt_end: Vec<i32> = vec_new();
+    let qnames: string = cov_plan_functions(tags, starts, ends, source, it, id1, id2, id4, pp,
+        cstarts, clens, src_unit, ent_item, ent_source, ent_start, ent_end, ent_owner,
+        pt_kind, pt_entity, pt_start, pt_end);
+    if cov_src_is_error(qnames) {
+        write_file("/dev/stderr", "coverage: could not recover a function's span from its tokens\n");
+        return 9;
+    }
+    if mode == 3 {
+        write_file("/dev/stdout", cov_plan_dump(source, table, cstarts, clens, src_unit,
+            ent_source, ent_start, ent_end, ent_owner, qnames, pt_kind, pt_entity, pt_start, pt_end));
+        return 0;
+    }
+    write_file("/dev/stderr", string_concat(string_concat("--coverage=", megatu_cov_mode_name(mode)),
+        " is not available yet: coverage map emission (sv0cov CV-110) and instrumentation (CV-112) have not landed; build with --coverage=off\n"));
+    return 9;
+}
+
 fn main() -> i32 {
     /* M4-S-023/024: the next three lines (smoke source + contract-mode defaults)
        are replaced atomically by the native build's CLI patch
@@ -172,6 +286,11 @@ fn main() -> i32 {
     let source: string = "enum Opt { None, Some(i32) } fn main() -> i32 { let o: Opt = Opt::Some(5); return match o { Opt::None => 0, Opt::Some(x) => x }; }";
     let _contract_mode: i32 = 0;
     let proven_lines: Vec<i32> = vec_new();
+    /* sv0cov CV-106/CV-107: coverage request. The CLI patches replace these
+       three lines with the SV0_COVERAGE_REQUEST read; off (0) by default. */
+    let _cov_mode: i32 = 0;
+    let _cov_root: string = "";
+    let _cov_listing: string = "";
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let tags: Vec<i32> = vec_new();
@@ -288,6 +407,13 @@ fn main() -> i32 {
     if cr != 0 {
         megatu_emit_diagnostics(diag_sink, source, starts);
         return 4;
+    }
+
+    /* Coverage planning (sv0cov CV-107): after resolve/check, before lower,
+       so both backends share one plan. */
+    if _cov_mode != 0 {
+        return megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
+                               tags, starts, ends, it, id1, id2, id4, pp);
     }
 
     /* Phase 5: lower (real lowering.sv0) — parse arenas -> IR out_blocks; returns
