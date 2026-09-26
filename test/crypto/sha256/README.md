@@ -22,7 +22,7 @@ pulling M5-S-040a/b forward).
 The implementation (`lib/sha256.sv0`, CV-104) is generated: 32-bit words are
 pairs of 16-bit halves in i32 locals, so it never relies on signed overflow
 (undefined in the generated C) and allocates no Vec. It is not yet in the
-mega-TU module list; CV-105 adds it when the compiler first calls it.
+mega-TU module list; the planner (CV-107) adds it when the compiler first calls it.
 
 ```bash
 python3 sv0c/test/crypto/sha256/run_kat.py

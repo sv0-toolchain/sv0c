@@ -1,0 +1,312 @@
+/* Coverage source-unit table (sv0cov CV-105; SPEC 10.1, 10.2, 16.3.2).
+ *
+ * Maps each compiled source file to its logical project-relative path and the
+ * SHA-256 of its exact bytes, and maps an offset in the compiled text (the
+ * project concat: files joined with one "\n", as in
+ * link_project_concat_sources_offsets_from_listing) back to (unit,
+ * file-relative byte). Also gives 1-based lines (split at LF only; a CR is an
+ * ordinary column) and Unicode-scalar columns, matching sv0cov's map reader.
+ *
+ * The table is text: one line per unit, "<logical path>\t<sha256 hex>",
+ * joined with "\n". A failed build returns text starting with "\n" (a logical
+ * path never contains LF): "\n<error>\t<path>" where <error> is
+ * "invalid-path" or "collision". Offsets live in two parallel Vec<i32>s
+ * (starts, lens) filled by the builder.
+ *
+ * Project mode's name mangling (link_u15_mangle_source) inserts text when
+ * modules collide, which would shift offsets; callers compare
+ * cov_src_concat(listing) with the compiled concat and refuse coverage when
+ * they differ (fail closed) until mangling records its edits.
+ *
+ * Depends on lib/sha256.sv0 (sha256_hex). Names are prefixed cov_src_ because
+ * compiler modules share one translation unit.
+ */
+
+fn cov_src_starts_with(s: string, prefix: string) -> bool {
+    let n: i32 = string_len(prefix);
+    if string_len(s) < n { return false; }
+    return string_eq(string_substr(s, 0, n), prefix);
+}
+
+fn cov_src_has_char(s: string, c: i32) -> bool {
+    let n: i32 = string_len(s);
+    let mut i: i32 = 0;
+    while i < n {
+        if string_char_at(s, i) == c { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn cov_src_is_drive(s: string) -> bool {
+    if string_len(s) < 2 { return false; }
+    let c: i32 = string_char_at(s, 0);
+    let upper: bool = if c >= 65 { c <= 90 } else { false };
+    let lower: bool = if c >= 97 { c <= 122 } else { false };
+    if upper || lower { return string_char_at(s, 1) == 58; }
+    return false;
+}
+
+/* Drop the last "/component" (or the only component) of a normalized path. */
+fn cov_src_pop(path: string) -> string {
+    let mut i: i32 = string_len(path) - 1;
+    while i >= 0 {
+        if string_char_at(path, i) == 47 { return string_substr(path, 0, i); }
+        i = i - 1;
+    }
+    return "";
+}
+
+/* Logical path of host `path` inside project `root` (SPEC 10.1); "" when
+ * invalid: empty, not under `root` (unless `root` is "."), absolute, a
+ * drive designator, a backslash, CR/LF/TAB, escaping the root with "..", or
+ * over 4096 bytes. "." components are dropped and ".." pops; case and
+ * UTF-8 spelling are kept byte for byte. */
+fn cov_src_logical_path(root: string, path: string) -> string {
+    let mut rest: string = path;
+    if string_len(root) > 0 {
+        let prefix: string = if string_char_at(root, string_len(root) - 1) == 47 { root } else { string_concat(root, "/") };
+        if cov_src_starts_with(path, prefix) {
+            rest = string_substr(path, string_len(prefix), string_len(path) - string_len(prefix));
+        } else {
+            if string_eq(root, ".") == false { return ""; }
+        }
+    }
+    if string_len(rest) == 0 { return ""; }
+    if string_char_at(rest, 0) == 47 { return ""; }
+    if cov_src_is_drive(rest) { return ""; }
+    if cov_src_has_char(rest, 92) { return ""; }
+    if cov_src_has_char(rest, 10) || cov_src_has_char(rest, 13) || cov_src_has_char(rest, 9) { return ""; }
+    let n: i32 = string_len(rest);
+    let mut out: string = "";
+    let mut depth: i32 = 0;
+    let mut i: i32 = 0;
+    while i <= n {
+        let mut j: i32 = i;
+        let mut scanning: bool = true;
+        while scanning {
+            if j >= n {
+                scanning = false;
+            } else {
+                if string_char_at(rest, j) == 47 { scanning = false; } else { j = j + 1; }
+            }
+        }
+        let comp: string = string_substr(rest, i, j - i);
+        let keep: bool = if string_len(comp) == 0 { false } else { string_eq(comp, ".") == false };
+        if keep {
+            if string_eq(comp, "..") {
+                if depth == 0 { return ""; }
+                out = cov_src_pop(out);
+                depth = depth - 1;
+            } else {
+                out = if depth == 0 { comp } else { string_concat(string_concat(out, "/"), comp) };
+                depth = depth + 1;
+            }
+        }
+        i = j + 1;
+    }
+    if depth == 0 { return ""; }
+    if string_len(out) > 4096 { return ""; }
+    return out;
+}
+
+/* Decimal spelling of `n` (no sign for zero or positive values). */
+fn cov_src_itoa(n: i32) -> string {
+    if n == 0 { return "0"; }
+    let digits: string = "0123456789";
+    let neg: bool = n < 0;
+    let mut v: i32 = if neg { 0 - n } else { n };
+    let mut out: string = "";
+    while v > 0 {
+        out = string_concat(string_substr(digits, v % 10, 1), out);
+        v = v / 10;
+    }
+    if neg { return string_concat("-", out); }
+    return out;
+}
+
+/* Lowercase hex SHA-256 of the exact source bytes (SPEC 10.2). */
+fn cov_src_digest(src: string) -> string {
+    return sha256_hex(src);
+}
+
+fn cov_src_next_line(text: string, p: i32) -> i32 {
+    let n: i32 = string_len(text);
+    let mut i: i32 = p;
+    while i < n {
+        if string_char_at(text, i) == 10 { return i; }
+        i = i + 1;
+    }
+    return n;
+}
+
+/* Field `k` (0-based, tab-separated) of line `idx` of table-like text. */
+fn cov_src_field(text: string, idx: i32, k: i32) -> string {
+    let n: i32 = string_len(text);
+    let mut p: i32 = 0;
+    let mut line: i32 = 0;
+    while p <= n {
+        let e: i32 = cov_src_next_line(text, p);
+        if line == idx {
+            let mut f: i32 = 0;
+            let mut s: i32 = p;
+            let mut q: i32 = p;
+            while q <= e {
+                let boundary: bool = if q == e { true } else { string_char_at(text, q) == 9 };
+                if boundary {
+                    if f == k { return string_substr(text, s, q - s); }
+                    f = f + 1;
+                    s = q + 1;
+                }
+                q = q + 1;
+            }
+            return "";
+        }
+        line = line + 1;
+        p = e + 1;
+    }
+    return "";
+}
+
+fn cov_src_is_error(table: string) -> bool {
+    if string_len(table) == 0 { return false; }
+    return string_char_at(table, 0) == 10;
+}
+
+fn cov_src_count(table: string) -> i32 {
+    if string_len(table) == 0 { return 0; }
+    if cov_src_is_error(table) { return 0; }
+    let n: i32 = string_len(table);
+    let mut c: i32 = 1;
+    let mut i: i32 = 0;
+    while i < n {
+        if string_char_at(table, i) == 10 { c = c + 1; }
+        i = i + 1;
+    }
+    return c;
+}
+
+fn cov_src_path_at(table: string, idx: i32) -> string {
+    return cov_src_field(table, idx, 0);
+}
+
+fn cov_src_digest_at(table: string, idx: i32) -> string {
+    return cov_src_field(table, idx, 1);
+}
+
+/* Build the table for the newline-separated host `listing` (compile order)
+ * under project `root`, reading each file. Fills `starts`/`lens` with each
+ * unit's offset and length in the concat. */
+fn cov_src_table_build(root: string, listing: string, starts: Vec<i32>, lens: Vec<i32>) -> string {
+    let n: i32 = string_len(listing);
+    let mut p: i32 = 0;
+    let mut table: string = "";
+    let mut count: i32 = 0;
+    let mut next: i32 = 0;
+    while p < n {
+        let e: i32 = cov_src_next_line(listing, p);
+        if e > p {
+            let host: string = string_substr(listing, p, e - p);
+            let logical: string = cov_src_logical_path(root, host);
+            if string_len(logical) == 0 {
+                return string_concat("\ninvalid-path\t", host);
+            }
+            let mut k: i32 = 0;
+            while k < count {
+                if string_eq(cov_src_path_at(table, k), logical) {
+                    return string_concat("\ncollision\t", logical);
+                }
+                k = k + 1;
+            }
+            let src: string = read_file(host);
+            let row: string = string_concat(string_concat(logical, "\t"), cov_src_digest(src));
+            table = if count == 0 { row } else { string_concat(string_concat(table, "\n"), row) };
+            vec_push(starts, next);
+            vec_push(lens, string_len(src));
+            next = next + string_len(src) + 1;
+            count = count + 1;
+        }
+        p = e + 1;
+    }
+    return table;
+}
+
+/* The unmangled project concat for `listing` (files joined with "\n"). */
+fn cov_src_concat(listing: string) -> string {
+    let n: i32 = string_len(listing);
+    let mut p: i32 = 0;
+    let mut out: string = "";
+    let mut first: bool = true;
+    while p < n {
+        let e: i32 = cov_src_next_line(listing, p);
+        if e > p {
+            let src: string = read_file(string_substr(listing, p, e - p));
+            out = if first { src } else { string_concat(string_concat(out, "\n"), src) };
+            first = false;
+        }
+        p = e + 1;
+    }
+    return out;
+}
+
+/* Unit containing concat offset `off` (end offsets count as inside), or -1
+ * for a joining newline or an offset outside every unit. */
+fn cov_src_unit_at(starts: Vec<i32>, lens: Vec<i32>, off: i32) -> i32 {
+    let n: i32 = vec_len(starts);
+    let mut i: i32 = 0;
+    while i < n {
+        let s: i32 = vec_get(starts, i);
+        if off >= s {
+            if off <= s + vec_get(lens, i) { return i; }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+fn cov_src_file_offset(starts: Vec<i32>, unit: i32, off: i32) -> i32 {
+    return off - vec_get(starts, unit);
+}
+
+/* True when `off` is a valid position in `src`: within bounds and not inside
+ * a UTF-8 sequence. */
+fn cov_src_valid_offset(src: string, off: i32) -> bool {
+    let n: i32 = string_len(src);
+    if off < 0 || off > n { return false; }
+    if off == n { return true; }
+    let b: i32 = string_char_at(src, off);
+    return b < 128 || b >= 192;
+}
+
+/* 1-based line of `off` (lines split at LF), or 0 when invalid. */
+fn cov_src_line(src: string, off: i32) -> i32 {
+    if cov_src_valid_offset(src, off) == false { return 0; }
+    let mut line: i32 = 1;
+    let mut i: i32 = 0;
+    while i < off {
+        if string_char_at(src, i) == 10 { line = line + 1; }
+        i = i + 1;
+    }
+    return line;
+}
+
+/* 1-based Unicode-scalar column of `off`, or 0 when invalid. */
+fn cov_src_column(src: string, off: i32) -> i32 {
+    if cov_src_valid_offset(src, off) == false { return 0; }
+    let mut i: i32 = off;
+    let mut back: bool = true;
+    while back {
+        if i == 0 {
+            back = false;
+        } else {
+            if string_char_at(src, i - 1) == 10 { back = false; } else { i = i - 1; }
+        }
+    }
+    let mut col: i32 = 1;
+    while i < off {
+        let b: i32 = string_char_at(src, i);
+        if b < 128 || b >= 192 { col = col + 1; }
+        i = i + 1;
+    }
+    return col;
+}
