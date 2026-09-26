@@ -155,3 +155,4 @@ test/behavior/cases/fill_explicit_intrinsic.sv0|42|native
 test/behavior/cases/struct_ref_param.sv0|42|native
 test/behavior/cases/c_name_libc_functions.sv0|42|native
 test/behavior/cases/c_name_keywords_macros.sv0|42
+test/behavior/cases/runtime_handle_tables_grow.sv0|42|native

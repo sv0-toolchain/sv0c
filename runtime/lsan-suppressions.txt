@@ -9,7 +9,7 @@
 # and vectors are arena-style for the process's lifetime by design (see
 # sv0_runtime.h's own SV0_BOX_POOL_SIZE comment: "Boxes are never freed
 # (arena-style)"). Every such allocation is reachable from
-# sv0_vec_table (a file-scope static array), so it is a deliberate,
+# sv0_vec_table (a file-scope pointer to a growable table), so it is a deliberate,
 # intentional "leak" at process exit, not a bug -- LeakSanitizer would
 # otherwise flag it on every single Vec-using program.
 leak:sv0_vec_new
@@ -44,7 +44,7 @@ leak:sv0_string_concat
 # the real Linux verification for this file's own entries was done via a
 # local Docker container (ubuntu:22.04 + gcc), not just reasoned about.
 #
-# The box pool (sv0_box_pool, sv0_runtime.h) is a file-scope STATIC array,
-# not a heap allocation at all -- box_new/box_alloc never call malloc, so
-# there is nothing for LeakSanitizer to report there in the first place;
-# no suppression entry is needed for it.
+# The box pool (sv0_box_pool, sv0_runtime.h) and the string, Vec and slice
+# handle tables grow with realloc (sv0_table_reserve) and are held by
+# file-scope pointers for the whole run, so they stay reachable and
+# LeakSanitizer does not report them; no suppression entry is needed.

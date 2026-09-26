@@ -100,7 +100,31 @@ static inline const char *sv0_string_substr(const char *s, int start, int len) {
  * inputs left unchanged. The compiler front end still emits the old API; the
  * migration (literals carrying a decoded byte length, `ast_ty_to_c_string`
  * `string -> sv0_str`, `sv0_println`) is the rest of SS-U02b. */
-#define SV0_STR_MAX 262144
+/* Handle tables (strings, Vecs, slices) and the Box word pool grow on demand
+ * by doubling: handles are indices, entries are only ever copied by value,
+ * so moving the table on realloc is invisible to callers. Nothing is freed
+ * (arena-style, see below), so a large compile allocates many short-lived
+ * handles; the old fixed tables panicked at 262,144 Vecs. `limit` caps the
+ * element count (slice and Vec handles must stay below SV0_SLICE_TAG). */
+static void *sv0_table_reserve(void *table, int32_t *cap, int32_t need,
+                               size_t elem, int32_t limit, const char *full) {
+  if (table && need <= *cap)
+    return table;
+  if (need > limit)
+    sv0_panic(full);
+  int64_t ncap = *cap > 0 ? (int64_t)*cap : 1024;
+  while (ncap < need)
+    ncap *= 2;
+  if (ncap > limit)
+    ncap = limit;
+  void *t = realloc(table, (size_t)ncap * elem);
+  if (!t)
+    sv0_panic(full);
+  *cap = (int32_t)ncap;
+  return t;
+}
+
+#define SV0_STR_MAX 0x7fffffff
 
 typedef struct {
   uint8_t *data;
@@ -108,7 +132,8 @@ typedef struct {
   int32_t cap;
 } sv0_str;
 
-static sv0_str sv0_str_table[SV0_STR_MAX];
+static sv0_str *sv0_str_table = 0;
+static int32_t sv0_str_cap = 0;
 static int32_t sv0_str_count = 0;
 static uint8_t sv0_str_empty_base[1] = {0}; /* non-null base for len == 0 */
 
@@ -137,8 +162,9 @@ static inline uint8_t *sv0_str_alloc(int32_t nbytes) {
 }
 
 static inline int32_t sv0_str_slot(void) {
-  if (sv0_str_count >= SV0_STR_MAX)
-    sv0_panic("string: too many strings");
+  sv0_str_table = (sv0_str *)sv0_table_reserve(
+      sv0_str_table, &sv0_str_cap, sv0_str_count + 1, sizeof(sv0_str),
+      SV0_STR_MAX, "string: too many strings");
   return sv0_str_count++;
 }
 
@@ -232,19 +258,21 @@ static inline void sv0_str_println(int32_t h) {
  * Each vec_new() returns an int handle into a global table.
  * Elements are stored as intptr_t (word-sized); works for i32, bool, pointers.
  */
-#define SV0_VEC_MAX 262144
+#define SV0_VEC_MAX 0x3fffffff
 
 static struct {
   intptr_t *data;
   int32_t len;
   int32_t cap;
-} sv0_vec_table[SV0_VEC_MAX];
+} *sv0_vec_table = 0;
+static int32_t sv0_vec_cap = 0;
 
 static int32_t sv0_vec_count = 0;
 
 static inline int32_t sv0_vec_new(void) {
-  if (sv0_vec_count >= SV0_VEC_MAX)
-    sv0_panic("vec: too many vectors");
+  sv0_vec_table = sv0_table_reserve(sv0_vec_table, &sv0_vec_cap,
+                                    sv0_vec_count + 1, sizeof(*sv0_vec_table),
+                                    SV0_VEC_MAX, "vec: too many vectors");
   int32_t h = sv0_vec_count++;
   sv0_vec_table[h].cap = 8;
   sv0_vec_table[h].len = 0;
@@ -334,15 +362,17 @@ typedef struct {
   int32_t len;
 } sv0_slice;
 
-#define SV0_SLICE_MAX 262144
+#define SV0_SLICE_MAX 0x3fffffff
 #define SV0_SLICE_TAG 0x40000000
 
-static sv0_slice sv0_slice_table[SV0_SLICE_MAX];
+static sv0_slice *sv0_slice_table = 0;
+static int32_t sv0_slice_cap = 0;
 static int32_t sv0_slice_count = 0;
 
 static inline int32_t sv0_slice_intern(intptr_t *data, int32_t len) {
-  if (sv0_slice_count >= SV0_SLICE_MAX)
-    sv0_panic("slice: too many slices");
+  sv0_slice_table = (sv0_slice *)sv0_table_reserve(
+      sv0_slice_table, &sv0_slice_cap, sv0_slice_count + 1, sizeof(sv0_slice),
+      SV0_SLICE_MAX, "slice: too many slices");
   int32_t s = sv0_slice_count++;
   sv0_slice_table[s].data = data;
   sv0_slice_table[s].len = len;
@@ -495,14 +525,18 @@ static inline int32_t sv0_str_byte_view(int32_t h) {
  * lowering, thousands of lines) needs millions of words; sized generously — it
  * is demand-paged BSS, so unused capacity costs nothing.
  */
-#define SV0_BOX_POOL_SIZE (16 * 1024 * 1024)
+#define SV0_BOX_POOL_SIZE 0x7fffffff
 
-static intptr_t sv0_box_pool[SV0_BOX_POOL_SIZE];
+static intptr_t *sv0_box_pool = 0;
+static int32_t sv0_box_cap = 0;
 static int32_t sv0_box_next = 0;
 
 static inline int32_t sv0_box_alloc(int32_t nwords) {
-  if (sv0_box_next + nwords > SV0_BOX_POOL_SIZE)
+  if (nwords < 0 || sv0_box_next > SV0_BOX_POOL_SIZE - nwords)
     sv0_panic("box: pool exhausted");
+  sv0_box_pool = (intptr_t *)sv0_table_reserve(
+      sv0_box_pool, &sv0_box_cap, sv0_box_next + nwords, sizeof(intptr_t),
+      SV0_BOX_POOL_SIZE, "box: pool exhausted");
   int32_t h = sv0_box_next;
   sv0_box_next += nwords;
   return h;

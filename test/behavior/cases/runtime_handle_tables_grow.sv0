@@ -1,0 +1,35 @@
+// The native runtime's Vec and string handle tables grow on demand. They
+// used to be fixed arrays of 262,144 handles that were never reused, so a
+// large compile (the self-hosted compiler allocates many short-lived Vecs)
+// panicked with "vec: too many vectors". This program allocates 300,000
+// Vecs and 300,000 strings, past the old cap, and reads the first and last
+// ones back.
+//
+// Native backend only: sv0vm keeps Vecs in an uncapped list with an O(n)
+// append per allocation, so it has no such limit but 300,000 iterations are
+// too slow for the suite. Expected exit: 42.
+
+fn main() -> i32 {
+    let n: i32 = 300000;
+    let first: Vec<i32> = vec_new();
+    vec_push(first, 7);
+    let mut last: Vec<i32> = first;
+    let mut s: string = "x";
+    let mut i: i32 = 0;
+    while i < n {
+        let v: Vec<i32> = vec_new();
+        vec_push(v, i);
+        last = v;
+        s = string_substr(string_concat(s, "y"), 1, 1);
+        i = i + 1;
+    }
+    let ok_first: bool = vec_get(first, 0) == 7;
+    let ok_last: bool = vec_get(last, 0) == n - 1;
+    let ok_str: bool = string_eq(s, "y");
+    if ok_first {
+        if ok_last {
+            if ok_str { return 42; }
+        }
+    }
+    return 1;
+}
