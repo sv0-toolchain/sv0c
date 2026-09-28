@@ -7,6 +7,16 @@ Governing spec: `~/Documents/project-specs/sv0c-runtime-executable/SPEC.md`
 through `NEX-036` of the R0 corpus/project/reliability band are done as of
 this writing).
 
+> **Planned CLI change (not yet implemented).** The installed-toolchain spec
+> (`~/Documents/project-specs/sv0-toolchain-interface-and-distribution/SPEC.md`,
+> `0.1.0-draft`, §3.3) supersedes this document's command surface at its R0:
+> bare `sv0c INPUT` will build `./a.out` (today it emits C), `--project DIR`
+> becomes the positional `sv0c DIR`, installed `sv0c` rejects `--project` and
+> `--target=vm`, and manifest v1 replaces the `sv0.toml` `[build]` table.
+> Everything below describes **current** behavior. Entry adaptation, runtime
+> matching, staging, and publication stay authoritative. Planning: parent repo
+> `task/sv0-toolchain-interface-distribution.Rmd`.
+
 ## Current status
 
 **The engine and both CLI command surfaces are real and tested end to
