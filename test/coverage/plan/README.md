@@ -1,4 +1,4 @@
-# Coverage planner and map tests (sv0cov CV-107..CV-110)
+# Coverage planner and map tests (sv0cov CV-107..CV-111)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -51,3 +51,10 @@ The script checks:
   placement lands).
 
 `./scripts/sv0 test` runs it.
+
+`run_determinism.py` (CV-111) builds the map of each fixture and of
+`constructs.sv0` five times with the native compiler and once with the VM
+emitter, from different working directories, map paths, and environment
+noise, and requires identical bytes. It also requires `map` mode's generated
+C and `.sv0b` to be byte-identical to an `off` build (map mode adds no hit
+operations).
