@@ -18,7 +18,11 @@ For the seven sv0cov semantic fixtures and constructs.sv0 this checks:
    CV-112 loop rewrite (`while (1) { if (c) { } else { break; } ...` back to
    `while (c) { ...`), gives exactly the `off` build's C: instrumentation
    adds nothing else.
-4. Linked with stub_rt.c (a test-only stand-in for the CV-114 runtime that
+4. Linked with the real sv0cov runtime (runtime/c/sv0cov_rt.c, CV-114)
+   and run under a valid transport, the program behaves exactly as the off
+   build (the runtime accepts sv0c's registration); with a malformed
+   SV0COV_RUN_ID in required mode it exits 1 with COV2001 before printing
+   anything. Linked with stub_rt.c (a test-only stand-in for the CV-114 runtime that
    validates the registration and counts hits) and run, the program exits
    as the off build does, and each point's count equals the fixture's
    hand-reviewed expected-counts.json. No gcov, profiling, or debug flags
@@ -47,6 +51,8 @@ SV0C = HERE.parents[2]
 ROOT = SV0C.parent
 RUNTIME = SV0C / "runtime"
 GOLDEN = HERE / "emit-f0.expected.c"
+SV0COV_RT = ROOT / "sv0cov" / "runtime" / "c" / "sv0cov_rt.c"
+RUN_ID = "0123456789abcdef0123456789abcdef"
 IDENTITY = "sv0c+test"
 
 sys.path.insert(0, str(HERE))
@@ -84,12 +90,19 @@ def cc() -> str:
     return os.environ.get("CC") or shutil.which("cc") or "cc"
 
 
-def link(c_path: Path, exe: Path, with_stub: bool) -> subprocess.CompletedProcess:
+def link(c_path: Path, exe: Path, extra: str | None) -> subprocess.CompletedProcess:
     argv = [cc(), "-std=gnu99", "-O0", "-I", str(RUNTIME), "-o", str(exe), str(c_path),
             str(RUNTIME / "sv0_runtime.c")]
-    if with_stub:
-        argv.append(str(HERE / "stub_rt.c"))
+    if extra:
+        argv.append(extra)
     return subprocess.run(argv, capture_output=True, text=True, timeout=300)
+
+
+def transport_env(profile_dir: Path, **over: str) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if not k.startswith("SV0COV")}
+    env.update({"SV0COV_PROFILE_DIR": str(profile_dir), "SV0COV_RUN_ID": RUN_ID, "SV0COV_REQUIRED": "1"})
+    env.update(over)
+    return env
 
 
 def main() -> int:
@@ -99,6 +112,13 @@ def main() -> int:
     progs = programs()
     with tempfile.TemporaryDirectory() as td:
         t = Path(td)
+        profiles = t / "profiles"
+        profiles.mkdir()
+        rt_obj = t / "sv0cov_rt.o"
+        rc = subprocess.run([cc(), "-std=c11", "-O0", "-c", str(SV0COV_RT), "-o", str(rt_obj)],
+                            capture_output=True, text=True, timeout=300)
+        if rc.returncode:
+            errors.append(f"compiling the sv0cov runtime failed: {rc.stderr.strip()}")
         for name, request in progs:
             d = t / name
             d.mkdir()
@@ -145,8 +165,8 @@ def main() -> int:
             # 4. Link with the stub runtime and run.
             (d / "inst.c").write_text(c)
             (d / "off.c").write_text(off.stdout)
-            l1 = link(d / "inst.c", d / "inst", True)
-            l2 = link(d / "off.c", d / "off", False)
+            l1 = link(d / "inst.c", d / "inst", str(HERE / "stub_rt.c"))
+            l2 = link(d / "off.c", d / "off", None)
             if l1.returncode or l2.returncode:
                 errors.append(f"{name}: cc failed: {l1.stderr.strip()} {l2.stderr.strip()}")
                 continue
@@ -176,6 +196,23 @@ def main() -> int:
                         errors.append(f"{name}: {e['label']} counted {got}, expected {e['count']}")
             elif sum(counts) == 0:
                 errors.append(f"{name}: no counter was hit")
+            # 4b. The real runtime (sv0cov CV-114) accepts this registration
+            # and leaves the program's behavior alone; a bad transport in
+            # required mode stops it before any user code.
+            l3 = link(d / "inst.c", d / "real", str(rt_obj))
+            if l3.returncode:
+                errors.append(f"{name}: linking against the sv0cov runtime failed: {l3.stderr.strip()}")
+            else:
+                r_real = subprocess.run([str(d / "real")], capture_output=True, timeout=60,
+                                        env=transport_env(profiles))
+                if (r_real.returncode, r_real.stdout, r_real.stderr) != (r_off.returncode, r_off.stdout, r_off.stderr):
+                    errors.append(f"{name}: with the sv0cov runtime the program behaves differently "
+                                  f"(rc {r_real.returncode}): {r_real.stderr.decode(errors='replace').strip()}")
+                r_bad = subprocess.run([str(d / "real")], capture_output=True, timeout=60,
+                                       env=transport_env(profiles, SV0COV_RUN_ID=RUN_ID.upper()))
+                if r_bad.returncode != 1 or b"error[COV2001]" not in r_bad.stderr or r_bad.stdout:
+                    errors.append(f"{name}: a bad transport in required mode did not stop before user code "
+                                  f"(rc {r_bad.returncode})")
             # 5. The generated-C golden.
             if name == "f0":
                 if update:
@@ -197,7 +234,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print(f"coverage C emission: OK ({len(progs)} programs: map-mode map, prelude = map, one hit per counter, "
-          "C minus coverage = off, stub-runtime counts = expected-counts.json; f0 golden; no-hosted-main refused)")
+          "C minus coverage = off, sv0cov runtime accepts the registration, stub-runtime counts = expected-counts.json; f0 golden; no-hosted-main refused)")
     return 0
 
 
