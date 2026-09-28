@@ -14,8 +14,9 @@ pre-order instead of C. This script checks:
 2. The negative cases fail the build with COV1020: a dropped hit
    (SV0_COVERAGE_FAULT=drop), a duplicated one (dup), a hit naming no planned
    counter (orphan), and any hit in map mode (dup under --coverage=map).
-3. Through the real drivers, --coverage=instrument passes the check and is
-   then refused (no emission yet, CV-113/CV-117) without COV1020.
+3. Through the real drivers, --coverage=instrument passes the check: the C
+   driver emits instrumented C (CV-113), and the VM emitter is then refused
+   (no COVER_HIT emission yet, CV-117) without COV1020.
 
     python3 sv0c/test/coverage/plan/run_hits.py
 """
@@ -40,7 +41,7 @@ VM_EMIT = ROOT / "build" / "sv0-megatu-vm-native"
 sys.path.insert(0, str(HERE))
 from run_plan import ensure_built  # noqa: E402
 
-PENDING = "hits are placed and checked"
+PENDING = "not available on the VM yet: coverage hits are placed and checked"
 
 
 def compile_with(binary: Path, request: str, coverage: str, fault: str | None = None) -> subprocess.CompletedProcess:
@@ -109,12 +110,14 @@ def main() -> int:
         if p.returncode != 9 or "COV1020" not in p.stderr or "--coverage=map placed coverage hits" not in p.stderr:
             errors.append(f"map-mode hit: rc={p.returncode} stderr={p.stderr.strip()!r}")
 
-        # 3. The drivers reach the check, which passes; emission is still pending.
-        exe = t / "inst"
-        p = subprocess.run([str(SV0), "native-compile", "--coverage=instrument", "-o", str(exe), f0],
+        # 3. The drivers reach the check, which passes: the C driver emits the
+        # instrumented C (CV-113); the VM emitter refuses after the check
+        # until COVER_HIT emission (CV-117).
+        cpath = t / "inst.c"
+        p = subprocess.run([str(SV0), "native-compile", "--emit=c", "--coverage=instrument", "-o", str(cpath), f0],
                            capture_output=True, text=True, timeout=300)
-        if p.returncode == 0 or PENDING not in p.stderr or "COV1020" in p.stderr or exe.exists():
-            errors.append(f"native-compile --coverage=instrument: rc={p.returncode} stderr={p.stderr.strip()!r}")
+        if p.returncode or "COV1020" in p.stderr or "__sv0cov_hit(" not in (cpath.read_text() if cpath.exists() else ""):
+            errors.append(f"native-compile --emit=c --coverage=instrument: rc={p.returncode} stderr={p.stderr.strip()!r}")
         p = subprocess.run([str(SV0), "vm-native-compile", "--coverage=instrument", f0, str(t / "inst.sv0b")],
                            capture_output=True, text=True, timeout=300)
         if p.returncode != 9 or PENDING not in p.stderr or "COV1020" in p.stderr:
@@ -126,7 +129,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print(f"coverage hits: OK ({len(progs)} programs: every counter placed exactly once on native + VM emitter, "
-          "entry first; drop/dup/orphan/map-mode faults fail with COV1020; drivers reach the check)")
+          "entry first; drop/dup/orphan/map-mode faults fail with COV1020; drivers pass the check)")
     return 0
 
 

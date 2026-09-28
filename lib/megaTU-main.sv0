@@ -250,20 +250,33 @@ fn megatu_cov_project_listing(dir: string) -> string {
     return listing;
 }
 
+/* What megatu_coverage decided: rc is main's exit code, or -1 to continue
+   compiling; map is the canonical map an instrument build writes once its C
+   is emitted (megatu_cov_emit_c). */
+struct MegatuCov {
+    rc: i32,
+    map: string,
+}
+
+fn megatu_cov_rc(rc: i32) -> MegatuCov {
+    return MegatuCov { rc: rc, map: "" };
+}
+
 /* Plan coverage for the checked program (lib/coverage_plan.sv0) and act on
-   the mode. Returns main's exit code, or -1 to continue compiling: map
-   writes the canonical map (lib/coverage_map.sv0) to the requested path and
-   continues with an uninstrumented build; plan-dump prints the plan instead
-   of C (0); instrument is refused (9) until hit placement (CV-112) lands, as
-   is every failure. */
+   the mode: map writes the canonical map (lib/coverage_map.sv0) to the
+   requested path and continues with an uninstrumented build; instrument
+   fills the hit table for lowering and returns the map, written only once
+   the instrumented C is emitted; plan-dump prints the plan instead of C (0);
+   hit-dump fills the hit table (its dump follows lowering). Every failure
+   is 9. */
 fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                    tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id4: Vec<i32>,
                    pp: Vec<i32>, bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>,
-                   bed4: Vec<i32>, cov_tab: Vec<i32>, cov_info: Vec<i32>) -> i32 {
+                   bed4: Vec<i32>, cov_tab: Vec<i32>, cov_info: Vec<i32>) -> MegatuCov {
     if mode < 0 {
         write_file("/dev/stderr", "coverage: unknown mode in SV0_COVERAGE_REQUEST (want map, instrument or plan-dump)\n");
-        return 9;
+        return megatu_cov_rc(9);
     }
     let cstarts: Vec<i32> = vec_new();
     let clens: Vec<i32> = vec_new();
@@ -271,11 +284,11 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
     if cov_src_is_error(table) {
         write_file("/dev/stderr", string_concat(string_concat("coverage: source table: ",
             string_substr(table, 1, string_len(table) - 1)), "\n"));
-        return 9;
+        return megatu_cov_rc(9);
     }
     if string_eq(cov_src_concat(listing), source) != true {
         write_file("/dev/stderr", "coverage: the compiled source differs from the build's files (include expansion or cross-module name mangling); coverage does not support this build yet\n");
-        return 9;
+        return megatu_cov_rc(9);
     }
     let src_unit: Vec<i32> = vec_new();
     cov_plan_sources(table, src_unit);
@@ -293,7 +306,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         pt_kind, pt_entity, pt_start, pt_end);
     if cov_src_is_error(qnames) {
         write_file("/dev/stderr", "coverage: could not recover a function's span from its tokens\n");
-        return 9;
+        return megatu_cov_rc(9);
     }
     /* Regions and branches (CV-108): the token walk's statement count per
        function body is checked against the AST body block. */
@@ -317,14 +330,14 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
     if bad >= 0 {
         write_file("/dev/stderr", string_concat(string_concat("coverage: could not plan the regions of function ",
             cov_plan_line_at(qnames, bad)), " (unsupported statement or construct)\n"));
-        return 9;
+        return megatu_cov_rc(9);
     }
     if mode == 3 {
         write_file("/dev/stdout", string_concat(cov_plan_dump(source, table, cstarts, clens, src_unit,
             ent_source, ent_start, ent_end, ent_owner, qnames, pt_kind, pt_entity, pt_start, pt_end),
             cov_plan_region_dump(source, starts, ends, cstarts, clens, src_unit, ent_source, rg, br, cef, cet,
                 vec_len(pt_kind))));
-        return 0;
+        return megatu_cov_rc(0);
     }
     /* cov_info[0] = the planned counter count (hits are checked after lowering). */
     let counters: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br);
@@ -336,7 +349,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
             vec_push(cov_tab, vec_get(tab5, t5));
             t5 = t5 + 1;
         }
-        return 0 - 1;
+        return megatu_cov_rc(0 - 1);
     }
     let is_map_or_instr: bool = if mode == 1 { true } else { mode == 2 };
     if is_map_or_instr {
@@ -347,14 +360,12 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         let missing: bool = if string_len(map_path) == 0 { true } else { if string_len(target) == 0 { true } else { string_len(identity) == 0 } };
         if missing {
             write_file("/dev/stderr", "coverage: SV0_COVERAGE_REQUEST needs <mode>, <map path>, <target>, and <compiler identity> lines\n");
-            return 9;
+            return megatu_cov_rc(9);
         }
-        /* instrument writes its map once the build succeeds; until emission
-           lands (CV-113/CV-117) it is refused after the placement check and
-           must leave nothing behind. */
+        let map: string = cov_map_build(source, starts, ends, table, cstarts, src_unit,
+            ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity);
         if mode == 1 {
-            write_file(map_path, cov_map_build(source, starts, ends, table, cstarts, src_unit,
-                ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity));
+            write_file(map_path, map);
         }
         if mode == 2 {
             let tab2: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, counters);
@@ -363,11 +374,12 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                 vec_push(cov_tab, vec_get(tab2, t2));
                 t2 = t2 + 1;
             }
+            return MegatuCov { rc: 0 - 1, map: map };
         }
-        return 0 - 1;
+        return megatu_cov_rc(0 - 1);
     }
     write_file("/dev/stderr", "coverage: unsupported coverage mode\n");
-    return 9;
+    return megatu_cov_rc(9);
 }
 
 /* Count the CovHit instructions under `list` into counts (orphans = hits
@@ -512,8 +524,46 @@ fn megatu_cov_check(mode: i32, out_blocks: Vec<i32>, cov_info: Vec<i32>,
         write_file("/dev/stdout", dump);
         return 0;
     }
-    write_file("/dev/stderr", "--coverage=instrument is not available yet: coverage hits are placed and checked, but generated-C and VM emission (sv0cov CV-113, CV-117) have not landed; build with --coverage=off or --coverage=map\n");
-    return 9;
+    return 0 - 1;
+}
+
+/* Index of needle in hay, or -1. */
+fn megatu_str_find(hay: string, needle: string) -> i32 {
+    return cov_map_find(hay, needle, 0);
+}
+
+/* Finish an instrument build's C (sv0cov CV-113, SPEC 14.1): insert the
+   coverage registration prelude after the runtime include, register it in
+   the hosted main right after sv0_runtime_init (before user entry), and
+   write the map now that the C exists. Any other mode returns c unchanged.
+   "" (exit 9) when the program has no hosted main to register from. */
+fn megatu_cov_emit_c(mode: i32, cov: MegatuCov, c: string) -> string {
+    if mode != 2 { return c; }
+    let req: string = getenv("SV0_COVERAGE_REQUEST");
+    let prelude: string = cov_map_c_prelude(cov.map, megatu_cov_req_line(req, 2), megatu_cov_req_line(req, 3));
+    if string_len(prelude) == 0 {
+        write_file("/dev/stderr", "error[COV1020]: coverage instrumentation failed: the coverage map has no usable fragment table\n");
+        return "";
+    }
+    let head: string = "#include \"sv0_runtime.h\"\n\n";
+    let init: string = "  sv0_runtime_init(argc, argv);\n";
+    let at: i32 = megatu_str_find(c, init);
+    let hn: i32 = string_len(head);
+    let has_head: bool = if string_len(c) < hn { false } else { string_eq(string_substr(c, 0, hn), head) };
+    if at < 0 {
+        write_file("/dev/stderr", "coverage: --coverage=instrument needs a hosted `fn main() -> i32` or `fn main()` to register coverage before user code\n");
+        return "";
+    }
+    if has_head != true {
+        write_file("/dev/stderr", "coverage: the generated C does not start with the runtime include; cannot place the coverage prelude\n");
+        return "";
+    }
+    let cut: i32 = at + string_len(init);
+    let body: string = string_substr(c, hn, cut - hn);
+    let rest: string = string_substr(c, cut, string_len(c) - cut);
+    write_file(megatu_cov_req_line(req, 1), cov.map);
+    return string_concat(string_concat(string_concat(head, prelude), body),
+        string_concat("  __sv0cov_start(__sv0cov_modules, 1u);\n", rest));
 }
 
 fn main() -> i32 {
@@ -651,11 +701,12 @@ fn main() -> i32 {
        so both backends share one plan. */
     let cov_tab: Vec<i32> = vec_new();
     let cov_info: Vec<i32> = vec_new();
+    let mut cov: MegatuCov = megatu_cov_rc(0 - 1);
     if _cov_mode != 0 {
-        let cov_rc: i32 = megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
+        cov = megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
                                tags, starts, ends, it, id1, id2, id4, pp, bet, bed1, bed2, bed3,
                                bed4, cov_tab, cov_info);
-        if cov_rc >= 0 { return cov_rc; }
+        if cov.rc >= 0 { return cov.rc; }
     }
 
     /* Phase 5: lower (real lowering.sv0) — parse arenas -> IR out_blocks; returns
@@ -857,12 +908,18 @@ fn main() -> i32 {
     let sidx: Vec<i32> = assign_shadow_indices(it, id3, id4, id5, fpn,
                                                bet, bed1, bed2, bed3, bed4, pp,
                                                source, starts, ends);
-    let c: string = megatu_emit_program(td, out_blocks, source, starts, ends,
+    let c_plain: string = megatu_emit_program(td, out_blocks, source, starts, ends,
                                         it, id1, id2, id3, id5, fpn,
                                         fpt, frt, ptt, ptd1, ptd2, pp, sidx,
                                         eit_nt, eit_base, eit_cnt, eit_cats,
                                         sit_nt, sit_base, sit_cnt,
                                         sit_field_name, sit_field_cat);
+    /* sv0cov CV-113: an instrument build gets its registration prelude and
+       writes its map here; other modes pass the C through unchanged. */
+    let c: string = megatu_cov_emit_c(_cov_mode, cov, c_plain);
+    if _cov_mode == 2 {
+        if string_len(c) == 0 { return 9; }
+    }
     if string_len(c) == 0 { return 5; }
 
     /* MILESTONE: all six real phases (tokenize -> parse -> resolve -> check ->
@@ -2919,6 +2976,12 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "return ");
             let b: string = string_concat(a, megatu_emit_value(v, source, starts, ends, sidx));
             return string_concat(b, ";\n");
+        },
+        codegen_Instr::CovHit(k) => {
+            /* sv0cov CV-113: one module holds the whole program, so the
+               module-local counter is the program counter. */
+            return string_concat(string_concat(indent, "__sv0cov_hit(&__sv0cov_module, "),
+                string_concat(int_to_string(k), "u);\n"));
         },
         codegen_Instr::DeclPtr(inner, kind, h) => {
             let base_cty: string = megatu_ty_name(inner, source, starts, ends);

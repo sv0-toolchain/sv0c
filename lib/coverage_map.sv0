@@ -694,3 +694,133 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
     return string_concat(string_concat(string_concat(string_concat(head, mid), frag),
         string_concat(string_concat(",\"map_id\":\"", map_id), "\"")), string_concat(tail, "\n"));
 }
+
+/* ── generated-C registration (CV-113; SPEC 14.1) ──────────────────────── */
+
+/* Index of needle in hay at or after from, or -1. */
+fn cov_map_find(hay: string, needle: string, from: i32) -> i32 {
+    let n: i32 = string_len(hay);
+    let m: i32 = string_len(needle);
+    let c0: i32 = string_char_at(needle, 0);
+    let mut i: i32 = from;
+    while i + m <= n {
+        if string_char_at(hay, i) == c0 {
+            if string_eq(string_substr(hay, i, m), needle) { return i; }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* The decimal digits starting at s[at] (0 when there are none). */
+fn cov_map_read_int(s: string, at: i32) -> i32 {
+    let n: i32 = string_len(s);
+    let mut v: i32 = 0;
+    let mut i: i32 = at;
+    let mut going: bool = true;
+    while going {
+        going = false;
+        if i < n {
+            let c: i32 = string_char_at(s, i);
+            if c >= 48 {
+                if c <= 57 {
+                    v = v * 10 + c - 48;
+                    i = i + 1;
+                    going = true;
+                }
+            }
+        }
+    }
+    return v;
+}
+
+/* A C string literal for the bytes of s: printable ASCII copied, `"` `\`
+   and `?` (trigraphs) escaped, every other byte as a three-digit octal
+   escape, so a following digit is never absorbed. */
+fn cov_map_c_str(s: string) -> string {
+    let digits: string = "01234567";
+    let n: i32 = string_len(s);
+    let mut out: string = "\"";
+    let mut start: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(s, i);
+        let mut esc: string = "";
+        if c == 34 { esc = "\\\""; }
+        if c == 92 { esc = "\\\\"; }
+        if c == 63 { esc = "\\?"; }
+        let plain: bool = if c < 32 { false } else { c < 127 };
+        if plain != true {
+            esc = string_concat(string_concat("\\", string_substr(digits, c / 64, 1)),
+                string_concat(string_substr(digits, (c / 8) % 8, 1), string_substr(digits, c % 8, 1)));
+        }
+        if string_len(esc) > 0 {
+            out = string_concat(string_concat(out, string_substr(s, start, i - start)), esc);
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return string_concat(string_concat(out, string_substr(s, start, n - start)), "\"");
+}
+
+/* The C declarations an instrumented translation unit carries (generated-C
+   coverage protocol 1): the runtime interface, one descriptor per map
+   fragment, and this module's registration record (map ID, program counter
+   count, target, compiler identity, and the module's counter slice). The
+   generated main passes __sv0cov_modules to __sv0cov_start right after
+   sv0_runtime_init, before user code; every hit is
+   __sv0cov_hit(&__sv0cov_module, local) with local counted from the
+   module's slice base. The mega-TU is one module holding every fragment,
+   so its slice is the whole program and local equals the program counter.
+   Reads the canonical map `map` built by cov_map_build; "" if it lacks the
+   expected fields. */
+fn cov_map_c_prelude(map: string, target: string, identity: string) -> string {
+    let fr: i32 = cov_map_find(map, "\"fragments\":[", 0);
+    let mid: i32 = cov_map_find(map, "\"map_id\":\"", 0);
+    let pc: i32 = cov_map_find(map, "\"program_counter_count\":", 0);
+    if fr < 0 { return ""; }
+    if mid < 0 { return ""; }
+    if pc < 0 { return ""; }
+    let map_id: string = string_substr(map, mid + 10, 64);
+    let total: i32 = cov_map_read_int(map, pc + 24);
+    let mut frags: string = "";
+    let mut nfrag: i32 = 0;
+    let mut first_base: i32 = 0;
+    let mut covered: i32 = 0;
+    let mut at: i32 = cov_map_find(map, "{\"fragment_id\":\"", fr);
+    while at >= 0 {
+        if at > mid {
+            at = 0 - 1;
+        } else {
+            let fid: string = string_substr(map, at + 16, 64);
+            let sb: i32 = cov_map_find(map, "\"slice_base\":", at);
+            let sl: i32 = cov_map_find(map, "\"slice_length\":", at);
+            if sb < 0 { return ""; }
+            if sl < 0 { return ""; }
+            let base: i32 = cov_map_read_int(map, sb + 13);
+            let len: i32 = cov_map_read_int(map, sl + 15);
+            if nfrag == 0 { first_base = base; }
+            if base != first_base + covered { return ""; }
+            covered = covered + len;
+            frags = string_concat(frags, string_concat(string_concat(string_concat("  {\"", fid), "\", "),
+                string_concat(string_concat(string_concat(cov_map_int(base), "u, "), cov_map_int(len)), "u},\n")));
+            nfrag = nfrag + 1;
+            at = cov_map_find(map, "{\"fragment_id\":\"", at + 16);
+        }
+    }
+    if nfrag == 0 { return ""; }
+    if covered != total { return ""; }
+    let nf: string = cov_map_int(nfrag);
+    let mut out: string = "/* sv0cov coverage instrumentation, generated-C protocol 1 (sv0cov CV-113).\n   Hits count module-local counters; the coverage runtime validates this\n   module's registration before user entry. */\n";
+    out = string_concat(out, "struct __sv0cov_fragment {\n  const char *fragment_id;\n  uint32_t slice_base;\n  uint32_t slice_length;\n};\n");
+    out = string_concat(out, "struct __sv0cov_module {\n  uint32_t protocol_major;\n  const char *map_id;\n  uint32_t program_counter_count;\n  const char *target;\n  const char *compiler_identity;\n  uint32_t slice_base;\n  uint32_t slice_length;\n  uint32_t fragment_count;\n  const struct __sv0cov_fragment *fragments;\n};\n");
+    out = string_concat(out, "void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t module_count);\n");
+    out = string_concat(out, "void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);\n");
+    out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_fragment __sv0cov_fragments[", nf), "] = {\n"));
+    out = string_concat(string_concat(out, frags), "};\n");
+    out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_module __sv0cov_module = {\n  1u, \"", map_id), "\", "));
+    out = string_concat(out, string_concat(string_concat(cov_map_int(total), "u, "), string_concat(cov_map_c_str(target), ", ")));
+    out = string_concat(out, string_concat(cov_map_c_str(identity), string_concat(", ", string_concat(cov_map_int(first_base), "u, "))));
+    out = string_concat(out, string_concat(string_concat(cov_map_int(covered), "u, "), string_concat(nf, "u, __sv0cov_fragments\n};\n")));
+    return string_concat(out, "static const struct __sv0cov_module *const __sv0cov_modules[1] = {&__sv0cov_module};\n\n");
+}

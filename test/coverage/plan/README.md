@@ -1,4 +1,4 @@
-# Coverage planner, map, and hit tests (sv0cov CV-107..CV-112)
+# Coverage planner, map, hit, and C emission tests (sv0cov CV-107..CV-113)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -67,3 +67,31 @@ requires, for every fixture and `constructs.sv0` on both binaries, that the
 hits are exactly counters `0..N-1` with each function's entry counter first,
 and that a dropped, duplicated, or orphan hit (`SV0_COVERAGE_FAULT` test hook)
 and any hit in map mode fail with `COV1020`.
+
+`run_emit_c.py` (CV-113) checks the generated C of `--coverage=instrument`.
+The C carries a registration prelude after the runtime include: the runtime
+interface (`__sv0cov_start`, `__sv0cov_hit`), one descriptor per map
+fragment, and the module record (protocol major 1, map ID, program counter
+count, target, compiler identity, the module's counter slice). Every hit is
+`__sv0cov_hit(&__sv0cov_module, <i>u);`, and the hosted `main` calls
+`__sv0cov_start(__sv0cov_modules, 1u);` right after `sv0_runtime_init`,
+before user code. The map is written once the C is. For every fixture and
+`constructs.sv0` the script requires:
+
+- the instrument map to be byte-identical to the map-mode map;
+- the prelude to carry the map's ID, counter count, and fragment table, and
+  the C to hold exactly one hit per counter;
+- the C minus the prelude, hits, start call, and CV-112 loop rewrite to equal
+  the `off` build's C;
+- the program, linked with `stub_rt.c` (a test-only stand-in for the CV-114
+  runtime that validates the registration and counts hits) and run without
+  gcov, profiling, or debug flags, to exit as the `off` build does, with
+  every point's count equal to the fixture's `expected-counts.json`;
+- f0's instrumented C to equal `emit-f0.expected.c` (`--update` rewrites
+  it);
+- a program with no hosted `main` to be refused (exit 9) with no map left.
+
+Until the native runtime lands (CV-114), `sv0 native-compile
+--coverage=instrument` refuses to link (exit 7) and `--emit=c` is the way to
+get instrumented C; the VM emitter refuses `instrument` (exit 9) until
+`COVER_HIT` emission (CV-117).
