@@ -171,8 +171,9 @@ fn megatu_index_of(s: string, ch: i32, from: i32) -> i32 {
    "<mode>\n<map path>"; the CLI patches in build-sv0-megatu-*native.sh read it
    into main's _cov_* locals through these helpers. */
 
-/* 0 = off (empty request), 1 = map, 2 = instrument, 3 = plan-dump (an
-   internal test hook that prints the plan instead of C), -1 = unknown. */
+/* 0 = off (empty request), 1 = map, 2 = instrument, 3 = plan-dump and
+   5 = hit-dump (internal test hooks that print the plan, or the placed hits,
+   instead of C), -1 = unknown. */
 fn megatu_cov_mode_of(req: string) -> i32 {
     if string_len(req) == 0 { return 0; }
     let nl: i32 = megatu_index_of(req, 10, 0);
@@ -181,6 +182,7 @@ fn megatu_cov_mode_of(req: string) -> i32 {
     if string_eq(mode, "map") { return 1; }
     if string_eq(mode, "instrument") { return 2; }
     if string_eq(mode, "plan-dump") { return 3; }
+    if string_eq(mode, "hit-dump") { return 5; }
     return 0 - 1;
 }
 
@@ -188,6 +190,7 @@ fn megatu_cov_mode_name(mode: i32) -> string {
     if mode == 1 { return "map"; }
     if mode == 2 { return "instrument"; }
     if mode == 3 { return "plan-dump"; }
+    if mode == 5 { return "hit-dump"; }
     return "off";
 }
 
@@ -256,7 +259,8 @@ fn megatu_cov_project_listing(dir: string) -> string {
 fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                    tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id4: Vec<i32>,
-                   pp: Vec<i32>, bet: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>) -> i32 {
+                   pp: Vec<i32>, bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>,
+                   bed4: Vec<i32>, cov_tab: Vec<i32>, cov_info: Vec<i32>) -> i32 {
     if mode < 0 {
         write_file("/dev/stderr", "coverage: unknown mode in SV0_COVERAGE_REQUEST (want map, instrument or plan-dump)\n");
         return 9;
@@ -322,7 +326,20 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                 vec_len(pt_kind))));
         return 0;
     }
-    if mode == 1 {
+    /* cov_info[0] = the planned counter count (hits are checked after lowering). */
+    let counters: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br);
+    vec_push(cov_info, vec_len(counters));
+    if mode == 5 {
+        let tab5: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, counters);
+        let mut t5: i32 = 0;
+        while t5 < vec_len(tab5) {
+            vec_push(cov_tab, vec_get(tab5, t5));
+            t5 = t5 + 1;
+        }
+        return 0 - 1;
+    }
+    let is_map_or_instr: bool = if mode == 1 { true } else { mode == 2 };
+    if is_map_or_instr {
         let req: string = getenv("SV0_COVERAGE_REQUEST");
         let map_path: string = megatu_cov_req_line(req, 1);
         let target: string = megatu_cov_req_line(req, 2);
@@ -332,12 +349,170 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
             write_file("/dev/stderr", "coverage: SV0_COVERAGE_REQUEST needs <mode>, <map path>, <target>, and <compiler identity> lines\n");
             return 9;
         }
-        write_file(map_path, cov_map_build(source, starts, ends, table, cstarts, src_unit,
-            ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity));
+        /* instrument writes its map once the build succeeds; until emission
+           lands (CV-113/CV-117) it is refused after the placement check and
+           must leave nothing behind. */
+        if mode == 1 {
+            write_file(map_path, cov_map_build(source, starts, ends, table, cstarts, src_unit,
+                ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity));
+        }
+        if mode == 2 {
+            let tab2: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, counters);
+            let mut t2: i32 = 0;
+            while t2 < vec_len(tab2) {
+                vec_push(cov_tab, vec_get(tab2, t2));
+                t2 = t2 + 1;
+            }
+        }
         return 0 - 1;
     }
-    write_file("/dev/stderr", string_concat(string_concat("--coverage=", megatu_cov_mode_name(mode)),
-        " is not available yet: coverage instrumentation (sv0cov CV-112) has not landed; build with --coverage=off or --coverage=map\n"));
+    write_file("/dev/stderr", "coverage: unsupported coverage mode\n");
+    return 9;
+}
+
+/* Count the CovHit instructions under `list` into counts (orphans = hits
+   outside 0..counts-1 in orphan[0]); an instruction list the IR shares (a
+   guarded match arm's else chain) is visited once. `seq` collects the
+   counters in pre-order for the hit dump. */
+fn megatu_cov_walk(list: Vec<i32>, counts: Vec<i32>, orphan: Vec<i32>, visited: Vec<i32>,
+                   seq: Vec<i32>) -> i32 {
+    let nv: i32 = vec_len(visited);
+    let mut v: i32 = 0;
+    while v < nv {
+        if vec_get(visited, v) == list { return 0; }
+        v = v + 1;
+    }
+    vec_push(visited, list);
+    let n: i32 = vec_len(list);
+    let mut i: i32 = 0;
+    while i < n {
+        let ins: codegen_Instr = box_deref(vec_get(list, i));
+        match ins {
+            codegen_Instr::CovHit(c) => {
+                vec_push(seq, c);
+                if c >= 0 {
+                    if c < vec_len(counts) {
+                        vec_set(counts, c, vec_get(counts, c) + 1);
+                    } else {
+                        vec_set(orphan, 0, vec_get(orphan, 0) + 1);
+                    }
+                } else {
+                    vec_set(orphan, 0, vec_get(orphan, 0) + 1);
+                }
+            },
+            codegen_Instr::IfElse(_, t, e) => {
+                megatu_cov_walk(t, counts, orphan, visited, seq);
+                megatu_cov_walk(e, counts, orphan, visited, seq);
+            },
+            codegen_Instr::WhileLoop(_, body) => {
+                megatu_cov_walk(body, counts, orphan, visited, seq);
+            },
+            codegen_Instr::BlockInstr(inner) => {
+                megatu_cov_walk(inner, counts, orphan, visited, seq);
+            },
+            _ => {},
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+/* Placement check after lowering (sv0cov CV-111/CV-112, SPEC 13.2): map mode
+   places no hit; instrument places every planned counter exactly once and
+   nothing else, or the build fails with COV1020. SV0_COVERAGE_FAULT (a test
+   hook: drop, dup, or orphan) corrupts the placement first so the negative
+   tests can prove the check fires. Returns main's exit code, or -1 to
+   continue. */
+fn megatu_cov_check(mode: i32, out_blocks: Vec<i32>, cov_info: Vec<i32>,
+                    source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let total: i32 = vec_get(cov_info, 0);
+    let nblocks: i32 = vec_len(out_blocks) / 4;
+    let fault: string = getenv("SV0_COVERAGE_FAULT");
+    if string_len(fault) > 0 {
+        if nblocks > 0 {
+            let first: Vec<i32> = box_deref(vec_get(out_blocks, 3));
+            if string_eq(fault, "drop") {
+                let mut k: i32 = 0;
+                let mut done: bool = false;
+                while k < vec_len(first) {
+                    if done != true {
+                        let fi: codegen_Instr = box_deref(vec_get(first, k));
+                        match fi {
+                            codegen_Instr::CovHit(_) => {
+                                vec_set(first, k, box_new(codegen_Instr::Nop));
+                                done = true;
+                            },
+                            _ => {},
+                        }
+                    }
+                    k = k + 1;
+                }
+            }
+            if string_eq(fault, "dup") { vec_push(first, box_new(codegen_Instr::CovHit(0))); }
+            if string_eq(fault, "orphan") { vec_push(first, box_new(codegen_Instr::CovHit(total))); }
+        }
+    }
+    let counts: Vec<i32> = vec_new();
+    let mut c: i32 = 0;
+    while c < total {
+        vec_push(counts, 0);
+        c = c + 1;
+    }
+    let orphan: Vec<i32> = vec_new();
+    vec_push(orphan, 0);
+    let visited: Vec<i32> = vec_new();
+    let mut dump: string = "";
+    let mut b: i32 = 0;
+    while b < nblocks {
+        let seq: Vec<i32> = vec_new();
+        megatu_cov_walk(box_deref(vec_get(out_blocks, b * 4 + 3)), counts, orphan, visited, seq);
+        let mut line: string = string_concat(string_concat("hits\t", handle_to_str(vec_get(out_blocks, b * 4), source, starts, ends)), "\t");
+        let mut q: i32 = 0;
+        while q < vec_len(seq) {
+            if q > 0 { line = string_concat(line, ","); }
+            line = string_concat(line, int_to_string(vec_get(seq, q)));
+            q = q + 1;
+        }
+        dump = string_concat(dump, string_concat(line, "\n"));
+        b = b + 1;
+    }
+    let mut placed: i32 = vec_get(orphan, 0);
+    let mut missing: i32 = 0 - 1;
+    let mut twice: i32 = 0 - 1;
+    c = 0;
+    while c < total {
+        let n: i32 = vec_get(counts, c);
+        placed = placed + n;
+        if n == 0 { if missing < 0 { missing = c; } }
+        if n > 1 { if twice < 0 { twice = c; } }
+        c = c + 1;
+    }
+    if mode == 1 {
+        if placed > 0 {
+            write_file("/dev/stderr", "error[COV1020]: coverage instrumentation failed: --coverage=map placed coverage hits\n");
+            return 9;
+        }
+        return 0 - 1;
+    }
+    if vec_get(orphan, 0) > 0 {
+        write_file("/dev/stderr", "error[COV1020]: coverage instrumentation failed: a hit names no planned counter\n");
+        return 9;
+    }
+    if twice >= 0 {
+        write_file("/dev/stderr", string_concat(string_concat("error[COV1020]: coverage instrumentation failed: counter ",
+            int_to_string(twice)), " is placed more than once\n"));
+        return 9;
+    }
+    if missing >= 0 {
+        write_file("/dev/stderr", string_concat(string_concat("error[COV1020]: coverage instrumentation failed: counter ",
+            int_to_string(missing)), " has no placement\n"));
+        return 9;
+    }
+    if mode == 5 {
+        write_file("/dev/stdout", dump);
+        return 0;
+    }
+    write_file("/dev/stderr", "--coverage=instrument is not available yet: coverage hits are placed and checked, but generated-C and VM emission (sv0cov CV-113, CV-117) have not landed; build with --coverage=off or --coverage=map\n");
     return 9;
 }
 
@@ -474,9 +649,12 @@ fn main() -> i32 {
 
     /* Coverage planning (sv0cov CV-107): after resolve/check, before lower,
        so both backends share one plan. */
+    let cov_tab: Vec<i32> = vec_new();
+    let cov_info: Vec<i32> = vec_new();
     if _cov_mode != 0 {
         let cov_rc: i32 = megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
-                               tags, starts, ends, it, id1, id2, id4, pp, bet, bed2, bed3);
+                               tags, starts, ends, it, id1, id2, id4, pp, bet, bed1, bed2, bed3,
+                               bed4, cov_tab, cov_info);
         if cov_rc >= 0 { return cov_rc; }
     }
 
@@ -660,7 +838,11 @@ fn main() -> i32 {
         bet, bed1, bed2, bed3, bed4, bsf,
         pp, tags, out_blocks, imp, fcr, fcb, frt, ptt, ptd1,
         _contract_mode, proven_lines,
-        evpv, evptn);
+        evpv, evptn, cov_tab);
+    if _cov_mode != 0 {
+        let chk_rc: i32 = megatu_cov_check(_cov_mode, out_blocks, cov_info, source, starts, ends);
+        if chk_rc >= 0 { return chk_rc; }
+    }
 
     /* Phase 6: emit C. codegen's emit_program AND its body emit (emit_instrs)
        use hardcoded test stubs — name_of (token-index -> fabricated names,

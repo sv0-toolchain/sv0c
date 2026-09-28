@@ -308,6 +308,51 @@ fn cov_map_ref_point(r: i32, n_entries: i32, obase: Vec<i32>) -> i32 {
     return n_entries + vec_get(obase, enc / 1024) + enc % 1024;
 }
 
+/* Counter index of every planned point: entries first (point e is entity
+   e's function_entry), then branch b's outcomes (point ne + obase + k, obase
+   = the outcomes of earlier branches). Counters follow source, span start,
+   entry before outcome, then ordinal; the map writer and hit placement
+   (CV-112) both use this numbering. */
+fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
+                    br: Vec<i32>) -> Vec<i32> {
+    let ne: i32 = vec_len(ent_source);
+    let nb: i32 = vec_len(br) / 5;
+    let mut keys: string = "";
+    let koff: Vec<i32> = vec_new();
+    let klen: Vec<i32> = vec_new();
+    let mut e: i32 = 0;
+    while e < ne {
+        let k0: string = string_concat(string_concat(cov_map_pad(vec_get(ent_source, e)), cov_map_pad(vec_get(ent_start, e))), "0");
+        keys = cov_map_key_push(keys, koff, klen, string_concat(k0, cov_map_pad(0)));
+        e = e + 1;
+    }
+    let mut b: i32 = 0;
+    while b < nb {
+        let bsrc: i32 = vec_get(ent_source, vec_get(br, b * 5 + 1));
+        let bstart: i32 = vec_get(starts, vec_get(br, b * 5 + 2));
+        let mut k: i32 = 0;
+        while k < vec_get(br, b * 5 + 4) {
+            let k1: string = string_concat(string_concat(cov_map_pad(bsrc), cov_map_pad(bstart)), "1");
+            keys = cov_map_key_push(keys, koff, klen, string_concat(k1, cov_map_pad(k + 1)));
+            k = k + 1;
+        }
+        b = b + 1;
+    }
+    let order: Vec<i32> = cov_map_sort(keys, koff, klen);
+    let counter: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < vec_len(order) {
+        vec_push(counter, 0);
+        i = i + 1;
+    }
+    i = 0;
+    while i < vec_len(order) {
+        vec_set(counter, vec_get(order, i), i);
+        i = i + 1;
+    }
+    return counter;
+}
+
 /* Build the canonical map (bytes including the final LF). */
 fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string,
                  cstarts: Vec<i32>, src_unit: Vec<i32>,
@@ -378,27 +423,16 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
     }
 
     /* Counter order: source, span start, entry before outcome, ordinal. */
-    let mut ckeys: string = "";
-    let ckoff: Vec<i32> = vec_new();
-    let cklen: Vec<i32> = vec_new();
+    let counter: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br);
+    let corder: Vec<i32> = vec_new();
     p = 0;
     while p < np {
-        let mut ko: string = string_concat(cov_map_pad(vec_get(p_src, p)), cov_map_pad(vec_get(p_s, p)));
-        if vec_get(p_kind, p) == 1 { ko = string_concat(ko, "0"); } else { ko = string_concat(ko, "1"); }
-        ko = string_concat(ko, cov_map_pad(vec_get(p_ord, p) + 1));
-        ckeys = cov_map_key_push(ckeys, ckoff, cklen, ko);
-        p = p + 1;
-    }
-    let corder: Vec<i32> = cov_map_sort(ckeys, ckoff, cklen);
-    let counter: Vec<i32> = vec_new();
-    p = 0;
-    while p < np {
-        vec_push(counter, 0);
+        vec_push(corder, 0);
         p = p + 1;
     }
     p = 0;
     while p < np {
-        vec_set(counter, vec_get(corder, p), p);
+        vec_set(corder, vec_get(counter, p), p);
         p = p + 1;
     }
 

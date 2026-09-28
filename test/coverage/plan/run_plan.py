@@ -302,7 +302,7 @@ def check_refusals(tmp: Path, errors: list[str]) -> None:
         errors.append(f"include: expected refusal 9, got native {rc} vm {vrc}: {err.strip()}")
     (d / "plain.sv0").write_text("fn main() -> i32 { return 0; }\n")
     for mode, needle in (("bogus", "unknown mode"), ("map", "needs <mode>, <map path>"),
-                         ("instrument", "is not available yet")):
+                         ("instrument", "needs <mode>, <map path>")):
         rc, out, err, vrc, _ = run_plan(str(d / "plain.sv0"), mode)
         if rc != 9 or vrc != 9 or needle not in err or out:
             errors.append(f"mode {mode}: expected refusal 9 with {needle!r}, got native {rc} vm {vrc}: {err.strip()}")

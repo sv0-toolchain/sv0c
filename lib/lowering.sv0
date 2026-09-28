@@ -113,6 +113,10 @@ enum Instr {
        primitive/user-type name token; ptr_kind = 1 (`*const T`) or 2
        (`*mut T`); h = the declared variable/temp's own handle. */
     DeclPtr(i32, i32, i32),
+    /* sv0cov CV-112: count coverage counter `counter` (a planned
+       function_entry or branch_outcome point); placed only for
+       --coverage=instrument from the planner's node table (lower_cov_*). */
+    CovHit(i32),
 }
 
 fn ir_value_tag(v: Value) -> i32 {
@@ -140,6 +144,72 @@ fn ir_expr_tag(e: Expr) -> i32 {
     }
 }
 
+/* ── Coverage hit placement (sv0cov CV-112) ──────────────────────────────
+   For --coverage=instrument, lower() receives the planner's node table: one
+   entry per body-arena node, the counter of a function body's
+   function_entry point (at the body block node) or of outcome 0 of an
+   if/while/for/loop/match construct (outcome k is counter + k), else -1.
+   It rides in fn_ctx's last slot (boxed), after the BH-11a entries, so no
+   lowering signature changes; an empty table places nothing. Placement:
+   entry first in the function; if true/false at the head of the then/else
+   lists (an absent else still gets its list, the implicit false); while and
+   for become `while (1) { if (cond) { hit(body) } else { hit(exit); break } ...`
+   so exit counts false condition evaluations only; loop hits body at the
+   head and exit after the loop; match arm k at the head of its body. */
+
+fn lower_cov_counter(fn_ctx: Vec<i32>, node: i32) -> i32 {
+    let n: i32 = vec_len(fn_ctx);
+    if n == 0 { return 0 - 1; }
+    let slot: i32 = 1 + 2 * vec_get(fn_ctx, 0);
+    if slot >= n { return 0 - 1; }
+    let tab: Vec<i32> = box_deref(vec_get(fn_ctx, slot));
+    if node < 0 { return 0 - 1; }
+    if node >= vec_len(tab) { return 0 - 1; }
+    return vec_get(tab, node);
+}
+
+/* `list` with CovHit(counter) in front (the list itself when counter < 0). */
+fn lower_cov_prepend(list: Vec<i32>, counter: i32) -> Vec<i32> {
+    if counter < 0 { return list; }
+    let out: Vec<i32> = vec_new();
+    vec_push(out, box_new(Instr::CovHit(counter)));
+    let n: i32 = vec_len(list);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(out, vec_get(list, i));
+        i = i + 1;
+    }
+    return out;
+}
+
+/* IfElse for the if node `node`, with its true/false hits. */
+fn lower_cov_if(fn_ctx: Vec<i32>, node: i32, cond: Box<Expr>, then_is: Vec<i32>, else_is: Vec<i32>) -> Instr {
+    let c: i32 = lower_cov_counter(fn_ctx, node);
+    if c < 0 { return Instr::IfElse(cond, then_is, else_is); }
+    return Instr::IfElse(cond, lower_cov_prepend(then_is, c), lower_cov_prepend(else_is, c + 1));
+}
+
+/* WhileLoop for the while/for node `node`: with coverage, the condition
+   moves into the body so a false evaluation can count `exit`. */
+fn lower_cov_while(fn_ctx: Vec<i32>, node: i32, cond: Expr, body: Vec<i32>) -> Instr {
+    let c: i32 = lower_cov_counter(fn_ctx, node);
+    if c < 0 { return Instr::WhileLoop(box_new(cond), body); }
+    let hit_body: Vec<i32> = vec_new();
+    vec_push(hit_body, box_new(Instr::CovHit(c)));
+    let hit_exit: Vec<i32> = vec_new();
+    vec_push(hit_exit, box_new(Instr::CovHit(c + 1)));
+    vec_push(hit_exit, box_new(Instr::Break));
+    let loop_is: Vec<i32> = vec_new();
+    vec_push(loop_is, box_new(Instr::IfElse(box_new(cond), hit_body, hit_exit)));
+    let n: i32 = vec_len(body);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(loop_is, vec_get(body, i));
+        i = i + 1;
+    }
+    return Instr::WhileLoop(box_new(Expr::Literal(box_new(Value::VBoolTrue))), loop_is);
+}
+
 fn ir_instr_tag(ins: Instr) -> i32 {
     match ins {
         Instr::Nop => { return 0; },
@@ -159,6 +229,7 @@ fn ir_instr_tag(ins: Instr) -> i32 {
         Instr::ReturnVoid => { return 14; },
         Instr::ReturnVal(_) => { return 15; },
         Instr::DeclPtr(_, _, _) => { return 16; },
+        Instr::CovHit(_) => { return 17; },
     }
 }
 
@@ -1249,7 +1320,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             vec_push(out_instrs, box_new(Instr::DeclVar(t)));
             vec_push(out_instrs, box_new(Instr::DeclVar(u)));
         }
-        let if_instr: Instr = Instr::IfElse(box_new(cond_expr),
+        let if_instr: Instr = lower_cov_if(fn_ctx, idx, box_new(cond_expr),
                                               then_instrs, else_instrs);
         vec_push(out_instrs, box_new(if_instr));
         let load_u: Expr = Expr::Load(u);
@@ -1265,7 +1336,7 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                enum_tag_counts,
                                                enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
     let mut no_else: Vec<i32> = vec_new();
-    let if_no_el: Instr = Instr::IfElse(box_new(cond_expr),
+    let if_no_el: Instr = lower_cov_if(fn_ctx, idx, box_new(cond_expr),
                                           then_only, no_else);
     vec_push(out_instrs, box_new(if_no_el));
     return Value::VUnit;
@@ -1335,7 +1406,7 @@ fn lower_tag_for(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                       enum_tag_offsets,
                                                       enum_tag_counts,
                                                       enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-        let wl: Instr = Instr::WhileLoop(box_new(cond_e), loop_body);
+        let wl: Instr = lower_cov_while(fn_ctx, idx, cond_e, loop_body);
         vec_push(out_instrs, box_new(wl));
     }
     return Value::VUnit;
@@ -1988,7 +2059,7 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         if vec_len(cond_is) == 0 {
             /* Simple condition (no sub-instructions): while (cond) { body } — C
                re-evaluates the condition expression each iteration. */
-            let wl: Instr = Instr::WhileLoop(box_new(ce2), body_is);
+            let wl: Instr = lower_cov_while(fn_ctx, idx, ce2, body_is);
             vec_push(out_instrs, box_new(wl));
         } else {
             /* Complex condition: while (1) { cond_is; ct = cond; if (!ct) break;
@@ -2003,9 +2074,12 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let asg_w: Instr = Instr::Assign(ct_w, box_new(ce2));
             vec_push(loop_body, box_new(asg_w));
             let neg_w: Expr = Expr::Unop(1, box_new(Value::VVar(ct_w)));
+            let cov_w: i32 = lower_cov_counter(fn_ctx, idx);
             let brk_blk: Vec<i32> = vec_new();
+            if cov_w >= 0 { vec_push(brk_blk, box_new(Instr::CovHit(cov_w + 1))); }
             vec_push(brk_blk, box_new(Instr::Break));
             let empty_else: Vec<i32> = vec_new();
+            if cov_w >= 0 { vec_push(empty_else, box_new(Instr::CovHit(cov_w))); }
             /* if (!ct) { break } else {} — break when the condition is FALSE. The
                break block is the THEN arm; putting it in the else arm inverts the
                loop (breaks while the condition holds), miscompiling any while whose
@@ -2040,8 +2114,10 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-        let ll: Instr = Instr::WhileLoop(box_new(true_e), loop_is);
+        let cov_l: i32 = lower_cov_counter(fn_ctx, idx);
+        let ll: Instr = Instr::WhileLoop(box_new(true_e), lower_cov_prepend(loop_is, cov_l));
         vec_push(out_instrs, box_new(ll));
+        if cov_l >= 0 { vec_push(out_instrs, box_new(Instr::CovHit(cov_l + 1))); }
         return Value::VUnit;
     }
     if tag == 15 {
@@ -2395,7 +2471,7 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                   else_idx_wi, u_wi, ctr, else_wi,
                                   enum_names, enum_tag_offsets, enum_tag_counts,
                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-            vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e_wi), then_wi, else_wi)));
+            vec_push(out_instrs, box_new(lower_cov_if(fn_ctx, idx, box_new(cond_e_wi), then_wi, else_wi)));
             vec_push(out_instrs, box_new(Instr::Store(t_wi, box_new(Expr::Load(u_wi)))));
             return value_to_expr(Value::VVar(t_wi));
         }
@@ -2493,7 +2569,7 @@ fn lower_for_effect(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                            enum_names, enum_tag_offsets, enum_tag_counts,
                                            enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         }
-        vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e), then_is, else_is)));
+        vec_push(out_instrs, box_new(lower_cov_if(fn_ctx, idx, box_new(cond_e), then_is, else_is)));
         return 0;
     }
     let discard5: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
@@ -2569,7 +2645,7 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let mut else_is_iv: Vec<i32> = vec_new();
             vec_push(else_is_iv, box_new(Instr::Store(dest,
                 box_new(Expr::Literal(box_new(Value::VUnit))))));
-            vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e_iv), then_is_iv, else_is_iv)));
+            vec_push(out_instrs, box_new(lower_cov_if(fn_ctx, body_idx, box_new(cond_e_iv), then_is_iv, else_is_iv)));
             return 0;
         } else {
             /* ExprIf WITH else into a var (SML lowerIntoVarInstrs): a fresh `u`
@@ -2597,7 +2673,7 @@ fn lower_into_var_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                   else_idx_iv, u_we, ctr, else_we,
                                   enum_names, enum_tag_offsets, enum_tag_counts,
                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
-            vec_push(out_instrs, box_new(Instr::IfElse(box_new(cond_e_we), then_we, else_we)));
+            vec_push(out_instrs, box_new(lower_cov_if(fn_ctx, body_idx, box_new(cond_e_we), then_we, else_we)));
             vec_push(out_instrs, box_new(Instr::Store(dest, box_new(Expr::Load(u_we)))));
             return 0;
         }
@@ -2739,7 +2815,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                     match_env: Vec<i32>,
                     source: string, starts: Vec<i32>,
                     ends: Vec<i32>,
-                    import_aliases: Vec<i32>) -> i32 {
+                    import_aliases: Vec<i32>, cov_base: i32) -> i32 {
     let mut result_instrs: Vec<i32> = vec_new();
     let mut ai: i32 = arm_count - 1;
     while ai >= 0 {
@@ -3145,6 +3221,7 @@ fn lower_match_arms(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                   tok_tags, body_idx, out_var, ctr, body_is,
                                   enum_names, enum_tag_offsets, enum_tag_counts,
                                   enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, arm_menv, import_aliases);
+        if cov_base >= 0 { body_is = lower_cov_prepend(body_is, cov_base + ai); }
         let mut th: Vec<i32> = vec_new();
         let bli: i32 = vec_len(bind_instrs);
         let mut bi: i32 = 0;
@@ -3815,7 +3892,7 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                             enum_vnames_flat, enum_max_payloads, item_fn_row,
                                             match_env,
                                             source, starts, ends,
-                                            import_aliases);
+                                            import_aliases, lower_cov_counter(fn_ctx, idx));
     return Value::VVar(out);
 }
 
@@ -4537,6 +4614,8 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let body_final: Vec<i32> = inject_ensures_and_ret_slot(
         body_instrs, ens_instrs, use_slot, ret_slot);
     let discard_append_decl: i32 = append_instrs(out_instrs, decl_instrs);
+    let cov_entry: i32 = lower_cov_counter(fn_ctx, body_idx);
+    if cov_entry >= 0 { vec_push(out_instrs, box_new(Instr::CovHit(cov_entry))); }
     let discard_append_req: i32 = append_instrs(out_instrs, req_instrs);
     let discard_append_body: i32 = append_instrs(out_instrs, body_final);
     return 0;
@@ -5814,7 +5893,10 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
          pty_tt: Vec<i32>, pty_td1: Vec<i32>,
          contract_mode: i32, proven_lines: Vec<i32>,
          enum_variant_payload_count_by_variant: Vec<i32>,
-         enum_variant_payload_ty_name_tok: Vec<i32>) -> string {
+         enum_variant_payload_ty_name_tok: Vec<i32>,
+         cov_tab: Vec<i32>) -> string {
+    /* cov_tab (sv0cov CV-112): the coverage node table (see lower_cov_counter);
+       empty for builds without --coverage=instrument. */
     /* contract_mode (M4-S-023/024): 0 = runtime (emit all contract checks — the
        default), 1 = verified (drop `ensures` whose source line is in proven_lines,
        keep everything else), 2 = disabled (drop all requires + ensures runtime
@@ -5903,6 +5985,7 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
         vec_push(fn_ctx, vec_get(ctx_enums, ck));
         ck = ck + 1;
     }
+    if vec_len(cov_tab) > 0 { vec_push(fn_ctx, box_new(cov_tab)); }
     let mut i: i32 = 0;
     while i < n {
         /* A bodyless trait method declaration (body root -1) is a signature
@@ -11130,7 +11213,7 @@ fn test_lower_program_fn() -> i32 {
                              bpp, ttags, oblks,
                              vec_new(), vec_new(), vec_new(),
                              vec_new(), vec_new(), vec_new(), 0, vec_new(),
-                             vec_new(), vec_new());
+                             vec_new(), vec_new(), vec_new());
     if vec_len(ob) != 1 { return 1; }
     if vec_get(ob, 0) != 3 { return 2; }
     if vec_len(osn) != 1 { return 3; }

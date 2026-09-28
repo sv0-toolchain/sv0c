@@ -1,4 +1,4 @@
-# Coverage planner and map tests (sv0cov CV-107..CV-111)
+# Coverage planner, map, and hit tests (sv0cov CV-107..CV-112)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -46,9 +46,8 @@ The script checks:
 - that the native compiler and the native VM emitter, which share the
   planner, print identical plans;
 - that coverage fails closed with exit 9 for an `include`d file (the
-  compiled source is not the file's bytes), an unknown mode, `map` without
-  its target and identity lines, and `instrument` (refused until hit
-  placement lands).
+  compiled source is not the file's bytes), an unknown mode, and `map` or
+  `instrument` without their target and identity lines.
 
 `./scripts/sv0 test` runs it.
 
@@ -58,3 +57,13 @@ emitter, from different working directories, map paths, and environment
 noise, and requires identical bytes. It also requires `map` mode's generated
 C and `.sv0b` to be byte-identical to an `off` build (map mode adds no hit
 operations).
+
+`run_hits.py` (CV-112) checks hit placement. For `--coverage=instrument`
+lowering places `CovHit(counter)` IR instructions from the planner's node
+table, and the compiler checks after lowering that every planned counter is
+placed exactly once and nothing else (`COV1020` otherwise). The internal
+`hit-dump` mode prints each function's hits in IR pre-order. The script
+requires, for every fixture and `constructs.sv0` on both binaries, that the
+hits are exactly counters `0..N-1` with each function's entry counter first,
+and that a dropped, duplicated, or orphan hit (`SV0_COVERAGE_FAULT` test hook)
+and any hit in map mode fail with `COV1020`.

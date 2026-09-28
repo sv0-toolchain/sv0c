@@ -1057,3 +1057,136 @@ fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
     }
     return out;
 }
+
+/* ── Hit placement table (CV-112) ──────────────────────────────────────────
+ *
+ * Lowering places hits by AST node (lowering.sv0 lower_cov_*); the planner
+ * works on tokens. A construct node is tied to its planned branch through
+ * the leftmost source token of its condition (if/while), scrutinee (match),
+ * iterable (for), or body (loop): that token lies in the anchor ranges of
+ * the constructs enclosing it, and the innermost such branch with the same
+ * keyword (if/match/while/for/loop) is the node's own. A node that maps to nothing gets no
+ * hit, which the placement check reports as a missing counter (COV1020).
+ */
+
+/* Leftmost source token of the expression subtree at `idx` (the parser's
+   expression arena, children before parents), or -1 when it has none. */
+fn cov_leftmost_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>, ed4: Vec<i32>,
+                    pp: Vec<i32>, idx: i32) -> i32 {
+    let mut i: i32 = idx;
+    let mut steps: i32 = 0;
+    while i >= 0 {
+        if i >= vec_len(et) { return 0 - 1; }
+        steps = steps + 1;
+        if steps > 100000 { return 0 - 1; }
+        let t: i32 = vec_get(et, i);
+        if t == 0 { return vec_get(ed2, i); }
+        if t == 1 { return vec_get(pp, vec_get(ed1, i)); }
+        if t == 24 { return vec_get(pp, vec_get(ed1, i)); }
+        if t == 27 { return vec_get(ed1, i); }
+        let mut next: i32 = 0 - 1;
+        if t == 2 { next = vec_get(ed2, i); }
+        if t == 3 { next = vec_get(ed2, i); }
+        if t == 19 { next = vec_get(ed2, i); }
+        if t == 13 { next = vec_get(ed2, i); }
+        if t == 9 {
+            if vec_get(ed2, i) > 0 {
+                let sc: i32 = vec_get(ed4, i);
+                if sc > 0 { next = vec_get(pp, sc - 1); } else { next = vec_get(ed1, i); }
+            } else {
+                next = vec_get(ed3, i);
+            }
+        }
+        let first_d1: bool = if t == 4 { true } else { if t == 5 { true } else { if t == 6 { true } else {
+            if t == 7 { true } else { if t == 8 { true } else { if t == 10 { true } else { if t == 11 { true } else {
+            if t == 12 { true } else { if t == 14 { true } else { if t == 15 { true } else { if t == 16 { true } else {
+            if t == 18 { true } else { if t == 20 { true } else { if t == 21 { true } else { if t == 22 { true } else {
+            if t == 23 { true } else { if t == 25 { true } else { if t == 26 { true } else { t == 28 } } } } } } } } } } } } } } } } } };
+        if first_d1 { next = vec_get(ed1, i); }
+        if t == 21 {
+            if next < 0 { next = vec_get(ed2, i); }
+        }
+        i = next;
+    }
+    return 0 - 1;
+}
+
+/* The node table lowering reads (lower_cov_counter): one entry per
+   expression-arena node, the counter of a function body's entry point at
+   its body block node, of outcome 0 at an if/while/for/loop/match node,
+   else -1. `counters` is cov_map_counters' numbering. */
+fn cov_hit_table(tags: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>, ed4: Vec<i32>,
+                 pp: Vec<i32>, id4: Vec<i32>, ent_item: Vec<i32>, br: Vec<i32>, counters: Vec<i32>) -> Vec<i32> {
+    let n: i32 = vec_len(et);
+    let ntok: i32 = vec_len(tags);
+    let tab: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(tab, 0 - 1);
+        i = i + 1;
+    }
+    let ne: i32 = vec_len(ent_item);
+    let mut e: i32 = 0;
+    while e < ne {
+        let root: i32 = vec_get(id4, vec_get(ent_item, e));
+        if root >= 0 {
+            if root < n { vec_set(tab, root, vec_get(counters, e)); }
+        }
+        e = e + 1;
+    }
+    /* Each branch's anchor range and first counter. */
+    let nb: i32 = vec_len(br) / 5;
+    let alo: Vec<i32> = vec_new();
+    let ahi: Vec<i32> = vec_new();
+    let bctr: Vec<i32> = vec_new();
+    let mut b: i32 = 0;
+    let mut obase: i32 = 0;
+    while b < nb {
+        let first: i32 = vec_get(br, b * 5 + 2);
+        let open: i32 = cov_tok_body_open(tags, first + 1, ntok);
+        if vec_get(tags, first) == 72 {
+            vec_push(alo, open + 1);
+            vec_push(ahi, vec_get(br, b * 5 + 3) - 1);
+        } else {
+            vec_push(alo, first + 1);
+            vec_push(ahi, open - 1);
+        }
+        vec_push(bctr, vec_get(counters, ne + obase));
+        obase = obase + vec_get(br, b * 5 + 4);
+        b = b + 1;
+    }
+    i = 0;
+    while i < n {
+        let t: i32 = vec_get(et, i);
+        let mut anchor_child: i32 = 0 - 1;
+        let mut want: i32 = 0;
+        /* want = the construct's keyword token tag */
+        if t == 10 { anchor_child = vec_get(ed1, i); want = 68; }
+        if t == 11 { anchor_child = vec_get(ed1, i); want = 74; }
+        if t == 12 { anchor_child = vec_get(ed1, i); want = 96; }
+        if t == 13 { anchor_child = vec_get(ed2, i); want = 66; }
+        if t == 14 { anchor_child = vec_get(ed1, i); want = 72; }
+        if want > 0 {
+            let leaf: i32 = cov_leftmost_tok(et, ed1, ed2, ed3, ed4, pp, anchor_child);
+            if leaf >= 0 {
+                let mut best: i32 = 0 - 1;
+                let mut bb: i32 = 0;
+                while bb < nb {
+                    if vec_get(tags, vec_get(br, bb * 5 + 2)) == want {
+                        if leaf >= vec_get(alo, bb) {
+                            if leaf <= vec_get(ahi, bb) {
+                                if best < 0 { best = bb; } else {
+                                    if vec_get(br, bb * 5 + 2) > vec_get(br, best * 5 + 2) { best = bb; }
+                                }
+                            }
+                        }
+                    }
+                    bb = bb + 1;
+                }
+                if best >= 0 { vec_set(tab, i, vec_get(bctr, best)); }
+            }
+        }
+        i = i + 1;
+    }
+    return tab;
+}

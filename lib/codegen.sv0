@@ -256,6 +256,9 @@ enum Instr {
     /* FFI-004b: mirrors lowering.sv0's Instr::DeclPtr exactly (kept in
        lockstep, same shape as DeclNamed already is). */
     DeclPtr(i32, i32, i32),
+    /* sv0cov CV-112: mirrors lowering.sv0's Instr::CovHit (same position,
+       so the boxed IR the mega-TU hands between them keeps its tags). */
+    CovHit(i32),
 }
 
 fn instr_tag(ins: Instr) -> i32 {
