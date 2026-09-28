@@ -149,7 +149,9 @@ fn ir_expr_tag(e: Expr) -> i32 {
    entry per body-arena node, the counter of a function body's
    function_entry point (at the body block node) or of outcome 0 of an
    if/while/for/loop/match construct (outcome k is counter + k), else -1.
-   It rides in fn_ctx's last slot (boxed), after the BH-11a entries, so no
+   It rides in fn_ctx's last slot (as a Vec handle; a boxed Vec compiles
+   differently on the native and SML VM emitters, which tier-2 byte parity
+   forbids), after the BH-11a entries, so no
    lowering signature changes; an empty table places nothing. Placement:
    entry first in the function; if true/false at the head of the then/else
    lists (an absent else still gets its list, the implicit false); while and
@@ -162,7 +164,7 @@ fn lower_cov_counter(fn_ctx: Vec<i32>, node: i32) -> i32 {
     if n == 0 { return 0 - 1; }
     let slot: i32 = 1 + 2 * vec_get(fn_ctx, 0);
     if slot >= n { return 0 - 1; }
-    let tab: Vec<i32> = box_deref(vec_get(fn_ctx, slot));
+    let tab: Vec<i32> = vec_get(fn_ctx, slot);
     if node < 0 { return 0 - 1; }
     if node >= vec_len(tab) { return 0 - 1; }
     return vec_get(tab, node);
@@ -5985,7 +5987,7 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
         vec_push(fn_ctx, vec_get(ctx_enums, ck));
         ck = ck + 1;
     }
-    if vec_len(cov_tab) > 0 { vec_push(fn_ctx, box_new(cov_tab)); }
+    if vec_len(cov_tab) > 0 { vec_push(fn_ctx, cov_tab); }
     let mut i: i32 = 0;
     while i < n {
         /* A bodyless trait method declaration (body root -1) is a signature
