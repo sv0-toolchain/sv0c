@@ -35,3 +35,4 @@ lib/include_expand.sv0
 lib/sha256.sv0
 lib/coverage_source.sv0
 lib/coverage_plan.sv0
+lib/coverage_map.sv0

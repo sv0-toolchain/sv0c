@@ -219,6 +219,25 @@ fn megatu_cov_dir_of(path: string) -> string {
     return ".";
 }
 
+/* Line k (0-based) of the coverage request "<mode>\n<map path>\n<target>\n
+   <compiler identity>", or "" when it has fewer lines. */
+fn megatu_cov_req_line(req: string, k: i32) -> string {
+    let n: i32 = string_len(req);
+    let mut line: i32 = 0;
+    let mut start: i32 = 0;
+    let mut i: i32 = 0;
+    while i <= n {
+        let at_end: bool = if i == n { true } else { string_char_at(req, i) == 10 };
+        if at_end {
+            if line == k { return string_substr(req, start, i - start); }
+            line = line + 1;
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return "";
+}
+
 /* The project file listing link_project_concat_sources_from_dir compiles. */
 fn megatu_cov_project_listing(dir: string) -> string {
     let listing: string = link_project_dir(dir);
@@ -229,9 +248,11 @@ fn megatu_cov_project_listing(dir: string) -> string {
 }
 
 /* Plan coverage for the checked program (lib/coverage_plan.sv0) and act on
-   the mode. Returns main's exit code: 0 after a plan-dump (the plan on
-   stdout, no C), 9 for every refusal. map and instrument are refused after
-   planning until map emission (CV-110) and hit placement (CV-112) land. */
+   the mode. Returns main's exit code, or -1 to continue compiling: map
+   writes the canonical map (lib/coverage_map.sv0) to the requested path and
+   continues with an uninstrumented build; plan-dump prints the plan instead
+   of C (0); instrument is refused (9) until hit placement (CV-112) lands, as
+   is every failure. */
 fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                    tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id4: Vec<i32>,
@@ -301,8 +322,22 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                 vec_len(pt_kind))));
         return 0;
     }
+    if mode == 1 {
+        let req: string = getenv("SV0_COVERAGE_REQUEST");
+        let map_path: string = megatu_cov_req_line(req, 1);
+        let target: string = megatu_cov_req_line(req, 2);
+        let identity: string = megatu_cov_req_line(req, 3);
+        let missing: bool = if string_len(map_path) == 0 { true } else { if string_len(target) == 0 { true } else { string_len(identity) == 0 } };
+        if missing {
+            write_file("/dev/stderr", "coverage: SV0_COVERAGE_REQUEST needs <mode>, <map path>, <target>, and <compiler identity> lines\n");
+            return 9;
+        }
+        write_file(map_path, cov_map_build(source, starts, ends, table, cstarts, src_unit,
+            ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity));
+        return 0 - 1;
+    }
     write_file("/dev/stderr", string_concat(string_concat("--coverage=", megatu_cov_mode_name(mode)),
-        " is not available yet: coverage map emission (sv0cov CV-110) and instrumentation (CV-112) have not landed; build with --coverage=off\n"));
+        " is not available yet: coverage instrumentation (sv0cov CV-112) has not landed; build with --coverage=off or --coverage=map\n"));
     return 9;
 }
 
@@ -440,8 +475,9 @@ fn main() -> i32 {
     /* Coverage planning (sv0cov CV-107): after resolve/check, before lower,
        so both backends share one plan. */
     if _cov_mode != 0 {
-        return megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
+        let cov_rc: i32 = megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
                                tags, starts, ends, it, id1, id2, id4, pp, bet, bed2, bed3);
+        if cov_rc >= 0 { return cov_rc; }
     }
 
     /* Phase 5: lower (real lowering.sv0) — parse arenas -> IR out_blocks; returns

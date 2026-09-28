@@ -1,4 +1,4 @@
-# Coverage planner tests (sv0cov CV-107..CV-109)
+# Coverage planner and map tests (sv0cov CV-107..CV-110)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -27,6 +27,12 @@ The script checks:
   `function_entry` and `branch_outcome` points, branches with their outcome
   names, and regions (spans, line numbers,
   counter expressions) equal their `expected-map.json`;
+- the canonical map (`--coverage=map`, `lib/coverage_map.sv0`) of each of
+  those fixtures is byte-identical to its `expected-map.json`, from both the
+  native compiler and the native VM emitter;
+- the map of `constructs.sv0` passes sv0cov's own `validate_map` with its
+  source bytes (run with the first Python >= 3.10 found; the summary line
+  says when it was skipped);
 - `constructs.sv0` against the hand-reviewed `constructs.expected`
   (else-if chains, `for`, `loop`, loop invariants, block match arms with
   `break`/`continue`, `+=`, conditional expressions, tail expressions,
@@ -40,7 +46,8 @@ The script checks:
 - that the native compiler and the native VM emitter, which share the
   planner, print identical plans;
 - that coverage fails closed with exit 9 for an `include`d file (the
-  compiled source is not the file's bytes), an unknown mode, and `map` / `instrument` (refused until map emission and hit
-  placement land).
+  compiled source is not the file's bytes), an unknown mode, `map` without
+  its target and identity lines, and `instrument` (refused until hit
+  placement lands).
 
 `./scripts/sv0 test` runs it.

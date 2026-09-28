@@ -56,6 +56,28 @@ def ensure_built() -> None:
 def run_plan(request: str, mode: str = "plan-dump") -> tuple[int, str, str, int, str]:
     """(native rc, native stdout, native stderr, vm rc, vm stdout)."""
     env = dict(os.environ, SV0_COVERAGE_REQUEST=f"{mode}\n/unused.sv0covmap.json", SV0_DRV_REQUEST=request)
+    return _run_both(request, env)
+
+
+def run_map(request: str, out_dir: Path, target: str, identity: str) -> tuple[int, bytes, int, bytes, str]:
+    """Build `request` in map mode on both binaries: (native rc, map, vm rc, map, stderr)."""
+    maps = []
+    rcs = []
+    err = ""
+    for binary in ("native", "vm"):
+        path = out_dir / f"{binary}.sv0covmap.json"
+        env = dict(os.environ, SV0_COVERAGE_REQUEST=f"map\n{path}\n{target}\n{identity}", SV0_DRV_REQUEST=request)
+        if binary == "native":
+            proc = subprocess.run([str(NATIVE), *request.split(" ", 1)], capture_output=True, text=True, env=env, timeout=300)
+            err = proc.stderr
+        else:
+            proc = subprocess.run([str(VM_EMIT)], capture_output=True, env=env, timeout=300)
+        rcs.append(proc.returncode)
+        maps.append(path.read_bytes() if path.is_file() else b"")
+    return rcs[0], maps[0], rcs[1], maps[1], err
+
+
+def _run_both(request: str, env: dict) -> tuple[int, str, str, int, str]:
     n = subprocess.run([str(NATIVE), *request.split(" ", 1)], capture_output=True, text=True, env=env, timeout=300)
     v = subprocess.run([str(VM_EMIT)], capture_output=True, env=env, timeout=300)
     return n.returncode, n.stdout, n.stderr, v.returncode, v.stdout.decode("utf-8", "replace")
@@ -137,11 +159,20 @@ def ref_span(data: bytes, start: int, end: int) -> dict:
             "end_line": el, "end_column": ec}
 
 
-def check_fixture(name: str, errors: list[str]) -> None:
+def check_fixture(name: str, errors: list[str], tmp: Path) -> None:
     d = FIXTURES / name
-    expected = json.loads((d / "expected-map.json").read_bytes())
+    expected_bytes = (d / "expected-map.json").read_bytes()
+    expected = json.loads(expected_bytes)
     project = any(p.parent != d for p in d.rglob("*.sv0"))
     request = f"--project {d}" if project else str(d / "main.sv0")
+    # CV-110: the emitted map is byte-identical to the hand-reviewed one.
+    out = tmp / f"map-{name}"
+    out.mkdir()
+    nrc, nmap, vrc, vmap, merr = run_map(request, out, expected["target"]["name"], expected["compiler"]["identity"])
+    if nrc != 0 or vrc != 0:
+        errors.append(f"{name}: map build failed (native {nrc}, vm {vrc}): {merr.strip()}")
+    elif nmap != expected_bytes or vmap != expected_bytes:
+        errors.append(f"{name}: emitted map differs from expected-map.json (native {nmap == expected_bytes}, vm {vmap == expected_bytes})")
     rc, out, err, vrc, vout = run_plan(request)
     if rc != 0 or vrc != 0:
         errors.append(f"{name}: plan-dump failed (native {rc}, vm {vrc}): {err.strip()}")
@@ -270,11 +301,47 @@ def check_refusals(tmp: Path, errors: list[str]) -> None:
     if rc != 9 or vrc == 0 or "compiled source differs" not in err:
         errors.append(f"include: expected refusal 9, got native {rc} vm {vrc}: {err.strip()}")
     (d / "plain.sv0").write_text("fn main() -> i32 { return 0; }\n")
-    for mode, needle in (("bogus", "unknown mode"), ("map", "is not available yet"),
+    for mode, needle in (("bogus", "unknown mode"), ("map", "needs <mode>, <map path>"),
                          ("instrument", "is not available yet")):
         rc, out, err, vrc, _ = run_plan(str(d / "plain.sv0"), mode)
         if rc != 9 or vrc != 9 or needle not in err or out:
             errors.append(f"mode {mode}: expected refusal 9 with {needle!r}, got native {rc} vm {vrc}: {err.strip()}")
+
+
+def modern_python() -> list[str] | None:
+    """A command running Python >= 3.10 (sv0cov's floor), or None."""
+    import shutil
+
+    if sys.version_info >= (3, 10):
+        return [sys.executable]
+    for name in ("python3.14", "python3.13", "python3.12", "python3.11", "python3.10"):
+        exe = shutil.which(name)
+        if exe:
+            return [exe]
+    return None
+
+
+def check_constructs_map(tmp: Path, errors: list[str]) -> bool:
+    """constructs.sv0's map (no hand-written counterpart) passes sv0cov's own
+    map validator with its source bytes. Returns False when no Python >= 3.10
+    is available to run the validator (reported as skipped, not passed)."""
+    out = tmp / "map-constructs"
+    out.mkdir()
+    src = HERE / "constructs.sv0"
+    nrc, nmap, vrc, vmap, merr = run_map(str(src), out, "constructs", "sv0c+test")
+    if nrc != 0 or vrc != 0 or nmap != vmap or not nmap:
+        errors.append(f"constructs map: build failed or backends differ (native {nrc}, vm {vrc}): {merr.strip()}")
+        return True
+    py = modern_python()
+    if py is None:
+        return False
+    code = ("import sys; sys.path.insert(0, sys.argv[1]); from sv0cov.formats.map import validate_map; "
+            "validate_map(open(sys.argv[2], 'rb').read(), sources={'constructs.sv0': open(sys.argv[3], 'rb').read()})")
+    proc = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), str(out / "native.sv0covmap.json"), str(src)],
+                          capture_output=True, text=True, timeout=300)
+    if proc.returncode != 0:
+        errors.append(f"constructs map: sv0cov validate_map rejected it: {proc.stderr.strip()[-600:]}")
+    return True
 
 
 def check_constructs(errors: list[str]) -> None:
@@ -305,9 +372,10 @@ def main() -> int:
     fixtures = sorted(p.parent.name for p in FIXTURES.glob("*/expected-map.json"))
     if len(fixtures) < 7:
         errors.append(f"expected the 7 sv0cov semantic fixtures under {FIXTURES}, found {fixtures}")
-    for name in fixtures:
-        check_fixture(name, errors)
     with tempfile.TemporaryDirectory() as td:
+        for name in fixtures:
+            check_fixture(name, errors, Path(td))
+        validated = check_constructs_map(Path(td), errors)
         for case in SYNTHETIC:
             check_synthetic(case, Path(td), errors)
         check_refusals(Path(td), errors)
@@ -316,8 +384,9 @@ def main() -> int:
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1
-    print(f"coverage plan: OK ({len(fixtures)} sv0cov fixtures, {len(SYNTHETIC)} synthetic programs, "
-          "native = VM emitter, include/unknown/map/instrument refused)")
+    validation = "sv0cov-validated" if validated else "sv0cov validation SKIPPED (no Python >= 3.10)"
+    print(f"coverage plan: OK ({len(fixtures)} sv0cov fixtures with byte-identical maps, {len(SYNTHETIC)} synthetic "
+          f"programs, constructs map {validation}, native = VM emitter, include/unknown/instrument refused)")
     return 0
 
 

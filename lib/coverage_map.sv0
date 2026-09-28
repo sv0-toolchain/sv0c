@@ -1,0 +1,662 @@
+/* Canonical coverage map writer (sv0cov CV-110; SPEC 10.3, 16.2, 16.3).
+ *
+ * Turns the planner's side tables (lib/coverage_plan.sv0) into the canonical
+ * `.sv0covmap.json` bytes: sources, function entities, function_entry and
+ * branch_outcome points with their point IDs, one fragment per source,
+ * branches, regions with normalized counter expressions, and the map ID.
+ *
+ *   point ID     SHA-256 of the SPEC 10.3 binary preimage (sha256_hex_bytes)
+ *   counters     numbered by source, span start, entry before outcome, then
+ *                outcome ordinal; each source is one fragment (a contiguous
+ *                counter slice), identified by the SHA-256 of its canonical
+ *                fragment-identity projection
+ *   map ID       SHA-256 of the canonical map without `map_id`
+ *
+ * Canonical JSON (SPEC 16.2): object keys in bytewise order, no whitespace,
+ * `"` `\` and the controls \b \t \n \f \r escaped short, other controls as
+ * \u00xx, every other byte (UTF-8 included) copied, one final LF. The
+ * writer emits keys in their sorted order directly.
+ *
+ * Arrays are sorted with a stable merge sort over byte-comparable keys
+ * (fixed-width decimal fields and names). Positions come from a per-build
+ * line-start table, so a large program costs O(n log n), not O(n * size).
+ * Names are prefixed cov_map_ because compiler modules share one
+ * translation unit.
+ */
+
+/* ── canonical JSON pieces ─────────────────────────────────────────────── */
+
+fn cov_map_hex2(b: i32) -> string {
+    let digits: string = "0123456789abcdef";
+    return string_concat(string_substr(digits, b / 16, 1), string_substr(digits, b % 16, 1));
+}
+
+/* A canonical JSON string literal for the UTF-8 bytes of s. */
+fn cov_map_str(s: string) -> string {
+    let n: i32 = string_len(s);
+    let mut out: string = "\"";
+    let mut start: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(s, i);
+        let mut esc: string = "";
+        if c == 34 { esc = "\\\""; }
+        if c == 92 { esc = "\\\\"; }
+        if c < 32 {
+            esc = string_concat("\\u00", cov_map_hex2(c));
+            if c == 8 { esc = "\\b"; }
+            if c == 9 { esc = "\\t"; }
+            if c == 10 { esc = "\\n"; }
+            if c == 12 { esc = "\\f"; }
+            if c == 13 { esc = "\\r"; }
+        }
+        if string_len(esc) > 0 {
+            out = string_concat(string_concat(out, string_substr(s, start, i - start)), esc);
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return string_concat(string_concat(out, string_substr(s, start, n - start)), "\"");
+}
+
+fn cov_map_int(n: i32) -> string {
+    return cov_src_itoa(n);
+}
+
+/* Zero-padded 10-digit decimal (a byte-comparable key field, n >= 0). */
+fn cov_map_pad(n: i32) -> string {
+    let s: string = cov_src_itoa(n);
+    let mut out: string = "";
+    let mut k: i32 = string_len(s);
+    while k < 10 {
+        out = string_concat(out, "0");
+        k = k + 1;
+    }
+    return string_concat(out, s);
+}
+
+/* ── stable merge sort of item indices by byte keys ────────────────────── */
+
+/* Key i is keys[koff[i] .. koff[i] + klen[i]). */
+fn cov_map_key_lt(keys: string, koff: Vec<i32>, klen: Vec<i32>, a: i32, b: i32) -> bool {
+    let ao: i32 = vec_get(koff, a);
+    let bo: i32 = vec_get(koff, b);
+    let al: i32 = vec_get(klen, a);
+    let bl: i32 = vec_get(klen, b);
+    let mut i: i32 = 0;
+    while i < al {
+        if i >= bl { return false; }
+        let ca: i32 = string_char_at(keys, ao + i);
+        let cb: i32 = string_char_at(keys, bo + i);
+        if ca != cb { return ca < cb; }
+        i = i + 1;
+    }
+    return al < bl;
+}
+
+/* Item indices 0..n-1 ordered by key (ties keep index order). */
+fn cov_map_sort(keys: string, koff: Vec<i32>, klen: Vec<i32>) -> Vec<i32> {
+    let n: i32 = vec_len(koff);
+    let mut src: Vec<i32> = vec_new();
+    let mut dst: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(src, i);
+        vec_push(dst, i);
+        i = i + 1;
+    }
+    let mut width: i32 = 1;
+    while width < n {
+        let mut lo: i32 = 0;
+        while lo < n {
+            let mid: i32 = if lo + width < n { lo + width } else { n };
+            let hi: i32 = if lo + 2 * width < n { lo + 2 * width } else { n };
+            let mut x: i32 = lo;
+            let mut y: i32 = mid;
+            let mut k: i32 = lo;
+            while k < hi {
+                let mut take_y: bool = false;
+                if x >= mid {
+                    take_y = true;
+                } else {
+                    if y < hi {
+                        if cov_map_key_lt(keys, koff, klen, vec_get(src, y), vec_get(src, x)) { take_y = true; }
+                    }
+                }
+                if take_y {
+                    vec_set(dst, k, vec_get(src, y));
+                    y = y + 1;
+                } else {
+                    vec_set(dst, k, vec_get(src, x));
+                    x = x + 1;
+                }
+                k = k + 1;
+            }
+            lo = lo + 2 * width;
+        }
+        let tmp: Vec<i32> = src;
+        src = dst;
+        dst = tmp;
+        width = width * 2;
+    }
+    return src;
+}
+
+fn cov_map_key_push(keys: string, koff: Vec<i32>, klen: Vec<i32>, key: string) -> string {
+    vec_push(koff, string_len(keys));
+    vec_push(klen, string_len(key));
+    return string_concat(keys, key);
+}
+
+/* ── positions ─────────────────────────────────────────────────────────── */
+
+/* Concat offsets of every line start (offset 0, and each byte after LF). */
+fn cov_map_line_starts(source: string) -> Vec<i32> {
+    let ls: Vec<i32> = vec_new();
+    vec_push(ls, 0);
+    let n: i32 = string_len(source);
+    let mut i: i32 = 0;
+    while i < n {
+        if string_char_at(source, i) == 10 { vec_push(ls, i + 1); }
+        i = i + 1;
+    }
+    return ls;
+}
+
+/* Index of the last line start <= off. */
+fn cov_map_line_index(ls: Vec<i32>, off: i32) -> i32 {
+    let mut lo: i32 = 0;
+    let mut hi: i32 = vec_len(ls) - 1;
+    while lo < hi {
+        let mid: i32 = (lo + hi + 1) / 2;
+        if vec_get(ls, mid) <= off { lo = mid; } else { hi = mid - 1; }
+    }
+    return lo;
+}
+
+/* {"end_byte":..,"end_column":..,"end_line":..,"start_byte":..,
+   "start_column":..,"start_line":..} for concat span [s, e) of the unit
+   starting at concat offset base. */
+fn cov_map_span(source: string, ls: Vec<i32>, base: i32, s: i32, e: i32) -> string {
+    let first: i32 = cov_map_line_index(ls, base);
+    let sl: i32 = cov_map_line_index(ls, s);
+    let el: i32 = cov_map_line_index(ls, e);
+    let sc: i32 = cov_map_column(source, vec_get(ls, sl), s);
+    let ec: i32 = cov_map_column(source, vec_get(ls, el), e);
+    let mut out: string = string_concat("{\"end_byte\":", cov_map_int(e - base));
+    out = string_concat(string_concat(out, ",\"end_column\":"), cov_map_int(ec));
+    out = string_concat(string_concat(out, ",\"end_line\":"), cov_map_int(el - first + 1));
+    out = string_concat(string_concat(out, ",\"start_byte\":"), cov_map_int(s - base));
+    out = string_concat(string_concat(out, ",\"start_column\":"), cov_map_int(sc));
+    out = string_concat(string_concat(out, ",\"start_line\":"), cov_map_int(sl - first + 1));
+    return string_concat(out, "}");
+}
+
+/* 1-based Unicode-scalar column of concat offset off on the line starting at ls0. */
+fn cov_map_column(source: string, ls0: i32, off: i32) -> i32 {
+    let mut col: i32 = 1;
+    let mut i: i32 = ls0;
+    while i < off {
+        let b: i32 = string_char_at(source, i);
+        if b < 128 { col = col + 1; } else { if b >= 192 { col = col + 1; } }
+        i = i + 1;
+    }
+    return col;
+}
+
+/* Strictly increasing lines (unit-relative) on which concat bytes [s, e)
+   hold a non-whitespace byte, as a JSON array. */
+fn cov_map_line_numbers(source: string, ls: Vec<i32>, base: i32, s: i32, e: i32) -> string {
+    let first: i32 = cov_map_line_index(ls, base);
+    let mut line: i32 = cov_map_line_index(ls, s) - first + 1;
+    let mut last: i32 = 0;
+    let mut out: string = "[";
+    let mut i: i32 = s;
+    while i < e {
+        let c: i32 = string_char_at(source, i);
+        if c == 10 {
+            line = line + 1;
+        } else {
+            let ws: bool = if c == 32 { true } else { if c == 9 { true } else { c == 13 } };
+            if ws != true {
+                if line != last {
+                    if last != 0 { out = string_concat(out, ","); }
+                    out = string_concat(out, cov_map_int(line));
+                    last = line;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return string_concat(out, "]");
+}
+
+/* ── point identity (SPEC 10.3) ────────────────────────────────────────── */
+
+fn cov_map_push_u32(v: Vec<i32>, n: i32) -> i32 {
+    vec_push(v, n % 256);
+    vec_push(v, (n / 256) % 256);
+    vec_push(v, (n / 65536) % 256);
+    vec_push(v, n / 16777216);
+    return 0;
+}
+
+fn cov_map_push_text(v: Vec<i32>, s: string) -> i32 {
+    let n: i32 = string_len(s);
+    cov_map_push_u32(v, n);
+    let mut i: i32 = 0;
+    while i < n {
+        vec_push(v, string_char_at(s, i));
+        i = i + 1;
+    }
+    return 0;
+}
+
+fn cov_map_hexval(c: i32) -> i32 {
+    if c >= 97 { return c - 87; }
+    return c - 48;
+}
+
+/* Lowercase hex point ID. kind: 1 function_entry, 3 branch_outcome;
+   ordinal < 0 means "no ordinal" (0xffffffff). The entity is the function. */
+fn cov_map_point_id(path: string, digest: string, qname: string, kind: i32,
+                    s: i32, e: i32, ordinal: i32, disc: string) -> string {
+    let v: Vec<i32> = vec_new();
+    let domain: string = "sv0cov.point.v1";
+    let mut i: i32 = 0;
+    while i < string_len(domain) {
+        vec_push(v, string_char_at(domain, i));
+        i = i + 1;
+    }
+    vec_push(v, 0);
+    vec_push(v, 1);
+    vec_push(v, 0);
+    vec_push(v, 0);
+    vec_push(v, 0);
+    cov_map_push_text(v, path);
+    let mut d: i32 = 0;
+    while d < 32 {
+        vec_push(v, cov_map_hexval(string_char_at(digest, 2 * d)) * 16 + cov_map_hexval(string_char_at(digest, 2 * d + 1)));
+        d = d + 1;
+    }
+    vec_push(v, 1);
+    cov_map_push_text(v, qname);
+    vec_push(v, kind);
+    cov_map_push_u32(v, s);
+    cov_map_push_u32(v, 0);
+    cov_map_push_u32(v, e);
+    cov_map_push_u32(v, 0);
+    if ordinal < 0 {
+        vec_push(v, 255);
+        vec_push(v, 255);
+        vec_push(v, 255);
+        vec_push(v, 255);
+    } else {
+        cov_map_push_u32(v, ordinal);
+    }
+    cov_map_push_text(v, disc);
+    return sha256_hex_bytes(v);
+}
+
+/* ── the map ───────────────────────────────────────────────────────────── */
+
+/* Point index of a counter-expression ref (see lib/coverage_plan.sv0):
+   ref >= 0 is entity ref's entry (point ref); else outcome k of branch b. */
+fn cov_map_ref_point(r: i32, n_entries: i32, obase: Vec<i32>) -> i32 {
+    if r >= 0 { return r; }
+    let enc: i32 = 0 - r - 1;
+    return n_entries + vec_get(obase, enc / 1024) + enc % 1024;
+}
+
+/* Build the canonical map (bytes including the final LF). */
+fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string,
+                 cstarts: Vec<i32>, src_unit: Vec<i32>,
+                 ent_source: Vec<i32>, ent_start: Vec<i32>, ent_end: Vec<i32>, qnames: string,
+                 br: Vec<i32>, rg: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>,
+                 target: string, identity: string) -> string {
+    let ls: Vec<i32> = cov_map_line_starts(source);
+    let nsrc: i32 = vec_len(src_unit);
+    let ne: i32 = vec_len(ent_source);
+    let nb: i32 = vec_len(br) / 5;
+
+    /* Points: entries first (point e = entity e's entry), then every branch
+       outcome (point ne + obase[b] + k). */
+    let p_src: Vec<i32> = vec_new();
+    let p_ent: Vec<i32> = vec_new();
+    let p_kind: Vec<i32> = vec_new();
+    let p_s: Vec<i32> = vec_new();
+    let p_e: Vec<i32> = vec_new();
+    let p_ord: Vec<i32> = vec_new();
+    let p_br: Vec<i32> = vec_new();
+    let obase: Vec<i32> = vec_new();
+    let mut e: i32 = 0;
+    while e < ne {
+        vec_push(p_src, vec_get(ent_source, e));
+        vec_push(p_ent, e);
+        vec_push(p_kind, 1);
+        vec_push(p_s, vec_get(ent_start, e));
+        vec_push(p_e, vec_get(ent_end, e));
+        vec_push(p_ord, 0 - 1);
+        vec_push(p_br, 0 - 1);
+        e = e + 1;
+    }
+    let mut b: i32 = 0;
+    let mut nout: i32 = 0;
+    while b < nb {
+        vec_push(obase, nout);
+        let be: i32 = vec_get(br, b * 5 + 1);
+        let mut k: i32 = 0;
+        while k < vec_get(br, b * 5 + 4) {
+            vec_push(p_src, vec_get(ent_source, be));
+            vec_push(p_ent, be);
+            vec_push(p_kind, 3);
+            vec_push(p_s, vec_get(starts, vec_get(br, b * 5 + 2)));
+            vec_push(p_e, vec_get(ends, vec_get(br, b * 5 + 3)));
+            vec_push(p_ord, k);
+            vec_push(p_br, b);
+            k = k + 1;
+        }
+        nout = nout + k;
+        b = b + 1;
+    }
+    let np: i32 = vec_len(p_kind);
+
+    /* Point IDs, 64 hex characters each, concatenated. */
+    let mut ids: string = "";
+    let mut p: i32 = 0;
+    while p < np {
+        let sk: i32 = vec_get(p_src, p);
+        let unit: i32 = vec_get(src_unit, sk);
+        let base: i32 = vec_get(cstarts, unit);
+        let pb: i32 = vec_get(p_br, p);
+        let mut disc: string = "entry";
+        if pb >= 0 { disc = cov_br_kind_name(vec_get(br, pb * 5)); }
+        ids = string_concat(ids, cov_map_point_id(cov_src_path_at(table, unit), cov_src_digest_at(table, unit),
+            cov_plan_line_at(qnames, vec_get(p_ent, p)), vec_get(p_kind, p),
+            vec_get(p_s, p) - base, vec_get(p_e, p) - base, vec_get(p_ord, p), disc));
+        p = p + 1;
+    }
+
+    /* Counter order: source, span start, entry before outcome, ordinal. */
+    let mut ckeys: string = "";
+    let ckoff: Vec<i32> = vec_new();
+    let cklen: Vec<i32> = vec_new();
+    p = 0;
+    while p < np {
+        let mut ko: string = string_concat(cov_map_pad(vec_get(p_src, p)), cov_map_pad(vec_get(p_s, p)));
+        if vec_get(p_kind, p) == 1 { ko = string_concat(ko, "0"); } else { ko = string_concat(ko, "1"); }
+        ko = string_concat(ko, cov_map_pad(vec_get(p_ord, p) + 1));
+        ckeys = cov_map_key_push(ckeys, ckoff, cklen, ko);
+        p = p + 1;
+    }
+    let corder: Vec<i32> = cov_map_sort(ckeys, ckoff, cklen);
+    let counter: Vec<i32> = vec_new();
+    p = 0;
+    while p < np {
+        vec_push(counter, 0);
+        p = p + 1;
+    }
+    p = 0;
+    while p < np {
+        vec_set(counter, vec_get(corder, p), p);
+        p = p + 1;
+    }
+
+    /* Sources and one fragment per source (counters are grouped by source). */
+    let mut sources_json: string = "[";
+    let mut frags_json: string = "[";
+    let mut c: i32 = 0;
+    let mut sk2: i32 = 0;
+    while sk2 < nsrc {
+        let unit2: i32 = vec_get(src_unit, sk2);
+        let path_j: string = cov_map_str(cov_src_path_at(table, unit2));
+        let digest_j: string = cov_map_str(cov_src_digest_at(table, unit2));
+        if sk2 > 0 { sources_json = string_concat(sources_json, ","); }
+        sources_json = string_concat(sources_json, string_concat(string_concat("{\"digest\":", digest_j),
+            string_concat(string_concat(",\"ownership\":\"user\",\"package\":null,\"path\":", path_j),
+            string_concat(string_concat(",\"source_index\":", cov_map_int(sk2)), "}"))));
+        let slice_base: i32 = c;
+        let mut pids: string = "[";
+        let mut in_source: bool = true;
+        while in_source {
+            if c >= np {
+                in_source = false;
+            } else {
+                let q: i32 = vec_get(corder, c);
+                if vec_get(p_src, q) != sk2 {
+                    in_source = false;
+                } else {
+                    if c > slice_base { pids = string_concat(pids, ","); }
+                    pids = string_concat(pids, string_concat(string_concat("\"", string_substr(ids, q * 64, 64)), "\""));
+                    c = c + 1;
+                }
+            }
+        }
+        pids = string_concat(pids, "]");
+        let projection: string = string_concat(string_concat(string_concat("{\"point_ids\":", pids),
+            string_concat(",\"schema\":\"sv0cov.fragment-identity\",\"sources\":[{\"digest\":", digest_j)),
+            string_concat(string_concat(",\"path\":", path_j), "}],\"version\":\"1.0\"}\n"));
+        if sk2 > 0 { frags_json = string_concat(frags_json, ","); }
+        frags_json = string_concat(frags_json, string_concat(string_concat("{\"fragment_id\":\"", sha256_hex(projection)),
+            string_concat(string_concat("\",\"fragment_index\":", cov_map_int(sk2)),
+            string_concat(string_concat(string_concat(",\"slice_base\":", cov_map_int(slice_base)),
+                string_concat(",\"slice_length\":", cov_map_int(c - slice_base))),
+                string_concat(string_concat(",\"source_indices\":[", cov_map_int(sk2)), "]}")))));
+        sk2 = sk2 + 1;
+    }
+    sources_json = string_concat(sources_json, "]");
+    frags_json = string_concat(frags_json, "]");
+
+    /* Entities, in plan order (source, then position). */
+    let mut ents_json: string = "[";
+    e = 0;
+    while e < ne {
+        let esk: i32 = vec_get(ent_source, e);
+        let ebase: i32 = vec_get(cstarts, vec_get(src_unit, esk));
+        if e > 0 { ents_json = string_concat(ents_json, ","); }
+        ents_json = string_concat(ents_json, string_concat(string_concat("{\"entity_index\":", cov_map_int(e)),
+            string_concat(string_concat(",\"kind\":\"function\",\"qualified_name\":", cov_map_str(cov_plan_line_at(qnames, e))),
+            string_concat(string_concat(",\"source_index\":", cov_map_int(esk)),
+            string_concat(string_concat(",\"span\":", cov_map_span(source, ls, ebase, vec_get(ent_start, e), vec_get(ent_end, e))), "}")))));
+        e = e + 1;
+    }
+    ents_json = string_concat(ents_json, "]");
+
+    /* Points, ordered by point ID. */
+    let mut ikeys: string = "";
+    let ikoff: Vec<i32> = vec_new();
+    let iklen: Vec<i32> = vec_new();
+    p = 0;
+    while p < np {
+        ikeys = cov_map_key_push(ikeys, ikoff, iklen, string_substr(ids, p * 64, 64));
+        p = p + 1;
+    }
+    let iorder: Vec<i32> = cov_map_sort(ikeys, ikoff, iklen);
+    let mut points_json: string = "[";
+    p = 0;
+    while p < np {
+        let q2: i32 = vec_get(iorder, p);
+        let psk: i32 = vec_get(p_src, q2);
+        let pbase: i32 = vec_get(cstarts, vec_get(src_unit, psk));
+        let pbr: i32 = vec_get(p_br, q2);
+        if p > 0 { points_json = string_concat(points_json, ","); }
+        let mut rec: string = string_concat("{\"classification\":\"user\",\"counter_index\":", cov_map_int(vec_get(counter, q2)));
+        rec = string_concat(string_concat(rec, ",\"entity_index\":"), cov_map_int(vec_get(p_ent, q2)));
+        rec = string_concat(string_concat(rec, ",\"fragment_index\":"), cov_map_int(psk));
+        if pbr < 0 {
+            rec = string_concat(rec, ",\"kind\":\"function_entry\",\"outcome_ordinal\":null");
+        } else {
+            rec = string_concat(string_concat(rec, ",\"kind\":\"branch_outcome\",\"outcome_ordinal\":"), cov_map_int(vec_get(p_ord, q2)));
+        }
+        rec = string_concat(string_concat(string_concat(rec, ",\"point_id\":\""), string_substr(ids, q2 * 64, 64)), "\"");
+        let mut pdisc: string = "entry";
+        if pbr >= 0 { pdisc = cov_br_kind_name(vec_get(br, pbr * 5)); }
+        rec = string_concat(string_concat(rec, ",\"semantic_discriminator\":"), cov_map_str(pdisc));
+        rec = string_concat(string_concat(rec, ",\"source_index\":"), cov_map_int(psk));
+        rec = string_concat(string_concat(rec, ",\"span\":"), cov_map_span(source, ls, pbase, vec_get(p_s, q2), vec_get(p_e, q2)));
+        points_json = string_concat(points_json, string_concat(rec, "}"));
+        p = p + 1;
+    }
+    points_json = string_concat(points_json, "]");
+
+    /* Branches: source, span, kind, first outcome point ID. */
+    let mut bkeys: string = "";
+    let bkoff: Vec<i32> = vec_new();
+    let bklen: Vec<i32> = vec_new();
+    b = 0;
+    while b < nb {
+        let bp0: i32 = ne + vec_get(obase, b);
+        let mut bk: string = string_concat(cov_map_pad(vec_get(p_src, bp0)), cov_map_pad(vec_get(p_s, bp0)));
+        bk = string_concat(string_concat(bk, cov_map_pad(vec_get(p_e, bp0))), cov_br_kind_name(vec_get(br, b * 5)));
+        bk = string_concat(string_concat(bk, "\t"), string_substr(ids, bp0 * 64, 64));
+        bkeys = cov_map_key_push(bkeys, bkoff, bklen, bk);
+        b = b + 1;
+    }
+    let border: Vec<i32> = cov_map_sort(bkeys, bkoff, bklen);
+    let mut branches_json: string = "[";
+    let mut bi: i32 = 0;
+    while bi < nb {
+        let bb: i32 = vec_get(border, bi);
+        let bp: i32 = ne + vec_get(obase, bb);
+        let bsk: i32 = vec_get(p_src, bp);
+        let bbase: i32 = vec_get(cstarts, vec_get(src_unit, bsk));
+        let bkind: i32 = vec_get(br, bb * 5);
+        if bi > 0 { branches_json = string_concat(branches_json, ","); }
+        let mut brec: string = string_concat("{\"branch_index\":", cov_map_int(bi));
+        brec = string_concat(string_concat(brec, ",\"entity_index\":"), cov_map_int(vec_get(p_ent, bp)));
+        brec = string_concat(string_concat(brec, ",\"kind\":"), cov_map_str(cov_br_kind_name(bkind)));
+        brec = string_concat(brec, ",\"outcomes\":[");
+        let mut k2: i32 = 0;
+        while k2 < vec_get(br, bb * 5 + 4) {
+            if k2 > 0 { brec = string_concat(brec, ","); }
+            brec = string_concat(brec, "{\"classification\":\"eligible\",\"evidence_identity\":null,\"name\":");
+            brec = string_concat(string_concat(brec, cov_map_str(cov_outcome_name(bkind, k2))), ",\"ordinal\":");
+            brec = string_concat(string_concat(brec, cov_map_int(k2)), ",\"point_id\":\"");
+            brec = string_concat(string_concat(brec, string_substr(ids, (bp + k2) * 64, 64)), "\"}");
+            k2 = k2 + 1;
+        }
+        brec = string_concat(string_concat(brec, "],\"source_index\":"), cov_map_int(bsk));
+        brec = string_concat(string_concat(brec, ",\"span\":"), cov_map_span(source, ls, bbase, vec_get(p_s, bp), vec_get(p_e, bp)));
+        branches_json = string_concat(branches_json, string_concat(brec, "}"));
+        bi = bi + 1;
+    }
+    branches_json = string_concat(branches_json, "]");
+
+    /* Regions: each counter expression normalized (equal points merged,
+       zero terms dropped, terms ordered by point ID); regions ordered by
+       source, span, kind, then the expression's canonical bytes. */
+    let nr: i32 = vec_len(rg) / 5;
+    let mut exprs: string = "";
+    let xoff: Vec<i32> = vec_new();
+    let xlen: Vec<i32> = vec_new();
+    let mut rkeys: string = "";
+    let rkoff: Vec<i32> = vec_new();
+    let rklen: Vec<i32> = vec_new();
+    let mut r: i32 = 0;
+    while r < nr {
+        let h: i32 = vec_get(rg, r * 5 + 4);
+        let tp: Vec<i32> = vec_new();
+        let tc: Vec<i32> = vec_new();
+        if h >= 0 {
+            let first: i32 = vec_get(cef, h * 2);
+            let n: i32 = vec_get(cef, h * 2 + 1);
+            let mut i: i32 = 0;
+            while i < n {
+                let pt: i32 = cov_map_ref_point(vec_get(cet, (first + i) * 2 + 1), ne, obase);
+                let coef: i32 = vec_get(cet, (first + i) * 2);
+                let mut found: bool = false;
+                let mut j: i32 = 0;
+                while j < vec_len(tp) {
+                    if vec_get(tp, j) == pt {
+                        vec_set(tc, j, vec_get(tc, j) + coef);
+                        found = true;
+                    }
+                    j = j + 1;
+                }
+                if found != true {
+                    vec_push(tp, pt);
+                    vec_push(tc, coef);
+                }
+                i = i + 1;
+            }
+        }
+        let mut tkeys: string = "";
+        let tkoff: Vec<i32> = vec_new();
+        let tklen: Vec<i32> = vec_new();
+        let mut t: i32 = 0;
+        while t < vec_len(tp) {
+            tkeys = cov_map_key_push(tkeys, tkoff, tklen, string_substr(ids, vec_get(tp, t) * 64, 64));
+            t = t + 1;
+        }
+        let torder: Vec<i32> = cov_map_sort(tkeys, tkoff, tklen);
+        let mut expr: string = "{\"terms\":[";
+        let mut written: i32 = 0;
+        t = 0;
+        while t < vec_len(tp) {
+            let ti: i32 = vec_get(torder, t);
+            if vec_get(tc, ti) != 0 {
+                if written > 0 { expr = string_concat(expr, ","); }
+                expr = string_concat(string_concat(expr, "{\"coefficient\":"), cov_map_int(vec_get(tc, ti)));
+                expr = string_concat(string_concat(string_concat(expr, ",\"point_id\":\""), string_substr(ids, vec_get(tp, ti) * 64, 64)), "\"}");
+                written = written + 1;
+            }
+            t = t + 1;
+        }
+        expr = string_concat(expr, "]}");
+        exprs = cov_map_key_push(exprs, xoff, xlen, expr);
+        let re: i32 = vec_get(rg, r * 5 + 1);
+        let mut rk: string = string_concat(cov_map_pad(vec_get(ent_source, re)), cov_map_pad(vec_get(starts, vec_get(rg, r * 5 + 2))));
+        rk = string_concat(string_concat(rk, cov_map_pad(vec_get(ends, vec_get(rg, r * 5 + 3)))), cov_rg_kind_name(vec_get(rg, r * 5)));
+        rk = string_concat(string_concat(rk, "\t"), expr);
+        rkeys = cov_map_key_push(rkeys, rkoff, rklen, rk);
+        r = r + 1;
+    }
+    let rorder: Vec<i32> = cov_map_sort(rkeys, rkoff, rklen);
+    let mut regions_json: string = "[";
+    let mut ri: i32 = 0;
+    while ri < nr {
+        let rr: i32 = vec_get(rorder, ri);
+        let kind: i32 = vec_get(rg, rr * 5);
+        let rent: i32 = vec_get(rg, rr * 5 + 1);
+        let rsk: i32 = vec_get(ent_source, rent);
+        let rbase: i32 = vec_get(cstarts, vec_get(src_unit, rsk));
+        let rs: i32 = vec_get(starts, vec_get(rg, rr * 5 + 2));
+        let rend: i32 = vec_get(ends, vec_get(rg, rr * 5 + 3));
+        if ri > 0 { regions_json = string_concat(regions_json, ","); }
+        let mut rrec: string = string_concat("{\"classification\":\"user\",\"counter_expression\":",
+            string_substr(exprs, vec_get(xoff, rr), vec_get(xlen, rr)));
+        rrec = string_concat(string_concat(rrec, ",\"entity_index\":"), cov_map_int(rent));
+        rrec = string_concat(string_concat(rrec, ",\"kind\":"), cov_map_str(cov_rg_kind_name(kind)));
+        if kind == 2 {
+            rrec = string_concat(rrec, ",\"line_contributing\":false");
+        } else {
+            if kind == 9 {
+                rrec = string_concat(rrec, ",\"line_contributing\":false");
+            } else {
+                rrec = string_concat(rrec, ",\"line_contributing\":true");
+            }
+        }
+        rrec = string_concat(string_concat(rrec, ",\"line_numbers\":"), cov_map_line_numbers(source, ls, rbase, rs, rend));
+        rrec = string_concat(string_concat(rrec, ",\"region_index\":"), cov_map_int(ri));
+        rrec = string_concat(string_concat(rrec, ",\"source_index\":"), cov_map_int(rsk));
+        rrec = string_concat(string_concat(rrec, ",\"span\":"), cov_map_span(source, ls, rbase, rs, rend));
+        regions_json = string_concat(regions_json, string_concat(rrec, "}"));
+        ri = ri + 1;
+    }
+    regions_json = string_concat(regions_json, "]");
+
+    /* Assemble in key order; map_id hashes the map without itself. */
+    let caps: string = "[\"branch-outcomes\",\"contract-coverage\",\"exclusion-audit\",\"module-fragments\",\"normalized-linear-expressions\",\"nullable-counter-bindings\",\"semantic-function-ownership\",\"source-digests\"]";
+    let head: string = string_concat(string_concat(string_concat("{\"branches\":", branches_json), ",\"capabilities\":"), caps);
+    let mid: string = string_concat(string_concat(string_concat(",\"compiler\":{\"identity\":", cov_map_str(identity)),
+        ",\"name\":\"sv0c\"},\"contracts\":[],\"entities\":"), ents_json);
+    let frag: string = string_concat(string_concat(",\"exclusions\":[],\"fragments\":", frags_json), "");
+    let tail: string = string_concat(string_concat(string_concat(",\"point_identity_version\":\"1.0\",\"points\":", points_json),
+        string_concat(string_concat(",\"program_counter_count\":", cov_map_int(np)), string_concat(",\"regions\":", regions_json))),
+        string_concat(string_concat(",\"schema\":\"sv0cov.map\",\"sources\":", sources_json),
+        string_concat(string_concat(",\"target\":{\"kind\":\"executable\",\"name\":", cov_map_str(target)), "},\"version\":\"1.0\"}")));
+    let without: string = string_concat(string_concat(string_concat(head, mid), frag), tail);
+    let map_id: string = sha256_hex(string_concat(without, "\n"));
+    return string_concat(string_concat(string_concat(string_concat(head, mid), frag),
+        string_concat(string_concat(",\"map_id\":\"", map_id), "\"")), string_concat(tail, "\n"));
+}

@@ -14,8 +14,10 @@ shifts mask before shifting left. The message schedule is a rolling window of
 allocates no Vec, slice, or string-table handle; only the 64-character hex
 result is built with ``string_concat``.
 
-Input is the bytes of an sv0 ``str`` (``string_char_at`` yields 0..255).
-Strings cannot contain NUL, which the coverage formats forbid anyway.
+``sha256_hex(s)`` hashes the bytes of an sv0 ``str`` (``string_char_at``
+yields 0..255). ``sha256_hex_bytes(v)`` hashes a ``Vec<i32>`` of byte values
+0..255, for binary preimages that may hold any byte (sv0cov point identities
+carry raw digests, little-endian integers and NUL bytes).
 
 The file has no ``module`` line: compiler library files are concatenated into
 one translation unit (mega-TU), so every name is prefixed ``sha256_``.
@@ -198,6 +200,102 @@ def generate() -> str:
     for j in range(16):
         w(f"    let mut w{j}h = sha256_word_hi(s, n, total, off + {4 * j});")
         w(f"    let mut w{j}l = sha256_word_lo(s, n, total, off + {4 * j});")
+    for i, c in enumerate(LETTERS):
+        w(f"    let mut {c}h = h{i}h;")
+        w(f"    let mut {c}l = h{i}l;")
+    w("    let mut t = 0;")
+    w("    while t < 64 {")
+    # T1 = h + S1(e) + ch(e,f,g) + K[t] + W[t]
+    w("      let t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + sha256_k_lo(t) + w0l;")
+    w("      let t1l = t1lsum % 65536;")
+    w("      let t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + sha256_k_hi(t) + w0h + t1lsum / 65536) % 65536;")
+    w("      let t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);")
+    w("      let t2l = t2lsum % 65536;")
+    w("      let t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;")
+    w("      hh = gh;")
+    w("      hl = gl;")
+    w("      gh = fh;")
+    w("      gl = fl;")
+    w("      fh = eh;")
+    w("      fl = el;")
+    w("      let elsum = dl + t1l;")
+    w("      el = elsum % 65536;")
+    w("      eh = (dh + t1h + elsum / 65536) % 65536;")
+    w("      dh = ch;")
+    w("      dl = cl;")
+    w("      ch = bh;")
+    w("      cl = bl;")
+    w("      bh = ah;")
+    w("      bl = al;")
+    w("      let alsum = t1l + t2l;")
+    w("      al = alsum % 65536;")
+    w("      ah = (t1h + t2h + alsum / 65536) % 65536;")
+    # schedule: W[t+16] = s1(w14) + w9 + s0(w1) + w0
+    w("      let nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;")
+    w("      let nl = nlsum % 65536;")
+    w("      let nh = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;")
+    for j in range(15):
+        w(f"      w{j}h = w{j + 1}h;")
+        w(f"      w{j}l = w{j + 1}l;")
+    w("      w15h = nh;")
+    w("      w15l = nl;")
+    w("      t = t + 1;")
+    w("    };")
+    for i, c in enumerate(LETTERS):
+        w(f"    let s{i} = h{i}l + {c}l;")
+        w(f"    h{i}l = s{i} % 65536;")
+        w(f"    h{i}h = (h{i}h + {c}h + s{i} / 65536) % 65536;")
+    w("    off = off + 64;")
+    w("  };")
+    w('  let mut out = "";')
+    for i in range(8):
+        w(f"  out = string_concat(out, sha256_hex4(h{i}h));")
+        w(f"  out = string_concat(out, sha256_hex4(h{i}l));")
+    w("  return out;")
+    w("}")
+    # the same padded-message readers over a Vec of byte values (0..255)
+    w("/* Byte i of the padded message: data, 0x80, zeros, then the 64-bit big-endian bit length. */")
+    w("fn sha256_vbyte(s: Vec<i32>, n: i32, total: i32, i: i32) -> i32 {")
+    w("  if i < n {")
+    w("    return vec_get(s, i);")
+    w("  };")
+    w("  if i == n {")
+    w("    return 128;")
+    w("  };")
+    w("  let k = total - 1 - i;")
+    w("  if k >= 8 {")
+    w("    return 0;")
+    w("  };")
+    w("  if k == 0 {")
+    w("    return (n % 32) * 8;")
+    w("  };")
+    w("  if k >= 5 {")
+    w("    return 0;")
+    w("  };")
+    w("  return (n / sha256_pow2(8 * k - 3)) % 256;")
+    w("}")
+    w("")
+    w("fn sha256_vword_hi(s: Vec<i32>, n: i32, total: i32, i: i32) -> i32 {")
+    w("  return sha256_vbyte(s, n, total, i) * 256 + sha256_vbyte(s, n, total, i + 1);")
+    w("}")
+    w("")
+    w("fn sha256_vword_lo(s: Vec<i32>, n: i32, total: i32, i: i32) -> i32 {")
+    w("  return sha256_vbyte(s, n, total, i + 2) * 256 + sha256_vbyte(s, n, total, i + 3);")
+    w("}")
+    w("")
+    # main function over a Vec of byte values (binary preimages such as
+    # sv0cov point identities, which may hold any byte)
+    w("fn sha256_hex_bytes(s: Vec<i32>) -> str {")
+    w("  let n = vec_len(s);")
+    w("  let total = ((n + 8) / 64 + 1) * 64;")
+    for i, x in enumerate(H0):
+        w(f"  let mut h{i}h = {x >> 16};")
+        w(f"  let mut h{i}l = {x & 0xFFFF};")
+    w("  let mut off = 0;")
+    w("  while off < total {")
+    for j in range(16):
+        w(f"    let mut w{j}h = sha256_vword_hi(s, n, total, off + {4 * j});")
+        w(f"    let mut w{j}l = sha256_vword_lo(s, n, total, off + {4 * j});")
     for i, c in enumerate(LETTERS):
         w(f"    let mut {c}h = h{i}h;")
         w(f"    let mut {c}l = h{i}l;")

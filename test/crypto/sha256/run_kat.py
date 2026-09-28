@@ -82,6 +82,29 @@ def differential_program(cases: int = 200, seed: int = 20260925) -> str:
     return "\n".join(lines) + "\n"
 
 
+def bytes_program(seed: int = 20260928) -> str:
+    """sha256_hex_bytes over byte vectors (any byte 0..255, including NUL and
+    0xff) at lengths around the 64-byte block and padding boundaries,
+    digests from hashlib."""
+    state = seed
+    lengths = [0, 1, 2, 31, 32, 55, 56, 57, 63, 64, 65, 119, 120, 127, 128, 129, 200]
+    lines = ["fn main() -> i32 {"]
+    for i, length in enumerate(lengths):
+        data = []
+        for _ in range(length):
+            state = (state * 6364136223846793005 + 1442695040888963407) % (1 << 64)
+            data.append((state >> 33) % 256)
+        if length >= 2:
+            data[0], data[-1] = 0, 255
+        lines.append(f"  let v{i}: Vec<i32> = vec_new();")
+        lines.extend(f"  vec_push(v{i}, {b});" for b in data)
+        digest = hashlib.sha256(bytes(data)).hexdigest()
+        lines.append(f'  if string_eq(sha256_hex_bytes(v{i}), "{digest}") {{\n  }} else {{\n    return {i + 1};\n  }};')
+    lines.append("  return 0;")
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
 LONG_VECTOR = re.compile(r'  if check\(repeat_str\("a", 1000000\).*?\n  \};\n', re.S)
 
 
@@ -136,6 +159,8 @@ def main() -> int:
         print(f"run_kat: RED — {args.impl.relative_to(ROOT) if args.impl.is_relative_to(ROOT) else args.impl} does not exist yet (CV-104)")
         return 1
     status = run(args.impl, args.backend, vm_long=args.vm_long)
+    print("byte vectors (sha256_hex_bytes, 17 lengths incl. NUL and 0xff vs hashlib):")
+    status |= run(args.impl, args.backend, bytes_program().encode("utf-8"))
     if args.differential:
         print("differential (200 seeded UTF-8 messages vs hashlib):")
         status |= run(args.impl, args.differential_backend, differential_program().encode("utf-8"))

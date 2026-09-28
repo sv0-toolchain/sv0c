@@ -15,14 +15,18 @@ pulling M5-S-040a/b forward).
   on native and VM. `--differential` adds 200 seeded pseudo-random UTF-8
   messages (0..300 characters) checked against `hashlib`. The VM skips the
   million-`a` vector unless `--vm-long` is given (the SML interpreter needs
-  many minutes for its 15,626 blocks); native always runs it.
+  many minutes for its 15,626 blocks); native always runs it. Every run
+  also checks `sha256_hex_bytes` (a `Vec<i32>` of bytes, used for binary
+  point-identity preimages) on 17 lengths around the block and padding
+  boundaries, with NUL and 0xff bytes, against `hashlib`.
 - `./scripts/sv0 test` runs `run_kat.py --differential`; `test-guards`
   checks that `lib/sha256.sv0` matches `sv0c/scripts/gen_sha256_sv0.py`.
 
 The implementation (`lib/sha256.sv0`, CV-104) is generated: 32-bit words are
 pairs of 16-bit halves in i32 locals, so it never relies on signed overflow
-(undefined in the generated C) and allocates no Vec. It is not yet in the
-mega-TU module list; the planner (CV-107) adds it when the compiler first calls it.
+(undefined in the generated C). `sha256_hex` hashes a `str`;
+`sha256_hex_bytes` hashes a `Vec<i32>` of byte values. It is in the mega-TU
+module list (CV-107); the coverage map writer (CV-110) uses both.
 
 ```bash
 python3 sv0c/test/crypto/sha256/run_kat.py
