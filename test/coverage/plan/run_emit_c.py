@@ -18,9 +18,10 @@ For the seven sv0cov semantic fixtures and constructs.sv0 this checks:
    CV-112 loop rewrite (`while (1) { if (c) { } else { break; } ...` back to
    `while (c) { ...`), gives exactly the `off` build's C: instrumentation
    adds nothing else.
-4. Linked with the real sv0cov runtime (runtime/c/sv0cov_rt.c, CV-114)
-   and run under a valid transport, the program behaves exactly as the off
-   build (the runtime accepts sv0c's registration); with a malformed
+4. Linked with the real sv0cov runtime (runtime/c/sv0cov_rt.c, CV-114/
+   CV-115) and run under a valid transport, the program behaves exactly as
+   the off build (the runtime accepts sv0c's registration) and publishes
+   one raw profile that sv0cov's reader accepts, with the stub's counts; with a malformed
    SV0COV_RUN_ID in required mode it exits 1 with COV2001 before printing
    anything. Linked with stub_rt.c (a test-only stand-in for the CV-114 runtime that
    validates the registration and counts hits) and run, the program exits
@@ -56,6 +57,8 @@ RUN_ID = "0123456789abcdef0123456789abcdef"
 IDENTITY = "sv0c+test"
 
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(ROOT / "sv0cov" / "src"))
+from sv0cov.formats.rawprofile import RawProfileError, decode  # noqa: E402
 from run_hits import NATIVE, compile_with, programs  # noqa: E402
 from run_plan import ensure_built  # noqa: E402
 
@@ -196,15 +199,32 @@ def main() -> int:
                         errors.append(f"{name}: {e['label']} counted {got}, expected {e['count']}")
             elif sum(counts) == 0:
                 errors.append(f"{name}: no counter was hit")
-            # 4b. The real runtime (sv0cov CV-114) accepts this registration
-            # and leaves the program's behavior alone; a bad transport in
-            # required mode stops it before any user code.
+            # 4b. The real runtime (sv0cov CV-114/CV-115) accepts this
+            # registration, leaves the program's behavior alone, and at exit
+            # publishes one raw profile whose counts equal the stub's; a bad
+            # transport in required mode stops it before any user code.
             l3 = link(d / "inst.c", d / "real", str(rt_obj))
             if l3.returncode:
                 errors.append(f"{name}: linking against the sv0cov runtime failed: {l3.stderr.strip()}")
             else:
+                pdir = profiles / name
+                pdir.mkdir()
                 r_real = subprocess.run([str(d / "real")], capture_output=True, timeout=60,
-                                        env=transport_env(profiles))
+                                        env=transport_env(pdir))
+                got = sorted(pdir.iterdir())
+                if len(got) != 1 or not got[0].name.startswith(RUN_ID + "-") or got[0].suffix != ".sv0profraw":
+                    errors.append(f"{name}: expected one published profile, found {[g.name for g in got]}")
+                else:
+                    try:
+                        prof = decode(got[0].read_bytes(), map_counter_count=total,
+                                      expected_map_id=bytes.fromhex(m["map_id"]))
+                        dense = [0] * total
+                        for i, v in prof.counts:
+                            dense[i] = v
+                        if dense != counts or prof.backend != "native":
+                            errors.append(f"{name}: the published profile's counts differ from the stub runtime's")
+                    except RawProfileError as exc:
+                        errors.append(f"{name}: the published profile is invalid: {exc}")
                 if (r_real.returncode, r_real.stdout, r_real.stderr) != (r_off.returncode, r_off.stdout, r_off.stderr):
                     errors.append(f"{name}: with the sv0cov runtime the program behaves differently "
                                   f"(rc {r_real.returncode}): {r_real.stderr.decode(errors='replace').strip()}")
@@ -234,7 +254,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print(f"coverage C emission: OK ({len(progs)} programs: map-mode map, prelude = map, one hit per counter, "
-          "C minus coverage = off, sv0cov runtime accepts the registration, stub-runtime counts = expected-counts.json; f0 golden; no-hosted-main refused)")
+          "C minus coverage = off, sv0cov runtime publishes a valid profile, stub-runtime counts = expected-counts.json; f0 golden; no-hosted-main refused)")
     return 0
 
 

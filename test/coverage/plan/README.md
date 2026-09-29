@@ -84,9 +84,10 @@ before user code. The map is written once the C is. For every fixture and
 - the C minus the prelude, hits, start call, and CV-112 loop rewrite to equal
   the `off` build's C;
 - the program, linked with the real sv0cov runtime
-  (`sv0cov/runtime/c/sv0cov_rt.c`, CV-114) and run under a valid
+  (`sv0cov/runtime/c/sv0cov_rt.c`, CV-114/CV-115) and run under a valid
   `SV0COV_*` transport, to behave exactly as the `off` build (the runtime
-  accepts sv0c's registration), and with a malformed `SV0COV_RUN_ID` in
+  accepts sv0c's registration) and publish one raw profile that sv0cov's
+  reader accepts, with the same counts as the stub, and with a malformed `SV0COV_RUN_ID` in
   required mode to exit 1 with `COV2001` before any output;
 - the program, linked with `stub_rt.c` (a test-only stand-in for the CV-114
   runtime that validates the registration and counts hits) and run without
@@ -96,7 +97,7 @@ before user code. The map is written once the C is. For every fixture and
   it);
 - a program with no hosted `main` to be refused (exit 9) with no map left.
 
-Until the runtime can publish a profile (CV-115), `sv0 native-compile
---coverage=instrument` refuses to link (exit 7) and `--emit=c` is the way to
-get instrumented C; the VM emitter refuses `instrument` (exit 9) until
-`COVER_HIT` emission (CV-117).
+`sv0 native-compile --coverage=instrument` links the sv0cov runtime; the
+executable publishes one raw profile into `SV0COV_PROFILE_DIR` when it exits
+(CV-115). The VM emitter refuses `instrument` (exit 9) until `COVER_HIT`
+emission (CV-117).
