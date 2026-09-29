@@ -1,4 +1,4 @@
-# Coverage planner, map, hit, C and VM emission tests (sv0cov CV-107..CV-117)
+# Coverage planner, map, hit, C and VM emission tests (sv0cov CV-107..CV-118)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -119,6 +119,14 @@ displacements widen by five bytes per hit they cross. For every fixture and
   `vm-disasm-f0.expected.txt` (`--update` rewrites it);
 - a VM without coverage support (today's sv0vm, until CV-119) to reject the
   instrumented bytecode with `unknown opcode 119` before running it.
+- the companion binding (CV-118), written to the path on request line 5
+  (`sv0 vm-native-compile` uses `<stem>.sv0covbind.json` beside the
+  `.sv0b`): sv0cov's own `decode_v1` accepts it bound to the exact bytecode,
+  it equals `encode_v1` byte for byte with the map's ID, counter count, and
+  compiler identity, and two emissions give the same bytes (checked with the
+  first Python >= 3.10 found; the summary says when it was skipped). A VM
+  instrument build without a binding path is refused (exit 9) and writes no
+  map.
 
 `bytecode.sv0`'s own tests cover `COVER_HIT` sizing, the encode/decode
 round trip, and a disassembly with a forward and a backward jump across

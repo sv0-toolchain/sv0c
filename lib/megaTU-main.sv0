@@ -223,7 +223,7 @@ fn megatu_cov_dir_of(path: string) -> string {
 }
 
 /* Line k (0-based) of the coverage request "<mode>\n<map path>\n<target>\n
-   <compiler identity>", or "" when it has fewer lines. */
+   <compiler identity>[\n<VM binding path>]", or "" when it has fewer lines. */
 fn megatu_cov_req_line(req: string, k: i32) -> string {
     let n: i32 = string_len(req);
     let mut line: i32 = 0;
@@ -527,11 +527,34 @@ fn megatu_cov_check(mode: i32, out_blocks: Vec<i32>, cov_info: Vec<i32>,
     return 0 - 1;
 }
 
-/* An instrument build's map, written once the VM bytecode exists (sv0cov
-   CV-117; the C path writes it in megatu_cov_emit_c). */
-fn megatu_cov_write_map(mode: i32, cov: MegatuCov) -> i32 {
+/* Before VM emission (sv0cov CV-118): an instrument build needs the
+   companion binding path (request line 5) and a compiler identity the
+   binding admits (1..128 bytes). Returns main's exit code, or -1. */
+fn megatu_cov_vm_check(mode: i32) -> i32 {
+    if mode != 2 { return 0 - 1; }
+    let req: string = getenv("SV0_COVERAGE_REQUEST");
+    if string_len(megatu_cov_req_line(req, 4)) == 0 {
+        write_file("/dev/stderr", "coverage: a VM --coverage=instrument build needs a companion binding path (SV0_COVERAGE_REQUEST line 5)\n");
+        return 9;
+    }
+    if string_len(megatu_cov_req_line(req, 3)) > 128 {
+        write_file("/dev/stderr", "coverage: the compiler identity is longer than the 128 bytes a VM coverage binding allows\n");
+        return 9;
+    }
+    return 0 - 1;
+}
+
+/* After VM emission (sv0cov CV-117, CV-118): an instrument build writes its
+   map, then the sv0cov.vm-binding companion bound to the exact bytecode
+   bytes (length and SHA-256). The C path writes its map in
+   megatu_cov_emit_c. */
+fn megatu_cov_write_vm(mode: i32, cov: MegatuCov, bytecode: Vec<i32>, bytecode_len: i32) -> i32 {
     if mode != 2 { return 0; }
-    write_file(megatu_cov_req_line(getenv("SV0_COVERAGE_REQUEST"), 1), cov.map);
+    let req: string = getenv("SV0_COVERAGE_REQUEST");
+    write_file(megatu_cov_req_line(req, 1), cov.map);
+    let binding: string = cov_map_vm_binding(cov.map, megatu_cov_req_line(req, 3), bytecode_len,
+        sha256_hex_bytes(bytecode));
+    write_file(megatu_cov_req_line(req, 4), binding);
     return 0;
 }
 

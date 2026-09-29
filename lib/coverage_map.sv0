@@ -824,3 +824,27 @@ fn cov_map_c_prelude(map: string, target: string, identity: string) -> string {
     out = string_concat(out, string_concat(string_concat(cov_map_int(covered), "u, "), string_concat(nf, "u, __sv0cov_fragments\n};\n")));
     return string_concat(out, "static const struct __sv0cov_module *const __sv0cov_modules[1] = {&__sv0cov_module};\n\n");
 }
+
+/* ── VM v1 companion binding (CV-118; sv0doc bytecode/coverage.md 4) ───── */
+
+/* The canonical `sv0cov.vm-binding` 1.0 companion for bytecode of
+   bytecode_len bytes with SHA-256 bytecode_sha (64 hex), bound to the
+   canonical map `map`: the eleven properties in key order, no whitespace,
+   one final LF (sv0cov.formats.vmbinding.encode_v1). "" if the map lacks
+   its ID or counter count. */
+fn cov_map_vm_binding(map: string, identity: string, bytecode_len: i32, bytecode_sha: string) -> string {
+    let mid: i32 = cov_map_find(map, "\"map_id\":\"", 0);
+    let pc: i32 = cov_map_find(map, "\"program_counter_count\":", 0);
+    if mid < 0 { return ""; }
+    if pc < 0 { return ""; }
+    let map_id: string = string_substr(map, mid + 10, 64);
+    let total: i32 = cov_map_read_int(map, pc + 24);
+    let mut out: string = string_concat("{\"bytecode_length\":", cov_map_int(bytecode_len));
+    out = string_concat(out, string_concat(string_concat(",\"bytecode_sha256\":\"", bytecode_sha), "\""));
+    out = string_concat(out, ",\"capabilities\":[\"sv0cov.coverage.v1\"]");
+    out = string_concat(out, string_concat(",\"compiler_identity\":", cov_map_str(identity)));
+    out = string_concat(out, string_concat(string_concat(",\"map_id\":\"", map_id), "\""));
+    out = string_concat(out, ",\"plan_capability\":\"sv0cov.plan.v1\",\"profile\":\"sv0vm-v1-coverage\"");
+    out = string_concat(out, string_concat(",\"program_counter_count\":", cov_map_int(total)));
+    return string_concat(out, ",\"raw_profile_version\":\"1.0\",\"schema\":\"sv0cov.vm-binding\",\"version\":\"1.0\"}\n");
+}

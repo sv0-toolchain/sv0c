@@ -20,6 +20,12 @@ this checks:
 5. A VM without coverage support rejects the instrumented bytecode with
    "unknown opcode 119" before running anything (until CV-119 teaches
    sv0vm the opcode, this is the reference sv0vm).
+6. The companion binding (CV-118; request line 5) is written beside it:
+   sv0cov's own decoder (sv0cov.formats.vmbinding, run with a Python >=
+   3.10) accepts it bound to the exact bytecode bytes, it equals
+   encode_v1 byte for byte and names the map's ID, counter count, and
+   compiler identity, and a second emission gives the same bytes. Without a
+   binding path the VM build is refused (exit 9) and writes no map.
 
     python3 sv0c/test/coverage/plan/run_emit_vm.py [--update]
 """
@@ -44,7 +50,7 @@ IDENTITY = "sv0c+test"
 
 sys.path.insert(0, str(HERE))
 from run_hits import VM_EMIT, programs  # noqa: E402
-from run_plan import ensure_built  # noqa: E402
+from run_plan import ensure_built, modern_python  # noqa: E402
 
 JUMPS = {112, 113, 114}
 COVER_HIT = 119
@@ -147,13 +153,16 @@ def main() -> int:
     errors: list[str] = []
     progs = programs()
     rejected_checked = False
+    bindings: list[tuple[str, str, str]] = []
+    validated = False
     with tempfile.TemporaryDirectory() as td:
         t = Path(td)
         for name, request in progs:
             ref, imap = t / f"{name}.map.json", t / f"{name}.inst.json"
             m = emit(request, f"map\n{ref}\n{name}\n{IDENTITY}")
             off = emit(request, "")
-            inst = emit(request, f"instrument\n{imap}\n{name}\n{IDENTITY}")
+            bind = t / f"{name}.sv0covbind.json"
+            inst = emit(request, f"instrument\n{imap}\n{name}\n{IDENTITY}\n{bind}")
             if m.returncode or off.returncode or inst.returncode:
                 errors.append(f"{name}: map rc={m.returncode} off rc={off.returncode} instrument rc={inst.returncode}: "
                               f"{inst.stderr.decode(errors='replace').strip()}")
@@ -190,7 +199,13 @@ def main() -> int:
             if rc_off is None or rc_off != rc_str:
                 errors.append(f"{name}: off exit {rc_off}, stripped instrumented exit {rc_str}: {out_str[-300:]}")
             # 4. Disassembly agrees with this decoder; f0 is pinned.
-            d = emit(request, f"instrument\n{t / 'disasm.json'}\n{name}\n{IDENTITY}", disasm=True)
+            bind2 = t / f"{name}.again.sv0covbind.json"
+            d = emit(request, f"instrument\n{t / 'disasm.json'}\n{name}\n{IDENTITY}\n{bind2}", disasm=True)
+            if not bind.is_file() or not bind2.is_file() or bind.read_bytes() != bind2.read_bytes():
+                errors.append(f"{name}: the binding is missing or differs between two emissions")
+            instb = t / f"{name}.inst.sv0b"
+            instb.write_bytes(inst.stdout)
+            bindings.append((str(bind), str(instb), str(ref)))
             text = d.stdout.decode()
             if d.returncode or text.count("COVER_HIT ") != total:
                 errors.append(f"{name}: disassembly (rc {d.returncode}) shows {text.count('COVER_HIT ')} hits, want {total}")
@@ -201,19 +216,41 @@ def main() -> int:
                     errors.append(f"f0: disassembly differs from {GOLDEN.relative_to(SV0C)} (--update to rewrite)")
             # 5. A VM without coverage support refuses it before running.
             if not rejected_checked:
-                instb = t / f"{name}.inst.sv0b"
-                instb.write_bytes(inst.stdout)
                 rc, out = run_sv0vm(instb)
                 if rc is not None or "unknown opcode 119" not in out:
                     errors.append(f"{name}: sv0vm did not reject COVER_HIT before running (exit {rc})")
                 rejected_checked = True
+        # 6. The bindings validate with sv0cov itself.
+        py = modern_python()
+        if py is not None and bindings:
+            code = ("import json, sys; sys.path.insert(0, sys.argv[1])\n"
+                    "from sv0cov.formats.vmbinding import Binding, decode_v1, encode_v1\n"
+                    "for b, c, m in json.loads(sys.argv[2]):\n"
+                    "    data, bc, mp = open(b, 'rb').read(), open(c, 'rb').read(), json.load(open(m))\n"
+                    "    got = decode_v1(data, bc)\n"
+                    f"    want = Binding(mp['map_id'], mp['program_counter_count'], {IDENTITY!r})\n"
+                    "    assert got == want, (b, got, want)\n"
+                    "    assert encode_v1(want, bc) == data, b\n")
+            p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(bindings)],
+                               capture_output=True, text=True, timeout=300)
+            if p.returncode:
+                errors.append(f"sv0cov rejected a binding: {p.stderr.strip()[-600:]}")
+            validated = True
+        # A VM instrument build without a binding path is refused and writes nothing.
+        f0 = next(r for n, r in progs if n == "f0")
+        nomap = t / "nobinding.json"
+        p = emit(f0, f"instrument\n{nomap}\nf0\n{IDENTITY}")
+        if p.returncode != 9 or b"companion binding path" not in p.stderr or p.stdout or nomap.exists():
+            errors.append(f"VM instrument without a binding path: rc={p.returncode} map left={nomap.exists()}")
     if errors:
         print("coverage VM emission: FAIL", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1
+    bind_note = "bindings sv0cov-validated" if validated else "binding validation SKIPPED (no Python >= 3.10)"
     print(f"coverage VM emission: OK ({len(progs)} programs: map-mode map, one COVER_HIT per counter, jumps on "
-          "boundaries, hit-stripped bytecode runs like off on sv0vm; disassembly + f0 golden; sv0vm rejects opcode 119)")
+          f"boundaries, hit-stripped bytecode runs like off on sv0vm; disassembly + f0 golden; sv0vm rejects opcode 119; "
+          f"{bind_note}, deterministic; no binding path refused)")
     return 0
 
 
