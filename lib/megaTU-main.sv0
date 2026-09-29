@@ -527,6 +527,14 @@ fn megatu_cov_check(mode: i32, out_blocks: Vec<i32>, cov_info: Vec<i32>,
     return 0 - 1;
 }
 
+/* An instrument build's map, written once the VM bytecode exists (sv0cov
+   CV-117; the C path writes it in megatu_cov_emit_c). */
+fn megatu_cov_write_map(mode: i32, cov: MegatuCov) -> i32 {
+    if mode != 2 { return 0; }
+    write_file(megatu_cov_req_line(getenv("SV0_COVERAGE_REQUEST"), 1), cov.map);
+    return 0;
+}
+
 /* Index of needle in hay, or -1. */
 fn megatu_str_find(hay: string, needle: string) -> i32 {
     return cov_map_find(hay, needle, 0);

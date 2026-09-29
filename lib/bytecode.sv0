@@ -15,7 +15,9 @@
    encodeAll/decodeAll — full instruction stream encode/decode),
    encode_file / decode_file (SML encodeFile/decodeFile — complete
    .sv0b file-level serialization with header, string section,
-   function table section, and code section). */
+   function table section, and code section), and disasm_file (a text
+   disassembly of a .sv0b byte buffer; sv0cov CV-117 added COVER_HIT,
+   opcode 119, sv0doc bytecode/coverage.md). */
 
 /* ── magic and version ──────────────────────────────────────── */
 
@@ -106,6 +108,9 @@ fn OP_CALL() -> i32 { return 115; }
 fn OP_RETURN() -> i32 { return 116; }
 fn OP_CALL_BUILTIN() -> i32 { return 117; }
 fn OP_RETURN_SLOTS() -> i32 { return 118; }
+/* sv0cov CV-117: five bytes (opcode + u32le counter index), stack-neutral,
+   no source form (sv0doc bytecode/coverage.md). */
+fn OP_COVER_HIT() -> i32 { return 119; }
 
 fn OP_ALLOC_STRUCT() -> i32 { return 128; }
 fn OP_GET_FIELD() -> i32 { return 129; }
@@ -161,6 +166,7 @@ fn insn_encoded_size(opc: i32) -> i32 {
     if opc == 116 { return 1; }
     if opc == 117 { return 5; }
     if opc == 118 { return 2; }
+    if opc == 119 { return 5; }
     if opc == 128 { return 5; }
     if opc == 129 { return 5; }
     if opc == 130 { return 5; }
@@ -194,6 +200,7 @@ fn opcode_has_u32_payload(opc: i32) -> bool {
     if opc == 96 { return true; }
     if opc == 97 { return true; }
     if opc == 117 { return true; }
+    if opc == 119 { return true; }
     if opc == 128 { return true; }
     if opc == 129 { return true; }
     if opc == 130 { return true; }
@@ -643,6 +650,10 @@ fn encode_insn_at(instrs: Vec<i32>, idx: i32, out: Vec<i32>) -> i32 {
         vec_push(out, cnt);
         return idx + 2;
     }
+    if opc == 119 {
+        encode_u32_le(vec_get(instrs, idx + 1), out);
+        return idx + 2;
+    }
 
     if opc == 128 {
         encode_u32_le(vec_get(instrs, idx + 1), out);
@@ -793,6 +804,11 @@ fn decode_insn_at(buf: Vec<i32>, pos: i32, out: Vec<i32>) -> i32 {
         let cnt: i32 = vec_get(buf, pos + 1);
         vec_push(out, cnt);
         return pos + 2;
+    }
+    if opc == 119 {
+        let v: i32 = decode_u32_at(buf, pos + 1);
+        vec_push(out, v);
+        return pos + 5;
     }
 
     if opc == 128 {
@@ -988,6 +1004,264 @@ fn decode_file(buf: Vec<i32>, buf_len: i32,
         fi = fi + 1;
     }
     return 0;
+}
+
+
+/* ── disassembly (sv0cov CV-117) ──────────────────────────────
+   disasm_file renders a .sv0b byte buffer as text: a header line, then
+   per function a header and one line per instruction,
+
+     sv0b v1: <functions> functions, <string section bytes> string bytes
+     fn <index> (name #<string index>, arity <a>, locals <l>, <n> bytes):
+       <offset>  <MNEMONIC> <operands>
+
+   with the offset (decimal, width 5) relative to the function's code.
+   Mnemonics are the OP_* names above; operands are decimal (u32 and i32
+   decoded without overflow), jumps add "-> <target offset>", PUSH_I64 and
+   PUSH_F64 print their 8 bytes as 0x-hex (most significant first), and
+   COVER_HIT prints its counter index as sv0doc bytecode/coverage.md 1.2
+   requires. An opcode the size table does not know ends the function's
+   listing with "?? <opcode>". Uses no string-valued if-expressions (the
+   SML bootstrap). */
+
+fn opcode_mnemonic(opc: i32) -> string {
+    if opc == 0 { return "HALT"; }
+    if opc == 1 { return "POP"; }
+    if opc == 2 { return "DUP"; }
+    if opc == 3 { return "PUSH_UNIT"; }
+    if opc == 4 { return "PUSH_I32"; }
+    if opc == 5 { return "PUSH_I64"; }
+    if opc == 6 { return "PUSH_F64"; }
+    if opc == 7 { return "PUSH_BOOL"; }
+    if opc == 8 { return "PUSH_STRING"; }
+    if opc == 16 { return "ADD_I32"; }
+    if opc == 17 { return "SUB_I32"; }
+    if opc == 18 { return "MUL_I32"; }
+    if opc == 19 { return "DIV_I32"; }
+    if opc == 20 { return "MOD_I32"; }
+    if opc == 21 { return "NEG_I32"; }
+    if opc == 32 { return "ADD_I64"; }
+    if opc == 33 { return "SUB_I64"; }
+    if opc == 34 { return "MUL_I64"; }
+    if opc == 35 { return "DIV_I64"; }
+    if opc == 36 { return "MOD_I64"; }
+    if opc == 37 { return "NEG_I64"; }
+    if opc == 38 { return "DIV_U64"; }
+    if opc == 39 { return "MOD_U64"; }
+    if opc == 40 { return "SHL_I64"; }
+    if opc == 41 { return "SHR_I64"; }
+    if opc == 42 { return "SHR_U64"; }
+    if opc == 43 { return "AND_I64"; }
+    if opc == 44 { return "OR_I64"; }
+    if opc == 45 { return "XOR_I64"; }
+    if opc == 48 { return "ADD_F64"; }
+    if opc == 49 { return "SUB_F64"; }
+    if opc == 50 { return "MUL_F64"; }
+    if opc == 51 { return "DIV_F64"; }
+    if opc == 52 { return "NEG_F64"; }
+    if opc == 64 { return "EQ"; }
+    if opc == 65 { return "NEQ"; }
+    if opc == 66 { return "LT"; }
+    if opc == 67 { return "GT"; }
+    if opc == 68 { return "LTE"; }
+    if opc == 69 { return "GTE"; }
+    if opc == 70 { return "LT_U64"; }
+    if opc == 71 { return "GT_U64"; }
+    if opc == 72 { return "LTE_U64"; }
+    if opc == 73 { return "GTE_U64"; }
+    if opc == 80 { return "AND"; }
+    if opc == 81 { return "OR"; }
+    if opc == 82 { return "NOT"; }
+    if opc == 88 { return "BIT_AND"; }
+    if opc == 89 { return "BIT_OR"; }
+    if opc == 90 { return "BIT_XOR"; }
+    if opc == 91 { return "BIT_NOT"; }
+    if opc == 92 { return "SHL"; }
+    if opc == 93 { return "SHR"; }
+    if opc == 96 { return "LOAD_LOCAL"; }
+    if opc == 97 { return "STORE_LOCAL"; }
+    if opc == 112 { return "JUMP"; }
+    if opc == 113 { return "JUMP_IF"; }
+    if opc == 114 { return "JUMP_IF_NOT"; }
+    if opc == 115 { return "CALL"; }
+    if opc == 116 { return "RETURN"; }
+    if opc == 117 { return "CALL_BUILTIN"; }
+    if opc == 118 { return "RETURN_SLOTS"; }
+    if opc == 119 { return "COVER_HIT"; }
+    if opc == 128 { return "ALLOC_STRUCT"; }
+    if opc == 129 { return "GET_FIELD"; }
+    if opc == 130 { return "SET_FIELD"; }
+    if opc == 131 { return "ALLOC_ARRAY"; }
+    if opc == 132 { return "GET_INDEX"; }
+    if opc == 133 { return "SET_INDEX"; }
+    if opc == 144 { return "CONSTRUCT_VARIANT"; }
+    if opc == 145 { return "GET_TAG"; }
+    if opc == 146 { return "GET_VARIANT_FIELD"; }
+    if opc == 160 { return "CONTRACT_CHECK"; }
+    if opc == 161 { return "CAST"; }
+    return "";
+}
+
+/* Decimal text of a non-negative value below 2^31. */
+fn bc_itoa(n: i32) -> string {
+    if n == 0 { return "0"; }
+    let digits: string = "0123456789";
+    let mut out: string = "";
+    let mut v: i32 = n;
+    while v > 0 {
+        out = string_concat(string_substr(digits, v % 10, 1), out);
+        v = v / 10;
+    }
+    return out;
+}
+
+/* Decimal text of the u32 hi * 65536 + lo (hi, lo in 0..65535), by long
+   division on the two 16-bit limbs so no i32 overflows. */
+fn bc_u32_dec(hi: i32, lo: i32) -> string {
+    if hi < 32768 { return bc_itoa(hi * 65536 + lo); }
+    let digits: string = "0123456789";
+    let mut out: string = "";
+    let mut h: i32 = hi;
+    let mut l: i32 = lo;
+    let mut going: bool = true;
+    while going {
+        let rh: i32 = h % 10;
+        h = h / 10;
+        let wide: i32 = rh * 65536 + l;
+        l = wide / 10;
+        out = string_concat(string_substr(digits, wide % 10, 1), out);
+        going = if h > 0 { true } else { l > 0 };
+    }
+    return out;
+}
+
+/* The u32 at buf[pos..pos+4), little-endian, as decimal text. */
+fn bc_u32_text(buf: Vec<i32>, pos: i32) -> string {
+    let lo: i32 = vec_get(buf, pos) + vec_get(buf, pos + 1) * 256;
+    let hi: i32 = vec_get(buf, pos + 2) + vec_get(buf, pos + 3) * 256;
+    return bc_u32_dec(hi, lo);
+}
+
+/* The i32 at buf[pos..pos+4) as a value, without overflow: a negative
+   operand is minus its two's-complement magnitude. */
+fn bc_i32_at(buf: Vec<i32>, pos: i32) -> i32 {
+    let b0: i32 = vec_get(buf, pos);
+    let b1: i32 = vec_get(buf, pos + 1);
+    let b2: i32 = vec_get(buf, pos + 2);
+    let b3: i32 = vec_get(buf, pos + 3);
+    if b3 < 128 { return b0 + b1 * 256 + b2 * 65536 + b3 * 16777216; }
+    let mag: i32 = (255 - b0) + (255 - b1) * 256 + (255 - b2) * 65536 + (255 - b3) * 16777216;
+    return 0 - mag - 1;
+}
+
+fn bc_i32_text(v: i32) -> string {
+    if v < 0 {
+        if v == 0 - 2147483647 - 1 { return "-2147483648"; }
+        return string_concat("-", bc_itoa(0 - v));
+    }
+    return bc_itoa(v);
+}
+
+fn bc_hex2(b: i32) -> string {
+    let digits: string = "0123456789abcdef";
+    return string_concat(string_substr(digits, b / 16, 1), string_substr(digits, b % 16, 1));
+}
+
+/* Right-align n in width 5 (offsets). */
+fn bc_pad5(n: i32) -> string {
+    let mut s: string = bc_itoa(n);
+    while string_len(s) < 5 {
+        s = string_concat(" ", s);
+    }
+    return s;
+}
+
+/* One instruction at buf[pos] (pos relative to code start cs) as text,
+   without the offset column. */
+fn disasm_insn(buf: Vec<i32>, cs: i32, pos: i32) -> string {
+    let opc: i32 = vec_get(buf, cs + pos);
+    let name: string = opcode_mnemonic(opc);
+    let a: i32 = cs + pos + 1;
+    let size: i32 = insn_encoded_size(opc);
+    if opc == 4 { return string_concat("PUSH_I32 ", bc_i32_text(bc_i32_at(buf, a))); }
+    if opc == 7 { return string_concat("PUSH_BOOL ", bc_itoa(vec_get(buf, a))); }
+    if opc == 118 { return string_concat("RETURN_SLOTS ", bc_itoa(vec_get(buf, a))); }
+    let is_wide: bool = if opc == 5 { true } else { opc == 6 };
+    if is_wide {
+        let mut hex: string = "0x";
+        let mut k: i32 = 7;
+        while k >= 0 {
+            hex = string_concat(hex, bc_hex2(vec_get(buf, a + k)));
+            k = k - 1;
+        }
+        return string_concat(string_concat(name, " "), hex);
+    }
+    let is_jump: bool = if opc < 112 { false } else { opc <= 114 };
+    if is_jump {
+        let d: i32 = bc_i32_at(buf, a);
+        return string_concat(string_concat(string_concat(name, " "), bc_i32_text(d)),
+            string_concat(" -> ", bc_i32_text(pos + 5 + d)));
+    }
+    if opc == 161 {
+        let t1: i32 = vec_get(buf, a) + vec_get(buf, a + 1) * 256;
+        let t2: i32 = vec_get(buf, a + 2) + vec_get(buf, a + 3) * 256;
+        return string_concat(string_concat(string_concat("CAST ", bc_itoa(t1)), " "), bc_itoa(t2));
+    }
+    /* Everything else is zero or more u32 operands. */
+    let mut out: string = name;
+    let mut k2: i32 = 1;
+    while k2 + 4 <= size {
+        out = string_concat(string_concat(out, " "), bc_u32_text(buf, cs + pos + k2));
+        k2 = k2 + 4;
+    }
+    return out;
+}
+
+fn disasm_file(buf: Vec<i32>, buf_len: i32) -> string {
+    if verify_magic(buf) == false { return "not a .sv0b file\n"; }
+    let ver: i32 = decode_u16_at(buf, 4);
+    let str_sec_len: i32 = decode_u32_at(buf, 6);
+    let mut pos: i32 = 10 + str_sec_len;
+    let func_sec_len: i32 = decode_u32_at(buf, pos);
+    pos = pos + 4;
+    let code_sec_start: i32 = pos + func_sec_len + 4;
+    let func_count: i32 = decode_u32_at(buf, pos);
+    pos = pos + 4;
+    let mut out: string = string_concat(string_concat(string_concat("sv0b v", bc_itoa(ver)), ": "),
+        string_concat(string_concat(bc_itoa(func_count), " functions, "),
+            string_concat(bc_itoa(str_sec_len), " string bytes\n")));
+    let mut fi: i32 = 0;
+    while fi < func_count {
+        let e: i32 = pos + fi * 20;
+        let code_off: i32 = decode_u32_at(buf, e + 12);
+        let code_len: i32 = decode_u32_at(buf, e + 16);
+        out = string_concat(out, string_concat(string_concat("fn ", bc_itoa(fi)),
+            string_concat(string_concat(" (name #", bc_itoa(decode_u32_at(buf, e))),
+            string_concat(string_concat(", arity ", bc_itoa(decode_u32_at(buf, e + 4))),
+            string_concat(string_concat(", locals ", bc_itoa(decode_u32_at(buf, e + 8))),
+            string_concat(string_concat(", ", bc_itoa(code_len)), " bytes):\n"))))));
+        let cs: i32 = code_sec_start + code_off;
+        let mut ip: i32 = 0;
+        while ip < code_len {
+            let opc: i32 = vec_get(buf, cs + ip);
+            let size: i32 = insn_encoded_size(opc);
+            let mut line: string = "";
+            if size == 0 {
+                line = string_concat("?? ", bc_itoa(opc));
+            } else {
+                line = disasm_insn(buf, cs, ip);
+            }
+            out = string_concat(out, string_concat(string_concat(string_concat("  ", bc_pad5(ip)), "  "),
+                string_concat(line, "\n")));
+            if size == 0 {
+                ip = code_len;
+            } else {
+                ip = ip + size;
+            }
+        }
+        fi = fi + 1;
+    }
+    return out;
 }
 
 /* ── tests ──────────────────────────────────────────────────── */
@@ -1479,6 +1753,48 @@ fn test_logical_opcode_cluster() -> i32 {
     return 0;
 }
 
+/* sv0cov CV-117: COVER_HIT sizing, round trip, and disassembly, with a
+   forward and a backward jump across hits. */
+fn test_cover_hit() -> i32 {
+    if OP_COVER_HIT() != 119 { return 1; }
+    if insn_encoded_size(119) != 5 { return 2; }
+    if opcode_has_u32_payload(119) != true { return 3; }
+    let code: Vec<i32> = vec_new();
+    vec_push(code, 119); vec_push(code, 0);
+    vec_push(code, 114); vec_push(code, 10);
+    vec_push(code, 119); vec_push(code, 4194303);
+    vec_push(code, 119); vec_push(code, 70000);
+    vec_push(code, 112); vec_push(code, 0 - 25);
+    vec_push(code, 116);
+    let bytes: Vec<i32> = vec_new();
+    let n: i32 = encode_all_insns(code, bytes);
+    if n != 26 { return 4; }
+    if vec_get(bytes, 0) != 119 { return 5; }
+    if vec_get(bytes, 10) != 119 { return 6; }
+    if vec_get(bytes, 11) != 255 { return 7; }
+    if vec_get(bytes, 13) != 63 { return 8; }
+    let back: Vec<i32> = vec_new();
+    decode_all_insns(bytes, n, back);
+    if vec_len(back) != vec_len(code) { return 9; }
+    let mut i: i32 = 0;
+    while i < vec_len(code) {
+        if vec_get(back, i) != vec_get(code, i) { return 10; }
+        i = i + 1;
+    }
+    let str_sec: Vec<i32> = vec_new();
+    encode_u32_le(0, str_sec);
+    let ft: Vec<i32> = vec_new();
+    vec_push(ft, 0); vec_push(ft, 0); vec_push(ft, 1); vec_push(ft, code);
+    let file: Vec<i32> = vec_new();
+    let total: i32 = encode_file(str_sec, 4, ft, file);
+    let text: string = disasm_file(file, total);
+    let want: string = "sv0b v1: 1 functions, 4 string bytes\nfn 0 (name #0, arity 0, locals 1, 26 bytes):\n      0  COVER_HIT 0\n      5  JUMP_IF_NOT 10 -> 20\n     10  COVER_HIT 4194303\n     15  COVER_HIT 70000\n     20  JUMP -25 -> 0\n     25  RETURN\n";
+    if string_eq(text, want) != true { return 11; }
+    if string_eq(bc_u32_dec(65535, 65535), "4294967295") != true { return 12; }
+    if string_eq(bc_u32_dec(32768, 0), "2147483648") != true { return 13; }
+    return 0;
+}
+
 fn main() -> i32 {
     let r1: i32 = test_magic();
     if r1 != 0 { return r1; }
@@ -1524,5 +1840,7 @@ fn main() -> i32 {
     if r20 != 0 { return 246 + r20; }
     let r21: i32 = test_decode_file_roundtrip();
     if r21 != 0 { return 10 + r21; }
+    let r22: i32 = test_cover_hit();
+    if r22 != 0 { return 60 + r22; }
     return 0;
 }

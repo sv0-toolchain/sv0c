@@ -1,0 +1,90 @@
+sv0b v1: 3 functions, 46 string bytes
+fn 0 (name #0, arity 1, locals 3, 159 bytes):
+      0  COVER_HIT 0
+      5  PUSH_I32 0
+     10  STORE_LOCAL 1
+     15  LOAD_LOCAL 0
+     20  PUSH_I32 10
+     25  GT
+     26  JUMP_IF_NOT 26 -> 57
+     31  COVER_HIT 1
+     36  LOAD_LOCAL 1
+     41  PUSH_I32 100
+     46  ADD_I32
+     47  STORE_LOCAL 1
+     52  JUMP 5 -> 62
+     57  COVER_HIT 2
+     62  PUSH_I32 0
+     67  STORE_LOCAL 2
+     72  PUSH_BOOL 1
+     74  JUMP_IF_NOT 73 -> 152
+     79  LOAD_LOCAL 2
+     84  LOAD_LOCAL 0
+     89  LT
+     90  JUMP_IF_NOT 10 -> 105
+     95  COVER_HIT 3
+    100  JUMP 10 -> 115
+    105  COVER_HIT 4
+    110  JUMP 37 -> 152
+    115  LOAD_LOCAL 1
+    120  LOAD_LOCAL 2
+    125  ADD_I32
+    126  STORE_LOCAL 1
+    131  LOAD_LOCAL 2
+    136  PUSH_I32 1
+    141  ADD_I32
+    142  STORE_LOCAL 2
+    147  JUMP -80 -> 72
+    152  LOAD_LOCAL 1
+    157  RETURN_SLOTS 1
+fn 1 (name #1, arity 2, locals 4, 94 bytes):
+      0  COVER_HIT 5
+      5  LOAD_LOCAL 0
+     10  PUSH_I32 0
+     15  EQ
+     16  JUMP_IF_NOT 20 -> 41
+     21  COVER_HIT 6
+     26  PUSH_I32 0
+     31  STORE_LOCAL 2
+     36  JUMP 46 -> 87
+     41  LOAD_LOCAL 0
+     46  PUSH_I32 1
+     51  EQ
+     52  JUMP_IF_NOT 30 -> 87
+     57  LOAD_LOCAL 1
+     62  STORE_LOCAL 3
+     67  COVER_HIT 7
+     72  LOAD_LOCAL 3
+     77  STORE_LOCAL 2
+     82  JUMP 0 -> 87
+     87  LOAD_LOCAL 2
+     92  RETURN_SLOTS 1
+fn 2 (name #3, arity 0, locals 9, 137 bytes):
+      0  COVER_HIT 8
+      5  PUSH_STRING 2
+     10  STORE_LOCAL 0
+     15  PUSH_I32 3
+     20  CALL 0 1
+     29  STORE_LOCAL 1
+     34  LOAD_LOCAL 1
+     39  STORE_LOCAL 2
+     44  PUSH_I32 1
+     49  STORE_LOCAL 3
+     54  PUSH_I32 2
+     59  STORE_LOCAL 4
+     64  LOAD_LOCAL 3
+     69  LOAD_LOCAL 4
+     74  CALL 1 2
+     83  STORE_LOCAL 5
+     88  LOAD_LOCAL 5
+     93  STORE_LOCAL 6
+     98  LOAD_LOCAL 2
+    103  LOAD_LOCAL 6
+    108  ADD_I32
+    109  STORE_LOCAL 7
+    114  LOAD_LOCAL 7
+    119  PUSH_I32 5
+    124  SUB_I32
+    125  STORE_LOCAL 8
+    130  LOAD_LOCAL 8
+    135  RETURN_SLOTS 1

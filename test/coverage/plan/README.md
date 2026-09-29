@@ -1,4 +1,4 @@
-# Coverage planner, map, hit, and C emission tests (sv0cov CV-107..CV-113)
+# Coverage planner, map, hit, C and VM emission tests (sv0cov CV-107..CV-117)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -99,5 +99,27 @@ before user code. The map is written once the C is. For every fixture and
 
 `sv0 native-compile --coverage=instrument` links the sv0cov runtime; the
 executable publishes one raw profile into `SV0COV_PROFILE_DIR` when it exits
-(CV-115). The VM emitter refuses `instrument` (exit 9) until `COVER_HIT`
-emission (CV-117).
+(CV-115).
+
+`run_emit_vm.py` (CV-117) checks the VM emitter's `--coverage=instrument`
+bytecode. Each placed hit is `COVER_HIT <counter>` (opcode 119, u32le, five
+bytes, stack-neutral; sv0doc `bytecode/coverage.md`), and byte-relative jump
+displacements widen by five bytes per hit they cross. For every fixture and
+`constructs.sv0` the script requires:
+
+- the instrument map to equal the map-mode map;
+- exactly one `COVER_HIT` per counter, and every jump to land on an
+  instruction boundary;
+- the bytecode, with every `COVER_HIT` removed and each jump re-derived from
+  its old target, to run on sv0vm to the `off` build's exit code (so the
+  offsets are right, not just aligned; wrong displacements hang or underflow
+  the stack, and the script reports it);
+- the emitter's disassembly (`SV0_VM_DISASM=1`, `bytecode.sv0`
+  `disasm_file`) to show one hit per counter, and f0's to equal
+  `vm-disasm-f0.expected.txt` (`--update` rewrites it);
+- a VM without coverage support (today's sv0vm, until CV-119) to reject the
+  instrumented bytecode with `unknown opcode 119` before running it.
+
+`bytecode.sv0`'s own tests cover `COVER_HIT` sizing, the encode/decode
+round trip, and a disassembly with a forward and a backward jump across
+hits.

@@ -339,6 +339,7 @@ fn insn_size(opc: i32) -> i32 {
     if opc == 116 { return 1; }
     if opc == 117 { return 5; }
     if opc == 118 { return 2; }
+    if opc == 119 { return 5; }
     if opc == 128 { return 5; }
     if opc == 129 { return 5; }
     if opc == 130 { return 5; }
@@ -2388,6 +2389,11 @@ enum Instr {
     Ensures(Box<Expr>, i32),
     ReturnVoid,
     ReturnVal(Box<Value>),
+    /* Mirrors lowering.sv0's Instr positions: DeclPtr (FFI; programs using
+       it are refused before VM emission) and sv0cov CV-117's CovHit, which
+       emits COVER_HIT <counter>. */
+    DeclPtr(i32, i32, i32),
+    CovHit(i32),
 }
 
 /* ── emit_instr (SML emitInstr — IR instruction → bytecode) ──
@@ -2399,7 +2405,8 @@ enum Instr {
    WhileLoop emits cond + JUMP_IF_NOT + body + JUMP back-edge,
    with sentinel patching for break/continue.  Break/Continue
    emit JUMP with sentinel operands, patched by WhileLoop.
-   All 16 Instr cases implemented.
+   All 16 Instr cases implemented, plus CovHit (COVER_HIT, sv0cov CV-117);
+   DeclPtr is never reached (FFI programs are refused before VM emission).
    StoreField uses env_field_starts/env_fields_flat for per-slot
    field-name lookup.  Requires/Ensures use contract_pool_key to
    encode contract-message pool entries (decoded at serialisation). */
@@ -2797,6 +2804,13 @@ fn emit_instr(ins: Instr,
             vec_push(out, 118);
             vec_push(out, w);
             return n + 2;
+        },
+        Instr::CovHit(k) => {
+            /* COVER_HIT: 5 bytes, 2 slots; the jump offsets around it come
+               from flat_byte_size, which sizes it through insn_size. */
+            vec_push(out, 119);
+            vec_push(out, k);
+            return 2;
         },
     }
     return 0 - 1;

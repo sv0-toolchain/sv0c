@@ -717,6 +717,10 @@ static int insn_size(int opc) {
     return 2;
   } else {
   }
+  if ((opc == 119)) {
+    return 5;
+  } else {
+  }
   if ((opc == 128)) {
     return 5;
   } else {
@@ -5014,6 +5018,14 @@ static int emit_instr(Instr ins, int env_names, int env_bases, int env_widths, i
                                   return _sv0t9;
                                   _sv0t0 = 0;
                                 } else {
+                                  if ((ins.tag == 17)) {
+                                    int k = ins.p0;
+                                    sv0_vec_push(out, 119);
+                                    sv0_vec_push(out, k);
+                                    return 2;
+                                    _sv0t0 = 0;
+                                  } else {
+                                  }
                                 }
                               }
                             }

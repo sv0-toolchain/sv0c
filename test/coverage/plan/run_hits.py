@@ -14,9 +14,9 @@ pre-order instead of C. This script checks:
 2. The negative cases fail the build with COV1020: a dropped hit
    (SV0_COVERAGE_FAULT=drop), a duplicated one (dup), a hit naming no planned
    counter (orphan), and any hit in map mode (dup under --coverage=map).
-3. Through the real drivers, --coverage=instrument passes the check: the C
-   driver emits instrumented C (CV-113), and the VM emitter is then refused
-   (no COVER_HIT emission yet, CV-117) without COV1020.
+3. Through the real drivers, --coverage=instrument passes the check without
+   COV1020: the C driver emits instrumented C (CV-113) and the VM driver
+   bytecode with COVER_HIT (CV-117).
 
     python3 sv0c/test/coverage/plan/run_hits.py
 """
@@ -41,7 +41,6 @@ VM_EMIT = ROOT / "build" / "sv0-megatu-vm-native"
 sys.path.insert(0, str(HERE))
 from run_plan import ensure_built  # noqa: E402
 
-PENDING = "not available on the VM yet: coverage hits are placed and checked"
 
 
 def compile_with(binary: Path, request: str, coverage: str, fault: str | None = None) -> subprocess.CompletedProcess:
@@ -111,16 +110,16 @@ def main() -> int:
             errors.append(f"map-mode hit: rc={p.returncode} stderr={p.stderr.strip()!r}")
 
         # 3. The drivers reach the check, which passes: the C driver emits the
-        # instrumented C (CV-113); the VM emitter refuses after the check
-        # until COVER_HIT emission (CV-117).
+        # instrumented C (CV-113) and the VM driver COVER_HIT bytecode (CV-117).
         cpath = t / "inst.c"
         p = subprocess.run([str(SV0), "native-compile", "--emit=c", "--coverage=instrument", "-o", str(cpath), f0],
                            capture_output=True, text=True, timeout=300)
         if p.returncode or "COV1020" in p.stderr or "__sv0cov_hit(" not in (cpath.read_text() if cpath.exists() else ""):
             errors.append(f"native-compile --emit=c --coverage=instrument: rc={p.returncode} stderr={p.stderr.strip()!r}")
-        p = subprocess.run([str(SV0), "vm-native-compile", "--coverage=instrument", f0, str(t / "inst.sv0b")],
+        bpath = t / "inst.sv0b"
+        p = subprocess.run([str(SV0), "vm-native-compile", "--coverage=instrument", f0, str(bpath)],
                            capture_output=True, text=True, timeout=300)
-        if p.returncode != 9 or PENDING not in p.stderr or "COV1020" in p.stderr:
+        if p.returncode or "COV1020" in p.stderr or not bpath.is_file() or 119 not in bpath.read_bytes():
             errors.append(f"vm-native-compile --coverage=instrument: rc={p.returncode} stderr={p.stderr.strip()!r}")
 
     if errors:

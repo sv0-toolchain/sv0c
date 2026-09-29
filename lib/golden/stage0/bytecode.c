@@ -67,6 +67,7 @@ static int OP_CALL(void);
 static int OP_RETURN(void);
 static int OP_CALL_BUILTIN(void);
 static int OP_RETURN_SLOTS(void);
+static int OP_COVER_HIT(void);
 static int OP_ALLOC_STRUCT(void);
 static int OP_GET_FIELD(void);
 static int OP_SET_FIELD(void);
@@ -124,6 +125,16 @@ static int encode_all_insns(int instrs, int out);
 static int decode_all_insns(int buf, int buf_len, int out);
 static int encode_file(int str_sec, int str_sec_len, int ft_entries, int out);
 static int decode_file(int buf, int buf_len, int out_str_starts, int out_str_lens, int out_ft);
+static const char* opcode_mnemonic(int opc);
+static const char* bc_itoa(int n);
+static const char* bc_u32_dec(int hi, int lo);
+static const char* bc_u32_text(int buf, int pos);
+static int bc_i32_at(int buf, int pos);
+static const char* bc_i32_text(int v);
+static const char* bc_hex2(int b);
+static const char* bc_pad5(int n);
+static const char* disasm_insn(int buf, int cs, int pos);
+static const char* disasm_file(int buf, int buf_len);
 static int test_magic(void);
 static int test_opcodes(void);
 static int test_insn_sizes(void);
@@ -146,6 +157,7 @@ static int test_encode_decode_all(void);
 static int test_encode_file(void);
 static int test_decode_file_roundtrip(void);
 static int test_logical_opcode_cluster(void);
+static int test_cover_hit(void);
 
 static int magic_byte_0(void) {
   return 83;
@@ -415,6 +427,10 @@ static int OP_RETURN_SLOTS(void) {
   return 118;
 }
 
+static int OP_COVER_HIT(void) {
+  return 119;
+}
+
 static int OP_ALLOC_STRUCT(void) {
   return 128;
 }
@@ -574,6 +590,10 @@ static int insn_encoded_size(int opc) {
     return 2;
   } else {
   }
+  if ((opc == 119)) {
+    return 5;
+  } else {
+  }
   if ((opc == 128)) {
     return 5;
   } else {
@@ -661,6 +681,10 @@ static int opcode_has_u32_payload(int opc) {
   } else {
   }
   if ((opc == 117)) {
+    return 1;
+  } else {
+  }
+  if ((opc == 119)) {
     return 1;
   } else {
   }
@@ -1415,7 +1439,7 @@ static int encode_insn_at(int instrs, int idx, int out) {
     return _sv0t70;
   } else {
   }
-  if ((opc == 128)) {
+  if ((opc == 119)) {
     int _sv0t71 = (idx + 1);
     int _sv0t72 = sv0_vec_get(instrs, _sv0t71);
     int _sv0t73 = encode_u32_le(_sv0t72, out);
@@ -1423,7 +1447,7 @@ static int encode_insn_at(int instrs, int idx, int out) {
     return _sv0t74;
   } else {
   }
-  if ((opc == 129)) {
+  if ((opc == 128)) {
     int _sv0t75 = (idx + 1);
     int _sv0t76 = sv0_vec_get(instrs, _sv0t75);
     int _sv0t77 = encode_u32_le(_sv0t76, out);
@@ -1431,7 +1455,7 @@ static int encode_insn_at(int instrs, int idx, int out) {
     return _sv0t78;
   } else {
   }
-  if ((opc == 130)) {
+  if ((opc == 129)) {
     int _sv0t79 = (idx + 1);
     int _sv0t80 = sv0_vec_get(instrs, _sv0t79);
     int _sv0t81 = encode_u32_le(_sv0t80, out);
@@ -1439,7 +1463,7 @@ static int encode_insn_at(int instrs, int idx, int out) {
     return _sv0t82;
   } else {
   }
-  if ((opc == 131)) {
+  if ((opc == 130)) {
     int _sv0t83 = (idx + 1);
     int _sv0t84 = sv0_vec_get(instrs, _sv0t83);
     int _sv0t85 = encode_u32_le(_sv0t84, out);
@@ -1447,44 +1471,44 @@ static int encode_insn_at(int instrs, int idx, int out) {
     return _sv0t86;
   } else {
   }
-  if ((opc == 132)) {
+  if ((opc == 131)) {
     int _sv0t87 = (idx + 1);
-    return _sv0t87;
+    int _sv0t88 = sv0_vec_get(instrs, _sv0t87);
+    int _sv0t89 = encode_u32_le(_sv0t88, out);
+    int _sv0t90 = (idx + 2);
+    return _sv0t90;
+  } else {
+  }
+  if ((opc == 132)) {
+    int _sv0t91 = (idx + 1);
+    return _sv0t91;
   } else {
   }
   if ((opc == 133)) {
-    int _sv0t88 = (idx + 1);
-    return _sv0t88;
+    int _sv0t92 = (idx + 1);
+    return _sv0t92;
   } else {
   }
   if ((opc == 144)) {
-    int _sv0t89 = (idx + 1);
-    int _sv0t90 = sv0_vec_get(instrs, _sv0t89);
-    int _sv0t91 = encode_u32_le(_sv0t90, out);
-    int _sv0t92 = (idx + 2);
-    int _sv0t93 = sv0_vec_get(instrs, _sv0t92);
-    int _sv0t94 = encode_u32_le(_sv0t93, out);
-    int _sv0t95 = (idx + 3);
-    int _sv0t96 = sv0_vec_get(instrs, _sv0t95);
-    int _sv0t97 = encode_u32_le(_sv0t96, out);
-    int _sv0t98 = (idx + 4);
-    return _sv0t98;
+    int _sv0t93 = (idx + 1);
+    int _sv0t94 = sv0_vec_get(instrs, _sv0t93);
+    int _sv0t95 = encode_u32_le(_sv0t94, out);
+    int _sv0t96 = (idx + 2);
+    int _sv0t97 = sv0_vec_get(instrs, _sv0t96);
+    int _sv0t98 = encode_u32_le(_sv0t97, out);
+    int _sv0t99 = (idx + 3);
+    int _sv0t100 = sv0_vec_get(instrs, _sv0t99);
+    int _sv0t101 = encode_u32_le(_sv0t100, out);
+    int _sv0t102 = (idx + 4);
+    return _sv0t102;
   } else {
   }
   if ((opc == 145)) {
-    int _sv0t99 = (idx + 1);
-    return _sv0t99;
-  } else {
-  }
-  if ((opc == 146)) {
-    int _sv0t100 = (idx + 1);
-    int _sv0t101 = sv0_vec_get(instrs, _sv0t100);
-    int _sv0t102 = encode_u32_le(_sv0t101, out);
-    int _sv0t103 = (idx + 2);
+    int _sv0t103 = (idx + 1);
     return _sv0t103;
   } else {
   }
-  if ((opc == 160)) {
+  if ((opc == 146)) {
     int _sv0t104 = (idx + 1);
     int _sv0t105 = sv0_vec_get(instrs, _sv0t104);
     int _sv0t106 = encode_u32_le(_sv0t105, out);
@@ -1492,19 +1516,27 @@ static int encode_insn_at(int instrs, int idx, int out) {
     return _sv0t107;
   } else {
   }
-  if ((opc == 161)) {
+  if ((opc == 160)) {
     int _sv0t108 = (idx + 1);
     int _sv0t109 = sv0_vec_get(instrs, _sv0t108);
-    int _sv0t110 = encode_u16_le(_sv0t109, out);
+    int _sv0t110 = encode_u32_le(_sv0t109, out);
     int _sv0t111 = (idx + 2);
-    int _sv0t112 = sv0_vec_get(instrs, _sv0t111);
-    int _sv0t113 = encode_u16_le(_sv0t112, out);
-    int _sv0t114 = (idx + 3);
-    return _sv0t114;
+    return _sv0t111;
   } else {
   }
-  int _sv0t115 = (idx + 1);
-  return _sv0t115;
+  if ((opc == 161)) {
+    int _sv0t112 = (idx + 1);
+    int _sv0t113 = sv0_vec_get(instrs, _sv0t112);
+    int _sv0t114 = encode_u16_le(_sv0t113, out);
+    int _sv0t115 = (idx + 2);
+    int _sv0t116 = sv0_vec_get(instrs, _sv0t115);
+    int _sv0t117 = encode_u16_le(_sv0t116, out);
+    int _sv0t118 = (idx + 3);
+    return _sv0t118;
+  } else {
+  }
+  int _sv0t119 = (idx + 1);
+  return _sv0t119;
 }
 
 static int decode_insn_at(int buf, int pos, int out) {
@@ -1713,7 +1745,7 @@ static int decode_insn_at(int buf, int pos, int out) {
     return _sv0t56;
   } else {
   }
-  if ((opc == 128)) {
+  if ((opc == 119)) {
     int _sv0t57 = (pos + 1);
     int _sv0t58 = decode_u32_at(buf, _sv0t57);
     int v = _sv0t58;
@@ -1722,7 +1754,7 @@ static int decode_insn_at(int buf, int pos, int out) {
     return _sv0t59;
   } else {
   }
-  if ((opc == 129)) {
+  if ((opc == 128)) {
     int _sv0t60 = (pos + 1);
     int _sv0t61 = decode_u32_at(buf, _sv0t60);
     int v = _sv0t61;
@@ -1731,7 +1763,7 @@ static int decode_insn_at(int buf, int pos, int out) {
     return _sv0t62;
   } else {
   }
-  if ((opc == 130)) {
+  if ((opc == 129)) {
     int _sv0t63 = (pos + 1);
     int _sv0t64 = decode_u32_at(buf, _sv0t63);
     int v = _sv0t64;
@@ -1740,7 +1772,7 @@ static int decode_insn_at(int buf, int pos, int out) {
     return _sv0t65;
   } else {
   }
-  if ((opc == 131)) {
+  if ((opc == 130)) {
     int _sv0t66 = (pos + 1);
     int _sv0t67 = decode_u32_at(buf, _sv0t66);
     int v = _sv0t67;
@@ -1749,48 +1781,48 @@ static int decode_insn_at(int buf, int pos, int out) {
     return _sv0t68;
   } else {
   }
-  if ((opc == 132)) {
+  if ((opc == 131)) {
     int _sv0t69 = (pos + 1);
-    return _sv0t69;
+    int _sv0t70 = decode_u32_at(buf, _sv0t69);
+    int v = _sv0t70;
+    sv0_vec_push(out, v);
+    int _sv0t71 = (pos + 5);
+    return _sv0t71;
+  } else {
+  }
+  if ((opc == 132)) {
+    int _sv0t72 = (pos + 1);
+    return _sv0t72;
   } else {
   }
   if ((opc == 133)) {
-    int _sv0t70 = (pos + 1);
-    return _sv0t70;
+    int _sv0t73 = (pos + 1);
+    return _sv0t73;
   } else {
   }
   if ((opc == 144)) {
-    int _sv0t71 = (pos + 1);
-    int _sv0t72 = decode_u32_at(buf, _sv0t71);
-    int t = _sv0t72;
-    int _sv0t73 = (pos + 5);
-    int _sv0t74 = decode_u32_at(buf, _sv0t73);
-    int vv = _sv0t74;
-    int _sv0t75 = (pos + 9);
-    int _sv0t76 = decode_u32_at(buf, _sv0t75);
-    int fc = _sv0t76;
+    int _sv0t74 = (pos + 1);
+    int _sv0t75 = decode_u32_at(buf, _sv0t74);
+    int t = _sv0t75;
+    int _sv0t76 = (pos + 5);
+    int _sv0t77 = decode_u32_at(buf, _sv0t76);
+    int vv = _sv0t77;
+    int _sv0t78 = (pos + 9);
+    int _sv0t79 = decode_u32_at(buf, _sv0t78);
+    int fc = _sv0t79;
     sv0_vec_push(out, t);
     sv0_vec_push(out, vv);
     sv0_vec_push(out, fc);
-    int _sv0t77 = (pos + 13);
-    return _sv0t77;
+    int _sv0t80 = (pos + 13);
+    return _sv0t80;
   } else {
   }
   if ((opc == 145)) {
-    int _sv0t78 = (pos + 1);
-    return _sv0t78;
-  } else {
-  }
-  if ((opc == 146)) {
-    int _sv0t79 = (pos + 1);
-    int _sv0t80 = decode_u32_at(buf, _sv0t79);
-    int v = _sv0t80;
-    sv0_vec_push(out, v);
-    int _sv0t81 = (pos + 5);
+    int _sv0t81 = (pos + 1);
     return _sv0t81;
   } else {
   }
-  if ((opc == 160)) {
+  if ((opc == 146)) {
     int _sv0t82 = (pos + 1);
     int _sv0t83 = decode_u32_at(buf, _sv0t82);
     int v = _sv0t83;
@@ -1799,21 +1831,30 @@ static int decode_insn_at(int buf, int pos, int out) {
     return _sv0t84;
   } else {
   }
-  if ((opc == 161)) {
+  if ((opc == 160)) {
     int _sv0t85 = (pos + 1);
-    int _sv0t86 = decode_u16_at(buf, _sv0t85);
-    int a = _sv0t86;
-    int _sv0t87 = (pos + 3);
-    int _sv0t88 = decode_u16_at(buf, _sv0t87);
-    int b = _sv0t88;
-    sv0_vec_push(out, a);
-    sv0_vec_push(out, b);
-    int _sv0t89 = (pos + 5);
-    return _sv0t89;
+    int _sv0t86 = decode_u32_at(buf, _sv0t85);
+    int v = _sv0t86;
+    sv0_vec_push(out, v);
+    int _sv0t87 = (pos + 5);
+    return _sv0t87;
   } else {
   }
-  int _sv0t90 = (pos + 1);
-  return _sv0t90;
+  if ((opc == 161)) {
+    int _sv0t88 = (pos + 1);
+    int _sv0t89 = decode_u16_at(buf, _sv0t88);
+    int a = _sv0t89;
+    int _sv0t90 = (pos + 3);
+    int _sv0t91 = decode_u16_at(buf, _sv0t90);
+    int b = _sv0t91;
+    sv0_vec_push(out, a);
+    sv0_vec_push(out, b);
+    int _sv0t92 = (pos + 5);
+    return _sv0t92;
+  } else {
+  }
+  int _sv0t93 = (pos + 1);
+  return _sv0t93;
 }
 
 static int encode_all_insns(int instrs, int out) {
@@ -1984,6 +2025,683 @@ static int decode_file(int buf, int buf_len, int out_str_starts, int out_str_len
     fi = (fi + 1);
   }
   return 0;
+}
+
+static const char* opcode_mnemonic(int opc) {
+  if ((opc == 0)) {
+    return "HALT";
+  } else {
+  }
+  if ((opc == 1)) {
+    return "POP";
+  } else {
+  }
+  if ((opc == 2)) {
+    return "DUP";
+  } else {
+  }
+  if ((opc == 3)) {
+    return "PUSH_UNIT";
+  } else {
+  }
+  if ((opc == 4)) {
+    return "PUSH_I32";
+  } else {
+  }
+  if ((opc == 5)) {
+    return "PUSH_I64";
+  } else {
+  }
+  if ((opc == 6)) {
+    return "PUSH_F64";
+  } else {
+  }
+  if ((opc == 7)) {
+    return "PUSH_BOOL";
+  } else {
+  }
+  if ((opc == 8)) {
+    return "PUSH_STRING";
+  } else {
+  }
+  if ((opc == 16)) {
+    return "ADD_I32";
+  } else {
+  }
+  if ((opc == 17)) {
+    return "SUB_I32";
+  } else {
+  }
+  if ((opc == 18)) {
+    return "MUL_I32";
+  } else {
+  }
+  if ((opc == 19)) {
+    return "DIV_I32";
+  } else {
+  }
+  if ((opc == 20)) {
+    return "MOD_I32";
+  } else {
+  }
+  if ((opc == 21)) {
+    return "NEG_I32";
+  } else {
+  }
+  if ((opc == 32)) {
+    return "ADD_I64";
+  } else {
+  }
+  if ((opc == 33)) {
+    return "SUB_I64";
+  } else {
+  }
+  if ((opc == 34)) {
+    return "MUL_I64";
+  } else {
+  }
+  if ((opc == 35)) {
+    return "DIV_I64";
+  } else {
+  }
+  if ((opc == 36)) {
+    return "MOD_I64";
+  } else {
+  }
+  if ((opc == 37)) {
+    return "NEG_I64";
+  } else {
+  }
+  if ((opc == 38)) {
+    return "DIV_U64";
+  } else {
+  }
+  if ((opc == 39)) {
+    return "MOD_U64";
+  } else {
+  }
+  if ((opc == 40)) {
+    return "SHL_I64";
+  } else {
+  }
+  if ((opc == 41)) {
+    return "SHR_I64";
+  } else {
+  }
+  if ((opc == 42)) {
+    return "SHR_U64";
+  } else {
+  }
+  if ((opc == 43)) {
+    return "AND_I64";
+  } else {
+  }
+  if ((opc == 44)) {
+    return "OR_I64";
+  } else {
+  }
+  if ((opc == 45)) {
+    return "XOR_I64";
+  } else {
+  }
+  if ((opc == 48)) {
+    return "ADD_F64";
+  } else {
+  }
+  if ((opc == 49)) {
+    return "SUB_F64";
+  } else {
+  }
+  if ((opc == 50)) {
+    return "MUL_F64";
+  } else {
+  }
+  if ((opc == 51)) {
+    return "DIV_F64";
+  } else {
+  }
+  if ((opc == 52)) {
+    return "NEG_F64";
+  } else {
+  }
+  if ((opc == 64)) {
+    return "EQ";
+  } else {
+  }
+  if ((opc == 65)) {
+    return "NEQ";
+  } else {
+  }
+  if ((opc == 66)) {
+    return "LT";
+  } else {
+  }
+  if ((opc == 67)) {
+    return "GT";
+  } else {
+  }
+  if ((opc == 68)) {
+    return "LTE";
+  } else {
+  }
+  if ((opc == 69)) {
+    return "GTE";
+  } else {
+  }
+  if ((opc == 70)) {
+    return "LT_U64";
+  } else {
+  }
+  if ((opc == 71)) {
+    return "GT_U64";
+  } else {
+  }
+  if ((opc == 72)) {
+    return "LTE_U64";
+  } else {
+  }
+  if ((opc == 73)) {
+    return "GTE_U64";
+  } else {
+  }
+  if ((opc == 80)) {
+    return "AND";
+  } else {
+  }
+  if ((opc == 81)) {
+    return "OR";
+  } else {
+  }
+  if ((opc == 82)) {
+    return "NOT";
+  } else {
+  }
+  if ((opc == 88)) {
+    return "BIT_AND";
+  } else {
+  }
+  if ((opc == 89)) {
+    return "BIT_OR";
+  } else {
+  }
+  if ((opc == 90)) {
+    return "BIT_XOR";
+  } else {
+  }
+  if ((opc == 91)) {
+    return "BIT_NOT";
+  } else {
+  }
+  if ((opc == 92)) {
+    return "SHL";
+  } else {
+  }
+  if ((opc == 93)) {
+    return "SHR";
+  } else {
+  }
+  if ((opc == 96)) {
+    return "LOAD_LOCAL";
+  } else {
+  }
+  if ((opc == 97)) {
+    return "STORE_LOCAL";
+  } else {
+  }
+  if ((opc == 112)) {
+    return "JUMP";
+  } else {
+  }
+  if ((opc == 113)) {
+    return "JUMP_IF";
+  } else {
+  }
+  if ((opc == 114)) {
+    return "JUMP_IF_NOT";
+  } else {
+  }
+  if ((opc == 115)) {
+    return "CALL";
+  } else {
+  }
+  if ((opc == 116)) {
+    return "RETURN";
+  } else {
+  }
+  if ((opc == 117)) {
+    return "CALL_BUILTIN";
+  } else {
+  }
+  if ((opc == 118)) {
+    return "RETURN_SLOTS";
+  } else {
+  }
+  if ((opc == 119)) {
+    return "COVER_HIT";
+  } else {
+  }
+  if ((opc == 128)) {
+    return "ALLOC_STRUCT";
+  } else {
+  }
+  if ((opc == 129)) {
+    return "GET_FIELD";
+  } else {
+  }
+  if ((opc == 130)) {
+    return "SET_FIELD";
+  } else {
+  }
+  if ((opc == 131)) {
+    return "ALLOC_ARRAY";
+  } else {
+  }
+  if ((opc == 132)) {
+    return "GET_INDEX";
+  } else {
+  }
+  if ((opc == 133)) {
+    return "SET_INDEX";
+  } else {
+  }
+  if ((opc == 144)) {
+    return "CONSTRUCT_VARIANT";
+  } else {
+  }
+  if ((opc == 145)) {
+    return "GET_TAG";
+  } else {
+  }
+  if ((opc == 146)) {
+    return "GET_VARIANT_FIELD";
+  } else {
+  }
+  if ((opc == 160)) {
+    return "CONTRACT_CHECK";
+  } else {
+  }
+  if ((opc == 161)) {
+    return "CAST";
+  } else {
+  }
+  return "";
+}
+
+static const char* bc_itoa(int n) {
+  if ((n == 0)) {
+    return "0";
+  } else {
+  }
+  const char* digits;
+  digits = "0123456789";
+  const char* out;
+  out = "";
+  int v = n;
+  while ((v > 0)) {
+    int _sv0t0 = (v % 10);
+    const char* _sv0t1 = sv0_string_substr(digits, _sv0t0, 1);
+    const char* _sv0t2 = sv0_string_concat(_sv0t1, out);
+    out = _sv0t2;
+    v = (v / 10);
+  }
+  return out;
+}
+
+static const char* bc_u32_dec(int hi, int lo) {
+  if ((hi < 32768)) {
+    int _sv0t0 = (hi * 65536);
+    int _sv0t1 = (_sv0t0 + lo);
+    const char* _sv0t2 = bc_itoa(_sv0t1);
+    return _sv0t2;
+  } else {
+  }
+  const char* digits;
+  digits = "0123456789";
+  const char* out;
+  out = "";
+  int h = hi;
+  int l = lo;
+  int going = 1;
+  while (going) {
+    int rh = (h % 10);
+    h = (h / 10);
+    int _sv0t3 = (rh * 65536);
+    int wide = (_sv0t3 + l);
+    l = (wide / 10);
+    int _sv0t4 = (wide % 10);
+    const char* _sv0t5 = sv0_string_substr(digits, _sv0t4, 1);
+    const char* _sv0t6 = sv0_string_concat(_sv0t5, out);
+    out = _sv0t6;
+    int _sv0t7;
+    int _sv0t8;
+    if ((h > 0)) {
+      _sv0t8 = 1;
+    } else {
+      _sv0t8 = (l > 0);
+    }
+    _sv0t7 = _sv0t8;
+    going = _sv0t7;
+  }
+  return out;
+}
+
+static const char* bc_u32_text(int buf, int pos) {
+  int _sv0t0 = sv0_vec_get(buf, pos);
+  int _sv0t1 = (pos + 1);
+  int _sv0t2 = sv0_vec_get(buf, _sv0t1);
+  int _sv0t3 = (_sv0t2 * 256);
+  int lo = (_sv0t0 + _sv0t3);
+  int _sv0t4 = (pos + 2);
+  int _sv0t5 = sv0_vec_get(buf, _sv0t4);
+  int _sv0t6 = (pos + 3);
+  int _sv0t7 = sv0_vec_get(buf, _sv0t6);
+  int _sv0t8 = (_sv0t7 * 256);
+  int hi = (_sv0t5 + _sv0t8);
+  const char* _sv0t9 = bc_u32_dec(hi, lo);
+  return _sv0t9;
+}
+
+static int bc_i32_at(int buf, int pos) {
+  int _sv0t0 = sv0_vec_get(buf, pos);
+  int b0 = _sv0t0;
+  int _sv0t1 = (pos + 1);
+  int _sv0t2 = sv0_vec_get(buf, _sv0t1);
+  int b1 = _sv0t2;
+  int _sv0t3 = (pos + 2);
+  int _sv0t4 = sv0_vec_get(buf, _sv0t3);
+  int b2 = _sv0t4;
+  int _sv0t5 = (pos + 3);
+  int _sv0t6 = sv0_vec_get(buf, _sv0t5);
+  int b3 = _sv0t6;
+  if ((b3 < 128)) {
+    int _sv0t7 = (b1 * 256);
+    int _sv0t8 = (b0 + _sv0t7);
+    int _sv0t9 = (b2 * 65536);
+    int _sv0t10 = (_sv0t8 + _sv0t9);
+    int _sv0t11 = (b3 * 16777216);
+    int _sv0t12 = (_sv0t10 + _sv0t11);
+    return _sv0t12;
+  } else {
+  }
+  int _sv0t13 = (255 - b0);
+  int _sv0t14 = (255 - b1);
+  int _sv0t15 = (_sv0t14 * 256);
+  int _sv0t16 = (_sv0t13 + _sv0t15);
+  int _sv0t17 = (255 - b2);
+  int _sv0t18 = (_sv0t17 * 65536);
+  int _sv0t19 = (_sv0t16 + _sv0t18);
+  int _sv0t20 = (255 - b3);
+  int _sv0t21 = (_sv0t20 * 16777216);
+  int mag = (_sv0t19 + _sv0t21);
+  int _sv0t22 = (0 - mag);
+  int _sv0t23 = (_sv0t22 - 1);
+  return _sv0t23;
+}
+
+static const char* bc_i32_text(int v) {
+  if ((v < 0)) {
+    int _sv0t0 = (0 - 2147483647);
+    int _sv0t1 = (_sv0t0 - 1);
+    if ((v == _sv0t1)) {
+      return "-2147483648";
+    } else {
+    }
+    int _sv0t2 = (0 - v);
+    const char* _sv0t3 = bc_itoa(_sv0t2);
+    const char* _sv0t4 = sv0_string_concat("-", _sv0t3);
+    return _sv0t4;
+  } else {
+  }
+  const char* _sv0t5 = bc_itoa(v);
+  return _sv0t5;
+}
+
+static const char* bc_hex2(int b) {
+  const char* digits;
+  digits = "0123456789abcdef";
+  int _sv0t0 = (b / 16);
+  const char* _sv0t1 = sv0_string_substr(digits, _sv0t0, 1);
+  int _sv0t2 = (b % 16);
+  const char* _sv0t3 = sv0_string_substr(digits, _sv0t2, 1);
+  const char* _sv0t4 = sv0_string_concat(_sv0t1, _sv0t3);
+  return _sv0t4;
+}
+
+static const char* bc_pad5(int n) {
+  const char* _sv0t0 = bc_itoa(n);
+  const char* s;
+  s = _sv0t0;
+  while (1) {
+    int _sv0t1 = sv0_string_len(s);
+    int _sv0t3 = (_sv0t1 < 5);
+    if ((!_sv0t3)) {
+      break;
+    } else {
+    }
+    const char* _sv0t2 = sv0_string_concat(" ", s);
+    s = _sv0t2;
+  }
+  return s;
+}
+
+static const char* disasm_insn(int buf, int cs, int pos) {
+  int _sv0t0 = (cs + pos);
+  int _sv0t1 = sv0_vec_get(buf, _sv0t0);
+  int opc = _sv0t1;
+  const char* _sv0t2 = opcode_mnemonic(opc);
+  const char* name;
+  name = _sv0t2;
+  int _sv0t3 = (cs + pos);
+  int a = (_sv0t3 + 1);
+  int _sv0t4 = insn_encoded_size(opc);
+  int size = _sv0t4;
+  if ((opc == 4)) {
+    int _sv0t5 = bc_i32_at(buf, a);
+    const char* _sv0t6 = bc_i32_text(_sv0t5);
+    const char* _sv0t7 = sv0_string_concat("PUSH_I32 ", _sv0t6);
+    return _sv0t7;
+  } else {
+  }
+  if ((opc == 7)) {
+    int _sv0t8 = sv0_vec_get(buf, a);
+    const char* _sv0t9 = bc_itoa(_sv0t8);
+    const char* _sv0t10 = sv0_string_concat("PUSH_BOOL ", _sv0t9);
+    return _sv0t10;
+  } else {
+  }
+  if ((opc == 118)) {
+    int _sv0t11 = sv0_vec_get(buf, a);
+    const char* _sv0t12 = bc_itoa(_sv0t11);
+    const char* _sv0t13 = sv0_string_concat("RETURN_SLOTS ", _sv0t12);
+    return _sv0t13;
+  } else {
+  }
+  int _sv0t14;
+  int _sv0t15;
+  if ((opc == 5)) {
+    _sv0t15 = 1;
+  } else {
+    _sv0t15 = (opc == 6);
+  }
+  _sv0t14 = _sv0t15;
+  int is_wide = _sv0t14;
+  if (is_wide) {
+    const char* hex;
+    hex = "0x";
+    int k = 7;
+    while ((k >= 0)) {
+      int _sv0t16 = (a + k);
+      int _sv0t17 = sv0_vec_get(buf, _sv0t16);
+      const char* _sv0t18 = bc_hex2(_sv0t17);
+      const char* _sv0t19 = sv0_string_concat(hex, _sv0t18);
+      hex = _sv0t19;
+      k = (k - 1);
+    }
+    const char* _sv0t20 = sv0_string_concat(name, " ");
+    const char* _sv0t21 = sv0_string_concat(_sv0t20, hex);
+    return _sv0t21;
+  } else {
+  }
+  int _sv0t22;
+  int _sv0t23;
+  if ((opc < 112)) {
+    _sv0t23 = 0;
+  } else {
+    _sv0t23 = (opc <= 114);
+  }
+  _sv0t22 = _sv0t23;
+  int is_jump = _sv0t22;
+  if (is_jump) {
+    int _sv0t24 = bc_i32_at(buf, a);
+    int d = _sv0t24;
+    const char* _sv0t25 = sv0_string_concat(name, " ");
+    const char* _sv0t26 = bc_i32_text(d);
+    const char* _sv0t27 = sv0_string_concat(_sv0t25, _sv0t26);
+    int _sv0t28 = (pos + 5);
+    int _sv0t29 = (_sv0t28 + d);
+    const char* _sv0t30 = bc_i32_text(_sv0t29);
+    const char* _sv0t31 = sv0_string_concat(" -> ", _sv0t30);
+    const char* _sv0t32 = sv0_string_concat(_sv0t27, _sv0t31);
+    return _sv0t32;
+  } else {
+  }
+  if ((opc == 161)) {
+    int _sv0t33 = sv0_vec_get(buf, a);
+    int _sv0t34 = (a + 1);
+    int _sv0t35 = sv0_vec_get(buf, _sv0t34);
+    int _sv0t36 = (_sv0t35 * 256);
+    int t1 = (_sv0t33 + _sv0t36);
+    int _sv0t37 = (a + 2);
+    int _sv0t38 = sv0_vec_get(buf, _sv0t37);
+    int _sv0t39 = (a + 3);
+    int _sv0t40 = sv0_vec_get(buf, _sv0t39);
+    int _sv0t41 = (_sv0t40 * 256);
+    int t2 = (_sv0t38 + _sv0t41);
+    const char* _sv0t42 = bc_itoa(t1);
+    const char* _sv0t43 = sv0_string_concat("CAST ", _sv0t42);
+    const char* _sv0t44 = sv0_string_concat(_sv0t43, " ");
+    const char* _sv0t45 = bc_itoa(t2);
+    const char* _sv0t46 = sv0_string_concat(_sv0t44, _sv0t45);
+    return _sv0t46;
+  } else {
+  }
+  const char* out;
+  out = name;
+  int k2 = 1;
+  while (1) {
+    int _sv0t47 = (k2 + 4);
+    int _sv0t53 = (_sv0t47 <= size);
+    if ((!_sv0t53)) {
+      break;
+    } else {
+    }
+    const char* _sv0t48 = sv0_string_concat(out, " ");
+    int _sv0t49 = (cs + pos);
+    int _sv0t50 = (_sv0t49 + k2);
+    const char* _sv0t51 = bc_u32_text(buf, _sv0t50);
+    const char* _sv0t52 = sv0_string_concat(_sv0t48, _sv0t51);
+    out = _sv0t52;
+    k2 = (k2 + 4);
+  }
+  return out;
+}
+
+static const char* disasm_file(int buf, int buf_len) {
+  int _sv0t0 = verify_magic(buf);
+  if ((_sv0t0 == 0)) {
+    return "not a .sv0b file\n";
+  } else {
+  }
+  int _sv0t1 = decode_u16_at(buf, 4);
+  int ver = _sv0t1;
+  int _sv0t2 = decode_u32_at(buf, 6);
+  int str_sec_len = _sv0t2;
+  int pos = (10 + str_sec_len);
+  int _sv0t3 = decode_u32_at(buf, pos);
+  int func_sec_len = _sv0t3;
+  pos = (pos + 4);
+  int _sv0t4 = (pos + func_sec_len);
+  int code_sec_start = (_sv0t4 + 4);
+  int _sv0t5 = decode_u32_at(buf, pos);
+  int func_count = _sv0t5;
+  pos = (pos + 4);
+  const char* _sv0t6 = bc_itoa(ver);
+  const char* _sv0t7 = sv0_string_concat("sv0b v", _sv0t6);
+  const char* _sv0t8 = sv0_string_concat(_sv0t7, ": ");
+  const char* _sv0t9 = bc_itoa(func_count);
+  const char* _sv0t10 = sv0_string_concat(_sv0t9, " functions, ");
+  const char* _sv0t11 = bc_itoa(str_sec_len);
+  const char* _sv0t12 = sv0_string_concat(_sv0t11, " string bytes\n");
+  const char* _sv0t13 = sv0_string_concat(_sv0t10, _sv0t12);
+  const char* _sv0t14 = sv0_string_concat(_sv0t8, _sv0t13);
+  const char* out;
+  out = _sv0t14;
+  int fi = 0;
+  while ((fi < func_count)) {
+    int _sv0t15 = (fi * 20);
+    int e = (pos + _sv0t15);
+    int _sv0t16 = (e + 12);
+    int _sv0t17 = decode_u32_at(buf, _sv0t16);
+    int code_off = _sv0t17;
+    int _sv0t18 = (e + 16);
+    int _sv0t19 = decode_u32_at(buf, _sv0t18);
+    int code_len = _sv0t19;
+    const char* _sv0t20 = bc_itoa(fi);
+    const char* _sv0t21 = sv0_string_concat("fn ", _sv0t20);
+    int _sv0t22 = decode_u32_at(buf, e);
+    const char* _sv0t23 = bc_itoa(_sv0t22);
+    const char* _sv0t24 = sv0_string_concat(" (name #", _sv0t23);
+    int _sv0t25 = (e + 4);
+    int _sv0t26 = decode_u32_at(buf, _sv0t25);
+    const char* _sv0t27 = bc_itoa(_sv0t26);
+    const char* _sv0t28 = sv0_string_concat(", arity ", _sv0t27);
+    int _sv0t29 = (e + 8);
+    int _sv0t30 = decode_u32_at(buf, _sv0t29);
+    const char* _sv0t31 = bc_itoa(_sv0t30);
+    const char* _sv0t32 = sv0_string_concat(", locals ", _sv0t31);
+    const char* _sv0t33 = bc_itoa(code_len);
+    const char* _sv0t34 = sv0_string_concat(", ", _sv0t33);
+    const char* _sv0t35 = sv0_string_concat(_sv0t34, " bytes):\n");
+    const char* _sv0t36 = sv0_string_concat(_sv0t32, _sv0t35);
+    const char* _sv0t37 = sv0_string_concat(_sv0t28, _sv0t36);
+    const char* _sv0t38 = sv0_string_concat(_sv0t24, _sv0t37);
+    const char* _sv0t39 = sv0_string_concat(_sv0t21, _sv0t38);
+    const char* _sv0t40 = sv0_string_concat(out, _sv0t39);
+    out = _sv0t40;
+    int cs = (code_sec_start + code_off);
+    int ip = 0;
+    while ((ip < code_len)) {
+      int _sv0t41 = (cs + ip);
+      int _sv0t42 = sv0_vec_get(buf, _sv0t41);
+      int opc = _sv0t42;
+      int _sv0t43 = insn_encoded_size(opc);
+      int size = _sv0t43;
+      const char* line;
+      line = "";
+      if ((size == 0)) {
+        const char* _sv0t44 = bc_itoa(opc);
+        const char* _sv0t45 = sv0_string_concat("?? ", _sv0t44);
+        line = _sv0t45;
+      } else {
+        const char* _sv0t46 = disasm_insn(buf, cs, ip);
+        line = _sv0t46;
+      }
+      const char* _sv0t47 = bc_pad5(ip);
+      const char* _sv0t48 = sv0_string_concat("  ", _sv0t47);
+      const char* _sv0t49 = sv0_string_concat(_sv0t48, "  ");
+      const char* _sv0t50 = sv0_string_concat(line, "\n");
+      const char* _sv0t51 = sv0_string_concat(_sv0t49, _sv0t50);
+      const char* _sv0t52 = sv0_string_concat(out, _sv0t51);
+      out = _sv0t52;
+      if ((size == 0)) {
+        ip = code_len;
+      } else {
+        ip = (ip + size);
+      }
+    }
+    fi = (fi + 1);
+  }
+  return out;
 }
 
 static int test_magic(void) {
@@ -3490,6 +4208,127 @@ static int test_logical_opcode_cluster(void) {
   return 0;
 }
 
+static int test_cover_hit(void) {
+  int _sv0t0 = OP_COVER_HIT();
+  if ((_sv0t0 != 119)) {
+    return 1;
+  } else {
+  }
+  int _sv0t1 = insn_encoded_size(119);
+  if ((_sv0t1 != 5)) {
+    return 2;
+  } else {
+  }
+  int _sv0t2 = opcode_has_u32_payload(119);
+  if ((_sv0t2 != 1)) {
+    return 3;
+  } else {
+  }
+  int _sv0t3 = sv0_vec_new();
+  int code = _sv0t3;
+  sv0_vec_push(code, 119);
+  sv0_vec_push(code, 0);
+  sv0_vec_push(code, 114);
+  sv0_vec_push(code, 10);
+  sv0_vec_push(code, 119);
+  sv0_vec_push(code, 4194303);
+  sv0_vec_push(code, 119);
+  sv0_vec_push(code, 70000);
+  sv0_vec_push(code, 112);
+  int _sv0t4 = (0 - 25);
+  sv0_vec_push(code, _sv0t4);
+  sv0_vec_push(code, 116);
+  int _sv0t5 = sv0_vec_new();
+  int bytes = _sv0t5;
+  int _sv0t6 = encode_all_insns(code, bytes);
+  int n = _sv0t6;
+  if ((n != 26)) {
+    return 4;
+  } else {
+  }
+  int _sv0t7 = sv0_vec_get(bytes, 0);
+  if ((_sv0t7 != 119)) {
+    return 5;
+  } else {
+  }
+  int _sv0t8 = sv0_vec_get(bytes, 10);
+  if ((_sv0t8 != 119)) {
+    return 6;
+  } else {
+  }
+  int _sv0t9 = sv0_vec_get(bytes, 11);
+  if ((_sv0t9 != 255)) {
+    return 7;
+  } else {
+  }
+  int _sv0t10 = sv0_vec_get(bytes, 13);
+  if ((_sv0t10 != 63)) {
+    return 8;
+  } else {
+  }
+  int _sv0t11 = sv0_vec_new();
+  int back = _sv0t11;
+  int _sv0t12 = decode_all_insns(bytes, n, back);
+  int _sv0t13 = sv0_vec_len(back);
+  int _sv0t14 = sv0_vec_len(code);
+  if ((_sv0t13 != _sv0t14)) {
+    return 9;
+  } else {
+  }
+  int i = 0;
+  while (1) {
+    int _sv0t15 = sv0_vec_len(code);
+    int _sv0t18 = (i < _sv0t15);
+    if ((!_sv0t18)) {
+      break;
+    } else {
+    }
+    int _sv0t16 = sv0_vec_get(back, i);
+    int _sv0t17 = sv0_vec_get(code, i);
+    if ((_sv0t16 != _sv0t17)) {
+      return 10;
+    } else {
+    }
+    i = (i + 1);
+  }
+  int _sv0t19 = sv0_vec_new();
+  int str_sec = _sv0t19;
+  int _sv0t20 = encode_u32_le(0, str_sec);
+  int _sv0t21 = sv0_vec_new();
+  int ft = _sv0t21;
+  sv0_vec_push(ft, 0);
+  sv0_vec_push(ft, 0);
+  sv0_vec_push(ft, 1);
+  sv0_vec_push(ft, code);
+  int _sv0t22 = sv0_vec_new();
+  int file = _sv0t22;
+  int _sv0t23 = encode_file(str_sec, 4, ft, file);
+  int total = _sv0t23;
+  const char* _sv0t24 = disasm_file(file, total);
+  const char* text;
+  text = _sv0t24;
+  const char* want;
+  want = "sv0b v1: 1 functions, 4 string bytes\nfn 0 (name #0, arity 0, locals 1, 26 bytes):\n      0  COVER_HIT 0\n      5  JUMP_IF_NOT 10 -> 20\n     10  COVER_HIT 4194303\n     15  COVER_HIT 70000\n     20  JUMP -25 -> 0\n     25  RETURN\n";
+  int _sv0t25 = sv0_string_eq(text, want);
+  if ((_sv0t25 != 1)) {
+    return 11;
+  } else {
+  }
+  const char* _sv0t26 = bc_u32_dec(65535, 65535);
+  int _sv0t27 = sv0_string_eq(_sv0t26, "4294967295");
+  if ((_sv0t27 != 1)) {
+    return 12;
+  } else {
+  }
+  const char* _sv0t28 = bc_u32_dec(32768, 0);
+  int _sv0t29 = sv0_string_eq(_sv0t28, "2147483648");
+  if ((_sv0t29 != 1)) {
+    return 13;
+  } else {
+  }
+  return 0;
+}
+
 int main(void) {
   int _sv0t0 = test_magic();
   int r1 = _sv0t0;
@@ -3642,6 +4481,13 @@ int main(void) {
   if ((r21 != 0)) {
     int _sv0t42 = (10 + r21);
     return _sv0t42;
+  } else {
+  }
+  int _sv0t43 = test_cover_hit();
+  int r22 = _sv0t43;
+  if ((r22 != 0)) {
+    int _sv0t44 = (60 + r22);
+    return _sv0t44;
   } else {
   }
   return 0;
