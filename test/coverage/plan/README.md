@@ -148,6 +148,10 @@ requires:
   map, with backend `native` and `vm-v1`;
 - VM counts equal to the native counts, counter for counter, and to the
   fixtures' `expected-counts.json`.
+- sv0cov's reader (`sv0cov.resolve`, CV-170) to resolve both profiles
+  through the map to the same per-point counts, equal to
+  `expected-counts.json`, and both together to exactly double (run with the
+  first Python >= 3.10 found).
 
 With small programs it also requires that:
 

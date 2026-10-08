@@ -11,7 +11,11 @@ constructs.sv0:
    accepts for the program's map with backend vm-v1 and the run ID;
 2. its counts equal the native executable's profile for the same program
    (same target name, so the same map), counter for counter, and the
-   fixtures' hand-reviewed expected-counts.json.
+   fixtures' hand-reviewed expected-counts.json;
+2b. sv0cov's reader (sv0cov.resolve, CV-170; run with the first Python >=
+   3.10 found) resolves the native (CV-115) and VM (CV-121) profiles through
+   the map to the same per-point counts, equal to expected-counts.json, and
+   the two together to exactly double.
 
 And with small programs:
 
@@ -51,7 +55,7 @@ RUN_ID = "0123456789abcdef0123456789abcdef"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "sv0cov" / "src"))
 from run_hits import programs  # noqa: E402
-from run_plan import ensure_built  # noqa: E402
+from run_plan import ensure_built, modern_python  # noqa: E402
 from sv0cov.formats.rawprofile import RawProfileError, decode  # noqa: E402
 
 
@@ -113,6 +117,8 @@ def main() -> int:
     ensure_built()
     errors: list[str] = []
     progs = programs()
+    resolved: list[tuple[str, str, str, str]] = []
+    reader = "skipped (no Python >= 3.10)"
     with tempfile.TemporaryDirectory() as td:
         t = Path(td)
         # 0. sv0vm's golden copies are sv0cov's.
@@ -149,6 +155,8 @@ def main() -> int:
             n = m["program_counter_count"]
             if dense(vm, n) != dense(native, n):
                 errors.append(f"{name}: VM counts {dense(vm, n)} differ from native {dense(native, n)}")
+            resolved.append((name, str(d / f"{name}.sv0covmap.json"), str(next(npdir.iterdir())),
+                             str(next(vpdir.iterdir()))))
             exp_path = FIXTURES / name / "expected-counts.json"
             if exp_path.is_file():
                 counts = dense(vm, n)
@@ -159,6 +167,36 @@ def main() -> int:
                         errors.append(f"{name}: VM counted {e['label']} {by_id.get(e['point_id'])}, expected {e['count']}")
             elif sum(dense(vm, n)) == 0:
                 errors.append(f"{name}: the VM profile has no counts")
+
+        # 2b. CV-170: sv0cov's own reader resolves both backends' profiles
+        # through the map to the expected per-point counts.
+        py = modern_python()
+        if py is not None and resolved:
+            code = (
+                "import json, sys\n"
+                "sys.path.insert(0, sys.argv[1])\n"
+                "from pathlib import Path\n"
+                "from sv0cov.resolve import resolve\n"
+                "bad = []\n"
+                "for name, m, nat, vm in json.loads(sys.argv[2]):\n"
+                "    mb = Path(m).read_bytes()\n"
+                "    a = resolve(mb, [Path(nat).read_bytes()]).counts()\n"
+                "    b = resolve(mb, [Path(vm).read_bytes()]).counts()\n"
+                "    both = resolve(mb, [Path(nat).read_bytes(), Path(vm).read_bytes()])\n"
+                "    if a != b: bad.append(f'{name}: native and VM resolve differently')\n"
+                "    if both.counts() != {k: 2 * v for k, v in a.items()} or both.backends != ('native', 'vm-v1'):\n"
+                "        bad.append(f'{name}: native + VM did not add up')\n"
+                "    exp = Path(sys.argv[3]) / name / 'expected-counts.json'\n"
+                "    if exp.is_file():\n"
+                "        want = {e['point_id']: e['count'] for e in json.loads(exp.read_bytes())['counts']}\n"
+                "        if a != want: bad.append(f'{name}: resolved counts differ from expected-counts.json')\n"
+                "print('\\n'.join(bad))\n"
+            )
+            p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES)],
+                               capture_output=True, text=True, timeout=300)
+            if p.returncode or p.stdout.strip():
+                errors.append(f"sv0cov reader: {p.stdout.strip()} {p.stderr.strip()[-600:]}")
+            reader = "sv0cov reader resolves native + VM to the expected counts"
 
         # 3-4. Small programs.
         small = {
@@ -224,7 +262,7 @@ def main() -> int:
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1
-    print(f"coverage VM profiles: OK ({len(progs)} programs: one valid vm-v1 profile each, counts = native = expected; "
+    print(f"coverage VM profiles: OK ({len(progs)} programs: one valid vm-v1 profile each, counts = native = expected; {reader}; "
           "context, contract failure publishes, crash publishes nothing; required transport failure stops before user "
           "code; outside sv0cov runs and publishes nothing; sv0vm golden copies = sv0cov's)")
     return 0
