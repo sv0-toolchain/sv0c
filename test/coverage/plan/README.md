@@ -1,4 +1,4 @@
-# Coverage planner, map, hit, C and VM emission tests (sv0cov CV-107..CV-118)
+# Coverage planner, map, hit, C and VM emission tests (sv0cov CV-107..CV-120)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -120,6 +120,11 @@ displacements widen by five bytes per hit they cross. For every fixture and
 - sv0vm (CV-119) to disassemble the instrumented bytecode exactly as sv0c
   does (`sv0vm/scripts/disasm_sv0b.sml`), and to reject it at load with
   `COV2201` when no coverage binding is supplied.
+- sv0vm (CV-120) to run every instrumented program with its binding to the
+  `off` build's exit, and to reject a printing program before it prints:
+  tampered bytecode or a transplanted binding (`COV2202`), a binding next to
+  the bytecode but not named, a missing binding file, a lowered counter
+  count, or non-canonical JSON (`COV2201`).
 - the companion binding (CV-118), written to the path on request line 5
   (`sv0 vm-native-compile` uses `<stem>.sv0covbind.json` beside the
   `.sv0b`): sv0cov's own `decode_v1` accepts it bound to the exact bytecode,

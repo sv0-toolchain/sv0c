@@ -21,6 +21,11 @@ this checks:
    (Bytecode.disassemble, scripts/disasm_sv0b.sml) equals sv0c's for every
    instrumented program, and without a coverage binding it rejects the
    program at load with COV2201 before running anything.
+7. CV-120: every instrumented program runs on sv0vm with its binding to the
+   off build's exit, and a printing program prints nothing when sv0vm
+   rejects it for tampered bytecode or a transplanted binding (COV2202), a
+   binding sitting next to the bytecode but not named, a missing binding
+   file, a lowered counter count, or non-canonical JSON (COV2201).
 6. The companion binding (CV-118; request line 5) is written beside it:
    sv0cov's own decoder (sv0cov.formats.vmbinding, run with a Python >=
    3.10) accepts it bound to the exact bytecode bytes, it equals
@@ -128,10 +133,14 @@ def strip_hits(code: bytes) -> bytes:
     return bytes(out)
 
 
-def run_sv0vm(path: Path) -> tuple[int | None, str]:
+def run_sv0vm(path: Path, binding: Path | None = None) -> tuple[int | None, str]:
+    env = {k: v for k, v in os.environ.items() if k != "SV0B_COVERAGE_BINDING"}
+    env["SV0B"] = str(path)
+    if binding is not None:
+        env["SV0B_COVERAGE_BINDING"] = str(binding)
     try:
         p = subprocess.run(["sml"], stdin=open(SV0VM / "scripts" / "run_sv0b.sml"), capture_output=True, text=True,
-                           cwd=SV0VM, env={**os.environ, "SV0B": str(path)}, timeout=60)
+                           cwd=SV0VM, env=env, timeout=60)
     except subprocess.TimeoutExpired:
         return None, "sv0vm did not finish within 60 s (a misplaced jump can loop forever)"
     out = p.stdout + p.stderr
@@ -144,6 +153,57 @@ def sv0vm_disasm(path: Path) -> str | None:
                        cwd=SV0VM, env={**os.environ, "SV0B": str(path)}, timeout=120)
     m = re.search(r"SV0VM_DISASM_BEGIN\n(.*)SV0VM_DISASM_END\n", p.stdout, re.S)
     return m.group(1) if m else None
+
+
+def binding_fixtures(t: Path, progs: dict[str, str]) -> list[str]:
+    """Run a printing program under good and bad bindings: every bad one is
+    rejected with its code and the program prints nothing."""
+    errs: list[str] = []
+    src = t / "talk.sv0"
+    src.write_text('fn main() -> i32 {\n    println("user code ran");\n    return 7;\n}\n')
+    d = t / "fixtures"
+    d.mkdir()
+    built = {}
+    for name, request in (("talk", str(src)), ("loops", progs["loops"])):
+        b, bind = d / f"{name}.sv0b", d / f"{name}.binding.json"
+        r = emit(request, f"instrument\n{d / name}.map.json\n{name}\n{IDENTITY}\n{bind}")
+        if r.returncode:
+            return [f"fixtures: could not build {name}: {r.stderr.decode(errors='replace')}"]
+        b.write_bytes(r.stdout)
+        built[name] = (b, bind)
+    talk, talk_bind = built["talk"]
+    rc, out = run_sv0vm(talk, talk_bind)
+    if rc != 7 or "user code ran" not in out:
+        errs.append(f"fixture good binding: exit {rc}, output {out[-300:]!r}")
+
+    def reject(label: str, code: str, sv0b: Path, binding: Path | None) -> None:
+        rc, out = run_sv0vm(sv0b, binding)
+        if rc is not None or f"error[{code}]" not in out or "user code ran" in out:
+            errs.append(f"fixture {label}: want {code} before user code, got exit {rc}: {out[-300:]!r}")
+
+    tampered = d / "tampered.sv0b"
+    data = bytearray(talk.read_bytes())
+    data[-2] ^= 0x01
+    tampered.write_bytes(bytes(data))
+    reject("tampered bytecode", "COV2202", tampered, talk_bind)
+    reject("transplanted binding", "COV2202", talk, built["loops"][1])
+    neighbour = d / "neighbour"
+    neighbour.mkdir()
+    (neighbour / "talk.sv0b").write_bytes(talk.read_bytes())
+    (neighbour / "talk.sv0covbind.json").write_bytes(talk_bind.read_bytes())
+    reject("wrong neighbour (not named)", "COV2201", neighbour / "talk.sv0b", None)
+    reject("missing binding file", "COV2201", talk, d / "absent.sv0covbind.json")
+    edited = d / "edited.json"
+    text = talk_bind.read_text()
+    # A lowered count leaves a COVER_HIT out of range. (A raised one cannot be
+    # seen by the VM: the binding is not authenticated, and every operand is
+    # still in range; the raw-profile reader checks the map.)
+    edited.write_text(re.sub(r'"program_counter_count":(\d+)', lambda m: f'"program_counter_count":{int(m.group(1)) - 1}', text))
+    reject("lowered counter count", "COV2201", talk, edited)
+    spaced = d / "spaced.json"
+    spaced.write_text(text.replace('"version":"1.0"}', '"version": "1.0"}'))
+    reject("non-canonical binding", "COV2201", talk, spaced)
+    return errs
 
 
 def emit(request: str, coverage: str, disasm: bool = False) -> subprocess.CompletedProcess:
@@ -206,13 +266,18 @@ def main() -> int:
             rc_str, out_str = run_sv0vm(stripped)
             if rc_off is None or rc_off != rc_str:
                 errors.append(f"{name}: off exit {rc_off}, stripped instrumented exit {rc_str}: {out_str[-300:]}")
+            # CV-120: with its binding, sv0vm runs the instrumented bytecode
+            # itself, to the same exit.
+            instb = t / f"{name}.inst.sv0b"
+            instb.write_bytes(inst.stdout)
+            rc_bound, out_bound = run_sv0vm(instb, bind)
+            if rc_bound != rc_off:
+                errors.append(f"{name}: off exit {rc_off}, instrumented + binding exit {rc_bound}: {out_bound[-300:]}")
             # 4. Disassembly agrees with this decoder; f0 is pinned.
             bind2 = t / f"{name}.again.sv0covbind.json"
             d = emit(request, f"instrument\n{t / 'disasm.json'}\n{name}\n{IDENTITY}\n{bind2}", disasm=True)
             if not bind.is_file() or not bind2.is_file() or bind.read_bytes() != bind2.read_bytes():
                 errors.append(f"{name}: the binding is missing or differs between two emissions")
-            instb = t / f"{name}.inst.sv0b"
-            instb.write_bytes(inst.stdout)
             bindings.append((str(bind), str(instb), str(ref)))
             text = d.stdout.decode()
             if d.returncode or text.count("COVER_HIT ") != total:
@@ -247,6 +312,8 @@ def main() -> int:
             if p.returncode:
                 errors.append(f"sv0cov rejected a binding: {p.stderr.strip()[-600:]}")
             validated = True
+        # 7. CV-120: binding fixtures, rejected before any user instruction.
+        errors.extend(binding_fixtures(t, dict(progs)))
         # A VM instrument build without a binding path is refused and writes nothing.
         f0 = next(r for n, r in progs if n == "f0")
         nomap = t / "nobinding.json"
@@ -260,7 +327,7 @@ def main() -> int:
         return 1
     bind_note = "bindings sv0cov-validated" if validated else "binding validation SKIPPED (no Python >= 3.10)"
     print(f"coverage VM emission: OK ({len(progs)} programs: map-mode map, one COVER_HIT per counter, jumps on "
-          f"boundaries, hit-stripped bytecode runs like off on sv0vm; disassembly + f0 golden = sv0vm's; sv0vm rejects it unbound (COV2201); "
+          f"boundaries, hit-stripped bytecode runs like off on sv0vm; disassembly + f0 golden = sv0vm's; sv0vm rejects it unbound (COV2201) and runs it bound; 6 binding fixtures rejected pre-execution; "
           f"{bind_note}, deterministic; no binding path refused)")
     return 0
 
