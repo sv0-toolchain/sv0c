@@ -1,4 +1,4 @@
-# Coverage planner, map, hit, C and VM emission tests (sv0cov CV-107..CV-120)
+# Coverage planner, map, hit, emission and profile tests (sv0cov CV-107..CV-121)
 
 `run_plan.py` exercises `lib/coverage_plan.sv0` through the compiler. The
 planner runs after resolve/check and before lowering; the internal
@@ -137,3 +137,27 @@ displacements widen by five bytes per hit they cross. For every fixture and
 `bytecode.sv0`'s own tests cover `COVER_HIT` sizing, the encode/decode
 round trip, and a disassembly with a forward and a backward jump across
 hits.
+
+`run_vm_profile.py` (CV-121) builds every fixture and `constructs.sv0` with
+`sv0 native-compile --coverage=instrument` and `sv0 vm-native-compile
+--coverage=instrument`, runs both under one `SV0COV_*` transport, and
+requires:
+
+- exactly one raw profile from each, mode 0600, named
+  `<run_id>-<profile_id>.sv0profraw`, that sv0cov's reader accepts for the
+  map, with backend `native` and `vm-v1`;
+- VM counts equal to the native counts, counter for counter, and to the
+  fixtures' `expected-counts.json`.
+
+With small programs it also requires that:
+
+- `SV0COV_CONTEXT` reaches the VM profile;
+- a contract failure (exit 1) still publishes;
+- a crash (division by zero) publishes nothing;
+- a required-mode transport failure stops the program before it prints;
+- a run outside sv0cov behaves normally, notes `COV2001`, and publishes
+  nothing.
+
+It also checks that sv0vm's copies of the CV-024 golden profiles equal
+sv0cov's. sv0vm's own `test/coverage_test.sml` holds the byte parity with
+those goldens, the flush, and collision tests.
