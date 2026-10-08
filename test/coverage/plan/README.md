@@ -117,8 +117,9 @@ displacements widen by five bytes per hit they cross. For every fixture and
 - the emitter's disassembly (`SV0_VM_DISASM=1`, `bytecode.sv0`
   `disasm_file`) to show one hit per counter, and f0's to equal
   `vm-disasm-f0.expected.txt` (`--update` rewrites it);
-- a VM without coverage support (today's sv0vm, until CV-119) to reject the
-  instrumented bytecode with `unknown opcode 119` before running it.
+- sv0vm (CV-119) to disassemble the instrumented bytecode exactly as sv0c
+  does (`sv0vm/scripts/disasm_sv0b.sml`), and to reject it at load with
+  `COV2201` when no coverage binding is supplied.
 - the companion binding (CV-118), written to the path on request line 5
   (`sv0 vm-native-compile` uses `<stem>.sv0covbind.json` beside the
   `.sv0b`): sv0cov's own `decode_v1` accepts it bound to the exact bytecode,

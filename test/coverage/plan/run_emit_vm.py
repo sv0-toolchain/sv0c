@@ -17,9 +17,10 @@ this checks:
 4. The emitter's disassembly (SV0_VM_DISASM, bytecode.sv0 disasm_file)
    agrees with this script's own decoder, and f0's instrumented disassembly
    equals the golden vm-disasm-f0.expected.txt (`--update` rewrites it).
-5. A VM without coverage support rejects the instrumented bytecode with
-   "unknown opcode 119" before running anything (until CV-119 teaches
-   sv0vm the opcode, this is the reference sv0vm).
+5. sv0vm (CV-119) decodes COVER_HIT: its disassembly
+   (Bytecode.disassemble, scripts/disasm_sv0b.sml) equals sv0c's for every
+   instrumented program, and without a coverage binding it rejects the
+   program at load with COV2201 before running anything.
 6. The companion binding (CV-118; request line 5) is written beside it:
    sv0cov's own decoder (sv0cov.formats.vmbinding, run with a Python >=
    3.10) accepts it bound to the exact bytecode bytes, it equals
@@ -138,6 +139,13 @@ def run_sv0vm(path: Path) -> tuple[int | None, str]:
     return (int(m.group(1).replace("~", "-")) & 0xFF if m else None), out
 
 
+def sv0vm_disasm(path: Path) -> str | None:
+    p = subprocess.run(["sml"], stdin=open(SV0VM / "scripts" / "disasm_sv0b.sml"), capture_output=True, text=True,
+                       cwd=SV0VM, env={**os.environ, "SV0B": str(path)}, timeout=120)
+    m = re.search(r"SV0VM_DISASM_BEGIN\n(.*)SV0VM_DISASM_END\n", p.stdout, re.S)
+    return m.group(1) if m else None
+
+
 def emit(request: str, coverage: str, disasm: bool = False) -> subprocess.CompletedProcess:
     env_extra = {"SV0_VM_DISASM": "1"} if disasm else {}
     env = {k: v for k, v in os.environ.items() if k not in ("SV0_COVERAGE_REQUEST", "SV0_VM_DISASM")}
@@ -214,11 +222,14 @@ def main() -> int:
                     GOLDEN.write_text(text)
                 elif not GOLDEN.is_file() or GOLDEN.read_text() != text:
                     errors.append(f"f0: disassembly differs from {GOLDEN.relative_to(SV0C)} (--update to rewrite)")
-            # 5. A VM without coverage support refuses it before running.
+            # 5. sv0vm decodes it: the same disassembly, and no run without a binding.
+            vm_text = sv0vm_disasm(instb)
+            if vm_text != text:
+                errors.append(f"{name}: sv0vm's disassembly differs from sv0c's")
             if not rejected_checked:
                 rc, out = run_sv0vm(instb)
-                if rc is not None or "unknown opcode 119" not in out:
-                    errors.append(f"{name}: sv0vm did not reject COVER_HIT before running (exit {rc})")
+                if rc is not None or "error[COV2201]" not in out or "no coverage binding" not in out:
+                    errors.append(f"{name}: sv0vm did not reject the unbound COVER_HIT program at load (exit {rc})")
                 rejected_checked = True
         # 6. The bindings validate with sv0cov itself.
         py = modern_python()
@@ -249,7 +260,7 @@ def main() -> int:
         return 1
     bind_note = "bindings sv0cov-validated" if validated else "binding validation SKIPPED (no Python >= 3.10)"
     print(f"coverage VM emission: OK ({len(progs)} programs: map-mode map, one COVER_HIT per counter, jumps on "
-          f"boundaries, hit-stripped bytecode runs like off on sv0vm; disassembly + f0 golden; sv0vm rejects opcode 119; "
+          f"boundaries, hit-stripped bytecode runs like off on sv0vm; disassembly + f0 golden = sv0vm's; sv0vm rejects it unbound (COV2201); "
           f"{bind_note}, deterministic; no binding path refused)")
     return 0
 
