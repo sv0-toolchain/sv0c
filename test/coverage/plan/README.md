@@ -151,7 +151,12 @@ requires:
 - sv0cov's reader (`sv0cov.resolve`, CV-170) to resolve both profiles
   through the map to the same per-point counts, equal to
   `expected-counts.json`, and both together to exactly double (run with the
-  first Python >= 3.10 found).
+  first Python >= 3.10 found);
+- the generated-C and VM maps (each build writes its own) to be
+  byte-identical, and sv0cov's parity comparator (`sv0cov.parity`, CV-171,
+  F0-G4: AC-001 identical point identities and semantic metadata, AC-002
+  identical counts) to pass for every program; f0's (CV-027) report is
+  written to `build/coverage-parity/f0.json`.
 
 With small programs it also requires that:
 

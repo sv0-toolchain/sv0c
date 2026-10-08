@@ -15,7 +15,11 @@ constructs.sv0:
 2b. sv0cov's reader (sv0cov.resolve, CV-170; run with the first Python >=
    3.10 found) resolves the native (CV-115) and VM (CV-121) profiles through
    the map to the same per-point counts, equal to expected-counts.json, and
-   the two together to exactly double.
+   the two together to exactly double;
+2c. sv0cov's parity comparator (sv0cov.parity, CV-171, F0-G4: AC-001 same
+   point identities and semantic metadata, AC-002 same counts) passes for
+   every program; f0's (CV-027) report is written to
+   build/coverage-parity/f0.json.
 
 And with small programs:
 
@@ -51,6 +55,7 @@ ROOT = SV0C.parent
 SV0 = ROOT / "scripts" / "sv0"
 FIXTURES = ROOT / "sv0cov" / "tests" / "fixtures" / "semantic"
 RUN_ID = "0123456789abcdef0123456789abcdef"
+PARITY_DIR = ROOT / "build" / "coverage-parity"
 
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "sv0cov" / "src"))
@@ -132,22 +137,29 @@ def main() -> int:
             args = request.split(" ", 1) if request.startswith("--project") else [request]
             d = t / name
             d.mkdir()
-            exe, sv0b = d / name, d / f"{name}.sv0b"
+            # The VM build goes in its own directory, so each backend keeps
+            # its own map (same target name: <name>) for the identity check.
+            (d / "vm").mkdir()
+            exe, sv0b = d / name, d / "vm" / f"{name}.sv0b"
+            nmap, vmap = d / f"{name}.sv0covmap.json", d / "vm" / f"{name}.sv0covmap.json"
             p = sv0("native-compile", "--coverage=instrument", "-o", str(exe), *args)
             err = build_vm(args, sv0b)
             if p.returncode or err:
                 errors.append(f"{name}: build failed: {p.stderr.strip()} {err or ''}")
                 continue
-            m = json.loads((d / f"{name}.sv0covmap.json").read_bytes())
+            if nmap.read_bytes() != vmap.read_bytes():
+                errors.append(f"{name}: the generated-C and VM maps differ (same compiler, same target)")
+            m = json.loads(nmap.read_bytes())
+            mv = json.loads(vmap.read_bytes())
             npdir, vpdir = d / "native-profiles", d / "vm-profiles"
             npdir.mkdir()
             vpdir.mkdir()
             rn = subprocess.run([str(exe)], capture_output=True, env=transport(npdir), timeout=60)
-            rc, out = vm_run(sv0b, d / f"{name}.sv0covbind.json", transport(vpdir))
+            rc, out = vm_run(sv0b, d / "vm" / f"{name}.sv0covbind.json", transport(vpdir))
             if rc is None or rc != rn.returncode:
                 errors.append(f"{name}: native exit {rn.returncode}, VM exit {rc}: {out[-300:]}")
             native = profile(npdir, m, errors, f"{name} native")
-            vm = profile(vpdir, m, errors, f"{name} VM")
+            vm = profile(vpdir, mv, errors, f"{name} VM")
             if native is None or vm is None:
                 continue
             if vm.backend != "vm-v1" or native.backend != "native":
@@ -155,8 +167,7 @@ def main() -> int:
             n = m["program_counter_count"]
             if dense(vm, n) != dense(native, n):
                 errors.append(f"{name}: VM counts {dense(vm, n)} differ from native {dense(native, n)}")
-            resolved.append((name, str(d / f"{name}.sv0covmap.json"), str(next(npdir.iterdir())),
-                             str(next(vpdir.iterdir()))))
+            resolved.append((name, str(nmap), str(next(npdir.iterdir())), str(vmap), str(next(vpdir.iterdir()))))
             exp_path = FIXTURES / name / "expected-counts.json"
             if exp_path.is_file():
                 counts = dense(vm, n)
@@ -178,10 +189,10 @@ def main() -> int:
                 "from pathlib import Path\n"
                 "from sv0cov.resolve import resolve\n"
                 "bad = []\n"
-                "for name, m, nat, vm in json.loads(sys.argv[2]):\n"
-                "    mb = Path(m).read_bytes()\n"
+                "for name, nm, nat, vmm, vm in json.loads(sys.argv[2]):\n"
+                "    mb, vmb = Path(nm).read_bytes(), Path(vmm).read_bytes()\n"
                 "    a = resolve(mb, [Path(nat).read_bytes()]).counts()\n"
-                "    b = resolve(mb, [Path(vm).read_bytes()]).counts()\n"
+                "    b = resolve(vmb, [Path(vm).read_bytes()]).counts()\n"
                 "    both = resolve(mb, [Path(nat).read_bytes(), Path(vm).read_bytes()])\n"
                 "    if a != b: bad.append(f'{name}: native and VM resolve differently')\n"
                 "    if both.counts() != {k: 2 * v for k, v in a.items()} or both.backends != ('native', 'vm-v1'):\n"
@@ -190,13 +201,22 @@ def main() -> int:
                 "    if exp.is_file():\n"
                 "        want = {e['point_id']: e['count'] for e in json.loads(exp.read_bytes())['counts']}\n"
                 "        if a != want: bad.append(f'{name}: resolved counts differ from expected-counts.json')\n"
+                "    from sv0cov.parity import compare\n"
+                "    from sv0cov.formats.canonical_json import encode\n"
+                "    rep = compare(name, mb, [Path(nat).read_bytes()], vmb, [Path(vm).read_bytes()])\n"
+                "    if rep['status'] != 'pass': bad.append(f'{name}: parity report failed: {rep}')\n"
+                "    if name == 'f0':\n"
+                "        out = Path(sys.argv[4]); out.mkdir(parents=True, exist_ok=True)\n"
+                "        (out / 'f0.json').write_bytes(encode(rep))\n"
                 "print('\\n'.join(bad))\n"
             )
-            p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES)],
+            p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES),
+                                str(PARITY_DIR)],
                                capture_output=True, text=True, timeout=300)
             if p.returncode or p.stdout.strip():
                 errors.append(f"sv0cov reader: {p.stdout.strip()} {p.stderr.strip()[-600:]}")
-            reader = "sv0cov reader resolves native + VM to the expected counts"
+            reader = ("sv0cov reader resolves native + VM to the expected counts; parity reports pass "
+                      f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
         # 3-4. Small programs.
         small = {
