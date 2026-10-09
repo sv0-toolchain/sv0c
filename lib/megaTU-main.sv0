@@ -251,15 +251,16 @@ fn megatu_cov_project_listing(dir: string) -> string {
 }
 
 /* What megatu_coverage decided: rc is main's exit code, or -1 to continue
-   compiling; map is the canonical map an instrument build writes once its C
-   is emitted (megatu_cov_emit_c). */
+   compiling; map is the canonical map's bytes, which an instrument build
+   writes once its C or bytecode is emitted (megatu_cov_emit_c,
+   megatu_cov_write_vm). */
 struct MegatuCov {
     rc: i32,
-    map: string,
+    map: Vec<i32>,
 }
 
 fn megatu_cov_rc(rc: i32) -> MegatuCov {
-    return MegatuCov { rc: rc, map: "" };
+    return MegatuCov { rc: rc, map: vec_new() };
 }
 
 /* Plan coverage for the checked program (lib/coverage_plan.sv0) and act on
@@ -307,6 +308,27 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
     if cov_src_is_error(qnames) {
         write_file("/dev/stderr", "coverage: could not recover a function's span from its tokens\n");
         return megatu_cov_rc(9);
+    }
+    /* `?` hides an early return the planner does not model yet: the code
+       after it would be counted on runs that returned early. Refuse rather
+       than over-count (CV-201; modelled as a synthetic-support branch in
+       CV-213). */
+    let mut qt: i32 = 0;
+    while qt < vec_len(tags) {
+        if vec_get(tags, qt) == 34 {
+            let qoff: i32 = vec_get(starts, qt);
+            let mut qe: i32 = 0;
+            while qe < vec_len(ent_start) {
+                let inside: bool = if qoff < vec_get(ent_start, qe) { false } else { qoff < vec_get(ent_end, qe) };
+                if inside {
+                    write_file("/dev/stderr", string_concat(string_concat("coverage: function ", cov_plan_line_at(qnames, qe)),
+                        " uses the `?` operator, which coverage does not plan yet (the code after an early return would be over-counted; sv0cov CV-213); build with --coverage=off\n"));
+                    return megatu_cov_rc(9);
+                }
+                qe = qe + 1;
+            }
+        }
+        qt = qt + 1;
     }
     /* Regions and branches (CV-108): the token walk's statement count per
        function body is checked against the AST body block. */
@@ -362,10 +384,10 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
             write_file("/dev/stderr", "coverage: SV0_COVERAGE_REQUEST needs <mode>, <map path>, <target>, and <compiler identity> lines\n");
             return megatu_cov_rc(9);
         }
-        let map: string = cov_map_build(source, starts, ends, table, cstarts, src_unit,
+        let map: Vec<i32> = cov_map_build(source, starts, ends, table, cstarts, src_unit,
             ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity);
         if mode == 1 {
-            write_file(map_path, map);
+            write_bytes(map_path, map);
         }
         if mode == 2 {
             let tab2: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, counters);
@@ -551,7 +573,7 @@ fn megatu_cov_vm_check(mode: i32) -> i32 {
 fn megatu_cov_write_vm(mode: i32, cov: MegatuCov, bytecode: Vec<i32>, bytecode_len: i32) -> i32 {
     if mode != 2 { return 0; }
     let req: string = getenv("SV0_COVERAGE_REQUEST");
-    write_file(megatu_cov_req_line(req, 1), cov.map);
+    write_bytes(megatu_cov_req_line(req, 1), cov.map);
     let binding: string = cov_map_vm_binding(cov.map, megatu_cov_req_line(req, 3), bytecode_len,
         sha256_hex_bytes(bytecode));
     write_file(megatu_cov_req_line(req, 4), binding);
@@ -592,7 +614,7 @@ fn megatu_cov_emit_c(mode: i32, cov: MegatuCov, c: string) -> string {
     let cut: i32 = at + string_len(init);
     let body: string = string_substr(c, hn, cut - hn);
     let rest: string = string_substr(c, cut, string_len(c) - cut);
-    write_file(megatu_cov_req_line(req, 1), cov.map);
+    write_bytes(megatu_cov_req_line(req, 1), cov.map);
     return string_concat(string_concat(string_concat(head, prelude), body),
         string_concat("  __sv0cov_start(__sv0cov_modules, 1u);\n", rest));
 }

@@ -1,0 +1,28 @@
+enum Pick { One, Two }
+
+fn pick(n: i32) -> Pick {
+    if n > 1 {
+        return Pick::Two;
+    }
+    return Pick::One;
+}
+
+fn total(n: i32) -> i32 {
+    let mut t: i32 = 0;
+    match pick(n) {
+        Pick::One => { t = 1; },
+        Pick::Two => { t = 2; },
+    };
+    t
+}
+
+fn tail(n: i32) -> i32 {
+    match pick(n) {
+        Pick::One => 10,
+        Pick::Two => 20,
+    }
+}
+
+fn main() -> i32 {
+    return total(2) + tail(1) - 12;
+}

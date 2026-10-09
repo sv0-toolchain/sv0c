@@ -1,0 +1,12 @@
+# Hand-reviewed regions of dead_code.sv0 (sv0cov CV-201): kind span classification count (one native run).
+return 2:5-2:14 user 1
+initializer 3:5-3:24 statically_unreachable 0
+return 4:5-4:14 statically_unreachable 0
+initializer 8:5-8:24 user 1
+expression 9:11-9:16 user 1
+loop_body 9:17-13:6 user 1
+assignment 10:9-10:20 user 1
+break 11:9-11:15 user 1
+assignment 12:9-12:19 statically_unreachable 0
+return 14:5-14:14 user 1
+return 18:5-18:42 user 1

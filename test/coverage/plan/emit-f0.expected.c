@@ -25,7 +25,7 @@ static const struct __sv0cov_fragment __sv0cov_fragments[1] = {
   {"6d599e56e518833b373e55b1e8c222e77b7cdcc241f74d02a5a1a3a6f6b72971", 0u, 9u},
 };
 static const struct __sv0cov_module __sv0cov_module = {
-  1u, "8e5dd7c230de96245d88c482a47196c3ccaf5c779dc88d6c270e7c7ed99e7b7c", 9u, "f0", "sv0c+test", 0u, 9u, 1u, __sv0cov_fragments
+  1u, "3c5230fd25be66a7c2daf5cb569cf226c7427ad13b056b4e8c288994797c9b7e", 9u, "f0", "sv0c+test", 0u, 9u, 1u, __sv0cov_fragments
 };
 static const struct __sv0cov_module *const __sv0cov_modules[1] = {&__sv0cov_module};
 

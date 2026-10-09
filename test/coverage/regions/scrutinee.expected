@@ -1,0 +1,16 @@
+# Hand-reviewed regions of scrutinee.sv0 (sv0cov CV-201): kind span classification count (one native run).
+expression 4:8-4:13 user 2
+branch_body 4:14-6:6 user 1
+return 5:9-5:26 user 1
+return 7:5-7:22 user 1
+initializer 11:5-11:24 user 1
+expression 12:11-12:18 user 1
+match_arm 13:22-13:32 user 0
+assignment 13:24-13:30 user 0
+match_arm 14:22-14:32 user 1
+assignment 14:24-14:30 user 1
+expression 16:5-16:6 user 1
+expression 20:11-20:18 user 1
+match_arm 21:22-21:24 user 1
+match_arm 22:22-22:24 user 0
+return 27:5-27:36 user 1

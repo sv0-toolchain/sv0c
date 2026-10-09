@@ -616,8 +616,16 @@ fn cov_walk_stmt(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br:
         vec_set(ret, 2, next);
         return 0;
     }
-    if g == 8 {
-        if cov_walk_block(tags, cef, cet, rg, br, e, t, p, ret) < 0 { return 0 - 1; }
+    /* `unsafe { ... }` has the same execution meaning as its block, so it is
+       planned as that block and gets no region of its own (CV-201). */
+    let mut bt: i32 = t;
+    if g == 93 {
+        if t + 1 < close {
+            if vec_get(tags, t + 1) == 8 { bt = t + 1; }
+        }
+    }
+    if vec_get(tags, bt) == 8 {
+        if cov_walk_block(tags, cef, cet, rg, br, e, bt, p, ret) < 0 { return 0 - 1; }
         let mut next2: i32 = vec_get(ret, 2) + 1;
         if next2 < close {
             if vec_get(tags, next2) == 13 { next2 = next2 + 1; }
@@ -769,6 +777,9 @@ fn cov_walk_construct(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>
         let b3: i32 = cov_br_push(br, 3, e, t);
         let open3: i32 = cov_tok_body_open(tags, t + 1, n);
         if open3 <= t + 1 { return 0 - 1; }
+        /* The scrutinee is an `expression` region at the enclosing position,
+           like an if or loop condition (CV-201), so a call in it is owned. */
+        cov_rg_push(rg, 6, e, t + 1, open3 - 1, p);
         if cov_walk_expr(tags, cef, cet, rg, br, e, t + 1, open3 - 1, p, ret) < 0 { return 0 - 1; }
         let mut r3: i32 = vec_get(ret, 0);
         let mut j3: i32 = vec_get(ret, 1);

@@ -1,0 +1,12 @@
+fn bump(x: i32) -> i32 {
+    return x + 1;
+}
+
+fn main() -> i32 {
+    let a: i32 = unsafe { 3 };
+    let mut b: i32 = a;
+    unsafe {
+        b = bump(b);
+    }
+    return b - 4;
+}
