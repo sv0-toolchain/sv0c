@@ -398,6 +398,21 @@ fn cov_rg_kind_name(k: i32) -> string {
     return "call";
 }
 
+/* Whether a region contributes to line status (SPEC 11.4, 27.1; CV-202).
+   Containers do not, so a brace-only line stays non_executable: branch and
+   loop bodies, and a match arm whose result is a block (first byte `{`;
+   its statements carry the lines). Nor does a statically unreachable
+   region (empty expression): only user regions enter line status (11.7). */
+fn cov_rg_line_contributing(kind: i32, first: i32, empty: bool) -> bool {
+    if empty { return false; }
+    if kind == 2 { return false; }
+    if kind == 9 { return false; }
+    if kind == 10 {
+        if first == 123 { return false; }
+    }
+    return true;
+}
+
 fn cov_br_kind_name(k: i32) -> string {
     if k == 1 { return "if"; }
     if k == 2 { return "loop"; }
@@ -1056,14 +1071,15 @@ fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
         let en: i32 = vec_get(ends, vec_get(rg, r * 5 + 3));
         let base: i32 = vec_get(cstarts, unit2);
         let text: string = string_substr(source, base, vec_get(clens, unit2));
-        let lc: bool = if kind == 2 { false } else { kind != 9 };
+        let terms: string = cov_plan_terms(cef, cet, vec_get(rg, r * 5 + 4));
+        let lc: bool = cov_rg_line_contributing(kind, string_char_at(source, s), string_len(terms) == 0);
         out = string_concat(out, string_concat(string_concat("region\t", cov_src_itoa(x)), "\t"));
         out = string_concat(out, string_concat(cov_rg_kind_name(kind), "\t"));
         out = string_concat(out, string_concat(string_concat(cov_src_itoa(re), "\t"), string_concat(cov_src_itoa(sk2), "\t")));
         out = string_concat(out, cov_plan_span_text(source, cstarts, clens, unit2, s, en));
         if lc { out = string_concat(out, "\t1\t"); } else { out = string_concat(out, "\t0\t"); }
         out = string_concat(out, string_concat(cov_plan_line_numbers(text, s - base, en - base), "\t"));
-        out = string_concat(out, string_concat(cov_plan_terms(cef, cet, vec_get(rg, r * 5 + 4)), "\n"));
+        out = string_concat(out, string_concat(terms, "\n"));
         x = x + 1;
     }
     return out;

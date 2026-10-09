@@ -21,7 +21,9 @@
    sv0c/test/integration project, and lib/parser.sv0 (7k lines) plan in map
    mode, except the known refusals (`include`, `?`), and every map passes
    sv0cov's own validate_map with its source bytes (run with the first
-   Python >= 3.10 found).
+   Python >= 3.10 found), and its line flags follow CV-202: a region
+   contributes to lines exactly when it is a `user` region and not a
+   container (branch body, loop body, block match arm).
 
     python3 sv0c/test/coverage/regions/run_regions.py
 """
@@ -86,6 +88,11 @@ for mpath, root in json.loads(sys.argv[2]):
         continue
     for r in m['regions']:
         totals[r['classification']] = totals.get(r['classification'], 0) + 1
+        at = r['span']['start_byte']
+        src = srcs[m['sources'][r['source_index']]['path']]
+        container = r['kind'] in ('branch_body', 'loop_body') or (r['kind'] == 'match_arm' and src[at:at + 1] == b'{')
+        if r['line_contributing'] != (r['classification'] == 'user' and not container):
+            print(f"{mpath}: region {r['region_index']} ({r['kind']}, {r['classification']}) has line_contributing={r['line_contributing']}")
 print("TOTALS " + json.dumps(totals, sort_keys=True))
 """
 

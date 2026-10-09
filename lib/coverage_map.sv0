@@ -728,14 +728,10 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         cov_vb_from(rgs, exprs, vec_get(xoff, rr), vec_get(xlen, rr));
         cov_vb(rgs, string_concat(",\"entity_index\":", cov_map_int(rent)));
         cov_vb(rgs, string_concat(",\"kind\":", cov_map_str(cov_rg_kind_name(kind))));
-        if kind == 2 {
-            cov_vb(rgs, ",\"line_contributing\":false");
+        if cov_rg_line_contributing(kind, string_char_at(source, rs), vec_get(xempty, rr) == 1) {
+            cov_vb(rgs, ",\"line_contributing\":true");
         } else {
-            if kind == 9 {
-                cov_vb(rgs, ",\"line_contributing\":false");
-            } else {
-                cov_vb(rgs, ",\"line_contributing\":true");
-            }
+            cov_vb(rgs, ",\"line_contributing\":false");
         }
         cov_vb(rgs, string_concat(",\"line_numbers\":", cov_map_line_numbers(source, ls, rbase, rs, rend)));
         cov_vb(rgs, string_concat(",\"region_index\":", cov_map_int(ri)));

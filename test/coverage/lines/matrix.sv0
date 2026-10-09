@@ -1,0 +1,79 @@
+// Partial-line matrix (sv0cov CV-202). Statuses in matrix.expected.
+enum Pick { One, Two }
+
+fn side(n: i32) -> i32 {
+    return n + 1;
+}
+
+fn one_line(c: i32) -> i32 {
+    let mut r: i32 = 0;
+    if c > 0 { r = side(c); } else { r = side(0 - c); }
+    if c > 9 { r = 0; }
+    return r;
+}
+
+fn block_arm(p: Pick) -> i32 {
+    let mut t: i32 = 0;
+    match p {
+        Pick::One => {
+            t = 1;
+        },
+        Pick::Two => {
+            t = 2;
+        },
+    };
+    return t;
+}
+
+fn expr_arm(p: Pick) -> i32 {
+    return match p {
+        Pick::One => 1,
+        Pick::Two => 2,
+    };
+}
+
+fn multi(c: i32) -> i32 {
+    let v: i32 = side(
+        // a comment inside a statement is a non-whitespace byte
+        c
+
+    );
+    let w: i32 = if c > 5 {
+        v
+    } else {
+        0
+    };
+    return v + w;
+}
+
+fn loops(n: i32) -> i32 {
+    let mut i: i32 = 0;
+    while i < n { i = i + 1; }
+    let mut s: i32 = 0;
+    for k in 0..3 { if k == 1 { continue; } s = s + k; }
+    while true {
+        s = s + 1;
+        break;
+    }
+    return i + s;
+}
+
+fn dead(x: i32) -> i32 {
+    return x;
+    let y: i32 = x + 1;
+    return y;
+}
+
+fn never(x: i32) -> i32 {
+    return x;
+}
+
+fn main() -> i32 {
+    let a: i32 = one_line(1);
+    let b: i32 = block_arm(Pick::Two);
+    let c: i32 = expr_arm(Pick::One);
+    let d: i32 = multi(1);
+    let e: i32 = loops(0);
+    let f: i32 = dead(0);
+    return a + b + c + d + e + f - 10;
+}
