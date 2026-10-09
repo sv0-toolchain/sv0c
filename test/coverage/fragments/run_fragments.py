@@ -19,7 +19,13 @@ sorted listing, so this script can show the map does not depend on it:
 3. instrumented builds of proj/ linked in sorted and reversed order, run on
    native C and the VM, publish profiles whose counts are equal, point for
    point, and equal the hand-derived counts below;
-4. a link order that is not a permutation of the files fails the build.
+4. a link order that is not a permutation of the files fails the build;
+5. CV-206 (COV-C-005): the generated C registers one module per fragment
+   (five, two of them empty) and runs under the real sv0cov runtime; each
+   tampered copy (a module naming another map, overlapping or gapped
+   slices, an empty fragment off a slice boundary, a module registered
+   twice, a positive module missing from the aggregator) exits 1 with
+   COV1015 before user code and publishes nothing.
 
     python3 sv0c/test/coverage/fragments/run_fragments.py
 """
@@ -44,6 +50,7 @@ VM_EMIT = ROOT / "build" / "sv0-megatu-vm-native"
 
 sys.path.insert(0, str(SV0C / "test" / "coverage" / "plan"))
 from run_plan import ensure_built, modern_python  # noqa: E402
+from run_emit_c import SV0COV_RT, cc, link  # noqa: E402
 from run_vm_profile import build_vm, sv0, transport, vm_run  # noqa: E402
 
 # (fragment source path, slice_base, slice_length), hand-derived: calc has
@@ -75,6 +82,73 @@ def build_map(binary: Path, project: Path, out: Path, order: str | None, target:
     argv = [str(binary)] + (["--project", str(project)] if binary == NATIVE else [])
     p = subprocess.run(argv, capture_output=True, env=env, timeout=300)  # the VM emitter prints bytecode
     return p.returncode, p.stderr.decode("utf-8", "replace")
+
+
+def registration_matrix(t: Path, errors: list[str]) -> int:
+    d = t / "registration"
+    d.mkdir()
+    env = dict(os.environ, SV0_DRV_REQUEST=f"--project {PROJ}",
+               SV0_COVERAGE_REQUEST=f"instrument\n{d / 'm.json'}\nfragments\nsv0c+test")
+    env.pop("SV0_COVERAGE_LINK_ORDER", None)
+    p = subprocess.run([str(NATIVE), "--project", str(PROJ)], capture_output=True, text=True, env=env, timeout=300)
+    if p.returncode:
+        errors.append(f"registration: instrument build failed: {p.stderr.strip()}")
+        return 0
+    c = p.stdout
+    m = json.loads((d / "m.json").read_bytes())
+    mid = m["map_id"]
+    agg = "static const struct __sv0cov_module *const __sv0cov_modules[5] = {" + \
+          ", ".join(f"&__sv0cov_module_{j}" for j in range(5)) + "};"
+    start = "__sv0cov_start(__sv0cov_modules, 5u);"
+    if agg not in c or start not in c:
+        errors.append("registration: the C does not register five per-fragment modules")
+        return 0
+    rt = d / "sv0cov_rt.o"
+    r = subprocess.run([cc(), "-std=c11", "-O0", "-c", str(SV0COV_RT), "-o", str(rt)], capture_output=True, text=True)
+    if r.returncode:
+        errors.append(f"registration: runtime compile failed: {r.stderr[-300:]}")
+        return 0
+    # (kind, edit): each breaks one rule in a module other than the first.
+    cases = {
+        "valid": c,
+        "wrong map": c.replace(f'= {{\n  1u, "{mid}", 7u, "fragments", "sv0c+test", 3u, 3u',
+                               '= {\n  1u, "' + "1" * 64 + '", 7u, "fragments", "sv0c+test", 3u, 3u', 1),
+        "overlap": c.replace('"sv0c+test", 3u, 3u, 1u, __sv0cov_fragment_1', '"sv0c+test", 2u, 3u, 1u, __sv0cov_fragment_1')
+                    .replace(', 3u, 3u}};', ', 2u, 3u}};', 1),
+        "gap": c.replace('"sv0c+test", 6u, 1u, 1u, __sv0cov_fragment_3', '"sv0c+test", 7u, 0u, 1u, __sv0cov_fragment_3')
+                .replace(', 6u, 1u}};', ', 7u, 0u}};', 1),
+        "empty fragment off a boundary": c.replace('"sv0c+test", 6u, 0u, 1u, __sv0cov_fragment_2',
+                                                   '"sv0c+test", 5u, 0u, 1u, __sv0cov_fragment_2')
+                                          .replace(', 6u, 0u}};', ', 5u, 0u}};', 1),
+        "module registered twice": c.replace(agg, agg.replace("[5]", "[6]").replace("};", ", &__sv0cov_module_1};"))
+                                    .replace(start, "__sv0cov_start(__sv0cov_modules, 6u);"),
+        "positive module missing": c.replace(agg, agg.replace("[5]", "[4]").replace("&__sv0cov_module_3, ", ""))
+                                    .replace(start, "__sv0cov_start(__sv0cov_modules, 4u);"),
+    }
+    n = 0
+    for kind, text in cases.items():
+        if kind != "valid" and text == c:
+            errors.append(f"registration: the {kind!r} edit did not apply")
+            continue
+        k = d / kind.replace(" ", "-")
+        (k / "p").mkdir(parents=True)
+        (k / "main.c").write_text(text)
+        lk = link(k / "main.c", k / "main", str(rt))
+        if lk.returncode:
+            errors.append(f"registration {kind}: link failed: {lk.stderr[-300:]}")
+            continue
+        env = {kk: v for kk, v in os.environ.items() if not kk.startswith("SV0COV")}
+        env.update(SV0COV_PROFILE_DIR=str(k / "p"), SV0COV_RUN_ID="0123456789abcdef0123456789abcdef", SV0COV_REQUIRED="1")
+        run = subprocess.run([str(k / "main")], capture_output=True, text=True, env=env, timeout=60)
+        published = list((k / "p").iterdir())
+        if kind == "valid":
+            if run.returncode != 0 or len(published) != 1:
+                errors.append(f"registration: the untampered program exited {run.returncode} with {len(published)} profiles: {run.stderr}")
+        else:
+            if run.returncode != 1 or "error[COV1015]" not in run.stderr or run.stdout or published:
+                errors.append(f"registration {kind}: exit {run.returncode}, {len(published)} profiles, stderr {run.stderr.strip()!r}")
+            n += 1
+    return n
 
 
 def main() -> int:
@@ -164,6 +238,9 @@ def main() -> int:
             if rc == 0 or out.exists() or "not a permutation" not in err:
                 errors.append(f"link order {bad!r} was accepted (rc={rc})")
 
+        # 5. Per-fragment registration against the real runtime.
+        tampered = registration_matrix(t, errors)
+
     if errors:
         print("coverage fragments: FAIL", file=sys.stderr)
         for e in errors:
@@ -172,7 +249,8 @@ def main() -> int:
     note = "sv0cov-validated" if py is not None else "validation SKIPPED (no Python >= 3.10)"
     print(f"coverage fragments: OK (5-module project: 120 link orders x native + VM emitter give one map ({note}), "
           f"zero-length slices placed per 16.3.3; project fixture: 6 orders = expected-map.json; instrumented runs "
-          f"in two link orders count the same on C and VM; bad orders refused)")
+          f"in two link orders count the same on C and VM; bad orders refused; one module per fragment "
+          f"registers under the real runtime and {tampered} tampered registrations fail before user code)")
     return 0
 
 

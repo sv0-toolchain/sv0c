@@ -946,55 +946,98 @@ fn cov_map_c_str(s: string) -> string {
    so its slice is the whole program and local equals the program counter.
    Reads the canonical map `map` built by cov_map_build; "" if it lacks the
    expected fields. */
-fn cov_map_c_prelude(map: Vec<i32>, target: string, identity: string) -> string {
+/* The map's fragment table as [slice_base, slice_length] pairs in fragment
+   order, or an empty Vec when the map has none or its slices are not
+   contiguous from 0 to program_counter_count (CV-206). */
+fn cov_map_fragment_table(map: Vec<i32>) -> Vec<i32> {
+    let out: Vec<i32> = vec_new();
     let fr: i32 = cov_map_findv(map, "\"fragments\":[", 0);
     let mid: i32 = cov_map_findv(map, "\"map_id\":\"", 0);
     let pc: i32 = cov_map_findv(map, "\"program_counter_count\":", 0);
-    if fr < 0 { return ""; }
-    if mid < 0 { return ""; }
-    if pc < 0 { return ""; }
-    let map_id: string = cov_map_strv(map, mid + 10, 64);
+    if fr < 0 { return out; }
+    if mid < 0 { return out; }
+    if pc < 0 { return out; }
     let total: i32 = cov_map_read_intv(map, pc + 24);
-    let mut frags: string = "";
-    let mut nfrag: i32 = 0;
-    let mut first_base: i32 = 0;
     let mut covered: i32 = 0;
     let mut at: i32 = cov_map_findv(map, "{\"fragment_id\":\"", fr);
     while at >= 0 {
         if at > mid {
             at = 0 - 1;
         } else {
-            let fid: string = cov_map_strv(map, at + 16, 64);
             let sb: i32 = cov_map_findv(map, "\"slice_base\":", at);
             let sl: i32 = cov_map_findv(map, "\"slice_length\":", at);
-            if sb < 0 { return ""; }
-            if sl < 0 { return ""; }
+            if sb < 0 { return vec_new(); }
+            if sl < 0 { return vec_new(); }
             let base: i32 = cov_map_read_intv(map, sb + 13);
             let len: i32 = cov_map_read_intv(map, sl + 15);
-            if nfrag == 0 { first_base = base; }
-            if base != first_base + covered { return ""; }
+            if base != covered { return vec_new(); }
             covered = covered + len;
-            frags = string_concat(frags, string_concat(string_concat(string_concat("  {\"", fid), "\", "),
-                string_concat(string_concat(string_concat(cov_map_int(base), "u, "), cov_map_int(len)), "u},\n")));
-            nfrag = nfrag + 1;
+            vec_push(out, base);
+            vec_push(out, len);
             at = cov_map_findv(map, "{\"fragment_id\":\"", at + 16);
         }
     }
+    if covered != total { return vec_new(); }
+    return out;
+}
+
+/* The fragment that owns program counter k in a cov_map_fragment_table, or
+   -1. Zero-length fragments own nothing. */
+fn cov_map_fragment_of(table: Vec<i32>, k: i32) -> i32 {
+    let mut j: i32 = 0;
+    while j * 2 < vec_len(table) {
+        let base: i32 = vec_get(table, j * 2);
+        if k >= base {
+            if k < base + vec_get(table, j * 2 + 1) { return j; }
+        }
+        j = j + 1;
+    }
+    return 0 - 1;
+}
+
+/* Generated-C protocol 1 prelude (CV-113, CV-206): one module descriptor per
+   map fragment, each holding that fragment, and the aggregator
+   __sv0cov_modules[] the hosted main registers before user code. A hit
+   names its fragment's module and a module-local index. Empty when the map
+   has no usable fragment table. */
+fn cov_map_c_prelude(map: Vec<i32>, target: string, identity: string) -> string {
+    let table: Vec<i32> = cov_map_fragment_table(map);
+    let nfrag: i32 = vec_len(table) / 2;
     if nfrag == 0 { return ""; }
-    if covered != total { return ""; }
-    let nf: string = cov_map_int(nfrag);
-    let mut out: string = "/* sv0cov coverage instrumentation, generated-C protocol 1 (sv0cov CV-113).\n   Hits count module-local counters; the coverage runtime validates this\n   module's registration before user entry. */\n";
+    let mid: i32 = cov_map_findv(map, "\"map_id\":\"", 0);
+    let pc: i32 = cov_map_findv(map, "\"program_counter_count\":", 0);
+    let map_id: string = cov_map_strv(map, mid + 10, 64);
+    let total: string = cov_map_int(cov_map_read_intv(map, pc + 24));
+    let head: string = string_concat(string_concat(string_concat(string_concat("  1u, \"", map_id), "\", "),
+        string_concat(total, "u, ")), string_concat(string_concat(cov_map_c_str(target), ", "),
+        string_concat(cov_map_c_str(identity), ", ")));
+    let mut out: string = "/* sv0cov coverage instrumentation, generated-C protocol 1 (sv0cov CV-113, CV-206).\n   One module descriptor per map fragment; hits count module-local counters.\n   The coverage runtime validates the whole set before user entry. */\n";
     out = string_concat(out, "struct __sv0cov_fragment {\n  const char *fragment_id;\n  uint32_t slice_base;\n  uint32_t slice_length;\n};\n");
     out = string_concat(out, "struct __sv0cov_module {\n  uint32_t protocol_major;\n  const char *map_id;\n  uint32_t program_counter_count;\n  const char *target;\n  const char *compiler_identity;\n  uint32_t slice_base;\n  uint32_t slice_length;\n  uint32_t fragment_count;\n  const struct __sv0cov_fragment *fragments;\n};\n");
     out = string_concat(out, "void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t module_count);\n");
     out = string_concat(out, "void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);\n");
-    out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_fragment __sv0cov_fragments[", nf), "] = {\n"));
-    out = string_concat(string_concat(out, frags), "};\n");
-    out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_module __sv0cov_module = {\n  1u, \"", map_id), "\", "));
-    out = string_concat(out, string_concat(string_concat(cov_map_int(total), "u, "), string_concat(cov_map_c_str(target), ", ")));
-    out = string_concat(out, string_concat(cov_map_c_str(identity), string_concat(", ", string_concat(cov_map_int(first_base), "u, "))));
-    out = string_concat(out, string_concat(string_concat(cov_map_int(covered), "u, "), string_concat(nf, "u, __sv0cov_fragments\n};\n")));
-    return string_concat(out, "static const struct __sv0cov_module *const __sv0cov_modules[1] = {&__sv0cov_module};\n\n");
+    let mut agg: string = "";
+    let fr: i32 = cov_map_findv(map, "\"fragments\":[", 0);
+    let mut at: i32 = cov_map_findv(map, "{\"fragment_id\":\"", fr);
+    let mut j: i32 = 0;
+    while j < nfrag {
+        let fid: string = cov_map_strv(map, at + 16, 64);
+        let jn: string = cov_map_int(j);
+        let base: string = cov_map_int(vec_get(table, j * 2));
+        let len: string = cov_map_int(vec_get(table, j * 2 + 1));
+        let slice: string = string_concat(string_concat(base, "u, "), string_concat(len, "u"));
+        out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_fragment __sv0cov_fragment_", jn),
+            string_concat(string_concat("[1] = {{\"", fid), string_concat(string_concat("\", ", slice), "}};\n"))));
+        out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_module __sv0cov_module_", jn),
+            string_concat(string_concat(" = {\n", head), string_concat(slice, string_concat(", 1u, __sv0cov_fragment_",
+            string_concat(jn, "\n};\n"))))));
+        if j > 0 { agg = string_concat(agg, ", "); }
+        agg = string_concat(agg, string_concat("&__sv0cov_module_", jn));
+        at = cov_map_findv(map, "{\"fragment_id\":\"", at + 16);
+        j = j + 1;
+    }
+    out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_module *const __sv0cov_modules[", cov_map_int(nfrag)), "] = {"));
+    return string_concat(out, string_concat(agg, "};\n\n"));
 }
 
 /* ── VM v1 companion binding (CV-118; sv0doc bytecode/coverage.md 4) ───── */

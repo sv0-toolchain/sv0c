@@ -694,9 +694,14 @@ fn megatu_cov_emit_c(mode: i32, cov: MegatuCov, c: string) -> string {
     let cut: i32 = at + string_len(init);
     let body: string = string_substr(c, hn, cut - hn);
     let rest: string = string_substr(c, cut, string_len(c) - cut);
+    if megatu_str_find(c, "__SV0COV_UNOWNED_HIT") >= 0 {
+        write_file("/dev/stderr", "error[COV1020]: coverage instrumentation failed: a hit names a counter no fragment owns\n");
+        return "";
+    }
     write_bytes(megatu_cov_req_line(req, 1), cov.map);
+    let nmods: string = int_to_string(vec_len(cov_map_fragment_table(cov.map)) / 2);
     return string_concat(string_concat(string_concat(head, prelude), body),
-        string_concat("  __sv0cov_start(__sv0cov_modules, 1u);\n", rest));
+        string_concat(string_concat(string_concat("  __sv0cov_start(__sv0cov_modules, ", nmods), "u);\n"), rest));
 }
 
 fn main() -> i32 {
@@ -1046,7 +1051,8 @@ fn main() -> i32 {
                                         fpt, frt, ptt, ptd1, ptd2, pp, sidx,
                                         eit_nt, eit_base, eit_cnt, eit_cats,
                                         sit_nt, sit_base, sit_cnt,
-                                        sit_field_name, sit_field_cat);
+                                        sit_field_name, sit_field_cat,
+                                        cov_map_fragment_table(cov.map));
     /* sv0cov CV-113: an instrument build gets its registration prelude and
        writes its map here; other modes pass the C through unchanged. */
     let c: string = megatu_cov_emit_c(_cov_mode, cov, c_plain);
@@ -1509,7 +1515,8 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                        eit_nt: Vec<i32>, eit_base: Vec<i32>, eit_cnt: Vec<i32>,
                        eit_cats: Vec<i32>,
                        sit_nt: Vec<i32>, sit_base: Vec<i32>, sit_cnt: Vec<i32>,
-                       sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>) -> string {
+                       sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
+                       cov_fb: Vec<i32>) -> string {
     let num_blocks: i32 = vec_len(blocks) / 4;
     if num_blocks == 0 {
         return "#include \"sv0_runtime.h\"\nint main(void) { return 0; }\n";
@@ -1569,7 +1576,7 @@ fn megatu_emit_program(typedefs: string, blocks: Vec<i32>,
                                               tyenv_st, sit_nt, sit_base, sit_cnt,
                                               sit_field_name, sit_field_cat,
                                               it, id1, id2, frt, ptt, ptd1, ptd2, pp,
-                                              id3, id5, fpt);
+                                              id3, id5, fpt, cov_fb);
         /* SS-U12 prerequisite: prepend the struct-ref dereference
            prologue (empty string, no-op, for a fn with no such params). */
         let ref_prologue: string = megatu_ref_param_prologue(item_i, it, id1, id3,
@@ -2882,7 +2889,8 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
                      sit_cnt: Vec<i32>, sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                      it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
                      ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>,
-                     id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>) -> string {
+                     id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>,
+                     cov_fb: Vec<i32>) -> string {
     match ins {
         codegen_Instr::Nop => { return ""; },
         codegen_Instr::DeclVar(h) => {
@@ -2962,10 +2970,10 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "if (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
+            let d: string = string_concat(c, megatu_emit_instrs(th, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt, cov_fb));
             let f: string = string_concat(d, indent);
             let g: string = string_concat(f, "} else {\n");
-            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
+            let h: string = string_concat(g, megatu_emit_instrs(el, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt, cov_fb));
             let j: string = string_concat(h, indent);
             return string_concat(j, "}\n");
         },
@@ -2975,14 +2983,14 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             let a: string = string_concat(indent, "while (");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ") {\n");
-            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
+            let d: string = string_concat(c, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt, cov_fb));
             let f: string = string_concat(d, indent);
             return string_concat(f, "}\n");
         },
         codegen_Instr::BlockInstr(body) => {
             let deeper: string = string_concat(indent, "  ");
             let a: string = string_concat(indent, "{\n");
-            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
+            let b: string = string_concat(a, megatu_emit_instrs(body, deeper, ret_ty, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt, cov_fb));
             let c: string = string_concat(b, indent);
             return string_concat(c, "}\n");
         },
@@ -3111,10 +3119,14 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
             return string_concat(b, ";\n");
         },
         codegen_Instr::CovHit(k) => {
-            /* sv0cov CV-113: one module holds the whole program, so the
-               module-local counter is the program counter. */
-            return string_concat(string_concat(indent, "__sv0cov_hit(&__sv0cov_module, "),
-                string_concat(int_to_string(k), "u);\n"));
+            /* sv0cov CV-206: one module per map fragment; the hit names the
+               fragment that owns program counter k and its local index.
+               (megatu_cov_emit_c refuses the build if any hit has no owner.) */
+            let j: i32 = cov_map_fragment_of(cov_fb, k);
+            if j < 0 { return string_concat(indent, "__SV0COV_UNOWNED_HIT;\n"); }
+            let local: i32 = k - vec_get(cov_fb, j * 2);
+            return string_concat(string_concat(string_concat(indent, "__sv0cov_hit(&__sv0cov_module_"), int_to_string(j)),
+                string_concat(string_concat(", ", int_to_string(local)), "u);\n"));
         },
         codegen_Instr::DeclPtr(inner, kind, h) => {
             let base_cty: string = megatu_ty_name(inner, source, starts, ends);
@@ -3215,7 +3227,8 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
                       sit_cnt: Vec<i32>, sit_field_name: Vec<i32>, sit_field_cat: Vec<i32>,
                       it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, frt: Vec<i32>,
                       ptt: Vec<i32>, ptd1: Vec<i32>, ptd2: Vec<i32>, pp: Vec<i32>,
-                      id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>) -> string {
+                      id3: Vec<i32>, id5: Vec<i32>, fpt: Vec<i32>,
+                      cov_fb: Vec<i32>) -> string {
     let count: i32 = vec_len(instrs);
     if count == 0 { return ""; }
     let mut out: string = "";
@@ -3245,7 +3258,7 @@ fn megatu_emit_instrs(instrs: Vec<i32>, indent: string, ret_ty: string,
             idx = idx + 1;
             continue;
         }
-        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt));
+        out = string_concat(out, megatu_emit_instr(indent, ret_ty, ins, source, starts, ends, sidx, tyenv_h, tyenv_f, tyenv_e, eit_nt, eit_base, eit_cnt, eit_cats, tyenv_st, sit_nt, sit_base, sit_cnt, sit_field_name, sit_field_cat, it, id1, id2, frt, ptt, ptd1, ptd2, pp, id3, id5, fpt, cov_fb));
         idx = idx + 1;
     }
     return out;

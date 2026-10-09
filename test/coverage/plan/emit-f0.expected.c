@@ -1,8 +1,8 @@
 #include "sv0_runtime.h"
 
-/* sv0cov coverage instrumentation, generated-C protocol 1 (sv0cov CV-113).
-   Hits count module-local counters; the coverage runtime validates this
-   module's registration before user entry. */
+/* sv0cov coverage instrumentation, generated-C protocol 1 (sv0cov CV-113, CV-206).
+   One module descriptor per map fragment; hits count module-local counters.
+   The coverage runtime validates the whole set before user entry. */
 struct __sv0cov_fragment {
   const char *fragment_id;
   uint32_t slice_base;
@@ -21,13 +21,11 @@ struct __sv0cov_module {
 };
 void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t module_count);
 void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);
-static const struct __sv0cov_fragment __sv0cov_fragments[1] = {
-  {"6d599e56e518833b373e55b1e8c222e77b7cdcc241f74d02a5a1a3a6f6b72971", 0u, 9u},
+static const struct __sv0cov_fragment __sv0cov_fragment_0[1] = {{"6d599e56e518833b373e55b1e8c222e77b7cdcc241f74d02a5a1a3a6f6b72971", 0u, 9u}};
+static const struct __sv0cov_module __sv0cov_module_0 = {
+  1u, "3c5230fd25be66a7c2daf5cb569cf226c7427ad13b056b4e8c288994797c9b7e", 9u, "f0", "sv0c+test", 0u, 9u, 1u, __sv0cov_fragment_0
 };
-static const struct __sv0cov_module __sv0cov_module = {
-  1u, "3c5230fd25be66a7c2daf5cb569cf226c7427ad13b056b4e8c288994797c9b7e", 9u, "f0", "sv0c+test", 0u, 9u, 1u, __sv0cov_fragments
-};
-static const struct __sv0cov_module *const __sv0cov_modules[1] = {&__sv0cov_module};
+static const struct __sv0cov_module *const __sv0cov_modules[1] = {&__sv0cov_module_0};
 
 typedef struct {
   int tag;
@@ -38,22 +36,22 @@ static int sv0u_classify(int sv0u_n);
 static int sv0u_measure(Shape sv0u_s);
 
 static int sv0u_classify(int sv0u_n) {
-  __sv0cov_hit(&__sv0cov_module, 0u);
+  __sv0cov_hit(&__sv0cov_module_0, 0u);
   int sv0u_total;
   sv0u_total = 0;
   if ((sv0u_n > 10)) {
-    __sv0cov_hit(&__sv0cov_module, 1u);
+    __sv0cov_hit(&__sv0cov_module_0, 1u);
     sv0u_total = (sv0u_total + 100);
   } else {
-    __sv0cov_hit(&__sv0cov_module, 2u);
+    __sv0cov_hit(&__sv0cov_module_0, 2u);
   }
   int sv0u_i;
   sv0u_i = 0;
   while (1) {
     if ((sv0u_i < sv0u_n)) {
-      __sv0cov_hit(&__sv0cov_module, 3u);
+      __sv0cov_hit(&__sv0cov_module_0, 3u);
     } else {
-      __sv0cov_hit(&__sv0cov_module, 4u);
+      __sv0cov_hit(&__sv0cov_module_0, 4u);
       break;
     }
     sv0u_total = (sv0u_total + sv0u_i);
@@ -63,16 +61,16 @@ static int sv0u_classify(int sv0u_n) {
 }
 
 static int sv0u_measure(Shape sv0u_s) {
-  __sv0cov_hit(&__sv0cov_module, 5u);
+  __sv0cov_hit(&__sv0cov_module_0, 5u);
   int _sv0t0;
   _sv0t0 = 0;
   if ((sv0u_s.tag == 0)) {
-    __sv0cov_hit(&__sv0cov_module, 6u);
+    __sv0cov_hit(&__sv0cov_module_0, 6u);
     _sv0t0 = 0;
   } else {
     if ((sv0u_s.tag == 1)) {
       int sv0u_len = sv0u_s.p0;
-      __sv0cov_hit(&__sv0cov_module, 7u);
+      __sv0cov_hit(&__sv0cov_module_0, 7u);
       _sv0t0 = sv0u_len;
     } else {
     }
@@ -81,7 +79,7 @@ static int sv0u_measure(Shape sv0u_s) {
 }
 
 static int sv0_user_main(void) {
-  __sv0cov_hit(&__sv0cov_module, 8u);
+  __sv0cov_hit(&__sv0cov_module_0, 8u);
   int sv0u_label;
   sv0u_label = sv0_str_lit("Größe", 7);
   int _sv0t0 = sv0u_classify(3);

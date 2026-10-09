@@ -3,17 +3,22 @@
 
 With --coverage=instrument the native compiler emits C that calls the
 coverage runtime: a registration prelude after the runtime include (the
-runtime interface, one descriptor per map fragment, and the module record
-with the map ID, program counter count, protocol major 1, target, and
-compiler identity), `__sv0cov_hit(&__sv0cov_module, <i>u);` at every placed
-hit, and `__sv0cov_start(__sv0cov_modules, 1u);` in the hosted main right
-after sv0_runtime_init, before user code. The map is written once the C is.
+runtime interface, then for each map fragment j a module record
+`__sv0cov_module_<j>` holding exactly that fragment, with the map ID, program
+counter count, protocol major 1, target, compiler identity, and the
+fragment's slice; CV-206), `__sv0cov_hit(&__sv0cov_module_<j>, <local>u);`
+at every placed hit (the owning fragment's module, a module-local index),
+and `__sv0cov_start(__sv0cov_modules, <fragments>u);` in the hosted main
+right after sv0_runtime_init, before user code. The map is written once the
+C is.
 
 For the seven sv0cov semantic fixtures and constructs.sv0 this checks:
 
 1. The instrument map is byte-identical to the map-mode map.
-2. The prelude carries the map's ID, counter count, fragment table, target,
-   and identity; every counter 0..N-1 has exactly one hit in the C.
+2. The prelude has one module per map fragment, in map order, and the
+   aggregator registers all of them (a missing empty fragment, which the
+   runtime cannot see, is caught here); every counter 0..N-1 has exactly
+   one hit, in the module that owns it.
 3. Removing the prelude, the hits, and the start call, and undoing the
    CV-112 loop rewrite (`while (1) { if (c) { } else { break; } ...` back to
    `while (c) { ...`), gives exactly the `off` build's C: instrumentation
@@ -62,10 +67,10 @@ from sv0cov.formats.rawprofile import RawProfileError, decode  # noqa: E402
 from run_hits import NATIVE, compile_with, programs  # noqa: E402
 from run_plan import ensure_built  # noqa: E402
 
-HIT_RE = re.compile(r"^\s*__sv0cov_hit\(&__sv0cov_module, (\d+)u\);$")
-START = "  __sv0cov_start(__sv0cov_modules, 1u);"
+HIT_RE = re.compile(r"^\s*__sv0cov_hit\(&__sv0cov_module_(\d+), (\d+)u\);$")
+START_RE = re.compile(r"^  __sv0cov_start\(__sv0cov_modules, (\d+)u\);$")
 PRELUDE_START = "/* sv0cov coverage instrumentation, generated-C protocol 1"
-PRELUDE_END = "static const struct __sv0cov_module *const __sv0cov_modules[1] = {&__sv0cov_module};"
+PRELUDE_END = "static const struct __sv0cov_module *const __sv0cov_modules["
 
 
 def c_str(s: str) -> str:
@@ -83,9 +88,9 @@ def strip_coverage(c: str) -> str:
     """The instrumented C without its prelude, hits, start call, and loop rewrite."""
     lines = c.split("\n")
     a = next(i for i, line in enumerate(lines) if line.startswith(PRELUDE_START))
-    b = lines.index(PRELUDE_END)
+    b = next(i for i, line in enumerate(lines) if line.startswith(PRELUDE_END))
     kept = lines[:a] + lines[b + 2:]
-    plain = "\n".join(line for line in kept if line != START and not HIT_RE.match(line))
+    plain = "\n".join(line for line in kept if not START_RE.match(line) and not HIT_RE.match(line))
     return LOOP_RE.sub(lambda m: f"{m.group(1)}while ({m.group(2)}) {{\n", plain)
 
 
@@ -141,20 +146,36 @@ def main() -> int:
                 continue
             m = json.loads(ref.read_bytes())
             total = m["program_counter_count"]
-            # 2. The prelude carries the map; every counter has one hit.
-            frags = "".join(f'  {{"{f["fragment_id"]}", {f["slice_base"]}u, {f["slice_length"]}u}},\n'
-                            for f in m["fragments"])
-            want = (f"static const struct __sv0cov_fragment __sv0cov_fragments[{len(m['fragments'])}] = {{\n{frags}}};\n"
-                    f"static const struct __sv0cov_module __sv0cov_module = {{\n"
-                    f"  1u, \"{m['map_id']}\", {total}u, {c_str(name)}, {c_str(IDENTITY)}, 0u, {total}u, "
-                    f"{len(m['fragments'])}u, __sv0cov_fragments\n}};\n")
+            # 2. The prelude carries the map: one module per fragment (CV-206),
+            # each with exactly that fragment and its slice, and an aggregator
+            # registering every fragment's module; every counter has one hit,
+            # addressed to the module owning it with its module-local index.
+            frags = m["fragments"]
+            want = ""
+            for j, f in enumerate(frags):
+                sl = f"{f['slice_base']}u, {f['slice_length']}u"
+                want += (f"static const struct __sv0cov_fragment __sv0cov_fragment_{j}[1] = "
+                         f"{{{{\"{f['fragment_id']}\", {sl}}}}};\n"
+                         f"static const struct __sv0cov_module __sv0cov_module_{j} = {{\n"
+                         f"  1u, \"{m['map_id']}\", {total}u, {c_str(name)}, {c_str(IDENTITY)}, {sl}, 1u, "
+                         f"__sv0cov_fragment_{j}\n}};\n")
+            want += (f"static const struct __sv0cov_module *const __sv0cov_modules[{len(frags)}] = {{"
+                     + ", ".join(f"&__sv0cov_module_{j}" for j in range(len(frags))) + "};\n")
             if want not in c:
-                errors.append(f"{name}: the prelude does not carry the map's fragment table and module record")
-            hits = sorted(int(x.group(1)) for x in map(HIT_RE.match, c.split("\n")) if x)
-            if hits != list(range(total)):
-                errors.append(f"{name}: hits in the C {hits} are not exactly 0..{total - 1}")
-            if c.count(START) != 1 or "sv0_runtime_init(argc, argv);\n" + START not in c:
-                errors.append(f"{name}: __sv0cov_start is not called once, right after sv0_runtime_init")
+                errors.append(f"{name}: the prelude does not carry one module per map fragment and the aggregator")
+            hits = []
+            for x in map(HIT_RE.match, c.split("\n")):
+                if x:
+                    j, local = int(x.group(1)), int(x.group(2))
+                    if j >= len(frags) or local >= frags[j]["slice_length"]:
+                        errors.append(f"{name}: hit ({j}, {local}) is outside module {j}'s slice")
+                        continue
+                    hits.append(frags[j]["slice_base"] + local)
+            if sorted(hits) != list(range(total)):
+                errors.append(f"{name}: hits in the C {sorted(hits)} are not exactly 0..{total - 1}")
+            start = f"  __sv0cov_start(__sv0cov_modules, {len(frags)}u);"
+            if c.count(start) != 1 or "sv0_runtime_init(argc, argv);\n" + start not in c:
+                errors.append(f"{name}: __sv0cov_start is not called once with every module, right after sv0_runtime_init")
             if "#line" in c:
                 errors.append(f"{name}: the C has #line directives")
             # 3. Nothing else changes.
