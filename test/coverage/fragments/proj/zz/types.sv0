@@ -1,0 +1,7 @@
+module zz;
+
+/* Sorts last and plans no counter: its slice base is the total count. */
+struct Pair {
+    a: i32,
+    b: i32,
+}

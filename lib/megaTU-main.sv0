@@ -241,13 +241,93 @@ fn megatu_cov_req_line(req: string, k: i32) -> string {
     return "";
 }
 
-/* The project file listing link_project_concat_sources_from_dir compiles. */
+/* The project file listing link_project_concat_sources_from_dir compiles,
+   in link order (megatu_link_order). */
 fn megatu_cov_project_listing(dir: string) -> string {
     let listing: string = link_project_dir(dir);
     if link_listing_root_entry_count(listing, dir) == 1 {
-        return link_listing_drop_nested_entries(listing, dir);
+        return megatu_link_order(link_listing_drop_nested_entries(listing, dir));
     }
-    return listing;
+    return megatu_link_order(listing);
+}
+
+/* Project-mode source: the concat of the project's files in link order. */
+fn megatu_project_concat(dir: string) -> string {
+    let listing: string = link_project_dir(dir);
+    if link_listing_root_entry_count(listing, dir) > 1 {
+        return link_project_concat_sources_from_dir(dir);
+    }
+    let order: string = megatu_cov_project_listing(dir);
+    if string_len(order) == 0 { return ""; }
+    return link_project_concat_sources_from_listing(order);
+}
+
+/* sv0cov CV-205 test hook: SV0_COVERAGE_LINK_ORDER="2,0,1" links the
+   project's files (the sorted listing's lines) in that order instead, so a
+   test can show the coverage map does not depend on link order (SPEC
+   13.1.1). Unset or empty keeps the listing; anything but a permutation of
+   the line indexes fails the build (empty source). */
+fn megatu_link_order(listing: string) -> string {
+    let spec: string = getenv("SV0_COVERAGE_LINK_ORDER");
+    if string_len(spec) == 0 { return listing; }
+    let ls: Vec<i32> = vec_new();
+    let le: Vec<i32> = vec_new();
+    let n: i32 = string_len(listing);
+    let mut p: i32 = 0;
+    while p < n {
+        let nl: i32 = megatu_index_of(listing, 10, p);
+        let end: i32 = if nl < 0 { n } else { nl };
+        if end > p {
+            vec_push(ls, p);
+            vec_push(le, end);
+        }
+        p = end + 1;
+    }
+    let nlines: i32 = vec_len(ls);
+    let used: Vec<i32> = vec_new();
+    let mut k: i32 = 0;
+    while k < nlines {
+        vec_push(used, 0);
+        k = k + 1;
+    }
+    let mut out: string = "";
+    let mut count: i32 = 0;
+    let mut ok: bool = true;
+    let mut v: i32 = 0;
+    let mut digits: i32 = 0;
+    let sn: i32 = string_len(spec);
+    let mut q: i32 = 0;
+    while q <= sn {
+        let mut c: i32 = 44;
+        if q < sn { c = string_char_at(spec, q); }
+        if c == 44 {
+            /* one index ends at a comma or the end of the spec */
+            if digits == 0 { ok = false; }
+            if v >= nlines { ok = false; }
+            if ok {
+                if vec_get(used, v) == 1 { ok = false; } else {
+                    vec_set(used, v, 1);
+                    out = string_concat(out, string_substr(listing, vec_get(ls, v), vec_get(le, v) - vec_get(ls, v)));
+                    out = string_concat(out, "\n");
+                    count = count + 1;
+                }
+            }
+            v = 0;
+            digits = 0;
+        } else {
+            if c < 48 { ok = false; }
+            if c > 57 { ok = false; }
+            if digits < 6 { v = v * 10 + c - 48; }
+            digits = digits + 1;
+        }
+        q = q + 1;
+    }
+    if count != nlines { ok = false; }
+    if ok != true {
+        write_file("/dev/stderr", "SV0_COVERAGE_LINK_ORDER is not a permutation of the project's files\n");
+        return "";
+    }
+    return out;
 }
 
 /* What megatu_coverage decided: rc is main's exit code, or -1 to continue

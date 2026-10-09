@@ -1,0 +1,7 @@
+module kinds;
+
+/* No function: this module's fragment has no counter (zero-length slice). */
+enum Kind {
+    A(),
+    B(),
+}

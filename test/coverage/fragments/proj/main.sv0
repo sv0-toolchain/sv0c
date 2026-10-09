@@ -1,0 +1,9 @@
+use geom::area;
+use calc::sum_to;
+
+/* sv0cov CV-205: a five-module project; kinds/ and zz/ plan no counter. */
+fn main() -> i32 {
+    let a: i32 = area(3);
+    let b: i32 = sum_to(4);
+    return a + b - 19;
+}
