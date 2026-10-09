@@ -13,7 +13,9 @@ backend and on the VM:
 2. every loop and match outcome equals the hand-derived edges.expected;
    the exits of `loop { }` and `while true { }` are statically_unreachable
    (uncounted, with their evidence identity), every other exit is counted;
-3. self-check of the derived region counts: each probe statement `mK();`
+3. every region expression evaluates (sv0cov.expr, CV-204) to the same
+   exact, nonnegative count on both backends;
+4. self-check of the derived region counts: each probe statement `mK();`
    calls a function that only returns, so its region count (an expression
    over entry and outcome points, sv0cov.resolve) must equal mK's own
    function_entry count. All 28 probes are checked, including code after a
@@ -47,11 +49,12 @@ REPORT = r"""
 import json, sys
 sys.path.insert(0, sys.argv[1])
 from sv0cov.resolve import resolve
-from sv0cov.lines import region_count
+from sv0cov.lines import region_count, region_counts
 mb = open(sys.argv[2], 'rb').read()
 src = open(sys.argv[4], 'rb').read()
 m = json.loads(mb)
-c = resolve(mb, [open(sys.argv[3], 'rb').read()], sources={'main.sv0': src}).counts()
+res = resolve(mb, [open(sys.argv[3], 'rb').read()], sources={'main.sv0': src})
+c = res.counts()
 ents = m['entities']
 entry = {ents[p['entity_index']]['qualified_name']: c[p['point_id']] for p in m['points'] if p['kind'] == 'function_entry'}
 for b in m['branches']:
@@ -66,6 +69,8 @@ for r in m['regions']:
     text = src[r['span']['start_byte']:r['span']['end_byte']].decode()
     if r['kind'] == 'expression_statement':
         print('probe', text, region_count(r, c), entry.get(text.split('(')[0]))
+for i, rec in sorted(region_counts(m, res.context_counts()).items()):
+    print('region', i, rec.value, 'inexact' if rec.inexact else 'exact')
 """
 
 
@@ -81,6 +86,7 @@ def main() -> int:
             f = line.split()
             want[(f[0], f[1], int(f[2]))] = f[3:]
     checked = []
+    regions = 0
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         (d / "vm").mkdir()
@@ -132,6 +138,10 @@ def main() -> int:
                         outs.append(f"{name}={val}")
                     if key in want or f[2] != "if":
                         got[key] = outs
+                elif f[0] == "region":
+                    if f[3] != "exact":
+                        errors.append(f"{backend}: region {f[1]} has an inexact count on an exact run")
+                    regions += 1
                 else:
                     probe, count, entry = f[1], f[2], f[3]
                     if count != entry:

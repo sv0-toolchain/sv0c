@@ -189,6 +189,7 @@ def main() -> int:
                 "from pathlib import Path\n"
                 "from sv0cov.resolve import resolve\n"
                 "bad = []\n"
+                "regions_checked = []\n"
                 "for name, nm, nat, vmm, vm in json.loads(sys.argv[2]):\n"
                 "    mb, vmb = Path(nm).read_bytes(), Path(vmm).read_bytes()\n"
                 "    a = resolve(mb, [Path(nat).read_bytes()]).counts()\n"
@@ -201,6 +202,25 @@ def main() -> int:
                 "    if exp.is_file():\n"
                 "        want = {e['point_id']: e['count'] for e in json.loads(exp.read_bytes())['counts']}\n"
                 "        if a != want: bad.append(f'{name}: resolved counts differ from expected-counts.json')\n"
+                "    # CV-204: every region expression sv0c emitted evaluates (sv0cov.expr,\n"
+                "    # per context then aggregated) to the same nonnegative exact count on\n"
+                "    # both backends, and to twice that over both profiles.\n"
+                "    from sv0cov.lines import region_counts\n"
+                "    from sv0cov.expr import ExprError\n"
+                "    m = json.loads(mb)\n"
+                "    try:\n"
+                "        rn = region_counts(m, resolve(mb, [Path(nat).read_bytes()]).context_counts())\n"
+                "        rv = region_counts(json.loads(vmb), resolve(vmb, [Path(vm).read_bytes()]).context_counts())\n"
+                "        r2 = region_counts(m, both.context_counts())\n"
+                "    except ExprError as exc:\n"
+                "        bad.append(f'{name}: region evaluation failed: {exc}')\n"
+                "    else:\n"
+                "        if any(c.inexact for c in rn.values()): bad.append(f'{name}: an exact run gave an inexact region count')\n"
+                "        if {i: c.value for i, c in rn.items()} != {i: c.value for i, c in rv.items()}:\n"
+                "            bad.append(f'{name}: native and VM region counts differ')\n"
+                "        if {i: c.value for i, c in r2.items()} != {i: 2 * c.value for i, c in rn.items()}:\n"
+                "            bad.append(f'{name}: native + VM region counts did not add up')\n"
+                "        regions_checked.append(len(rn))\n"
                 "    from sv0cov.parity import compare\n"
                 "    from sv0cov.formats.canonical_json import encode\n"
                 "    rep = compare(name, mb, [Path(nat).read_bytes()], vmb, [Path(vm).read_bytes()])\n"
@@ -208,14 +228,18 @@ def main() -> int:
                 "    if name == 'f0':\n"
                 "        out = Path(sys.argv[4]); out.mkdir(parents=True, exist_ok=True)\n"
                 "        (out / 'f0.json').write_bytes(encode(rep))\n"
-                "print('\\n'.join(bad))\n"
+                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)}']))\n"
             )
             p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES),
                                 str(PARITY_DIR)],
                                capture_output=True, text=True, timeout=300)
-            if p.returncode or p.stdout.strip():
-                errors.append(f"sv0cov reader: {p.stdout.strip()} {p.stderr.strip()[-600:]}")
-            reader = ("sv0cov reader resolves native + VM to the expected counts; parity reports pass "
+            out_lines = p.stdout.strip().splitlines()
+            nregions = out_lines[-1].split()[1] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            bad = [line for line in out_lines if not line.startswith("REGIONS ")]
+            if p.returncode or bad:
+                errors.append(f"sv0cov reader: {' '.join(bad)} {p.stderr.strip()[-600:]}")
+            reader = (f"sv0cov reader resolves native + VM to the expected counts; {nregions} region expressions "
+                      "evaluate equal and exact on both (CV-204); parity reports pass "
                       f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
         # 3-4. Small programs.
