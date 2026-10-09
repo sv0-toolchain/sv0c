@@ -363,7 +363,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
     }
     /* cov_info[0] = the planned counter count (hits are checked after lowering). */
     let counters: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br);
-    vec_push(cov_info, vec_len(counters));
+    vec_push(cov_info, cov_map_counted(counters));
     if mode == 5 {
         let tab5: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, counters);
         let mut t5: i32 = 0;

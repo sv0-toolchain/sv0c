@@ -10,7 +10,7 @@ source  <index> <logical path> <sha256>
 entity  <index> function <qualified name> <source> <span> <owner>
 point   <index> function_entry <entity> entry <source> <span>
 branch  <index> <kind> <entity> <source> <span> <outcome count> <outcome names>
-point   <index> branch_outcome <entity> <branch kind> <source> <span> <ordinal>
+point   <index> branch_outcome <entity> <branch kind> <source> <span> <ordinal> [statically_unreachable <evidence>]
 region  <index> <kind> <entity> <source> <span> <line_contributing> <lines> <terms>
 ```
 

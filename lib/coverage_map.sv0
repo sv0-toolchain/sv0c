@@ -369,6 +369,12 @@ fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
         cov_map_key_push(keys, koff, klen, string_concat(k0, cov_map_pad(0)));
         e = e + 1;
     }
+    let uncounted: Vec<i32> = vec_new();
+    e = 0;
+    while e < ne {
+        vec_push(uncounted, 0);
+        e = e + 1;
+    }
     let mut b: i32 = 0;
     while b < nb {
         let bsrc: i32 = vec_get(ent_source, vec_get(br, b * 5 + 1));
@@ -377,6 +383,7 @@ fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
         while k < vec_get(br, b * 5 + 4) {
             let k1: string = string_concat(string_concat(cov_map_pad(bsrc), cov_map_pad(bstart)), "1");
             cov_map_key_push(keys, koff, klen, string_concat(k1, cov_map_pad(k + 1)));
+            if cov_outcome_unreachable(vec_get(br, b * 5), k) { vec_push(uncounted, 1); } else { vec_push(uncounted, 0); }
             k = k + 1;
         }
         b = b + 1;
@@ -385,15 +392,32 @@ fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
     let counter: Vec<i32> = vec_new();
     let mut i: i32 = 0;
     while i < vec_len(order) {
-        vec_push(counter, 0);
+        vec_push(counter, 0 - 1);
         i = i + 1;
     }
+    /* A statically unreachable outcome is uncounted (counter -1). */
+    let mut next: i32 = 0;
     i = 0;
     while i < vec_len(order) {
-        vec_set(counter, vec_get(order, i), i);
+        let q: i32 = vec_get(order, i);
+        if vec_get(uncounted, q) == 0 {
+            vec_set(counter, q, next);
+            next = next + 1;
+        }
         i = i + 1;
     }
     return counter;
+}
+
+/* Number of counted points in a cov_map_counters numbering. */
+fn cov_map_counted(counter: Vec<i32>) -> i32 {
+    let mut n: i32 = 0;
+    let mut i: i32 = 0;
+    while i < vec_len(counter) {
+        if vec_get(counter, i) >= 0 { n = n + 1; }
+        i = i + 1;
+    }
+    return n;
 }
 
 /* Build the canonical map (bytes including the final LF) as a byte buffer. */
@@ -467,15 +491,16 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
 
     /* Counter order: source, span start, entry before outcome, ordinal. */
     let counter: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br);
+    let nc: i32 = cov_map_counted(counter);
     let corder: Vec<i32> = vec_new();
     p = 0;
-    while p < np {
+    while p < nc {
         vec_push(corder, 0);
         p = p + 1;
     }
     p = 0;
     while p < np {
-        vec_set(corder, vec_get(counter, p), p);
+        if vec_get(counter, p) >= 0 { vec_set(corder, vec_get(counter, p), p); }
         p = p + 1;
     }
 
@@ -499,7 +524,7 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         cov_vb(proj, "{\"point_ids\":[");
         let mut in_source: bool = true;
         while in_source {
-            if c >= np {
+            if c >= nc {
                 in_source = false;
             } else {
                 let q: i32 = vec_get(corder, c);
@@ -562,9 +587,16 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         let pbase: i32 = vec_get(cstarts, vec_get(src_unit, psk));
         let pbr: i32 = vec_get(p_br, q2);
         if p > 0 { cov_vb(pts, ","); }
-        cov_vb(pts, string_concat("{\"classification\":\"user\",\"counter_index\":", cov_map_int(vec_get(counter, q2))));
-        cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, q2))));
-        cov_vb(pts, string_concat(",\"fragment_index\":", cov_map_int(psk)));
+        if vec_get(counter, q2) < 0 {
+            /* Uncounted: counter and fragment indexes are both null (16.3.4). */
+            cov_vb(pts, "{\"classification\":\"statically_unreachable\",\"counter_index\":null");
+            cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, q2))));
+            cov_vb(pts, ",\"fragment_index\":null");
+        } else {
+            cov_vb(pts, string_concat("{\"classification\":\"user\",\"counter_index\":", cov_map_int(vec_get(counter, q2))));
+            cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, q2))));
+            cov_vb(pts, string_concat(",\"fragment_index\":", cov_map_int(psk)));
+        }
         if pbr < 0 {
             cov_vb(pts, ",\"kind\":\"function_entry\",\"outcome_ordinal\":null");
         } else {
@@ -613,7 +645,12 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         let mut k2: i32 = 0;
         while k2 < vec_get(br, bb * 5 + 4) {
             if k2 > 0 { cov_vb(brs, ","); }
-            cov_vb(brs, "{\"classification\":\"eligible\",\"evidence_identity\":null,\"name\":");
+            if cov_outcome_unreachable(bkind, k2) {
+                cov_vb(brs, string_concat(string_concat("{\"classification\":\"statically_unreachable\",\"evidence_identity\":",
+                    cov_map_str(cov_outcome_evidence(bkind))), ",\"name\":"));
+            } else {
+                cov_vb(brs, "{\"classification\":\"eligible\",\"evidence_identity\":null,\"name\":");
+            }
             cov_vb(brs, string_concat(string_concat(cov_map_str(cov_outcome_name(bkind, k2)), ",\"ordinal\":"), cov_map_int(k2)));
             cov_vb(brs, ",\"point_id\":\"");
             cov_vb_from(brs, ids, (bp + k2) * 64, 64);
@@ -755,7 +792,7 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
     let after: Vec<i32> = vec_new();
     cov_vb(after, ",\"point_identity_version\":\"1.0\",\"points\":");
     cov_vb_all(after, pts);
-    cov_vb(after, string_concat(",\"program_counter_count\":", cov_map_int(np)));
+    cov_vb(after, string_concat(",\"program_counter_count\":", cov_map_int(nc)));
     cov_vb(after, ",\"regions\":");
     cov_vb_all(after, rgs);
     cov_vb(after, ",\"schema\":\"sv0cov.map\",\"sources\":");

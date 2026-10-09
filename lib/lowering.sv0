@@ -156,8 +156,10 @@ fn ir_expr_tag(e: Expr) -> i32 {
    entry first in the function; if true/false at the head of the then/else
    lists (an absent else still gets its list, the implicit false); while and
    for become `while (1) { if (cond) { hit(body) } else { hit(exit); break } ...`
-   so exit counts false condition evaluations only; loop hits body at the
-   head and exit after the loop; match arm k at the head of its body. */
+   so exit counts false condition evaluations only; `loop` hits body at the
+   head; match arm k at the head of its body. `loop { }` and `while true`
+   place no exit hit: the planner classifies that exit statically
+   unreachable (CV-203). */
 
 fn lower_cov_counter(fn_ctx: Vec<i32>, node: i32) -> i32 {
     let n: i32 = vec_len(fn_ctx);
@@ -167,7 +169,20 @@ fn lower_cov_counter(fn_ctx: Vec<i32>, node: i32) -> i32 {
     let tab: Vec<i32> = vec_get(fn_ctx, slot);
     if node < 0 { return 0 - 1; }
     if node >= vec_len(tab) { return 0 - 1; }
-    return vec_get(tab, node);
+    let v: i32 = vec_get(tab, node);
+    if v >= 1073741824 { return v - 1073741824; }
+    return v;
+}
+
+/* The exit counter of the loop node `node` (body counter + 1), or -1 when
+   there is none: no coverage, or an exit the planner proved unreachable
+   (`loop { }`, `while true { }`; flagged with 2^30 in the table, CV-203). */
+fn lower_cov_exit(fn_ctx: Vec<i32>, node: i32) -> i32 {
+    let c: i32 = lower_cov_counter(fn_ctx, node);
+    if c < 0 { return 0 - 1; }
+    let tab: Vec<i32> = vec_get(fn_ctx, 1 + 2 * vec_get(fn_ctx, 0));
+    if vec_get(tab, node) >= 1073741824 { return 0 - 1; }
+    return c + 1;
 }
 
 /* `list` with CovHit(counter) in front (the list itself when counter < 0). */
@@ -199,7 +214,8 @@ fn lower_cov_while(fn_ctx: Vec<i32>, node: i32, cond: Expr, body: Vec<i32>) -> I
     let hit_body: Vec<i32> = vec_new();
     vec_push(hit_body, box_new(Instr::CovHit(c)));
     let hit_exit: Vec<i32> = vec_new();
-    vec_push(hit_exit, box_new(Instr::CovHit(c + 1)));
+    let cx: i32 = lower_cov_exit(fn_ctx, node);
+    if cx >= 0 { vec_push(hit_exit, box_new(Instr::CovHit(cx))); }
     vec_push(hit_exit, box_new(Instr::Break));
     let loop_is: Vec<i32> = vec_new();
     vec_push(loop_is, box_new(Instr::IfElse(box_new(cond), hit_body, hit_exit)));
@@ -2078,7 +2094,8 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             let neg_w: Expr = Expr::Unop(1, box_new(Value::VVar(ct_w)));
             let cov_w: i32 = lower_cov_counter(fn_ctx, idx);
             let brk_blk: Vec<i32> = vec_new();
-            if cov_w >= 0 { vec_push(brk_blk, box_new(Instr::CovHit(cov_w + 1))); }
+            let cov_wx: i32 = lower_cov_exit(fn_ctx, idx);
+            if cov_wx >= 0 { vec_push(brk_blk, box_new(Instr::CovHit(cov_wx))); }
             vec_push(brk_blk, box_new(Instr::Break));
             let empty_else: Vec<i32> = vec_new();
             if cov_w >= 0 { vec_push(empty_else, box_new(Instr::CovHit(cov_w))); }
@@ -2119,7 +2136,8 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         let cov_l: i32 = lower_cov_counter(fn_ctx, idx);
         let ll: Instr = Instr::WhileLoop(box_new(true_e), lower_cov_prepend(loop_is, cov_l));
         vec_push(out_instrs, box_new(ll));
-        if cov_l >= 0 { vec_push(out_instrs, box_new(Instr::CovHit(cov_l + 1))); }
+        let cov_lx: i32 = lower_cov_exit(fn_ctx, idx);
+        if cov_lx >= 0 { vec_push(out_instrs, box_new(Instr::CovHit(cov_lx))); }
         return Value::VUnit;
     }
     if tag == 15 {

@@ -413,16 +413,42 @@ fn cov_rg_line_contributing(kind: i32, first: i32, empty: bool) -> bool {
     return true;
 }
 
+/* Branch kinds: 1 if, 2 loop, 3 match, 4 conditional_expression, and two
+   loops whose condition can never be false (SPEC 11.5 "when both are
+   semantically possible"; CV-203): 5 `loop { }` (no condition) and 6
+   `while true { }`. Kinds 5 and 6 are written as `loop`; their `exit`
+   outcome is statically_unreachable (uncounted, no hit) with the evidence
+   identity below. */
+fn cov_br_is_loop(kind: i32) -> bool {
+    if kind == 2 { return true; }
+    if kind == 5 { return true; }
+    return kind == 6;
+}
+
+/* Whether outcome k of a kind-`kind` branch is statically unreachable. */
+fn cov_outcome_unreachable(kind: i32, k: i32) -> bool {
+    if k != 1 { return false; }
+    if kind == 5 { return true; }
+    return kind == 6;
+}
+
+fn cov_outcome_evidence(kind: i32) -> string {
+    if kind == 5 { return "sv0c:loop:no-condition"; }
+    return "sv0c:loop:condition-literal-true";
+}
+
 fn cov_br_kind_name(k: i32) -> string {
     if k == 1 { return "if"; }
     if k == 2 { return "loop"; }
+    if k == 5 { return "loop"; }
+    if k == 6 { return "loop"; }
     if k == 4 { return "conditional_expression"; }
     return "match";
 }
 
 /* Outcome k's name: true/false, body/exit, or arm:k (SPEC 16.3.6). */
 fn cov_outcome_name(kind: i32, k: i32) -> string {
-    if kind == 2 {
+    if cov_br_is_loop(kind) {
         if k == 0 { return "body"; }
         return "exit";
     }
@@ -749,6 +775,7 @@ fn cov_walk_construct(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>
         vec_set(br, b2 * 5 + 4, 2);
         let open2: i32 = cov_tok_body_open(tags, t + 1, n);
         if open2 < 0 { return 0 - 1; }
+        if g == 72 { vec_set(br, b2 * 5, 5); }
         let mut r2: i32 = 0 - 1;
         if g == 96 {
             /* while <cond> [loop_invariant(...)]* { ... }: the condition
@@ -757,8 +784,14 @@ fn cov_walk_construct(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>
             let inv: i32 = cov_tok_find0(tags, t + 1, open2, 73);
             if inv >= 0 { cond_end = inv - 1; }
             if cond_end < t + 1 { return 0 - 1; }
-            let both: i32 = cov_ce_lin(cef, cet, cov_ce_ref(cef, cet, cov_outcome_ref(b2, 0)), 1,
-                                       cov_ce_ref(cef, cet, cov_outcome_ref(b2, 1)), 1);
+            let mut both: i32 = cov_ce_ref(cef, cet, cov_outcome_ref(b2, 0));
+            if cond_end == t + 1 {
+                /* `while true`: a false evaluation is impossible (CV-203). */
+                if vec_get(tags, t + 1) == 91 { vec_set(br, b2 * 5, 6); }
+            }
+            if vec_get(br, b2 * 5) == 2 {
+                both = cov_ce_lin(cef, cet, both, 1, cov_ce_ref(cef, cet, cov_outcome_ref(b2, 1)), 1);
+            }
             cov_rg_push(rg, 6, e, t + 1, cond_end, both);
             if cov_walk_expr(tags, cef, cet, rg, br, e, t + 1, cond_end, both, ret) < 0 { return 0 - 1; }
             r2 = vec_get(ret, 0);
@@ -967,7 +1000,7 @@ fn cov_plan_terms(cef: Vec<i32>, cet: Vec<i32>, h: i32) -> string {
  *   branch  <index> <kind> <entity> <source> <span> <outcome count>
  *           <outcome names, comma-separated>
  *   point   <index> branch_outcome <entity> <branch kind> <source> <span>
- *           <ordinal>
+ *           <ordinal> [statically_unreachable <evidence identity>]
  *   region  <index> <kind> <entity> <source> <span> <line_contributing 0|1>
  *           <line numbers> <counter terms>
  * Regions are ordered by source, span start, span end, then kind name. */
@@ -1014,7 +1047,11 @@ fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
             out = string_concat(out, string_concat(cov_src_itoa(obe), "\t"));
             out = string_concat(out, string_concat(cov_br_kind_name(vec_get(br, ob * 5)), "\t"));
             out = string_concat(out, string_concat(string_concat(cov_src_itoa(osk), "\t"), ospan));
-            out = string_concat(out, string_concat(string_concat("\t", cov_src_itoa(ok)), "\n"));
+            out = string_concat(out, string_concat("\t", cov_src_itoa(ok)));
+            if cov_outcome_unreachable(vec_get(br, ob * 5), ok) {
+                out = string_concat(out, string_concat("\tstatically_unreachable\t", cov_outcome_evidence(vec_get(br, ob * 5))));
+            }
+            out = string_concat(out, "\n");
             pidx = pidx + 1;
             ok = ok + 1;
         }
@@ -1178,7 +1215,13 @@ fn cov_hit_table(tags: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3
             vec_push(alo, first + 1);
             vec_push(ahi, open - 1);
         }
-        vec_push(bctr, vec_get(counters, ne + obase));
+        /* A loop whose exit is unreachable carries COV_NO_EXIT on its body
+           counter: lowering places no exit hit (lower_cov_counter). */
+        if cov_outcome_unreachable(vec_get(br, b * 5), 1) {
+            vec_push(bctr, vec_get(counters, ne + obase) + 1073741824);
+        } else {
+            vec_push(bctr, vec_get(counters, ne + obase));
+        }
         obase = obase + vec_get(br, b * 5 + 4);
         b = b + 1;
     }

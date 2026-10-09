@@ -1,0 +1,13 @@
+# Hand-derived loop and match outcomes of edges.sv0 (sv0cov CV-203), one run:
+# <function> <kind> <line> <outcome>=<count> ...; `-` = statically_unreachable (uncounted).
+w loop 133 body=4 exit=3
+f loop 144 body=6 exit=2
+lp loop 163 body=4 exit=-
+lp_ret loop 175 body=4 exit=-
+wt loop 187 body=4 exit=-
+nested_ret loop 199 body=7 exit=1
+nested_ret loop 202 body=24 exit=5
+nested_break loop 217 body=4 exit=2
+nested_break loop 220 body=8 exit=0
+arms loop 235 body=6 exit=2
+arms match 239 arm:0=3 arm:1=1 arm:2=2

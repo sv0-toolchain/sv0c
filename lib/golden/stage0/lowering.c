@@ -22,6 +22,7 @@ typedef struct {
 static int ir_value_tag(Value v);
 static int ir_expr_tag(Expr e);
 static int lower_cov_counter(int fn_ctx, int node);
+static int lower_cov_exit(int fn_ctx, int node);
 static int lower_cov_prepend(int list, int counter);
 static Instr lower_cov_if(int fn_ctx, int node, int cond, int then_is, int else_is);
 static Instr lower_cov_while(int fn_ctx, int node, Expr cond, int body);
@@ -432,7 +433,36 @@ static int lower_cov_counter(int fn_ctx, int node) {
   } else {
   }
   int _sv0t9 = sv0_vec_get(tab, node);
-  return _sv0t9;
+  int v = _sv0t9;
+  if ((v >= 1073741824)) {
+    int _sv0t10 = (v - 1073741824);
+    return _sv0t10;
+  } else {
+  }
+  return v;
+}
+
+static int lower_cov_exit(int fn_ctx, int node) {
+  int _sv0t0 = lower_cov_counter(fn_ctx, node);
+  int c = _sv0t0;
+  if ((c < 0)) {
+    int _sv0t1 = (0 - 1);
+    return _sv0t1;
+  } else {
+  }
+  int _sv0t2 = sv0_vec_get(fn_ctx, 0);
+  int _sv0t3 = (2 * _sv0t2);
+  int _sv0t4 = (1 + _sv0t3);
+  int _sv0t5 = sv0_vec_get(fn_ctx, _sv0t4);
+  int tab = _sv0t5;
+  int _sv0t6 = sv0_vec_get(tab, node);
+  if ((_sv0t6 >= 1073741824)) {
+    int _sv0t7 = (0 - 1);
+    return _sv0t7;
+  } else {
+  }
+  int _sv0t8 = (c + 1);
+  return _sv0t8;
 }
 
 static int lower_cov_prepend(int list, int counter) {
@@ -516,17 +546,21 @@ static Instr lower_cov_while(int fn_ctx, int node, Expr cond, int body) {
   sv0_vec_push(hit_body, _sv0t5);
   int _sv0t6 = sv0_vec_new();
   int hit_exit = _sv0t6;
-  Instr _sv0t7;
-  int _sv0t8 = (c + 1);
-  _sv0t7.tag = 17;
-  _sv0t7.p0 = _sv0t8;
-  int _sv0t9 = sv0_box_alloc(5);
-  sv0_box_store(_sv0t9, 0, _sv0t7.tag);
-  sv0_box_store(_sv0t9, 1, _sv0t7.p0);
-  sv0_box_store(_sv0t9, 2, _sv0t7.p1);
-  sv0_box_store(_sv0t9, 3, _sv0t7.p2);
-  sv0_box_store(_sv0t9, 4, _sv0t7.p3);
-  sv0_vec_push(hit_exit, _sv0t9);
+  int _sv0t7 = lower_cov_exit(fn_ctx, node);
+  int cx = _sv0t7;
+  if ((cx >= 0)) {
+    Instr _sv0t8;
+    _sv0t8.tag = 17;
+    _sv0t8.p0 = cx;
+    int _sv0t9 = sv0_box_alloc(5);
+    sv0_box_store(_sv0t9, 0, _sv0t8.tag);
+    sv0_box_store(_sv0t9, 1, _sv0t8.p0);
+    sv0_box_store(_sv0t9, 2, _sv0t8.p1);
+    sv0_box_store(_sv0t9, 3, _sv0t8.p2);
+    sv0_box_store(_sv0t9, 4, _sv0t8.p3);
+    sv0_vec_push(hit_exit, _sv0t9);
+  } else {
+  }
   Instr _sv0t10;
   _sv0t10.tag = 9;
   int _sv0t11 = sv0_box_alloc(5);
@@ -4107,17 +4141,18 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
       int cov_w = _sv0t208;
       int _sv0t209 = sv0_vec_new();
       int brk_blk = _sv0t209;
-      if ((cov_w >= 0)) {
-        Instr _sv0t210;
-        int _sv0t211 = (cov_w + 1);
-        _sv0t210.tag = 17;
-        _sv0t210.p0 = _sv0t211;
+      int _sv0t210 = lower_cov_exit(fn_ctx, idx);
+      int cov_wx = _sv0t210;
+      if ((cov_wx >= 0)) {
+        Instr _sv0t211;
+        _sv0t211.tag = 17;
+        _sv0t211.p0 = cov_wx;
         int _sv0t212 = sv0_box_alloc(5);
-        sv0_box_store(_sv0t212, 0, _sv0t210.tag);
-        sv0_box_store(_sv0t212, 1, _sv0t210.p0);
-        sv0_box_store(_sv0t212, 2, _sv0t210.p1);
-        sv0_box_store(_sv0t212, 3, _sv0t210.p2);
-        sv0_box_store(_sv0t212, 4, _sv0t210.p3);
+        sv0_box_store(_sv0t212, 0, _sv0t211.tag);
+        sv0_box_store(_sv0t212, 1, _sv0t211.p0);
+        sv0_box_store(_sv0t212, 2, _sv0t211.p1);
+        sv0_box_store(_sv0t212, 3, _sv0t211.p2);
+        sv0_box_store(_sv0t212, 4, _sv0t211.p3);
         sv0_vec_push(brk_blk, _sv0t212);
       } else {
       }
@@ -4245,17 +4280,18 @@ static Value lower_expr_to_value(int et, int ed1, int ed2, int ed3, int ed4, int
     sv0_box_store(_sv0t237, 3, ll.p2);
     sv0_box_store(_sv0t237, 4, ll.p3);
     sv0_vec_push(out_instrs, _sv0t237);
-    if ((cov_l >= 0)) {
-      Instr _sv0t238;
-      int _sv0t239 = (cov_l + 1);
-      _sv0t238.tag = 17;
-      _sv0t238.p0 = _sv0t239;
+    int _sv0t238 = lower_cov_exit(fn_ctx, idx);
+    int cov_lx = _sv0t238;
+    if ((cov_lx >= 0)) {
+      Instr _sv0t239;
+      _sv0t239.tag = 17;
+      _sv0t239.p0 = cov_lx;
       int _sv0t240 = sv0_box_alloc(5);
-      sv0_box_store(_sv0t240, 0, _sv0t238.tag);
-      sv0_box_store(_sv0t240, 1, _sv0t238.p0);
-      sv0_box_store(_sv0t240, 2, _sv0t238.p1);
-      sv0_box_store(_sv0t240, 3, _sv0t238.p2);
-      sv0_box_store(_sv0t240, 4, _sv0t238.p3);
+      sv0_box_store(_sv0t240, 0, _sv0t239.tag);
+      sv0_box_store(_sv0t240, 1, _sv0t239.p0);
+      sv0_box_store(_sv0t240, 2, _sv0t239.p1);
+      sv0_box_store(_sv0t240, 3, _sv0t239.p2);
+      sv0_box_store(_sv0t240, 4, _sv0t239.p3);
       sv0_vec_push(out_instrs, _sv0t240);
     } else {
     }
