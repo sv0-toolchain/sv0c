@@ -1,0 +1,11 @@
+/* sv0cov CV-207: declarations only. No function, so no coverage point and no
+   counter: the map of this source is a zero-counter map. */
+enum Kind {
+    A(),
+    B(),
+}
+
+struct Pair {
+    a: i32,
+    b: i32,
+}

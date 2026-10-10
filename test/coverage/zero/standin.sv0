@@ -1,0 +1,10 @@
+/* sv0cov CV-207: an ordinary program. Its uninstrumented code, paired with
+   zero-counter coverage metadata, stands in for a fully excluded build. */
+fn twice(n: i32) -> i32 {
+    return n + n;
+}
+
+fn main() -> i32 {
+    println("stand-in ran");
+    return twice(4) - 8;
+}
