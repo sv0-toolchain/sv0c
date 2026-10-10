@@ -2,3 +2,5 @@ build/
 .cm/
 __pycache__/
 *.pyc
+# sv0cov CV-209 layout fixture: a source directory that happens to be named build/.
+!test/coverage/ownership/proj/build/
