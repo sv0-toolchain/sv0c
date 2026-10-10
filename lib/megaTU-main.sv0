@@ -21,6 +21,23 @@ fn megatu_no_items_message() -> string {
     return "error[E0100]: syntax error: the source has no items (it is empty or holds only comments)\n";
 }
 
+/* Report a source with no items, once. A project whose link step failed
+   (duplicate entry files, a bad link order) arrives here as an empty source
+   with its own error already on stderr, and megatu_project_concat reports
+   an empty project itself, so an empty project source is not reported
+   again: a second write_file("/dev/stderr") truncates the first when stderr
+   is redirected to a file on Linux. */
+fn megatu_report_no_items(source: string) -> i32 {
+    if string_len(source) == 0 {
+        let req: string = getenv("SV0_DRV_REQUEST");
+        if string_len(req) >= 10 {
+            if string_eq(string_substr(req, 0, 10), "--project ") { return 0; }
+        }
+    }
+    write_file("/dev/stderr", megatu_no_items_message());
+    return 0;
+}
+
 fn megatu_diag_code_str(code: i32) -> string {
     if code == 100 { return "E0100"; }
     if code == 400 { return "E0400"; }
@@ -262,8 +279,15 @@ fn megatu_project_concat(dir: string) -> string {
         return link_project_concat_sources_from_dir(dir);
     }
     let order: string = megatu_cov_project_listing(dir);
-    if string_len(order) == 0 { return ""; }
-    return link_project_concat_sources_from_listing(order);
+    if string_len(order) == 0 {
+        /* megatu_link_order reported a bad link order; otherwise the
+           project has no source file. */
+        if string_len(listing) == 0 { write_file("/dev/stderr", megatu_no_items_message()); }
+        return "";
+    }
+    let joined: string = link_project_concat_sources_from_listing(order);
+    if string_len(joined) == 0 { write_file("/dev/stderr", megatu_no_items_message()); }
+    return joined;
 }
 
 /* sv0cov CV-205 test hook: SV0_COVERAGE_LINK_ORDER="2,0,1" links the
@@ -729,7 +753,7 @@ fn main() -> i32 {
     let tc: i32 = tokenize(source, tags, starts, ends);
     if vec_len(tags) == 0 {
         /* An empty or comment-only source used to exit with no message. */
-        write_file("/dev/stderr", megatu_no_items_message());
+        megatu_report_no_items(source);
         return 1;
     }
 
@@ -804,7 +828,7 @@ fn main() -> i32 {
     /* At least one top-level item must have parsed (multi-fn programs are now
        supported — the mega-TU threads all items through lower + emit). */
     /* (The gate below stays on one line: the verify build anchors on it.) */
-    if vec_len(it) < 1 { write_file("/dev/stderr", megatu_no_items_message()); }
+    if vec_len(it) < 1 { megatu_report_no_items(source); }
     if vec_len(it) < 1 { return 2; }
 
     /* Phase 3: resolve (real resolver.sv0). mv/mt/fa are the module value/type/
