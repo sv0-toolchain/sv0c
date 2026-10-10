@@ -494,6 +494,32 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         }
         let map: Vec<i32> = cov_map_build(source, starts, ends, table, cstarts, src_unit,
             ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity);
+        /* sv0cov CV-211 (SPEC 16.3.9, 16.4): never write a map over the
+           tier this build is for. Request line 6 carries the tier's counter
+           ceiling and map byte ceiling; without it the standard tier
+           applies (4,194,304 counters, 512 MiB). */
+        let limits: Vec<i32> = megatu_parse_ints(megatu_cov_req_line(req, 5));
+        let mut max_counters: i32 = 4194304;
+        let mut max_map_bytes: i32 = 536870912;
+        if vec_len(limits) == 2 {
+            max_counters = vec_get(limits, 0);
+            max_map_bytes = vec_get(limits, 1);
+        }
+        let planned: i32 = cov_map_counted(counters);
+        if planned > max_counters {
+            write_file("/dev/stderr", string_concat(string_concat(string_concat(
+                "error[COV6001]: resource limit exceeded: the program plans ", int_to_string(planned)),
+                string_concat(" coverage counters; the raw-profile tier this build is for allows ", int_to_string(max_counters))),
+                " (see --coverage-tier)\n"));
+            return megatu_cov_rc(9);
+        }
+        if vec_len(map) > max_map_bytes {
+            write_file("/dev/stderr", string_concat(string_concat(string_concat(
+                "error[COV6001]: resource limit exceeded: the coverage map is ", int_to_string(vec_len(map))),
+                string_concat(" bytes; the tier this build is for allows ", int_to_string(max_map_bytes))),
+                " (see --coverage-tier)\n"));
+            return megatu_cov_rc(9);
+        }
         if mode == 1 {
             write_bytes(map_path, map);
         }
