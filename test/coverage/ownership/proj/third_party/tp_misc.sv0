@@ -1,0 +1,16 @@
+module tp_misc;
+
+/* sv0cov CV-209: compiled root-project code. The directory it sits in
+   (third_party/) says nothing about ownership or scope. */
+fn misc(n: i32) -> i32 {
+    if n > 4 {
+        return n * 2;
+    }
+    let mut s: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        i = i + 1;
+        s = s + i;
+    }
+    return s;
+}

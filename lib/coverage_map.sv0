@@ -420,6 +420,12 @@ fn cov_map_counted(counter: Vec<i32>) -> i32 {
     return n;
 }
 
+/* A source's package as JSON: null for the root project (no package). */
+fn cov_map_package_json(name: string) -> string {
+    if string_len(name) == 0 { return "null"; }
+    return cov_map_str(name);
+}
+
 /* Build the canonical map (bytes including the final LF) as a byte buffer. */
 fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string,
                  cstarts: Vec<i32>, src_unit: Vec<i32>,
@@ -515,9 +521,13 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         let unit2: i32 = vec_get(src_unit, sk2);
         let path_j: string = cov_map_str(cov_src_path_at(table, unit2));
         let digest_j: string = cov_map_str(cov_src_digest_at(table, unit2));
+        /* Ownership and package come from the build graph (CV-209). */
+        let own_j: string = cov_map_str(cov_src_ownership_name(cov_src_ownership(table, unit2)));
+        let pkg_j: string = cov_map_package_json(cov_src_package(table, unit2));
         if sk2 > 0 { cov_vb(srcs, ","); }
         cov_vb(srcs, string_concat(string_concat("{\"digest\":", digest_j),
-            string_concat(string_concat(",\"ownership\":\"user\",\"package\":null,\"path\":", path_j),
+            string_concat(string_concat(string_concat(string_concat(",\"ownership\":", own_j),
+                string_concat(string_concat(",\"package\":", pkg_j), ",\"path\":")), path_j),
             string_concat(string_concat(",\"source_index\":", cov_map_int(sk2)), "}"))));
         let slice_base: i32 = c;
         let proj: Vec<i32> = vec_new();

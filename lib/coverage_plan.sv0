@@ -131,6 +131,34 @@ fn cov_plan_line_at(text: string, idx: i32) -> string {
     return cov_src_field(text, idx, 0);
 }
 
+/* Source ownership (sv0cov CV-209; SPEC 16.3.2, 18.1, COV-SCP-001/002/004).
+ *
+ * Ownership comes from the build graph, never from how a path is spelled:
+ * a directory named tests/, examples/, vendor/, third_party/, generated/,
+ * build/ or node_modules/ means nothing. An sv0 build has exactly one
+ * package, the root project: every file the project compiles (the listing
+ * the linker concatenates) belongs to it, so every source unit is
+ * user-owned and has no package. When sv0 gains dependency packages, the
+ * build metadata that names a unit's package decides these two values
+ * (dependency units get `dependency` and their package name); nothing
+ * here may ever look at the logical path.
+ *
+ * cov_src_ownership: 0 = user, 1 = dependency.
+ * cov_src_package: the owning package's name, or "" for the root project
+ * (written as JSON null). */
+fn cov_src_ownership(table: string, unit: i32) -> i32 {
+    return 0;
+}
+
+fn cov_src_package(table: string, unit: i32) -> string {
+    return "";
+}
+
+fn cov_src_ownership_name(ownership: i32) -> string {
+    if ownership == 1 { return "dependency"; }
+    return "user";
+}
+
 /* Fill src_unit with listing units sorted by logical path (the table's
  * first field). Returns the unit count. */
 fn cov_plan_sources(table: string, src_unit: Vec<i32>) -> i32 {
