@@ -33,7 +33,8 @@ So this script checks, on the native compiler and the VM emitter:
    has COVER_HIT, a positive-count binding on bytecode that has none, and
    instrumented bytecode with no binding are all rejected (COV2201) before
    user code, with no profile.
-4. An empty source is rejected by both compilers in every mode, with no map.
+4. An empty source is rejected by both compilers in every mode with a
+   diagnostic (E0100) and no map.
 
     python3 sv0c/test/coverage/zero/run_zero.py
 """
@@ -274,8 +275,9 @@ def main() -> int:
             for mode in (None, "map", "instrument"):
                 out = t / f"empty-{binary.name}-{mode}.json"
                 p = compiler(binary, empty, None if mode is None else f"{mode}\n{out}\nempty\nsv0c+test\n{out}.bind")
-                if p.returncode == 0 or out.exists():
-                    errors.append(f"an empty source compiled on {binary.name} in mode {mode}")
+                if p.returncode == 0 or out.exists() or b"error[E0100]" not in p.stderr:
+                    errors.append(f"an empty source on {binary.name} in mode {mode}: rc={p.returncode}, "
+                                  f"stderr {p.stderr.decode()[:120]!r} (want a refusal with E0100 and no map)")
 
     if errors:
         print("coverage zero: FAIL", file=sys.stderr)

@@ -71,3 +71,7 @@ test/diagnostics/cases/vec_f64_int_element.sv0|E0452|native
 test/diagnostics/cases/vec_f64_typed_on_int_vec.sv0|E0453|native
 test/diagnostics/cases/dup_method_names.sv0|E0418|native
 test/diagnostics/cases/dup_trait_default_override.sv0|E0418|native
+# --- a source with no items (native only: the SML reference accepts an empty program) ---
+test/diagnostics/cases/no_items.sv0|E0100|native
+# --- a failed type check always reports (a trailing `loop` is unit) ---
+test/diagnostics/cases/loop_tail_no_return.sv0|E0400

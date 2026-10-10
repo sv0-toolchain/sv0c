@@ -17,6 +17,10 @@
    resolve the token to a 1-based (line, col), and format via diagnostic.sv0's
    SML-parity formatters into one stderr write. */
 
+fn megatu_no_items_message() -> string {
+    return "error[E0100]: syntax error: the source has no items (it is empty or holds only comments)\n";
+}
+
 fn megatu_diag_code_str(code: i32) -> string {
     if code == 100 { return "E0100"; }
     if code == 400 { return "E0400"; }
@@ -723,7 +727,11 @@ fn main() -> i32 {
     let starts: Vec<i32> = vec_new();
     let ends: Vec<i32> = vec_new();
     let tc: i32 = tokenize(source, tags, starts, ends);
-    if vec_len(tags) == 0 { return 1; }
+    if vec_len(tags) == 0 {
+        /* An empty or comment-only source used to exit with no message. */
+        write_file("/dev/stderr", megatu_no_items_message());
+        return 1;
+    }
 
     /* Phase 2: parse_program (real parser.sv0) — full arena set */
     let it: Vec<i32> = vec_new();
@@ -795,6 +803,8 @@ fn main() -> i32 {
 
     /* At least one top-level item must have parsed (multi-fn programs are now
        supported — the mega-TU threads all items through lower + emit). */
+    /* (The gate below stays on one line: the verify build anchors on it.) */
+    if vec_len(it) < 1 { write_file("/dev/stderr", megatu_no_items_message()); }
     if vec_len(it) < 1 { return 2; }
 
     /* Phase 3: resolve (real resolver.sv0). mv/mt/fa are the module value/type/
@@ -831,6 +841,14 @@ fn main() -> i32 {
         fpn, fpt, frt, ptt, ptd1, ptd2, ptd3,
         bet, bed1, bed2, bed3, bed4, tp, 0, diag_sink);
     if cr != 0 {
+        /* Some checker failures record no (code, token) pair, for example a
+           function whose body ends in a `loop` (unit) but declares a return
+           type. Never fail silently: report the type mismatch without a
+           location, as the SML reference does. */
+        if vec_len(diag_sink) == 0 {
+            vec_push(diag_sink, 400);
+            vec_push(diag_sink, 0 - 1);
+        }
         megatu_emit_diagnostics(diag_sink, source, starts);
         return 4;
     }

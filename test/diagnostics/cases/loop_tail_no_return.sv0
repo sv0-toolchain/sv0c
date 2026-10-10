@@ -1,0 +1,14 @@
+/* E0400 (both): a function that declares a return type but whose body ends
+   in a `loop` (which has unit type). The native compiler used to exit with
+   no message. */
+fn first_at(n: i32) -> i32 {
+    let mut i: i32 = 0;
+    loop {
+        if i == n { return i; }
+        i = i + 1;
+    }
+}
+
+fn main() -> i32 {
+    return first_at(0);
+}
