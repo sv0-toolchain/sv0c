@@ -273,6 +273,16 @@ def main() -> int:
                 "    xb = indexed([(nm, nat), (vmm, vm)], run_selection=select_runs(runs))\n"
                 "    if xb['run_selection']['mode'] != 'explicit-list' or xb['run_selection']['selected_run_ids'] != runs:\n"
                 "        bad.append(f'{name}: the declared run set was not recorded')\n"
+                "    # CV-227: the merge command over the same files publishes exactly that evidence.\n"
+                "    import io, tempfile\n"
+                "    from sv0cov import cli\n"
+                "    with tempfile.TemporaryDirectory() as td:\n"
+                "        o, e = io.StringIO(), io.StringIO()\n"
+                "        rc = cli.main(['merge', nm, nat, vmm, vm, '--expect-run', runs[0], '--output', 'out.json'], stdout=o, stderr=e, cwd=Path(td))\n"
+                "        if rc != 0 or e.getvalue() or read_indexed((Path(td) / 'out.json').read_bytes()) != xb:\n"
+                "            bad.append(f'{name}: sv0cov merge exit {rc}, or its output differs from the engine: {e.getvalue()[:200]}')\n"
+                "        rc2 = cli.main(['merge', nm, nat, '--output', 'out.json'], stdout=io.StringIO(), stderr=io.StringIO(), cwd=Path(td))\n"
+                "        if rc2 != 5: bad.append(f'{name}: sv0cov merge replaced an existing output (exit {rc2})')\n"
                 "    cut = merge(arts([nm]), arts([nat]) + [Artifact('cut.sv0profraw', Path(vm).read_bytes()[:-6])])\n"
                 "    if cut.complete or cut.publishable or [r['status'] for r in cut.indexed['profile_inputs']] != ['accepted', 'incomplete']:\n"
                 "        bad.append(f'{name}: a truncated real profile was not inventoried as incomplete')\n"
@@ -304,7 +314,7 @@ def main() -> int:
                 errors.append(f"sv0cov reader: {' '.join(bad)} {p.stderr.strip()[-600:]}")
             reader = (f"sv0cov reader resolves native + VM to the expected counts; {nregions} region expressions "
                       "evaluate equal and exact on both (CV-204); the semantic model of each real run equals the fixture's "
-                      f"expected-semantic.json ({nmodels} fixtures, CV-221); merged indexed evidence of {nindexed} programs (a truncated profile inventoried incomplete) reads back "
+                      f"expected-semantic.json ({nmodels} fixtures, CV-221); merged indexed evidence of {nindexed} programs (a truncated profile inventoried incomplete; `sv0cov merge` publishes the same bytes and refuses to replace them, CV-227) reads back "
                       "complete, with one semantic projection for native and VM runs (CV-222); parity reports pass "
                       f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
