@@ -1,0 +1,18 @@
+/* division and remainder truncate toward zero; MIN / 1, wide and unsigned
+   forms, and IEEE float division by zero all have results — exits 16. */
+fn main() -> i32 {
+    let a: i32 = 0 - 7;
+    let m: i32 = 0 - 2147483647 - 1;
+    let b: i64 = 9000000000;
+    let c: u64 = 10;
+    let f: f64 = 1.0;
+    let g: f64 = f / 0.0;
+    let w: i64 = b / 1000000000;
+    let u: u64 = c % 4;
+    if m / 1 != m { return 2; }
+    if m % 1 != 0 { return 3; }
+    if w != 9 { return 4; }
+    if u != 2 { return 5; }
+    if g > 1000.0 { return a / 2 + a % 3 + 20; }
+    return 1;
+}

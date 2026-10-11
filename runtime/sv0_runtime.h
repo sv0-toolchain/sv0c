@@ -7,6 +7,7 @@
 #ifndef SV0_RUNTIME_H
 #define SV0_RUNTIME_H
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -33,6 +34,65 @@ static inline void sv0_assert(bool cond, const char *msg) {
   if (!cond)
     sv0_panic(msg);
 }
+
+/* Integer division and remainder (sv0doc type-system/rules.md 1.5). A zero
+ * divisor and the one signed overflow (MIN / -1, MIN % -1) are undefined in
+ * C; in sv0 both are panics. Generated C writes every `/` and `%` as
+ * SV0_DIV / SV0_MOD, which pick the helper for the operands' type after the
+ * usual arithmetic conversions; floating-point division stays IEEE-754. */
+#define SV0_DEFINE_SIGNED_DIV(suffix, type, min)                               \
+  static inline type sv0_div_##suffix(type a, type b) {                        \
+    if (b == 0)                                                                \
+      sv0_panic("division by zero");                                           \
+    if (a == (min) && b == -1)                                                 \
+      sv0_panic("division overflow");                                          \
+    return a / b;                                                              \
+  }                                                                            \
+  static inline type sv0_mod_##suffix(type a, type b) {                        \
+    if (b == 0)                                                                \
+      sv0_panic("division by zero");                                           \
+    if (a == (min) && b == -1)                                                 \
+      sv0_panic("division overflow");                                          \
+    return a % b;                                                              \
+  }
+#define SV0_DEFINE_UNSIGNED_DIV(suffix, type)                                  \
+  static inline type sv0_div_##suffix(type a, type b) {                        \
+    if (b == 0)                                                                \
+      sv0_panic("division by zero");                                           \
+    return a / b;                                                              \
+  }                                                                            \
+  static inline type sv0_mod_##suffix(type a, type b) {                        \
+    if (b == 0)                                                                \
+      sv0_panic("division by zero");                                           \
+    return a % b;                                                              \
+  }
+SV0_DEFINE_SIGNED_DIV(int, int, INT_MIN)
+SV0_DEFINE_SIGNED_DIV(long, long, LONG_MIN)
+SV0_DEFINE_SIGNED_DIV(llong, long long, LLONG_MIN)
+SV0_DEFINE_UNSIGNED_DIV(uint, unsigned int)
+SV0_DEFINE_UNSIGNED_DIV(ulong, unsigned long)
+SV0_DEFINE_UNSIGNED_DIV(ullong, unsigned long long)
+static inline double sv0_div_double(double a, double b) { return a / b; }
+static inline float sv0_div_float(float a, float b) { return a / b; }
+
+#define SV0_DIV(a, b)                                                          \
+  _Generic((a) + (b),                                                          \
+      int: sv0_div_int,                                                        \
+      long: sv0_div_long,                                                      \
+      long long: sv0_div_llong,                                                \
+      unsigned int: sv0_div_uint,                                              \
+      unsigned long: sv0_div_ulong,                                            \
+      unsigned long long: sv0_div_ullong,                                      \
+      float: sv0_div_float,                                                    \
+      double: sv0_div_double)((a), (b))
+#define SV0_MOD(a, b)                                                          \
+  _Generic((a) + (b),                                                          \
+      int: sv0_mod_int,                                                        \
+      long: sv0_mod_long,                                                      \
+      long long: sv0_mod_llong,                                                \
+      unsigned int: sv0_mod_uint,                                              \
+      unsigned long: sv0_mod_ulong,                                            \
+      unsigned long long: sv0_mod_ullong)((a), (b))
 
 /* contract checking (runtime mode) */
 static inline void sv0_requires(bool cond, const char *fn_name) {

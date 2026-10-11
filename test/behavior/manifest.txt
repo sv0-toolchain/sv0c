@@ -163,3 +163,9 @@ test/behavior/cases/if_enum_value.sv0|28
 test/behavior/cases/if_struct_value.sv0|7
 test/behavior/cases/match_aggregate_value.sv0|7
 test/behavior/cases/question_if_operand.sv0|14|native
+test/behavior/cases/div_by_zero_panics.sv0|1
+test/behavior/cases/mod_by_zero_panics.sv0|1
+test/behavior/cases/div_i32_min_by_neg1_panics.sv0|1
+test/behavior/cases/mod_i32_min_by_neg1_panics.sv0|1
+test/behavior/cases/div_i64_by_zero_panics.sv0|1
+test/behavior/cases/div_mod_defined_results.sv0|16|native

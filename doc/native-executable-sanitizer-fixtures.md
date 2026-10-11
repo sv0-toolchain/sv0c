@@ -47,10 +47,16 @@ against.
 | Fixture | Triggers | Expected UBSan verdict | Observed today (unsanitized, arm64/Apple Clang, `-O0`) |
 |---|---|---|---|
 | `ub_arith_neg_i32_min.sv0` | `-INT32_MIN` (negation overflow) | "signed integer overflow" | no crash; silently wraps to `INT32_MIN` unchanged, exits 0 |
-| `ub_arith_div_i32_min_by_neg1.sv0` | `INT32_MIN / -1` (division overflow) | "signed integer overflow" | no crash; exits 0 |
-| `ub_arith_mod_i32_min_by_neg1.sv0` | `INT32_MIN % -1` (division overflow, same IDIV instruction) | "signed integer overflow" | no crash; exits 0 |
 
-All three construct `INT32_MIN` via `0 - 2147483647 - 1` — every
+`INT32_MIN / -1` and `INT32_MIN % -1` were two more fixtures here
+(`ub_arith_div_i32_min_by_neg1.sv0`, `ub_arith_mod_i32_min_by_neg1.sv0`). sv0
+now defines both as `sv0 panic: division overflow` (sv0doc
+`type-system/rules.md` §1.5): generated C reaches division only through the
+runtime's checked `SV0_DIV` / `SV0_MOD`, so the undefined operation never
+executes. They are ordinary behavior cases now
+(`div_i32_min_by_neg1_panics.sv0`, `mod_i32_min_by_neg1_panics.sv0`, exit 1).
+
+The fixture constructs `INT32_MIN` via `0 - 2147483647 - 1` — every
 intermediate step is representable and non-overflowing, so the deliberate
 UB is isolated to exactly the fixture's final operation, not smeared
 across the setup.

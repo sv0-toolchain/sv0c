@@ -2812,6 +2812,15 @@ fn megatu_emit_expr(e: codegen_Expr, source: string, starts: Vec<i32>, ends: Vec
             let v2: codegen_Value = box_deref(bv2);
             let s1: string = megatu_emit_value(v1, source, starts, ends, sidx);
             let s2: string = megatu_emit_value(v2, source, starts, ends, sidx);
+            /* Division and remainder go through the runtime's checked helpers
+               (a zero divisor and MIN / -1 are panics, not C undefined
+               behavior; sv0doc type-system/rules.md 1.5). */
+            if op_h == 3 {
+                return string_concat(string_concat(string_concat("SV0_DIV(", s1), ", "), string_concat(s2, ")"));
+            }
+            if op_h == 4 {
+                return string_concat(string_concat(string_concat("SV0_MOD(", s1), ", "), string_concat(s2, ")"));
+            }
             let op: string = megatu_binop_c(op_h);
             let a: string = string_concat("(", s1);
             let b: string = string_concat(a, " ");

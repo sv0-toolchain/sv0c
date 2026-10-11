@@ -45,3 +45,15 @@ sv0c/test/behavior/cases/struct_ref_param.sv0
 sv0c/test/behavior/cases/c_name_libc_functions.sv0
 sv0c/test/behavior/cases/c_name_keywords_macros.sv0
 sv0c/test/behavior/cases/trait_bodyless_method_impl.sv0
+sv0c/test/behavior/cases/div_mod_defined_results.sv0
+sv0c/test/behavior/cases/div_by_zero_panics.sv0
+sv0c/test/behavior/cases/mod_by_zero_panics.sv0
+sv0c/test/behavior/cases/div_i32_min_by_neg1_panics.sv0
+sv0c/test/behavior/cases/mod_i32_min_by_neg1_panics.sv0
+sv0c/test/behavior/cases/div_i64_by_zero_panics.sv0
+sv0c/test/behavior/cases/if_enum_value.sv0
+sv0c/test/behavior/cases/if_struct_value.sv0
+sv0c/test/behavior/cases/match_aggregate_value.sv0
+sv0c/test/behavior/cases/question_if_operand.sv0
+sv0c/test/behavior/cases/question_field_operand.sv0
+sv0c/test/behavior/cases/question_block_operand.sv0

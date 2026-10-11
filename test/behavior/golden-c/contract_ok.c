@@ -4,7 +4,7 @@ static int sv0u_half(int sv0u_x);
 
 static int sv0u_half(int sv0u_x) {
   sv0_requires((sv0u_x > 0), "half");
-  int _sv0t0 = (sv0u_x / 2);
+  int _sv0t0 = SV0_DIV(sv0u_x, 2);
   return _sv0t0;
 }
 

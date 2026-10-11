@@ -11,7 +11,8 @@ counts.
 1. Exit paths, with SV0COV_REQUIRED 1 and 0: return 0 / 7 / 300 / -1 (the
    status is the low 8 bits), a failed `requires` and `ensures`, and the
    runtime panics the C runtime defines (Vec get/set, string index, substring,
-   slice index, a missing file). All are orderly: exit 1 for a failure, the
+   a missing file, integer division and remainder by zero, MIN / -1). All
+   are orderly: exit 1 for a failure, the
    same `sv0 panic:` line, one valid profile with equal counts.
 2. Transport failures (SPEC 14.3): an unknown SV0COV_* name, a malformed,
    zero or missing run ID, a missing, relative or nonexistent profile
@@ -30,14 +31,16 @@ counts.
    user instruction in both modes. (The native peer, a registration with
    another protocol, is COV1015 in sv0cov's runtime tests; required or not,
    sv0vm cannot run a COVER_HIT it has not bound, so it always stops.)
-6. A fatal VM failure (integer division by zero) is not an exit: one
-   `sv0vm: fatal:` diagnostic, status 134, no `vm_exit` line, no profile.
+6. A fatal VM failure (truncated bytecode behind a binding that matches it)
+   is not an exit: one `sv0vm: fatal:` diagnostic, status 134, no `vm_exit`
+   line, no profile.
 
     python3 sv0c/test/coverage/lifecycle/run_lifecycle.py
 """
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import json
 import os
@@ -86,11 +89,20 @@ PROGRAMS = {
                1, "sv0 panic: string: substring out of bounds"),
     "read-file": (main_of('    return string_len(read_file("/nonexistent/sv0cov-cv212"));\n'),
                   1, "sv0 panic: read_file: fopen failed"),
+    "div-zero": (main_of("    return quot(7, 0);\n", "fn quot(a: i32, b: i32) -> i32 {\n    return a / b;\n}\n\n"),
+                 1, "sv0 panic: division by zero"),
+    "mod-zero": (main_of("    return rem(7, 0);\n", "fn rem(a: i32, b: i32) -> i32 {\n    return a % b;\n}\n\n"),
+                 1, "sv0 panic: division by zero"),
+    "div-overflow": (main_of("    let m: i32 = 0 - 2147483647 - 1;\n    return quot(m, 0 - 1);\n",
+                             "fn quot(a: i32, b: i32) -> i32 {\n    return a / b;\n}\n\n"),
+                     1, "sv0 panic: division overflow"),
+    "div-zero-i64": (main_of("    let z: i64 = 0;\n    let q: i64 = quot(9, z);\n    return 3;\n",
+                             "fn quot(a: i64, b: i64) -> i64 {\n    return a / b;\n}\n\n"),
+                     1, "sv0 panic: division by zero"),
 }
 # Runs until it is killed.
 SPIN = main_of("    let mut i: i32 = 0;\n    while true {\n        i = i + 1;\n        if i > 1000 {\n            i = 0;\n        }\n"
                "    }\n    return i;\n")
-FATAL = main_of("    return div(7, 0);\n", "fn div(a: i32, b: i32) -> i32 {\n    return a / b;\n}\n\n")
 
 DIAG = re.compile(r"error\[(COV\d{4})\]: ([^:\n]+):")
 
@@ -141,7 +153,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         t = Path(td)
         built: dict[str, Built] = {}
-        todo = {**PROGRAMS, "spin": (SPIN, 0, None), "fatal": (FATAL, 0, None)}
+        todo = {**PROGRAMS, "spin": (SPIN, 0, None)}
         with ThreadPoolExecutor(max_workers=4) as pool:
             for name, b in zip(todo, pool.map(lambda kv: build(t / kv[0], kv[1][0], errors, kv[0]), todo.items())):
                 if b is not None:
@@ -341,14 +353,28 @@ def main() -> int:
         if (o["status"], o["ran"], o["diag"]) != (7, True, None) or len(o["files"]) != 1:
             errors.append(f"capability: the unchanged binding did not run and publish: {o['status']}, {o['files']}")
 
-        # 6. A fatal VM failure is not an exit.
+        # 6. A fatal VM failure is not an exit: valid bytecode is cut in half
+        # and the binding is rewritten to match those bytes, so the binding
+        # checks pass and sv0vm itself fails.
+        b = built["ret7"]
+        code = b.sv0b.read_bytes()
+        code = code[:len(code) // 2]
+        broken = t / "broken.sv0b"
+        broken.write_bytes(code)
+        bind = json.loads(b.bind.read_text())
+        bind["bytecode_sha256"] = hashlib.sha256(code).hexdigest()
+        bind["bytecode_length"] = len(code)
+        broken_bind = t / "broken.sv0covbind.json"
+        broken_bind.write_text(json.dumps(bind, sort_keys=True, separators=(",", ":")) + "\n")
         for req in ("1", "0"):
             pdir = t / f"fatal-{req}"
             pdir.mkdir()
-            o = observe(built["fatal"].argv("vm"), transport(pdir, SV0COV_REQUIRED=req), pdir)
-            if o["status"] != 134 or not o["ran"] or o["vm_exit"] or o["files"] or not (o["line"] or "").startswith("sv0vm: fatal:"):
-                errors.append(f"fatal VM failure (required={req}): status {o['status']}, vm_exit {o['vm_exit']}, files {o['files']}, "
-                              f"line {o['line']!r}; want status 134, one `sv0vm: fatal:` line, no vm_exit, no profile")
+            o = observe([str(SV0), "vm-run", "--coverage-binding", str(broken_bind), str(broken)],
+                        transport(pdir, SV0COV_REQUIRED=req), pdir)
+            if o["status"] != 134 or o["vm_exit"] or o["files"] or not (o["line"] or "").startswith("sv0vm: fatal:"):
+                errors.append(f"fatal VM failure (required={req}): status {o['status']}, vm_exit {o['vm_exit']}, "
+                              f"files {o['files']}, line {o['line']!r}; want status 134, one `sv0vm: fatal:` line, no vm_exit, "
+                              "no profile")
 
     if errors:
         print("coverage lifecycle: FAIL", file=sys.stderr)
@@ -358,7 +384,7 @@ def main() -> int:
     print(f"coverage lifecycle: OK (native = sv0vm on {exits} exit-path runs (returns, contract failures, runtime panics; "
           f"status, publication, counts), {transports} transport failures + outside sv0cov, {publish} unwritable-directory runs"
           f"{'' if publish else ' (SKIPPED as root)'}, {kills} hard terminations; {rejections} bad bindings + no binding rejected "
-          "before user code; a fatal VM failure exits 134 with no profile)")
+          "before user code; truncated bytecode is a fatal VM failure: exit 134, no profile)")
     return 0
 
 

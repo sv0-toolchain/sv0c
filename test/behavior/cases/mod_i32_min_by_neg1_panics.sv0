@@ -1,0 +1,8 @@
+/* i32 MIN % -1 is the same overflow: `sv0 panic: division overflow` — exits 1
+   (sv0doc type-system/rules.md 1.5). Until that rule this was the NEX-048b
+   sanitizer fixture ub_arith_mod_i32_min_by_neg1. */
+fn main() -> i32 {
+    let min: i32 = 0 - 2147483647 - 1;
+    let neg1: i32 = 0 - 1;
+    return min % neg1;
+}

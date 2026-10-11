@@ -8,7 +8,7 @@ static int sv0_user_main(void) {
   sv0u_b = 24;
   while ((sv0u_b != 0)) {
     int sv0u_t;
-    sv0u_t = (sv0u_a % sv0u_b);
+    sv0u_t = SV0_MOD(sv0u_a, sv0u_b);
     sv0u_a = sv0u_b;
     sv0u_b = sv0u_t;
   }

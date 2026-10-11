@@ -1,0 +1,3 @@
+/* integer remainder by zero is a runtime panic — exits 1. */
+fn rem(a: i32, b: i32) -> i32 { return a % b; }
+fn main() -> i32 { return rem(7, 0) + 40; }

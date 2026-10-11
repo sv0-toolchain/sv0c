@@ -1,0 +1,3 @@
+/* i64 division by zero is the same panic — exits 1. */
+fn div(a: i64, b: i64) -> i64 { return a / b; }
+fn main() -> i32 { let z: i64 = 0; let q: i64 = div(9, z); return 3; }

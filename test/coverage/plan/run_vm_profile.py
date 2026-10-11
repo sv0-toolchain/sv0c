@@ -24,8 +24,8 @@ constructs.sv0:
 And with small programs:
 
 3. SV0COV_CONTEXT reaches the profile; a contract failure (exit 1) still
-   publishes; a crash (division by zero) publishes nothing and leaves no
-   temporary;
+   publishes, and so does an integer division by zero (a defined panic); a
+   VM crash (truncated bytecode) publishes nothing and leaves no temporary;
 4. a required-mode transport failure (an unknown SV0COV_* name, a bad run
    ID) stops the program before it prints anything, with COV2001 and no
    profile; outside sv0cov (no transport, not required) the program runs
@@ -40,6 +40,7 @@ sv0vm's golden copies equal sv0cov's.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -334,12 +335,31 @@ def main() -> int:
             if rc != 1 or prof is None or sum(c for _, c in prof.counts) == 0:
                 errors.append(f"contract failure: exit {rc}, want 1 with a published profile: {out[-300:]}")
 
+            # Integer division by zero is a defined panic (sv0doc type-system/rules.md
+            # 1.5): exit 1 with the profile published, like a contract failure.
             sv0b, bind, m = built["crash"]
-            pdir = t / "crash"
+            pdir = t / "panic"
             pdir.mkdir()
             rc, out = vm_run(sv0b, bind, transport(pdir))
-            if rc is not None or list(pdir.iterdir()):
-                errors.append(f"crash: exit {rc}, files {[f.name for f in pdir.iterdir()]}; want no exit and nothing published")
+            prof = profile(pdir, m, errors, "division by zero")
+            if rc != 1 or prof is None or "sv0 panic: division by zero" not in out:
+                errors.append(f"division by zero: exit {rc}, want the panic, exit 1 and a published profile: {out[-300:]}")
+            # A crash is a VM failure with no program exit: the same bytecode cut
+            # in half, behind a binding rewritten to match those bytes.
+            code = sv0b.read_bytes()
+            code = code[:len(code) // 2]
+            broken, broken_bind = t / "broken.sv0b", t / "broken.sv0covbind.json"
+            broken.write_bytes(code)
+            fields = json.loads(bind.read_text())
+            fields["bytecode_sha256"] = hashlib.sha256(code).hexdigest()
+            fields["bytecode_length"] = len(code)
+            broken_bind.write_text(json.dumps(fields, sort_keys=True, separators=(",", ":")) + "\n")
+            pdir = t / "crash"
+            pdir.mkdir()
+            rc, out = vm_run(broken, broken_bind, transport(pdir))
+            if rc is not None or list(pdir.iterdir()) or "sv0vm: fatal:" not in out:
+                errors.append(f"crash: exit {rc}, files {[f.name for f in pdir.iterdir()]}; want a fatal VM failure, no exit, "
+                              f"nothing published: {out[-300:]}")
 
             sv0b, bind, m = built["talk"]
             for label, over in (("unknown name", {"SV0COV_THRESHOLD": "90"}),
@@ -364,7 +384,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print(f"coverage VM profiles: OK ({len(progs)} programs: one valid vm-v1 profile each, counts = native = expected; {reader}; "
-          "context, contract failure publishes, crash publishes nothing; required transport failure stops before user "
+          "context, contract failure and division by zero publish, a VM crash publishes nothing; required transport failure stops before user "
           "code; outside sv0cov runs and publishes nothing; sv0vm golden copies = sv0cov's)")
     return 0
 
