@@ -189,7 +189,7 @@ def main() -> int:
                 "from pathlib import Path\n"
                 "from sv0cov.resolve import resolve\n"
                 "bad = []\n"
-                "regions_checked = []\n"
+                "regions_checked = []\n"                "models_checked = []\n"
                 "for name, nm, nat, vmm, vm in json.loads(sys.argv[2]):\n"
                 "    mb, vmb = Path(nm).read_bytes(), Path(vmm).read_bytes()\n"
                 "    a = resolve(mb, [Path(nat).read_bytes()]).counts()\n"
@@ -228,18 +228,47 @@ def main() -> int:
                 "    if name == 'f0':\n"
                 "        out = Path(sys.argv[4]); out.mkdir(parents=True, exist_ok=True)\n"
                 "        (out / 'f0.json').write_bytes(encode(rep))\n"
-                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)}']))\n"
+                "    # CV-221: the semantic model built from each backend's real profile is\n"
+                "    # the fixture's hand-derived expected-semantic.json (only map_ids differs:\n"
+                "    # the fixture map names the fixture compiler identity).\n"
+                "    from sv0cov.formats.map import validate_map\n"
+                "    from sv0cov.formats.rawprofile import decode\n"
+                "    from sv0cov.formats.indexed import check_semantic_structure\n"
+                "    from sv0cov.model.semantic import build_semantic\n"
+                "    def model(map_bytes, raws):\n"
+                "        mm = validate_map(map_bytes)\n"
+                "        profs = [decode(Path(r).read_bytes(), map_counter_count=mm['program_counter_count'],\n"
+                "                        expected_map_id=bytes.fromhex(mm['map_id'])) for r in raws]\n"
+                "        return check_semantic_structure(build_semantic([mm], profs))\n"
+                "    sn, sv, s2 = model(mb, [nat]), model(vmb, [vm]), model(mb, [nat, vm])\n"
+                "    if sn != sv: bad.append(f'{name}: the semantic models of the native and VM runs differ')\n"
+                "    if not sn['complete'] or sn['map_ids'] != [m['map_id']]: bad.append(f'{name}: semantic model incomplete or wrong map_ids')\n"
+                "    if [p['count']['value'] for p in s2['points']] != [2 * p['count']['value'] for p in sn['points']] \\\n"
+                "            or [l['status'] for l in s2['lines']] != [l['status'] for l in sn['lines']]:\n"
+                "        bad.append(f'{name}: the model of native + VM profiles is not the doubled model')\n"
+                "    exps = Path(sys.argv[3]) / name / 'expected-semantic.json'\n"
+                "    if exps.is_file():\n"
+                "        want = json.loads(exps.read_bytes())\n"
+                "        if {**sn, 'map_ids': want['map_ids']} != want:\n"
+                "            keys = [k for k in want if k != 'map_ids' and sn[k] != want[k]]\n"
+                "            bad.append(f'{name}: semantic model differs from expected-semantic.json in {keys}')\n"
+                "        models_checked.append(name)\n"
+                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)} MODELS {len(models_checked)}']))\n"
             )
             p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES),
                                 str(PARITY_DIR)],
                                capture_output=True, text=True, timeout=300)
             out_lines = p.stdout.strip().splitlines()
             nregions = out_lines[-1].split()[1] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            nmodels = out_lines[-1].split()[3] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            if nmodels != str(len(list(FIXTURES.glob("*/expected-semantic.json")))):
+                errors.append(f"sv0cov reader: {nmodels} semantic models compared with expected-semantic.json, want every fixture")
             bad = [line for line in out_lines if not line.startswith("REGIONS ")]
             if p.returncode or bad:
                 errors.append(f"sv0cov reader: {' '.join(bad)} {p.stderr.strip()[-600:]}")
             reader = (f"sv0cov reader resolves native + VM to the expected counts; {nregions} region expressions "
-                      "evaluate equal and exact on both (CV-204); parity reports pass "
+                      "evaluate equal and exact on both (CV-204); the semantic model of each real run equals the fixture's "
+                      f"expected-semantic.json ({nmodels} fixtures, CV-221); parity reports pass "
                       f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
         # 3-4. Small programs.
