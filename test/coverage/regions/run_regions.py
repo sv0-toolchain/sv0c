@@ -15,11 +15,19 @@
    - desugar.sv0 (COV-MET-008): `for` and compound assignment plan only
      source regions (the iterable, the loop body, one `mutation` region);
      no compiler-generated code gets a region.
-2. `?` is refused (exit 9, no map) until CV-213 models it: the code after
-   an early return would otherwise be over-counted.
+2. `?` is planned (CV-213; the reviewed `question` fixture pins its points
+   and counts). Where the planner cannot reach one, in a contract clause
+   (question_requires.sv0) or a loop invariant (question_invariant.sv0), the
+   build is refused (exit 9, no map) rather than left over-counting the code
+   after the early return. The corpus `?` programs must each carry a
+   synthetic-support propagate point. Three of them, including `?` on a
+   struct field and on a block (operands lowering used to drop silently),
+   also run instrumented on the C backend and on sv0vm: the same exit
+   status and the same counts, with the propagate point counting exactly
+   the early returns.
 3. Sweep: every program in sv0c/test/behavior/cases, every
    sv0c/test/integration project, and lib/parser.sv0 (7k lines) plan in map
-   mode, except the known refusals (`include`, `?`), and every map passes
+   mode, except the known refusal (`include`), and every map passes
    sv0cov's own validate_map with its source bytes (run with the first
    Python >= 3.10 found), and its line flags follow CV-202: a region
    contributes to lines exactly when it is a `user` region and not a
@@ -46,15 +54,21 @@ RUN_ID = "0123456789abcdef0123456789abcdef"
 
 sys.path.insert(0, str(SV0C / "test" / "coverage" / "plan"))
 from run_plan import ensure_built, modern_python  # noqa: E402
+from run_vm_profile import build_vm, transport, vm_run  # noqa: E402
+from run_vm_profile import profile as read_profile  # noqa: E402
 
 TARGETED = ("dead_code", "unsafe_block", "scrutinee", "desugar")
 # Programs coverage refuses on purpose, with the reason it must name.
 REFUSED = {
-    "question_op": "`?` operator",
-    "question_none_propagates": "`?` operator",
-    "option_result": "`?` operator",
     "include_basic": "compiled source differs",
+    "question_requires": "`?` operator where coverage cannot plan it",
+    "question_invariant": "`?` operator where coverage cannot plan it",
 }
+# Corpus programs that use `?`: each map has a propagate point (CV-213).
+QUESTION = ("question_op", "question_none_propagates", "option_result", "question_field_operand", "question_block_operand")
+# name -> (exit status, early returns through `?`), run on native and sv0vm.
+QUESTION_RUNS = {"question_none_propagates": (7, 1), "question_field_operand": (7, 1), "question_block_operand": (9, 1),
+                 "question_op": (42, 0)}
 
 # Resolve a native profile through its map and print each region's line.
 RESOLVE = r"""
@@ -137,6 +151,40 @@ def main() -> int:
                 errors.append(f"{name}: regions differ from {name}.expected:\n    got  {got.stdout.splitlines()}\n"
                               f"    want {want}\n    {got.stderr.strip()[-300:]}")
 
+        # 2. `?` programs run instrumented on both backends.
+        for name, (status, early) in QUESTION_RUNS.items():
+            src = SV0C / "test" / "behavior" / "cases" / f"{name}.sv0"
+            d = t / f"q-{name}"
+            (d / "vm").mkdir(parents=True)
+            p = subprocess.run([str(SV0), "native-compile", "--coverage=instrument", "-o", str(d / "x"), str(src)],
+                               capture_output=True, text=True, timeout=300)
+            err = build_vm([str(src)], d / "vm" / "x.sv0b")
+            if p.returncode or err:
+                errors.append(f"{name}: instrumented build failed: {p.stderr.strip()[-300:]} {err or ''}")
+                continue
+            m = json.loads((d / "x.sv0covmap.json").read_bytes())
+            if (d / "vm" / "x.sv0covmap.json").read_bytes() != (d / "x.sv0covmap.json").read_bytes():
+                errors.append(f"{name}: the C and VM maps differ")
+            qctr = sorted(q["counter_index"] for q in m["points"] if q["semantic_discriminator"] == "question:propagate")
+            seen = {}
+            for backend in ("native", "vm"):
+                pdir = d / f"p-{backend}"
+                pdir.mkdir()
+                if backend == "native":
+                    rc = subprocess.run([str(d / "x")], capture_output=True, env=transport(pdir), timeout=60).returncode
+                else:
+                    rc, _ = vm_run(d / "vm" / "x.sv0b", d / "vm" / "x.sv0covbind.json", transport(pdir))
+                prof = read_profile(pdir, m, errors, f"{name} {backend}")
+                if rc != status or prof is None:
+                    errors.append(f"{name} {backend}: exit {rc}, want {status} with a profile")
+                    continue
+                counts = dict(prof.counts)
+                seen[backend] = counts
+                if sum(counts.get(c, 0) for c in qctr) != early:
+                    errors.append(f"{name} {backend}: `?` propagate points count {[counts.get(c, 0) for c in qctr]}, want {early} in total")
+            if len(seen) == 2 and seen["native"] != seen["vm"]:
+                errors.append(f"{name}: native and VM counts differ")
+
         # 2 + 3. The corpus sweep.
         requests: list[tuple[str, list[str], Path]] = []
         for f in sorted((SV0C / "test" / "behavior" / "cases").glob("*.sv0")):
@@ -146,8 +194,11 @@ def main() -> int:
             mode = [str(d / "main.sv0")] if d.name == "include_basic" else ["--project", str(d)]
             requests.append((d.name, mode, d))
         requests.append(("parser", [str(SV0C / "lib" / "parser.sv0")], SV0C / "lib"))
+        for name in ("question_requires", "question_invariant"):
+            requests.append((name, [str(HERE / f"{name}.sv0")], HERE))
         maps: list[tuple[str, str]] = []
         refused_seen = set()
+        question_seen: set[str] = set()
         for name, request, root in requests:
             out = t / "sweep" / f"{name}-{len(maps)}.json"
             out.parent.mkdir(exist_ok=True)
@@ -161,6 +212,18 @@ def main() -> int:
                 errors.append(f"{name}: map mode failed (rc={p.returncode}): {p.stderr.strip()[:300]}")
                 continue
             maps.append((str(out), str(root)))
+            if name in QUESTION:
+                question_seen.add(name)
+                m = json.loads(out.read_bytes())
+                qs = [q for q in m["points"] if q["semantic_discriminator"] == "question:propagate"]
+                bad_q = [q for q in qs if (q["kind"], q["classification"], q["outcome_ordinal"]) != ("region", "synthetic_support", None)
+                         or q["counter_index"] is None]
+                syn = [r for r in m["regions"] if r["classification"] == "synthetic_support"]
+                if not qs or bad_q or len(syn) != len(qs) or any(r["kind"] != "return" or r["line_contributing"] for r in syn):
+                    errors.append(f"{name}: want one counted synthetic-support region point and `return` region per `?`: "
+                                  f"{len(qs)} points, {len(bad_q)} malformed, {len(syn)} regions")
+        if not set(QUESTION) <= question_seen:
+            errors.append(f"the sweep did not plan every `?` corpus program: {sorted(set(QUESTION) - question_seen)}")
         if refused_seen != set(REFUSED):
             errors.append(f"the sweep did not meet every expected refusal: {sorted(set(REFUSED) - refused_seen)}")
         totals = "validation SKIPPED (no Python >= 3.10)"
@@ -182,7 +245,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print(f"coverage regions: OK ({len(TARGETED)} targeted programs match their reviewed regions and counts; "
-          f"{len(maps)} programs swept and sv0cov-validated ({totals}); {len(REFUSED)} expected refusals)")
+          f"{len(maps)} programs swept and sv0cov-validated ({totals}); {len(QUESTION)} `?` programs planned with synthetic-support propagate points; {len(QUESTION_RUNS)} of them run on C + sv0vm with equal counts; {len(REFUSED)} expected refusals)")
     return 0
 
 

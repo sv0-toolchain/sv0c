@@ -84,7 +84,8 @@ def _run_both(request: str, env: dict) -> tuple[int, str, str, int, str]:
 
 
 def parse_dump(text: str) -> dict:
-    out: dict = {"sources": [], "entities": [], "points": [], "outcome_points": [], "branches": [], "regions": []}
+    out: dict = {"sources": [], "entities": [], "points": [], "outcome_points": [], "question_points": [], "branches": [],
+                 "regions": []}
     for line in text.splitlines():
         f = line.split("\t")
         if f[0] == "source":
@@ -98,6 +99,11 @@ def parse_dump(text: str) -> dict:
             if f[2] == "branch_outcome":
                 pt["outcome_ordinal"] = int(f[12])
                 out["outcome_points"].append(pt)
+            elif f[2] == "region":
+                # A `?` operator's propagate point (CV-213).
+                if f[12:] != ["-1", "synthetic_support"]:
+                    raise ValueError(f"unexpected region point {line!r}")
+                out["question_points"].append(pt)
             else:
                 out["points"].append(pt)
         elif f[0] == "branch":
@@ -125,8 +131,12 @@ def terms(text: str) -> list[tuple[int, str]]:
 
 def expected_regions(expected: dict) -> tuple[list, list]:
     """Branches and regions of an expected map, with counter terms named like
-    the dump (entry:<entity>, branch:<branch index>:<ordinal>)."""
+    the dump (entry:<entity>, branch:<branch index>:<ordinal>, and
+    question:<n> for the n-th `?` point in source order)."""
     names = {p["point_id"]: f"entry:{p['entity_index']}" for p in expected["points"] if p["kind"] == "function_entry"}
+    for n, q in enumerate(sorted((p for p in expected["points"] if p["kind"] == "region"),
+                                 key=lambda p: (p["source_index"], p["span"]["start_byte"]))):
+        names[q["point_id"]] = f"question:{n}"
     branches = []
     for b in expected["branches"]:
         for o in b["outcomes"]:
@@ -203,6 +213,15 @@ def check_fixture(name: str, errors: list[str], tmp: Path) -> None:
     got_outcomes = sorted(got["outcome_points"], key=lambda p: (p["span"]["start_byte"], p["outcome_ordinal"]))
     if got_outcomes != want_outcomes:
         errors.append(f"{name}: branch_outcome points differ:\n    got  {got_outcomes}\n    want {want_outcomes}")
+    want_questions = sorted(
+        ({"kind": p["kind"], "entity_index": p["entity_index"], "semantic_discriminator": p["semantic_discriminator"],
+          "source_index": p["source_index"], "span": p["span"]}
+         for p in expected["points"] if p["kind"] == "region"),
+        key=lambda p: (p["source_index"], p["span"]["start_byte"]))
+    if any(p["classification"] != "synthetic_support" for p in expected["points"] if p["kind"] == "region"):
+        errors.append(f"{name}: a region point of the expected map is not synthetic_support")
+    if got["question_points"] != want_questions:
+        errors.append(f"{name}: `?` points differ:\n    got  {got['question_points']}\n    want {want_questions}")
     want_branches, want_regions = expected_regions(expected)
     if got["branches"] != want_branches:
         errors.append(f"{name}: branches differ:\n    got  {got['branches']}\n    want {want_branches}")
@@ -370,8 +389,8 @@ def main() -> int:
     errors: list[str] = []
     check_constructs(errors)
     fixtures = sorted(p.parent.name for p in FIXTURES.glob("*/expected-map.json"))
-    if len(fixtures) < 7:
-        errors.append(f"expected the 7 sv0cov semantic fixtures under {FIXTURES}, found {fixtures}")
+    if len(fixtures) < 8:
+        errors.append(f"expected the 8 sv0cov semantic fixtures under {FIXTURES}, found {fixtures}")
     with tempfile.TemporaryDirectory() as td:
         for name in fixtures:
             check_fixture(name, errors, Path(td))

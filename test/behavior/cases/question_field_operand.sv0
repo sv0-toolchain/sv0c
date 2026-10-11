@@ -1,0 +1,8 @@
+/* ? on a struct field propagates the failure variant — exits 7. The operand is
+   not a call or a bare name, so its enum is the enclosing fn's return type. */
+enum Opt { Some(i32), None }
+struct Holder { o: Opt }
+fn g(n: i32) -> Opt { if n > 0 { return Opt::Some(n); } return Opt::None; }
+fn f(n: i32) -> Opt { let h: Holder = Holder { o: g(n) }; let v: i32 = h.o?; return Opt::Some(v + 1); }
+fn pick(o: Opt, d: i32) -> i32 { return match o { Opt::Some(x) => x, Opt::None => d }; }
+fn main() -> i32 { return pick(f(0), 4) + pick(f(2), 0); }

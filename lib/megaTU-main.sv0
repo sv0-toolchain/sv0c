@@ -417,27 +417,6 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         write_file("/dev/stderr", "coverage: could not recover a function's span from its tokens\n");
         return megatu_cov_rc(9);
     }
-    /* `?` hides an early return the planner does not model yet: the code
-       after it would be counted on runs that returned early. Refuse rather
-       than over-count (CV-201; modelled as a synthetic-support branch in
-       CV-213). */
-    let mut qt: i32 = 0;
-    while qt < vec_len(tags) {
-        if vec_get(tags, qt) == 34 {
-            let qoff: i32 = vec_get(starts, qt);
-            let mut qe: i32 = 0;
-            while qe < vec_len(ent_start) {
-                let inside: bool = if qoff < vec_get(ent_start, qe) { false } else { qoff < vec_get(ent_end, qe) };
-                if inside {
-                    write_file("/dev/stderr", string_concat(string_concat("coverage: function ", cov_plan_line_at(qnames, qe)),
-                        " uses the `?` operator, which coverage does not plan yet (the code after an early return would be over-counted; sv0cov CV-213); build with --coverage=off\n"));
-                    return megatu_cov_rc(9);
-                }
-                qe = qe + 1;
-            }
-        }
-        qt = qt + 1;
-    }
     /* Regions and branches (CV-108): the token walk's statement count per
        function body is checked against the AST body block. */
     let body_stmts: Vec<i32> = vec_new();
@@ -461,6 +440,37 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         write_file("/dev/stderr", string_concat(string_concat("coverage: could not plan the regions of function ",
             cov_plan_line_at(qnames, bad)), " (unsupported statement or construct)\n"));
         return megatu_cov_rc(9);
+    }
+    /* `?` hides an early return (CV-213): the walk plans each one as a
+       counted propagate point. One it did not reach (in a contract clause or
+       a loop invariant) would leave the code after it over-counted, so the
+       build is refused rather than mis-planned. */
+    let mut qt: i32 = 0;
+    while qt < vec_len(tags) {
+        if vec_get(tags, qt) == 34 {
+            let mut planned: bool = false;
+            let mut qb: i32 = 0;
+            while qb < vec_len(br) / 5 {
+                if vec_get(br, qb * 5) == 7 {
+                    if vec_get(br, qb * 5 + 2) == qt { planned = true; }
+                }
+                qb = qb + 1;
+            }
+            let qoff: i32 = vec_get(starts, qt);
+            let mut qe: i32 = 0;
+            while qe < vec_len(ent_start) {
+                let inside: bool = if qoff < vec_get(ent_start, qe) { false } else { qoff < vec_get(ent_end, qe) };
+                if inside {
+                    if planned != true {
+                        write_file("/dev/stderr", string_concat(string_concat("coverage: function ", cov_plan_line_at(qnames, qe)),
+                            " uses the `?` operator where coverage cannot plan it (a contract clause or loop invariant); build with --coverage=off\n"));
+                        return megatu_cov_rc(9);
+                    }
+                }
+                qe = qe + 1;
+            }
+        }
+        qt = qt + 1;
     }
     if mode == 3 {
         write_file("/dev/stdout", string_concat(cov_plan_dump(source, table, cstarts, clens, src_unit,

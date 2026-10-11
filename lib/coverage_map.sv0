@@ -467,10 +467,17 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         while k < vec_get(br, b * 5 + 4) {
             vec_push(p_src, vec_get(ent_source, be));
             vec_push(p_ent, be);
-            vec_push(p_kind, 3);
             vec_push(p_s, vec_get(starts, vec_get(br, b * 5 + 2)));
             vec_push(p_e, vec_get(ends, vec_get(br, b * 5 + 3)));
-            vec_push(p_ord, k);
+            /* A `?` operator's propagate point is a synthetic-support
+               `region` point with no ordinal (CV-213). */
+            if cov_br_is_question(vec_get(br, b * 5)) {
+                vec_push(p_kind, 2);
+                vec_push(p_ord, 0 - 1);
+            } else {
+                vec_push(p_kind, 3);
+                vec_push(p_ord, k);
+            }
             vec_push(p_br, b);
             k = k + 1;
         }
@@ -603,15 +610,21 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
             cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, q2))));
             cov_vb(pts, ",\"fragment_index\":null");
         } else {
-            cov_vb(pts, string_concat("{\"classification\":\"user\",\"counter_index\":", cov_map_int(vec_get(counter, q2))));
+            if vec_get(p_kind, q2) == 2 {
+                cov_vb(pts, string_concat("{\"classification\":\"synthetic_support\",\"counter_index\":", cov_map_int(vec_get(counter, q2))));
+            } else {
+                cov_vb(pts, string_concat("{\"classification\":\"user\",\"counter_index\":", cov_map_int(vec_get(counter, q2))));
+            }
             cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, q2))));
             cov_vb(pts, string_concat(",\"fragment_index\":", cov_map_int(psk)));
         }
         if pbr < 0 {
             cov_vb(pts, ",\"kind\":\"function_entry\",\"outcome_ordinal\":null");
+        } else { if vec_get(p_kind, q2) == 2 {
+            cov_vb(pts, ",\"kind\":\"region\",\"outcome_ordinal\":null");
         } else {
             cov_vb(pts, string_concat(",\"kind\":\"branch_outcome\",\"outcome_ordinal\":", cov_map_int(vec_get(p_ord, q2))));
-        }
+        } }
         cov_vb(pts, ",\"point_id\":\"");
         cov_vb_from(pts, ids, q2 * 64, 64);
         cov_vb(pts, "\"");
@@ -628,22 +641,31 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
     let bkeys: Vec<i32> = vec_new();
     let bkoff: Vec<i32> = vec_new();
     let bklen: Vec<i32> = vec_new();
+    /* `?` points are not map branches (CV-213): `real` lists the others. */
+    let real: Vec<i32> = vec_new();
     b = 0;
     while b < nb {
+        if cov_br_is_question(vec_get(br, b * 5)) != true { vec_push(real, b); }
+        b = b + 1;
+    }
+    let nreal: i32 = vec_len(real);
+    let mut rb: i32 = 0;
+    while rb < nreal {
+        b = vec_get(real, rb);
         let bp0: i32 = ne + vec_get(obase, b);
         cov_map_key_begin(bkeys, bkoff);
         cov_vb(bkeys, string_concat(cov_map_pad(vec_get(p_src, bp0)), cov_map_pad(vec_get(p_s, bp0))));
         cov_vb(bkeys, string_concat(string_concat(cov_map_pad(vec_get(p_e, bp0)), cov_br_kind_name(vec_get(br, b * 5))), "\t"));
         cov_vb_from(bkeys, ids, bp0 * 64, 64);
         cov_map_key_end(bkeys, bkoff, bklen);
-        b = b + 1;
+        rb = rb + 1;
     }
     let border: Vec<i32> = cov_map_sort(bkeys, bkoff, bklen);
     let brs: Vec<i32> = vec_new();
     cov_vb(brs, "[");
     let mut bi: i32 = 0;
-    while bi < nb {
-        let bb: i32 = vec_get(border, bi);
+    while bi < nreal {
+        let bb: i32 = vec_get(real, vec_get(border, bi));
         let bp: i32 = ne + vec_get(obase, bb);
         let bsk: i32 = vec_get(p_src, bp);
         let bbase: i32 = vec_get(cstarts, vec_get(src_unit, bsk));
@@ -769,9 +791,11 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
            the canonical empty expression (SPEC 11.7, 16.3.6; CV-201). */
         if vec_get(xempty, rr) == 1 {
             cov_vb(rgs, "{\"classification\":\"statically_unreachable\",\"counter_expression\":");
+        } else { if cov_rg_synthetic(kind) {
+            cov_vb(rgs, "{\"classification\":\"synthetic_support\",\"counter_expression\":");
         } else {
             cov_vb(rgs, "{\"classification\":\"user\",\"counter_expression\":");
-        }
+        } }
         cov_vb_from(rgs, exprs, vec_get(xoff, rr), vec_get(xlen, rr));
         cov_vb(rgs, string_concat(",\"entity_index\":", cov_map_int(rent)));
         cov_vb(rgs, string_concat(",\"kind\":", cov_map_str(cov_rg_kind_name(kind))));

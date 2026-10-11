@@ -396,8 +396,9 @@ fn cov_plan_dump(source: string, table: string, cstarts: Vec<i32>, clens: Vec<i3
  * Side tables (flat, stride shown):
  *   rg  (5): kind, entity, first token, last token, counter expression
  *   br  (5): kind (1 if, 2 loop, 3 match, 4 conditional_expression: an
- *            `if` nested in an expression), entity, first token, last
- *            token, outcome count
+ *            `if` nested in an expression, 7 a `?` operator: not a branch
+ *            but one counted synthetic-support point, see below), entity,
+ *            first token, last token, outcome count
  *   cef (2): first term, term count  -- counter expressions over
  *   cet (2): coefficient, point ref     entry and outcome points
  * A point ref >= 0 is the function_entry of that entity; a ref < 0 is branch
@@ -409,6 +410,18 @@ fn cov_plan_dump(source: string, table: string, cstarts: Vec<i32>, clens: Vec<i3
  * paths inside it that always leave: `return` leaves the function, `break`
  * and `continue` leave the loop body (a loop absorbs them). The walk returns
  * both amounts through `ret`: [returns, jumps, next token, statement count].
+ *
+ * The `?` operator (CV-213) hides an early return: `e?` leaves the function
+ * when `e` is the failure variant. Each `?` token is planned as one counted
+ * point, `propagate` (kind `region`, classification `synthetic_support`,
+ * discriminator `question:propagate`, span = the `?` token), hit only when
+ * the operator returns early, plus a `return` region of the same span and
+ * classification whose counter is that point. It is compiler-generated
+ * support, so it enters no ordinary denominator (SPEC 11.7; a map branch
+ * outcome cannot be synthetic, 16.3.6). The point's count is an amount that
+ * leaves the function: the position drops by it for whatever follows the
+ * `?`, in the same expression and after the statement. It rides in `br` as
+ * kind 7 with one outcome so counter expressions can name it.
  */
 
 fn cov_rg_kind_name(k: i32) -> string {
@@ -423,7 +436,14 @@ fn cov_rg_kind_name(k: i32) -> string {
     if k == 10 { return "match_arm"; }
     if k == 11 { return "mutation"; }
     if k == 12 { return "return"; }
+    if k == 13 { return "return"; }
     return "call";
+}
+
+/* Region kind 13 is the early return of a `?` operator: written as `return`,
+   classified synthetic_support (CV-213). */
+fn cov_rg_synthetic(kind: i32) -> bool {
+    return kind == 13;
 }
 
 /* Whether a region contributes to line status (SPEC 11.4, 27.1; CV-202).
@@ -433,6 +453,7 @@ fn cov_rg_kind_name(k: i32) -> string {
    region (empty expression): only user regions enter line status (11.7). */
 fn cov_rg_line_contributing(kind: i32, first: i32, empty: bool) -> bool {
     if empty { return false; }
+    if kind == 13 { return false; }
     if kind == 2 { return false; }
     if kind == 9 { return false; }
     if kind == 10 {
@@ -465,7 +486,26 @@ fn cov_outcome_evidence(kind: i32) -> string {
     return "sv0c:loop:condition-literal-true";
 }
 
+/* Kind 7 is a `?` operator's propagate point, not a map branch (CV-213). */
+fn cov_br_is_question(kind: i32) -> bool {
+    return kind == 7;
+}
+
+/* Branch b's index among the entries of its own class (map branches, or `?`
+   points): the plan dump and the map leave the other class out. */
+fn cov_br_rank(br: Vec<i32>, b: i32) -> i32 {
+    let q: bool = cov_br_is_question(vec_get(br, b * 5));
+    let mut n: i32 = 0;
+    let mut i: i32 = 0;
+    while i < b {
+        if cov_br_is_question(vec_get(br, i * 5)) == q { n = n + 1; }
+        i = i + 1;
+    }
+    return n;
+}
+
 fn cov_br_kind_name(k: i32) -> string {
+    if k == 7 { return "question:propagate"; }
     if k == 1 { return "if"; }
     if k == 2 { return "loop"; }
     if k == 5 { return "loop"; }
@@ -476,6 +516,7 @@ fn cov_br_kind_name(k: i32) -> string {
 
 /* Outcome k's name: true/false, body/exit, or arm:k (SPEC 16.3.6). */
 fn cov_outcome_name(kind: i32, k: i32) -> string {
+    if kind == 7 { return "propagate"; }
     if cov_br_is_loop(kind) {
         if k == 0 { return "body"; }
         return "exit";
@@ -606,17 +647,43 @@ fn cov_is_construct(t: i32) -> bool {
     return t == 72;
 }
 
+/* The `?` at token t as a kind-7 entry of `br` (pushed once: a loop
+   condition names its `?` points before it is walked). */
+fn cov_q_point(br: Vec<i32>, e: i32, t: i32) -> i32 {
+    let nb: i32 = vec_len(br) / 5;
+    let mut b: i32 = 0;
+    while b < nb {
+        if vec_get(br, b * 5) == 7 {
+            if vec_get(br, b * 5 + 2) == t { return b; }
+        }
+        b = b + 1;
+    }
+    let nw: i32 = cov_br_push(br, 7, e, t);
+    vec_set(br, nw * 5 + 3, t);
+    vec_set(br, nw * 5 + 4, 1);
+    return nw;
+}
+
 /* Walk the constructs inside expression tokens [t0, t1] at position p.
    ret = [returns, jumps]. */
 fn cov_walk_expr(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
                  e: i32, t0: i32, t1: i32, p: i32, ret: Vec<i32>) -> i32 {
     let mut r: i32 = 0 - 1;
     let mut j: i32 = 0 - 1;
+    /* The position moves as the expression is evaluated left to right: it
+       drops by what has already left through a `?` (CV-213). */
+    let mut cur: i32 = p;
     let mut t: i32 = t0;
     while t <= t1 {
         let g: i32 = vec_get(tags, t);
-        if cov_is_construct(g) {
-            if cov_walk_construct(tags, cef, cet, rg, br, e, t, p, true, ret) < 0 { return 0 - 1; }
+        if g == 34 {
+            let q: i32 = cov_ce_ref(cef, cet, cov_outcome_ref(cov_q_point(br, e, t), 0));
+            cov_rg_push(rg, 13, e, t, t, q);
+            r = cov_ce_lin(cef, cet, r, 1, q, 1);
+            cur = cov_ce_lin(cef, cet, cur, 1, q, 0 - 1);
+            t = t + 1;
+        } else { if cov_is_construct(g) {
+            if cov_walk_construct(tags, cef, cet, rg, br, e, t, cur, true, ret) < 0 { return 0 - 1; }
             r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
             j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
             t = vec_get(ret, 2) + 1;
@@ -629,14 +696,14 @@ fn cov_walk_expr(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br:
                 if prev != 5 { block = true; }
             }
             if block {
-                if cov_walk_block(tags, cef, cet, rg, br, e, t, p, ret) < 0 { return 0 - 1; }
+                if cov_walk_block(tags, cef, cet, rg, br, e, t, cur, ret) < 0 { return 0 - 1; }
                 r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
                 j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
                 t = vec_get(ret, 2) + 1;
             } else {
                 t = t + 1;
             }
-        }
+        } }
     }
     vec_set(ret, 0, r);
     vec_set(ret, 1, j);
@@ -820,6 +887,15 @@ fn cov_walk_construct(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>
             if vec_get(br, b2 * 5) == 2 {
                 both = cov_ce_lin(cef, cet, both, 1, cov_ce_ref(cef, cet, cov_outcome_ref(b2, 1)), 1);
             }
+            /* An evaluation that leaves through a `?` in the condition
+               reaches neither body nor exit (CV-213). */
+            let mut ct: i32 = t + 1;
+            while ct <= cond_end {
+                if vec_get(tags, ct) == 34 {
+                    both = cov_ce_lin(cef, cet, both, 1, cov_ce_ref(cef, cet, cov_outcome_ref(cov_q_point(br, e, ct), 0)), 1);
+                }
+                ct = ct + 1;
+            }
             cov_rg_push(rg, 6, e, t + 1, cond_end, both);
             if cov_walk_expr(tags, cef, cet, rg, br, e, t + 1, cond_end, both, ret) < 0 { return 0 - 1; }
             r2 = vec_get(ret, 0);
@@ -958,7 +1034,7 @@ fn cov_plan_line_numbers(text: string, fs: i32, fe: i32) -> string {
 
 /* Normalized terms of expression h: equal refs merged, zeros dropped,
    sorted by ref; "+1*entry:<e>" / "-1*branch:<b>:<k>", comma-separated. */
-fn cov_plan_terms(cef: Vec<i32>, cet: Vec<i32>, h: i32) -> string {
+fn cov_plan_terms(cef: Vec<i32>, cet: Vec<i32>, br: Vec<i32>, h: i32) -> string {
     if h < 0 { return ""; }
     let first: i32 = vec_get(cef, h * 2);
     let n: i32 = vec_get(cef, h * 2 + 1);
@@ -1014,8 +1090,12 @@ fn cov_plan_terms(cef: Vec<i32>, cet: Vec<i32>, h: i32) -> string {
                 term = string_concat(string_concat(term, "entry:"), cov_src_itoa(rj));
             } else {
                 let enc: i32 = 0 - rj - 1;
-                term = string_concat(string_concat(term, "branch:"), cov_src_itoa(enc / 1024));
-                term = string_concat(string_concat(term, ":"), cov_src_itoa(enc % 1024));
+                if cov_br_is_question(vec_get(br, (enc / 1024) * 5)) {
+                    term = string_concat(string_concat(term, "question:"), cov_src_itoa(cov_br_rank(br, enc / 1024)));
+                } else {
+                    term = string_concat(string_concat(term, "branch:"), cov_src_itoa(cov_br_rank(br, enc / 1024)));
+                    term = string_concat(string_concat(term, ":"), cov_src_itoa(enc % 1024));
+                }
             }
             if string_len(out) == 0 { out = term; } else { out = string_concat(string_concat(out, ","), term); }
         }
@@ -1029,8 +1109,12 @@ fn cov_plan_terms(cef: Vec<i32>, cet: Vec<i32>, h: i32) -> string {
  *           <outcome names, comma-separated>
  *   point   <index> branch_outcome <entity> <branch kind> <source> <span>
  *           <ordinal> [statically_unreachable <evidence identity>]
+ *   point   <index> region <entity> question:propagate <source> <span> -1
+ *           synthetic_support        (a `?` operator's early return, CV-213)
  *   region  <index> <kind> <entity> <source> <span> <line_contributing 0|1>
  *           <line numbers> <counter terms>
+ * Branch indexes skip the `?` points; a term names one as question:<n>, its
+ * index among them in source order.
  * Regions are ordered by source, span start, span end, then kind name. */
 fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
                         cstarts: Vec<i32>, clens: Vec<i32>, src_unit: Vec<i32>,
@@ -1040,10 +1124,14 @@ fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
     let nb: i32 = vec_len(br) / 5;
     let mut b: i32 = 0;
     while b < nb {
+        if cov_br_is_question(vec_get(br, b * 5)) {
+            b = b + 1;
+            continue;
+        }
         let be: i32 = vec_get(br, b * 5 + 1);
         let sk: i32 = vec_get(ent_source, be);
         let unit: i32 = vec_get(src_unit, sk);
-        out = string_concat(out, string_concat(string_concat("branch\t", cov_src_itoa(b)), "\t"));
+        out = string_concat(out, string_concat(string_concat("branch\t", cov_src_itoa(cov_br_rank(br, b))), "\t"));
         out = string_concat(out, string_concat(cov_br_kind_name(vec_get(br, b * 5)), "\t"));
         out = string_concat(out, string_concat(string_concat(cov_src_itoa(be), "\t"), string_concat(cov_src_itoa(sk), "\t")));
         out = string_concat(out, cov_plan_span_text(source, cstarts, clens, unit,
@@ -1071,11 +1159,19 @@ fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
             vec_get(starts, vec_get(br, ob * 5 + 2)), vec_get(ends, vec_get(br, ob * 5 + 3)));
         let mut ok: i32 = 0;
         while ok < vec_get(br, ob * 5 + 4) {
-            out = string_concat(out, string_concat(string_concat("point\t", cov_src_itoa(pidx)), "\tbranch_outcome\t"));
+            if cov_br_is_question(vec_get(br, ob * 5)) {
+                out = string_concat(out, string_concat(string_concat("point\t", cov_src_itoa(pidx)), "\tregion\t"));
+            } else {
+                out = string_concat(out, string_concat(string_concat("point\t", cov_src_itoa(pidx)), "\tbranch_outcome\t"));
+            }
             out = string_concat(out, string_concat(cov_src_itoa(obe), "\t"));
             out = string_concat(out, string_concat(cov_br_kind_name(vec_get(br, ob * 5)), "\t"));
             out = string_concat(out, string_concat(string_concat(cov_src_itoa(osk), "\t"), ospan));
-            out = string_concat(out, string_concat("\t", cov_src_itoa(ok)));
+            if cov_br_is_question(vec_get(br, ob * 5)) {
+                out = string_concat(out, "\t-1\tsynthetic_support");
+            } else {
+                out = string_concat(out, string_concat("\t", cov_src_itoa(ok)));
+            }
             if cov_outcome_unreachable(vec_get(br, ob * 5), ok) {
                 out = string_concat(out, string_concat("\tstatically_unreachable\t", cov_outcome_evidence(vec_get(br, ob * 5))));
             }
@@ -1136,7 +1232,7 @@ fn cov_plan_region_dump(source: string, starts: Vec<i32>, ends: Vec<i32>,
         let en: i32 = vec_get(ends, vec_get(rg, r * 5 + 3));
         let base: i32 = vec_get(cstarts, unit2);
         let text: string = string_substr(source, base, vec_get(clens, unit2));
-        let terms: string = cov_plan_terms(cef, cet, vec_get(rg, r * 5 + 4));
+        let terms: string = cov_plan_terms(cef, cet, br, vec_get(rg, r * 5 + 4));
         let lc: bool = cov_rg_line_contributing(kind, string_char_at(source, s), string_len(terms) == 0);
         out = string_concat(out, string_concat(string_concat("region\t", cov_src_itoa(x)), "\t"));
         out = string_concat(out, string_concat(cov_rg_kind_name(kind), "\t"));
@@ -1285,6 +1381,41 @@ fn cov_hit_table(tags: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3
             }
         }
         i = i + 1;
+    }
+    /* `?` (CV-213): the parser makes an ExprTry node (tag 22) when it
+       consumes a `?` token, so the k-th such node is the k-th `?` token; its
+       entry is the counter of that token's propagate point (-1 when the
+       token was not planned). The two counts must agree, else no `?` gets a
+       hit and the placement check fails the build. */
+    let qtok: Vec<i32> = vec_new();
+    let mut tq: i32 = 0;
+    while tq < ntok {
+        if vec_get(tags, tq) == 34 { vec_push(qtok, tq); }
+        tq = tq + 1;
+    }
+    let mut nq: i32 = 0;
+    i = 0;
+    while i < n {
+        if vec_get(et, i) == 22 { nq = nq + 1; }
+        i = i + 1;
+    }
+    if nq == vec_len(qtok) {
+        let mut kq: i32 = 0;
+        i = 0;
+        while i < n {
+            if vec_get(et, i) == 22 {
+                let want_tok: i32 = vec_get(qtok, kq);
+                let mut qb: i32 = 0;
+                while qb < nb {
+                    if vec_get(br, qb * 5) == 7 {
+                        if vec_get(br, qb * 5 + 2) == want_tok { vec_set(tab, i, vec_get(bctr, qb)); }
+                    }
+                    qb = qb + 1;
+                }
+                kq = kq + 1;
+            }
+            i = i + 1;
+        }
     }
     return tab;
 }

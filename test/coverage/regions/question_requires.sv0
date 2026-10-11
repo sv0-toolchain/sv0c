@@ -1,0 +1,20 @@
+enum Opt { Some(i32), None }
+
+fn pick(n: i32) -> Opt {
+    if n > 0 {
+        return Opt::Some(n);
+    }
+    return Opt::None;
+}
+
+fn half(n: i32) -> Opt requires(pick(n)? > 0) {
+    return Opt::Some(n / 2);
+}
+
+fn main() -> i32 {
+    let r: Opt = half(4);
+    return match r {
+        Opt::Some(x) => x - 2,
+        Opt::None => 9,
+    };
+}

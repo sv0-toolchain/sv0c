@@ -1,0 +1,6 @@
+/* ? on a block expression unwraps and propagates — exits 9. */
+enum Opt { Some(i32), None }
+fn g(n: i32) -> Opt { if n > 0 { return Opt::Some(n); } return Opt::None; }
+fn f(n: i32) -> Opt { let v: i32 = { g(n) }?; return Opt::Some(v + 1); }
+fn pick(o: Opt, d: i32) -> i32 { return match o { Opt::Some(x) => x, Opt::None => d }; }
+fn main() -> i32 { return pick(f(0), 5) + pick(f(3), 0); }

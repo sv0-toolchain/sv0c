@@ -159,7 +159,8 @@ fn ir_expr_tag(e: Expr) -> i32 {
    so exit counts false condition evaluations only; `loop` hits body at the
    head; match arm k at the head of its body. `loop { }` and `while true`
    place no exit hit: the planner classifies that exit statically
-   unreachable (CV-203). */
+   unreachable (CV-203). A `?` node (ExprTry) carries its propagate point:
+   the hit goes first in the early-return arm (CV-213). */
 
 fn lower_cov_counter(fn_ctx: Vec<i32>, node: i32) -> i32 {
     let n: i32 = vec_len(fn_ctx);
@@ -1510,6 +1511,24 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             }
         }
     }
+    if enum_name < 0 {
+        /* Any other operand (`b.o?`, `{ ... }?`, `if c { a } else { b }?`):
+           `?` returns the operand itself on failure, so its enum is the one
+           the enclosing fn returns. Without this the `?` lowered to nothing
+           and the function ran on with a garbage value (sv0cov CV-213). */
+        if item_fn_row >= 0 {
+            if item_fn_row < vec_len(item_names) {
+                let own_fn_tok: i32 = vec_get(item_names, item_fn_row);
+                let mut fk: i32 = 0;
+                while fk < fn_count {
+                    if vec_get(fn_ctx, 1 + fk) == own_fn_tok {
+                        enum_name = vec_get(fn_ctx, 1 + fn_count + fk);
+                    }
+                    fk = fk + 1;
+                }
+            }
+        }
+    }
     if enum_name < 0 { return Value::VUnit; }
     let failK: i32 = 1;
     let inner_v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
@@ -1533,6 +1552,9 @@ fn lower_tag_try(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     let cond_e: Expr = Expr::Binop(11, box_new(tag_member),
                                      box_new(fail_v));
     let mut then_is: Vec<i32> = vec_new();
+    /* sv0cov CV-213: the early return is the `?`'s propagate point. */
+    let cov_q: i32 = lower_cov_counter(fn_ctx, idx);
+    if cov_q >= 0 { vec_push(then_is, box_new(Instr::CovHit(cov_q))); }
     let ret_fail: Instr = Instr::ReturnVal(box_new(Value::VVar(u)));
     vec_push(then_is, box_new(ret_fail));
     let mut else_is: Vec<i32> = vec_new();
