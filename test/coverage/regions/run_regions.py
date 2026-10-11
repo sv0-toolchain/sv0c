@@ -65,10 +65,11 @@ REFUSED = {
     "question_invariant": "`?` operator where coverage cannot plan it",
 }
 # Corpus programs that use `?`: each map has a propagate point (CV-213).
-QUESTION = ("question_op", "question_none_propagates", "option_result", "question_field_operand", "question_block_operand")
+QUESTION = ("question_op", "question_none_propagates", "option_result", "question_field_operand", "question_block_operand",
+            "question_if_operand")
 # name -> (exit status, early returns through `?`), run on native and sv0vm.
 QUESTION_RUNS = {"question_none_propagates": (7, 1), "question_field_operand": (7, 1), "question_block_operand": (9, 1),
-                 "question_op": (42, 0)}
+                 "question_op": (42, 0), "question_if_operand": (14, 2)}
 
 # Resolve a native profile through its map and print each region's line.
 RESOLVE = r"""

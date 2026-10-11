@@ -1332,13 +1332,23 @@ fn lower_tag_if(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                 item_tags, item_names, item_d2, tok_tags, source, starts, ends) {
             if_is_str = 1;
         }
+        /* A struct or enum result: the temps carry that type. */
+        let mut if_user_ty: i32 = lower_expr_user_ty_tok(et, ed1, ed2, ed3, pp, then_idx,
+            item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+        if if_user_ty < 0 {
+            if_user_ty = lower_expr_user_ty_tok(et, ed1, ed2, ed3, pp, else_idx,
+                item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+        }
         if if_is_str == 1 {
             vec_push(out_instrs, box_new(Instr::DeclNamed(lower_string_cty(), t)));
             vec_push(out_instrs, box_new(Instr::DeclNamed(lower_string_cty(), u)));
+        } else { if if_user_ty >= 0 {
+            vec_push(out_instrs, box_new(Instr::DeclNamed(if_user_ty, t)));
+            vec_push(out_instrs, box_new(Instr::DeclNamed(if_user_ty, u)));
         } else {
             vec_push(out_instrs, box_new(Instr::DeclVar(t)));
             vec_push(out_instrs, box_new(Instr::DeclVar(u)));
-        }
+        } }
         let if_instr: Instr = lower_cov_if(fn_ctx, idx, box_new(cond_expr),
                                               then_instrs, else_instrs);
         vec_push(out_instrs, box_new(if_instr));
@@ -3888,8 +3898,27 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
         }
     }
     let out: i32 = ctr_fresh(ctr);
-    let dv: Instr = Instr::DeclVar(out);
-    vec_push(out_instrs, box_new(dv));
+    /* A struct or enum result (the first arm whose body's shape names one):
+       the result temp carries that type instead of int. */
+    let mut out_user_ty: i32 = 0 - 1;
+    let mut oa: i32 = 0;
+    while oa < arm_count {
+        if out_user_ty < 0 {
+            let oarm: i32 = block_stmt_index(pp, arms_first, arms_sidecar, oa);
+            if oarm >= 0 {
+                if vec_get(et, oarm) == 29 {
+                    out_user_ty = lower_expr_user_ty_tok(et, ed1, ed2, ed3, pp, vec_get(ed4, oarm),
+                        item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+                }
+            }
+        }
+        oa = oa + 1;
+    }
+    if out_user_ty >= 0 {
+        vec_push(out_instrs, box_new(Instr::DeclNamed(out_user_ty, out)));
+    } else {
+        vec_push(out_instrs, box_new(Instr::DeclVar(out)));
+    }
     /* KC-003 fix: lower_match_arms builds the if/else-if chain with an
        EMPTY final else (the innermost `result_instrs` it starts from,
        used as the last arm's implicit else-branch) -- currently
@@ -3918,8 +3947,11 @@ fn lower_tag_match(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
        no VM-side bug to justify it, permanently diverging from the SML
        reference. */
     if lower_vm_target() == 0 {
-        let zero_init: Instr = Instr::Store(out, box_new(Expr::Literal(box_new(Value::VInt(0)))));
-        vec_push(out_instrs, box_new(zero_init));
+        /* An aggregate temp cannot take the integer 0; it is left to the arms. */
+        if out_user_ty < 0 {
+            let zero_init: Instr = Instr::Store(out, box_new(Expr::Literal(box_new(Value::VInt(0)))));
+            vec_push(out_instrs, box_new(zero_init));
+        }
     }
     let discard_ma: i32 = lower_match_arms(et, ed1, ed2, ed3, ed4, pp,
                                             tok_tags, arms_first, arm_count,
@@ -6705,6 +6737,66 @@ fn lower_expr_yields_string(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             source, starts, ends);
     }
     return false;
+}
+
+/* Name token of the user struct/enum an expression yields, when its shape
+   says so, else -1: a call to a fn or method returning one, `Enum::Variant`
+   (with or without a payload), a struct literal, and a block or `if` whose
+   result is one of those. A bare variable or a member has no type here and
+   gives -1. Types the result temps of an `if` expression (lower_tag_if):
+   they were always `int`, so `let o: Opt = if c { a() } else { b() };` did
+   not compile as C. */
+fn lower_expr_user_ty_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+        ed3: Vec<i32>, pp: Vec<i32>, idx: i32,
+        item_tags: Vec<i32>, item_names: Vec<i32>, item_d2: Vec<i32>,
+        tok_tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    if idx < 0 { return 0 - 1; }
+    if idx >= vec_len(et) { return 0 - 1; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 9 {
+        return lower_expr_user_ty_tok(et, ed1, ed2, ed3, pp, vec_get(ed3, idx),
+            item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+    }
+    if tag == 10 {
+        let then_ty: i32 = lower_expr_user_ty_tok(et, ed1, ed2, ed3, pp, vec_get(ed2, idx),
+            item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+        if then_ty >= 0 { return then_ty; }
+        return lower_expr_user_ty_tok(et, ed1, ed2, ed3, pp, vec_get(ed3, idx),
+            item_tags, item_names, item_d2, tok_tags, source, starts, ends);
+    }
+    if tag == 5 {
+        return lower_mcall_ret_user_ty_tok(et, ed2, idx, item_tags, item_names, item_d2,
+            tok_tags, source, starts, ends);
+    }
+    /* The path naming the type: a struct literal's own path, `Enum::Variant`
+       itself, or the callee `Enum::Variant` of a payload constructor. */
+    let mut path: i32 = 0 - 1;
+    let mut want_segs: i32 = 2;
+    if tag == 24 { path = idx; want_segs = 1; }
+    if tag == 1 { path = idx; }
+    if tag == 4 {
+        let by_ret: i32 = lower_call_ret_user_ty_tok(et, ed1, ed2, pp, idx, item_tags, item_names,
+            item_d2, tok_tags, source, starts, ends);
+        if by_ret >= 0 { return by_ret; }
+        let callee: i32 = vec_get(ed1, idx);
+        if callee >= 0 {
+            if callee < vec_len(et) {
+                if vec_get(et, callee) == 1 { path = callee; }
+            }
+        }
+    }
+    if path < 0 { return 0 - 1; }
+    if vec_get(ed2, path) != want_segs { return 0 - 1; }
+    let pps: i32 = vec_get(ed1, path);
+    if pps < 0 { return 0 - 1; }
+    if pps >= vec_len(pp) { return 0 - 1; }
+    let ty_tok: i32 = vec_get(pp, pps);
+    if lower_tok_in_bounds(ty_tok, starts, ends) != true { return 0 - 1; }
+    if lower_name_is_user_type(handle_to_str(ty_tok, source, starts, ends), item_tags, item_names,
+            source, starts, ends) {
+        return ty_tok;
+    }
+    return 0 - 1;
 }
 
 fn fresh_tmp_name(counter: i32) -> i32 {

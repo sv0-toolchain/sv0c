@@ -1,0 +1,16 @@
+/* an `if` expression whose value is an enum: as a let initializer, a call
+   argument, a return value, and built from variants — exits 28. Its result
+   temps used to be `int`, which did not compile as C. */
+enum Opt { Some(i32), None }
+fn pick(n: i32) -> Opt { if n > 0 { return Opt::Some(n); } return Opt::None; }
+fn val(o: Opt) -> i32 { return match o { Opt::Some(x) => x, Opt::None => 7 }; }
+fn ret(n: i32) -> Opt { return if n > 5 { pick(n) } else { pick(n - 1) }; }
+fn main() -> i32 {
+    let n: i32 = 0;
+    let o: Opt = if n > 5 { pick(n) } else { pick(n - 1) };
+    let a: i32 = val(o);
+    let b: i32 = val(if n > 5 { pick(n) } else { pick(n - 1) });
+    let c: i32 = val(ret(0));
+    let d: i32 = val(if n > 5 { Opt::Some(1) } else { Opt::None });
+    return a + b + c + d;
+}

@@ -1,0 +1,7 @@
+/* a `match` expression whose value is an enum or a struct — exits 7. */
+enum Opt { Some(i32), None }
+struct Pt { x: i32, y: i32 }
+fn val(o: Opt) -> i32 { return match o { Opt::Some(x) => x, Opt::None => 7 }; }
+fn step(n: i32) -> Opt { return match n { 0 => Opt::None, 1 => Opt::Some(40), _ => Opt::Some(n) }; }
+fn corner(n: i32) -> Pt { let p: Pt = match n { 0 => Pt { x: 1, y: 2 }, _ => Pt { x: n, y: n } }; return p; }
+fn main() -> i32 { return val(step(0)) + val(step(1)) + val(step(5)) + corner(0).y + corner(4).x - 51; }

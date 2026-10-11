@@ -159,3 +159,7 @@ test/behavior/cases/runtime_handle_tables_grow.sv0|42|native
 test/behavior/cases/trait_bodyless_method_impl.sv0|42|native
 test/behavior/cases/question_field_operand.sv0|7|native
 test/behavior/cases/question_block_operand.sv0|9|native
+test/behavior/cases/if_enum_value.sv0|28
+test/behavior/cases/if_struct_value.sv0|7
+test/behavior/cases/match_aggregate_value.sv0|7
+test/behavior/cases/question_if_operand.sv0|14|native

@@ -1,0 +1,7 @@
+/* ? on an `if` expression and on a `match` expression — exits 14. */
+enum Opt { Some(i32), None }
+fn pick(n: i32) -> Opt { if n > 0 { return Opt::Some(n); } return Opt::None; }
+fn val(o: Opt) -> i32 { return match o { Opt::Some(x) => x, Opt::None => 7 }; }
+fn f(n: i32) -> Opt { let v: i32 = if n > 5 { pick(n) } else { pick(n - 1) }?; return Opt::Some(v + 1); }
+fn g(n: i32) -> Opt { let v: i32 = match n { 0 => pick(0), _ => pick(n) }?; return Opt::Some(v + 1); }
+fn main() -> i32 { return val(f(0)) + val(g(0)); }

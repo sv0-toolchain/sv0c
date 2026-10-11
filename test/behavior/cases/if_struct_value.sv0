@@ -1,0 +1,8 @@
+/* an `if` expression whose value is a struct — exits 7. */
+struct Pt { x: i32, y: i32 }
+fn mk(a: i32) -> Pt { return Pt { x: a, y: a + 1 }; }
+fn main() -> i32 {
+    let n: i32 = 3;
+    let p: Pt = if n > 5 { mk(1) } else { mk(3) };
+    return p.x + p.y;
+}
