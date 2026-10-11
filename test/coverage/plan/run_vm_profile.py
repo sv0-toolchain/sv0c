@@ -189,7 +189,7 @@ def main() -> int:
                 "from pathlib import Path\n"
                 "from sv0cov.resolve import resolve\n"
                 "bad = []\n"
-                "regions_checked = []\n"                "models_checked = []\n"
+                "regions_checked = []\n"                "models_checked = []\n"                "indexed_checked = []\n"
                 "for name, nm, nat, vmm, vm in json.loads(sys.argv[2]):\n"
                 "    mb, vmb = Path(nm).read_bytes(), Path(vmm).read_bytes()\n"
                 "    a = resolve(mb, [Path(nat).read_bytes()]).counts()\n"
@@ -253,7 +253,31 @@ def main() -> int:
                 "            keys = [k for k in want if k != 'map_ids' and sn[k] != want[k]]\n"
                 "            bad.append(f'{name}: semantic model differs from expected-semantic.json in {keys}')\n"
                 "        models_checked.append(name)\n"
-                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)} MODELS {len(models_checked)}']))\n"
+                "    # CV-222: the full indexed object from the real artifacts reads back valid\n"
+                "    # and complete; a native run and a VM run give byte-identical semantic\n"
+                "    # projections (COV-MRG-008) while their transport records differ.\n"
+                "    from sv0cov.model.indexed import MapInput, ProfileInput, build_indexed, read_indexed\n"
+                "    def indexed(pairs):\n"
+                "        maps, profs = [], []\n"
+                "        for map_path, raw_path in pairs:\n"
+                "            data = Path(map_path).read_bytes(); mm = validate_map(data)\n"
+                "            maps.append(MapInput(Path(map_path).name, data, mm))\n"
+                "            rb = Path(raw_path).read_bytes()\n"
+                "            profs.append(ProfileInput(Path(raw_path).name, rb, decode(rb, map_counter_count=mm['program_counter_count'],\n"
+                "                                                                     expected_map_id=bytes.fromhex(mm['map_id']))))\n"
+                "        obj = build_indexed(maps, profs)\n"
+                "        return read_indexed(encode(obj))\n"
+                "    xn, xv, xb = indexed([(nm, nat)]), indexed([(vmm, vm)]), indexed([(nm, nat), (vmm, vm)])\n"
+                "    for label, x in (('native', xn), ('VM', xv), ('native + VM', xb)):\n"
+                "        if not x['semantic']['complete'] or x['diagnostics']: bad.append(f'{name}: {label} indexed evidence is incomplete')\n"
+                "    if xn['semantic_projection_sha256'] != xv['semantic_projection_sha256']:\n"
+                "        bad.append(f'{name}: native and VM runs have different semantic projections')\n"
+                "    if xn['profile_inputs'] == xv['profile_inputs'] or [r['backend'] for r in xb['profile_inputs']] not in (['native', 'vm-v1'], ['vm-v1', 'native']):\n"
+                "        bad.append(f'{name}: the transport inventory does not tell the two runs apart')\n"
+                "    if len(xb['map_inputs']) != 1 or len(xb['maps']) != 1 or len(xb['maps'][0]['bindings']) != m['program_counter_count']:\n"
+                "        bad.append(f'{name}: the two identical maps were not inventoried once with a full binding')\n"
+                "    indexed_checked.append(name)\n"
+                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)} MODELS {len(models_checked)} INDEXED {len(indexed_checked)}']))\n"
             )
             p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES),
                                 str(PARITY_DIR)],
@@ -261,6 +285,9 @@ def main() -> int:
             out_lines = p.stdout.strip().splitlines()
             nregions = out_lines[-1].split()[1] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
             nmodels = out_lines[-1].split()[3] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            nindexed = out_lines[-1].split()[5] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            if nindexed != str(len(resolved)):
+                errors.append(f"sv0cov reader: {nindexed} programs went through the indexed producer and reader, want {len(resolved)}")
             if nmodels != str(len(list(FIXTURES.glob("*/expected-semantic.json")))):
                 errors.append(f"sv0cov reader: {nmodels} semantic models compared with expected-semantic.json, want every fixture")
             bad = [line for line in out_lines if not line.startswith("REGIONS ")]
@@ -268,7 +295,8 @@ def main() -> int:
                 errors.append(f"sv0cov reader: {' '.join(bad)} {p.stderr.strip()[-600:]}")
             reader = (f"sv0cov reader resolves native + VM to the expected counts; {nregions} region expressions "
                       "evaluate equal and exact on both (CV-204); the semantic model of each real run equals the fixture's "
-                      f"expected-semantic.json ({nmodels} fixtures, CV-221); parity reports pass "
+                      f"expected-semantic.json ({nmodels} fixtures, CV-221); indexed evidence of {nindexed} programs reads back "
+                      "complete, with one semantic projection for native and VM runs (CV-222); parity reports pass "
                       f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
         # 3-4. Small programs.
