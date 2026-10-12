@@ -194,6 +194,8 @@ def main() -> int:
                 "import hashlib\n"
                 "SRC = {hashlib.sha256(q.read_bytes()).hexdigest(): q.read_bytes() for q in Path(sys.argv[3]).rglob('*.sv0')}\n"
                 "reports_checked = []\n"
+                "terminal_checked = []\n"
+                "GOLD = Path(sys.argv[1]).parent / 'tests' / 'fixtures' / 'terminal'\n"
                 "for name, nm, nat, vmm, vm in json.loads(sys.argv[2]):\n"
                 "    mb, vmb = Path(nm).read_bytes(), Path(vmm).read_bytes()\n"
                 "    a = resolve(mb, [Path(nat).read_bytes()]).counts()\n"
@@ -312,9 +314,19 @@ def main() -> int:
                 "            bad.append(f'{name}: the native and VM reports differ, or are not passing evidence')\n"
                 "        if rn['provenance']['backends'] == rv['provenance']['backends']:\n"
                 "            bad.append(f'{name}: the reports do not record their backends')\n"
+                "        # CV-230: the terminal report of the real run is the checked-in golden from its\n"
+                "        # summary on, has no control sequence, and differs across backends only in the backend line.\n"
+                "        from sv0cov.formats.terminal import render_terminal\n"
+                "        tn, tv = render_terminal(rn), render_terminal(rv)\n"
+                "        gold = (GOLD / f'fixture-{name}.txt').read_text(encoding='utf-8')\n"
+                "        if tn[tn.index('\\nSummary\\n'):] != gold[gold.index('\\nSummary\\n'):]:\n"
+                "            bad.append(f'{name}: the terminal report of the real run is not the golden')\n"
+                "        if chr(27) in tn + render_terminal(rv) or [a for a, b in zip(tn.split('\\n'), tv.split('\\n')) if a != b] != ['backends:   native']:\n"
+                "            bad.append(f'{name}: the native and VM terminal reports differ beyond the backend line')\n"
+                "        terminal_checked.append(name)\n"
                 "        reports_checked.append(name)\n"
                 "    indexed_checked.append(name)\n"
-                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)} MODELS {len(models_checked)} INDEXED {len(indexed_checked)} REPORTS {len(reports_checked)}']))\n"
+                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)} MODELS {len(models_checked)} INDEXED {len(indexed_checked)} REPORTS {len(reports_checked)} TERMINAL {len(terminal_checked)}']))\n"
             )
             p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES),
                                 str(PARITY_DIR)],
@@ -324,6 +336,9 @@ def main() -> int:
             nmodels = out_lines[-1].split()[3] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
             nindexed = out_lines[-1].split()[5] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
             nreports = out_lines[-1].split()[7] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            nterminal = out_lines[-1].split()[9] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            if nterminal != nmodels:
+                errors.append(f"sv0cov reader: {nterminal} terminal reports of real runs matched their golden, want one per fixture ({nmodels})")
             if nreports != nmodels:
                 errors.append(f"sv0cov reader: {nreports} native reports were built from real runs, want one per fixture ({nmodels})")
             if nindexed != str(len(resolved)):
@@ -336,7 +351,7 @@ def main() -> int:
             reader = (f"sv0cov reader resolves native + VM to the expected counts; {nregions} region expressions "
                       "evaluate equal and exact on both (CV-204); the semantic model of each real run equals the fixture's "
                       f"expected-semantic.json ({nmodels} fixtures, CV-221); merged indexed evidence of {nindexed} programs (a truncated profile inventoried incomplete; `sv0cov merge` publishes the same bytes and refuses to replace them, CV-227) reads back "
-                      f"complete, with one semantic projection for native and VM runs (CV-222); native reports of {nreports} real runs read back passing and agree across backends (CV-229); parity reports pass "
+                      f"complete, with one semantic projection for native and VM runs (CV-222); native reports of {nreports} real runs read back passing and agree across backends (CV-229), and their {nterminal} terminal reports are the sv0cov goldens (CV-230); parity reports pass "
                       f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
         # 3-4. Small programs.
