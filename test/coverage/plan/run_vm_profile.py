@@ -191,6 +191,9 @@ def main() -> int:
                 "from sv0cov.resolve import resolve\n"
                 "bad = []\n"
                 "regions_checked = []\n"                "models_checked = []\n"                "indexed_checked = []\n"
+                "import hashlib\n"
+                "SRC = {hashlib.sha256(q.read_bytes()).hexdigest(): q.read_bytes() for q in Path(sys.argv[3]).rglob('*.sv0')}\n"
+                "reports_checked = []\n"
                 "for name, nm, nat, vmm, vm in json.loads(sys.argv[2]):\n"
                 "    mb, vmb = Path(nm).read_bytes(), Path(vmm).read_bytes()\n"
                 "    a = resolve(mb, [Path(nat).read_bytes()]).counts()\n"
@@ -295,8 +298,23 @@ def main() -> int:
                 "        bad.append(f'{name}: the transport inventory does not tell the two runs apart')\n"
                 "    if len(xb['map_inputs']) != 1 or len(xb['maps']) != 1 or len(xb['maps'][0]['bindings']) != m['program_counter_count']:\n"
                 "        bad.append(f'{name}: the two identical maps were not inventoried once with a full binding')\n"
+                "    # CV-229: a native report from the real evidence and the program's own source reads back,\n"
+                "    # passes, and is the same for the native and the VM run apart from transport.\n"
+                "    from sv0cov.config_resolve import resolve as resolve_config\n"
+                "    from sv0cov.model.report import build_report, read_report\n"
+                "    srcs = {s['path']: SRC.get(s['digest']) for s in xn['semantic']['sources']}\n"
+                "    if all(v is not None for v in srcs.values()):\n"
+                "        cfg = resolve_config('report', [('--format', 'json')])\n"
+                "        rn, rv = (read_report(encode(build_report(encode(x), cfg, srcs))) for x in (xn, xv))\n"
+                "        same = ('summary', 'points', 'regions', 'lines', 'branches', 'contracts', 'policy', 'evidence_eligibility')\n"
+                "        if rn['evidence_eligibility'] != 'passing' or any(rn[k] != rv[k] for k in same) \\\n"
+                "                or [e['summary'] for e in rn['entities']] != [e['summary'] for e in rv['entities']]:\n"
+                "            bad.append(f'{name}: the native and VM reports differ, or are not passing evidence')\n"
+                "        if rn['provenance']['backends'] == rv['provenance']['backends']:\n"
+                "            bad.append(f'{name}: the reports do not record their backends')\n"
+                "        reports_checked.append(name)\n"
                 "    indexed_checked.append(name)\n"
-                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)} MODELS {len(models_checked)} INDEXED {len(indexed_checked)}']))\n"
+                "print('\\n'.join(bad + [f'REGIONS {sum(regions_checked)} MODELS {len(models_checked)} INDEXED {len(indexed_checked)} REPORTS {len(reports_checked)}']))\n"
             )
             p = subprocess.run([*py, "-c", code, str(ROOT / "sv0cov" / "src"), json.dumps(resolved), str(FIXTURES),
                                 str(PARITY_DIR)],
@@ -305,6 +323,9 @@ def main() -> int:
             nregions = out_lines[-1].split()[1] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
             nmodels = out_lines[-1].split()[3] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
             nindexed = out_lines[-1].split()[5] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            nreports = out_lines[-1].split()[7] if out_lines and out_lines[-1].startswith("REGIONS ") else "?"
+            if nreports != nmodels:
+                errors.append(f"sv0cov reader: {nreports} native reports were built from real runs, want one per fixture ({nmodels})")
             if nindexed != str(len(resolved)):
                 errors.append(f"sv0cov reader: {nindexed} programs went through the indexed producer and reader, want {len(resolved)}")
             if nmodels != str(len(list(FIXTURES.glob("*/expected-semantic.json")))):
@@ -315,7 +336,7 @@ def main() -> int:
             reader = (f"sv0cov reader resolves native + VM to the expected counts; {nregions} region expressions "
                       "evaluate equal and exact on both (CV-204); the semantic model of each real run equals the fixture's "
                       f"expected-semantic.json ({nmodels} fixtures, CV-221); merged indexed evidence of {nindexed} programs (a truncated profile inventoried incomplete; `sv0cov merge` publishes the same bytes and refuses to replace them, CV-227) reads back "
-                      "complete, with one semantic projection for native and VM runs (CV-222); parity reports pass "
+                      f"complete, with one semantic projection for native and VM runs (CV-222); native reports of {nreports} real runs read back passing and agree across backends (CV-229); parity reports pass "
                       f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
         # 3-4. Small programs.
