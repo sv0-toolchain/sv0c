@@ -395,10 +395,12 @@ def main() -> int:
                       f"complete, with one semantic projection for native and VM runs (CV-222); native reports of {nreports} real runs read back passing and agree across backends (CV-229), and their {nterminal} terminal reports are the sv0cov goldens (CV-230); `sv0cov check` on {ncheck} real projects passes at the exact line fraction, fails one basis point above it and refuses a changed source (CV-231); `sv0cov report` publishes their terminal and native reports without replacing anything and `sv0cov clean` removes exactly those (CV-232); parity reports pass "
                       f"(F0-G4; f0 report in {PARITY_DIR.relative_to(ROOT)}/f0.json)")
 
-        # CV-233: `sv0cov run` end to end with the real driver, compiler and runtime, on a copy
-        # of the multi-module fixture project: the instrumented program runs by name with
-        # shell-hostile arguments, a caller's SV0COV_* variables change nothing, the run's
-        # evidence merges complete and checks, and a failing test command is exit 4.
+        # CV-233, CV-234: `sv0cov run` end to end with the real driver, compiler and runtime, on a
+        # copy of the multi-module fixture project. The instrumented program runs by name with
+        # shell-hostile arguments under a poisoned caller environment; the run's merged evidence
+        # is the fixture's expected model; reports are published; and the exit status follows the
+        # matrix: pass 0, policy fail 1, test fail 4 (coverage still reported), killed 128+9, and
+        # a run that executed no instrumented program is incomplete (5), never zero coverage.
         if not errors and py:
             run_code = (
                 "import io, json, os, sys\n"
@@ -406,43 +408,59 @@ def main() -> int:
                 "from pathlib import Path\n"
                 "from sv0cov import cli\n"
                 "from sv0cov.model.indexed import read_indexed\n"
+                "from sv0cov.model.report import read_report\n"
                 "cwd, bad = Path(sys.argv[2]), []\n"
                 "os.environ.update({'SV0COV_RUN_ID': 'f' * 32, 'SV0COV_PROFILE_DIR': '/nonexistent', 'SV0COV_REQUIRED': '0', 'SV0COV_BOGUS': '1'})\n"
+                "runs = cwd / '.sv0cov' / 'runs'\n"
                 "def cmd(*a):\n"
+                "    before = set(os.listdir(runs)) if runs.is_dir() else set()\n"
                 "    o, e = io.StringIO(), io.StringIO()\n"
-                "    return cli.main(list(a), stdout=o, stderr=e, cwd=cwd), o.getvalue(), e.getvalue()\n"
+                "    rc = cli.main(list(a), stdout=o, stderr=e, cwd=cwd)\n"
+                "    new = sorted((set(os.listdir(runs)) if runs.is_dir() else set()) - before)\n"
+                "    return rc, o.getvalue(), e.getvalue(), (runs / new[0] if len(new) == 1 else None)\n"
                 "hostile = ['a b', '$(touch pwned)', '; touch pwned', '*', '']\n"
-                "rc, out, err = cmd('run', '--', 'project', *hostile)\n"
-                "runs = sorted(os.listdir(cwd / '.sv0cov' / 'runs')) if (cwd / '.sv0cov' / 'runs').is_dir() else []\n"
-                "if rc != 7 or 'COV5001' not in err or len(runs) != 1 or runs == ['f' * 32]:\n"
-                "    bad.append(f'sv0cov run: exit {rc}, runs {runs}: {err[-300:]}')\n"
+                "rc, out, err, rd = cmd('run', '--report', 'term', '--report', 'json', '--', 'project', *hostile)\n"
+                "if rc != 0 or err or rd is None or rd.name == 'f' * 32 or (cwd / 'pwned').exists():\n"
+                "    bad.append(f'sv0cov run (pass): exit {rc}: {err[-300:]}')\n"
                 "else:\n"
-                "    rd = cwd / '.sv0cov' / 'runs' / runs[0]\n"
-                "    profs = os.listdir(rd / 'profiles')\n"
-                "    if len(profs) != 1 or not profs[0].startswith(runs[0] + '-') or (cwd / 'pwned').exists():\n"
-                "        bad.append(f'sv0cov run: profiles {profs}, or an argument was interpreted')\n"
-                "    rc, _, err = cmd('merge', str(rd / 'maps'), str(rd / 'profiles'), '--expect-run', runs[0])\n"
-                "    if rc != 0: bad.append(f'sv0cov merge of the run: exit {rc}: {err[-300:]}')\n"
-                "    else:\n"
-                "        ix = read_indexed((cwd / '.sv0cov' / 'coverage.sv0covdata.json').read_bytes())\n"
-                "        want = json.loads(Path(sys.argv[3]).read_bytes())\n"
-                "        if not ix['semantic']['complete'] or [k for k in want if k != 'map_ids' and ix['semantic'][k] != want[k]] or set(ix['semantic']) != set(want):\n"
-                "            bad.append('sv0cov run: the evidence of the run is not the expected semantic model of the fixture (map_ids aside)')\n"
-                "        rc = cmd('check', '.sv0cov/coverage.sv0covdata.json')[0]\n"
-                "        if rc != 0: bad.append(f'sv0cov check of the run: exit {rc}')\n"
-                "    rc = cmd('run', '--', '/bin/sh', '-c', 'project; exit 3')[0]\n"
-                "    if rc != 4: bad.append(f'sv0cov run with a failing test command: exit {rc}, want 4')\n"
-                "    if cmd('clean')[0] != 0 or (cwd / '.sv0cov').exists(): bad.append('sv0cov clean did not remove the runs')\n"
+                "    ix = read_indexed((rd / 'coverage.sv0covdata.json').read_bytes())\n"
+                "    want = json.loads(Path(sys.argv[3]).read_bytes())\n"
+                "    if not ix['semantic']['complete'] or [k for k in want if k != 'map_ids' and ix['semantic'][k] != want[k]] or set(ix['semantic']) != set(want):\n"
+                "        bad.append('sv0cov run: the evidence of the run is not the expected semantic model of the fixture (map_ids aside)')\n"
+                "    if ix['execution']['status'] != 'passed' or ix['run_selection']['selected_run_ids'] != [rd.name] or len(os.listdir(rd / 'profiles')) != 1:\n"
+                "        bad.append('sv0cov run: execution, run selection or profile count is wrong')\n"
+                "    rep = read_report((rd / 'reports' / 'coverage.json').read_bytes())\n"
+                "    if rep['evidence_eligibility'] != 'passing' or 'evidence:   PASSING' not in out:\n"
+                "        bad.append('sv0cov run: the published or printed report is not passing')\n"
+                "    ln = rep['summary']['line']\n"
+                "    at = ln['covered'] * 10000 // ln['total']\n"
+                "    if at < 10000:\n"
+                "        rc, _, err, _ = cmd('run', '--quiet', '--threshold-line', f'{at + 1}bp', '--', 'project')\n"
+                "        if rc != 1 or 'COV4101' not in err: bad.append(f'sv0cov run (policy fail): exit {rc}')\n"
+                "    rc, _, _, _ = cmd('run', '--quiet', '--threshold-line', f'{at}bp', '--', 'project')\n"
+                "    if rc != 0: bad.append(f'sv0cov run at the exact line fraction: exit {rc}')\n"
+                "rc, out, err, rd = cmd('run', '--', '/bin/sh', '-c', 'project; exit 3')\n"
+                "if rc != 4 or 'COV2130' not in err or 'execution:  failed (exit 3)' not in out or rd is None \\\n"
+                "        or read_indexed((rd / 'coverage.sv0covdata.json').read_bytes())['execution']['status'] != 'failed':\n"
+                "    bad.append(f'sv0cov run (test fail): exit {rc}, want 4 with the coverage still reported')\n"
+                "rc, out, err, rd = cmd('run', '--', '/bin/sh', '-c', 'project; kill -9 $$')\n"
+                "if rc != 137 or 'execution:  signaled (signal 9)' not in out: bad.append(f'sv0cov run (killed): exit {rc}, want 137')\n"
+                "rc, out, err, rd = cmd('run', '--', '/usr/bin/true')\n"
+                "if rc != 5 or 'COV3001' not in err or 'coverage report' in out or rd is None or (rd / 'coverage.sv0covdata.json').exists():\n"
+                "    bad.append(f'sv0cov run that executed no instrumented program: exit {rc}, want incomplete (5) and no report')\n"
+                "if cmd('clean')[0] != 0 or (cwd / '.sv0cov').exists(): bad.append('sv0cov clean did not remove the runs')\n"
                 "print('\\n'.join(bad + ['RUN OK' if not bad else 'RUN BAD']))\n"
             )
             proj = t / "run-root" / "project"  # the directory name is the target name, as in the fixture map
             shutil.copytree(FIXTURES / "project", proj, ignore=shutil.ignore_patterns("expected-*"))
             p = subprocess.run([*py, "-c", run_code, str(ROOT / "sv0cov" / "src"), str(proj), str(FIXTURES / "project" / "expected-semantic.json")],
-                               capture_output=True, text=True, timeout=600)
+                               capture_output=True, text=True, timeout=900)
             if p.returncode or p.stdout.strip().splitlines()[-1:] != ["RUN OK"]:
                 errors.append(f"sv0cov run: {p.stdout.strip()} {p.stderr.strip()[-600:]}")
             else:
-                reader += "; `sv0cov run` builds the multi-module project through this driver, runs it by name with shell-hostile arguments under a poisoned environment, and its evidence merges to the expected model and checks (CV-233)"
+                reader += ("; `sv0cov run` builds the multi-module project through this driver and runs it by name with shell-hostile arguments "
+                           "under a poisoned environment: its evidence is the expected model, reports are published, and the exit status is 0 on a "
+                           "pass, 1 on a failed threshold, 4 on a failing test command, 137 when killed, 5 when no instrumented program ran (CV-233, CV-234)")
 
         # 3-4. Small programs.
         small = {
