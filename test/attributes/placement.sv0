@@ -1,0 +1,55 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov CV-302: every legal place for an attribute, including misleading
+   layouts. Each one attaches to exactly the next item or statement. The
+   program exits 0. */
+
+#[coverage(off, reason = "an item")]
+fn excluded() -> i32 { return 1; }
+
+#[coverage(off, reason = "first of a run")] #[coverage(contract_off, reason = "second of a run")]
+fn half(x: i32) -> i32 requires(x > 0) { return x / 2; }
+
+struct Rect { w: i32, h: i32 }
+
+impl Rect {
+    #[coverage(off, reason = "a method")]
+    fn area(self: Rect) -> i32 { return self.w * self.h; }
+}
+
+fn layouts(n: i32) -> i32 {
+    #[coverage(off, reason = "same line")] let a: i32 = n; let b: i32 = a + 1;
+    #[coverage(off, reason = "comments and a blank line between")]
+    // a line comment
+    /* a block comment */
+
+    let c: i32 = b + 1;
+            #[coverage(branch_off, reason = "odd indentation")]
+    if c > 100 {
+        return 0;
+    };
+    let mut i: i32 = 0;
+    #[coverage(branch_off, reason = "a loop")]
+    while i < 3 {
+        #[coverage(off, reason = "inside a loop body")]
+        i = i + 1;
+    };
+    #[coverage(branch_off, reason = "a match")]
+    match i {
+        3 => {
+            #[coverage(off, reason = "inside an arm block")]
+            let d: i32 = i;
+        },
+        _ => {},
+    };
+    #[coverage(off, reason = "an explicit block")]
+    {
+        let e: i32 = c;
+    };
+    #[coverage(off, reason = "a return")]
+    return c;
+}
+
+fn main() -> i32 {
+    let r: Rect = Rect { w: 2, h: 3 };
+    return excluded() + half(4) + r.area() + layouts(1) - 12;
+}

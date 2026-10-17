@@ -116,6 +116,35 @@ fn megatu_col_of_pos(source: string, pos: i32) -> i32 {
     return col;
 }
 
+/* Attribute errors (lib/attributes.sv0): (code, first token, last token,
+   message id) quadruples, each reported as error[COVxxxx] at its span. */
+fn megatu_report_attrs(errs: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let mut out: string = "";
+    let mut i: i32 = 0;
+    while i + 3 < vec_len(errs) {
+        let a: i32 = vec_get(errs, i + 1);
+        let b: i32 = vec_get(errs, i + 2);
+        let pos: i32 = vec_get(starts, a);
+        let line: i32 = megatu_line_of_pos(source, pos);
+        let col: i32 = megatu_col_of_pos(source, pos);
+        let mut len: i32 = vec_get(ends, b) - pos;
+        if megatu_line_of_pos(source, vec_get(ends, b)) != line { len = vec_get(ends, a) - pos; }
+        if len < 1 { len = 1; }
+        out = string_concat(out, format_header_with_code(0, attrs_message(vec_get(errs, i + 3)), attrs_code_text(vec_get(errs, i))));
+        out = string_concat(out, "\n");
+        out = string_concat(out, format_location("", line, col));
+        out = string_concat(out, "\n");
+        let snip: string = format_snippet(source, line, col, len);
+        if string_len(snip) > 0 {
+            out = string_concat(out, snip);
+            out = string_concat(out, "\n");
+        }
+        i = i + 4;
+    }
+    if string_len(out) > 0 { write_file("/dev/stderr", out); }
+    return 0;
+}
+
 fn megatu_emit_diagnostics(diag_sink: Vec<i32>, source: string,
                            starts: Vec<i32>) -> i32 {
     let n: i32 = vec_len(diag_sink);
@@ -194,7 +223,8 @@ fn megatu_index_of(s: string, ch: i32, from: i32) -> i32 {
 
 /* 0 = off (empty request), 1 = map, 2 = instrument, 3 = plan-dump and
    5 = hit-dump (internal test hooks that print the plan, or the placed hits,
-   instead of C), -1 = unknown. */
+   instead of C), 6 = attr-dump (an internal test hook that prints the
+   attribute table, sv0cov CV-302), -1 = unknown. */
 fn megatu_cov_mode_of(req: string) -> i32 {
     if string_len(req) == 0 { return 0; }
     let nl: i32 = megatu_index_of(req, 10, 0);
@@ -204,6 +234,7 @@ fn megatu_cov_mode_of(req: string) -> i32 {
     if string_eq(mode, "instrument") { return 2; }
     if string_eq(mode, "plan-dump") { return 3; }
     if string_eq(mode, "hit-dump") { return 5; }
+    if string_eq(mode, "attr-dump") { return 6; }
     return 0 - 1;
 }
 
@@ -212,6 +243,7 @@ fn megatu_cov_mode_name(mode: i32) -> string {
     if mode == 2 { return "instrument"; }
     if mode == 3 { return "plan-dump"; }
     if mode == 5 { return "hit-dump"; }
+    if mode == 6 { return "attr-dump"; }
     return "off";
 }
 
@@ -783,14 +815,48 @@ fn main() -> i32 {
     let _cov_listing: string = "";
 
     /* Phase 1: tokenize (real lexer.sv0) */
-    let tags: Vec<i32> = vec_new();
-    let starts: Vec<i32> = vec_new();
-    let ends: Vec<i32> = vec_new();
+    let mut tags: Vec<i32> = vec_new();
+    let mut starts: Vec<i32> = vec_new();
+    let mut ends: Vec<i32> = vec_new();
     let tc: i32 = tokenize(source, tags, starts, ends);
     if vec_len(tags) == 0 {
         /* An empty or comment-only source used to exit with no message. */
         megatu_report_no_items(source);
         return 1;
+    }
+
+    /* Attributes (sv0cov CV-302, lib/attributes.sv0): record every attribute
+       and where it stands, validate `coverage` attributes in every build
+       (sv0doc attributes/coverage.md), then hand the parser the token stream
+       without the attributes it need not see. attr-dump prints the table. */
+    let at_tab: Vec<i32> = vec_new();
+    let at_args: Vec<i32> = vec_new();
+    let at_n: i32 = attrs_scan(tags, at_tab, at_args);
+    if at_n < 0 {
+        let udiag: Vec<i32> = vec_new();
+        vec_push(udiag, 100);
+        vec_push(udiag, 0 - at_n - 2);
+        megatu_emit_diagnostics(udiag, source, starts);
+        return 6;
+    }
+    let at_errs: Vec<i32> = vec_new();
+    let cov_on: bool = _cov_mode == 1 || _cov_mode == 2 || _cov_mode == 3 || _cov_mode == 5;
+    if attrs_check(source, starts, ends, tags, at_tab, at_args, cov_on, at_errs) > 0 {
+        megatu_report_attrs(at_errs, source, starts, ends);
+        return 6;
+    }
+    if _cov_mode == 6 {
+        write_file("/dev/stdout", attrs_dump(source, starts, ends, at_tab, at_args));
+        return 0;
+    }
+    if at_n > 0 {
+        let st_tags: Vec<i32> = vec_new();
+        let st_starts: Vec<i32> = vec_new();
+        let st_ends: Vec<i32> = vec_new();
+        attrs_strip(source, starts, ends, tags, at_tab, st_tags, st_starts, st_ends);
+        tags = st_tags;
+        starts = st_starts;
+        ends = st_ends;
     }
 
     /* Phase 2: parse_program (real parser.sv0) — full arena set */

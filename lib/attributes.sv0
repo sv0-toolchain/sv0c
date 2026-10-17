@@ -1,0 +1,587 @@
+/* Attribute table, placement and the `coverage` attribute (sv0cov CV-302;
+ * sv0doc attributes/coverage.md; SPEC 13.4, COV-EXC-007, -009, -012, -014,
+ * -015, -016).
+ *
+ * Runs once per build on the token stream, before the parser. It finds every
+ * attribute `#[ ... ]`, records it in a side table (the parser keeps no
+ * attribute and no statement span; the coverage planner identifies a
+ * statement by its first token, and so does this table), classifies where
+ * each run of attributes stands, validates every `coverage` attribute, and
+ * returns the token stream without the attributes the parser need not see.
+ *
+ * Attribute table `at`, stride ATTRS_STRIDE:
+ *   0 `#` token, 1 closing `]` token, 2 first path token, 3 last path token
+ *   (-1 when the attribute has no path), 4 run index (attributes with nothing
+ *   between them form one run), 5 target token (the first token after the
+ *   run: the annotated construct), 6 position (1 item, 2 statement, 0 neither),
+ *   7 first argument (index into `args`, -1 when there is no argument list),
+ *   8 argument count, 9 `(` token of the argument list (-1 when none), 10 the
+ *   frame the run stands in (see attrs_frame_name).
+ * Argument table `args`, stride 4: name token, first value token, last value
+ * token (-1 -1 for a bare identifier), kind (0 bare identifier, 1 name =
+ * value, 2 name(...), 3 anything else).
+ * Errors `errs`, stride 4: code (1021, 3201, 3207 for COVxxxx), first token,
+ * last token, message id (attrs_message).
+ *
+ * Placement is decided by a forward walk that keeps a stack of brace, paren
+ * and bracket frames. A `{` opens the frame its header announced: `fn` a
+ * block, `struct`/`enum` a field list, `impl`/`trait` a member list, `if`,
+ * `else`, `while`, `for`, `loop`, `unsafe` and `=>` a block, `match` an arm
+ * list; an unannounced `{` after a name is a struct literal, otherwise a
+ * block. A run stands at an item position when its frame is the file or a
+ * member list, or at a statement position when its frame is a block, and in
+ * both cases the token before it ends something (`{`, `;`, `}`, or nothing).
+ * A statement-position run must annotate a statement: a braced construct or
+ * `let`, or a run of tokens that reaches a `;` before the block's `}`. A
+ * block's tail expression is not a statement.
+ *
+ * Names are prefixed attrs_ because compiler modules share one translation
+ * unit (the parser already has attr_bracket_update).
+ */
+
+fn ATTRS_STRIDE() -> i32 { return 11; }
+
+fn attrs_tag(tags: Vec<i32>, i: i32) -> i32 {
+    if i < 0 { return 0 - 1; }
+    if i >= vec_len(tags) { return 97; }
+    return vec_get(tags, i);
+}
+
+fn attrs_text(source: string, starts: Vec<i32>, ends: Vec<i32>, t: i32) -> string {
+    let s: i32 = vec_get(starts, t);
+    return string_substr(source, s, vec_get(ends, t) - s);
+}
+
+/* ASCII lowercase of one byte. */
+fn attrs_lower(c: i32) -> i32 {
+    if c >= 65 {
+        if c <= 90 { return c + 32; }
+    }
+    return c;
+}
+
+/* Whether `s` equals `word` (lowercase ASCII) without regard to ASCII case. */
+fn attrs_eq_nocase(s: string, word: string) -> bool {
+    let n: i32 = string_len(s);
+    if n != string_len(word) { return false; }
+    let mut i: i32 = 0;
+    while i < n {
+        if attrs_lower(string_char_at(s, i)) != string_char_at(word, i) { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+/* The `]` matching the `[` at `lb`, or -1. */
+fn attrs_close(tags: Vec<i32>, lb: i32) -> i32 {
+    let n: i32 = vec_len(tags);
+    let mut depth: i32 = 0;
+    let mut i: i32 = lb;
+    while i < n {
+        let t: i32 = vec_get(tags, i);
+        if t == 10 { depth = depth + 1; }
+        if t == 11 {
+            depth = depth - 1;
+            if depth == 0 { return i; }
+        }
+        if t == 97 { return 0 - 1; }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* The `)` matching the `(` at `lp` (parens and brackets nest), or -1. */
+fn attrs_close_paren(tags: Vec<i32>, lp: i32, limit: i32) -> i32 {
+    let mut depth: i32 = 0;
+    let mut i: i32 = lp;
+    while i <= limit {
+        let t: i32 = vec_get(tags, i);
+        if t == 6 { depth = depth + 1; }
+        if t == 10 { depth = depth + 1; }
+        if t == 11 { depth = depth - 1; }
+        if t == 7 {
+            depth = depth - 1;
+            if depth == 0 { return i; }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
+}
+
+/* Frames: 0 the file, 1 an impl/trait member list, 2 a block, 3 a struct or
+   enum body, 4 a match arm list, 5 a struct literal, 6 parentheses, 7
+   brackets. */
+fn attrs_frame_name(f: i32) -> string {
+    if f == 0 { return "file"; }
+    if f == 1 { return "members"; }
+    if f == 2 { return "block"; }
+    if f == 3 { return "fields"; }
+    if f == 4 { return "arms"; }
+    if f == 5 { return "struct-literal"; }
+    if f == 6 { return "parens"; }
+    return "brackets";
+}
+
+/* The frame stack is `stack[0 .. depth)`; entries past `depth` are stale. */
+fn attrs_top(stack: Vec<i32>, depth: i32) -> i32 {
+    if depth <= 0 { return 0; }
+    return vec_get(stack, depth - 1);
+}
+
+fn attrs_push(stack: Vec<i32>, depth: i32, frame: i32) -> i32 {
+    if depth < vec_len(stack) { vec_set(stack, depth, frame); } else { vec_push(stack, frame); }
+    return depth + 1;
+}
+
+/* Tokens that can begin an item. */
+fn attrs_item_start(t: i32) -> bool {
+    if t == 65 { return true; }
+    if t == 82 { return true; }
+    if t == 89 { return true; }
+    if t == 62 { return true; }
+    if t == 69 { return true; }
+    if t == 90 { return true; }
+    if t == 92 { return true; }
+    if t == 78 { return true; }
+    if t == 93 { return true; }
+    return false;
+}
+
+/* Statements that are statements by their first token alone. */
+fn attrs_braced_or_keyword_stmt(t: i32) -> bool {
+    if t == 68 { return true; }
+    if t == 96 { return true; }
+    if t == 66 { return true; }
+    if t == 72 { return true; }
+    if t == 74 { return true; }
+    if t == 8 { return true; }
+    if t == 93 { return true; }
+    if t == 71 { return true; }
+    return attrs_item_start(t);
+}
+
+/* Whether the tokens from `t` reach a `;` at nesting depth 0 before the
+   enclosing block's `}`: a statement rather than the block's tail. */
+fn attrs_reaches_semicolon(tags: Vec<i32>, t: i32) -> bool {
+    let n: i32 = vec_len(tags);
+    let mut depth: i32 = 0;
+    let mut i: i32 = t;
+    while i < n {
+        let g: i32 = vec_get(tags, i);
+        if g == 97 { return false; }
+        if g == 6 { depth = depth + 1; }
+        if g == 10 { depth = depth + 1; }
+        if g == 8 { depth = depth + 1; }
+        if g == 7 { depth = depth - 1; }
+        if g == 11 { depth = depth - 1; }
+        if g == 9 {
+            if depth == 0 { return false; }
+            depth = depth - 1;
+        }
+        if g == 13 {
+            if depth == 0 { return true; }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* Position of a run whose first `#` follows token `prev` (-1: none), in
+   frame `frame`, annotating the construct at `target`: 1 item, 2 statement,
+   0 neither. */
+fn attrs_position(tags: Vec<i32>, frame: i32, prev: i32, target: i32) -> i32 {
+    let p: i32 = attrs_tag(tags, prev);
+    let ends_something: bool = if prev < 0 { true } else { p == 8 || p == 13 || p == 9 };
+    if ends_something != true { return 0; }
+    let g: i32 = attrs_tag(tags, target);
+    if frame == 0 || frame == 1 {
+        if attrs_item_start(g) { return 1; }
+        return 0;
+    }
+    if frame == 2 {
+        if attrs_braced_or_keyword_stmt(g) { return 2; }
+        if g == 9 || g == 13 || g == 97 || g == 60 || g == 12 || g == 7 || g == 11 || g == 20 { return 0; }
+        if attrs_reaches_semicolon(tags, target) { return 2; }
+        return 0;
+    }
+    return 0;
+}
+
+/* Split the argument list between `lp` and its `)` at `rp` into `args`;
+   returns the argument count. A trailing comma adds no argument. */
+fn attrs_split_args(tags: Vec<i32>, lp: i32, rp: i32, args: Vec<i32>) -> i32 {
+    let mut count: i32 = 0;
+    let mut a: i32 = lp + 1;
+    let mut depth: i32 = 0;
+    let mut i: i32 = lp + 1;
+    while i <= rp {
+        let t: i32 = vec_get(tags, i);
+        let at_end: bool = i == rp;
+        if t == 6 || t == 10 { depth = depth + 1; }
+        if t == 7 || t == 11 {
+            if at_end != true { depth = depth - 1; }
+        }
+        if at_end || (t == 12 && depth == 0) {
+            let b: i32 = i - 1;
+            if b >= a {
+                let mut kind: i32 = 3;
+                let mut vf: i32 = 0 - 1;
+                let mut vl: i32 = 0 - 1;
+                if vec_get(tags, a) == 5 {
+                    if b == a { kind = 0; }
+                    if b > a {
+                        let nx: i32 = vec_get(tags, a + 1);
+                        if nx == 35 { kind = 1; vf = a + 2; vl = b; }
+                        if nx == 6 { kind = 2; vf = a + 1; vl = b; }
+                    }
+                }
+                vec_push(args, a);
+                vec_push(args, vf);
+                vec_push(args, vl);
+                vec_push(args, kind);
+                count = count + 1;
+            } else {
+                if at_end != true {
+                    /* an empty argument before a comma: kept as an "other" argument */
+                    vec_push(args, a);
+                    vec_push(args, 0 - 1);
+                    vec_push(args, 0 - 1);
+                    vec_push(args, 3);
+                    count = count + 1;
+                }
+            }
+            a = i + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+/* Scan every attribute into `at` and `args`. Returns the attribute count, or
+   -(t + 2) for an attribute starting at token t that never closes. */
+fn attrs_scan(tags: Vec<i32>, at: Vec<i32>, args: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(tags);
+    let stack: Vec<i32> = vec_new();
+    let mut depth: i32 = 0;
+    let mut pend: i32 = 0 - 1;
+    let mut pend_at: i32 = 0;
+    let mut prev: i32 = 0 - 1;
+    let mut run: i32 = 0 - 1;
+    let mut last_close: i32 = 0 - 2;
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        let t: i32 = vec_get(tags, i);
+        if t == 21 && attrs_tag(tags, i + 1) == 10 {
+            let close: i32 = attrs_close(tags, i + 1);
+            if close < 0 { return 0 - i - 2; }
+            if last_close != i - 1 { run = run + 1; }
+            let mut pf: i32 = 0 - 1;
+            let mut pl: i32 = 0 - 1;
+            let mut q: i32 = i + 2;
+            if attrs_tag(tags, q) == 5 {
+                pf = q;
+                pl = q;
+                while attrs_tag(tags, pl + 1) == 15 && attrs_tag(tags, pl + 2) == 5 { pl = pl + 2; }
+                q = pl + 1;
+            }
+            let mut lp: i32 = 0 - 1;
+            let mut a0: i32 = 0 - 1;
+            let mut ac: i32 = 0;
+            if attrs_tag(tags, q) == 6 {
+                let rp: i32 = attrs_close_paren(tags, q, close);
+                if rp >= 0 {
+                    lp = q;
+                    a0 = vec_len(args) / 4;
+                    ac = attrs_split_args(tags, q, rp, args);
+                }
+            }
+            vec_push(at, i);
+            vec_push(at, close);
+            vec_push(at, pf);
+            vec_push(at, pl);
+            vec_push(at, run);
+            vec_push(at, 0 - 1);
+            vec_push(at, 0);
+            vec_push(at, a0);
+            vec_push(at, ac);
+            vec_push(at, lp);
+            vec_push(at, attrs_top(stack, depth));
+            count = count + 1;
+            last_close = close;
+            i = close + 1;
+        } else {
+            /* the token after a run: the run's target, and its position */
+            if last_close == i - 1 {
+                let s: i32 = ATTRS_STRIDE();
+                let pos: i32 = attrs_position(tags, attrs_top(stack, depth), prev, i);
+                /* (sv0c evaluates both sides of `&&`: no index guard inside one) */
+                let mut k: i32 = count - 1;
+                let mut more: bool = k >= 0;
+                while more {
+                    if vec_get(at, k * s + 4) == run {
+                        vec_set(at, k * s + 5, i);
+                        vec_set(at, k * s + 6, pos);
+                        k = k - 1;
+                        more = k >= 0;
+                    } else {
+                        more = false;
+                    }
+                }
+            }
+            if t == 65 || t == 89 || t == 62 || t == 69 || t == 90 || t == 68 || t == 60 || t == 96 || t == 66 || t == 72
+                    || t == 74 || t == 93 || t == 20 {
+                if pend < 0 || pend_at != depth {
+                    pend_at = depth;
+                    pend = 2;
+                    if t == 89 || t == 62 { pend = 3; }
+                    if t == 69 || t == 90 { pend = 1; }
+                    if t == 74 { pend = 4; }
+                }
+            }
+            if t == 13 || t == 12 {
+                if pend_at == depth { pend = 0 - 1; }
+            }
+            if t == 6 { depth = attrs_push(stack, depth, 6); }
+            if t == 10 { depth = attrs_push(stack, depth, 7); }
+            if t == 8 {
+                if pend >= 0 && pend_at == depth {
+                    depth = attrs_push(stack, depth, pend);
+                    pend = 0 - 1;
+                } else {
+                    let pt: i32 = attrs_tag(tags, prev);
+                    if pt == 5 || pt == 39 || pt == 87 { depth = attrs_push(stack, depth, 5); } else { depth = attrs_push(stack, depth, 2); }
+                }
+            }
+            if t == 7 || t == 11 || t == 9 {
+                if depth > 0 { depth = depth - 1; }
+                if depth < pend_at { pend = 0 - 1; }
+            }
+            prev = i;
+            i = i + 1;
+        }
+    }
+    return count;
+}
+
+/* ── the `coverage` attribute ─────────────────────────────────────────── */
+
+fn attrs_path_text(source: string, starts: Vec<i32>, ends: Vec<i32>, pf: i32, pl: i32) -> string {
+    if pf < 0 { return ""; }
+    return string_substr(source, vec_get(starts, pf), vec_get(ends, pl) - vec_get(starts, pf));
+}
+
+/* 1 exactly `coverage`, 2 a rejected spelling of it, 0 another attribute. */
+fn attrs_coverage_kind(source: string, starts: Vec<i32>, ends: Vec<i32>, pf: i32, pl: i32) -> i32 {
+    if pf < 0 { return 0; }
+    let last: string = attrs_text(source, starts, ends, pl);
+    if pf == pl {
+        if string_eq(last, "coverage") { return 1; }
+    }
+    if attrs_eq_nocase(last, "coverage") || attrs_eq_nocase(last, "sv0cov") { return 2; }
+    return 0;
+}
+
+fn attrs_mode_valid(m: string) -> bool {
+    return string_eq(m, "off") || string_eq(m, "branch_off") || string_eq(m, "contract_off");
+}
+
+/* Bytes of a string literal's value: its text without the quotes, a
+   backslash escape counting as one byte. */
+fn attrs_literal_len(lit: string) -> i32 {
+    let n: i32 = string_len(lit);
+    let mut len: i32 = 0;
+    let mut i: i32 = 1;
+    while i < n - 1 {
+        if string_char_at(lit, i) == 92 { i = i + 1; }
+        len = len + 1;
+        i = i + 1;
+    }
+    return len;
+}
+
+fn attrs_err(errs: Vec<i32>, code: i32, a: i32, b: i32, msg: i32) -> i32 {
+    vec_push(errs, code);
+    vec_push(errs, a);
+    vec_push(errs, b);
+    vec_push(errs, msg);
+    return 0;
+}
+
+fn attrs_message(id: i32) -> string {
+    if id == 1 { return "coverage attributes go only before an item or a statement; there is no expression attribute (use a `// sv0cov:` comment directive inside an expression)"; }
+    if id == 2 { return "this is not the coverage attribute namespace; write `coverage` exactly"; }
+    if id == 3 { return "the coverage attribute takes `(<mode>, reason = \"...\")`"; }
+    if id == 4 { return "unknown coverage mode; the modes are `off`, `branch_off` and `contract_off`"; }
+    if id == 5 { return "the coverage mode comes first, as a bare `off`, `branch_off` or `contract_off`"; }
+    if id == 6 { return "the coverage attribute needs `reason = \"...\"` after the mode"; }
+    if id == 7 { return "the coverage reason is empty"; }
+    if id == 8 { return "the second coverage argument must be `reason = \"...\"` with a string literal"; }
+    if id == 9 { return "the coverage reason is longer than 1024 bytes"; }
+    if id == 10 { return "the coverage attribute takes exactly two arguments, `<mode>` and `reason = \"...\"`"; }
+    if id == 11 { return "coverage exclusions are not implemented by this compiler yet (sv0cov CV-305); build without --coverage, or remove the attribute"; }
+    return "invalid coverage attribute";
+}
+
+fn attrs_code_text(code: i32) -> string {
+    if code == 1021 { return "COV1021"; }
+    if code == 3207 { return "COV3207"; }
+    return "COV3201";
+}
+
+/* Validate one `coverage` attribute (index k): form, mode and reason. */
+fn attrs_check_form(source: string, starts: Vec<i32>, ends: Vec<i32>, tags: Vec<i32>, at: Vec<i32>,
+                    args: Vec<i32>, k: i32, errs: Vec<i32>) -> i32 {
+    let s: i32 = ATTRS_STRIDE();
+    let hash: i32 = vec_get(at, k * s);
+    let close: i32 = vec_get(at, k * s + 1);
+    let a0: i32 = vec_get(at, k * s + 7);
+    let ac: i32 = vec_get(at, k * s + 8);
+    if a0 < 0 { return attrs_err(errs, 3201, hash, close, 3); }
+    if vec_get(at, k * s + 9) + 1 > close { return attrs_err(errs, 3201, hash, close, 3); }
+    let rp: i32 = attrs_close_paren(tags, vec_get(at, k * s + 9), close);
+    if rp + 1 != close { return attrs_err(errs, 3201, hash, close, 3); }
+    if ac == 0 { return attrs_err(errs, 3201, hash, close, 5); }
+    let m_tok: i32 = vec_get(args, a0 * 4);
+    let m_kind: i32 = vec_get(args, a0 * 4 + 3);
+    if m_kind != 0 { return attrs_err(errs, 3201, m_tok, close - 1, 5); }
+    if attrs_mode_valid(attrs_text(source, starts, ends, m_tok)) != true { return attrs_err(errs, 3201, m_tok, m_tok, 4); }
+    if ac < 2 { return attrs_err(errs, 3207, hash, close, 6); }
+    let r_tok: i32 = vec_get(args, (a0 + 1) * 4);
+    let r_kind: i32 = vec_get(args, (a0 + 1) * 4 + 3);
+    let r_vf: i32 = vec_get(args, (a0 + 1) * 4 + 1);
+    let r_vl: i32 = vec_get(args, (a0 + 1) * 4 + 2);
+    if r_kind != 1 { return attrs_err(errs, 3201, r_tok, r_tok, 8); }
+    if string_eq(attrs_text(source, starts, ends, r_tok), "reason") != true { return attrs_err(errs, 3201, r_tok, r_tok, 8); }
+    if r_vf != r_vl || vec_get(tags, r_vf) != 2 { return attrs_err(errs, 3201, r_tok, r_vl, 8); }
+    if ac > 2 { return attrs_err(errs, 3201, vec_get(args, (a0 + 2) * 4), close - 1, 10); }
+    let n: i32 = attrs_literal_len(attrs_text(source, starts, ends, r_vf));
+    if n == 0 { return attrs_err(errs, 3207, r_vf, r_vf, 7); }
+    if n > 1024 { return attrs_err(errs, 3201, r_vf, r_vf, 9); }
+    return 0;
+}
+
+/* Validate every attribute: a rejected namespace spelling, a misplaced or
+   malformed `coverage` attribute. With `coverage_on`, an otherwise valid
+   `coverage` attribute is refused too until exclusions are implemented
+   (sv0cov CV-305; a compiler rejects what it cannot honour). Returns the
+   number of errors pushed onto `errs`. */
+fn attrs_check(source: string, starts: Vec<i32>, ends: Vec<i32>, tags: Vec<i32>, at: Vec<i32>,
+               args: Vec<i32>, coverage_on: bool, errs: Vec<i32>) -> i32 {
+    let s: i32 = ATTRS_STRIDE();
+    let before: i32 = vec_len(errs);
+    let n: i32 = vec_len(at) / s;
+    let mut k: i32 = 0;
+    while k < n {
+        let hash: i32 = vec_get(at, k * s);
+        let close: i32 = vec_get(at, k * s + 1);
+        let kind: i32 = attrs_coverage_kind(source, starts, ends, vec_get(at, k * s + 2), vec_get(at, k * s + 3));
+        if kind == 2 {
+            attrs_err(errs, 3201, vec_get(at, k * s + 2), vec_get(at, k * s + 3), 2);
+        }
+        if kind == 1 {
+            let had: i32 = vec_len(errs);
+            if vec_get(at, k * s + 6) == 0 {
+                attrs_err(errs, 1021, hash, close, 1);
+            } else {
+                attrs_check_form(source, starts, ends, tags, at, args, k, errs);
+            }
+            if coverage_on && vec_len(errs) == had {
+                attrs_err(errs, 1021, hash, close, 11);
+            }
+        }
+        k = k + 1;
+    }
+    return (vec_len(errs) - before) / 4;
+}
+
+/* The token stream without the attributes the parser must not see: every
+   attribute at an item or statement position, except `#[extern_c]` at an
+   item position, which the parser reads itself. Attributes anywhere else
+   stay, so the parser rejects them as before. */
+fn attrs_strip(source: string, starts: Vec<i32>, ends: Vec<i32>, tags: Vec<i32>, at: Vec<i32>,
+               out_tags: Vec<i32>, out_starts: Vec<i32>, out_ends: Vec<i32>) -> i32 {
+    let s: i32 = ATTRS_STRIDE();
+    let n: i32 = vec_len(tags);
+    let na: i32 = vec_len(at) / s;
+    let mut k: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        let mut skip_to: i32 = 0 - 1;
+        if k < na {
+            if vec_get(at, k * s) == i {
+                let pos: i32 = vec_get(at, k * s + 6);
+                let pf: i32 = vec_get(at, k * s + 2);
+                let mut is_extern: bool = false;
+                if pf >= 0 {
+                    if pf == vec_get(at, k * s + 3) { is_extern = string_eq(attrs_text(source, starts, ends, pf), "extern_c"); }
+                }
+                if pos == 2 || (pos == 1 && is_extern != true) { skip_to = vec_get(at, k * s + 1) + 1; }
+                k = k + 1;
+            }
+        }
+        if skip_to >= 0 {
+            i = skip_to;
+        } else {
+            vec_push(out_tags, vec_get(tags, i));
+            vec_push(out_starts, vec_get(starts, i));
+            vec_push(out_ends, vec_get(ends, i));
+            i = i + 1;
+        }
+    }
+    return vec_len(out_tags);
+}
+
+/* The table as text, one line per attribute then one per argument (the
+   attr-dump test hook): byte offsets, so the snapshot is stable.
+     attr <k> <run> <item|statement|none> <frame> <path> <start> <end> <target start> <target text>
+     arg <k> <i> <name> <start> <end> */
+fn attrs_dump(source: string, starts: Vec<i32>, ends: Vec<i32>, at: Vec<i32>, args: Vec<i32>) -> string {
+    let s: i32 = ATTRS_STRIDE();
+    let n: i32 = vec_len(at) / s;
+    let mut out: string = "";
+    let mut k: i32 = 0;
+    while k < n {
+        let pos: i32 = vec_get(at, k * s + 6);
+        let mut pname: string = "none";
+        if pos == 1 { pname = "item"; }
+        if pos == 2 { pname = "statement"; }
+        let target: i32 = vec_get(at, k * s + 5);
+        let mut ttext: string = "<end>";
+        let mut tstart: i32 = 0 - 1;
+        if target >= 0 {
+            if target < vec_len(starts) {
+                ttext = attrs_text(source, starts, ends, target);
+                tstart = vec_get(starts, target);
+            }
+        }
+        let mut line: string = string_concat("attr\t", int_to_string(k));
+        line = string_concat(string_concat(line, "\t"), int_to_string(vec_get(at, k * s + 4)));
+        line = string_concat(string_concat(line, "\t"), pname);
+        line = string_concat(string_concat(line, "\t"), attrs_frame_name(vec_get(at, k * s + 10)));
+        line = string_concat(string_concat(line, "\t"), attrs_path_text(source, starts, ends, vec_get(at, k * s + 2), vec_get(at, k * s + 3)));
+        line = string_concat(string_concat(line, "\t"), int_to_string(vec_get(starts, vec_get(at, k * s))));
+        line = string_concat(string_concat(line, "\t"), int_to_string(vec_get(ends, vec_get(at, k * s + 1))));
+        line = string_concat(string_concat(line, "\t"), int_to_string(tstart));
+        line = string_concat(string_concat(line, "\t"), ttext);
+        out = string_concat(string_concat(out, line), "\n");
+        let a0: i32 = vec_get(at, k * s + 7);
+        let ac: i32 = vec_get(at, k * s + 8);
+        let mut j: i32 = 0;
+        while j < ac {
+            let nt: i32 = vec_get(args, (a0 + j) * 4);
+            let vl: i32 = vec_get(args, (a0 + j) * 4 + 2);
+            let mut last: i32 = nt;
+            if vl >= 0 { last = vl; }
+            let mut aline: string = string_concat("arg\t", int_to_string(k));
+            aline = string_concat(string_concat(aline, "\t"), int_to_string(j));
+            aline = string_concat(string_concat(aline, "\t"), attrs_text(source, starts, ends, nt));
+            aline = string_concat(string_concat(aline, "\t"), int_to_string(vec_get(starts, nt)));
+            aline = string_concat(string_concat(aline, "\t"), int_to_string(vec_get(ends, last)));
+            out = string_concat(string_concat(out, aline), "\n");
+            j = j + 1;
+        }
+        k = k + 1;
+    }
+    return out;
+}
