@@ -2,6 +2,7 @@
 /* sv0cov CV-302: every legal place for an attribute, including misleading
    layouts. Each one attaches to exactly the next item or statement. The
    program exits 0. */
+// fmt_sv0: keep-layout
 
 #[coverage(off, reason = "an item")]
 fn excluded() -> i32 { return 1; }

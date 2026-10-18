@@ -6,7 +6,7 @@ This note records a **workspace-level** direction for two future tools: **`sv0-f
 
 | Concern | Today | Target tool |
 |---------|--------|----------------|
-| Trailing whitespace + final newline on **`.sv0`** | **`scripts/fmt_sv0.py`**, invoked as **`./scripts/sv0 fmt`** (see **`task/sv0-toolchain-milestone-2-prep.Rmd`**) | Absorb or supersede with **`sv0-formatter`** **phase 0** (same contract: conservative, no AST reflow until specified) |
+| Trailing whitespace + final newline on **`.sv0`**; attribute layout (each `#[...]` on its own line directly before its item or statement, at the construct's indentation; sv0cov CV-303, sv0doc **`attributes/coverage.md`** §5) | **`scripts/fmt_sv0.py`**, invoked as **`./scripts/sv0 fmt`** (see **`task/sv0-toolchain-milestone-2-prep.Rmd`**); tests **`scripts/verify_fmt_sv0.py`** | Absorb or supersede with **`sv0-formatter`** **phase 0** (same contract: conservative, no AST reflow until specified) |
 | Deep layout (indent, line breaks, import/`use` order) | Not standardized in tooling | **`sv0-formatter`** **phase 1+**: AST-driven printer locked to **`sv0doc/grammar/`** + golden **`.sv0`** corpus |
 | “Obvious” hygiene (nested **`/* */`**, UTF-8 assumptions) | Python guards under **`./scripts/sv0 test`** / **`test-guards`** | **`sv0-linter`** **phase 0**: same rules as **library** checks + stable exit codes for CI |
 | Semantic rules (**E0xxx**), borrow/contract clauses | SML bootstrap compiler diagnostics | **`sv0-linter`** **phase 1+**: reuse compiler front-end (lexer → resolver/checker) as a **library**; emit **JSON** or **GNU-style** locations for editors |
@@ -48,6 +48,7 @@ Document the profile in-repo (e.g. **`sv0c/doc/style-profile.md`** plus a machin
 | Area | Phase 0 (today) | Phase 1+ (AST printer) |
 |------|-----------------|-------------------------|
 | **Trailing whitespace** | Strip each line; ensure single **`\n`** at EOF | Same invariants (may remain outside profile or as profile **`version: 0`**) |
+| **Attributes** | Each attribute on its own line directly before its construct, at the construct's indentation; comments between kept, blank lines between dropped, attribute text byte for byte; a construct sharing a line with earlier code is an error, never a guessed indentation (sv0cov D-15); a leading `// fmt_sv0: keep-layout` comment opts a fixture out | Same contract, from the parse tree |
 | **Indent unit** | N/A | **Profile-driven** (e.g. `indent_style = spaces`, `indent_width = N`); linter **L0006** applies only if the active profile **disallows** tabs |
 | **Brace / block layout** | N/A | **Profile-driven** brace / `else` attachment rules, constrained by grammar samples in **`sv0doc/`** (formatter must not invent elisions the grammar forbids) |
 | **Max line width** | N/A | **Profile-driven** optional `max_width`; soft warn vs hard wrap only where the grammar already allows line breaks (e.g. after `,` in lists) |

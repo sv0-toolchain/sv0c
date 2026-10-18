@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov CV-303: attribute layouts the formatter (scripts/fmt_sv0.py) puts
+   in canonical form. scripts/verify_fmt_sv0.py formats this file and checks
+   that every attribute keeps its attachment and arguments (attr-dump on both
+   binaries) and that the C and bytecode do not change. The program exits 0. */
+// fmt_sv0: keep-layout
+
+#[coverage(off, reason = "one")]
+#[coverage(contract_off, reason = "two")]
+fn halve(x: i32) -> i32 requires(x > 0) { return x / 2; }
+
+#[coverage(off, reason = "a trailing comment")] // why it is off
+/// a doc comment between the attribute and its item
+fn helper() -> i32 { return 1; }
+
+#[inline]
+fn zero() -> i32 { return 0; }
+
+struct P { x: i32 }
+
+impl P {
+        #[coverage(off,
+        reason = "an argument list over two lines")]
+        fn get(self: P) -> i32 { return self.x; }
+}
+
+fn text() -> i32 {
+    let s: string = "#[coverage(off, reason = \"in a string\")] // not a comment";
+    /* #[coverage(off, reason = "in a block comment")] */
+    // #[coverage(off, reason = "in a line comment")]
+    return string_len(s) - 57;
+}
+
+fn body(n: i32) -> i32 {
+    let mut t: i32 = n;
+    #[coverage(off, reason = "after code, statement below")]
+    t = t + 1;
+	#[coverage(off, reason = "tab indentation")] /* kept */
+	t = t + 1;
+    #[coverage(branch_off, reason = "blank lines")]
+    if t > 100 { return 0; };
+                    #[coverage(off, reason = "a run")]
+                    #[coverage(off, reason = "of three")]
+                    #[coverage(off, reason = "at three indentations")]
+                    return t - n - 2;
+}
+
+fn main() -> i32 {
+    let p: P = P { x: 1 };
+    #[allow(x)]
+    let z: i32 = zero();
+    return halve(2) + helper() + p.get() + text() + body(5) + z - 3;
+}
