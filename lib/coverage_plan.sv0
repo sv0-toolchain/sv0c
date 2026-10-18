@@ -1419,3 +1419,146 @@ fn cov_hit_table(tags: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3
     }
     return tab;
 }
+
+/* ── Contract clauses (sv0cov CV-306; SPEC 12, 13.1, 16.3.7) ────────────
+ * One contract entity per `requires`, `ensures`, `loop_invariant` and
+ * `assert` of a function with a body, owned by that function (sv0 has no
+ * nested functions, so the enclosing function is the nearest one). Span:
+ * the keyword through the clause's `)` (requires, ensures, loop_invariant)
+ * or through the last token of the asserted expression. Qualified name:
+ * `<function>#<kind>:<k>`, k counting that function's clauses of that kind
+ * in source order.
+ *
+ * Table `cl`, stride 8: function entity, kind token (83 requires, 61
+ * ensures, 73 loop_invariant, 55 assert), keyword token, last token, root
+ * node of the clause's expression in the body arena (-1 until matched),
+ * enforcement (1 runtime_checked, 2 statically_verified, 3 disabled, 4
+ * unsupported), ordinal k, the keyword's line (the verify key).
+ *
+ * Enforcement follows lowering exactly (a runtime_checked clause is one
+ * lowering checks, so its hits exist): contract mode disabled -> disabled;
+ * a model-only clause (old/forall/exists; not asserts) -> unsupported;
+ * verified mode with the clause's line proven (ensures, loop_invariant) ->
+ * statically_verified; otherwise runtime_checked.
+ */
+fn cov_plan_contracts(tags: Vec<i32>, starts: Vec<i32>, source: string, id1: Vec<i32>, ent_item: Vec<i32>,
+                      mode: i32, proven: Vec<i32>, cl: Vec<i32>) -> i32 {
+    let ne: i32 = vec_len(ent_item);
+    let mut e: i32 = 0;
+    while e < ne {
+        let name_tok: i32 = vec_get(id1, vec_get(ent_item, e));
+        let close: i32 = cov_plan_body_end(tags, name_tok);
+        let n_req: Vec<i32> = vec_new();
+        vec_push(n_req, 0);
+        vec_push(n_req, 0);
+        vec_push(n_req, 0);
+        vec_push(n_req, 0);
+        let mut t: i32 = name_tok + 1;
+        while t < close {
+            let g: i32 = vec_get(tags, t);
+            let mut last: i32 = 0 - 1;
+            let mut slot: i32 = 0 - 1;
+            if g == 83 || g == 61 || g == 73 {
+                if cov_plan_tag(tags, t + 1) == 6 {
+                    last = cov_tok_close(tags, t + 1);
+                    slot = 0;
+                    if g == 61 { slot = 1; }
+                    if g == 73 { slot = 2; }
+                }
+            }
+            if g == 55 {
+                let mut depth: i32 = 0;
+                let mut k: i32 = t + 1;
+                let mut going: bool = true;
+                while going {
+                    if k >= close { going = false; } else {
+                        let h: i32 = vec_get(tags, k);
+                        if h == 6 || h == 8 || h == 10 { depth = depth + 1; }
+                        if h == 7 || h == 9 || h == 11 {
+                            if depth == 0 { going = false; } else { depth = depth - 1; }
+                        }
+                        if going {
+                            if h == 13 {
+                                if depth == 0 { going = false; }
+                            }
+                        }
+                        if going { k = k + 1; }
+                    }
+                }
+                last = k - 1;
+                slot = 3;
+            }
+            if last > t {
+                let line: i32 = lower_line_of_pos(source, vec_get(starts, t));
+                let mut enf: i32 = 1;
+                if mode == 2 { enf = 3; } else {
+                    if g != 55 {
+                        if contract_is_advanced(tags, t) { enf = 4; }
+                    }
+                    if enf == 1 {
+                        if mode == 1 {
+                            if g == 61 || g == 73 {
+                                if lower_proven_has(proven, line) { enf = 2; }
+                            }
+                        }
+                    }
+                }
+                vec_push(cl, e);
+                vec_push(cl, g);
+                vec_push(cl, t);
+                vec_push(cl, last);
+                vec_push(cl, 0 - 1);
+                vec_push(cl, enf);
+                vec_push(cl, vec_get(n_req, slot));
+                vec_push(cl, line);
+                vec_set(n_req, slot, vec_get(n_req, slot) + 1);
+                if g != 55 { t = last; }
+            }
+            t = t + 1;
+        }
+        e = e + 1;
+    }
+    return vec_len(cl) / 8;
+}
+
+/* Match each clause to its expression's root node: `roots` lists every
+   candidate root (the parser's contract roots, loop invariant roots, and
+   assert conditions); a root belongs to the clause whose tokens hold one of
+   its tokens. Returns -1, or the index of a runtime_checked clause with no
+   root (the build then fails closed). */
+fn cov_plan_contract_roots(cl: Vec<i32>, roots: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
+                           ed3: Vec<i32>, pp: Vec<i32>) -> i32 {
+    let nc: i32 = vec_len(cl) / 8;
+    let mut r: i32 = 0;
+    while r < vec_len(roots) {
+        let root: i32 = vec_get(roots, r);
+        let tok: i32 = expr_any_tok(et, ed1, ed2, ed3, pp, root);
+        if tok >= 0 {
+            let mut c: i32 = 0;
+            while c < nc {
+                if vec_get(cl, c * 8 + 4) < 0 {
+                    if tok > vec_get(cl, c * 8 + 2) {
+                        if tok <= vec_get(cl, c * 8 + 3) { vec_set(cl, c * 8 + 4, root); }
+                    }
+                }
+                c = c + 1;
+            }
+        }
+        r = r + 1;
+    }
+    let mut c2: i32 = 0;
+    while c2 < nc {
+        if vec_get(cl, c2 * 8 + 5) == 1 {
+            if vec_get(cl, c2 * 8 + 4) < 0 { return c2; }
+        }
+        c2 = c2 + 1;
+    }
+    return 0 - 1;
+}
+
+fn cov_contract_kind_name(g: i32) -> string {
+    if g == 83 { return "requires"; }
+    if g == 61 { return "ensures"; }
+    if g == 73 { return "loop_invariant"; }
+    return "assert";
+}

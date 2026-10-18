@@ -467,7 +467,9 @@ fn bc_push_ascii(s: string, out: Vec<i32>) -> i32 {
 
 /* Decode a negative contract-message sentinel from vm_codegen.contract_pool_key
    ( key = -(kind*1000000 + fn_h + 1) ) into "requires failed: <fn>" /
-   "ensures failed: <fn>" bytes in `sbuf`, mirroring the SML VM emitter's
+   "ensures failed: <fn>" (and, since sv0cov CV-306, "assert failed: <fn>" /
+   "loop_invariant failed: <fn>" for kinds 2 and 3) bytes in `sbuf`,
+   mirroring the SML VM emitter's
    `poolAdd pool ("requires failed: " ^ fnName)`. Returns the byte length. */
 fn decode_contract_key(idx: i32, source: string, starts: Vec<i32>,
                        ends: Vec<i32>, sbuf: Vec<i32>) -> i32 {
@@ -477,9 +479,13 @@ fn decode_contract_key(idx: i32, source: string, starts: Vec<i32>,
     let mut plen: i32 = 0;
     if kind == 0 {
         plen = bc_push_ascii("requires failed: ", sbuf);
-    } else {
+    } else { if kind == 1 {
         plen = bc_push_ascii("ensures failed: ", sbuf);
-    }
+    } else { if kind == 2 {
+        plen = bc_push_ascii("assert failed: ", sbuf);
+    } else {
+        plen = bc_push_ascii("loop_invariant failed: ", sbuf);
+    } } }
     let mut nlen: i32 = 0;
     if fn_h >= 0 {
         if fn_h < vec_len(starts) {

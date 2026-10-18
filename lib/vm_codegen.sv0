@@ -2770,7 +2770,10 @@ fn emit_instr(ins: Instr,
             let ne: i32 = emit_expr(e, env_names, env_bases, env_widths, env_cats, env_field_starts, env_fields_flat,
                                     pool, source, starts, ends, out);
             if ne < 0 { return 0 - 1; }
-            let key: i32 = contract_pool_key(fn_h, 0);
+            /* an assert (2) / loop_invariant (3) check packs its kind above
+               2^20 (lowering lower_check_name, sv0cov CV-306) */
+            let ck: i32 = fn_h / 1048576;
+            let key: i32 = contract_pool_key(fn_h - ck * 1048576, ck);
             let pidx: i32 = pool_add(pool, key, source, starts, ends);
             vec_push(out, 160);
             vec_push(out, pidx);

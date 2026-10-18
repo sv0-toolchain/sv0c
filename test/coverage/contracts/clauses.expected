@@ -1,0 +1,28 @@
+entity 0 function clamp 7:1
+entity 1 contract clamp#requires:0 8:5
+entity 2 contract clamp#requires:1 9:5
+entity 3 contract clamp#ensures:0 10:5
+entity 4 function total 16:1
+entity 5 contract total#ensures:0 16:25
+entity 6 contract total#loop_invariant:0 20:9
+entity 7 contract total#loop_invariant:1 21:9
+entity 8 contract total#assert:0 25:9
+entity 9 contract total#assert:1 27:5
+entity 10 function same 31:1
+entity 11 contract same#ensures:0 31:24
+entity 12 function trusted 36:1
+entity 13 contract trusted#requires:0 36:27
+entity 14 function main 40:1
+contract 0 requires runtime_checked entity=1 function=0 true=2 false=0 result=evaluated_true
+contract 1 requires runtime_checked entity=2 function=0 true=2 false=0 result=evaluated_true
+contract 2 ensures runtime_checked entity=3 function=0 true=2 false=0 result=evaluated_true
+contract 3 ensures runtime_checked entity=5 function=4 true=1 false=0 result=evaluated_true
+contract 4 loop_invariant runtime_checked entity=6 function=4 true=4 false=0 result=evaluated_true
+contract 5 loop_invariant runtime_checked entity=7 function=4 true=4 false=0 result=evaluated_true
+contract 6 assert runtime_checked entity=8 function=4 true=3 false=0 result=evaluated_true
+contract 7 assert runtime_checked entity=9 function=4 true=1 false=0 result=evaluated_true
+contract 8 ensures unsupported entity=11 function=10 true=None false=None result=not_applicable
+contract 9 requires runtime_checked entity=13 function=12 true=1 false=0 result=evaluated_true
+exclusion contract_off clauses=[9] entities=[13] points=2
+points branch_outcome/user=4 contract_false/contract=9 contract_true/contract=9 function_entry/user=5
+counters 27

@@ -109,6 +109,14 @@ static inline void sv0_ensures(bool cond, const char *fn_name) {
   }
 }
 
+/* An `assert` or `loop_invariant` check (sv0cov CV-306). */
+static inline void sv0_contract_check(bool cond, const char *kind, const char *fn_name) {
+  if (!cond) {
+    fprintf(stderr, "sv0 contract violation: %s failed in %s\n", kind, fn_name);
+    exit(1);
+  }
+}
+
 /* Phase 9: pointer inequality (runtime approximation of no_alias) */
 static inline bool sv0_no_alias(const void *a, const void *b) { return a != b; }
 

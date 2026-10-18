@@ -207,6 +207,77 @@ fn lower_cov_if(fn_ctx: Vec<i32>, node: i32, cond: Box<Expr>, then_is: Vec<i32>,
     return Instr::IfElse(cond, lower_cov_prepend(then_is, c), lower_cov_prepend(else_is, c + 1));
 }
 
+/* ── Contract checks (sv0cov CV-306) ────────────────────────────────────
+   Every contract clause compiles to one check. Instr::Requires(e, h) and
+   Instr::Ensures(e, h) carry the enclosing function's name token h; an
+   `assert` or `loop_invariant` check is an Instr::Requires whose h is the
+   name token + kind * 2^20 (kind 2 assert, 3 loop_invariant; tokens and
+   temps stay below 2^20), which the C and VM emitters decode for the
+   failure message. With coverage, the clause's root node has a counter c
+   (contract_true; contract_false is c + 1) and the check becomes
+   `if (e) { hit(c) } else { hit(c + 1); fail }`, so the condition runs once
+   and a failing evaluation is counted before the program stops.
+
+   fn_ctx's slot after the coverage table holds [current function's name
+   token, contract mode (0 runtime, 1 verified, 2 disabled), proven_lines]
+   (lower() sets it per function); a context without it (unit tests) reads
+   name -1, runtime mode. */
+
+fn lower_check_name(fh: i32, kind: i32) -> i32 {
+    return fh + kind * 1048576;
+}
+
+fn lower_meta(fn_ctx: Vec<i32>) -> Vec<i32> {
+    let n: i32 = vec_len(fn_ctx);
+    let out: Vec<i32> = vec_new();
+    if n > 0 {
+        let slot: i32 = 2 + 2 * vec_get(fn_ctx, 0);
+        if slot < n { return vec_get(fn_ctx, slot); }
+    }
+    vec_push(out, 0 - 1);
+    vec_push(out, 0);
+    vec_push(out, vec_new());
+    return out;
+}
+
+/* Whether the clause whose keyword is at token kw is checked at runtime:
+   not in disabled mode, not a model-only clause (old/forall/exists), and,
+   for a loop_invariant in verified mode, not proven (its line is in
+   proven_lines, the same key the ensures rule uses). */
+fn lower_clause_kept(fn_ctx: Vec<i32>, tok_tags: Vec<i32>, source: string, starts: Vec<i32>, kw: i32,
+                     proven_strips: bool) -> bool {
+    let meta: Vec<i32> = lower_meta(fn_ctx);
+    let mode: i32 = vec_get(meta, 1);
+    if mode == 2 { return false; }
+    if kw >= 0 {
+        if contract_is_advanced(tok_tags, kw) { return false; }
+        if mode == 1 {
+            if proven_strips {
+                let proven: Vec<i32> = vec_get(meta, 2);
+                if lower_proven_has(proven, lower_line_of_pos(source, vec_get(starts, kw))) { return false; }
+            }
+        }
+    }
+    return true;
+}
+
+/* The check of one clause: `e` its lowered condition, `root` its root node,
+   `name` the (encoded) function name, `ens` an ensures clause. */
+fn lower_contract_check(fn_ctx: Vec<i32>, root: i32, e: Expr, name: i32, ens: bool) -> Instr {
+    let c: i32 = lower_cov_counter(fn_ctx, root);
+    if c < 0 {
+        if ens { return Instr::Ensures(box_new(e), name); }
+        return Instr::Requires(box_new(e), name);
+    }
+    let t: Vec<i32> = vec_new();
+    vec_push(t, box_new(Instr::CovHit(c)));
+    let f: Vec<i32> = vec_new();
+    vec_push(f, box_new(Instr::CovHit(c + 1)));
+    let no: Expr = Expr::Literal(box_new(Value::VBoolFalse));
+    if ens { vec_push(f, box_new(Instr::Ensures(box_new(no), name))); } else { vec_push(f, box_new(Instr::Requires(box_new(no), name))); }
+    return Instr::IfElse(box_new(e), t, f);
+}
+
 /* WhileLoop for the while/for node `node`: with coverage, the condition
    moves into the body so a false evaluation can count `exit`. */
 fn lower_cov_while(fn_ctx: Vec<i32>, node: i32, cond: Expr, body: Vec<i32>) -> Instr {
@@ -2106,6 +2177,31 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                                    enum_tag_offsets,
                                                    enum_tag_counts,
                                                    enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        /* loop_invariant clauses (sv0doc contracts 1.4, 3.1; sv0cov CV-306):
+           checked at the head of every iteration, before the condition, so
+           also once more when the loop exits. They used to be dropped. */
+        let inv_is: Vec<i32> = vec_new();
+        let inv_n: i32 = vec_get(ed4, idx);
+        let mut iv: i32 = 0;
+        while iv < inv_n {
+            let inv_root: i32 = block_stmt_index(pp, 0, vec_get(ed3, idx), iv);
+            let inv_kw: i32 = contract_kw_pos_of_root(et, ed1, ed2, ed3, pp, tok_tags, inv_root);
+            if lower_clause_kept(fn_ctx, tok_tags, source, starts, inv_kw, true) {
+                let ie: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, inv_root,
+                                                      ctr, inv_is, enum_names, enum_tag_offsets,
+                                                      enum_tag_counts, enum_tags_flat, fn_ctx,
+                                                      builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+                let iname: i32 = lower_check_name(vec_get(lower_meta(fn_ctx), 0), 3);
+                vec_push(inv_is, box_new(lower_contract_check(fn_ctx, inv_root, ie, iname, false)));
+            }
+            iv = iv + 1;
+        }
+        let mut ii0: i32 = 0;
+        while ii0 < vec_len(cond_is) {
+            vec_push(inv_is, vec_get(cond_is, ii0));
+            ii0 = ii0 + 1;
+        }
+        cond_is = inv_is;
         if vec_len(cond_is) == 0 {
             /* Simple condition (no sub-instructions): while (cond) { body } — C
                re-evaluates the condition expression each iteration. */
@@ -2438,10 +2534,21 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                         enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         }
     }
-    /* ExprAssert: evaluate condition for side effects only; runtime
-       assert lowering (branch on false) deferred to match SML. */
+    /* ExprAssert (sv0doc keywords 1.12): a runtime check that stops the
+       program when false (sv0cov CV-306; it used to evaluate the condition
+       for side effects only). Disabled contract mode keeps that old
+       behavior. */
     if tag == 23 {
         let assert_expr: i32 = vec_get(ed1, idx);
+        if lower_clause_kept(fn_ctx, tok_tags, source, starts, 0 - 1, false) {
+            let ae: Expr = lower_expr_with_instrs(et, ed1, ed2, ed3, ed4, pp, tok_tags, assert_expr,
+                                                  ctr, out_instrs, enum_names, enum_tag_offsets,
+                                                  enum_tag_counts, enum_tags_flat, fn_ctx,
+                                                  builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+            let aname: i32 = lower_check_name(vec_get(lower_meta(fn_ctx), 0), 2);
+            vec_push(out_instrs, box_new(lower_contract_check(fn_ctx, assert_expr, ae, aname, false)));
+            return Value::VUnit;
+        }
         lower_for_effect(et, ed1, ed2, ed3, ed4, pp, tok_tags, assert_expr,
                          ctr, out_instrs, enum_names, enum_tag_offsets,
                          enum_tag_counts, enum_tags_flat, fn_ctx,
@@ -4605,7 +4712,7 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                               item_d4, item_field_counts,
                                               enum_vnames_flat, enum_max_payloads, item_fn_row,
                                               match_env_inherit, import_aliases);
-        vec_push(req_instrs, box_new(Instr::Requires(box_new(re), fn_name_h)));
+        vec_push(req_instrs, box_new(lower_contract_check(fn_ctx, r_idx, re, fn_name_h, false)));
         ri = ri + 1;
     }
     let body_instrs: Vec<i32> = vec_new();
@@ -4685,8 +4792,18 @@ fn lower_fn(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         ej = ej + 1;
     }
+    /* With coverage the ensures checks go in once as one shared block, so
+       each contract counter is placed once however many returns run it. */
+    let mut ens_at_return: Vec<i32> = ens_instrs;
+    if lower_cov_counter(fn_ctx, body_idx) >= 0 {
+        if vec_len(ens_instrs) > 0 {
+            let shared: Vec<i32> = vec_new();
+            vec_push(shared, box_new(Instr::BlockInstr(ens_instrs)));
+            ens_at_return = shared;
+        }
+    }
     let body_final: Vec<i32> = inject_ensures_and_ret_slot(
-        body_instrs, ens_instrs, use_slot, ret_slot);
+        body_instrs, ens_at_return, use_slot, ret_slot);
     let discard_append_decl: i32 = append_instrs(out_instrs, decl_instrs);
     let cov_entry: i32 = lower_cov_counter(fn_ctx, body_idx);
     if cov_entry >= 0 { vec_push(out_instrs, box_new(Instr::CovHit(cov_entry))); }
@@ -6059,7 +6176,13 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
         vec_push(fn_ctx, vec_get(ctx_enums, ck));
         ck = ck + 1;
     }
-    if vec_len(cov_tab) > 0 { vec_push(fn_ctx, cov_tab); }
+    vec_push(fn_ctx, cov_tab);
+    /* the per-function slot read by lower_meta (sv0cov CV-306) */
+    let fn_meta: Vec<i32> = vec_new();
+    vec_push(fn_meta, 0 - 1);
+    vec_push(fn_meta, contract_mode);
+    vec_push(fn_meta, proven_lines);
+    vec_push(fn_ctx, fn_meta);
     let mut i: i32 = 0;
     while i < n {
         /* A bodyless trait method declaration (body root -1) is a signature
@@ -6068,6 +6191,7 @@ fn lower(item_tags: Vec<i32>, item_names: Vec<i32>,
         let has_body: bool = if vec_get(item_tags, i) == 0 { vec_get(item_d4, i) >= 0 } else { false };
         if has_body {
             let label_h: i32 = vec_get(item_names, i);
+            vec_set(fn_meta, 0, label_h);
             vec_push(out_block_labels, label_h);
             let body_root: i32 = vec_get(item_d4, i);
             let instrs: Vec<i32> = vec_new();
@@ -7267,8 +7391,7 @@ fn lower_ensures_clause(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
     if map_result == true {
         let keep_shape: i32 = 0;
     }
-    let ei: Instr = Instr::Ensures(box_new(ee), fn_name_h);
-    vec_push(out_instrs, box_new(ei));
+    vec_push(out_instrs, box_new(lower_contract_check(fn_ctx, expr_idx, ee, fn_name_h, true)));
     return 0;
 }
 
@@ -7276,7 +7399,25 @@ fn inject_ensures_and_ret_slot(is: Vec<i32>, ens_instrs: Vec<i32>,
                                use_ret_slot_flag: bool,
                                ret_slot: i32) -> Vec<i32> {
     if vec_len(ens_instrs) == 0 { return is; }
+    let memo: Vec<i32> = vec_new();
+    return inject_ensures_rec(is, ens_instrs, use_ret_slot_flag, ret_slot, memo);
+}
+
+/* The ensures checks go before EVERY return, however deeply nested (an
+   early `return` inside an `if` or loop used to skip them; found by sv0cov
+   CV-306). An instruction list the IR shares between parents (a guarded
+   match arm's else chain) is rebuilt once and stays shared (`memo`: old,
+   new list pairs), so nothing in it is duplicated. */
+fn inject_ensures_rec(is: Vec<i32>, ens_instrs: Vec<i32>, use_ret_slot_flag: bool,
+                      ret_slot: i32, memo: Vec<i32>) -> Vec<i32> {
+    let mut mj: i32 = 0;
+    while mj < vec_len(memo) {
+        if vec_get(memo, mj) == is { return vec_get(memo, mj + 1); }
+        mj = mj + 2;
+    }
     let out: Vec<i32> = vec_new();
+    vec_push(memo, is);
+    vec_push(memo, out);
     let n: i32 = vec_len(is);
     let mut i: i32 = 0;
     while i < n {
@@ -7298,6 +7439,19 @@ fn inject_ensures_and_ret_slot(is: Vec<i32>, ens_instrs: Vec<i32>,
             Instr::ReturnVoid => {
                 let discard_append2: i32 = append_instrs(out, ens_instrs);
                 vec_push(out, box_new(Instr::ReturnVoid));
+            },
+            Instr::IfElse(c, t, e) => {
+                let t2: Vec<i32> = inject_ensures_rec(t, ens_instrs, use_ret_slot_flag, ret_slot, memo);
+                let e2: Vec<i32> = inject_ensures_rec(e, ens_instrs, use_ret_slot_flag, ret_slot, memo);
+                vec_push(out, box_new(Instr::IfElse(c, t2, e2)));
+            },
+            Instr::WhileLoop(c, b) => {
+                let b2: Vec<i32> = inject_ensures_rec(b, ens_instrs, use_ret_slot_flag, ret_slot, memo);
+                vec_push(out, box_new(Instr::WhileLoop(c, b2)));
+            },
+            Instr::BlockInstr(b) => {
+                let b3: Vec<i32> = inject_ensures_rec(b, ens_instrs, use_ret_slot_flag, ret_slot, memo);
+                vec_push(out, box_new(Instr::BlockInstr(b3)));
             },
             _ => {
                 vec_push(out, box_new(ins));

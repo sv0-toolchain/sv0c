@@ -1,0 +1,44 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov CV-306: every contract clause kind, two of one kind, an ensures
+   checked at two returns, a model-only clause, and contract_off.
+   run_contracts.py snapshots its contract plan and counts on both
+   backends. The program exits 0. */
+
+fn clamp(x: i32, hi: i32) -> i32
+    requires(hi >= 0)
+    requires(x >= 0 - 1000)
+    ensures(result <= hi)
+{
+    if x > hi { return hi; };
+    return x;
+}
+
+fn total(n: i32) -> i32 ensures(result >= 0) {
+    let mut i: i32 = 0;
+    let mut s: i32 = 0;
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(s >= 0)
+    {
+        s = s + i;
+        i = i + 1;
+        assert s >= i - 1;
+    }
+    assert i == n;
+    return s;
+}
+
+fn same(x: i32) -> i32 ensures(result == old(x)) {
+    return x;
+}
+
+#[coverage(contract_off, reason = "callers pass checked values")]
+fn trusted(x: i32) -> i32 requires(x >= 0) {
+    return x + 1;
+}
+
+fn main() -> i32 {
+    let a: i32 = clamp(5, 3) + clamp(1, 3);
+    let b: i32 = total(3);
+    return a + b + same(2) + trusted(0) - 4 - 3 - 2 - 1;
+}

@@ -32,14 +32,15 @@
  * 2. Effect, in coverage builds (excl_resolve, excl_support), over the
  *    plan in concat offsets: `off` (and every directive) takes the
  *    function entities, branches and regions wholly inside its extent;
- *    `branch_off` takes the outcomes of the decision at its target. An
- *    exclusion that takes nothing is COV1021. Every excluded point is
- *    uncounted; where an ordinary region still needs an excluded outcome's
- *    count, a counted synthetic-support point stands in for it (SPEC 11.1;
- *    owner decision): kind `region`, the branch's span and entity,
- *    discriminator `support:<kind>:<outcome>`, hit where the outcome would
- *    be. `contract_off` waits for contract coverage (CV-306) and is refused
- *    in coverage builds.
+ *    `branch_off` takes the outcomes of the decision at its target;
+ *    `contract_off` takes the contract clauses its function owns directly
+ *    (they stay counted and enforced; only the contract denominator drops
+ *    them, CV-306). An exclusion that takes nothing is COV1021. Every
+ *    excluded point is uncounted; where an ordinary region still needs an
+ *    excluded outcome's count, a counted synthetic-support point stands in
+ *    for it (SPEC 11.1; owner decision): kind `region`, the branch's span
+ *    and entity, discriminator `support:<kind>:<outcome>`, hit where the
+ *    outcome would be.
  *
  * Errors: EXCL_ERR_STRIDE() ints: code, unit, start, end, message id, note
  * start, note end (-1 for no note); offsets into the unit's text.
@@ -587,7 +588,6 @@ fn excl_message(id: i32) -> string {
     if id == 11 { return "an attribute and a comment directive give this construct different policy"; }
     if id == 12 { return "this exclusion lies inside an `off` exclusion that already excludes it"; }
     if id == 13 { return "this exclusion resolves to no eligible construct"; }
-    if id == 14 { return "`contract_off` needs contract coverage, which this compiler does not plan yet (sv0cov CV-306); build without --coverage, or remove the attribute"; }
     return "invalid coverage exclusion";
 }
 
@@ -611,11 +611,11 @@ fn excl_code_text(code: i32) -> string {
 
 /* Fill ent_x / br_x / rg_x (1 = excluded) and memb (exclusion, kind 0
    entity / 1 branch / 2 region, plan index) for the exclusion table `ex`
-   (unit offsets; cstarts maps a unit to its concat offset). Returns -1, or
-   the index of an exclusion that takes nothing (COV1021), or -(k + 2) for a
-   contract_off exclusion k (refused until CV-306). */
+   (unit offsets; cstarts maps a unit to its concat offset); memb kind 3 is
+   a contract clause of `cl` (contract_off, CV-306). Returns -1, or the
+   index of an exclusion that takes nothing (COV1021). */
 fn excl_resolve(ex: Vec<i32>, cstarts: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
-                ent_start: Vec<i32>, ent_end: Vec<i32>, br: Vec<i32>, rg: Vec<i32>,
+                ent_start: Vec<i32>, ent_end: Vec<i32>, br: Vec<i32>, rg: Vec<i32>, cl: Vec<i32>,
                 ent_x: Vec<i32>, br_x: Vec<i32>, rg_x: Vec<i32>, memb: Vec<i32>) -> i32 {
     let x: i32 = EXCL_STRIDE();
     let ne: i32 = vec_len(ent_start);
@@ -632,11 +632,31 @@ fn excl_resolve(ex: Vec<i32>, cstarts: Vec<i32>, starts: Vec<i32>, ends: Vec<i32
     while k < nx {
         let base: i32 = vec_get(cstarts, vec_get(ex, k * x));
         let mode: i32 = vec_get(ex, k * x + 1);
-        if mode == 3 { return 0 - k - 2; }
         let xa: i32 = base + vec_get(ex, k * x + 5);
         let xb: i32 = base + vec_get(ex, k * x + 6);
         let target: i32 = vec_get(ex, k * x + 7);
         let mut took: i32 = 0;
+        if mode == 3 {
+            /* contract_off (CV-306): the clauses its function owns directly */
+            let mut e3: i32 = 0;
+            while e3 < ne {
+                if vec_get(ent_start, e3) >= xa {
+                    if vec_get(ent_end, e3) <= xb {
+                        let mut c3: i32 = 0;
+                        while c3 < vec_len(cl) / 8 {
+                            if vec_get(cl, c3 * 8) == e3 {
+                                vec_push(memb, k);
+                                vec_push(memb, 3);
+                                vec_push(memb, c3);
+                                took = took + 1;
+                            }
+                            c3 = c3 + 1;
+                        }
+                    }
+                }
+                e3 = e3 + 1;
+            }
+        }
         if mode == 2 {
             let ts: i32 = base + target;
             let mut b: i32 = 0;
@@ -652,7 +672,8 @@ fn excl_resolve(ex: Vec<i32>, cstarts: Vec<i32>, starts: Vec<i32>, ends: Vec<i32
                 }
                 b = b + 1;
             }
-        } else {
+        }
+        if mode == 1 {
             let mut e: i32 = 0;
             while e < ne {
                 if vec_get(ent_start, e) >= xa {

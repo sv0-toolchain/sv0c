@@ -573,7 +573,8 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                    tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id4: Vec<i32>,
                    pp: Vec<i32>, bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>,
-                   bed4: Vec<i32>, cov_tab: Vec<i32>, cov_info: Vec<i32>, ex_tab: Vec<i32>) -> MegatuCov {
+                   bed4: Vec<i32>, cov_tab: Vec<i32>, cov_info: Vec<i32>, ex_tab: Vec<i32>,
+                   fcr: Vec<i32>, contract_mode: i32, proven_lines: Vec<i32>) -> MegatuCov {
     if mode < 0 {
         write_file("/dev/stderr", "coverage: unknown mode in SV0_COVERAGE_REQUEST (want map, instrument or plan-dump)\n");
         return megatu_cov_rc(9);
@@ -669,15 +670,40 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
     let br_x: Vec<i32> = vec_new();
     let rg_x: Vec<i32> = vec_new();
     let memb: Vec<i32> = vec_new();
-    let rx: i32 = excl_resolve(ex_tab, cstarts, starts, ends, ent_start, ent_end, br, rg, ent_x, br_x, rg_x, memb);
-    if rx != 0 - 1 {
-        let mut xk: i32 = rx;
-        let mut xmsg: i32 = 13;
-        if rx < 0 {
-            xk = 0 - rx - 2;
-            xmsg = 14;
+    /* Contract clauses (CV-306): one entity per clause, enforcement as
+       lowering applies it, and each clause's expression root (where its
+       true/false hits go). */
+    let cl: Vec<i32> = vec_new();
+    cov_plan_contracts(tags, starts, source, id1, ent_item, contract_mode, proven_lines, cl);
+    let croots: Vec<i32> = vec_new();
+    let mut cr: i32 = 0;
+    while cr < vec_len(fcr) {
+        vec_push(croots, vec_get(fcr, cr));
+        cr = cr + 1;
+    }
+    let mut bn: i32 = 0;
+    while bn < vec_len(bet) {
+        let btag: i32 = vec_get(bet, bn);
+        if btag == 23 { vec_push(croots, vec_get(bed1, bn)); }
+        if btag == 12 {
+            let ninv: i32 = vec_get(bed4, bn);
+            let mut iv: i32 = 0;
+            while iv < ninv {
+                vec_push(croots, vec_get(pp, vec_get(bed3, bn) - 1 + iv));
+                iv = iv + 1;
+            }
         }
-        megatu_report_excl_at(ex_tab, xk, xmsg, source, cstarts, clens, table);
+        bn = bn + 1;
+    }
+    let lost: i32 = cov_plan_contract_roots(cl, croots, bet, bed1, bed2, bed3, pp);
+    if lost >= 0 {
+        write_file("/dev/stderr", string_concat(string_concat("coverage: could not find the expression of a contract clause in function ",
+            cov_plan_line_at(qnames, vec_get(cl, lost * 8))), "; refusing to plan (sv0cov CV-306)\n"));
+        return megatu_cov_rc(9);
+    }
+    let rx: i32 = excl_resolve(ex_tab, cstarts, starts, ends, ent_start, ent_end, br, rg, cl, ent_x, br_x, rg_x, memb);
+    if rx != 0 - 1 {
+        megatu_report_excl_at(ex_tab, rx, 13, source, cstarts, clens, table);
         return megatu_cov_rc(6);
     }
     let sup: Vec<i32> = vec_new();
@@ -693,11 +719,24 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         return megatu_cov_rc(0);
     }
     /* cov_info[0] = the planned counter count (hits are checked after lowering). */
-    let counters: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br, ent_x, br_x, sup);
+    let counters: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br, ent_x, br_x, sup, cl);
     vec_push(cov_info, cov_map_counted(counters));
     let hits: Vec<i32> = cov_map_hit_counters(counters, vec_len(ent_source), br, br_x, sup);
+    /* contract hits: the clause root carries its contract_true counter */
+    let ctab: Vec<i32> = vec_new();
+    let mut cpos: i32 = vec_len(hits) + vec_len(sup) / 2;
+    let mut cc: i32 = 0;
+    while cc < vec_len(cl) / 8 {
+        if vec_get(cl, cc * 8 + 5) == 1 {
+            vec_push(ctab, vec_get(cl, cc * 8 + 4));
+            vec_push(ctab, vec_get(counters, cpos));
+            cpos = cpos + 2;
+        }
+        cc = cc + 1;
+    }
     if mode == 5 {
         let tab5: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, hits);
+        megatu_cov_contract_hits(tab5, ctab);
         let mut t5: i32 = 0;
         while t5 < vec_len(tab5) {
             vec_push(cov_tab, vec_get(tab5, t5));
@@ -718,7 +757,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         }
         let map: Vec<i32> = cov_map_build(source, starts, ends, table, cstarts, src_unit,
             ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity,
-            ent_x, br_x, rg_x, sup, ex_tab, memb);
+            ent_x, br_x, rg_x, sup, ex_tab, memb, cl);
         /* sv0cov CV-211 (SPEC 16.3.9, 16.4): never write a map over the
            tier this build is for. Request line 6 carries the tier's counter
            ceiling and map byte ceiling; without it the standard tier
@@ -750,6 +789,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         }
         if mode == 2 {
             let tab2: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, hits);
+            megatu_cov_contract_hits(tab2, ctab);
             let mut t2: i32 = 0;
             while t2 < vec_len(tab2) {
                 vec_push(cov_tab, vec_get(tab2, t2));
@@ -767,6 +807,20 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
    outside 0..counts-1 in orphan[0]); an instruction list the IR shares (a
    guarded match arm's else chain) is visited once. `seq` collects the
    counters in pre-order for the hit dump. */
+/* Put each runtime_checked clause's contract_true counter on its root node
+   (`ctab`: root, counter pairs; sv0cov CV-306). */
+fn megatu_cov_contract_hits(tab: Vec<i32>, ctab: Vec<i32>) -> i32 {
+    let mut i: i32 = 0;
+    while i < vec_len(ctab) {
+        let root: i32 = vec_get(ctab, i);
+        if root >= 0 {
+            if root < vec_len(tab) { vec_set(tab, root, vec_get(ctab, i + 1)); }
+        }
+        i = i + 2;
+    }
+    return 0;
+}
+
 fn megatu_cov_walk(list: Vec<i32>, counts: Vec<i32>, orphan: Vec<i32>, visited: Vec<i32>,
                    seq: Vec<i32>) -> i32 {
     let nv: i32 = vec_len(visited);
@@ -1198,7 +1252,7 @@ fn main() -> i32 {
     if _cov_mode != 0 {
         cov = megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
                                tags, starts, ends, it, id1, id2, id4, pp, bet, bed1, bed2, bed3,
-                               bed4, cov_tab, cov_info, ex_tab);
+                               bed4, cov_tab, cov_info, ex_tab, fcr, _contract_mode, proven_lines);
         if cov.rc >= 0 { return cov.rc; }
     }
 
@@ -3494,6 +3548,19 @@ fn megatu_emit_instr(indent: string, ret_ty: string, ins: codegen_Instr,
         },
         codegen_Instr::Requires(be, fh) => {
             let e: codegen_Expr = box_deref(be);
+            /* an assert / loop_invariant check: kind packed above 2^20
+               (lowering lower_check_name, sv0cov CV-306) */
+            if fh >= 1048576 {
+                let ck: i32 = fh / 1048576;
+                let mut ckind: string = "assert";
+                if ck == 3 { ckind = "loop_invariant"; }
+                let a2: string = string_concat(indent, "sv0_contract_check(");
+                let b2: string = string_concat(a2, megatu_emit_expr(e, source, starts, ends, sidx));
+                let c2: string = string_concat(string_concat(b2, ", \""), ckind);
+                let d2: string = string_concat(c2, "\", \"");
+                let n2: string = string_concat(d2, megatu_val_name(fh - ck * 1048576, source, starts, ends, sidx));
+                return string_concat(n2, "\");\n");
+            }
             let a: string = string_concat(indent, "sv0_requires(");
             let b: string = string_concat(a, megatu_emit_expr(e, source, starts, ends, sidx));
             let c: string = string_concat(b, ", \"");

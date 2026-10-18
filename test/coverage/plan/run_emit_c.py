@@ -68,6 +68,8 @@ from run_hits import NATIVE, compile_with, programs  # noqa: E402
 from run_plan import ensure_built  # noqa: E402
 
 HIT_RE = re.compile(r"^\s*__sv0cov_hit\(&__sv0cov_module_(\d+), (\d+)u\);$")
+CONTRACT_RE = re.compile(r"^( *)if \((.*)\) \{\n *\} else \{\n *(sv0_requires|sv0_ensures|sv0_contract_check)\(0, (.*)\);\n *\}$",
+                         re.M)
 START_RE = re.compile(r"^  __sv0cov_start\(__sv0cov_modules, (\d+)u\);$")
 PRELUDE_START = "/* sv0cov coverage instrumentation, generated-C protocol 1"
 PRELUDE_END = "static const struct __sv0cov_module *const __sv0cov_modules["
@@ -91,7 +93,10 @@ def strip_coverage(c: str) -> str:
     b = next(i for i, line in enumerate(lines) if line.startswith(PRELUDE_END))
     kept = lines[:a] + lines[b + 2:]
     plain = "\n".join(line for line in kept if not START_RE.match(line) and not HIT_RE.match(line))
-    return LOOP_RE.sub(lambda m: f"{m.group(1)}while ({m.group(2)}) {{\n", plain)
+    plain = LOOP_RE.sub(lambda m: f"{m.group(1)}while ({m.group(2)}) {{\n", plain)
+    # a checked contract clause (CV-306): `if (e) { hit } else { hit; check(0, ...) }`
+    # is the off build's `check(e, ...)` once the hits are gone
+    return CONTRACT_RE.sub(lambda m: f"{m.group(1)}{m.group(3)}({m.group(2)}, {m.group(4)});", plain)
 
 
 def cc() -> str:

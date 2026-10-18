@@ -1144,21 +1144,31 @@ static int decode_contract_key(int idx, const char* source, int starts, int ends
     int _sv0t2 = bc_push_ascii("requires failed: ", sbuf);
     plen = _sv0t2;
   } else {
-    int _sv0t3 = bc_push_ascii("ensures failed: ", sbuf);
-    plen = _sv0t3;
+    if ((kind == 1)) {
+      int _sv0t3 = bc_push_ascii("ensures failed: ", sbuf);
+      plen = _sv0t3;
+    } else {
+      if ((kind == 2)) {
+        int _sv0t4 = bc_push_ascii("assert failed: ", sbuf);
+        plen = _sv0t4;
+      } else {
+        int _sv0t5 = bc_push_ascii("loop_invariant failed: ", sbuf);
+        plen = _sv0t5;
+      }
+    }
   }
   int nlen = 0;
   if ((fn_h >= 0)) {
-    int _sv0t4 = sv0_vec_len(starts);
-    if ((fn_h < _sv0t4)) {
-      int _sv0t5 = sv0_vec_get(starts, fn_h);
-      int fs = _sv0t5;
-      int _sv0t6 = sv0_vec_get(ends, fn_h);
-      int fe = _sv0t6;
+    int _sv0t6 = sv0_vec_len(starts);
+    if ((fn_h < _sv0t6)) {
+      int _sv0t7 = sv0_vec_get(starts, fn_h);
+      int fs = _sv0t7;
+      int _sv0t8 = sv0_vec_get(ends, fn_h);
+      int fe = _sv0t8;
       int k = fs;
       while ((k < fe)) {
-        int _sv0t7 = sv0_string_char_at(source, k);
-        sv0_vec_push(sbuf, _sv0t7);
+        int _sv0t9 = sv0_string_char_at(source, k);
+        sv0_vec_push(sbuf, _sv0t9);
         k = (k + 1);
       }
       nlen = (fe - fs);
@@ -1166,8 +1176,8 @@ static int decode_contract_key(int idx, const char* source, int starts, int ends
     }
   } else {
   }
-  int _sv0t8 = (plen + nlen);
-  return _sv0t8;
+  int _sv0t10 = (plen + nlen);
+  return _sv0t10;
 }
 
 static int encode_strings(int strings, const char* source, int starts, int ends, int out) {

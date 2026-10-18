@@ -25,9 +25,9 @@ Through the real native compiler and VM emitter:
    AC-044), attribute/directive conflict (COV3202), unresolvable
    `ignore-next` (COV1021) and straddling or empty region fails with its
    exact code, message and line:col (and the note's line:col).
-4. Coverage builds only: `contract_off` is refused until contract coverage
-   exists (CV-306), and an exclusion that takes nothing from the plan is
-   COV1021; both are fine in an ordinary build.
+4. Coverage builds only: an exclusion that takes nothing from the plan is
+   COV1021; it is fine in an ordinary build. (`contract_off`'s effect is
+   test/coverage/contracts, CV-306.)
 5. A two-file project: exclusions in both files land in one valid map with
    the right source indexes.
 
@@ -85,7 +85,6 @@ M = {
     11: "an attribute and a comment directive give this construct different policy",
     12: "this exclusion lies inside an `off` exclusion that already excludes it",
     13: "this exclusion resolves to no eligible construct",
-    14: "`contract_off` needs contract coverage, which this compiler does not plan yet (sv0cov CV-306); build without --coverage, or remove the attribute",
 }
 
 
@@ -143,7 +142,6 @@ POSITIVE = {
 
 # Refused only in coverage builds: (label, source, error at, message id).
 COVERAGE_ONLY = [
-    ("contract_off (CV-306)", f"{COFF}\nfn f(x: i32) -> i32 requires(x > 0) {{ return x; }}\nfn main() -> i32 {{ return f(1) - 1; }}\n", COFF, 14),
     ("a region with no planned code", f"{START}\nstruct S {{ a: i32 }}\n{END}\n{MAIN}", START, 13),
 ]
 
@@ -313,7 +311,7 @@ def main() -> int:
             for binary in (NATIVE, VM_EMIT):
                 if run(binary, str(src)).returncode != 0:
                     errors.append(f"{label} ({binary.name}): the ordinary build fails")
-                out = t / "m.json"
+                out = t / f"m-{binary.name}.json"
                 p = run(binary, str(src), f"map\n{out}\nt\nsv0c+test")
                 err = p.stderr.decode()
                 if p.returncode != 6 or f"error[COV1021]: {M[mid]}\n  --> {line_col(src_text, at)}\n" not in err or out.exists():

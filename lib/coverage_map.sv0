@@ -302,7 +302,7 @@ fn cov_map_hexval(c: i32) -> i32 {
 
 /* Lowercase hex point ID. kind: 1 function_entry, 3 branch_outcome;
    ordinal < 0 means "no ordinal" (0xffffffff). The entity is the function. */
-fn cov_map_point_id(path: string, digest: string, qname: string, kind: i32,
+fn cov_map_point_id(path: string, digest: string, ekind: i32, qname: string, kind: i32,
                     s: i32, e: i32, ordinal: i32, disc: string) -> string {
     let v: Vec<i32> = vec_new();
     let domain: string = "sv0cov.point.v1";
@@ -322,7 +322,7 @@ fn cov_map_point_id(path: string, digest: string, qname: string, kind: i32,
         vec_push(v, cov_map_hexval(string_char_at(digest, 2 * d)) * 16 + cov_map_hexval(string_char_at(digest, 2 * d + 1)));
         d = d + 1;
     }
-    vec_push(v, 1);
+    vec_push(v, ekind);
     cov_map_push_text(v, qname);
     vec_push(v, kind);
     cov_map_push_u32(v, s);
@@ -356,11 +356,12 @@ fn cov_map_ref_point(r: i32, n_entries: i32, obase: Vec<i32>) -> i32 {
    = the outcomes of earlier branches), then the synthetic-support points of
    excluded outcomes (`sup` pairs, CV-305). Counters follow source, span
    start, entry before outcome, then ordinal, a support point in its
-   outcome's place; the map writer and hit placement (CV-112) both use this
-   numbering. Excluded entries and outcomes (ent_x, br_x) and statically
+   outcome's place, then the contract_true/contract_false points of every
+   runtime_checked clause (`cl`, CV-306); the map writer and hit placement
+   (CV-112) both use this numbering. Excluded entries and outcomes (ent_x, br_x) and statically
    unreachable outcomes are uncounted (-1). */
 fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
-                    br: Vec<i32>, ent_x: Vec<i32>, br_x: Vec<i32>, sup: Vec<i32>) -> Vec<i32> {
+                    br: Vec<i32>, ent_x: Vec<i32>, br_x: Vec<i32>, sup: Vec<i32>, cl: Vec<i32>) -> Vec<i32> {
     let ne: i32 = vec_len(ent_source);
     let nb: i32 = vec_len(br) / 5;
     let keys: Vec<i32> = vec_new();
@@ -400,6 +401,21 @@ fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
         cov_map_key_push(keys, koff, klen, string_concat(string_concat(ks, cov_map_pad(vec_get(sup, j + 1) + 1)), "s"));
         vec_push(uncounted, 0);
         j = j + 2;
+    }
+    /* contract_true then contract_false of every runtime_checked clause
+       (CV-306), at the clause keyword's place */
+    let mut c: i32 = 0;
+    while c < vec_len(cl) / 8 {
+        if vec_get(cl, c * 8 + 5) == 1 {
+            let csrc: i32 = vec_get(ent_source, vec_get(cl, c * 8));
+            let cstart: i32 = vec_get(starts, vec_get(cl, c * 8 + 2));
+            let kc: string = string_concat(string_concat(cov_map_pad(csrc), cov_map_pad(cstart)), "2");
+            cov_map_key_push(keys, koff, klen, string_concat(kc, cov_map_pad(0)));
+            cov_map_key_push(keys, koff, klen, string_concat(kc, cov_map_pad(1)));
+            vec_push(uncounted, 0);
+            vec_push(uncounted, 0);
+        }
+        c = c + 1;
     }
     let order: Vec<i32> = cov_map_sort(keys, koff, klen);
     let counter: Vec<i32> = vec_new();
@@ -481,6 +497,55 @@ fn cov_map_disc(br: Vec<i32>, pb: i32, psup: i32) -> string {
     return cov_br_kind_name(kind);
 }
 
+/* Map entity index of plan function e: functions and their contract
+   entities interleave (a function, then its clauses in source order). */
+fn cov_map_emap(ne: i32, cl: Vec<i32>) -> Vec<i32> {
+    let em: Vec<i32> = vec_new();
+    let mut idx: i32 = 0;
+    let mut c: i32 = 0;
+    let nc: i32 = vec_len(cl) / 8;
+    let mut e: i32 = 0;
+    while e < ne {
+        vec_push(em, idx);
+        idx = idx + 1;
+        let mut more: bool = true;
+        while more {
+            if c >= nc { more = false; } else {
+                if vec_get(cl, c * 8) == e { idx = idx + 1; c = c + 1; } else { more = false; }
+            }
+        }
+        e = e + 1;
+    }
+    return em;
+}
+
+/* Map entity index of clause c's contract entity. */
+fn cov_map_centity(emap: Vec<i32>, cl: Vec<i32>, c: i32) -> i32 {
+    let e: i32 = vec_get(cl, c * 8);
+    let mut first: i32 = c;
+    let mut more: bool = true;
+    while more {
+        if first <= 0 { more = false; } else {
+            if vec_get(cl, (first - 1) * 8) == e { first = first - 1; } else { more = false; }
+        }
+    }
+    return vec_get(emap, e) + 1 + (c - first);
+}
+
+/* `<function>#<kind>:<k>` for clause c. */
+fn cov_map_cqname(qnames: string, cl: Vec<i32>, c: i32) -> string {
+    let q: string = string_concat(string_concat(cov_plan_line_at(qnames, vec_get(cl, c * 8)), "#"),
+        cov_contract_kind_name(vec_get(cl, c * 8 + 1)));
+    return string_concat(string_concat(q, ":"), cov_map_int(vec_get(cl, c * 8 + 6)));
+}
+
+fn cov_map_enforcement_name(enf: i32) -> string {
+    if enf == 1 { return "runtime_checked"; }
+    if enf == 2 { return "statically_verified"; }
+    if enf == 3 { return "disabled"; }
+    return "unsupported";
+}
+
 /* A source's package as JSON: null for the root project (no package). */
 fn cov_map_package_json(name: string) -> string {
     if string_len(name) == 0 { return "null"; }
@@ -494,7 +559,7 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
                  br: Vec<i32>, rg: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>,
                  target: string, identity: string,
                  ent_x: Vec<i32>, br_x: Vec<i32>, rg_x: Vec<i32>, sup: Vec<i32>,
-                 ex: Vec<i32>, memb: Vec<i32>) -> Vec<i32> {
+                 ex: Vec<i32>, memb: Vec<i32>, cl: Vec<i32>) -> Vec<i32> {
     let ls: Vec<i32> = cov_map_line_starts(source);
     let nsrc: i32 = vec_len(src_unit);
     let ne: i32 = vec_len(ent_source);
@@ -511,7 +576,10 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
     let p_br: Vec<i32> = vec_new();
     let p_sup: Vec<i32> = vec_new();
     let p_x: Vec<i32> = vec_new();
+    let p_cl: Vec<i32> = vec_new();
     let obase: Vec<i32> = vec_new();
+    let emap: Vec<i32> = cov_map_emap(vec_len(ent_source), cl);
+    let ncl: i32 = vec_len(cl) / 8;
     let mut e: i32 = 0;
     while e < ne {
         vec_push(p_src, vec_get(ent_source, e));
@@ -523,6 +591,7 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         vec_push(p_br, 0 - 1);
         vec_push(p_sup, 0 - 1);
         vec_push(p_x, vec_get(ent_x, e));
+        vec_push(p_cl, 0 - 1);
         e = e + 1;
     }
     let mut b: i32 = 0;
@@ -548,6 +617,7 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
             vec_push(p_br, b);
             vec_push(p_sup, 0 - 1);
             vec_push(p_x, vec_get(br_x, b));
+            vec_push(p_cl, 0 - 1);
             k = k + 1;
         }
         nout = nout + k;
@@ -568,7 +638,33 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         vec_push(p_br, sbr);
         vec_push(p_sup, vec_get(sup, sj + 1));
         vec_push(p_x, 0);
+        vec_push(p_cl, 0 - 1);
         sj = sj + 2;
+    }
+    /* contract_true / contract_false of every runtime_checked clause (CV-306) */
+    let cpt: Vec<i32> = vec_new();
+    let mut cj: i32 = 0;
+    while cj < ncl {
+        vec_push(cpt, 0 - 1);
+        if vec_get(cl, cj * 8 + 5) == 1 {
+            vec_set(cpt, cj, vec_len(p_kind));
+            let ce: i32 = vec_get(cl, cj * 8);
+            let mut tf: i32 = 0;
+            while tf < 2 {
+                vec_push(p_src, vec_get(ent_source, ce));
+                vec_push(p_ent, ce);
+                vec_push(p_kind, 4 + tf);
+                vec_push(p_s, vec_get(starts, vec_get(cl, cj * 8 + 2)));
+                vec_push(p_e, vec_get(ends, vec_get(cl, cj * 8 + 3)));
+                vec_push(p_ord, 0 - 1);
+                vec_push(p_br, 0 - 1);
+                vec_push(p_sup, 0 - 1);
+                vec_push(p_x, 0);
+                vec_push(p_cl, cj);
+                tf = tf + 1;
+            }
+        }
+        cj = cj + 1;
     }
     let np: i32 = vec_len(p_kind);
 
@@ -580,15 +676,23 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         let unit: i32 = vec_get(src_unit, sk);
         let base: i32 = vec_get(cstarts, unit);
         let pb: i32 = vec_get(p_br, p);
-        let disc: string = cov_map_disc(br, pb, vec_get(p_sup, p));
+        let pc: i32 = vec_get(p_cl, p);
+        let mut disc: string = cov_map_disc(br, pb, vec_get(p_sup, p));
+        let mut pq: string = cov_plan_line_at(qnames, vec_get(p_ent, p));
+        let mut pek: i32 = 1;
+        if pc >= 0 {
+            disc = cov_contract_kind_name(vec_get(cl, pc * 8 + 1));
+            pq = cov_map_cqname(qnames, cl, pc);
+            pek = 2;
+        }
         cov_vb(ids, cov_map_point_id(cov_src_path_at(table, unit), cov_src_digest_at(table, unit),
-            cov_plan_line_at(qnames, vec_get(p_ent, p)), vec_get(p_kind, p),
+            pek, pq, vec_get(p_kind, p),
             vec_get(p_s, p) - base, vec_get(p_e, p) - base, vec_get(p_ord, p), disc));
         p = p + 1;
     }
 
     /* Counter order: source, span start, entry before outcome, ordinal. */
-    let counter: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br, ent_x, br_x, sup);
+    let counter: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br, ent_x, br_x, sup, cl);
     let nc: i32 = cov_map_counted(counter);
     let corder: Vec<i32> = vec_new();
     p = 0;
@@ -662,10 +766,21 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         let esk: i32 = vec_get(ent_source, e);
         let ebase: i32 = vec_get(cstarts, vec_get(src_unit, esk));
         if e > 0 { cov_vb(ents, ","); }
-        cov_vb(ents, string_concat(string_concat("{\"entity_index\":", cov_map_int(e)),
+        cov_vb(ents, string_concat(string_concat("{\"entity_index\":", cov_map_int(vec_get(emap, e))),
             string_concat(string_concat(",\"kind\":\"function\",\"qualified_name\":", cov_map_str(cov_plan_line_at(qnames, e))),
             string_concat(string_concat(",\"source_index\":", cov_map_int(esk)),
             string_concat(string_concat(",\"span\":", cov_map_span(source, ls, ebase, vec_get(ent_start, e), vec_get(ent_end, e))), "}")))));
+        let mut ec: i32 = 0;
+        while ec < ncl {
+            if vec_get(cl, ec * 8) == e {
+                cov_vb(ents, string_concat(string_concat(",{\"entity_index\":", cov_map_int(cov_map_centity(emap, cl, ec))),
+                    string_concat(string_concat(",\"kind\":\"contract\",\"qualified_name\":", cov_map_str(cov_map_cqname(qnames, cl, ec))),
+                    string_concat(string_concat(",\"source_index\":", cov_map_int(esk)),
+                    string_concat(string_concat(",\"span\":", cov_map_span(source, ls, ebase, vec_get(starts, vec_get(cl, ec * 8 + 2)),
+                        vec_get(ends, vec_get(cl, ec * 8 + 3)))), "}")))));
+            }
+            ec = ec + 1;
+        }
         e = e + 1;
     }
     cov_vb(ents, "]");
@@ -696,28 +811,38 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
             } else {
                 cov_vb(pts, "{\"classification\":\"statically_unreachable\",\"counter_index\":null");
             }
-            cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, q2))));
+            cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(emap, vec_get(p_ent, q2)))));
             cov_vb(pts, ",\"fragment_index\":null");
         } else {
-            if vec_get(p_kind, q2) == 2 {
-                cov_vb(pts, string_concat("{\"classification\":\"synthetic_support\",\"counter_index\":", cov_map_int(vec_get(counter, q2))));
-            } else {
-                cov_vb(pts, string_concat("{\"classification\":\"user\",\"counter_index\":", cov_map_int(vec_get(counter, q2))));
-            }
-            cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, q2))));
+            let pk: i32 = vec_get(p_kind, q2);
+            let mut pcls: string = "user";
+            if pk == 2 { pcls = "synthetic_support"; }
+            if pk >= 4 { pcls = "contract"; }
+            cov_vb(pts, string_concat(string_concat(string_concat("{\"classification\":", cov_map_str(pcls)), ",\"counter_index\":"),
+                cov_map_int(vec_get(counter, q2))));
+            let mut pei: i32 = vec_get(emap, vec_get(p_ent, q2));
+            if vec_get(p_cl, q2) >= 0 { pei = cov_map_centity(emap, cl, vec_get(p_cl, q2)); }
+            cov_vb(pts, string_concat(",\"entity_index\":", cov_map_int(pei)));
             cov_vb(pts, string_concat(",\"fragment_index\":", cov_map_int(psk)));
         }
-        if pbr < 0 {
+        let pkind: i32 = vec_get(p_kind, q2);
+        if pkind == 1 {
             cov_vb(pts, ",\"kind\":\"function_entry\",\"outcome_ordinal\":null");
-        } else { if vec_get(p_kind, q2) == 2 {
+        } else { if pkind == 2 {
             cov_vb(pts, ",\"kind\":\"region\",\"outcome_ordinal\":null");
-        } else {
+        } else { if pkind == 3 {
             cov_vb(pts, string_concat(",\"kind\":\"branch_outcome\",\"outcome_ordinal\":", cov_map_int(vec_get(p_ord, q2))));
-        } }
+        } else { if pkind == 4 {
+            cov_vb(pts, ",\"kind\":\"contract_true\",\"outcome_ordinal\":null");
+        } else {
+            cov_vb(pts, ",\"kind\":\"contract_false\",\"outcome_ordinal\":null");
+        } } } }
         cov_vb(pts, ",\"point_id\":\"");
         cov_vb_from(pts, ids, q2 * 64, 64);
         cov_vb(pts, "\"");
-        cov_vb(pts, string_concat(",\"semantic_discriminator\":", cov_map_str(cov_map_disc(br, pbr, vec_get(p_sup, q2)))));
+        let mut pdisc: string = cov_map_disc(br, pbr, vec_get(p_sup, q2));
+        if vec_get(p_cl, q2) >= 0 { pdisc = cov_contract_kind_name(vec_get(cl, vec_get(p_cl, q2) * 8 + 1)); }
+        cov_vb(pts, string_concat(",\"semantic_discriminator\":", cov_map_str(pdisc)));
         cov_vb(pts, string_concat(",\"source_index\":", cov_map_int(psk)));
         cov_vb(pts, string_concat(string_concat(",\"span\":", cov_map_span(source, ls, pbase, vec_get(p_s, q2), vec_get(p_e, q2))), "}"));
         p = p + 1;
@@ -759,7 +884,7 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
         let bkind: i32 = vec_get(br, bb * 5);
         if bi > 0 { cov_vb(brs, ","); }
         cov_vb(brs, string_concat("{\"branch_index\":", cov_map_int(bi)));
-        cov_vb(brs, string_concat(",\"entity_index\":", cov_map_int(vec_get(p_ent, bp))));
+        cov_vb(brs, string_concat(",\"entity_index\":", cov_map_int(vec_get(emap, vec_get(p_ent, bp)))));
         cov_vb(brs, string_concat(string_concat(",\"kind\":", cov_map_str(cov_br_kind_name(bkind))), ",\"outcomes\":["));
         let mut k2: i32 = 0;
         while k2 < vec_get(br, bb * 5 + 4) {
@@ -894,7 +1019,7 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
             cov_vb(rgs, "{\"classification\":\"user\",\"counter_expression\":");
         } } }
         cov_vb_from(rgs, exprs, vec_get(xoff, rr), vec_get(xlen, rr));
-        cov_vb(rgs, string_concat(",\"entity_index\":", cov_map_int(rent)));
+        cov_vb(rgs, string_concat(",\"entity_index\":", cov_map_int(vec_get(emap, rent))));
         cov_vb(rgs, string_concat(",\"kind\":", cov_map_str(cov_rg_kind_name(kind))));
         if cov_rg_line_contributing(kind, string_char_at(source, rs), vec_get(xempty, rr) == 1 && rex != true) {
             cov_vb(rgs, ",\"line_contributing\":true");
@@ -916,10 +1041,13 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
     cov_vb_all(before, brs);
     cov_vb(before, ",\"capabilities\":[\"branch-outcomes\",\"contract-coverage\",\"exclusion-audit\",\"module-fragments\",\"normalized-linear-expressions\",\"nullable-counter-bindings\",\"semantic-function-ownership\",\"source-digests\"]");
     cov_vb(before, string_concat(string_concat(",\"compiler\":{\"identity\":", cov_map_str(identity)),
-        ",\"name\":\"sv0c\"},\"contracts\":[],\"entities\":"));
+        ",\"name\":\"sv0c\"},\"contracts\":"));
+    cov_vb_all(before, cov_map_contracts(source, ls, cstarts, src_unit, ent_source, cl, cpt, emap, ids, starts, ends));
+    cov_vb(before, ",\"entities\":");
     cov_vb_all(before, ents);
     cov_vb(before, ",\"exclusions\":");
-    cov_vb_all(before, cov_map_exclusions(source, ls, cstarts, src_unit, ne, nb, obase, br, ids, border, real, rorder, ex, memb));
+    cov_vb_all(before, cov_map_exclusions(source, ls, cstarts, src_unit, ne, nb, obase, br, ids, border, real, rorder, ex, memb,
+        emap, cl, cpt));
     cov_vb(before, ",\"fragments\":");
     cov_vb_all(before, frags);
     let after: Vec<i32> = vec_new();
@@ -1010,12 +1138,63 @@ fn cov_map_int_array(v: Vec<i32>) -> string {
     return string_concat(out, "]");
 }
 
+/* The contract records (SPEC 16.3.7; CV-306), in clause order (source, then
+   span: the entity order). */
+fn cov_map_contracts(source: string, ls: Vec<i32>, cstarts: Vec<i32>, src_unit: Vec<i32>, ent_source: Vec<i32>,
+                     cl: Vec<i32>, cpt: Vec<i32>, emap: Vec<i32>, ids: Vec<i32>, starts: Vec<i32>,
+                     ends: Vec<i32>) -> Vec<i32> {
+    let out: Vec<i32> = vec_new();
+    cov_vb(out, "[");
+    let nc: i32 = vec_len(cl) / 8;
+    let mut c: i32 = 0;
+    while c < nc {
+        let e: i32 = vec_get(cl, c * 8);
+        let sk: i32 = vec_get(ent_source, e);
+        let base: i32 = vec_get(cstarts, vec_get(src_unit, sk));
+        let enf: i32 = vec_get(cl, c * 8 + 5);
+        let kname: string = cov_contract_kind_name(vec_get(cl, c * 8 + 1));
+        if c > 0 { cov_vb(out, ","); }
+        cov_vb(out, string_concat(string_concat("{\"clause_index\":", cov_map_int(c)),
+            string_concat(",\"enforcement\":", cov_map_str(cov_map_enforcement_name(enf)))));
+        cov_vb(out, string_concat(",\"entity_index\":", cov_map_int(cov_map_centity(emap, cl, c))));
+        if enf == 2 {
+            cov_vb(out, string_concat(",\"evidence_identity\":",
+                cov_map_str(string_concat(string_concat(string_concat("sv0c:smt:", kname), ":"), cov_map_int(vec_get(cl, c * 8 + 7))))));
+        } else {
+            cov_vb(out, ",\"evidence_identity\":null");
+        }
+        let tp: i32 = vec_get(cpt, c);
+        if tp >= 0 {
+            cov_vb(out, ",\"false_point_id\":\"");
+            cov_vb_from(out, ids, (tp + 1) * 64, 64);
+            cov_vb(out, "\"");
+        } else {
+            cov_vb(out, ",\"false_point_id\":null");
+        }
+        cov_vb(out, string_concat(",\"function_entity_index\":", cov_map_int(vec_get(emap, e))));
+        cov_vb(out, string_concat(string_concat(",\"kind\":", cov_map_str(kname)), string_concat(",\"source_index\":", cov_map_int(sk))));
+        cov_vb(out, string_concat(",\"span\":", cov_map_span(source, ls, base, vec_get(starts, vec_get(cl, c * 8 + 2)),
+            vec_get(ends, vec_get(cl, c * 8 + 3)))));
+        if tp >= 0 {
+            cov_vb(out, ",\"true_point_id\":\"");
+            cov_vb_from(out, ids, tp * 64, 64);
+            cov_vb(out, "\"}");
+        } else {
+            cov_vb(out, ",\"true_point_id\":null}");
+        }
+        c = c + 1;
+    }
+    cov_vb(out, "]");
+    return out;
+}
+
 /* The exclusion records (SPEC 16.3.7; CV-305): one per exclusion in `ex`
    (lib/exclusions.sv0), its affected sets in map indexes and point IDs,
    ordered by source, span, mode, then reason. */
 fn cov_map_exclusions(source: string, ls: Vec<i32>, cstarts: Vec<i32>, src_unit: Vec<i32>, ne: i32, nb: i32,
                       obase: Vec<i32>, br: Vec<i32>, ids: Vec<i32>, border: Vec<i32>, real: Vec<i32>,
-                      rorder: Vec<i32>, ex: Vec<i32>, memb: Vec<i32>) -> Vec<i32> {
+                      rorder: Vec<i32>, ex: Vec<i32>, memb: Vec<i32>, emap: Vec<i32>, cl: Vec<i32>,
+                      cpt: Vec<i32>) -> Vec<i32> {
     let x: i32 = EXCL_STRIDE();
     let nx: i32 = vec_len(ex) / x;
     let binv: Vec<i32> = vec_new();
@@ -1051,14 +1230,23 @@ fn cov_map_exclusions(source: string, ls: Vec<i32>, cstarts: Vec<i32>, src_unit:
         let brs: Vec<i32> = vec_new();
         let rgs: Vec<i32> = vec_new();
         let pts: Vec<i32> = vec_new();
+        let cls: Vec<i32> = vec_new();
         let mut m: i32 = 0;
         while m < vec_len(memb) {
             if vec_get(memb, m) == k {
                 let kind: i32 = vec_get(memb, m + 1);
                 let idx: i32 = vec_get(memb, m + 2);
                 if kind == 0 {
-                    vec_push(ents, idx);
+                    vec_push(ents, vec_get(emap, idx));
                     vec_push(pts, idx);
+                }
+                if kind == 3 {
+                    vec_push(cls, idx);
+                    vec_push(ents, cov_map_centity(emap, cl, idx));
+                    if vec_get(cpt, idx) >= 0 {
+                        vec_push(pts, vec_get(cpt, idx));
+                        vec_push(pts, vec_get(cpt, idx) + 1);
+                    }
                 }
                 if kind == 1 {
                     vec_push(brs, vec_get(binv, idx));
@@ -1075,6 +1263,7 @@ fn cov_map_exclusions(source: string, ls: Vec<i32>, cstarts: Vec<i32>, src_unit:
         cov_map_isort(ents);
         cov_map_isort(brs);
         cov_map_isort(rgs);
+        cov_map_isort(cls);
         let pkoff: Vec<i32> = vec_new();
         let pklen: Vec<i32> = vec_new();
         i = 0;
@@ -1097,7 +1286,7 @@ fn cov_map_exclusions(source: string, ls: Vec<i32>, cstarts: Vec<i32>, src_unit:
         let reason: string = cov_map_reason_json(string_substr(source, ra, rb - ra));
         cov_map_key_begin(recs, roff);
         cov_vb(recs, string_concat(string_concat("{\"affected\":{\"branch_indices\":", cov_map_int_array(brs)),
-            string_concat(",\"clause_indices\":[],\"entity_indices\":", cov_map_int_array(ents))));
+            string_concat(string_concat(",\"clause_indices\":", cov_map_int_array(cls)), string_concat(",\"entity_indices\":", cov_map_int_array(ents)))));
         cov_vb(recs, ",\"point_ids\":[");
         i = 0;
         while i < vec_len(porder) {
