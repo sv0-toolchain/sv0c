@@ -20,6 +20,7 @@ lib/lexer.sv0
 lib/ast.sv0
 lib/parser.sv0
 lib/attributes.sv0
+lib/directives.sv0
 lib/env.sv0
 lib/resolver.sv0
 lib/types.sv0

@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* A string literal may hold a raw newline (sv0doc grammar string_char); the
+   C backend used to copy it into the C string unescaped, which C rejects.
+   `??=`, `??(` and friends must stay three characters, not become C99
+   trigraphs (gcc -std=c99 translates them). Found by sv0cov CV-304. */
+fn main() -> i32 {
+    let s: string = "a
+b??=??(x??";
+    if string_len(s) != 12 { return 1; }
+    if string_char_at(s, 1) != 10 { return 2; }
+    if string_char_at(s, 5) != 61 { return 3; }
+    if string_char_at(s, 8) != 40 { return 4; }
+    if string_char_at(s, 10) != 63 { return 5; }
+    return 0;
+}

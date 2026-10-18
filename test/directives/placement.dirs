@@ -1,0 +1,10 @@
+dir	0	0	ignore-next	392	431	an item	-1	432
+dir	1	0	ignore-next	696	762	a statement after quote characters	-1	767
+dir	2	0	ignore-next	964	1018	tabs between the parts	-1	1023
+dir	3	0	ignore-next	1051	1101	deeper indentation	-1	1106
+dir	4	0	ignore-next	1121	1191	an escaped \" quote and a \\ backslash	-1	1262
+dir	5	0	ignore-start	1277	1318	a region	6	-1
+dir	6	0	ignore-end	1380	1401	-	5	-1
+dir	7	0	ignore-start	1406	1471	a second region, after the first	8	-1
+dir	8	0	ignore-end	1476	1497	-	7	-1
+dir	9	0	ignore-next	1502	1557	an expression statement	-1	1562

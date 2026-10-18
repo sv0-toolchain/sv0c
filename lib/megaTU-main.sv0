@@ -145,6 +145,90 @@ fn megatu_report_attrs(errs: Vec<i32>, source: string, starts: Vec<i32>, ends: V
     return 0;
 }
 
+/* Directive errors (lib/directives.sv0): (code, unit, start, end, message
+   id) quintuples over the units' own texts, each reported as
+   error[COVxxxx] at its span; a project unit's path leads the location. */
+fn megatu_report_dirs(errs: Vec<i32>, units: string, source: string) -> i32 {
+    let mut out: string = "";
+    let mut i: i32 = 0;
+    while i + 4 < vec_len(errs) {
+        let unit: i32 = vec_get(errs, i + 1);
+        let mut text: string = source;
+        let mut path: string = "";
+        if string_len(units) > 0 {
+            path = megatu_unit_path(units, unit);
+            text = read_file(path);
+        }
+        let a: i32 = vec_get(errs, i + 2);
+        let b: i32 = vec_get(errs, i + 3);
+        let line: i32 = megatu_line_of_pos(text, a);
+        let col: i32 = megatu_col_of_pos(text, a);
+        let mut len: i32 = b - a;
+        if len < 1 { len = 1; }
+        out = string_concat(out, format_header_with_code(0, dirs_message(vec_get(errs, i + 4)), dirs_code_text(vec_get(errs, i))));
+        out = string_concat(out, "\n");
+        out = string_concat(out, format_location(path, line, col));
+        out = string_concat(out, "\n");
+        let snip: string = format_snippet(text, line, col, len);
+        if string_len(snip) > 0 {
+            out = string_concat(out, snip);
+            out = string_concat(out, "\n");
+        }
+        i = i + 5;
+    }
+    if string_len(out) > 0 { write_file("/dev/stderr", out); }
+    return 0;
+}
+
+/* The path on line `unit` (0-based) of a newline-separated unit listing. */
+fn megatu_unit_path(units: string, unit: i32) -> string {
+    let n: i32 = string_len(units);
+    let mut p: i32 = 0;
+    let mut k: i32 = 0;
+    while p < n {
+        let mut e: i32 = megatu_index_of(units, 10, p);
+        if e < 0 { e = n; }
+        if e > p {
+            if k == unit { return string_substr(units, p, e - p); }
+            k = k + 1;
+        }
+        p = e + 1;
+    }
+    return "";
+}
+
+/* The source units a project build reads (the files of the project, without
+   nested projects), newline-separated, for the directive scan. */
+fn megatu_dir_units(dir: string) -> string {
+    let listing: string = link_project_dir(dir);
+    if link_listing_root_entry_count(listing, dir) == 1 {
+        return link_listing_drop_nested_entries(listing, dir);
+    }
+    return listing;
+}
+
+/* Scan comment directives (sv0cov CV-304) in every unit: `source` as unit 0
+   when `units` is empty (file mode), otherwise each listed file. With
+   `dump`, returns the table lines; otherwise "". */
+fn megatu_scan_directives(units: string, source: string, tab: Vec<i32>, errs: Vec<i32>, dump: bool) -> string {
+    let mut out: string = "";
+    if string_len(units) == 0 {
+        dirs_scan_unit(source, 0, tab, errs);
+        if dump { out = dirs_dump_unit(source, 0, tab); }
+        return out;
+    }
+    let mut k: i32 = 0;
+    let mut path: string = megatu_unit_path(units, 0);
+    while string_len(path) > 0 {
+        let text: string = read_file(path);
+        dirs_scan_unit(text, k, tab, errs);
+        if dump { out = string_concat(out, dirs_dump_unit(text, k, tab)); }
+        k = k + 1;
+        path = megatu_unit_path(units, k);
+    }
+    return out;
+}
+
 fn megatu_emit_diagnostics(diag_sink: Vec<i32>, source: string,
                            starts: Vec<i32>) -> i32 {
     let n: i32 = vec_len(diag_sink);
@@ -224,7 +308,8 @@ fn megatu_index_of(s: string, ch: i32, from: i32) -> i32 {
 /* 0 = off (empty request), 1 = map, 2 = instrument, 3 = plan-dump and
    5 = hit-dump (internal test hooks that print the plan, or the placed hits,
    instead of C), 6 = attr-dump (an internal test hook that prints the
-   attribute table, sv0cov CV-302), -1 = unknown. */
+   attribute table, sv0cov CV-302), 7 = dir-dump (prints the comment
+   directive table, sv0cov CV-304), -1 = unknown. */
 fn megatu_cov_mode_of(req: string) -> i32 {
     if string_len(req) == 0 { return 0; }
     let nl: i32 = megatu_index_of(req, 10, 0);
@@ -235,6 +320,7 @@ fn megatu_cov_mode_of(req: string) -> i32 {
     if string_eq(mode, "plan-dump") { return 3; }
     if string_eq(mode, "hit-dump") { return 5; }
     if string_eq(mode, "attr-dump") { return 6; }
+    if string_eq(mode, "dir-dump") { return 7; }
     return 0 - 1;
 }
 
@@ -244,6 +330,7 @@ fn megatu_cov_mode_name(mode: i32) -> string {
     if mode == 3 { return "plan-dump"; }
     if mode == 5 { return "hit-dump"; }
     if mode == 6 { return "attr-dump"; }
+    if mode == 7 { return "dir-dump"; }
     return "off";
 }
 
@@ -813,6 +900,37 @@ fn main() -> i32 {
     let _cov_mode: i32 = 0;
     let _cov_root: string = "";
     let _cov_listing: string = "";
+    /* sv0cov CV-304: the project's source units for the directive scan
+       (empty in file mode: the scan reads `source`). */
+    let _cov_units: string = "";
+
+    /* Comment directives (sv0cov CV-304, lib/directives.sv0): a pre-lex scan
+       of every source unit, validated in every build like attributes; a
+       valid directive is refused under --coverage until CV-305. dir-dump
+       prints the table. */
+    let cov_on: bool = _cov_mode == 1 || _cov_mode == 2 || _cov_mode == 3 || _cov_mode == 5;
+    let dr_tab: Vec<i32> = vec_new();
+    let dr_errs: Vec<i32> = vec_new();
+    let dr_dump: string = megatu_scan_directives(_cov_units, source, dr_tab, dr_errs, _cov_mode == 7);
+    if vec_len(dr_errs) == 0 {
+        if cov_on {
+            if vec_len(dr_tab) > 0 {
+                vec_push(dr_errs, 1021);
+                vec_push(dr_errs, vec_get(dr_tab, 1));
+                vec_push(dr_errs, vec_get(dr_tab, 2));
+                vec_push(dr_errs, vec_get(dr_tab, 3));
+                vec_push(dr_errs, 17);
+            }
+        }
+    }
+    if vec_len(dr_errs) > 0 {
+        megatu_report_dirs(dr_errs, _cov_units, source);
+        return 6;
+    }
+    if _cov_mode == 7 {
+        write_file("/dev/stdout", dr_dump);
+        return 0;
+    }
 
     /* Phase 1: tokenize (real lexer.sv0) */
     let mut tags: Vec<i32> = vec_new();
@@ -840,7 +958,6 @@ fn main() -> i32 {
         return 6;
     }
     let at_errs: Vec<i32> = vec_new();
-    let cov_on: bool = _cov_mode == 1 || _cov_mode == 2 || _cov_mode == 3 || _cov_mode == 5;
     if attrs_check(source, starts, ends, tags, at_tab, at_args, cov_on, at_errs) > 0 {
         megatu_report_attrs(at_errs, source, starts, ends);
         return 6;
@@ -2801,6 +2918,44 @@ fn megatu_decoded_len(s: string) -> i32 {
     return count;
 }
 
+/* A string-literal body as a C string body. sv0 escapes already match C, so
+   the body is copied as is, except what C reads differently: a raw newline
+   or carriage return (legal inside an sv0 string, sv0doc grammar
+   string_char) becomes `\n` / `\r`, and the second `?` of a `??` that
+   would start a C trigraph (`??=`, `??(`, `??/`, `??)`, `??'`, `??<`, `??!`,
+   `??>`, `??-`, read as one character by C99 compilers that translate
+   trigraphs) becomes `\?`. The decoded length is unchanged. */
+fn megatu_c_string_body(s: string) -> string {
+    let n: i32 = string_len(s);
+    let mut out: string = "";
+    let mut run: i32 = 0;
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(s, i);
+        let mut rep: string = "";
+        if c == 10 { rep = "\\n"; }
+        if c == 13 { rep = "\\r"; }
+        if c == 63 {
+            if i + 2 < n {
+                if string_char_at(s, i + 1) == 63 {
+                    let t: i32 = string_char_at(s, i + 2);
+                    if t == 61 || t == 40 || t == 47 || t == 41 || t == 39 || t == 60 || t == 33 || t == 62 || t == 45 {
+                        rep = "?\\?";
+                    }
+                }
+            }
+        }
+        if string_len(rep) > 0 {
+            out = string_concat(string_concat(out, string_substr(s, run, i - run)), rep);
+            if c == 63 { i = i + 2; } else { i = i + 1; }
+            run = i;
+        } else {
+            i = i + 1;
+        }
+    }
+    return string_concat(out, string_substr(s, run, n - run));
+}
+
 fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: Vec<i32>, sidx: Vec<i32>) -> string {
     match v {
         codegen_Value::VInt(i) => { return int_to_string(i); },
@@ -2823,7 +2978,7 @@ fn megatu_emit_value(v: codegen_Value, source: string, starts: Vec<i32>, ends: V
                 inner = string_substr(raw, 1, rlen - 2);
             }
             let dlen: i32 = megatu_decoded_len(inner);
-            let a: string = string_concat("sv0_str_lit(\"", inner);
+            let a: string = string_concat("sv0_str_lit(\"", megatu_c_string_body(inner));
             let b: string = string_concat(a, "\", ");
             let c: string = string_concat(b, int_to_string(dlen));
             return string_concat(c, ")");

@@ -169,3 +169,4 @@ test/behavior/cases/div_i32_min_by_neg1_panics.sv0|1
 test/behavior/cases/mod_i32_min_by_neg1_panics.sv0|1
 test/behavior/cases/div_i64_by_zero_panics.sv0|1
 test/behavior/cases/div_mod_defined_results.sv0|16|native
+test/behavior/cases/string_raw_newline_trigraph.sv0|0

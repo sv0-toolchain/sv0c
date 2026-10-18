@@ -1,0 +1,49 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov CV-304: comment directives in every legal shape, next to text that
+   only looks like one. run_directives.py snapshots the directive table
+   (placement.dirs) on both binaries. The program exits 0. */
+
+// an ordinary comment that mentions sv0cov is not a directive
+// see sv0cov: this does not start with the reserved prefix either
+
+// sv0cov: ignore-next reason="an item"
+fn helper() -> i32 { return 1; }
+
+fn strings() -> i32 {
+    let a: string = "// sv0cov: ignore-next reason=\"inside a string\"";
+    let b: string = "\" // sv0cov: ignore-start reason=\"after an escaped quote\"";
+    let q: char = '"';
+    let r: char = '\'';
+    // sv0cov: ignore-next reason="a statement after quote characters"
+    let c: i32 = string_len(a) + string_len(b);
+    return c - 104;
+}
+
+/* a block comment
+// sv0cov: ignore-start reason="inside a block comment"
+   is not a directive */
+
+fn layouts(n: i32) -> i32 {
+	// sv0cov:	ignore-next	reason="tabs between the parts"
+    let mut t: i32 = n;
+        // sv0cov: ignore-next reason="deeper indentation"
+    t = t + 1;
+    // sv0cov: ignore-next reason="an escaped \" quote and a \\ backslash"
+
+    // an ordinary comment and a blank line before the construct
+    t = t + 1;
+    // sv0cov: ignore-start reason="a region"
+    if t > 100 {
+        return 0;
+    };
+    t = t + 1;
+    // sv0cov: ignore-end
+    // sv0cov: ignore-start reason="a second region, after the first"
+    // sv0cov: ignore-end
+    // sv0cov: ignore-next reason="an expression statement"
+    return t - n - 3;
+}
+
+fn main() -> i32 {
+    return helper() + strings() + layouts(2) - 1;
+}
