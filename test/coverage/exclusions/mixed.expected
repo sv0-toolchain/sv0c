@@ -1,0 +1,80 @@
+exclusion off attribute 6:1 entities=1 branches=1 regions=4 points=3 reason=a whole function
+exclusion off attribute 16:1 entities=2 branches=1 regions=5 points=4 reason=every method of an impl
+exclusion branch_off attribute 26:5 entities=0 branches=1 regions=0 points=2 reason=only the if's own outcomes; the nested match stays
+exclusion branch_off attribute 40:5 entities=0 branches=1 regions=0 points=2 reason=the loop's body and exit
+exclusion off attribute 45:5 entities=0 branches=1 regions=3 points=2 reason=an early return, and the code after it stays counted
+exclusion off comment 49:5 entities=0 branches=0 regions=1 points=0 reason=one statement
+exclusion off comment 52:9 entities=0 branches=1 regions=5 points=2 reason=an if expression
+exclusion off comment 54:5 entities=0 branches=2 regions=6 points=4 reason=a region of statements
+exclusion off attribute 61:5 entities=0 branches=0 regions=1 points=0 reason=a block
+exclusion branch_off attribute 69:5 entities=0 branches=1 regions=0 points=2 reason=the arms of a match
+branch if 8 true=excluded false=excluded
+branch if 20 true=excluded false=excluded
+branch if 27 true=excluded false=excluded
+branch match 28 arm:0=eligible arm:1=eligible arm:2=eligible
+branch loop 41 body=excluded exit=excluded
+branch if 46 true=excluded false=excluded
+branch conditional_expression 53 true=excluded false=excluded
+branch loop 56 body=excluded exit=excluded
+branch if 58 true=excluded false=excluded
+branch match 70 arm:0=excluded arm:1=excluded
+support support:if:false 46 count=1
+support support:match:arm:1 70 count=1
+support support:loop:body 41 count=4
+support support:if:true 46 count=0
+support support:if:false 27 count=1
+support support:match:arm:0 70 count=1
+support support:loop:exit 41 count=1
+support support:if:true 27 count=2
+region expression 8:8 excluded -
+region branch_body 8:14 excluded -
+region return 9:9 excluded -
+region return 11:5 excluded -
+region return 18:33 excluded -
+region expression 20:12 excluded -
+region branch_body 20:28 excluded -
+region return 20:30 excluded -
+region return 21:9 excluded -
+region expression 27:8 user 3
+region branch_body 27:15 user 2
+region expression 28:15 user 2
+region match_arm 29:18 user 0
+region return 29:20 user 0
+region match_arm 30:18 user 1
+region return 30:20 user 1
+region match_arm 31:18 user 1
+region return 34:5 user 2
+region initializer 38:5 user 1
+region initializer 39:5 user 1
+region expression 41:11 user 5
+region loop_body 41:21 user 4
+region assignment 42:9 user 4
+region assignment 43:9 user 4
+region expression 46:8 excluded -
+region branch_body 46:20 excluded -
+region return 47:9 excluded -
+region assignment 50:5 excluded -
+region initializer 51:5 user 1
+region expression 53:12 excluded -
+region branch_body 53:22 excluded -
+region expression 53:24 excluded -
+region branch_body 53:33 excluded -
+region expression 53:35 excluded -
+region initializer 55:5 excluded -
+region loop_body 56:10 excluded -
+region assignment 57:9 excluded -
+region expression 58:12 excluded -
+region branch_body 58:18 excluded -
+region break 58:20 excluded -
+region assignment 63:9 excluded -
+region return 65:5 user 1
+region expression 70:11 user 2
+region match_arm 71:14 user 1
+region return 71:16 user 1
+region match_arm 72:14 user 1
+region return 74:5 user 1
+region initializer 78:5 user 1
+region initializer 79:5 user 1
+region initializer 80:5 user 1
+region return 81:5 user 1
+counters 15

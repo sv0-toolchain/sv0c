@@ -27,7 +27,7 @@
  * ignore-end), partner (the matching start or end; -1), next (offset of the
  * first code byte after an ignore-next; -1 otherwise). Offsets are into the
  * unit's own text. Which construct an ignore-next excludes, and the effect,
- * are sv0cov CV-305.
+ * are lib/exclusions.sv0 (sv0cov CV-305).
  *
  * Errors: (code, unit, start, end, message id) quintuples.
  *
@@ -260,7 +260,6 @@ fn dirs_message(id: i32) -> string {
     if id == 14 { return "this `ignore-start` is never closed by an `ignore-end` in its file"; }
     if id == 15 { return "nothing follows this `ignore-next` in its file"; }
     if id == 16 { return "a coverage directive must be a `//` line comment"; }
-    if id == 17 { return "coverage exclusions are not implemented by this compiler yet (sv0cov CV-305); build without --coverage, or remove the directive"; }
     return "invalid coverage directive";
 }
 

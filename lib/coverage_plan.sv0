@@ -1341,7 +1341,7 @@ fn cov_hit_table(tags: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3
         }
         /* A loop whose exit is unreachable carries COV_NO_EXIT on its body
            counter: lowering places no exit hit (lower_cov_counter). */
-        if cov_outcome_unreachable(vec_get(br, b * 5), 1) {
+        if cov_outcome_unreachable(vec_get(br, b * 5), 1) && vec_get(counters, ne + obase) >= 0 {
             vec_push(bctr, vec_get(counters, ne + obase) + 1073741824);
         } else {
             vec_push(bctr, vec_get(counters, ne + obase));

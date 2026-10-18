@@ -1,0 +1,13 @@
+/* sv0cov CV-305: a fully excluded program. Every function is excluded, so
+   the instrumented build plans zero counters; it still runs like the off
+   build and publishes one complete empty profile on C and the VM. */
+// sv0cov: ignore-start reason="the whole program is excluded"
+fn twice(n: i32) -> i32 {
+    return n + n;
+}
+
+fn main() -> i32 {
+    println("excluded ran");
+    return twice(4) - 8;
+}
+// sv0cov: ignore-end

@@ -1,0 +1,768 @@
+/* Coverage exclusions (sv0cov CV-305; SPEC 19, 16.3.7, 11.1; sv0doc
+ * attributes/coverage.md sections 2 to 6).
+ *
+ * Two halves.
+ *
+ * 1. Policy, in every build (excl_check_unit), per source unit over that
+ *    unit's own tokens, after lib/attributes.sv0 and lib/directives.sv0
+ *    have validated form: what each `coverage` attribute and comment
+ *    directive attaches to, whether its mode can apply there (COV1021),
+ *    and whether two exclusions overlap: the same mode twice or `off` with
+ *    `branch_off` on one construct, or an exclusion inside another `off`
+ *    (COV3203, with a note at the other one), or an attribute and a
+ *    directive on one construct (COV3202). An `ignore-next` resolves to the
+ *    smallest construct starting at the next code (attributes and
+ *    non-executable declarations skipped): an item or statement, else an
+ *    `if` or `match` expression, else COV1021. An `ignore-start` region must
+ *    begin and end between the items or statements of one block (COV3201).
+ *    A reason must decode to a logical string (no NUL, CR or LF; COV3201).
+ *    The result is the exclusion table:
+ *
+ *      EXCL_STRIDE() ints: unit, mode (1 off, 2 branch_off, 3
+ *      contract_off), origin (1 attribute, 2 comment), span start, span end
+ *      (the attribute or the directive comment), extent start, extent end
+ *      (the bytes of the construct, or of a region's code), target start
+ *      (the construct's first byte; -1 for a region), reason start, reason
+ *      end (the raw literal body), kind (1 fn, 2 impl or trait, 3
+ *      statement, 4 decision statement, 5 `if`/`match` expression, 6
+ *      ignore region), 0.
+ *
+ *    Offsets are into the unit's own text.
+ *
+ * 2. Effect, in coverage builds (excl_resolve, excl_support), over the
+ *    plan in concat offsets: `off` (and every directive) takes the
+ *    function entities, branches and regions wholly inside its extent;
+ *    `branch_off` takes the outcomes of the decision at its target. An
+ *    exclusion that takes nothing is COV1021. Every excluded point is
+ *    uncounted; where an ordinary region still needs an excluded outcome's
+ *    count, a counted synthetic-support point stands in for it (SPEC 11.1;
+ *    owner decision): kind `region`, the branch's span and entity,
+ *    discriminator `support:<kind>:<outcome>`, hit where the outcome would
+ *    be. `contract_off` waits for contract coverage (CV-306) and is refused
+ *    in coverage builds.
+ *
+ * Errors: EXCL_ERR_STRIDE() ints: code, unit, start, end, message id, note
+ * start, note end (-1 for no note); offsets into the unit's text.
+ *
+ * `&&` and `||` evaluate both operands in sv0c today, so index guards are
+ * nested ifs. Depends on lib/lexer.sv0, lib/attributes.sv0 and
+ * lib/directives.sv0.
+ */
+
+fn EXCL_STRIDE() -> i32 { return 12; }
+fn EXCL_ERR_STRIDE() -> i32 { return 7; }
+
+fn excl_tag(tags: Vec<i32>, i: i32) -> i32 {
+    if i < 0 { return 0 - 1; }
+    if i >= vec_len(tags) { return 97; }
+    return vec_get(tags, i);
+}
+
+fn excl_put(v: Vec<i32>, i: i32, x: i32) -> i32 {
+    if i < vec_len(v) { vec_set(v, i, x); } else { vec_push(v, x); }
+    return 0;
+}
+
+fn excl_err(errs: Vec<i32>, code: i32, unit: i32, a: i32, b: i32, id: i32, na: i32, nb: i32) -> i32 {
+    vec_push(errs, code);
+    vec_push(errs, unit);
+    vec_push(errs, a);
+    vec_push(errs, b);
+    vec_push(errs, id);
+    vec_push(errs, na);
+    vec_push(errs, nb);
+    return 1;
+}
+
+/* For every token: pos (1 item, 2 statement, 0 neither, -1 inside an
+   attribute), the token that opened its innermost frame (-1: the file) and
+   that frame's kind (attributes.sv0 frames). The same walk as attrs_scan. */
+fn excl_positions(tags: Vec<i32>, pos: Vec<i32>, blk: Vec<i32>, frm: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(tags);
+    let stack: Vec<i32> = vec_new();
+    let opens: Vec<i32> = vec_new();
+    let mut depth: i32 = 0;
+    let mut pend: i32 = 0 - 1;
+    let mut pend_at: i32 = 0;
+    let mut prev: i32 = 0 - 1;
+    let mut i: i32 = 0;
+    while i < n {
+        let t: i32 = vec_get(tags, i);
+        let mut close: i32 = 0 - 1;
+        if t == 21 {
+            if excl_tag(tags, i + 1) == 10 {
+                close = attrs_close(tags, i + 1);
+                if close < 0 { close = n - 1; }
+            }
+        }
+        let mut top_open: i32 = 0 - 1;
+        if depth > 0 { top_open = vec_get(opens, depth - 1); }
+        let top: i32 = attrs_top(stack, depth);
+        if close >= 0 {
+            while i <= close {
+                vec_push(pos, 0 - 1);
+                vec_push(blk, top_open);
+                vec_push(frm, top);
+                i = i + 1;
+            }
+        } else {
+            vec_push(pos, attrs_position(tags, top, prev, i));
+            vec_push(blk, top_open);
+            vec_push(frm, top);
+            if t == 65 || t == 89 || t == 62 || t == 69 || t == 90 || t == 68 || t == 60 || t == 96 || t == 66 || t == 72
+                    || t == 74 || t == 93 || t == 20 {
+                if pend < 0 || pend_at != depth {
+                    pend_at = depth;
+                    pend = 2;
+                    if t == 89 || t == 62 { pend = 3; }
+                    if t == 69 || t == 90 { pend = 1; }
+                    if t == 74 { pend = 4; }
+                }
+            }
+            if t == 13 || t == 12 {
+                if pend_at == depth { pend = 0 - 1; }
+            }
+            if t == 6 {
+                depth = attrs_push(stack, depth, 6);
+                excl_put(opens, depth - 1, i);
+            }
+            if t == 10 {
+                depth = attrs_push(stack, depth, 7);
+                excl_put(opens, depth - 1, i);
+            }
+            if t == 8 {
+                if pend >= 0 && pend_at == depth {
+                    depth = attrs_push(stack, depth, pend);
+                    pend = 0 - 1;
+                } else {
+                    let pt: i32 = attrs_tag(tags, prev);
+                    if pt == 5 || pt == 39 || pt == 87 { depth = attrs_push(stack, depth, 5); } else { depth = attrs_push(stack, depth, 2); }
+                }
+                excl_put(opens, depth - 1, i);
+            }
+            if t == 7 || t == 11 || t == 9 {
+                if depth > 0 { depth = depth - 1; }
+                if depth < pend_at { pend = 0 - 1; }
+            }
+            prev = i;
+            i = i + 1;
+        }
+    }
+    return n;
+}
+
+/* The construct's first keyword: past `pub`. */
+fn excl_keyword(tags: Vec<i32>, t: i32) -> i32 {
+    let mut k: i32 = t;
+    while excl_tag(tags, k) == 82 { k = k + 1; }
+    return k;
+}
+
+/* Last token of the item or statement (or `if`/`match` expression) that
+   starts at t. */
+fn excl_end(tags: Vec<i32>, t: i32) -> i32 {
+    let n: i32 = vec_len(tags);
+    let g0: i32 = excl_tag(tags, excl_keyword(tags, t));
+    let braced: bool = g0 == 65 || g0 == 69 || g0 == 90 || g0 == 89 || g0 == 62 || g0 == 68 || g0 == 96 || g0 == 66
+        || g0 == 72 || g0 == 74 || g0 == 8 || g0 == 93;
+    let mut depth: i32 = 0;
+    let mut i: i32 = t;
+    while i < n {
+        let g: i32 = vec_get(tags, i);
+        if g == 97 { return i - 1; }
+        if g == 6 || g == 10 || g == 8 { depth = depth + 1; }
+        if g == 7 || g == 11 { depth = depth - 1; }
+        if g == 9 {
+            if depth == 0 { return i - 1; }
+            depth = depth - 1;
+            if depth == 0 {
+                if braced {
+                    if excl_tag(tags, i + 1) != 60 { return i; }
+                }
+            }
+        }
+        if g == 13 {
+            if depth == 0 { return i; }
+        }
+        i = i + 1;
+    }
+    return n - 1;
+}
+
+/* 1 a function, 2 an impl or trait, 0 an item with no code of its own. */
+fn excl_item_kind(tags: Vec<i32>, t: i32) -> i32 {
+    let k: i32 = excl_keyword(tags, t);
+    let g: i32 = excl_tag(tags, k);
+    if g == 65 { return 1; }
+    if g == 93 {
+        if excl_tag(tags, k + 1) == 65 { return 1; }
+    }
+    if g == 69 || g == 90 { return 2; }
+    return 0;
+}
+
+/* Whether some `fn` in tokens [t, end] has a body. */
+fn excl_has_body(tags: Vec<i32>, t: i32, end: i32) -> bool {
+    let mut i: i32 = t;
+    while i <= end {
+        if vec_get(tags, i) == 65 {
+            let mut depth: i32 = 0;
+            let mut j: i32 = i + 1;
+            let mut look: bool = true;
+            while look {
+                if j > end { look = false; } else {
+                    let g: i32 = vec_get(tags, j);
+                    if g == 6 || g == 10 { depth = depth + 1; }
+                    if g == 7 || g == 11 { depth = depth - 1; }
+                    if depth == 0 {
+                        if g == 13 { look = false; }
+                        if g == 8 { return true; }
+                    }
+                    j = j + 1;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* Whether tokens [t, end] hold a contract clause (requires, ensures,
+   loop_invariant, assert). */
+fn excl_has_clause(tags: Vec<i32>, t: i32, end: i32) -> bool {
+    let mut i: i32 = t;
+    while i <= end {
+        let g: i32 = vec_get(tags, i);
+        if g == 83 || g == 61 || g == 73 || g == 55 { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/* What starts at t, at position p: 1 fn, 2 impl/trait, 7 an item with no
+   code, 3 a statement, 4 a decision statement. */
+fn excl_construct_kind(tags: Vec<i32>, t: i32, p: i32) -> i32 {
+    let g: i32 = excl_tag(tags, t);
+    if p == 2 {
+        if g == 68 || g == 96 || g == 66 || g == 72 || g == 74 { return 4; }
+        if g == 93 {
+            if excl_tag(tags, t + 1) == 8 { return 3; }
+        }
+        if attrs_item_start(g) != true { return 3; }
+    }
+    let ik: i32 = excl_item_kind(tags, t);
+    if ik == 0 { return 7; }
+    return ik;
+}
+
+/* First token starting at or after byte `off` (n when none). */
+fn excl_tok_at(starts: Vec<i32>, off: i32) -> i32 {
+    let n: i32 = vec_len(starts);
+    let mut i: i32 = 0;
+    while i < n {
+        if vec_get(starts, i) >= off { return i; }
+        i = i + 1;
+    }
+    return n;
+}
+
+/* Whether a reason decodes to a logical string (no NUL, CR or LF) that the
+   map can carry byte for byte: an escape may not produce a byte above 0x7e
+   (raw UTF-8 text is fine). */
+fn excl_reason_ok(raw: string) -> bool {
+    let n: i32 = string_len(raw);
+    let mut i: i32 = 0;
+    while i < n {
+        let c: i32 = string_char_at(raw, i);
+        if c == 92 {
+            let b: Vec<i32> = vec_new();
+            i = scan_escape(raw, i + 1, b);
+            let v: i32 = vec_get(b, 0);
+            if v == 0 || v == 10 || v == 13 || v > 126 { return false; }
+        } else {
+            if c == 10 || c == 13 || c == 0 { return false; }
+            i = i + 1;
+        }
+    }
+    return true;
+}
+
+fn excl_push(out: Vec<i32>, unit: i32, mode: i32, origin: i32, sa: i32, sb: i32, xa: i32, xb: i32,
+             target: i32, ra: i32, rb: i32, kind: i32) -> i32 {
+    vec_push(out, unit);
+    vec_push(out, mode);
+    vec_push(out, origin);
+    vec_push(out, sa);
+    vec_push(out, sb);
+    vec_push(out, xa);
+    vec_push(out, xb);
+    vec_push(out, target);
+    vec_push(out, ra);
+    vec_push(out, rb);
+    vec_push(out, kind);
+    vec_push(out, 0);
+    return 0;
+}
+
+/* Skip forward from token t past attributes, `use`/`module` declarations
+   and items with no code, to the construct an `ignore-next` names. */
+fn excl_next_construct(tags: Vec<i32>, pos: Vec<i32>, t: i32) -> i32 {
+    let n: i32 = vec_len(tags);
+    let mut k: i32 = t;
+    let mut going: bool = true;
+    while going {
+        if k >= n { going = false; } else {
+            let g: i32 = vec_get(tags, k);
+            let mut skipped: bool = false;
+            if g == 21 {
+                if excl_tag(tags, k + 1) == 10 {
+                    let c: i32 = attrs_close(tags, k + 1);
+                    if c < 0 { k = n; } else { k = c + 1; }
+                    skipped = true;
+                }
+            }
+            if skipped != true {
+                if g == 94 || g == 75 {
+                    k = excl_end(tags, k) + 1;
+                    skipped = true;
+                }
+            }
+            if skipped != true {
+                let p: i32 = vec_get(pos, k);
+                if p == 1 || p == 2 {
+                    if excl_construct_kind(tags, k, p) == 7 {
+                        k = excl_end(tags, k) + 1;
+                        skipped = true;
+                    }
+                }
+            }
+            if skipped != true { going = false; }
+        }
+    }
+    return k;
+}
+
+/* Policy checks for one unit; appends its exclusions to `out` and errors to
+   `errs`. Returns the number of errors. */
+fn excl_check_unit(text: string, unit: i32, dr: Vec<i32>, out: Vec<i32>, errs: Vec<i32>) -> i32 {
+    let tags: Vec<i32> = vec_new();
+    let starts: Vec<i32> = vec_new();
+    let ends: Vec<i32> = vec_new();
+    tokenize(text, tags, starts, ends);
+    let n: i32 = vec_len(tags);
+    let at: Vec<i32> = vec_new();
+    let args: Vec<i32> = vec_new();
+    if attrs_scan(tags, at, args) < 0 { return 0; }
+    let pos: Vec<i32> = vec_new();
+    let blk: Vec<i32> = vec_new();
+    let frm: Vec<i32> = vec_new();
+    excl_positions(tags, pos, blk, frm);
+    let s: i32 = ATTRS_STRIDE();
+    let x: i32 = EXCL_STRIDE();
+    let first: i32 = vec_len(out) / x;
+    let mut nerr: i32 = 0;
+
+    /* attributes */
+    let na: i32 = vec_len(at) / s;
+    let mut k: i32 = 0;
+    while k < na {
+        let p: i32 = vec_get(at, k * s + 6);
+        let ck: i32 = attrs_coverage_kind(text, starts, ends, vec_get(at, k * s + 2), vec_get(at, k * s + 3));
+        if ck == 1 && p != 0 {
+            let hash: i32 = vec_get(at, k * s);
+            let close: i32 = vec_get(at, k * s + 1);
+            let sa: i32 = vec_get(starts, hash);
+            let sb: i32 = vec_get(ends, close);
+            let a0: i32 = vec_get(at, k * s + 7);
+            let mtext: string = attrs_text(text, starts, ends, vec_get(args, a0 * 4));
+            let mut mode: i32 = 1;
+            if string_eq(mtext, "branch_off") { mode = 2; }
+            if string_eq(mtext, "contract_off") { mode = 3; }
+            let rt: i32 = vec_get(args, (a0 + 1) * 4 + 1);
+            let ra: i32 = vec_get(starts, rt) + 1;
+            let rb: i32 = vec_get(ends, rt) - 1;
+            let t: i32 = vec_get(at, k * s + 5);
+            let end: i32 = excl_end(tags, t);
+            let kind: i32 = excl_construct_kind(tags, t, p);
+            let mut bad: i32 = 0;
+            if mode == 1 {
+                if kind == 7 { bad = 1; }
+                if kind == 2 {
+                    if excl_has_body(tags, t, end) != true { bad = 1; }
+                }
+            }
+            if mode == 2 {
+                if kind != 4 { bad = 2; }
+            }
+            if mode == 3 {
+                if kind != 1 { bad = 3; } else {
+                    if excl_has_clause(tags, t, end) != true { bad = 3; }
+                }
+            }
+            if bad > 0 {
+                nerr = nerr + excl_err(errs, 1021, unit, sa, sb, bad, 0 - 1, 0 - 1);
+            } else {
+                if excl_reason_ok(string_substr(text, ra, rb - ra)) != true {
+                    nerr = nerr + excl_err(errs, 3201, unit, ra - 1, rb + 1, 4, 0 - 1, 0 - 1);
+                } else {
+                    excl_push(out, unit, mode, 1, sa, sb, vec_get(starts, t), vec_get(ends, end), vec_get(starts, t), ra, rb, kind);
+                }
+            }
+        }
+        k = k + 1;
+    }
+
+    /* directives */
+    let ds: i32 = DIRS_STRIDE();
+    let nd: i32 = vec_len(dr) / ds;
+    let mut d: i32 = 0;
+    while d < nd {
+        if vec_get(dr, d * ds + 1) == unit {
+            let mut dkind: i32 = vec_get(dr, d * ds);
+            let ca: i32 = vec_get(dr, d * ds + 2);
+            let cb: i32 = vec_get(dr, d * ds + 3);
+            let ra2: i32 = vec_get(dr, d * ds + 4);
+            let rb2: i32 = vec_get(dr, d * ds + 5);
+            if dkind != 3 {
+                if excl_reason_ok(string_substr(text, ra2, rb2 - ra2)) != true {
+                    nerr = nerr + excl_err(errs, 3201, unit, ra2 - 1, rb2 + 1, 4, 0 - 1, 0 - 1);
+                    dkind = 0;
+                }
+            }
+            if dkind == 1 {
+                let tn: i32 = excl_next_construct(tags, pos, excl_tok_at(starts, vec_get(dr, d * ds + 7)));
+                let g: i32 = excl_tag(tags, tn);
+                if tn >= n || g == 9 || g == 97 {
+                    nerr = nerr + excl_err(errs, 1021, unit, ca, cb, 5, 0 - 1, 0 - 1);
+                } else {
+                    let p2: i32 = vec_get(pos, tn);
+                    let mut kind2: i32 = 0;
+                    if p2 == 1 || p2 == 2 { kind2 = excl_construct_kind(tags, tn, p2); } else {
+                        if g == 68 || g == 74 { kind2 = 5; }
+                    }
+                    if kind2 == 0 {
+                        nerr = nerr + excl_err(errs, 1021, unit, ca, cb, 6, vec_get(starts, tn), vec_get(ends, tn));
+                    } else {
+                        let end2: i32 = excl_end(tags, tn);
+                        if kind2 == 2 {
+                            if excl_has_body(tags, tn, end2) != true { kind2 = 7; }
+                        }
+                        if kind2 == 7 {
+                            nerr = nerr + excl_err(errs, 1021, unit, ca, cb, 5, 0 - 1, 0 - 1);
+                        } else {
+                            excl_push(out, unit, 1, 2, ca, cb, vec_get(starts, tn), vec_get(ends, end2), vec_get(starts, tn), ra2, rb2, kind2);
+                        }
+                    }
+                }
+            }
+            if dkind == 2 {
+                let partner: i32 = vec_get(dr, d * ds + 6);
+                let ea: i32 = vec_get(dr, partner * ds + 2);
+                let eb: i32 = vec_get(dr, partner * ds + 3);
+                let ts: i32 = excl_tok_at(starts, cb);
+                let te: i32 = excl_tok_at(starts, ea);
+                if ts >= te {
+                    nerr = nerr + excl_err(errs, 1021, unit, ca, cb, 7, ea, eb);
+                } else {
+                    if excl_region_ok(tags, pos, blk, frm, ts, te) != true {
+                        nerr = nerr + excl_err(errs, 3201, unit, ca, cb, 8, ea, eb);
+                    } else {
+                        excl_push(out, unit, 1, 2, ca, cb, vec_get(starts, ts), vec_get(ends, te - 1), 0 - 1, ra2, rb2, 6);
+                    }
+                }
+            }
+        }
+        d = d + 1;
+    }
+
+    /* overlaps among this unit's exclusions */
+    let last: i32 = vec_len(out) / x;
+    let mut i: i32 = first;
+    while i < last {
+        let mut j: i32 = first;
+        let mut reported: bool = false;
+        while j < last {
+            if j != i {
+                if reported != true {
+                    let id: i32 = excl_overlap(out, i, j);
+                    if id > 0 {
+                        let mut code: i32 = 3203;
+                        if id == 11 { code = 3202; }
+                        nerr = nerr + excl_err(errs, code, unit, vec_get(out, i * x + 3), vec_get(out, i * x + 4), id,
+                            vec_get(out, j * x + 3), vec_get(out, j * x + 4));
+                        reported = true;
+                    }
+                }
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return nerr;
+}
+
+/* An ignore region from token ts up to (not including) te must begin and
+   end between the items or statements of one block or file. */
+fn excl_region_ok(tags: Vec<i32>, pos: Vec<i32>, blk: Vec<i32>, frm: Vec<i32>, ts: i32, te: i32) -> bool {
+    let n: i32 = vec_len(tags);
+    let f: i32 = vec_get(frm, ts);
+    if f != 0 && f != 1 && f != 2 { return false; }
+    let gs: i32 = vec_get(tags, ts);
+    if gs == 60 || gs == 13 { return false; }
+    if ts > 0 {
+        let pg: i32 = vec_get(tags, ts - 1);
+        if pg != 8 && pg != 13 && pg != 9 {
+            if vec_get(pos, ts - 1) >= 0 { return false; }
+        }
+    }
+    let mut eblk: i32 = 0 - 1;
+    if te < n { eblk = vec_get(blk, te); }
+    if eblk != vec_get(blk, ts) { return false; }
+    if te < n {
+        let ge: i32 = vec_get(tags, te);
+        if ge == 60 || ge == 13 { return false; }
+        if ge != 9 {
+            let lg: i32 = vec_get(tags, te - 1);
+            if lg != 13 && lg != 9 && lg != 8 {
+                if vec_get(pos, te - 1) >= 0 { return false; }
+            }
+        }
+    }
+    return true;
+}
+
+/* Whether exclusion i conflicts with exclusion j (both in `out`): the
+   message id for i, or 0. */
+fn excl_overlap(out: Vec<i32>, i: i32, j: i32) -> i32 {
+    let x: i32 = EXCL_STRIDE();
+    let mi: i32 = vec_get(out, i * x + 1);
+    let mj: i32 = vec_get(out, j * x + 1);
+    let oi: i32 = vec_get(out, i * x + 2);
+    let oj: i32 = vec_get(out, j * x + 2);
+    let ti: i32 = vec_get(out, i * x + 7);
+    let tj: i32 = vec_get(out, j * x + 7);
+    let xia: i32 = vec_get(out, i * x + 5);
+    let xib: i32 = vec_get(out, i * x + 6);
+    let xja: i32 = vec_get(out, j * x + 5);
+    let xjb: i32 = vec_get(out, j * x + 6);
+    let same: bool = ti >= 0 && ti == tj;
+    if same {
+        /* report each pair once, at the later one */
+        if vec_get(out, i * x + 3) < vec_get(out, j * x + 3) { return 0; }
+        if oi != oj {
+            if mi == 3 || mj == 3 { return 0; }
+            return 11;
+        }
+        if mi == mj { return 9; }
+        if mi == 3 || mj == 3 { return 0; }
+        return 10;
+    }
+    if mi == 3 { return 0; }
+    if mj != 1 { return 0; }
+    /* the same code under two exclusions: report it once, at the later one */
+    if xia == xja {
+        if xib == xjb {
+            if mi == 1 {
+                if vec_get(out, i * x + 3) < vec_get(out, j * x + 3) { return 0; }
+            }
+        }
+    }
+    if xia >= xja {
+        if xib <= xjb { return 12; }
+    }
+    return 0;
+}
+
+fn excl_message(id: i32) -> string {
+    if id == 1 { return "`off` excludes code, and this item has none (only a `fn`, or an `impl` or `trait` with a function body, or a statement)"; }
+    if id == 2 { return "`branch_off` goes only on an `if`, `while`, `for`, `loop` or `match` statement"; }
+    if id == 3 { return "`contract_off` goes only on a function that owns a `requires`, `ensures`, `loop_invariant` or `assert`"; }
+    if id == 4 { return "a coverage reason may not contain a NUL, carriage return or line feed, and an escape in it may not stand for a byte above 0x7e"; }
+    if id == 5 { return "this `ignore-next` resolves to no eligible construct"; }
+    if id == 6 { return "this `ignore-next` resolves to no eligible construct: the code after it is part of an expression with no coverage of its own (only an `if` or `match` expression is)"; }
+    if id == 7 { return "this `ignore-start` region holds no code"; }
+    if id == 8 { return "an `ignore-start` region must begin and end between the items or statements of one block"; }
+    if id == 9 { return "this construct already has this coverage exclusion"; }
+    if id == 10 { return "`off` and `branch_off` on one construct: `off` already excludes the decision's outcomes"; }
+    if id == 11 { return "an attribute and a comment directive give this construct different policy"; }
+    if id == 12 { return "this exclusion lies inside an `off` exclusion that already excludes it"; }
+    if id == 13 { return "this exclusion resolves to no eligible construct"; }
+    if id == 14 { return "`contract_off` needs contract coverage, which this compiler does not plan yet (sv0cov CV-306); build without --coverage, or remove the attribute"; }
+    return "invalid coverage exclusion";
+}
+
+fn excl_note(id: i32) -> string {
+    if id == 9 || id == 10 { return "the other exclusion on this construct"; }
+    if id == 11 { return "the other exclusion on this construct"; }
+    if id == 12 { return "the enclosing exclusion"; }
+    if id == 6 { return "the code after the directive"; }
+    if id == 7 || id == 8 { return "the matching `ignore-end`"; }
+    return "";
+}
+
+fn excl_code_text(code: i32) -> string {
+    if code == 1021 { return "COV1021"; }
+    if code == 3202 { return "COV3202"; }
+    if code == 3203 { return "COV3203"; }
+    return "COV3201";
+}
+
+/* ── effect: resolution against the plan (coverage builds) ─────────────── */
+
+/* Fill ent_x / br_x / rg_x (1 = excluded) and memb (exclusion, kind 0
+   entity / 1 branch / 2 region, plan index) for the exclusion table `ex`
+   (unit offsets; cstarts maps a unit to its concat offset). Returns -1, or
+   the index of an exclusion that takes nothing (COV1021), or -(k + 2) for a
+   contract_off exclusion k (refused until CV-306). */
+fn excl_resolve(ex: Vec<i32>, cstarts: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
+                ent_start: Vec<i32>, ent_end: Vec<i32>, br: Vec<i32>, rg: Vec<i32>,
+                ent_x: Vec<i32>, br_x: Vec<i32>, rg_x: Vec<i32>, memb: Vec<i32>) -> i32 {
+    let x: i32 = EXCL_STRIDE();
+    let ne: i32 = vec_len(ent_start);
+    let nb: i32 = vec_len(br) / 5;
+    let nr: i32 = vec_len(rg) / 5;
+    let mut i: i32 = 0;
+    while i < ne { vec_push(ent_x, 0); i = i + 1; }
+    i = 0;
+    while i < nb { vec_push(br_x, 0); i = i + 1; }
+    i = 0;
+    while i < nr { vec_push(rg_x, 0); i = i + 1; }
+    let nx: i32 = vec_len(ex) / x;
+    let mut k: i32 = 0;
+    while k < nx {
+        let base: i32 = vec_get(cstarts, vec_get(ex, k * x));
+        let mode: i32 = vec_get(ex, k * x + 1);
+        if mode == 3 { return 0 - k - 2; }
+        let xa: i32 = base + vec_get(ex, k * x + 5);
+        let xb: i32 = base + vec_get(ex, k * x + 6);
+        let target: i32 = vec_get(ex, k * x + 7);
+        let mut took: i32 = 0;
+        if mode == 2 {
+            let ts: i32 = base + target;
+            let mut b: i32 = 0;
+            while b < nb {
+                if vec_get(br, b * 5) != 7 {
+                    if vec_get(starts, vec_get(br, b * 5 + 2)) == ts {
+                        vec_set(br_x, b, 1);
+                        vec_push(memb, k);
+                        vec_push(memb, 1);
+                        vec_push(memb, b);
+                        took = took + 1;
+                    }
+                }
+                b = b + 1;
+            }
+        } else {
+            let mut e: i32 = 0;
+            while e < ne {
+                if vec_get(ent_start, e) >= xa {
+                    if vec_get(ent_end, e) <= xb {
+                        vec_set(ent_x, e, 1);
+                        vec_push(memb, k);
+                        vec_push(memb, 0);
+                        vec_push(memb, e);
+                        took = took + 1;
+                    }
+                }
+                e = e + 1;
+            }
+            let mut b2: i32 = 0;
+            while b2 < nb {
+                if vec_get(br, b2 * 5) != 7 {
+                    if vec_get(starts, vec_get(br, b2 * 5 + 2)) >= xa {
+                        if vec_get(ends, vec_get(br, b2 * 5 + 3)) <= xb {
+                            vec_set(br_x, b2, 1);
+                            vec_push(memb, k);
+                            vec_push(memb, 1);
+                            vec_push(memb, b2);
+                            took = took + 1;
+                        }
+                    }
+                }
+                b2 = b2 + 1;
+            }
+            let mut r: i32 = 0;
+            while r < nr {
+                if vec_get(starts, vec_get(rg, r * 5 + 2)) >= xa {
+                    if vec_get(ends, vec_get(rg, r * 5 + 3)) <= xb {
+                        vec_set(rg_x, r, 1);
+                        vec_push(memb, k);
+                        vec_push(memb, 2);
+                        vec_push(memb, r);
+                        took = took + 1;
+                    }
+                }
+                r = r + 1;
+            }
+        }
+        if took == 0 { return k; }
+        k = k + 1;
+    }
+    return 0 - 1;
+}
+
+/* The excluded outcomes an ordinary region still needs, as (branch,
+   outcome) pairs in `sup`: every reachable outcome of a decision any of
+   whose outcomes is needed (owner decision: lowering hits a decision's
+   outcomes at consecutive counters, so they are observed together).
+   Returns -1, or the index of an ordinary region that needs an excluded
+   function entry (which cannot happen while functions do not nest). */
+fn excl_support(rg: Vec<i32>, br: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, ent_x: Vec<i32>, br_x: Vec<i32>,
+                rg_x: Vec<i32>, sup: Vec<i32>) -> i32 {
+    let nr: i32 = vec_len(rg) / 5;
+    let mut r: i32 = 0;
+    while r < nr {
+        let h: i32 = vec_get(rg, r * 5 + 4);
+        if vec_get(rg_x, r) == 0 {
+            if h >= 0 {
+                let f: i32 = vec_get(cef, h * 2);
+                let cnt: i32 = vec_get(cef, h * 2 + 1);
+                let mut i: i32 = 0;
+                while i < cnt {
+                    let rf: i32 = vec_get(cet, (f + i) * 2 + 1);
+                    if rf >= 0 {
+                        if vec_get(ent_x, rf) == 1 { return r; }
+                    } else {
+                        let enc: i32 = 0 - rf - 1;
+                        let b: i32 = enc / 1024;
+                        let ok: i32 = enc % 1024;
+                        if vec_get(br_x, b) == 1 {
+                            let mut have: bool = false;
+                            let mut j: i32 = 0;
+                            while j < vec_len(sup) {
+                                if vec_get(sup, j) == b { have = true; }
+                                j = j + 2;
+                            }
+                            if have != true {
+                                let mut kk: i32 = 0;
+                                while kk < vec_get(br, b * 5 + 4) {
+                                    if cov_outcome_unreachable(vec_get(br, b * 5), kk) != true {
+                                        vec_push(sup, b);
+                                        vec_push(sup, kk);
+                                    }
+                                    kk = kk + 1;
+                                }
+                            }
+                        }
+                    }
+                    i = i + 1;
+                }
+            }
+        }
+        r = r + 1;
+    }
+    return 0 - 1;
+}
+
+/* The support point index (0-based among support points) of outcome k of
+   branch b, or -1. */
+fn excl_support_of(sup: Vec<i32>, b: i32, k: i32) -> i32 {
+    let mut j: i32 = 0;
+    while j < vec_len(sup) {
+        if vec_get(sup, j) == b {
+            if vec_get(sup, j + 1) == k { return j / 2; }
+        }
+        j = j + 2;
+    }
+    return 0 - 1;
+}

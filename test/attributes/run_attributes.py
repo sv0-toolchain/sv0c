@@ -15,8 +15,9 @@ Through the real native compiler and VM emitter (both run lib/attributes.sv0):
 3. Negative matrix: each misplaced or malformed `coverage` attribute fails
    the ordinary build (no --coverage) with exit 6 and exactly its
    error[COVxxxx], message, and line:col, on both binaries.
-4. Until exclusions are implemented (sv0cov CV-305), a valid `coverage`
-   attribute is refused under --coverage=map (COV1021), never ignored.
+4. A valid `coverage` attribute builds in an ordinary build and, under
+   --coverage=map, lands in the map as one exclusion record (sv0cov CV-305;
+   the exclusion effect itself is test/coverage/exclusions).
 5. Unchanged behavior: `#[extern_c]` declarations, other attributes before
    items and statements, and a dangling non-coverage attribute.
 
@@ -25,6 +26,7 @@ Through the real native compiler and VM emitter (both run lib/attributes.sv0):
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -51,7 +53,6 @@ M7 = "the coverage reason is empty"
 M8 = "the second coverage argument must be `reason = \"...\"` with a string literal"
 M9 = "the coverage reason is longer than 1024 bytes"
 M10 = "the coverage attribute takes exactly two arguments, `<mode>` and `reason = \"...\"`"
-M11 = "coverage exclusions are not implemented by this compiler yet"
 
 R = 'reason = "r"'
 LONG = "x" * 1025
@@ -156,13 +157,15 @@ def main() -> int:
                 want = f"error[{code}]: {message}"
                 if p.returncode != 6 or want not in err or f"--> {where}" not in err or err.count("error[") != 1:
                     errors.append(f"{label} ({binary.name}): exit {p.returncode}, want 6 with {code} at {where}; got {err.strip()[:300]!r}")
-        # 4. a valid attribute is refused under --coverage until CV-305
+        # 4. a valid attribute is one exclusion record under --coverage=map
         ok = t / "ok.sv0"
         ok.write_text(f"#[coverage(off, {R})]\nfn f() -> i32 {{ return 1; }}\nfn main() -> i32 {{ return f() - 1; }}\n")
         for binary in (NATIVE, VM_EMIT):
-            p = run(binary, ok, f"map\n{t / 'm.json'}\nok\nsv0c+test")
-            if p.returncode != 6 or f"error[COV1021]: {M11}" not in p.stderr.decode() or (t / "m.json").exists():
-                errors.append(f"--coverage=map with a coverage attribute ({binary.name}): exit {p.returncode}, {p.stderr.decode()[:200]!r}")
+            mp = t / f"m-{binary.name}.json"
+            p = run(binary, ok, f"map\n{mp}\nok\nsv0c+test")
+            xs = json.loads(mp.read_bytes())["exclusions"] if mp.exists() else None
+            if p.returncode or not xs or [(x["mode"], x["origin"], x["reason"]) for x in xs] != [("off", "attribute", "r")]:
+                errors.append(f"--coverage=map with a coverage attribute ({binary.name}): exit {p.returncode}, {xs}, {p.stderr.decode()[:200]!r}")
             if run(binary, ok).returncode != 0:
                 errors.append(f"a valid coverage attribute fails the ordinary build ({binary.name})")
         # 5. unchanged behavior
@@ -183,8 +186,8 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print(f"attributes: OK (placement snapshot of {placement.read_text().count('#[coverage(')} attributes on both binaries; "
-          f"C and bytecode unchanged by attributes; {len(NEGATIVE)} negative cases x 2 binaries; refused under --coverage until "
-          f"CV-305; extern_c and other attributes unchanged)")
+          f"C and bytecode unchanged by attributes; {len(NEGATIVE)} negative cases x 2 binaries; one exclusion record under "
+          f"--coverage=map; extern_c and other attributes unchanged)")
     return 0
 
 

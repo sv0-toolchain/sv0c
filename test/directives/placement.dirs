@@ -6,5 +6,5 @@ dir	4	0	ignore-next	1121	1191	an escaped \" quote and a \\ backslash	-1	1262
 dir	5	0	ignore-start	1277	1318	a region	6	-1
 dir	6	0	ignore-end	1380	1401	-	5	-1
 dir	7	0	ignore-start	1406	1471	a second region, after the first	8	-1
-dir	8	0	ignore-end	1476	1497	-	7	-1
-dir	9	0	ignore-next	1502	1557	an expression statement	-1	1562
+dir	8	0	ignore-end	1501	1522	-	7	-1
+dir	9	0	ignore-next	1527	1582	an expression statement	-1	1587

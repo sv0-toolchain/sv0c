@@ -419,7 +419,6 @@ fn attrs_message(id: i32) -> string {
     if id == 8 { return "the second coverage argument must be `reason = \"...\"` with a string literal"; }
     if id == 9 { return "the coverage reason is longer than 1024 bytes"; }
     if id == 10 { return "the coverage attribute takes exactly two arguments, `<mode>` and `reason = \"...\"`"; }
-    if id == 11 { return "coverage exclusions are not implemented by this compiler yet (sv0cov CV-305); build without --coverage, or remove the attribute"; }
     return "invalid coverage attribute";
 }
 
@@ -462,12 +461,11 @@ fn attrs_check_form(source: string, starts: Vec<i32>, ends: Vec<i32>, tags: Vec<
 }
 
 /* Validate every attribute: a rejected namespace spelling, a misplaced or
-   malformed `coverage` attribute. With `coverage_on`, an otherwise valid
-   `coverage` attribute is refused too until exclusions are implemented
-   (sv0cov CV-305; a compiler rejects what it cannot honour). Returns the
-   number of errors pushed onto `errs`. */
+   malformed `coverage` attribute (what it attaches to and overlaps are
+   lib/exclusions.sv0, CV-305). Returns the number of errors pushed onto
+   `errs`. */
 fn attrs_check(source: string, starts: Vec<i32>, ends: Vec<i32>, tags: Vec<i32>, at: Vec<i32>,
-               args: Vec<i32>, coverage_on: bool, errs: Vec<i32>) -> i32 {
+               args: Vec<i32>, errs: Vec<i32>) -> i32 {
     let s: i32 = ATTRS_STRIDE();
     let before: i32 = vec_len(errs);
     let n: i32 = vec_len(at) / s;
@@ -480,14 +478,10 @@ fn attrs_check(source: string, starts: Vec<i32>, ends: Vec<i32>, tags: Vec<i32>,
             attrs_err(errs, 3201, vec_get(at, k * s + 2), vec_get(at, k * s + 3), 2);
         }
         if kind == 1 {
-            let had: i32 = vec_len(errs);
             if vec_get(at, k * s + 6) == 0 {
                 attrs_err(errs, 1021, hash, close, 1);
             } else {
                 attrs_check_form(source, starts, ends, tags, at, args, k, errs);
-            }
-            if coverage_on && vec_len(errs) == had {
-                attrs_err(errs, 1021, hash, close, 11);
             }
         }
         k = k + 1;

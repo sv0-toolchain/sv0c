@@ -39,6 +39,7 @@ fn layouts(n: i32) -> i32 {
     t = t + 1;
     // sv0cov: ignore-end
     // sv0cov: ignore-start reason="a second region, after the first"
+    let unused: i32 = 0;
     // sv0cov: ignore-end
     // sv0cov: ignore-next reason="an expression statement"
     return t - n - 3;

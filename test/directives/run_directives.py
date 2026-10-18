@@ -17,8 +17,8 @@ Through the real native compiler and VM emitter (both run lib/directives.sv0):
 4. Negative matrix: each malformed, misplaced or unpaired directive fails the
    ordinary build (no --coverage) with exit 6 and exactly its
    error[COVxxxx], message and line:col, on both binaries.
-5. Until exclusions are implemented (sv0cov CV-305), a valid directive is
-   refused under --coverage=map (COV1021), never ignored; no map is written.
+5. A valid directive builds in an ordinary build and, under
+   --coverage=map, lands in the map as one exclusion record (sv0cov CV-305).
 6. Project mode: each file is its own unit; a region left open in one file
    and closed in another fails in both, with the file's path; directives in
    two files are dumped with their unit.
@@ -63,7 +63,6 @@ M = {
     14: "this `ignore-start` is never closed by an `ignore-end` in its file",
     15: "nothing follows this `ignore-next` in its file",
     16: "a coverage directive must be a `//` line comment",
-    17: "coverage exclusions are not implemented by this compiler yet (sv0cov CV-305); build without --coverage, or remove the directive",
 }
 NEXT = '// sv0cov: ignore-next reason="r"'
 START = '// sv0cov: ignore-start reason="r"'
@@ -123,7 +122,7 @@ HOSTILE = {
 }
 POSITIVE = {
     "trailing spaces and tabs": (f"fn main() -> i32 {{\n    {NEXT}  \t\n    let a: i32 = 1;\n    {START}\t\n    let b: i32 = 2;\n    {END}   \n    return a + b - 3;\n}}\n", 3),
-    "CRLF line ends": (f"fn main() -> i32 {{\r\n    {NEXT}\r\n    let a: i32 = 1;\r\n    {START}\r\n    {END}\r\n    return a - 1;\r\n}}\r\n", 3),
+    "CRLF line ends": (f"fn main() -> i32 {{\r\n    {NEXT}\r\n    let a: i32 = 1;\r\n    {START}\r\n    let b: i32 = 0;\r\n    {END}\r\n    return a + b - 1;\r\n}}\r\n", 3),
     "a reason of 1024 bytes": (prog(f'    // sv0cov: ignore-next reason="{"x" * 1024}"\n    let a: i32 = 1;\n'), 1),
     "UTF-8 in the reason": (prog('    // sv0cov: ignore-next reason="日本語の理由"\n    let a: i32 = 1;\n'), 1),
 }
@@ -232,13 +231,15 @@ def main() -> int:
                 want = f"error[{code}]: {M[mid]}"
                 if p.returncode != 6 or want not in err or f"--> {where}\n" not in err or err.count("error[") != 1:
                     errors.append(f"{label} ({binary.name}): exit {p.returncode}, want 6 with {code} at {where}; got {err.strip()[:300]!r}")
-        # 5. a valid directive is refused under --coverage until CV-305
+        # 5. a valid directive is one exclusion record under --coverage=map
         ok = t / "ok.sv0"
         ok.write_text(prog(f"    {NEXT}\n    let a: i32 = 1;\n"))
         for binary in (NATIVE, VM_EMIT):
-            p = run(binary, str(ok), f"map\n{t / 'm.json'}\nok\nsv0c+test")
-            if p.returncode != 6 or f"error[COV1021]: {M[17]}" not in p.stderr.decode() or "--> 2:5\n" not in p.stderr.decode() or (t / "m.json").exists():
-                errors.append(f"--coverage=map with a directive ({binary.name}): exit {p.returncode}, {p.stderr.decode()[:200]!r}")
+            mp = t / f"m-{binary.name}.json"
+            p = run(binary, str(ok), f"map\n{mp}\nok\nsv0c+test")
+            xs = json.loads(mp.read_bytes())["exclusions"] if mp.exists() else None
+            if p.returncode or not xs or [(x["mode"], x["origin"], x["reason"]) for x in xs] != [("off", "comment", "r")]:
+                errors.append(f"--coverage=map with a directive ({binary.name}): exit {p.returncode}, {xs}, {p.stderr.decode()[:200]!r}")
             if run(binary, str(ok)).returncode != 0:
                 errors.append(f"a valid directive fails the ordinary build ({binary.name})")
         # 6. project mode: one unit per file
@@ -270,7 +271,7 @@ def main() -> int:
         return 1
     print(f"directives: OK (placement snapshot of {len(directive_lines)} directives on both binaries; {len(HOSTILE)} hostile texts "
           f"and {len(POSITIVE)} well-formed variants; C and bytecode unchanged by directives; {len(NEGATIVE)} negative cases x 2 "
-          f"binaries; refused under --coverage until CV-305; one unit per project file)")
+          f"binaries; one exclusion record under --coverage=map; one unit per project file)")
     return 0
 
 

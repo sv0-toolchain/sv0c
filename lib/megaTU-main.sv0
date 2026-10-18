@@ -229,6 +229,78 @@ fn megatu_scan_directives(units: string, source: string, tab: Vec<i32>, errs: Ve
     return out;
 }
 
+/* Exclusion policy errors (lib/exclusions.sv0): like directive errors,
+   with an optional note at the other construct or exclusion. */
+fn megatu_report_excl(errs: Vec<i32>, units: string, source: string) -> i32 {
+    let w: i32 = EXCL_ERR_STRIDE();
+    let mut out: string = "";
+    let mut i: i32 = 0;
+    while i + w - 1 < vec_len(errs) {
+        let unit: i32 = vec_get(errs, i + 1);
+        let mut text: string = source;
+        let mut path: string = "";
+        if string_len(units) > 0 {
+            path = megatu_unit_path(units, unit);
+            text = read_file(path);
+        }
+        let id: i32 = vec_get(errs, i + 4);
+        out = string_concat(out, format_header_with_code(0, excl_message(id), excl_code_text(vec_get(errs, i))));
+        out = string_concat(out, "\n");
+        out = string_concat(out, megatu_excl_where(text, path, vec_get(errs, i + 2), vec_get(errs, i + 3)));
+        let na: i32 = vec_get(errs, i + 5);
+        if na >= 0 {
+            out = string_concat(string_concat(string_concat(out, "  = note: "), excl_note(id)), "\n");
+            out = string_concat(out, megatu_excl_where(text, path, na, vec_get(errs, i + 6)));
+        }
+        i = i + w;
+    }
+    if string_len(out) > 0 { write_file("/dev/stderr", out); }
+    return 0;
+}
+
+/* `--> [path:]line:col` and the caret snippet for bytes [a, b) of text. */
+fn megatu_excl_where(text: string, path: string, a: i32, b: i32) -> string {
+    let line: i32 = megatu_line_of_pos(text, a);
+    let col: i32 = megatu_col_of_pos(text, a);
+    let mut len: i32 = b - a;
+    if len < 1 { len = 1; }
+    let mut out: string = string_concat(format_location(path, line, col), "\n");
+    let snip: string = format_snippet(text, line, col, len);
+    if string_len(snip) > 0 { out = string_concat(string_concat(out, snip), "\n"); }
+    return out;
+}
+
+/* One plan-time exclusion error (COV1021) at exclusion k of the table. */
+fn megatu_report_excl_at(ex: Vec<i32>, k: i32, id: i32, source: string, cstarts: Vec<i32>, clens: Vec<i32>,
+                         table: string) -> i32 {
+    let x: i32 = EXCL_STRIDE();
+    let unit: i32 = vec_get(ex, k * x);
+    let text: string = string_substr(source, vec_get(cstarts, unit), vec_get(clens, unit));
+    let mut path: string = "";
+    if vec_len(cstarts) > 1 { path = cov_src_path_at(table, unit); }
+    let mut out: string = format_header_with_code(0, excl_message(id), "COV1021");
+    out = string_concat(string_concat(out, "\n"), megatu_excl_where(text, path, vec_get(ex, k * x + 3), vec_get(ex, k * x + 4)));
+    write_file("/dev/stderr", out);
+    return 0;
+}
+
+/* Exclusion policy for every unit: `source` as unit 0 in file mode,
+   otherwise each listed file. */
+fn megatu_check_exclusions(units: string, source: string, dr: Vec<i32>, ex: Vec<i32>, errs: Vec<i32>) -> i32 {
+    if string_len(units) == 0 {
+        return excl_check_unit(source, 0, dr, ex, errs);
+    }
+    let mut n: i32 = 0;
+    let mut k: i32 = 0;
+    let mut path: string = megatu_unit_path(units, 0);
+    while string_len(path) > 0 {
+        n = n + excl_check_unit(read_file(path), k, dr, ex, errs);
+        k = k + 1;
+        path = megatu_unit_path(units, k);
+    }
+    return n;
+}
+
 fn megatu_emit_diagnostics(diag_sink: Vec<i32>, source: string,
                            starts: Vec<i32>) -> i32 {
     let n: i32 = vec_len(diag_sink);
@@ -501,7 +573,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                    tags: Vec<i32>, starts: Vec<i32>, ends: Vec<i32>,
                    it: Vec<i32>, id1: Vec<i32>, id2: Vec<i32>, id4: Vec<i32>,
                    pp: Vec<i32>, bet: Vec<i32>, bed1: Vec<i32>, bed2: Vec<i32>, bed3: Vec<i32>,
-                   bed4: Vec<i32>, cov_tab: Vec<i32>, cov_info: Vec<i32>) -> MegatuCov {
+                   bed4: Vec<i32>, cov_tab: Vec<i32>, cov_info: Vec<i32>, ex_tab: Vec<i32>) -> MegatuCov {
     if mode < 0 {
         write_file("/dev/stderr", "coverage: unknown mode in SV0_COVERAGE_REQUEST (want map, instrument or plan-dump)\n");
         return megatu_cov_rc(9);
@@ -591,6 +663,28 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         }
         qt = qt + 1;
     }
+    /* Exclusions (CV-305): what each one takes from the plan, and the
+       support points ordinary regions need in place of excluded outcomes. */
+    let ent_x: Vec<i32> = vec_new();
+    let br_x: Vec<i32> = vec_new();
+    let rg_x: Vec<i32> = vec_new();
+    let memb: Vec<i32> = vec_new();
+    let rx: i32 = excl_resolve(ex_tab, cstarts, starts, ends, ent_start, ent_end, br, rg, ent_x, br_x, rg_x, memb);
+    if rx != 0 - 1 {
+        let mut xk: i32 = rx;
+        let mut xmsg: i32 = 13;
+        if rx < 0 {
+            xk = 0 - rx - 2;
+            xmsg = 14;
+        }
+        megatu_report_excl_at(ex_tab, xk, xmsg, source, cstarts, clens, table);
+        return megatu_cov_rc(6);
+    }
+    let sup: Vec<i32> = vec_new();
+    if excl_support(rg, br, cef, cet, ent_x, br_x, rg_x, sup) >= 0 {
+        write_file("/dev/stderr", "coverage: an ordinary region needs an excluded function entry; refusing to plan (sv0cov CV-305)\n");
+        return megatu_cov_rc(9);
+    }
     if mode == 3 {
         write_file("/dev/stdout", string_concat(cov_plan_dump(source, table, cstarts, clens, src_unit,
             ent_source, ent_start, ent_end, ent_owner, qnames, pt_kind, pt_entity, pt_start, pt_end),
@@ -599,10 +693,11 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
         return megatu_cov_rc(0);
     }
     /* cov_info[0] = the planned counter count (hits are checked after lowering). */
-    let counters: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br);
+    let counters: Vec<i32> = cov_map_counters(starts, ent_source, ent_start, br, ent_x, br_x, sup);
     vec_push(cov_info, cov_map_counted(counters));
+    let hits: Vec<i32> = cov_map_hit_counters(counters, vec_len(ent_source), br, br_x, sup);
     if mode == 5 {
-        let tab5: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, counters);
+        let tab5: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, hits);
         let mut t5: i32 = 0;
         while t5 < vec_len(tab5) {
             vec_push(cov_tab, vec_get(tab5, t5));
@@ -622,7 +717,8 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
             return megatu_cov_rc(9);
         }
         let map: Vec<i32> = cov_map_build(source, starts, ends, table, cstarts, src_unit,
-            ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity);
+            ent_source, ent_start, ent_end, qnames, br, rg, cef, cet, target, identity,
+            ent_x, br_x, rg_x, sup, ex_tab, memb);
         /* sv0cov CV-211 (SPEC 16.3.9, 16.4): never write a map over the
            tier this build is for. Request line 6 carries the tier's counter
            ceiling and map byte ceiling; without it the standard tier
@@ -653,7 +749,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
             write_bytes(map_path, map);
         }
         if mode == 2 {
-            let tab2: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, counters);
+            let tab2: Vec<i32> = cov_hit_table(tags, bet, bed1, bed2, bed3, bed4, pp, id4, ent_item, br, hits);
             let mut t2: i32 = 0;
             while t2 < vec_len(tab2) {
                 vec_push(cov_tab, vec_get(tab2, t2));
@@ -906,23 +1002,11 @@ fn main() -> i32 {
 
     /* Comment directives (sv0cov CV-304, lib/directives.sv0): a pre-lex scan
        of every source unit, validated in every build like attributes; a
-       valid directive is refused under --coverage until CV-305. dir-dump
+       directive's effect comes with the exclusions below (CV-305). dir-dump
        prints the table. */
-    let cov_on: bool = _cov_mode == 1 || _cov_mode == 2 || _cov_mode == 3 || _cov_mode == 5;
     let dr_tab: Vec<i32> = vec_new();
     let dr_errs: Vec<i32> = vec_new();
     let dr_dump: string = megatu_scan_directives(_cov_units, source, dr_tab, dr_errs, _cov_mode == 7);
-    if vec_len(dr_errs) == 0 {
-        if cov_on {
-            if vec_len(dr_tab) > 0 {
-                vec_push(dr_errs, 1021);
-                vec_push(dr_errs, vec_get(dr_tab, 1));
-                vec_push(dr_errs, vec_get(dr_tab, 2));
-                vec_push(dr_errs, vec_get(dr_tab, 3));
-                vec_push(dr_errs, 17);
-            }
-        }
-    }
     if vec_len(dr_errs) > 0 {
         megatu_report_dirs(dr_errs, _cov_units, source);
         return 6;
@@ -958,13 +1042,23 @@ fn main() -> i32 {
         return 6;
     }
     let at_errs: Vec<i32> = vec_new();
-    if attrs_check(source, starts, ends, tags, at_tab, at_args, cov_on, at_errs) > 0 {
+    if attrs_check(source, starts, ends, tags, at_tab, at_args, at_errs) > 0 {
         megatu_report_attrs(at_errs, source, starts, ends);
         return 6;
     }
     if _cov_mode == 6 {
         write_file("/dev/stdout", attrs_dump(source, starts, ends, at_tab, at_args));
         return 0;
+    }
+    /* Exclusion policy (sv0cov CV-305, lib/exclusions.sv0), in every build:
+       what each coverage attribute and directive attaches to, whether its
+       mode applies there, and overlaps between exclusions. */
+    let ex_tab: Vec<i32> = vec_new();
+    let ex_errs: Vec<i32> = vec_new();
+    megatu_check_exclusions(_cov_units, source, dr_tab, ex_tab, ex_errs);
+    if vec_len(ex_errs) > 0 {
+        megatu_report_excl(ex_errs, _cov_units, source);
+        return 6;
     }
     if at_n > 0 {
         let st_tags: Vec<i32> = vec_new();
@@ -1104,7 +1198,7 @@ fn main() -> i32 {
     if _cov_mode != 0 {
         cov = megatu_coverage(_cov_mode, _cov_root, _cov_listing, source,
                                tags, starts, ends, it, id1, id2, id4, pp, bet, bed1, bed2, bed3,
-                               bed4, cov_tab, cov_info);
+                               bed4, cov_tab, cov_info, ex_tab);
         if cov.rc >= 0 { return cov.rc; }
     }
 

@@ -27,8 +27,13 @@ So this script checks, on the native compiler and the VM emitter:
    exactly like the off build and publishes one complete empty profile
    (zero pairs, zero overflow words, no overflow flag; mode 0600) bound to
    the zero-counter map; sv0cov's reader resolves both to no counts and
-   every line of decl.sv0 is non_executable. CV-305 repeats this with a
-   real fully excluded program.
+   every line of decl.sv0 is non_executable.
+5. A real fully excluded program (excluded.sv0, sv0cov CV-305): every
+   function under one ignore region, so the instrumented C and VM builds
+   plan zero counters with every point excluded. The two maps are identical
+   and sv0cov-valid; the bytecode equals the off build's (no COVER_HIT) with
+   a binding counting 0; each backend runs it like the off build and
+   publishes one complete empty profile bound to that map.
 3. COV-VM-025 through `sv0 vm-run`: a zero-count binding on bytecode that
    has COVER_HIT, a positive-count binding on bytecode that has none, and
    instrumented bytecode with no binding are all rejected (COV2201) before
@@ -134,7 +139,7 @@ def main() -> int:
     ensure_built()
     errors: list[str] = []
     py = modern_python()
-    decl, standin = HERE / "decl.sv0", HERE / "standin.sv0"
+    decl, standin, excluded = HERE / "decl.sv0", HERE / "standin.sv0", HERE / "excluded.sv0"
     with tempfile.TemporaryDirectory() as td:
         t = Path(td)
 
@@ -268,6 +273,43 @@ def main() -> int:
             if "COV2201" not in q.stdout + q.stderr or "stand-in ran" in q.stdout or any(pdir.iterdir()):
                 errors.append(f"instrumented bytecode without a binding was not rejected: {(q.stdout + q.stderr)[-300:]}")
 
+        # 5. A real fully excluded program, on both backends.
+        xd = t / "excluded"
+        (xd / "vm").mkdir(parents=True)
+        (xd / "pn").mkdir()
+        (xd / "pv").mkdir()
+        bn = sv0("native-compile", "--coverage=instrument", "-o", str(xd / "x"), str(excluded))
+        bv = sv0("vm-native-compile", "--coverage=instrument", str(excluded), str(xd / "vm" / "x.sv0b"))
+        voff = compiler(VM_EMIT, excluded, None)
+        if bn.returncode or bv.returncode:
+            errors.append(f"excluded: instrumented builds failed: {bn.stderr.strip()[-200:]} {bv.stderr.strip()[-200:]}")
+        else:
+            xmap = (xd / "x.sv0covmap.json").read_bytes()
+            xm = json.loads(xmap)
+            xbind = json.loads((xd / "vm" / "x.sv0covbind.json").read_bytes())
+            if xmap != (xd / "vm" / "x.sv0covmap.json").read_bytes():
+                errors.append("excluded: the C and VM maps differ")
+            if (xm["program_counter_count"] != 0 or not xm["points"] or {p["classification"] for p in xm["points"]} != {"excluded"}
+                    or len(xm["exclusions"]) != 1 or xbind["program_counter_count"] != 0):
+                errors.append("excluded: not a zero-counter map with every point excluded and one exclusion")
+            if (xd / "vm" / "x.sv0b").read_bytes() != voff.stdout or voff.returncode:
+                errors.append("excluded: the instrumented bytecode differs from the off build (it must have no COVER_HIT)")
+            nr = subprocess.run([str(xd / "x")], capture_output=True, env=transport(xd / "pn"), timeout=60)
+            if nr.returncode != 0 or b"excluded ran" not in nr.stdout:
+                errors.append(f"excluded native: exit {nr.returncode} {nr.stdout!r}")
+            empty_profile(xd / "pn", xm["map_id"], "native", errors, "excluded native")
+            rc, out = vm_run(xd / "vm" / "x.sv0b", xd / "vm" / "x.sv0covbind.json", transport(xd / "pv"))
+            if rc != 0 or "excluded ran" not in out:
+                errors.append(f"excluded VM: exit {rc}: {out[-300:]}")
+            empty_profile(xd / "pv", xm["map_id"], "vm-v1", errors, "excluded VM")
+            if py is not None:
+                r = subprocess.run([*py, "-c", "import sys; sys.path.insert(0, sys.argv[1]); from sv0cov.formats.map import validate_map; "
+                                    "validate_map(open(sys.argv[2], 'rb').read(), sources={'excluded.sv0': open(sys.argv[3], 'rb').read()})",
+                                    str(ROOT / "sv0cov" / "src"), str(xd / "x.sv0covmap.json"), str(excluded)],
+                                   capture_output=True, text=True, timeout=120)
+                if r.returncode:
+                    errors.append(f"excluded: sv0cov rejects the map: {r.stderr.strip()[-300:]}")
+
         # 4. An empty source is not a program.
         empty = t / "empty.sv0"
         empty.write_text("")
@@ -285,7 +327,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print("coverage zero: OK (declarations-only source: one zero-counter map on native + VM emitter, VM binding counts 0, "
-          "bytecode = off; stand-in fully excluded program publishes one complete empty profile on C and VM; "
+          "bytecode = off; stand-in and a real fully excluded program each publish one complete empty profile on C and VM; "
           f"{reader}; count/hit mismatches and unbound hits rejected (COV2201); empty source refused)")
     return 0
 
