@@ -37,8 +37,8 @@ fn body(n: i32) -> i32 {
 
 
     if t > 100 { return 0; };
-    #[coverage(off, reason = "a run")] #[coverage(off, reason = "of three")]
-        #[coverage(off, reason = "at three indentations")]
+    #[coverage(off, reason = "a run of three")] #[inline]
+        #[allow(at_three_indentations)]
                     return t - n - 2;
 }
 
