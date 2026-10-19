@@ -25,7 +25,9 @@ contexts, each with its own SEL:
    with one (absent) context and the same aggregate points, regions, lines
    and summary as the context-collecting one;
 4. the terminal report names all four contexts and holds no raw control
-   character.
+   character; the HTML report (CV-309) of the same evidence passes its
+   structural check, offers the four contexts and the aggregate in its
+   filter, and shows the program's source.
 
     python3 sv0c/test/coverage/contexts/run_contexts.py
 """
@@ -87,6 +89,9 @@ def scenario(name, items):
     rc = cli.main(["report", "--format", "term", "--output", "-", "m.sv0covdata.json"], stdout=out, stderr=e, cwd=d)
     if rc:
         sys.exit(f"{name}: terminal report exit {rc}: {e.getvalue()}")
+    rc = cli.main(["report", "--format", "html", "--output", "r.html", "m.sv0covdata.json"], stdout=io.StringIO(), stderr=e, cwd=d)
+    if rc:
+        sys.exit(f"{name}: HTML report exit {rc}: {e.getvalue()}")
     return json.loads((d / "r.json").read_text(encoding="utf-8")), out.getvalue()
 
 def strip(x):
@@ -104,6 +109,19 @@ errors = []
 P = spec["profiles"]
 allp = [p[3] for p in P if p[2]]
 full, term = scenario("all", allp)
+# CV-309: the HTML report of the same evidence passes the structural check,
+# offers every context in its filter and shows the real source.
+from sv0cov.formats.html import check_html
+page = (W / "scen" / "all" / "r.html").read_bytes()
+try:
+    check_html(page)
+except ValueError as exc:
+    errors.append(f"the HTML report fails its check: {exc}")
+text = page.decode("utf-8")
+if text.count("<option ") != len(spec["ctx"]) + 1:
+    errors.append("the HTML context filter does not offer every context and the aggregate")
+if "string_len(getenv(&quot;SEL&quot;))" not in text:
+    errors.append("the HTML report does not show the program's source")
 want = [c[0] for c in spec["ctx"]]
 got = [c["value"] for c in full["contexts"]]
 if got != want:
@@ -282,7 +300,7 @@ def main() -> int:
         return 1
     print("coverage contexts: OK (native + VM: absent / empty / unicode / 256-byte contexts decode and sit in the raw header exactly "
           f"(AC-058); merged report lists them in order, aggregate = sum of by_context over {units[0]} points / {units[1]} regions, "
-          "context_view = per-context merge, native = VM per context, COV-CTX-001 aggregate unchanged, terminal names all four)")
+          "context_view = per-context merge, native = VM per context, COV-CTX-001 aggregate unchanged, terminal names all four, HTML checked)")
     return 0
 
 
