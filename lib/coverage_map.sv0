@@ -355,7 +355,9 @@ fn cov_map_ref_point(r: i32, n_entries: i32, obase: Vec<i32>) -> i32 {
    e's function_entry), then branch b's outcomes (point ne + obase + k, obase
    = the outcomes of earlier branches), then the synthetic-support points of
    excluded outcomes (`sup` pairs, CV-305). Counters follow source, span
-   start, entry before outcome, then ordinal, a support point in its
+   start, entry before outcome, then the branch's last token (`a && b && c`:
+   the inner short circuit before the outer one, so a decision's outcomes
+   stay consecutive, CV-307), then ordinal, a support point in its
    outcome's place, then the contract_true/contract_false points of every
    runtime_checked clause (`cl`, CV-306); the map writer and hit placement
    (CV-112) both use this numbering. Excluded entries and outcomes (ent_x, br_x) and statically
@@ -385,7 +387,8 @@ fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
         let bstart: i32 = vec_get(starts, vec_get(br, b * 5 + 2));
         let mut k: i32 = 0;
         while k < vec_get(br, b * 5 + 4) {
-            let k1: string = string_concat(string_concat(cov_map_pad(bsrc), cov_map_pad(bstart)), "1");
+            let k1: string = string_concat(string_concat(string_concat(cov_map_pad(bsrc), cov_map_pad(bstart)), "1"),
+                                           cov_map_pad(vec_get(br, b * 5 + 3)));
             cov_map_key_push(keys, koff, klen, string_concat(k1, cov_map_pad(k + 1)));
             if cov_outcome_unreachable(vec_get(br, b * 5), k) || vec_get(br_x, b) == 1 { vec_push(uncounted, 1); } else { vec_push(uncounted, 0); }
             k = k + 1;
@@ -397,7 +400,8 @@ fn cov_map_counters(starts: Vec<i32>, ent_source: Vec<i32>, ent_start: Vec<i32>,
         let sb: i32 = vec_get(sup, j);
         let ssrc: i32 = vec_get(ent_source, vec_get(br, sb * 5 + 1));
         let sstart: i32 = vec_get(starts, vec_get(br, sb * 5 + 2));
-        let ks: string = string_concat(string_concat(cov_map_pad(ssrc), cov_map_pad(sstart)), "1");
+        let ks: string = string_concat(string_concat(string_concat(cov_map_pad(ssrc), cov_map_pad(sstart)), "1"),
+                                       cov_map_pad(vec_get(br, sb * 5 + 3)));
         cov_map_key_push(keys, koff, klen, string_concat(string_concat(ks, cov_map_pad(vec_get(sup, j + 1) + 1)), "s"));
         vec_push(uncounted, 0);
         j = j + 2;

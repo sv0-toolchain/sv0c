@@ -172,7 +172,20 @@ fn lower_cov_counter(fn_ctx: Vec<i32>, node: i32) -> i32 {
     if node >= vec_len(tab) { return 0 - 1; }
     let v: i32 = vec_get(tab, node);
     if v >= 1073741824 { return v - 1073741824; }
+    if v >= 536870912 { return v - 536870912; }
     return v;
+}
+
+/* The `evaluated` counter of the planned short circuit at `node` (CV-307;
+   flagged + 2^29 in the table, so a contract clause's root that is an
+   `&&` / `||` does not read as one), or -1. */
+fn lower_cov_sc(fn_ctx: Vec<i32>, node: i32) -> i32 {
+    let c: i32 = lower_cov_counter(fn_ctx, node);
+    if c < 0 { return 0 - 1; }
+    let tab: Vec<i32> = vec_get(fn_ctx, 1 + 2 * vec_get(fn_ctx, 0));
+    let v: i32 = vec_get(tab, node);
+    if v >= 536870912 && v < 1073741824 { return c; }
+    return 0 - 1;
 }
 
 /* The exit counter of the loop node `node` (body counter + 1), or -1 when
@@ -1685,9 +1698,11 @@ fn lower_cond_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
             enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         if lower_sc_op(op) {
+            let sc_ctr: i32 = lower_cov_sc(fn_ctx, idx);
             if lower_pure_instrs(rhs_c) != true {
-                return Expr::Load(lower_short_circuit(ctr, cond_is, op, vl, rhs_c, vr));
+                return Expr::Load(lower_short_circuit(ctr, cond_is, op, vl, rhs_c, vr, sc_ctr));
             }
+            lower_sc_pure_hits(cond_is, op, vl, sc_ctr);
         }
         let _ac: i32 = append_instrs(cond_is, rhs_c);
         return Expr::Binop(op, box_new(vl), box_new(vr));
@@ -1855,9 +1870,11 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_offsets, enum_tag_counts,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         if lower_sc_op(binop_tag) {
+            let sc_ctr: i32 = lower_cov_sc(fn_ctx, idx);
             if lower_pure_instrs(rhs_v) != true {
-                return Value::VVar(lower_short_circuit(ctr, out_instrs, binop_tag, vl, rhs_v, vr));
+                return Value::VVar(lower_short_circuit(ctr, out_instrs, binop_tag, vl, rhs_v, vr, sc_ctr));
             }
+            lower_sc_pure_hits(out_instrs, binop_tag, vl, sc_ctr);
         }
         let _av: i32 = append_instrs(out_instrs, rhs_v);
         let t: i32 = ctr_fresh(ctr);
@@ -2584,25 +2601,51 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
    when the left operand does not already decide the result:
    `t = left; if (t) { rhs...; t = right }` for `&&`, the else arm for `||`.
    A right operand whose instructions are pure (lower_pure_instrs) stays a
-   plain binop (evaluating it has no effect). The SML reference lowering (sml-legacy/ir/lowering.sml
+   plain binop (evaluating it has no effect). Under coverage a planned
+   short circuit (CV-307) hits `counter` (evaluated) in the arm that runs
+   the right operand and counter + 1 (skipped) in the other; a pure one
+   gets its hits beside the binop (lower_sc_pure_hits). The SML reference lowering (sml-legacy/ir/lowering.sml
    ExprBinop) builds the same IR, so tier-2 VM parity holds. Returns t. */
-fn lower_short_circuit(ctr: Vec<i32>, out_instrs: Vec<i32>, op: i32, vl: Value, rhs_is: Vec<i32>, vr: Value) -> i32 {
+fn lower_short_circuit(ctr: Vec<i32>, out_instrs: Vec<i32>, op: i32, vl: Value, rhs_is: Vec<i32>, vr: Value,
+                       counter: i32) -> i32 {
     let t: i32 = ctr_fresh(ctr);
     vec_push(out_instrs, box_new(Instr::Assign(t, box_new(value_to_expr(vl)))));
     let set: Vec<i32> = vec_new();
+    let none: Vec<i32> = vec_new();
+    if counter >= 0 {
+        vec_push(set, box_new(Instr::CovHit(counter)));
+        vec_push(none, box_new(Instr::CovHit(counter + 1)));
+    }
     let mut i: i32 = 0;
     while i < vec_len(rhs_is) {
         vec_push(set, vec_get(rhs_is, i));
         i = i + 1;
     }
     vec_push(set, box_new(Instr::Store(t, box_new(value_to_expr(vr)))));
-    let none: Vec<i32> = vec_new();
     if op == 11 {
         vec_push(out_instrs, box_new(Instr::IfElse(box_new(Expr::Load(t)), set, none)));
     } else {
         vec_push(out_instrs, box_new(Instr::IfElse(box_new(Expr::Load(t)), none, set)));
     }
     return t;
+}
+
+/* A planned short circuit whose right operand is pure keeps the plain
+   binop under coverage (the off build's code, CV-307): its outcomes are
+   counted beside it, `if (left) { evaluated } else { skipped }` for `&&`
+   and the arms swapped for `||`, as evaluating the operand would go. */
+fn lower_sc_pure_hits(out_instrs: Vec<i32>, op: i32, vl: Value, counter: i32) -> i32 {
+    if counter < 0 { return 0; }
+    let ev: Vec<i32> = vec_new();
+    vec_push(ev, box_new(Instr::CovHit(counter)));
+    let sk: Vec<i32> = vec_new();
+    vec_push(sk, box_new(Instr::CovHit(counter + 1)));
+    if op == 11 {
+        vec_push(out_instrs, box_new(Instr::IfElse(box_new(value_to_expr(vl)), ev, sk)));
+    } else {
+        vec_push(out_instrs, box_new(Instr::IfElse(box_new(value_to_expr(vl)), sk, ev)));
+    }
+    return 0;
 }
 
 fn lower_sc_op(op: i32) -> bool {
@@ -2724,9 +2767,11 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              enum_tag_offsets, enum_tag_counts,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
         if lower_sc_op(binop_tag) {
+            let sc_ctr: i32 = lower_cov_sc(fn_ctx, idx);
             if lower_pure_instrs(rhs_w) != true {
-                return Expr::Load(lower_short_circuit(ctr, out_instrs, binop_tag, vl, rhs_w, vr));
+                return Expr::Load(lower_short_circuit(ctr, out_instrs, binop_tag, vl, rhs_w, vr, sc_ctr));
             }
+            lower_sc_pure_hits(out_instrs, binop_tag, vl, sc_ctr);
         }
         let _aw: i32 = append_instrs(out_instrs, rhs_w);
         return Expr::Binop(binop_tag, box_new(vl), box_new(vr));

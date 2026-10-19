@@ -1,0 +1,19 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov CV-307 / AC-042: exclusions and short_circuit branches. Exits 0. */
+
+fn pick(b: bool) -> bool {
+    return b;
+}
+
+fn main() -> i32 {
+    let a: bool = true;
+    let b: bool = false;
+    // sv0cov: ignore-next reason="a statement holding &&"
+    let t: bool = a && pick(b);
+    #[coverage(branch_off, reason = "only the if's own outcomes")]
+    if a && pick(b) {
+        let s: bool = a;
+    }
+    let u: bool = a || pick(b);
+    return 0;
+}

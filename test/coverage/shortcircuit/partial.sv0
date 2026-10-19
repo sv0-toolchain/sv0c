@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* sv0cov CV-307: a line whose right operand never ran is partial. Exits 0. */
+
+fn compute() -> bool {
+    return true;
+}
+
+fn main() -> i32 {
+    let ready: bool = false;
+    let r2: bool = ready && compute();
+    if r2 {
+        return 1;
+    }
+    return 0;
+}

@@ -1,0 +1,64 @@
+# Hand-derived outcomes of matrix.sv0 (sv0cov CV-307), one run, native = VM.
+# branch lines: <function> TAB <kind> TAB <line> TAB <span text, newline as \n, or -> TAB <outcome>=<count> ...
+# Every short_circuit branch of the map must be listed (exactly once); other kinds only as listed.
+# entry lines: entry TAB <function> TAB <function_entry count>
+#
+# Derivations. Calls: and_op/or_op get (a,b) = TT x1, TF x2, FT x3, FF x4, so && evaluates
+# when a (3) and skips 7, || evaluates when !a (7) and skips 3. prec runs the 8 (a,b,c)
+# combinations once each; per line outer/inner branch evaluate counts follow the
+# left-associative parse (a || (b && c); (a && b) || c; (a || b) && c; a && (b || c);
+# (a && b) && c; (a || b) || c). in_while: n=5 -> 6 condition evaluations (5 run the right
+# operand, 1 skips), n=0 -> 1 skip, n=12 -> 11 evaluations, the last one's pos(0) false, 10 body runs;
+# total evaluated 16, skipped 2, body 15, exit 3. take gets 11 calls (true 6, false 5).
+# entry pick = 3+7+(2+6+6+2+2+2)+2+1+2+3+3+2+2 = 45; pos = 16 + 2 = 18; rt = 1 (rhs_if) + 1 (rhs_match k=0);
+# rf = 1 (rhs_if) + 2 (rhs_match k=1,2).
+take	if	55	-	true=6 false=5
+and_op	short_circuit	68	a && pick(b)	evaluated=3 skipped=7
+or_op	short_circuit	72	a || pick(b)	evaluated=7 skipped=3
+prec	short_circuit	101	a || b && pick(c)	evaluated=4 skipped=4
+prec	short_circuit	101	b && pick(c)	evaluated=2 skipped=2
+prec	short_circuit	102	a && b	evaluated=4 skipped=4
+prec	short_circuit	102	a && b || pick(c)	evaluated=6 skipped=2
+prec	short_circuit	103	(a || b) && pick(c)	evaluated=6 skipped=2
+prec	short_circuit	103	a || b	evaluated=4 skipped=4
+prec	short_circuit	104	a && (b || pick(c))	evaluated=4 skipped=4
+prec	short_circuit	104	b || pick(c)	evaluated=2 skipped=2
+prec	short_circuit	105	a && b	evaluated=4 skipped=4
+prec	short_circuit	105	a && b && pick(c)	evaluated=2 skipped=6
+prec	short_circuit	106	a || b	evaluated=4 skipped=4
+prec	short_circuit	106	a || b || pick(c)	evaluated=2 skipped=6
+in_if	if	123	-	true=1 false=2
+in_if	short_circuit	123	a && pick(b)	evaluated=2 skipped=1
+in_while	loop	133	-	body=15 exit=3
+in_while	short_circuit	133	i < n && pos(10 - i)	evaluated=16 skipped=2
+as_arg	short_circuit	141	a && pick(b)	evaluated=1 skipped=1
+assign	short_circuit	146	a || pick(b)	evaluated=2 skipped=1
+in_struct	short_circuit	151	a && pick(b)	evaluated=2 skipped=1
+in_struct	short_circuit	151	a || pick(b)	evaluated=1 skipped=2
+arm_expr	match	156	-	arm:0=2 arm:1=3 arm:2=1
+arm_expr	short_circuit	157	a && pick(b)	evaluated=1 skipped=1
+arm_expr	short_circuit	158	a || pick(b)	evaluated=2 skipped=1
+guard	match	165	-	arm:0=1 arm:1=3
+guard	short_circuit	166	x > 0 && pos(x - 3)	evaluated=2 skipped=2
+cond_expr	conditional_expression	178	-	true=1 false=2
+cond_expr	short_circuit	178	a && pick(b)	evaluated=2 skipped=1
+rhs_if	short_circuit	183	a && if pick(b) { rt() } else { rf() }	evaluated=2 skipped=2
+rhs_if	conditional_expression	183	-	true=1 false=1
+rhs_match	short_circuit	188	a || match k {\n        0 => rt(),\n        _ => rf(),\n    }	evaluated=3 skipped=1
+rhs_match	match	188	-	arm:0=1 arm:1=2
+entry	and_op	10
+entry	or_op	10
+entry	prec	8
+entry	take	11
+entry	pick	45
+entry	pos	18
+entry	rt	2
+entry	rf	3
+entry	m1	1
+entry	m2	2
+entry	m3	15
+entry	m4	1
+entry	m5	3
+entry	m6	1
+entry	m7	1
+entry	m8	1

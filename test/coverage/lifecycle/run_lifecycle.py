@@ -49,6 +49,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -284,14 +285,35 @@ def main() -> int:
         # 4. Hard termination.
         kills = 0
         procs = []
+        ready: list[threading.Event] = []
+
+        def drain(p: subprocess.Popen, ev: threading.Event) -> None:
+            # Read the VM's stdout to the end (never leave the pipe full); the
+            # event is set once the run marker has been seen.
+            for line in p.stdout:
+                if line.strip() == b"SV0VM_RUN_BEGIN":
+                    ev.set()
+            ev.set()
+
         for sig in (signal.SIGKILL, signal.SIGTERM):
             for backend in ("native", "vm"):
                 pdir = t / f"kill-{sig.name}-{backend}"
                 pdir.mkdir()
-                p = subprocess.Popen(built["spin"].argv(backend), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                     env=transport(pdir), start_new_session=True)
+                p = subprocess.Popen(built["spin"].argv(backend),
+                                     stdout=subprocess.PIPE if backend == "vm" else subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, env=transport(pdir), start_new_session=True)
+                ev = threading.Event()
+                if backend == "vm":
+                    threading.Thread(target=drain, args=(p, ev), daemon=True).start()
+                else:
+                    ev.set()
+                ready.append(ev)
                 procs.append((sig, backend, pdir, p))
-        time.sleep(6)
+        # The VM compiles its sources first (slow under load): wait for its run
+        # marker rather than a fixed time, then give the program a moment to spin.
+        for ev in ready:
+            ev.wait(timeout=120)
+        time.sleep(2)
         for sig, backend, pdir, p in procs:
             label = f"{sig.name} {backend}"
             if p.poll() is not None:

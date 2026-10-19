@@ -85,15 +85,22 @@ def c_str(s: str) -> str:
 # body and exit hits inside the `if`; with the hits removed it is undone.
 LOOP_RE = re.compile(r"^( *)while \(1\) \{\n\1  if \((.*)\) \{\n\1  \} else \{\n\1    break;\n\1  \}\n", re.M)
 
+# CV-307: a short circuit whose right operand is pure keeps the off build's
+# plain `a && b`; its outcomes are counted beside it by
+# `if (a) { hit } else { hit }`, which is empty once the hits are gone.
+SC_RE = re.compile(r"^( *)if \(([A-Za-z_][A-Za-z0-9_]*|[0-9]+)\) \{\n\1\} else \{\n\1\}\n", re.M)
+
 
 def strip_coverage(c: str) -> str:
-    """The instrumented C without its prelude, hits, start call, and loop rewrite."""
+    """The instrumented C without its prelude, hits, start call, loop rewrite,
+    and the empty short-circuit tallies."""
     lines = c.split("\n")
     a = next(i for i, line in enumerate(lines) if line.startswith(PRELUDE_START))
     b = next(i for i, line in enumerate(lines) if line.startswith(PRELUDE_END))
     kept = lines[:a] + lines[b + 2:]
     plain = "\n".join(line for line in kept if not START_RE.match(line) and not HIT_RE.match(line))
     plain = LOOP_RE.sub(lambda m: f"{m.group(1)}while ({m.group(2)}) {{\n", plain)
+    plain = SC_RE.sub("", plain)
     # a checked contract clause (CV-306): `if (e) { hit } else { hit; check(0, ...) }`
     # is the off build's `check(e, ...)` once the hits are gone
     return CONTRACT_RE.sub(lambda m: f"{m.group(1)}{m.group(3)}({m.group(2)}, {m.group(4)});", plain)

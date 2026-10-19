@@ -31,8 +31,8 @@
  *
  * Errors: (code, unit, start, end, message id) quintuples.
  *
- * `&&` and `||` evaluate both operands in sv0c today, so index guards here
- * are nested ifs. Depends on lib/lexer.sv0 (skip_line_comment,
+ * Index guards here are nested ifs, a style kept from before `&&` and `||`
+ * short-circuited. Depends on lib/lexer.sv0 (skip_line_comment,
  * skip_block_comment, scan_string_end, scan_char_end).
  */
 

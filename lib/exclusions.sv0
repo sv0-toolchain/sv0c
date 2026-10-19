@@ -45,8 +45,8 @@
  * Errors: EXCL_ERR_STRIDE() ints: code, unit, start, end, message id, note
  * start, note end (-1 for no note); offsets into the unit's text.
  *
- * `&&` and `||` evaluate both operands in sv0c today, so index guards are
- * nested ifs. Depends on lib/lexer.sv0, lib/attributes.sv0 and
+ * Index guards are nested ifs, a style kept from before `&&` and `||`
+ * short-circuited. Depends on lib/lexer.sv0, lib/attributes.sv0 and
  * lib/directives.sv0.
  */
 

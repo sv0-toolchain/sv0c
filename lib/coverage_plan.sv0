@@ -397,8 +397,9 @@ fn cov_plan_dump(source: string, table: string, cstarts: Vec<i32>, clens: Vec<i3
  *   rg  (5): kind, entity, first token, last token, counter expression
  *   br  (5): kind (1 if, 2 loop, 3 match, 4 conditional_expression: an
  *            `if` nested in an expression, 7 a `?` operator: not a branch
- *            but one counted synthetic-support point, see below), entity,
- *            first token, last token, outcome count
+ *            but one counted synthetic-support point, see below; 8
+ *            short_circuit: a `&&` or `||`, see below), entity, first
+ *            token, last token, outcome count
  *   cef (2): first term, term count  -- counter expressions over
  *   cet (2): coefficient, point ref     entry and outcome points
  * A point ref >= 0 is the function_entry of that entity; a ref < 0 is branch
@@ -422,6 +423,20 @@ fn cov_plan_dump(source: string, table: string, cstarts: Vec<i32>, clens: Vec<i3
  * leaves the function: the position drops by it for whatever follows the
  * `?`, in the same expression and after the statement. It rides in `br` as
  * kind 7 with one outcome so counter expressions can name it.
+ *
+ * `&&` and `||` (CV-307, SPEC 11.5, 27.3) are decisions of kind 8,
+ * `short_circuit`: outcome 0 `evaluated` (the right operand ran), 1
+ * `skipped`, both direct counters, span = the left operand's first token
+ * through the right operand's last. The right operand is also an
+ * `expression` region counted by `evaluated`, so a line whose right operand
+ * never ran is partial; a construct inside it sits at that position too
+ * (less what has left through a `?` in it). They are found per expression
+ * by precedence over tokens (cov_sc_scan): operands end at `,` `:` `=`
+ * `=>` `..` `..=` compound assignment and `return` / `break`, `||` binds
+ * looser than `&&`, both associate left, bracket groups are scanned on
+ * their own, and constructs and blocks are opaque (their own walk plans
+ * them). Match guards are planned for short circuits only. Operators in
+ * contract clauses are not planned: contracts have their own model.
  */
 
 fn cov_rg_kind_name(k: i32) -> string {
@@ -511,10 +526,12 @@ fn cov_br_kind_name(k: i32) -> string {
     if k == 5 { return "loop"; }
     if k == 6 { return "loop"; }
     if k == 4 { return "conditional_expression"; }
+    if k == 8 { return "short_circuit"; }
     return "match";
 }
 
-/* Outcome k's name: true/false, body/exit, or arm:k (SPEC 16.3.6). */
+/* Outcome k's name: true/false, body/exit, arm:k, or evaluated/skipped
+   (SPEC 16.3.6). */
 fn cov_outcome_name(kind: i32, k: i32) -> string {
     if kind == 7 { return "propagate"; }
     if cov_br_is_loop(kind) {
@@ -522,6 +539,10 @@ fn cov_outcome_name(kind: i32, k: i32) -> string {
         return "exit";
     }
     if kind == 3 { return string_concat("arm:", cov_src_itoa(k)); }
+    if kind == 8 {
+        if k == 0 { return "evaluated"; }
+        return "skipped";
+    }
     if k == 0 { return "true"; }
     return "false";
 }
@@ -664,6 +685,199 @@ fn cov_q_point(br: Vec<i32>, e: i32, t: i32) -> i32 {
     return nw;
 }
 
+/* Tokens that end a short-circuit operand: `,` `:` `=` `=>` `..` `..=`,
+   compound assignment, `return`, `break` (CV-307). */
+fn cov_sc_sep(g: i32) -> bool {
+    if g == 12 || g == 14 || g == 35 || g == 20 || g == 17 || g == 18 { return true; }
+    if g == 85 || g == 57 { return true; }
+    return g >= 44 && g <= 51;
+}
+
+/* Last token of the if/while/for/loop/match construct at t, or -1. */
+fn cov_construct_last(tags: Vec<i32>, t: i32) -> i32 {
+    let n: i32 = vec_len(tags);
+    let open: i32 = cov_tok_body_open(tags, t + 1, n);
+    if open < 0 { return 0 - 1; }
+    let close: i32 = cov_tok_close(tags, open);
+    if close < 0 { return 0 - 1; }
+    if vec_get(tags, t) == 68 && close + 2 < n {
+        if vec_get(tags, close + 1) == 60 {
+            let et: i32 = close + 2;
+            if vec_get(tags, et) == 68 { return cov_construct_last(tags, et); }
+            if vec_get(tags, et) == 8 { return cov_tok_close(tags, et); }
+            return 0 - 1;
+        }
+    }
+    return close;
+}
+
+/* The token after the bracket group, construct or block starting at t in
+   [t, t1] (t + 1 for any other token), or -1 when it does not close by t1. */
+fn cov_sc_skip(tags: Vec<i32>, t: i32, t1: i32) -> i32 {
+    let g: i32 = vec_get(tags, t);
+    let mut last: i32 = t;
+    if cov_is_construct(g) {
+        last = cov_construct_last(tags, t);
+    } else {
+        if g == 6 || g == 8 || g == 10 { last = cov_tok_close(tags, t); }
+    }
+    if last < 0 || last > t1 { return 0 - 1; }
+    return last + 1;
+}
+
+/* The short circuit of the operand-free segment [s0, s1]: its last `||`
+   outside brackets and constructs, else its last `&&`; -1 when it has
+   none, -2 when the segment is malformed. */
+fn cov_sc_op(tags: Vec<i32>, s0: i32, s1: i32) -> i32 {
+    let mut or_op: i32 = 0 - 1;
+    let mut and_op: i32 = 0 - 1;
+    let mut t: i32 = s0;
+    while t <= s1 {
+        let g: i32 = vec_get(tags, t);
+        if g == 30 { or_op = t; }
+        if g == 28 { and_op = t; }
+        let nx: i32 = cov_sc_skip(tags, t, s1);
+        if nx < 0 { return 0 - 2; }
+        t = nx;
+    }
+    if or_op >= 0 { return or_op; }
+    return and_op;
+}
+
+/* Push (first, operator, last) for every short circuit of segment [s0, s1]
+   into sc, outermost first. Returns -1 when malformed. */
+fn cov_sc_segment(tags: Vec<i32>, s0: i32, s1: i32, sc: Vec<i32>) -> i32 {
+    let op: i32 = cov_sc_op(tags, s0, s1);
+    if op == 0 - 2 { return 0 - 1; }
+    if op < 0 { return 0; }
+    if op <= s0 || op >= s1 { return 0 - 1; }
+    vec_push(sc, s0);
+    vec_push(sc, op);
+    vec_push(sc, s1);
+    if cov_sc_segment(tags, s0, op - 1, sc) < 0 { return 0 - 1; }
+    return cov_sc_segment(tags, op + 1, s1, sc);
+}
+
+/* Push every short circuit of expression tokens [t0, t1] into sc (stride
+   3: first, operator, last), descending into bracket groups and struct
+   literals but not into constructs or blocks. Returns -1 when malformed. */
+fn cov_sc_scan(tags: Vec<i32>, t0: i32, t1: i32, sc: Vec<i32>) -> i32 {
+    let mut s0: i32 = t0;
+    let mut t: i32 = t0;
+    while t <= t1 {
+        let g: i32 = vec_get(tags, t);
+        if cov_sc_sep(g) {
+            if s0 < t {
+                if cov_sc_segment(tags, s0, t - 1, sc) < 0 { return 0 - 1; }
+            }
+            s0 = t + 1;
+            t = t + 1;
+        } else {
+            let prev: i32 = if t > 0 { vec_get(tags, t - 1) } else { 0 };
+            let group: bool = g == 6 || g == 10 || (g == 8 && prev == 5);
+            if group {
+                let close: i32 = cov_tok_close(tags, t);
+                if close < 0 || close > t1 { return 0 - 1; }
+                if cov_sc_scan(tags, t + 1, close - 1, sc) < 0 { return 0 - 1; }
+            }
+            let nx: i32 = cov_sc_skip(tags, t, t1);
+            if nx < 0 { return 0 - 1; }
+            t = nx;
+        }
+    }
+    if s0 <= t1 {
+        if cov_sc_segment(tags, s0, t1, sc) < 0 { return 0 - 1; }
+    }
+    return 0;
+}
+
+/* Whether short circuit a of sc comes before short circuit b: by first
+   token, then last. */
+fn cov_sc_before(sc: Vec<i32>, a: i32, b: i32) -> bool {
+    if vec_get(sc, a * 3) != vec_get(sc, b * 3) { return vec_get(sc, a * 3) < vec_get(sc, b * 3); }
+    return vec_get(sc, a * 3 + 2) < vec_get(sc, b * 3 + 2);
+}
+
+/* Plan the short circuits of expression tokens [t0, t1] of entity e: a
+   kind-8 branch each and its right operand's `expression` region. Appends
+   (operator, branch, position handle -2 = not yet entered) per short
+   circuit to scp. Returns -1 when malformed. */
+fn cov_sc_plan(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
+               e: i32, t0: i32, t1: i32, scp: Vec<i32>) -> i32 {
+    /* an `assert` statement is a contract clause: the contract model's */
+    if vec_get(tags, t0) == 55 { return 0; }
+    let sc: Vec<i32> = vec_new();
+    if cov_sc_scan(tags, t0, t1, sc) < 0 { return 0 - 1; }
+    /* In map order (first token, then last: an inner `a && b` before the
+       `a && b && c` around it), as the planner pushes other branches. */
+    let mut i: i32 = 1;
+    while i < vec_len(sc) / 3 {
+        let mut j: i32 = i;
+        while j > 0 && cov_sc_before(sc, j, j - 1) {
+            let mut f: i32 = 0;
+            while f < 3 {
+                let x: i32 = vec_get(sc, j * 3 + f);
+                vec_set(sc, j * 3 + f, vec_get(sc, (j - 1) * 3 + f));
+                vec_set(sc, (j - 1) * 3 + f, x);
+                f = f + 1;
+            }
+            j = j - 1;
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < vec_len(sc) / 3 {
+        let op: i32 = vec_get(sc, i * 3 + 1);
+        let last: i32 = vec_get(sc, i * 3 + 2);
+        let b: i32 = cov_br_push(br, 8, e, vec_get(sc, i * 3));
+        vec_set(br, b * 5 + 3, last);
+        vec_set(br, b * 5 + 4, 2);
+        cov_rg_push(rg, 6, e, op + 1, last, cov_ce_ref(cef, cet, cov_outcome_ref(b, 0)));
+        vec_push(scp, op);
+        vec_push(scp, b);
+        vec_push(scp, 0 - 2);
+        i = i + 1;
+    }
+    return 0;
+}
+
+/* The position at token t: inside the right operand of a short circuit
+   of scp (the innermost), that operand's position, else cur. */
+fn cov_sc_pos(br: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, scp: Vec<i32>, t: i32, cur: i32) -> i32 {
+    let mut best: i32 = 0 - 1;
+    let mut i: i32 = 0;
+    while i < vec_len(scp) / 3 {
+        let op: i32 = vec_get(scp, i * 3);
+        let b: i32 = vec_get(scp, i * 3 + 1);
+        if t > op && t <= vec_get(br, b * 5 + 3) {
+            if best < 0 || op > vec_get(scp, best * 3) { best = i; }
+        }
+        i = i + 1;
+    }
+    if best < 0 { return cur; }
+    if vec_get(scp, best * 3 + 2) == 0 - 2 {
+        vec_set(scp, best * 3 + 2, cov_ce_ref(cef, cet, cov_outcome_ref(vec_get(scp, best * 3 + 1), 0)));
+    }
+    return vec_get(scp, best * 3 + 2);
+}
+
+/* A `?` at t with propagate expression q: every right operand around t
+   drops by q as the enclosing position does. */
+fn cov_sc_drop(br: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, scp: Vec<i32>, t: i32, q: i32) -> i32 {
+    let mut i: i32 = 0;
+    while i < vec_len(scp) / 3 {
+        let op: i32 = vec_get(scp, i * 3);
+        let b: i32 = vec_get(scp, i * 3 + 1);
+        if t > op && t <= vec_get(br, b * 5 + 3) {
+            let mut h: i32 = vec_get(scp, i * 3 + 2);
+            if h == 0 - 2 { h = cov_ce_ref(cef, cet, cov_outcome_ref(b, 0)); }
+            vec_set(scp, i * 3 + 2, cov_ce_lin(cef, cet, h, 1, q, 0 - 1));
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
 /* Walk the constructs inside expression tokens [t0, t1] at position p.
    ret = [returns, jumps]. */
 fn cov_walk_expr(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br: Vec<i32>,
@@ -671,7 +885,10 @@ fn cov_walk_expr(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br:
     let mut r: i32 = 0 - 1;
     let mut j: i32 = 0 - 1;
     /* The position moves as the expression is evaluated left to right: it
-       drops by what has already left through a `?` (CV-213). */
+       drops by what has already left through a `?` (CV-213); inside the
+       right operand of a short circuit it is that operand's (CV-307). */
+    let scp: Vec<i32> = vec_new();
+    if cov_sc_plan(tags, cef, cet, rg, br, e, t0, t1, scp) < 0 { return 0 - 1; }
     let mut cur: i32 = p;
     let mut t: i32 = t0;
     while t <= t1 {
@@ -681,9 +898,11 @@ fn cov_walk_expr(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br:
             cov_rg_push(rg, 13, e, t, t, q);
             r = cov_ce_lin(cef, cet, r, 1, q, 1);
             cur = cov_ce_lin(cef, cet, cur, 1, q, 0 - 1);
+            cov_sc_drop(br, cef, cet, scp, t, q);
             t = t + 1;
         } else { if cov_is_construct(g) {
-            if cov_walk_construct(tags, cef, cet, rg, br, e, t, cur, true, ret) < 0 { return 0 - 1; }
+            let pos: i32 = cov_sc_pos(br, cef, cet, scp, t, cur);
+            if cov_walk_construct(tags, cef, cet, rg, br, e, t, pos, true, ret) < 0 { return 0 - 1; }
             r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
             j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
             t = vec_get(ret, 2) + 1;
@@ -696,7 +915,8 @@ fn cov_walk_expr(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>, br:
                 if prev != 5 { block = true; }
             }
             if block {
-                if cov_walk_block(tags, cef, cet, rg, br, e, t, cur, ret) < 0 { return 0 - 1; }
+                let bpos: i32 = cov_sc_pos(br, cef, cet, scp, t, cur);
+                if cov_walk_block(tags, cef, cet, rg, br, e, t, bpos, ret) < 0 { return 0 - 1; }
                 r = cov_ce_lin(cef, cet, r, 1, vec_get(ret, 0), 1);
                 j = cov_ce_lin(cef, cet, j, 1, vec_get(ret, 1), 1);
                 t = vec_get(ret, 2) + 1;
@@ -943,6 +1163,14 @@ fn cov_walk_construct(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>
             if k >= 1024 { return 0 - 1; }
             let arrow: i32 = cov_tok_find0(tags, a, close3, 20);
             if arrow < 0 { return 0 - 1; }
+            /* A guard's short circuits (CV-307); nothing else in a guard is
+               planned. */
+            let guard: i32 = cov_tok_find0(tags, a, arrow, 68);
+            if guard >= 0 {
+                if guard + 1 >= arrow { return 0 - 1; }
+                let gscp: Vec<i32> = vec_new();
+                if cov_sc_plan(tags, cef, cet, rg, br, e, guard + 1, arrow - 1, gscp) < 0 { return 0 - 1; }
+            }
             let apos: i32 = cov_ce_ref(cef, cet, cov_outcome_ref(b3, k));
             let rs: i32 = arrow + 1;
             if rs >= close3 { return 0 - 1; }
@@ -1301,8 +1529,8 @@ fn cov_leftmost_tok(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>, e
 
 /* The node table lowering reads (lower_cov_counter): one entry per
    expression-arena node, the counter of a function body's entry point at
-   its body block node, of outcome 0 at an if/while/for/loop/match node,
-   else -1. `counters` is cov_map_counters' numbering. */
+   its body block node, of outcome 0 at an if/while/for/loop/match node
+   or a planned `&&` / `||` node (flagged + 2^29), else -1. `counters` is cov_map_counters' numbering. */
 fn cov_hit_table(tags: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>, ed4: Vec<i32>,
                  pp: Vec<i32>, id4: Vec<i32>, ent_item: Vec<i32>, br: Vec<i32>, counters: Vec<i32>) -> Vec<i32> {
     let n: i32 = vec_len(et);
@@ -1378,6 +1606,48 @@ fn cov_hit_table(tags: Vec<i32>, et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3
                     bb = bb + 1;
                 }
                 if best >= 0 { vec_set(tab, i, vec_get(bctr, best)); }
+            }
+        }
+        i = i + 1;
+    }
+    /* `&&` / `||` (CV-307): a binary node (tag 3, operator 11 or 12) is the
+       short circuit whose operator lies between its operands' leftmost
+       tokens (the latest such: only `(` and prefix operators can sit
+       between an operator and its right operand's leftmost token). */
+    let scop: Vec<i32> = vec_new();
+    b = 0;
+    while b < nb {
+        if vec_get(br, b * 5) == 8 {
+            vec_push(scop, cov_sc_op(tags, vec_get(br, b * 5 + 2), vec_get(br, b * 5 + 3)));
+        } else {
+            vec_push(scop, 0 - 1);
+        }
+        b = b + 1;
+    }
+    i = 0;
+    while i < n {
+        if vec_get(et, i) == 3 {
+            let bop: i32 = vec_get(ed1, i);
+            if bop == 11 || bop == 12 {
+                let want_op: i32 = if bop == 11 { 28 } else { 30 };
+                let ll: i32 = cov_leftmost_tok(et, ed1, ed2, ed3, ed4, pp, vec_get(ed2, i));
+                let rl: i32 = cov_leftmost_tok(et, ed1, ed2, ed3, ed4, pp, vec_get(ed3, i));
+                let mut sbest: i32 = 0 - 1;
+                let mut sb: i32 = 0;
+                while sb < nb {
+                    let op: i32 = vec_get(scop, sb);
+                    if op >= 0 && vec_get(tags, op) == want_op {
+                        if ll >= vec_get(br, sb * 5 + 2) && ll < op && rl > op && rl <= vec_get(br, sb * 5 + 3) {
+                            if sbest < 0 || op > vec_get(scop, sbest) { sbest = sb; }
+                        }
+                    }
+                    sb = sb + 1;
+                }
+                /* flagged 2^29: a contract clause's root carries a contract
+                   counter in the same table and must not read as one */
+                if sbest >= 0 {
+                    if vec_get(bctr, sbest) >= 0 { vec_set(tab, i, vec_get(bctr, sbest) + 536870912); }
+                }
             }
         }
         i = i + 1;
