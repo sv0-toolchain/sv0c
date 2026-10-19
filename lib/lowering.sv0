@@ -1678,11 +1678,18 @@ fn lower_cond_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
             item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
             enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        let rhs_c: Vec<i32> = vec_new();
         let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp, tok_tags,
-            rhs_i, ctr, cond_is, enum_names, enum_tag_offsets, enum_tag_counts,
+            rhs_i, ctr, rhs_c, enum_names, enum_tag_offsets, enum_tag_counts,
             enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends,
             item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts,
             enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        if lower_sc_op(op) {
+            if lower_pure_instrs(rhs_c) != true {
+                return Expr::Load(lower_short_circuit(ctr, cond_is, op, vl, rhs_c, vr));
+            }
+        }
+        let _ac: i32 = append_instrs(cond_is, rhs_c);
         return Expr::Binop(op, box_new(vl), box_new(vr));
     }
     /* Plain unary (! ~ -, tags 0/1/2); borrow/cast (4/5/99) are not loop
@@ -1841,11 +1848,18 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        let rhs_v: Vec<i32> = vec_new();
         let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, rhs_idx, ctr,
-                                             out_instrs, enum_names,
+                                             rhs_v, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        if lower_sc_op(binop_tag) {
+            if lower_pure_instrs(rhs_v) != true {
+                return Value::VVar(lower_short_circuit(ctr, out_instrs, binop_tag, vl, rhs_v, vr));
+            }
+        }
+        let _av: i32 = append_instrs(out_instrs, rhs_v);
         let t: i32 = ctr_fresh(ctr);
         let expr: Expr = Expr::Binop(binop_tag, box_new(vl), box_new(vr));
         let instr: Instr = Instr::Assign(t, box_new(expr));
@@ -2564,6 +2578,65 @@ fn lower_expr_to_value(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
 /* ── value_to_expr (SML valueToExpr) ────────────────────────
    VVar(x) → Load(x);  otherwise → Literal(v). */
 
+/* `&&` and `||` short-circuit (sv0doc expressions; they used to evaluate
+   both operands, found by sv0cov CV-302): when the right operand needs
+   instructions of its own (a call, a checked division, ...), they run only
+   when the left operand does not already decide the result:
+   `t = left; if (t) { rhs...; t = right }` for `&&`, the else arm for `||`.
+   A right operand whose instructions are pure (lower_pure_instrs) stays a
+   plain binop (evaluating it has no effect). The SML reference lowering (sml-legacy/ir/lowering.sml
+   ExprBinop) builds the same IR, so tier-2 VM parity holds. Returns t. */
+fn lower_short_circuit(ctr: Vec<i32>, out_instrs: Vec<i32>, op: i32, vl: Value, rhs_is: Vec<i32>, vr: Value) -> i32 {
+    let t: i32 = ctr_fresh(ctr);
+    vec_push(out_instrs, box_new(Instr::Assign(t, box_new(value_to_expr(vl)))));
+    let set: Vec<i32> = vec_new();
+    let mut i: i32 = 0;
+    while i < vec_len(rhs_is) {
+        vec_push(set, vec_get(rhs_is, i));
+        i = i + 1;
+    }
+    vec_push(set, box_new(Instr::Store(t, box_new(value_to_expr(vr)))));
+    let none: Vec<i32> = vec_new();
+    if op == 11 {
+        vec_push(out_instrs, box_new(Instr::IfElse(box_new(Expr::Load(t)), set, none)));
+    } else {
+        vec_push(out_instrs, box_new(Instr::IfElse(box_new(Expr::Load(t)), none, set)));
+    }
+    return t;
+}
+
+fn lower_sc_op(op: i32) -> bool {
+    return op == 11 || op == 12;
+}
+
+/* Whether a right operand's instructions are all pure temp assignments
+   (a load, literal, unary, or binary op other than `/` and `%`, which can
+   trap): evaluating them has no effect, so `&&`/`||` keeps the plain binop.
+   Mirrors sml-legacy/ir/lowering.sml pureInstrs. */
+fn lower_pure_instrs(is: Vec<i32>) -> bool {
+    let mut i: i32 = 0;
+    while i < vec_len(is) {
+        let ins: Instr = box_deref(vec_get(is, i));
+        let mut ok: bool = false;
+        match ins {
+            Instr::Assign(_, be) => {
+                let e: Expr = box_deref(be);
+                match e {
+                    Expr::Binop(op, _, _) => { ok = op != 3 && op != 4; },
+                    Expr::Unop(_, _) => { ok = true; },
+                    Expr::Load(_) => { ok = true; },
+                    Expr::Literal(_) => { ok = true; },
+                    _ => { ok = false; },
+                }
+            },
+            _ => { ok = false; },
+        }
+        if ok != true { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
 fn value_to_expr(v: Value) -> Expr {
     let t: i32 = ir_value_tag(v);
     if t == 3 {
@@ -2644,11 +2717,18 @@ fn lower_expr_with_instrs(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>,
                                              out_instrs, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        let rhs_w: Vec<i32> = vec_new();
         let vr: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
                                              tok_tags, rhs_idx, ctr,
-                                             out_instrs, enum_names,
+                                             rhs_w, enum_names,
                                              enum_tag_offsets, enum_tag_counts,
                                              enum_tags_flat, fn_ctx, builtin_map, lit_sf_names, source, starts, ends, item_tags, item_names, item_d2, item_d3, item_d4, item_field_counts, enum_vnames_flat, enum_max_payloads, item_fn_row, match_env_inherit, import_aliases);
+        if lower_sc_op(binop_tag) {
+            if lower_pure_instrs(rhs_w) != true {
+                return Expr::Load(lower_short_circuit(ctr, out_instrs, binop_tag, vl, rhs_w, vr));
+            }
+        }
+        let _aw: i32 = append_instrs(out_instrs, rhs_w);
         return Expr::Binop(binop_tag, box_new(vl), box_new(vr));
     }
     let v: Value = lower_expr_to_value(et, ed1, ed2, ed3, ed4, pp,
@@ -5821,9 +5901,8 @@ fn lower_vecf_apply(bm: Vec<i32>, sites: Vec<i32>, tok_tags: Vec<i32>) -> i32 {
    IDs 1–13 mirror checker.sv0 builtin_fn_lookup (0–12) shifted
    by +1.  ID 14 = no_alias.     IDs 15–17 = read_file / write_file / read_dir (host I/O; VM
    CALL_BUILTIN 15–17). ID 18 = write_bytes (C/native-only, no VM
-   CALL_BUILTIN case). ID 19 = getenv (NEX-055c; C/native-only, same as
-   write_bytes -- no VM CALL_BUILTIN case, since a host-env read has no
-   meaningful role in .sv0b/VM execution).
+   CALL_BUILTIN case). ID 19 = getenv (NEX-055c; VM CALL_BUILTIN 19 since
+   sv0vm implements it, "" when unset).
    `old` requires structural AST matching and is handled separately. */
 
 fn build_builtin_map_classify(s: string) -> i32 {

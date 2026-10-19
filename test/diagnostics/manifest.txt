@@ -75,3 +75,4 @@ test/diagnostics/cases/dup_trait_default_override.sv0|E0418|native
 test/diagnostics/cases/no_items.sv0|E0100|native
 # --- a failed type check always reports (a trailing `loop` is unit) ---
 test/diagnostics/cases/loop_tail_no_return.sv0|E0400
+test/diagnostics/cases/fn_body_no_value.sv0|E0408

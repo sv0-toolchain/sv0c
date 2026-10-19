@@ -1,0 +1,25 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* A function whose body ends in an if/else statement that returns in both
+   branches (or nested blocks that do) needs no trailing return. It used to
+   fail with E0400 at 1:1. */
+fn step(n: i32) -> i32 {
+    if n > 2 {
+        return n - 1;
+    } else {
+        return n + 2;
+    };
+}
+
+fn nested(n: i32) -> i32 {
+    if n > 0 {
+        if n > 10 { return 2; } else { return 1; };
+    } else {
+        {
+            return 0;
+        };
+    };
+}
+
+fn main() -> i32 {
+    return step(1) + nested(5) + nested(0) - 4;
+}

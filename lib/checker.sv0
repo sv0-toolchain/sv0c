@@ -1025,6 +1025,36 @@ fn stmt_returns_arena(et: Vec<i32>, ed1: Vec<i32>, idx: i32) -> bool {
     return false;
 }
 
+/* Whether statement or expression `idx` always leaves the function: a
+   `return`; an expression statement or block whose last statement (or
+   tail) does; an `if` with an `else` whose branches both do. A function
+   whose body ends in `if c { return a; } else { return b; };` used to fail
+   with E0400 (no tail value). */
+fn stmt_diverges_arena(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>, ed4: Vec<i32>,
+                       pp: Vec<i32>, idx: i32, depth: i32) -> bool {
+    if idx < 0 { return false; }
+    if idx >= vec_len(et) { return false; }
+    if depth > 64 { return false; }
+    let tag: i32 = vec_get(et, idx);
+    if tag == 15 { return true; }
+    if tag == 28 { return stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, vec_get(ed1, idx), depth + 1); }
+    if tag == 9 {
+        let tail: i32 = vec_get(ed3, idx);
+        if tail >= 0 { return stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, tail, depth + 1); }
+        let count: i32 = vec_get(ed2, idx);
+        if count <= 0 { return false; }
+        return stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp,
+            block_stmt_index(pp, vec_get(ed1, idx), vec_get(ed4, idx), count - 1), depth + 1);
+    }
+    if tag == 10 {
+        let els: i32 = vec_get(ed3, idx);
+        if els < 0 { return false; }
+        if stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, vec_get(ed2, idx), depth + 1) != true { return false; }
+        return stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, els, depth + 1);
+    }
+    return false;
+}
+
 fn last_stmt_returns_arena(et: Vec<i32>, ed1: Vec<i32>,
                            first_stmt: i32,
                            stmt_count: i32) -> bool {
@@ -2424,6 +2454,13 @@ fn check_fn_body(
     }
     if expect(body_ty, ret_ty) { return 0; }
     if ret_ty == TY_UNIT() { return 0; }
+    /* -2: the body block has no tail value and does not always return
+       (E0408); a unit tail (a trailing `loop`) is a type mismatch (E0400) */
+    if body_ty == TY_UNIT() {
+        if vec_get(bet, body_root) == 9 {
+            if vec_get(bed3, body_root) < 0 { return 0 - 2; }
+        }
+    }
     return 0 - 1;
 }
 
@@ -4874,6 +4911,14 @@ fn check_program(
                         vec_push(diag_sink, expr_span_tok(body_et, body_ed1, bpp, tup_i));
                     }
                 }
+                /* Otherwise the body has no value and does not always
+                   return (E0408, as in SML), or its type does not match the
+                   declared return type (E0400); either at the function's
+                   name (it used to print E0400 at 1:1). */
+                if vec_len(diag_sink) == 0 {
+                    if chk == 0 - 2 { vec_push(diag_sink, 408); } else { vec_push(diag_sink, 400); }
+                    vec_push(diag_sink, vec_get(id1, ii));
+                }
                 return 0 - 1;
             }
         }
@@ -6540,7 +6585,7 @@ fn synth_expr(et: Vec<i32>, ed1: Vec<i32>, ed2: Vec<i32>, ed3: Vec<i32>,
         if stmts_count > 0 {
             let last_idx: i32 = block_stmt_index(pp, stmts_first, sidecar,
                                                  stmts_count - 1);
-            if stmt_returns_arena(et, ed1, last_idx) {
+            if stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, last_idx, 0) {
                 let _r2: i32 = env_scope_restore(env_names, env_mark);
                 return TY_VAR();
             }
@@ -6981,6 +7026,33 @@ fn test_stmt_returns_arena() -> i32 {
     if stmt_returns_arena(et, ed1, 3) != false { return 2; }
     if stmt_returns_arena(et, ed1, 4) != false { return 3; }
     if stmt_returns_arena(et, ed1, 0) != true { return 4; }
+    return 0;
+}
+
+/* if c { return } else { return } diverges; without else, or with a
+   non-returning branch, it does not. Arena: 0 lit, 1 return, 2 return,
+   3 block[1], 4 block[2], 5 if(0, 3, 4), 6 if(0, 3, -1), 7 block[] (empty),
+   8 if(0, 3, 7). */
+fn test_stmt_diverges_arena() -> i32 {
+    let et: Vec<i32> = vec_new();
+    let ed1: Vec<i32> = vec_new();
+    let ed2: Vec<i32> = vec_new();
+    let ed3: Vec<i32> = vec_new();
+    let ed4: Vec<i32> = vec_new();
+    let pp: Vec<i32> = vec_new();
+    vec_push(et, 0); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 15); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 15); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0); vec_push(ed4, 0);
+    vec_push(et, 9); vec_push(ed1, 1); vec_push(ed2, 1); vec_push(ed3, 0 - 1); vec_push(ed4, 0);
+    vec_push(et, 9); vec_push(ed1, 2); vec_push(ed2, 1); vec_push(ed3, 0 - 1); vec_push(ed4, 0);
+    vec_push(et, 10); vec_push(ed1, 0); vec_push(ed2, 3); vec_push(ed3, 4); vec_push(ed4, 0);
+    vec_push(et, 10); vec_push(ed1, 0); vec_push(ed2, 3); vec_push(ed3, 0 - 1); vec_push(ed4, 0);
+    vec_push(et, 9); vec_push(ed1, 0); vec_push(ed2, 0); vec_push(ed3, 0 - 1); vec_push(ed4, 0);
+    vec_push(et, 10); vec_push(ed1, 0); vec_push(ed2, 3); vec_push(ed3, 7); vec_push(ed4, 0);
+    if stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 5, 0) != true { return 1; }
+    if stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 6, 0) != false { return 2; }
+    if stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 8, 0) != false { return 3; }
+    if stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 3, 0) != true { return 4; }
     return 0;
 }
 
@@ -9897,6 +9969,8 @@ fn main() -> i32 {
     let r29: i32 = test_stmt_returns_arena();
     if r29 != 0 { return 300 + r29; }
     let r30: i32 = test_last_stmt_returns_arena();
+    let r30d: i32 = test_stmt_diverges_arena();
+    if r30d != 0 { return 3000 + r30d; }
     if r30 != 0 { return 310 + r30; }
     let r31: i32 = test_expr_references_result();
     if r31 != 0 { return 320 + r31; }

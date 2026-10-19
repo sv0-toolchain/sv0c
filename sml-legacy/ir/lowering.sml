@@ -82,6 +82,35 @@ structure Lowering :> LOWERING = struct
     | Ast.ExprField (Ast.ExprPath ([b], _), fld, _) => SOME (ALField (b, fld))
     | _ => NONE
 
+  (* `&&` / `||` short-circuit when the right operand has instructions of
+     its own: t = left; if t { rhs; t = right } (the else arm for `||`).
+     Mirrors lib/lowering.sv0 lower_short_circuit (sv0cov CV-302 finding). *)
+  fun isShortCircuit (b : Ast.binop) : bool =
+    case b of Ast.And => true | Ast.Or => true | _ => false
+
+  (* Pure temp assignments (no call, store, `/` or `%`): no effect, so the
+     plain binop stays. Mirrors lib/lowering.sv0 lower_pure_instrs. *)
+  fun pureInstrs (is : Ir.instr list) : bool =
+    List.all
+      (fn Ir.Assign (_, Ir.Binop (opr, _, _)) => opr <> "/" andalso opr <> "%"
+        | Ir.Assign (_, Ir.Unop _) => true
+        | Ir.Assign (_, Ir.Load _) => true
+        | Ir.Assign (_, Ir.Literal _) => true
+        | _ => false)
+      is
+
+  fun scValueExpr (v : Ir.value) : Ir.expr =
+    case v of Ir.VVar x => Ir.Load x | _ => Ir.Literal v
+
+  fun shortCircuit (b : Ast.binop) (t : string) (vl : Ir.value) (ir : Ir.instr list) (vr : Ir.value)
+      : Ir.instr list =
+    let
+      val set = ir @ [Ir.Store (t, scValueExpr vr)]
+    in
+      [Ir.Assign (t, scValueExpr vl),
+       (case b of Ast.And => Ir.IfElse (Ir.Load t, set, []) | _ => Ir.IfElse (Ir.Load t, [], set))]
+    end
+
   fun astBinopToC (b : Ast.binop) : string =
     case b of
       Ast.Add => "+"
@@ -835,9 +864,12 @@ structure Lowering :> LOWERING = struct
         let
           val (il, vl) = lowerExprToValue l
           val (ir, vr) = lowerExprToValue r
-          val t = freshTmp ()
         in
-          (il @ ir @ [Ir.Assign (t, Ir.Binop (astBinopToC b, vl, vr))], Ir.VVar t)
+          if isShortCircuit b andalso not (pureInstrs ir) then
+            let val t = freshTmp () in (il @ shortCircuit b t vl ir vr, Ir.VVar t) end
+          else
+            let val t = freshTmp ()
+            in (il @ ir @ [Ir.Assign (t, Ir.Binop (astBinopToC b, vl, vr))], Ir.VVar t) end
         end
     | Ast.ExprUnop (Ast.Borrow, _, _) =>
         raise Fail "E0541: lowering: `&` expects a simple name (checker should reject this)"
@@ -953,7 +985,10 @@ structure Lowering :> LOWERING = struct
           val (il, vl) = lowerExprToValue l
           val (ir, vr) = lowerExprToValue r
         in
-          (il @ ir, Ir.Binop (astBinopToC b, vl, vr))
+          if isShortCircuit b andalso not (pureInstrs ir) then
+            let val t = freshTmp () in (il @ shortCircuit b t vl ir vr, Ir.Load t) end
+          else
+            (il @ ir, Ir.Binop (astBinopToC b, vl, vr))
         end
     | Ast.ExprUnop (u, e1, _) =>
         let val (i, v) = lowerExprToValue e1 in (i, Ir.Unop (unopToC u, v)) end

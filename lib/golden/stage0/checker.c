@@ -118,6 +118,7 @@ static int struct_enum_name_clash_str(const char* source, int starts, int ends, 
 static int named_only_ty(int struct_names, int enum_names, int name);
 static int fields_of_struct_count(int struct_names, int struct_field_counts, int name);
 static int stmt_returns_arena(int et, int ed1, int idx);
+static int stmt_diverges_arena(int et, int ed1, int ed2, int ed3, int ed4, int pp, int idx, int depth);
 static int last_stmt_returns_arena(int et, int ed1, int first_stmt, int stmt_count);
 static const char* chk_tok_str(const char* source, int starts, int ends, int pos);
 static int expr_references_result(int et, int ed1, int ed2, int ed3, int ed4, int idx, const char* source, int starts, int ends, int pp);
@@ -250,6 +251,7 @@ static int test_struct_enum_clash(void);
 static int test_named_only_ty(void);
 static int test_fields_of_struct_count(void);
 static int test_stmt_returns_arena(void);
+static int test_stmt_diverges_arena(void);
 static int test_last_stmt_returns_arena(void);
 static int test_expr_references_result(void);
 static int test_ast_ty_types_tag(void);
@@ -1873,6 +1875,79 @@ static int stmt_returns_arena(int et, int ed1, int idx) {
   }
   if ((tag == 15)) {
     return 1;
+  } else {
+  }
+  return 0;
+}
+
+static int stmt_diverges_arena(int et, int ed1, int ed2, int ed3, int ed4, int pp, int idx, int depth) {
+  if ((idx < 0)) {
+    return 0;
+  } else {
+  }
+  int _sv0t0 = sv0_vec_len(et);
+  if ((idx >= _sv0t0)) {
+    return 0;
+  } else {
+  }
+  if ((depth > 64)) {
+    return 0;
+  } else {
+  }
+  int _sv0t1 = sv0_vec_get(et, idx);
+  int tag = _sv0t1;
+  if ((tag == 15)) {
+    return 1;
+  } else {
+  }
+  if ((tag == 28)) {
+    int _sv0t2 = sv0_vec_get(ed1, idx);
+    int _sv0t3 = (depth + 1);
+    int _sv0t4 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, _sv0t2, _sv0t3);
+    return _sv0t4;
+  } else {
+  }
+  if ((tag == 9)) {
+    int _sv0t5 = sv0_vec_get(ed3, idx);
+    int tail = _sv0t5;
+    if ((tail >= 0)) {
+      int _sv0t6 = (depth + 1);
+      int _sv0t7 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, tail, _sv0t6);
+      return _sv0t7;
+    } else {
+    }
+    int _sv0t8 = sv0_vec_get(ed2, idx);
+    int count = _sv0t8;
+    if ((count <= 0)) {
+      return 0;
+    } else {
+    }
+    int _sv0t9 = sv0_vec_get(ed1, idx);
+    int _sv0t10 = sv0_vec_get(ed4, idx);
+    int _sv0t11 = (count - 1);
+    int _sv0t12 = block_stmt_index(pp, _sv0t9, _sv0t10, _sv0t11);
+    int _sv0t13 = (depth + 1);
+    int _sv0t14 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, _sv0t12, _sv0t13);
+    return _sv0t14;
+  } else {
+  }
+  if ((tag == 10)) {
+    int _sv0t15 = sv0_vec_get(ed3, idx);
+    int els = _sv0t15;
+    if ((els < 0)) {
+      return 0;
+    } else {
+    }
+    int _sv0t16 = sv0_vec_get(ed2, idx);
+    int _sv0t17 = (depth + 1);
+    int _sv0t18 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, _sv0t16, _sv0t17);
+    if ((_sv0t18 != 1)) {
+      return 0;
+    } else {
+    }
+    int _sv0t19 = (depth + 1);
+    int _sv0t20 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, els, _sv0t19);
+    return _sv0t20;
   } else {
   }
   return 0;
@@ -3689,8 +3764,22 @@ static int check_fn_body(int bet, int bed1, int bed2, int bed3, int bed4, int bp
     return 0;
   } else {
   }
-  int _sv0t42 = (0 - 1);
-  return _sv0t42;
+  int _sv0t42 = TY_UNIT();
+  if ((body_ty == _sv0t42)) {
+    int _sv0t43 = sv0_vec_get(bet, body_root);
+    if ((_sv0t43 == 9)) {
+      int _sv0t44 = sv0_vec_get(bed3, body_root);
+      if ((_sv0t44 < 0)) {
+        int _sv0t45 = (0 - 2);
+        return _sv0t45;
+      } else {
+      }
+    } else {
+    }
+  } else {
+  }
+  int _sv0t46 = (0 - 1);
+  return _sv0t46;
 }
 
 static int process_item_use(const char* source, int starts, int ends, int pp, int id1, int id2, int item_idx, int fn_names, int fn_ret_types, int sdef_names, int edef_names, int edef_variant_offsets, int edef_variant_counts, int edef_vnames_flat, int edef_vshapes_flat, int env_names, int env_types, int env_muts, int aliases, int alias_targets) {
@@ -7051,43 +7140,55 @@ static int check_program(int tok_tags, const char* source, int starts, int ends,
           }
         } else {
         }
-        int _sv0t82 = (0 - 1);
-        return _sv0t82;
+        int _sv0t82 = sv0_vec_len(diag_sink);
+        if ((_sv0t82 == 0)) {
+          int _sv0t83 = (0 - 2);
+          if ((chk == _sv0t83)) {
+            sv0_vec_push(diag_sink, 408);
+          } else {
+            sv0_vec_push(diag_sink, 400);
+          }
+          int _sv0t84 = sv0_vec_get(id1, ii);
+          sv0_vec_push(diag_sink, _sv0t84);
+        } else {
+        }
+        int _sv0t85 = (0 - 1);
+        return _sv0t85;
       } else {
       }
     } else {
     }
-    int _sv0t83 = sv0_vec_get(it, ii);
-    if ((_sv0t83 == 8)) {
-      int _sv0t84 = sv0_vec_get(id1, ii);
-      int ext_name_pos = _sv0t84;
-      int _sv0t85 = sv0_vec_get(id3, ii);
-      int ext_param_count = _sv0t85;
-      int _sv0t86 = sv0_vec_get(id5, ii);
-      int ext_pbase = _sv0t86;
-      int _sv0t87 = sv0_vec_new();
-      int ext_param_types = _sv0t87;
-      int _sv0t88 = scan_fn_param_type_tags_arena(fn_param_ty_root, ext_pbase, ext_param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, ext_param_types);
-      int ext_rpt = _sv0t88;
+    int _sv0t86 = sv0_vec_get(it, ii);
+    if ((_sv0t86 == 8)) {
+      int _sv0t87 = sv0_vec_get(id1, ii);
+      int ext_name_pos = _sv0t87;
+      int _sv0t88 = sv0_vec_get(id3, ii);
+      int ext_param_count = _sv0t88;
+      int _sv0t89 = sv0_vec_get(id5, ii);
+      int ext_pbase = _sv0t89;
+      int _sv0t90 = sv0_vec_new();
+      int ext_param_types = _sv0t90;
+      int _sv0t91 = scan_fn_param_type_tags_arena(fn_param_ty_root, ext_pbase, ext_param_count, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit, ext_param_types);
+      int ext_rpt = _sv0t91;
       if ((ext_rpt < 0)) {
-        int _sv0t89 = (0 - 1);
-        return _sv0t89;
+        int _sv0t92 = (0 - 1);
+        return _sv0t92;
       } else {
       }
-      int _sv0t90 = sv0_vec_get(id2, ii);
-      int ext_has_ret = (_sv0t90 % 2);
-      int _sv0t91 = scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item, ii, ext_has_ret, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit);
-      int ext_ret_tag = _sv0t91;
-      int _sv0t92 = check_extern_fn_signature(ext_param_types, ext_param_count, ext_ret_tag, ext_has_ret, ext_name_pos, diag_sink);
-      int _cefs = _sv0t92;
+      int _sv0t93 = sv0_vec_get(id2, ii);
+      int ext_has_ret = (_sv0t93 % 2);
+      int _sv0t94 = scan_fn_ret_type_tag_arena(fn_ret_ty_root_by_item, ii, ext_has_ret, pty_tt, pty_td1, pty_td2, pty_td3, pp, source, starts, ends, struct_names, enum_names, type_params, tp_limit);
+      int ext_ret_tag = _sv0t94;
+      int _sv0t95 = check_extern_fn_signature(ext_param_types, ext_param_count, ext_ret_tag, ext_has_ret, ext_name_pos, diag_sink);
+      int _cefs = _sv0t95;
     } else {
     }
     ii = (ii + 1);
   }
-  int _sv0t93 = sv0_vec_len(diag_sink);
-  if ((_sv0t93 > 0)) {
-    int _sv0t94 = (0 - 1);
-    return _sv0t94;
+  int _sv0t96 = sv0_vec_len(diag_sink);
+  if ((_sv0t96 > 0)) {
+    int _sv0t97 = (0 - 1);
+    return _sv0t97;
   } else {
   }
   return 0;
@@ -9087,7 +9188,7 @@ static int synth_expr(int et, int ed1, int ed2, int ed3, int ed4, int pp, const 
       int _sv0t220 = (stmts_count - 1);
       int _sv0t221 = block_stmt_index(pp, stmts_first, sidecar, _sv0t220);
       int last_idx = _sv0t221;
-      int _sv0t222 = stmt_returns_arena(et, ed1, last_idx);
+      int _sv0t222 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, last_idx, 0);
       if (_sv0t222) {
         int _sv0t223 = env_scope_restore(env_names, env_mark);
         int _r2 = _sv0t223;
@@ -10258,6 +10359,91 @@ static int test_stmt_returns_arena(void) {
   }
   int _sv0t6 = stmt_returns_arena(et, ed1, 0);
   if ((_sv0t6 != 1)) {
+    return 4;
+  } else {
+  }
+  return 0;
+}
+
+static int test_stmt_diverges_arena(void) {
+  int _sv0t0 = sv0_vec_new();
+  int et = _sv0t0;
+  int _sv0t1 = sv0_vec_new();
+  int ed1 = _sv0t1;
+  int _sv0t2 = sv0_vec_new();
+  int ed2 = _sv0t2;
+  int _sv0t3 = sv0_vec_new();
+  int ed3 = _sv0t3;
+  int _sv0t4 = sv0_vec_new();
+  int ed4 = _sv0t4;
+  int _sv0t5 = sv0_vec_new();
+  int pp = _sv0t5;
+  sv0_vec_push(et, 0);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 15);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 15);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  sv0_vec_push(ed3, 0);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 9);
+  sv0_vec_push(ed1, 1);
+  sv0_vec_push(ed2, 1);
+  int _sv0t6 = (0 - 1);
+  sv0_vec_push(ed3, _sv0t6);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 9);
+  sv0_vec_push(ed1, 2);
+  sv0_vec_push(ed2, 1);
+  int _sv0t7 = (0 - 1);
+  sv0_vec_push(ed3, _sv0t7);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 10);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 3);
+  sv0_vec_push(ed3, 4);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 10);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 3);
+  int _sv0t8 = (0 - 1);
+  sv0_vec_push(ed3, _sv0t8);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 9);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 0);
+  int _sv0t9 = (0 - 1);
+  sv0_vec_push(ed3, _sv0t9);
+  sv0_vec_push(ed4, 0);
+  sv0_vec_push(et, 10);
+  sv0_vec_push(ed1, 0);
+  sv0_vec_push(ed2, 3);
+  sv0_vec_push(ed3, 7);
+  sv0_vec_push(ed4, 0);
+  int _sv0t10 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 5, 0);
+  if ((_sv0t10 != 1)) {
+    return 1;
+  } else {
+  }
+  int _sv0t11 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 6, 0);
+  if ((_sv0t11 != 0)) {
+    return 2;
+  } else {
+  }
+  int _sv0t12 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 8, 0);
+  if ((_sv0t12 != 0)) {
+    return 3;
+  } else {
+  }
+  int _sv0t13 = stmt_diverges_arena(et, ed1, ed2, ed3, ed4, pp, 3, 0);
+  if ((_sv0t13 != 1)) {
     return 4;
   } else {
   }
@@ -16185,472 +16371,479 @@ int main(void) {
   }
   int _sv0t57 = test_last_stmt_returns_arena();
   int r30 = _sv0t57;
-  if ((r30 != 0)) {
-    int _sv0t58 = (310 + r30);
-    return _sv0t58;
+  int _sv0t58 = test_stmt_diverges_arena();
+  int r30d = _sv0t58;
+  if ((r30d != 0)) {
+    int _sv0t59 = (3000 + r30d);
+    return _sv0t59;
   } else {
   }
-  int _sv0t59 = test_expr_references_result();
-  int r31 = _sv0t59;
-  if ((r31 != 0)) {
-    int _sv0t60 = (320 + r31);
+  if ((r30 != 0)) {
+    int _sv0t60 = (310 + r30);
     return _sv0t60;
   } else {
   }
-  int _sv0t61 = test_ast_ty_types_tag();
-  int r32 = _sv0t61;
-  if ((r32 != 0)) {
-    int _sv0t62 = (330 + r32);
+  int _sv0t61 = test_expr_references_result();
+  int r31 = _sv0t61;
+  if ((r31 != 0)) {
+    int _sv0t62 = (320 + r31);
     return _sv0t62;
   } else {
   }
-  int _sv0t63 = test_type_params();
-  int r33 = _sv0t63;
-  if ((r33 != 0)) {
-    int _sv0t64 = (340 + r33);
+  int _sv0t63 = test_ast_ty_types_tag();
+  int r32 = _sv0t63;
+  if ((r32 != 0)) {
+    int _sv0t64 = (330 + r32);
     return _sv0t64;
   } else {
   }
-  int _sv0t65 = test_resolve_field_ty();
-  int r34 = _sv0t65;
-  if ((r34 != 0)) {
-    int _sv0t66 = (360 + r34);
+  int _sv0t65 = test_type_params();
+  int r33 = _sv0t65;
+  if ((r33 != 0)) {
+    int _sv0t66 = (340 + r33);
     return _sv0t66;
   } else {
   }
-  int _sv0t67 = test_contract_expr_flag();
-  int r35 = _sv0t67;
-  if ((r35 != 0)) {
-    int _sv0t68 = (370 + r35);
+  int _sv0t67 = test_resolve_field_ty();
+  int r34 = _sv0t67;
+  if ((r34 != 0)) {
+    int _sv0t68 = (360 + r34);
     return _sv0t68;
   } else {
   }
-  int _sv0t69 = test_ty_import_alias_push();
-  int r36 = _sv0t69;
-  if ((r36 != 0)) {
-    int _sv0t70 = (380 + r36);
+  int _sv0t69 = test_contract_expr_flag();
+  int r35 = _sv0t69;
+  if ((r35 != 0)) {
+    int _sv0t70 = (370 + r35);
     return _sv0t70;
   } else {
   }
-  int _sv0t71 = test_ctor_ty_tag();
-  int r37 = _sv0t71;
-  if ((r37 != 0)) {
-    int _sv0t72 = (390 + r37);
+  int _sv0t71 = test_ty_import_alias_push();
+  int r36 = _sv0t71;
+  if ((r36 != 0)) {
+    int _sv0t72 = (380 + r36);
     return _sv0t72;
   } else {
   }
-  int _sv0t73 = test_try_success_validate();
-  int r38 = _sv0t73;
-  if ((r38 != 0)) {
-    int _sv0t74 = (400 + r38);
+  int _sv0t73 = test_ctor_ty_tag();
+  int r37 = _sv0t73;
+  if ((r37 != 0)) {
+    int _sv0t74 = (390 + r37);
     return _sv0t74;
   } else {
   }
-  int _sv0t75 = test_int_width_from_name();
-  int r39 = _sv0t75;
-  if ((r39 != 0)) {
-    int _sv0t76 = (410 + r39);
+  int _sv0t75 = test_try_success_validate();
+  int r38 = _sv0t75;
+  if ((r38 != 0)) {
+    int _sv0t76 = (400 + r38);
     return _sv0t76;
   } else {
   }
-  int _sv0t77 = test_ast_ty_payload();
-  int r40 = _sv0t77;
-  if ((r40 != 0)) {
-    int _sv0t78 = (420 + r40);
+  int _sv0t77 = test_int_width_from_name();
+  int r39 = _sv0t77;
+  if ((r39 != 0)) {
+    int _sv0t78 = (410 + r39);
     return _sv0t78;
   } else {
   }
-  int _sv0t79 = test_enum_ctor_count();
-  int r41 = _sv0t79;
-  if ((r41 != 0)) {
-    int _sv0t80 = (430 + r41);
+  int _sv0t79 = test_ast_ty_payload();
+  int r40 = _sv0t79;
+  if ((r40 != 0)) {
+    int _sv0t80 = (420 + r40);
     return _sv0t80;
   } else {
   }
-  int _sv0t81 = test_binop_unop_result_ty();
-  int r42 = _sv0t81;
-  if ((r42 != 0)) {
-    int _sv0t82 = (440 + r42);
+  int _sv0t81 = test_enum_ctor_count();
+  int r41 = _sv0t81;
+  if ((r41 != 0)) {
+    int _sv0t82 = (430 + r41);
     return _sv0t82;
   } else {
   }
-  int _sv0t83 = test_env_entry_index();
-  int r43 = _sv0t83;
-  if ((r43 != 0)) {
-    int _sv0t84 = (450 + r43);
+  int _sv0t83 = test_binop_unop_result_ty();
+  int r42 = _sv0t83;
+  if ((r42 != 0)) {
+    int _sv0t84 = (440 + r42);
     return _sv0t84;
   } else {
   }
-  int _sv0t85 = test_fn_table();
-  int r44 = _sv0t85;
-  if ((r44 != 0)) {
-    int _sv0t86 = (460 + r44);
+  int _sv0t85 = test_env_entry_index();
+  int r43 = _sv0t85;
+  if ((r43 != 0)) {
+    int _sv0t86 = (450 + r43);
     return _sv0t86;
   } else {
   }
-  int _sv0t87 = test_scan_struct_field_names();
-  int r45 = _sv0t87;
-  if ((r45 != 0)) {
-    int _sv0t88 = (470 + r45);
+  int _sv0t87 = test_fn_table();
+  int r44 = _sv0t87;
+  if ((r44 != 0)) {
+    int _sv0t88 = (460 + r44);
     return _sv0t88;
   } else {
   }
-  int _sv0t89 = test_scan_enum_variant_names();
-  int r46 = _sv0t89;
-  if ((r46 != 0)) {
-    int _sv0t90 = (480 + r46);
+  int _sv0t89 = test_scan_struct_field_names();
+  int r45 = _sv0t89;
+  if ((r45 != 0)) {
+    int _sv0t90 = (470 + r45);
     return _sv0t90;
   } else {
   }
-  int _sv0t91 = test_scan_type_tag_at();
-  int r47 = _sv0t91;
-  if ((r47 != 0)) {
-    int _sv0t92 = (490 + r47);
+  int _sv0t91 = test_scan_enum_variant_names();
+  int r46 = _sv0t91;
+  if ((r46 != 0)) {
+    int _sv0t92 = (480 + r46);
     return _sv0t92;
   } else {
   }
-  int _sv0t93 = test_pty_root_to_type_tag();
-  int r47b = _sv0t93;
-  if ((r47b != 0)) {
-    int _sv0t94 = (460 + r47b);
+  int _sv0t93 = test_scan_type_tag_at();
+  int r47 = _sv0t93;
+  if ((r47 != 0)) {
+    int _sv0t94 = (490 + r47);
     return _sv0t94;
   } else {
   }
-  int _sv0t95 = test_scan_fn_param_arena();
-  int r47c = _sv0t95;
-  if ((r47c != 0)) {
-    int _sv0t96 = (470 + r47c);
+  int _sv0t95 = test_pty_root_to_type_tag();
+  int r47b = _sv0t95;
+  if ((r47b != 0)) {
+    int _sv0t96 = (460 + r47b);
     return _sv0t96;
   } else {
   }
-  int _sv0t97 = test_scan_struct_field_type_tags();
-  int r48 = _sv0t97;
-  if ((r48 != 0)) {
-    int _sv0t98 = (500 + r48);
+  int _sv0t97 = test_scan_fn_param_arena();
+  int r47c = _sv0t97;
+  if ((r47c != 0)) {
+    int _sv0t98 = (470 + r47c);
     return _sv0t98;
   } else {
   }
-  int _sv0t99 = test_scan_fn_param_type_tags();
-  int r49 = _sv0t99;
-  if ((r49 != 0)) {
-    int _sv0t100 = (510 + r49);
+  int _sv0t99 = test_scan_struct_field_type_tags();
+  int r48 = _sv0t99;
+  if ((r48 != 0)) {
+    int _sv0t100 = (500 + r48);
     return _sv0t100;
   } else {
   }
-  int _sv0t101 = test_fn_table_lookup_str();
-  int r50 = _sv0t101;
-  if ((r50 != 0)) {
-    int _sv0t102 = (520 + r50);
+  int _sv0t101 = test_scan_fn_param_type_tags();
+  int r49 = _sv0t101;
+  if ((r49 != 0)) {
+    int _sv0t102 = (510 + r49);
     return _sv0t102;
   } else {
   }
-  int _sv0t103 = test_scan_fn_ret_type_tag();
-  int r51 = _sv0t103;
-  if ((r51 != 0)) {
-    int _sv0t104 = (530 + r51);
+  int _sv0t103 = test_fn_table_lookup_str();
+  int r50 = _sv0t103;
+  if ((r50 != 0)) {
+    int _sv0t104 = (520 + r50);
     return _sv0t104;
   } else {
   }
-  int _sv0t105 = test_register_all_item_fns();
-  int r52 = _sv0t105;
-  if ((r52 != 0)) {
-    int _sv0t106 = (540 + r52);
+  int _sv0t105 = test_scan_fn_ret_type_tag();
+  int r51 = _sv0t105;
+  if ((r51 != 0)) {
+    int _sv0t106 = (530 + r51);
     return _sv0t106;
   } else {
   }
-  int _sv0t107 = test_scan_enum_variant_shapes();
-  int r53 = _sv0t107;
-  if ((r53 != 0)) {
-    int _sv0t108 = (550 + r53);
+  int _sv0t107 = test_register_all_item_fns();
+  int r52 = _sv0t107;
+  if ((r52 != 0)) {
+    int _sv0t108 = (540 + r52);
     return _sv0t108;
   } else {
   }
-  int _sv0t109 = test_init_struct_defs();
-  int r54 = _sv0t109;
-  if ((r54 != 0)) {
-    int _sv0t110 = (560 + r54);
+  int _sv0t109 = test_scan_enum_variant_shapes();
+  int r53 = _sv0t109;
+  if ((r53 != 0)) {
+    int _sv0t110 = (550 + r53);
     return _sv0t110;
   } else {
   }
-  int _sv0t111 = test_init_enum_defs();
-  int r55 = _sv0t111;
-  if ((r55 != 0)) {
-    int _sv0t112 = (570 + r55);
+  int _sv0t111 = test_init_struct_defs();
+  int r54 = _sv0t111;
+  if ((r54 != 0)) {
+    int _sv0t112 = (560 + r54);
     return _sv0t112;
   } else {
   }
-  int _sv0t113 = test_init_enum_defs_dup_variants();
-  int r55d = _sv0t113;
-  if ((r55d != 0)) {
-    int _sv0t114 = (574 + r55d);
+  int _sv0t113 = test_init_enum_defs();
+  int r55 = _sv0t113;
+  if ((r55 != 0)) {
+    int _sv0t114 = (570 + r55);
     return _sv0t114;
   } else {
   }
-  int _sv0t115 = test_builtin_fn_lookup();
-  int r56 = _sv0t115;
-  if ((r56 != 0)) {
-    int _sv0t116 = (580 + r56);
+  int _sv0t115 = test_init_enum_defs_dup_variants();
+  int r55d = _sv0t115;
+  if ((r55d != 0)) {
+    int _sv0t116 = (574 + r55d);
     return _sv0t116;
   } else {
   }
-  int _sv0t117 = test_resolve_fn_call();
-  int r57 = _sv0t117;
-  if ((r57 != 0)) {
-    int _sv0t118 = (600 + r57);
+  int _sv0t117 = test_builtin_fn_lookup();
+  int r56 = _sv0t117;
+  if ((r56 != 0)) {
+    int _sv0t118 = (580 + r56);
     return _sv0t118;
   } else {
   }
-  int _sv0t119 = test_enum_ctor_resolution();
-  int r58 = _sv0t119;
-  if ((r58 != 0)) {
-    int _sv0t120 = (610 + r58);
+  int _sv0t119 = test_resolve_fn_call();
+  int r57 = _sv0t119;
+  if ((r57 != 0)) {
+    int _sv0t120 = (600 + r57);
     return _sv0t120;
   } else {
   }
-  int _sv0t121 = test_synth_building_blocks();
-  int r59 = _sv0t121;
-  if ((r59 != 0)) {
-    int _sv0t122 = (620 + r59);
+  int _sv0t121 = test_enum_ctor_resolution();
+  int r58 = _sv0t121;
+  if ((r58 != 0)) {
+    int _sv0t122 = (610 + r58);
     return _sv0t122;
   } else {
   }
-  int _sv0t123 = test_synth_expr();
-  int r60 = _sv0t123;
-  if ((r60 != 0)) {
-    int _sv0t124 = (630 + r60);
+  int _sv0t123 = test_synth_building_blocks();
+  int r59 = _sv0t123;
+  if ((r59 != 0)) {
+    int _sv0t124 = (620 + r59);
     return _sv0t124;
   } else {
   }
-  int _sv0t125 = test_scan_fn_param_names();
-  int r61 = _sv0t125;
-  if ((r61 != 0)) {
-    int _sv0t126 = (650 + r61);
+  int _sv0t125 = test_synth_expr();
+  int r60 = _sv0t125;
+  if ((r60 != 0)) {
+    int _sv0t126 = (630 + r60);
     return _sv0t126;
   } else {
   }
-  int _sv0t127 = test_check_fn_body();
-  int r62 = _sv0t127;
-  if ((r62 != 0)) {
-    int _sv0t128 = (660 + r62);
+  int _sv0t127 = test_scan_fn_param_names();
+  int r61 = _sv0t127;
+  if ((r61 != 0)) {
+    int _sv0t128 = (650 + r61);
     return _sv0t128;
   } else {
   }
-  int _sv0t129 = test_process_item_use();
-  int r63 = _sv0t129;
-  if ((r63 != 0)) {
-    int _sv0t130 = (670 + r63);
+  int _sv0t129 = test_check_fn_body();
+  int r62 = _sv0t129;
+  if ((r62 != 0)) {
+    int _sv0t130 = (660 + r62);
     return _sv0t130;
   } else {
   }
-  int _sv0t131 = test_build_mod_env();
-  int r64 = _sv0t131;
-  if ((r64 != 0)) {
-    int _sv0t132 = (680 + r64);
+  int _sv0t131 = test_process_item_use();
+  int r63 = _sv0t131;
+  if ((r63 != 0)) {
+    int _sv0t132 = (670 + r63);
     return _sv0t132;
   } else {
   }
-  int _sv0t133 = test_check_program();
-  int r65 = _sv0t133;
-  if ((r65 != 0)) {
-    int _sv0t134 = (685 + r65);
+  int _sv0t133 = test_build_mod_env();
+  int r64 = _sv0t133;
+  if ((r64 != 0)) {
+    int _sv0t134 = (680 + r64);
     return _sv0t134;
   } else {
   }
-  int _sv0t135 = test_check_program_mangled_name();
-  int r65m = _sv0t135;
-  if ((r65m != 0)) {
-    int _sv0t136 = (695 + r65m);
+  int _sv0t135 = test_check_program();
+  int r65 = _sv0t135;
+  if ((r65 != 0)) {
+    int _sv0t136 = (685 + r65);
     return _sv0t136;
   } else {
   }
-  int _sv0t137 = test_named_only_ty_basic();
-  int r66 = _sv0t137;
-  if ((r66 != 0)) {
-    int _sv0t138 = (690 + r66);
+  int _sv0t137 = test_check_program_mangled_name();
+  int r65m = _sv0t137;
+  if ((r65m != 0)) {
+    int _sv0t138 = (695 + r65m);
     return _sv0t138;
   } else {
   }
-  int _sv0t139 = test_resolve_field_ty_tag_ptr();
-  int r67 = _sv0t139;
-  if ((r67 != 0)) {
-    int _sv0t140 = (700 + r67);
+  int _sv0t139 = test_named_only_ty_basic();
+  int r66 = _sv0t139;
+  if ((r66 != 0)) {
+    int _sv0t140 = (690 + r66);
     return _sv0t140;
   } else {
   }
-  int _sv0t141 = test_ast_ty_to_ty_payload_ptr();
-  int r68 = _sv0t141;
-  if ((r68 != 0)) {
-    int _sv0t142 = (710 + r68);
+  int _sv0t141 = test_resolve_field_ty_tag_ptr();
+  int r67 = _sv0t141;
+  if ((r67 != 0)) {
+    int _sv0t142 = (700 + r67);
     return _sv0t142;
   } else {
   }
-  int _sv0t143 = test_slice_ctor_base_node_excludes_ptr_cast();
-  int r69 = _sv0t143;
-  if ((r69 != 0)) {
-    int _sv0t144 = (720 + r69);
+  int _sv0t143 = test_ast_ty_to_ty_payload_ptr();
+  int r68 = _sv0t143;
+  if ((r68 != 0)) {
+    int _sv0t144 = (710 + r68);
     return _sv0t144;
   } else {
   }
-  int _sv0t145 = test_synth_expr_ptr_cast_const_from_shared_ref();
-  int r70 = _sv0t145;
-  if ((r70 != 0)) {
-    int _sv0t146 = (730 + r70);
+  int _sv0t145 = test_slice_ctor_base_node_excludes_ptr_cast();
+  int r69 = _sv0t145;
+  if ((r69 != 0)) {
+    int _sv0t146 = (720 + r69);
     return _sv0t146;
   } else {
   }
-  int _sv0t147 = test_synth_expr_ptr_cast_const_from_mut_ref();
-  int r71 = _sv0t147;
-  if ((r71 != 0)) {
-    int _sv0t148 = (740 + r71);
+  int _sv0t147 = test_synth_expr_ptr_cast_const_from_shared_ref();
+  int r70 = _sv0t147;
+  if ((r70 != 0)) {
+    int _sv0t148 = (730 + r70);
     return _sv0t148;
   } else {
   }
-  int _sv0t149 = test_synth_expr_ptr_cast_mut_from_mut_ref();
-  int r72 = _sv0t149;
-  if ((r72 != 0)) {
-    int _sv0t150 = (750 + r72);
+  int _sv0t149 = test_synth_expr_ptr_cast_const_from_mut_ref();
+  int r71 = _sv0t149;
+  if ((r71 != 0)) {
+    int _sv0t150 = (740 + r71);
     return _sv0t150;
   } else {
   }
-  int _sv0t151 = test_synth_expr_ptr_cast_mut_from_shared_ref_rejected();
-  int r73 = _sv0t151;
-  if ((r73 != 0)) {
-    int _sv0t152 = (760 + r73);
+  int _sv0t151 = test_synth_expr_ptr_cast_mut_from_mut_ref();
+  int r72 = _sv0t151;
+  if ((r72 != 0)) {
+    int _sv0t152 = (750 + r72);
     return _sv0t152;
   } else {
   }
-  int _sv0t153 = test_synth_expr_cast_non_ptr_still_ty_int();
-  int r74 = _sv0t153;
-  if ((r74 != 0)) {
-    int _sv0t154 = (770 + r74);
+  int _sv0t153 = test_synth_expr_ptr_cast_mut_from_shared_ref_rejected();
+  int r73 = _sv0t153;
+  if ((r73 != 0)) {
+    int _sv0t154 = (760 + r73);
     return _sv0t154;
   } else {
   }
-  int _sv0t155 = test_pty_root_to_type_tag_ptr();
-  int r75 = _sv0t155;
-  if ((r75 != 0)) {
-    int _sv0t156 = (780 + r75);
+  int _sv0t155 = test_synth_expr_cast_non_ptr_still_ty_int();
+  int r74 = _sv0t155;
+  if ((r74 != 0)) {
+    int _sv0t156 = (770 + r74);
     return _sv0t156;
   } else {
   }
-  int _sv0t157 = test_synth_expr_unsafe_block_transparent();
-  int r76 = _sv0t157;
-  if ((r76 != 0)) {
-    int _sv0t158 = (790 + r76);
+  int _sv0t157 = test_pty_root_to_type_tag_ptr();
+  int r75 = _sv0t157;
+  if ((r75 != 0)) {
+    int _sv0t158 = (780 + r75);
     return _sv0t158;
   } else {
   }
-  int _sv0t159 = test_check_unsafe_gate_flags_deref_outside_unsafe();
-  int r77 = _sv0t159;
-  if ((r77 != 0)) {
-    int _sv0t160 = (800 + r77);
+  int _sv0t159 = test_synth_expr_unsafe_block_transparent();
+  int r76 = _sv0t159;
+  if ((r76 != 0)) {
+    int _sv0t160 = (790 + r76);
     return _sv0t160;
   } else {
   }
-  int _sv0t161 = test_check_unsafe_gate_silent_inside_unsafe();
-  int r78 = _sv0t161;
-  if ((r78 != 0)) {
-    int _sv0t162 = (810 + r78);
+  int _sv0t161 = test_check_unsafe_gate_flags_deref_outside_unsafe();
+  int r77 = _sv0t161;
+  if ((r77 != 0)) {
+    int _sv0t162 = (800 + r77);
     return _sv0t162;
   } else {
   }
-  int _sv0t163 = test_check_extern_fn_signature_flags_bad_param();
-  int r79 = _sv0t163;
-  if ((r79 != 0)) {
-    int _sv0t164 = (820 + r79);
+  int _sv0t163 = test_check_unsafe_gate_silent_inside_unsafe();
+  int r78 = _sv0t163;
+  if ((r78 != 0)) {
+    int _sv0t164 = (810 + r78);
     return _sv0t164;
   } else {
   }
-  int _sv0t165 = test_check_extern_fn_signature_flags_bad_return();
-  int r80 = _sv0t165;
-  if ((r80 != 0)) {
-    int _sv0t166 = (830 + r80);
+  int _sv0t165 = test_check_extern_fn_signature_flags_bad_param();
+  int r79 = _sv0t165;
+  if ((r79 != 0)) {
+    int _sv0t166 = (820 + r79);
     return _sv0t166;
   } else {
   }
-  int _sv0t167 = test_check_extern_fn_signature_silent_on_all_safe();
-  int r81 = _sv0t167;
-  if ((r81 != 0)) {
-    int _sv0t168 = (840 + r81);
+  int _sv0t167 = test_check_extern_fn_signature_flags_bad_return();
+  int r80 = _sv0t167;
+  if ((r80 != 0)) {
+    int _sv0t168 = (830 + r80);
     return _sv0t168;
   } else {
   }
-  int _sv0t169 = test_register_all_item_fns_extern_fn();
-  int r82 = _sv0t169;
-  if ((r82 != 0)) {
-    int _sv0t170 = (850 + r82);
+  int _sv0t169 = test_check_extern_fn_signature_silent_on_all_safe();
+  int r81 = _sv0t169;
+  if ((r81 != 0)) {
+    int _sv0t170 = (840 + r81);
     return _sv0t170;
   } else {
   }
-  int _sv0t171 = test_extern_fn_manifest_conflict_mismatch();
-  int r83 = _sv0t171;
-  if ((r83 != 0)) {
-    int _sv0t172 = (860 + r83);
+  int _sv0t171 = test_register_all_item_fns_extern_fn();
+  int r82 = _sv0t171;
+  if ((r82 != 0)) {
+    int _sv0t172 = (850 + r82);
     return _sv0t172;
   } else {
   }
-  int _sv0t173 = test_extern_fn_manifest_conflict_silent_on_identical_redecl();
-  int r84 = _sv0t173;
-  if ((r84 != 0)) {
-    int _sv0t174 = (870 + r84);
+  int _sv0t173 = test_extern_fn_manifest_conflict_mismatch();
+  int r83 = _sv0t173;
+  if ((r83 != 0)) {
+    int _sv0t174 = (860 + r83);
     return _sv0t174;
   } else {
   }
-  int _sv0t175 = test_extern_fn_manifest_conflict_ignores_non_extern_rows();
-  int r85 = _sv0t175;
-  if ((r85 != 0)) {
-    int _sv0t176 = (880 + r85);
+  int _sv0t175 = test_extern_fn_manifest_conflict_silent_on_identical_redecl();
+  int r84 = _sv0t175;
+  if ((r84 != 0)) {
+    int _sv0t176 = (870 + r84);
     return _sv0t176;
   } else {
   }
-  int _sv0t177 = test_program_uses_ffi_features_clean_program();
-  int r86 = _sv0t177;
-  if ((r86 != 0)) {
-    int _sv0t178 = (890 + r86);
+  int _sv0t177 = test_extern_fn_manifest_conflict_ignores_non_extern_rows();
+  int r85 = _sv0t177;
+  if ((r85 != 0)) {
+    int _sv0t178 = (880 + r85);
     return _sv0t178;
   } else {
   }
-  int _sv0t179 = test_program_uses_ffi_features_extern_item();
-  int r87 = _sv0t179;
-  if ((r87 != 0)) {
-    int _sv0t180 = (900 + r87);
+  int _sv0t179 = test_program_uses_ffi_features_clean_program();
+  int r86 = _sv0t179;
+  if ((r86 != 0)) {
+    int _sv0t180 = (890 + r86);
     return _sv0t180;
   } else {
   }
-  int _sv0t181 = test_program_uses_ffi_features_ptr_type();
-  int r88 = _sv0t181;
-  if ((r88 != 0)) {
-    int _sv0t182 = (910 + r88);
+  int _sv0t181 = test_program_uses_ffi_features_extern_item();
+  int r87 = _sv0t181;
+  if ((r87 != 0)) {
+    int _sv0t182 = (900 + r87);
     return _sv0t182;
   } else {
   }
-  int _sv0t183 = test_program_uses_ffi_features_unsafe_block();
-  int r89 = _sv0t183;
-  if ((r89 != 0)) {
-    int _sv0t184 = (920 + r89);
+  int _sv0t183 = test_program_uses_ffi_features_ptr_type();
+  int r88 = _sv0t183;
+  if ((r88 != 0)) {
+    int _sv0t184 = (910 + r88);
     return _sv0t184;
   } else {
   }
-  int _sv0t185 = test_chk_vecf_lookup_kinds();
-  int rv8 = _sv0t185;
-  if ((rv8 != 0)) {
-    int _sv0t186 = (930 + 80);
-    int _sv0t187 = (_sv0t186 + rv8);
-    return _sv0t187;
+  int _sv0t185 = test_program_uses_ffi_features_unsafe_block();
+  int r89 = _sv0t185;
+  if ((r89 != 0)) {
+    int _sv0t186 = (920 + r89);
+    return _sv0t186;
   } else {
   }
-  int _sv0t188 = test_chk_vecf_site_table();
-  int rt = _sv0t188;
-  if ((rt != 0)) {
-    int _sv0t189 = (1200 + rt);
+  int _sv0t187 = test_chk_vecf_lookup_kinds();
+  int rv8 = _sv0t187;
+  if ((rv8 != 0)) {
+    int _sv0t188 = (930 + 80);
+    int _sv0t189 = (_sv0t188 + rv8);
     return _sv0t189;
   } else {
   }
-  int _sv0t190 = test_scan_type_tag_at_array();
-  int rar = _sv0t190;
-  if ((rar != 0)) {
-    int _sv0t191 = (1300 + rar);
+  int _sv0t190 = test_chk_vecf_site_table();
+  int rt = _sv0t190;
+  if ((rt != 0)) {
+    int _sv0t191 = (1200 + rt);
     return _sv0t191;
+  } else {
+  }
+  int _sv0t192 = test_scan_type_tag_at_array();
+  int rar = _sv0t192;
+  if ((rar != 0)) {
+    int _sv0t193 = (1300 + rar);
+    return _sv0t193;
   } else {
   }
   return 0;

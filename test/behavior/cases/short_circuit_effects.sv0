@@ -1,0 +1,22 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0 */
+/* `&&` and `||` short-circuit: the right operand (here a call, or an
+   out-of-range vec_get) is not evaluated when the left one decides the
+   result. sv0c used to evaluate both (found by sv0cov CV-302). */
+fn bump(v: Vec<i32>) -> bool {
+    vec_push(v, 1);
+    return true;
+}
+fn main() -> i32 {
+    let v: Vec<i32> = vec_new();
+    let k: i32 = 0 - 1;
+    let a: bool = k >= 0 && vec_get(v, k) == 1;
+    let b: bool = k < 0 || vec_get(v, k) == 1;
+    let c: bool = false && bump(v);
+    let d: bool = true || bump(v);
+    let e: bool = true && bump(v);
+    let f: bool = false || bump(v);
+    let mut i: i32 = 0;
+    while i < 3 && vec_len(v) >= 0 { i = i + 1; }
+    if a || c || d == false || e == false || f == false || b == false { return 10; }
+    return vec_len(v) + i - 5;
+}

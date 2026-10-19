@@ -22,8 +22,8 @@ contracts/semantics.md 1.4, 3.1 and keywords/reference.md 1.12).
    loop_invariant lines has those `statically_verified` with evidence and
    no points, the rest `runtime_checked`; a model-only clause (`old`) is
    `unsupported`.
-5. AC-106 through `sv0cov merge` and `report` (native runs: sv0vm has no
-   `getenv` to select the failing run): a passing run and a run that
+5. AC-106 through `sv0cov merge` and `report`, on native and VM profiles:
+   a passing run and a run that
    fails a `requires` (its profile is still published) give contract
    coverage 2/3 (true-only and false-only clauses covered, the
    never-evaluated one not), with the `contract_off` and model-only clauses
@@ -341,10 +341,9 @@ def main() -> int:
                 "    if string_len(getenv(\"FAIL\")) > 0 { return fails(1); };\n"
                 "    return checked(1) + trusted(1) + model(1) - 3;\n"
                 "}\n")
-            # (native only: sv0vm has no getenv builtin to select the failing run)
-            profs = instrumented(src, ac / "b", errors, "AC-106", envs=[{}, {"FAIL": "1"}], backends=("native",))
-            if len(profs) == 2:
-                for backend, pair in (("native", profs),):
+            profs = instrumented(src, ac / "b", errors, "AC-106", envs=[{}, {"FAIL": "1"}])
+            if len(profs) == 4:
+                for backend, pair in (("native", profs[:2]), ("vm", profs[2:])):
                     inp = ac / f"run-{backend}" / "in"
                     inp.mkdir(parents=True)
                     (inp / "x.sv0covmap.json").write_bytes((ac / "b" / "x.sv0covmap.json").read_bytes())
@@ -389,7 +388,7 @@ def main() -> int:
         return 1
     print(f"coverage contracts: OK ({len(ENFORCE)} enforcement cases on native + VM, disabled mode strips them; clauses.sv0: "
           "C map = VM map, sv0cov-valid, clauses.expected, equal counts; AC-010 ordinary coverage unchanged; disabled and "
-          "verified dispositions; AC-106 2/3 through merge + report; AC-043)")
+          "verified dispositions; AC-106 2/3 through merge + report on both backends; AC-043)")
     return 0
 
 

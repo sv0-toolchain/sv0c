@@ -52,6 +52,7 @@ fn megatu_diag_code_str(code: i32) -> string {
     if code == 409 { return "E0409"; }
     if code == 418 { return "E0418"; }
     if code == 429 { return "E0429"; }
+    if code == 408 { return "E0408"; }
     if code == 446 { return "E0446"; }
     if code == 447 { return "E0447"; }
     if code == 451 { return "E0451"; }
@@ -78,6 +79,7 @@ fn megatu_diag_code_msg(code: i32) -> string {
     if code == 322 { return "cannot return a slice that borrows a local"; }
     if code == 323 { return "conflicting borrow of a slice source"; }
     if code == 429 { return "no such field"; }
+    if code == 408 { return "function body must return, end with return, or be unit"; }
     if code == 446 { return "multi-element tuples are not supported in this slice"; }
     if code == 447 { return "vec_push / vec_set / array literals / element stores use integer-sized slots and would silently truncate an f64; declare the vec, array or slice as f64 (Vec<f64>, [f64; N], &[f64]) so the f64 accessors are selected, or use vec_push_f64 / vec_set_f64"; }
     if code == 451 { return "ambiguous vec element type: this name is declared or used both as a Vec<f64> and as a word-sized Vec in the same function"; }
@@ -299,6 +301,34 @@ fn megatu_check_exclusions(units: string, source: string, dr: Vec<i32>, ex: Vec<
         path = megatu_unit_path(units, k);
     }
     return n;
+}
+
+/* The first token of a raw-pointer type (`*const` / `*mut`), an `unsafe`
+   block, or an `#[extern_c]` attribute: where the VM backend's E0553 points
+   (it used to have no span and print at 1:1). -1 when none is found. */
+fn megatu_ffi_feature_tok(tags: Vec<i32>, source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    let n: i32 = vec_len(tags);
+    let mut i: i32 = 0;
+    while i < n {
+        let t: i32 = vec_get(tags, i);
+        if t == 93 { return i; }
+        if i + 1 < n {
+            let u: i32 = vec_get(tags, i + 1);
+            if t == 24 {
+                if u == 58 || u == 77 { return i; }
+            }
+            if t == 21 {
+                if u == 10 {
+                    if i + 2 < n {
+                        let s: i32 = vec_get(starts, i + 2);
+                        if string_eq(string_substr(source, s, vec_get(ends, i + 2) - s), "extern_c") { return i; }
+                    }
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return 0 - 1;
 }
 
 fn megatu_emit_diagnostics(diag_sink: Vec<i32>, source: string,
