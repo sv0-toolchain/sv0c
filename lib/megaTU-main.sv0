@@ -660,7 +660,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
     let bad: i32 = cov_plan_regions(tags, ent_item, id1, body_stmts, cef, cet, rg, br);
     if bad >= 0 {
         write_file("/dev/stderr", string_concat(string_concat("coverage: could not plan the regions of function ",
-            cov_plan_line_at(qnames, bad)), " (unsupported statement or construct)\n"));
+            cov_plan_line_at(qnames, bad)), " (an unsupported statement or construct, such as an if, match, loop or block in a match guard)\n"));
         return megatu_cov_rc(9);
     }
     /* `?` hides an early return (CV-213): the walk plans each one as a
@@ -685,7 +685,7 @@ fn megatu_coverage(mode: i32, root: string, listing: string, source: string,
                 if inside {
                     if planned != true {
                         write_file("/dev/stderr", string_concat(string_concat("coverage: function ", cov_plan_line_at(qnames, qe)),
-                            " uses the `?` operator where coverage cannot plan it (a contract clause or loop invariant); build with --coverage=off\n"));
+                            " uses the `?` operator where coverage cannot plan it (a contract clause, loop invariant or match guard); build with --coverage=off\n"));
                         return megatu_cov_rc(9);
                     }
                 }

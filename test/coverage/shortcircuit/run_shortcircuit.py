@@ -28,7 +28,13 @@ like `evaluated`. On the native C backend and on the VM:
    a `partial` line, skipped covered and evaluated uncovered;
 7. excl.sv0: `// sv0cov: ignore-next` on a statement holding `&&` excludes
    that branch; `#[coverage(branch_off, ...)]` on `if a && b { }` excludes
-   only the if's outcomes and leaves the short_circuit ordinary (AC-042).
+   only the if's outcomes and leaves the short_circuit ordinary (AC-042);
+8. fail-closed match guards: an `if`/`match`/`while`/`for`/`loop` or a block
+   expression in a guard is refused under --coverage=instrument and map on
+   both backends (a guard's evaluation count is not expressible with the
+   counters; the message names the function), a `?` in a guard is refused
+   with the "contract clause, loop invariant or match guard" message, and
+   all of them still build and run with coverage off.
 
     python3 sv0c/test/coverage/shortcircuit/run_shortcircuit.py
 """
@@ -268,6 +274,70 @@ def check_exclusions(errors: list[str]) -> None:
             errors.append(f"exclusions {backend}: branch_off record {boff} (AC-042: only the if)")
 
 
+GUARD_CASES = {
+    "if": ("k if (if k > 2 { true } else { false }) => 1,", "could not plan the regions"),
+    "match": ("k if (match k { 5 => true, _ => false }) => 1,", "could not plan the regions"),
+    "block": ("k if { k > 2 } => 1,", "could not plan the regions"),
+    "try": ("k if pick(k)? > 2 => 1,", "contract clause, loop invariant or match guard)"),
+}
+GUARD_SRC = """enum Opt { Some(i32), None }
+fn pick(n: i32) -> Opt {
+  if n > 0 { return Opt::Some(n); }
+  return Opt::None;
+}
+fn g(n: i32) -> i32 {
+  let r: i32 = match n {
+    %s
+    _ => 0,
+  };
+  return r;
+}
+fn main() -> i32 { return g(5) + g(1) - 1; }
+"""
+
+
+# `?` needs an Opt-returning function.
+GUARD_TRY_SRC = """enum Opt { Some(i32), None }
+fn pick(n: i32) -> Opt {
+  if n > 0 { return Opt::Some(n); }
+  return Opt::None;
+}
+fn g(n: i32) -> Opt {
+  let r: i32 = match n {
+    %s
+    _ => 0,
+  };
+  return Opt::Some(r);
+}
+fn main() -> i32 {
+  return match g(5) { Opt::Some(x) => x - 1, Opt::None => 9 };
+}
+"""
+
+
+def check_guard_refusals(errors: list[str]) -> None:
+    for name, (arm, needle) in GUARD_CASES.items():
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            src = d / "main.sv0"
+            src.write_text(GUARD_TRY_SRC % arm if name == "try" else GUARD_SRC % arm)
+            for mode in ("instrument", "map"):
+                p = sv0("native-compile", f"--coverage={mode}", "-o", str(d / "out"), str(src))
+                if p.returncode == 0 or needle not in p.stderr or "function g" not in p.stderr:
+                    errors.append(f"guard {name} {mode}: expected refusal naming g with {needle!r}, "
+                                  f"got rc {p.returncode}: {p.stderr.strip()[-300:]}")
+            p = sv0("vm-native-compile", "--coverage=instrument", str(src), str(d / "out.sv0b"))
+            if p.returncode == 0 or needle not in p.stderr:
+                errors.append(f"guard {name} vm: expected refusal with {needle!r}, got rc {p.returncode}: {p.stderr.strip()[-300:]}")
+            p = sv0("native-compile", "--coverage=off", "-o", str(d / "off"), str(src))
+            if p.returncode != 0:
+                errors.append(f"guard {name} off: build failed: {p.stderr.strip()[-300:]}")
+                continue
+            rc = subprocess.run([str(d / "off")], capture_output=True, timeout=60).returncode
+            if rc != 0:
+                errors.append(f"guard {name} off: exit {rc}, want 0")
+
+
 def main() -> int:
     ensure_built()
     if modern_python() is None:
@@ -278,13 +348,14 @@ def main() -> int:
     check_contract(errors)
     check_partial(errors)
     check_exclusions(errors)
+    check_guard_refusals(errors)
     if errors:
         print("coverage shortcircuit: FAIL", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1
     print(f"coverage shortcircuit: OK (native + VM, equal counts; {n} hand-derived branches in matrix.expected, "
-          "right-operand regions = evaluated, contract clauses plan no branch, partial line, exclusions)")
+          "right-operand regions = evaluated, contract clauses plan no branch, partial line, exclusions, match-guard refusals)")
     return 0
 
 

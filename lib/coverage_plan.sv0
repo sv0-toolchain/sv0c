@@ -1164,10 +1164,20 @@ fn cov_walk_construct(tags: Vec<i32>, cef: Vec<i32>, cet: Vec<i32>, rg: Vec<i32>
             let arrow: i32 = cov_tok_find0(tags, a, close3, 20);
             if arrow < 0 { return 0 - 1; }
             /* A guard's short circuits (CV-307); nothing else in a guard is
-               planned. */
+               planned. A construct or block expression in a guard is refused
+               (the plan fails): how often a guard runs is not expressible
+               with the existing counters. */
             let guard: i32 = cov_tok_find0(tags, a, arrow, 68);
             if guard >= 0 {
                 if guard + 1 >= arrow { return 0 - 1; }
+                let mut gk: i32 = guard + 1;
+                while gk < arrow {
+                    if cov_is_construct(vec_get(tags, gk)) { return 0 - 1; }
+                    if vec_get(tags, gk) == 8 {
+                        if vec_get(tags, gk - 1) != 5 { return 0 - 1; }
+                    }
+                    gk = gk + 1;
+                }
                 let gscp: Vec<i32> = vec_new();
                 if cov_sc_plan(tags, cef, cet, rg, br, e, guard + 1, arrow - 1, gscp) < 0 { return 0 - 1; }
             }
