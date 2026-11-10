@@ -20,6 +20,7 @@ static const char* table_lookup_body3(const char* p0, const char* b0, const char
 static const char* expand_text_table2(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, int depth);
 static const char* expand_text_table3(const char* host_abs, const char* source, const char* p0, const char* b0, const char* p1, const char* b1, const char* p2, const char* b2, int depth);
 static const char* expand_file(const char* host_abs, const char* source, int depth);
+static const char* source_slice(const char* source, int start, int len);
 static const char* expand(const char* host_abs, const char* source);
 static const char* expand_from_file(const char* host_abs);
 static int test_expand_alias_matches_expand_file(void);
@@ -536,42 +537,57 @@ static const char* expand_file(const char* host_abs, const char* source, int dep
   int count = _sv0t2;
   const char* bo;
   bo = "";
+  int run = 0;
   int li = 0;
   while ((li < count)) {
-    if ((li > 0)) {
-      const char* _sv0t3 = sv0_string_concat(bo, "\n");
-      bo = _sv0t3;
-    } else {
-    }
-    const char* _sv0t4 = get_split_line(source, starts, lens, li);
+    const char* _sv0t3 = get_split_line(source, starts, lens, li);
     const char* line;
-    line = _sv0t4;
-    const char* _sv0t5 = parse_include_line(line);
+    line = _sv0t3;
+    const char* _sv0t4 = parse_include_line(line);
     const char* rel;
-    rel = _sv0t5;
-    int _sv0t6 = sv0_string_len(rel);
-    if ((_sv0t6 == 0)) {
-      const char* _sv0t7 = sv0_string_concat(bo, line);
-      bo = _sv0t7;
-    } else {
-      const char* _sv0t8 = path_dir(host_abs);
+    rel = _sv0t4;
+    int _sv0t5 = sv0_string_len(rel);
+    if ((_sv0t5 != 0)) {
+      int _sv0t6 = sv0_vec_get(starts, li);
+      int s = _sv0t6;
+      int _sv0t7 = (s - run);
+      const char* _sv0t8 = source_slice(source, run, _sv0t7);
+      const char* _sv0t9 = sv0_string_concat(bo, _sv0t8);
+      bo = _sv0t9;
+      const char* _sv0t10 = path_dir(host_abs);
       const char* dir;
-      dir = _sv0t8;
-      const char* _sv0t9 = path_join(dir, rel);
+      dir = _sv0t10;
+      const char* _sv0t11 = path_join(dir, rel);
       const char* merged;
-      merged = _sv0t9;
-      const char* _sv0t10 = sv0_read_file(merged);
+      merged = _sv0t11;
+      const char* _sv0t12 = sv0_read_file(merged);
       const char* body;
-      body = _sv0t10;
-      const char* _sv0t11 = expand_file(merged, body, dd);
+      body = _sv0t12;
+      const char* _sv0t13 = expand_file(merged, body, dd);
       const char* inner;
-      inner = _sv0t11;
-      const char* _sv0t12 = sv0_string_concat(bo, inner);
-      bo = _sv0t12;
+      inner = _sv0t13;
+      const char* _sv0t14 = sv0_string_concat(bo, inner);
+      bo = _sv0t14;
+      int _sv0t15 = sv0_vec_get(lens, li);
+      run = (s + _sv0t15);
+    } else {
     }
     li = (li + 1);
   }
-  return bo;
+  int _sv0t16 = sv0_string_len(source);
+  int _sv0t17 = (_sv0t16 - run);
+  const char* _sv0t18 = source_slice(source, run, _sv0t17);
+  const char* _sv0t19 = sv0_string_concat(bo, _sv0t18);
+  return _sv0t19;
+}
+
+static const char* source_slice(const char* source, int start, int len) {
+  if ((len == 0)) {
+    return "";
+  } else {
+  }
+  const char* _sv0t0 = sv0_string_substr(source, start, len);
+  return _sv0t0;
 }
 
 static const char* expand(const char* host_abs, const char* source) {

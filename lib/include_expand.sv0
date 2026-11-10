@@ -299,26 +299,35 @@ fn expand_file(host_abs: string, source: string, depth: i32) -> string {
     let starts: Vec<i32> = vec_new();
     let lens: Vec<i32> = vec_new();
     let count: i32 = split_lines(source, starts, lens);
+    /* Non-include lines are copied verbatim as one source slice per run: a
+       string_concat per line copies the whole prefix and the runtime never
+       frees it, so a 22k-line file used tens of GB (CV-428).
+       shortcut: still one prefix copy per include line, quadratic in the
+       include count; switch to a balanced join if a file has thousands. */
     let mut bo: string = "";
+    let mut run: i32 = 0;
     let mut li: i32 = 0;
     while li < count {
-        if li > 0 {
-            bo = string_concat(bo, "\n");
-        }
         let line: string = get_split_line(source, starts, lens, li);
         let rel: string = parse_include_line(line);
-        if string_len(rel) == 0 {
-            bo = string_concat(bo, line);
-        } else {
+        if string_len(rel) != 0 {
+            let s: i32 = vec_get(starts, li);
+            bo = string_concat(bo, source_slice(source, run, s - run));
             let dir: string = path_dir(host_abs);
             let merged: string = path_join(dir, rel);
             let body: string = read_file(merged);
             let inner: string = expand_file(merged, body, dd);
             bo = string_concat(bo, inner);
+            run = s + vec_get(lens, li);
         }
         li = li + 1;
     }
-    return bo;
+    return string_concat(bo, source_slice(source, run, string_len(source) - run));
+}
+
+fn source_slice(source: string, start: i32, len: i32) -> string {
+    if len == 0 { return ""; }
+    return string_substr(source, start, len);
 }
 
 /* M3-S-020: expand / expand_from_file names match milestone table;
