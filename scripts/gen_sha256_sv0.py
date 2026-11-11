@@ -76,67 +76,53 @@ def generate() -> str:
     w(" * docstring for why (no reliance on signed overflow, no Vec allocation).")
     w(" */")
     w("")
-    # round constants
+    # round constants: a balanced if tree (six compares per lookup) rather
+    # than a 64-arm match, which lowers to a linear compare chain and is a
+    # quarter of map-building time in the -O0 compiler (CV-428). t is 0..63.
+    def k_tree(vals: list[int], lo: int, hi: int, indent: str) -> None:
+        if hi - lo == 1:
+            w(f"{indent}return {vals[lo]};")
+            return
+        mid = (lo + hi) // 2
+        w(f"{indent}if t < {mid} {{")
+        k_tree(vals, lo, mid, indent + "  ")
+        w(f"{indent}}};")
+        k_tree(vals, mid, hi, indent)
+
     for part, shift in (("hi", 16), ("lo", 0)):
         w(f"fn sha256_k_{part}(t: i32) -> i32 {{")
-        w("  return match t {")
-        for i, k in enumerate(K):
-            w(f"    {i} => {(k >> shift) & 0xFFFF},")
-        w("    _ => 0,")
-        w("  };")
+        k_tree([(k >> shift) & 0xFFFF for k in K], 0, 64, "  ")
         w("}")
         w("")
-    # rotate right / shift right on (h, l) halves
+    # Rotations and shifts on (h, l) halves, expanded at generation time into
+    # shift-and-mask expressions with literal amounts (CV-428): the compiler
+    # is built at -O0, so the earlier rotr/mix helper calls and their 2^n
+    # loop dominated map building. Operands are 0..65535 halves and every
+    # amount is 0 < n < 16 after the half swap, so nothing reaches the sign bit.
     w("fn sha256_pow2(n: i32) -> i32 {")
-    w("  let mut p = 1;")
-    w("  let mut i = 0;")
-    w("  while i < n {")
-    w("    p = p * 2;")
-    w("    i = i + 1;")
-    w("  };")
-    w("  return p;")
+    w("  return 1 << n;")
     w("}")
     w("")
-    w("/* (x >> n) combined with the low n bits of y moved to the top: 0 < n < 16, x and y in 0..65535. */")
-    w("fn sha256_mix(x: i32, y: i32, n: i32) -> i32 {")
-    w("  let m = sha256_pow2(n);")
-    w("  return x / m + (y % m) * sha256_pow2(16 - n);")
-    w("}")
-    w("")
-    w("fn sha256_rotr_hi(h: i32, l: i32, n: i32) -> i32 {")
-    w("  if n >= 16 {")
-    w("    return sha256_rotr_hi(l, h, n - 16);")
-    w("  };")
-    w("  if n == 0 {")
-    w("    return h;")
-    w("  };")
-    w("  return sha256_mix(h, l, n);")
-    w("}")
-    w("")
-    w("fn sha256_rotr_lo(h: i32, l: i32, n: i32) -> i32 {")
-    w("  if n >= 16 {")
-    w("    return sha256_rotr_lo(l, h, n - 16);")
-    w("  };")
-    w("  if n == 0 {")
-    w("    return l;")
-    w("  };")
-    w("  return sha256_mix(l, h, n);")
-    w("}")
-    w("")
-    w("fn sha256_shr_hi(h: i32, l: i32, n: i32) -> i32 {")
-    w("  return h / sha256_pow2(n);")
-    w("}")
-    w("")
-    w("fn sha256_shr_lo(h: i32, l: i32, n: i32) -> i32 {")
-    w("  return sha256_mix(l, h, n);")
-    w("}")
-    w("")
+
+    def mix(x: str, y: str, n: int) -> str:
+        """(x >> n) with the low n bits of y on top, 0 < n < 16."""
+        return f"(({x} >> {n}) | (({y} & {(1 << n) - 1}) << {16 - n}))"
+
+    def rotr(part: str, n: int) -> str:
+        h, l = ("h", "l") if n < 16 else ("l", "h")
+        n %= 16
+        hi, lo = (h, l) if part == "hi" else (l, h)
+        return hi if n == 0 else mix(hi, lo, n)
+
+    def shr(part: str, n: int) -> str:
+        return f"(h >> {n})" if part == "hi" else mix("l", "h", n)
+
     # sigma functions
-    for name, a, b, c, shr in (("big0", 2, 13, 22, False), ("big1", 6, 11, 25, False), ("small0", 7, 18, 3, True), ("small1", 17, 19, 10, True)):
+    for name, a, b, c, is_shr in (("big0", 2, 13, 22, False), ("big1", 6, 11, 25, False), ("small0", 7, 18, 3, True), ("small1", 17, 19, 10, True)):
         for part in ("hi", "lo"):
-            third = f"sha256_shr_{part}(h, l, {c})" if shr else f"sha256_rotr_{part}(h, l, {c})"
+            third = shr(part, c) if is_shr else rotr(part, c)
             w(f"fn sha256_{name}_{part}(h: i32, l: i32) -> i32 {{")
-            w(f"  return sha256_rotr_{part}(h, l, {a}) ^ sha256_rotr_{part}(h, l, {b}) ^ {third};")
+            w(f"  return {rotr(part, a)} ^ {rotr(part, b)} ^ {third};")
             w("}")
             w("")
     w("fn sha256_ch(e: i32, f: i32, g: i32) -> i32 {")

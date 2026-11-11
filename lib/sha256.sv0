@@ -5,219 +5,425 @@
  */
 
 fn sha256_k_hi(t: i32) -> i32 {
-  return match t {
-    0 => 17034,
-    1 => 28983,
-    2 => 46528,
-    3 => 59829,
-    4 => 14678,
-    5 => 23025,
-    6 => 37439,
-    7 => 43804,
-    8 => 55303,
-    9 => 4739,
-    10 => 9265,
-    11 => 21772,
-    12 => 29374,
-    13 => 32990,
-    14 => 39900,
-    15 => 49563,
-    16 => 58523,
-    17 => 61374,
-    18 => 4033,
-    19 => 9228,
-    20 => 11753,
-    21 => 19060,
-    22 => 23728,
-    23 => 30457,
-    24 => 38974,
-    25 => 43057,
-    26 => 45059,
-    27 => 48985,
-    28 => 50912,
-    29 => 54695,
-    30 => 1738,
-    31 => 5161,
-    32 => 10167,
-    33 => 11803,
-    34 => 19756,
-    35 => 21304,
-    36 => 25866,
-    37 => 30314,
-    38 => 33218,
-    39 => 37490,
-    40 => 41663,
-    41 => 43034,
-    42 => 49739,
-    43 => 51052,
-    44 => 53650,
-    45 => 54937,
-    46 => 62478,
-    47 => 4202,
-    48 => 6564,
-    49 => 7735,
-    50 => 10056,
-    51 => 13488,
-    52 => 14620,
-    53 => 20184,
-    54 => 23452,
-    55 => 26670,
-    56 => 29839,
-    57 => 30885,
-    58 => 33992,
-    59 => 36039,
-    60 => 37054,
-    61 => 42064,
-    62 => 48889,
-    63 => 50801,
-    _ => 0,
+  if t < 32 {
+    if t < 16 {
+      if t < 8 {
+        if t < 4 {
+          if t < 2 {
+            if t < 1 {
+              return 17034;
+            };
+            return 28983;
+          };
+          if t < 3 {
+            return 46528;
+          };
+          return 59829;
+        };
+        if t < 6 {
+          if t < 5 {
+            return 14678;
+          };
+          return 23025;
+        };
+        if t < 7 {
+          return 37439;
+        };
+        return 43804;
+      };
+      if t < 12 {
+        if t < 10 {
+          if t < 9 {
+            return 55303;
+          };
+          return 4739;
+        };
+        if t < 11 {
+          return 9265;
+        };
+        return 21772;
+      };
+      if t < 14 {
+        if t < 13 {
+          return 29374;
+        };
+        return 32990;
+      };
+      if t < 15 {
+        return 39900;
+      };
+      return 49563;
+    };
+    if t < 24 {
+      if t < 20 {
+        if t < 18 {
+          if t < 17 {
+            return 58523;
+          };
+          return 61374;
+        };
+        if t < 19 {
+          return 4033;
+        };
+        return 9228;
+      };
+      if t < 22 {
+        if t < 21 {
+          return 11753;
+        };
+        return 19060;
+      };
+      if t < 23 {
+        return 23728;
+      };
+      return 30457;
+    };
+    if t < 28 {
+      if t < 26 {
+        if t < 25 {
+          return 38974;
+        };
+        return 43057;
+      };
+      if t < 27 {
+        return 45059;
+      };
+      return 48985;
+    };
+    if t < 30 {
+      if t < 29 {
+        return 50912;
+      };
+      return 54695;
+    };
+    if t < 31 {
+      return 1738;
+    };
+    return 5161;
   };
+  if t < 48 {
+    if t < 40 {
+      if t < 36 {
+        if t < 34 {
+          if t < 33 {
+            return 10167;
+          };
+          return 11803;
+        };
+        if t < 35 {
+          return 19756;
+        };
+        return 21304;
+      };
+      if t < 38 {
+        if t < 37 {
+          return 25866;
+        };
+        return 30314;
+      };
+      if t < 39 {
+        return 33218;
+      };
+      return 37490;
+    };
+    if t < 44 {
+      if t < 42 {
+        if t < 41 {
+          return 41663;
+        };
+        return 43034;
+      };
+      if t < 43 {
+        return 49739;
+      };
+      return 51052;
+    };
+    if t < 46 {
+      if t < 45 {
+        return 53650;
+      };
+      return 54937;
+    };
+    if t < 47 {
+      return 62478;
+    };
+    return 4202;
+  };
+  if t < 56 {
+    if t < 52 {
+      if t < 50 {
+        if t < 49 {
+          return 6564;
+        };
+        return 7735;
+      };
+      if t < 51 {
+        return 10056;
+      };
+      return 13488;
+    };
+    if t < 54 {
+      if t < 53 {
+        return 14620;
+      };
+      return 20184;
+    };
+    if t < 55 {
+      return 23452;
+    };
+    return 26670;
+  };
+  if t < 60 {
+    if t < 58 {
+      if t < 57 {
+        return 29839;
+      };
+      return 30885;
+    };
+    if t < 59 {
+      return 33992;
+    };
+    return 36039;
+  };
+  if t < 62 {
+    if t < 61 {
+      return 37054;
+    };
+    return 42064;
+  };
+  if t < 63 {
+    return 48889;
+  };
+  return 50801;
 }
 
 fn sha256_k_lo(t: i32) -> i32 {
-  return match t {
-    0 => 12184,
-    1 => 17553,
-    2 => 64463,
-    3 => 56229,
-    4 => 49755,
-    5 => 4593,
-    6 => 33444,
-    7 => 24277,
-    8 => 43672,
-    9 => 23297,
-    10 => 34238,
-    11 => 32195,
-    12 => 23924,
-    13 => 45566,
-    14 => 1703,
-    15 => 61812,
-    16 => 27073,
-    17 => 18310,
-    18 => 40390,
-    19 => 41420,
-    20 => 11375,
-    21 => 33962,
-    22 => 43484,
-    23 => 35034,
-    24 => 20818,
-    25 => 50797,
-    26 => 10184,
-    27 => 32711,
-    28 => 3059,
-    29 => 37191,
-    30 => 25425,
-    31 => 10599,
-    32 => 2693,
-    33 => 8504,
-    34 => 28156,
-    35 => 3347,
-    36 => 29524,
-    37 => 2747,
-    38 => 51502,
-    39 => 11397,
-    40 => 59553,
-    41 => 26187,
-    42 => 35696,
-    43 => 20899,
-    44 => 59417,
-    45 => 1572,
-    46 => 13701,
-    47 => 41072,
-    48 => 49430,
-    49 => 27656,
-    50 => 30540,
-    51 => 48309,
-    52 => 3251,
-    53 => 43594,
-    54 => 51791,
-    55 => 28659,
-    56 => 33518,
-    57 => 25455,
-    58 => 30740,
-    59 => 520,
-    60 => 65530,
-    61 => 27883,
-    62 => 41975,
-    63 => 30962,
-    _ => 0,
+  if t < 32 {
+    if t < 16 {
+      if t < 8 {
+        if t < 4 {
+          if t < 2 {
+            if t < 1 {
+              return 12184;
+            };
+            return 17553;
+          };
+          if t < 3 {
+            return 64463;
+          };
+          return 56229;
+        };
+        if t < 6 {
+          if t < 5 {
+            return 49755;
+          };
+          return 4593;
+        };
+        if t < 7 {
+          return 33444;
+        };
+        return 24277;
+      };
+      if t < 12 {
+        if t < 10 {
+          if t < 9 {
+            return 43672;
+          };
+          return 23297;
+        };
+        if t < 11 {
+          return 34238;
+        };
+        return 32195;
+      };
+      if t < 14 {
+        if t < 13 {
+          return 23924;
+        };
+        return 45566;
+      };
+      if t < 15 {
+        return 1703;
+      };
+      return 61812;
+    };
+    if t < 24 {
+      if t < 20 {
+        if t < 18 {
+          if t < 17 {
+            return 27073;
+          };
+          return 18310;
+        };
+        if t < 19 {
+          return 40390;
+        };
+        return 41420;
+      };
+      if t < 22 {
+        if t < 21 {
+          return 11375;
+        };
+        return 33962;
+      };
+      if t < 23 {
+        return 43484;
+      };
+      return 35034;
+    };
+    if t < 28 {
+      if t < 26 {
+        if t < 25 {
+          return 20818;
+        };
+        return 50797;
+      };
+      if t < 27 {
+        return 10184;
+      };
+      return 32711;
+    };
+    if t < 30 {
+      if t < 29 {
+        return 3059;
+      };
+      return 37191;
+    };
+    if t < 31 {
+      return 25425;
+    };
+    return 10599;
   };
+  if t < 48 {
+    if t < 40 {
+      if t < 36 {
+        if t < 34 {
+          if t < 33 {
+            return 2693;
+          };
+          return 8504;
+        };
+        if t < 35 {
+          return 28156;
+        };
+        return 3347;
+      };
+      if t < 38 {
+        if t < 37 {
+          return 29524;
+        };
+        return 2747;
+      };
+      if t < 39 {
+        return 51502;
+      };
+      return 11397;
+    };
+    if t < 44 {
+      if t < 42 {
+        if t < 41 {
+          return 59553;
+        };
+        return 26187;
+      };
+      if t < 43 {
+        return 35696;
+      };
+      return 20899;
+    };
+    if t < 46 {
+      if t < 45 {
+        return 59417;
+      };
+      return 1572;
+    };
+    if t < 47 {
+      return 13701;
+    };
+    return 41072;
+  };
+  if t < 56 {
+    if t < 52 {
+      if t < 50 {
+        if t < 49 {
+          return 49430;
+        };
+        return 27656;
+      };
+      if t < 51 {
+        return 30540;
+      };
+      return 48309;
+    };
+    if t < 54 {
+      if t < 53 {
+        return 3251;
+      };
+      return 43594;
+    };
+    if t < 55 {
+      return 51791;
+    };
+    return 28659;
+  };
+  if t < 60 {
+    if t < 58 {
+      if t < 57 {
+        return 33518;
+      };
+      return 25455;
+    };
+    if t < 59 {
+      return 30740;
+    };
+    return 520;
+  };
+  if t < 62 {
+    if t < 61 {
+      return 65530;
+    };
+    return 27883;
+  };
+  if t < 63 {
+    return 41975;
+  };
+  return 30962;
 }
 
 fn sha256_pow2(n: i32) -> i32 {
-  let mut p = 1;
-  let mut i = 0;
-  while i < n {
-    p = p * 2;
-    i = i + 1;
-  };
-  return p;
-}
-
-/* (x >> n) combined with the low n bits of y moved to the top: 0 < n < 16, x and y in 0..65535. */
-fn sha256_mix(x: i32, y: i32, n: i32) -> i32 {
-  let m = sha256_pow2(n);
-  return x / m + (y % m) * sha256_pow2(16 - n);
-}
-
-fn sha256_rotr_hi(h: i32, l: i32, n: i32) -> i32 {
-  if n >= 16 {
-    return sha256_rotr_hi(l, h, n - 16);
-  };
-  if n == 0 {
-    return h;
-  };
-  return sha256_mix(h, l, n);
-}
-
-fn sha256_rotr_lo(h: i32, l: i32, n: i32) -> i32 {
-  if n >= 16 {
-    return sha256_rotr_lo(l, h, n - 16);
-  };
-  if n == 0 {
-    return l;
-  };
-  return sha256_mix(l, h, n);
-}
-
-fn sha256_shr_hi(h: i32, l: i32, n: i32) -> i32 {
-  return h / sha256_pow2(n);
-}
-
-fn sha256_shr_lo(h: i32, l: i32, n: i32) -> i32 {
-  return sha256_mix(l, h, n);
+  return 1 << n;
 }
 
 fn sha256_big0_hi(h: i32, l: i32) -> i32 {
-  return sha256_rotr_hi(h, l, 2) ^ sha256_rotr_hi(h, l, 13) ^ sha256_rotr_hi(h, l, 22);
+  return ((h >> 2) | ((l & 3) << 14)) ^ ((h >> 13) | ((l & 8191) << 3)) ^ ((l >> 6) | ((h & 63) << 10));
 }
 
 fn sha256_big0_lo(h: i32, l: i32) -> i32 {
-  return sha256_rotr_lo(h, l, 2) ^ sha256_rotr_lo(h, l, 13) ^ sha256_rotr_lo(h, l, 22);
+  return ((l >> 2) | ((h & 3) << 14)) ^ ((l >> 13) | ((h & 8191) << 3)) ^ ((h >> 6) | ((l & 63) << 10));
 }
 
 fn sha256_big1_hi(h: i32, l: i32) -> i32 {
-  return sha256_rotr_hi(h, l, 6) ^ sha256_rotr_hi(h, l, 11) ^ sha256_rotr_hi(h, l, 25);
+  return ((h >> 6) | ((l & 63) << 10)) ^ ((h >> 11) | ((l & 2047) << 5)) ^ ((l >> 9) | ((h & 511) << 7));
 }
 
 fn sha256_big1_lo(h: i32, l: i32) -> i32 {
-  return sha256_rotr_lo(h, l, 6) ^ sha256_rotr_lo(h, l, 11) ^ sha256_rotr_lo(h, l, 25);
+  return ((l >> 6) | ((h & 63) << 10)) ^ ((l >> 11) | ((h & 2047) << 5)) ^ ((h >> 9) | ((l & 511) << 7));
 }
 
 fn sha256_small0_hi(h: i32, l: i32) -> i32 {
-  return sha256_rotr_hi(h, l, 7) ^ sha256_rotr_hi(h, l, 18) ^ sha256_shr_hi(h, l, 3);
+  return ((h >> 7) | ((l & 127) << 9)) ^ ((l >> 2) | ((h & 3) << 14)) ^ (h >> 3);
 }
 
 fn sha256_small0_lo(h: i32, l: i32) -> i32 {
-  return sha256_rotr_lo(h, l, 7) ^ sha256_rotr_lo(h, l, 18) ^ sha256_shr_lo(h, l, 3);
+  return ((l >> 7) | ((h & 127) << 9)) ^ ((h >> 2) | ((l & 3) << 14)) ^ ((l >> 3) | ((h & 7) << 13));
 }
 
 fn sha256_small1_hi(h: i32, l: i32) -> i32 {
-  return sha256_rotr_hi(h, l, 17) ^ sha256_rotr_hi(h, l, 19) ^ sha256_shr_hi(h, l, 10);
+  return ((l >> 1) | ((h & 1) << 15)) ^ ((l >> 3) | ((h & 7) << 13)) ^ (h >> 10);
 }
 
 fn sha256_small1_lo(h: i32, l: i32) -> i32 {
-  return sha256_rotr_lo(h, l, 17) ^ sha256_rotr_lo(h, l, 19) ^ sha256_shr_lo(h, l, 10);
+  return ((h >> 1) | ((l & 1) << 15)) ^ ((h >> 3) | ((l & 7) << 13)) ^ ((l >> 10) | ((h & 1023) << 6));
 }
 
 fn sha256_ch(e: i32, f: i32, g: i32) -> i32 {
