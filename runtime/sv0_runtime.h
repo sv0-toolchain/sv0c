@@ -675,10 +675,14 @@ static inline void sv0_write_bytes(const char *path, int32_t vec) {
   if (!f)
     sv0_panic("write_bytes: fopen failed");
   int32_t n = sv0_vec_len(vec);
-  int32_t i;
-  for (i = 0; i < n; i++) {
-    unsigned char b = (unsigned char)(sv0_vec_get(vec, i) & 0xFF);
-    if (fwrite(&b, 1u, 1u, f) != 1u) {
+  int32_t i = 0;
+  /* One fwrite per chunk, not per byte: coverage maps run to megabytes. */
+  unsigned char buf[4096];
+  while (i < n) {
+    size_t k = 0;
+    while (i < n && k < sizeof buf)
+      buf[k++] = (unsigned char)(sv0_vec_get(vec, i++) & 0xFF);
+    if (fwrite(buf, 1u, k, f) != k) {
       fclose(f);
       sv0_panic("write_bytes: fwrite failed");
     }

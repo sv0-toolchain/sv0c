@@ -1371,7 +1371,13 @@ fn cov_map_read_int(s: string, at: i32) -> i32 {
 
 /* The byte-buffer forms of the above, for reading a built map. */
 fn cov_map_findv(hay: Vec<i32>, needle: string, from: i32) -> i32 {
-    let n: i32 = vec_len(hay);
+    return cov_map_findv_to(hay, needle, from, vec_len(hay));
+}
+
+/* cov_map_findv for a match that ends by byte `to` (CV-428: the map is about
+   1.2 KB per point, so an unbounded miss scans to its end). */
+fn cov_map_findv_to(hay: Vec<i32>, needle: string, from: i32, to: i32) -> i32 {
+    let n: i32 = to;
     let m: i32 = string_len(needle);
     let mut i: i32 = from;
     while i + m <= n {
@@ -1472,15 +1478,17 @@ fn cov_map_c_str(s: string) -> string {
    contiguous from 0 to program_counter_count (CV-206). */
 fn cov_map_fragment_table(map: Vec<i32>) -> Vec<i32> {
     let out: Vec<i32> = vec_new();
+    /* Canonical key order puts fragments before map_id before
+       program_counter_count, so each search starts at the one before (CV-428). */
     let fr: i32 = cov_map_findv(map, "\"fragments\":[", 0);
-    let mid: i32 = cov_map_findv(map, "\"map_id\":\"", 0);
-    let pc: i32 = cov_map_findv(map, "\"program_counter_count\":", 0);
     if fr < 0 { return out; }
+    let mid: i32 = cov_map_findv(map, "\"map_id\":\"", fr);
     if mid < 0 { return out; }
+    let pc: i32 = cov_map_findv(map, "\"program_counter_count\":", mid);
     if pc < 0 { return out; }
     let total: i32 = cov_map_read_intv(map, pc + 24);
     let mut covered: i32 = 0;
-    let mut at: i32 = cov_map_findv(map, "{\"fragment_id\":\"", fr);
+    let mut at: i32 = cov_map_findv_to(map, "{\"fragment_id\":\"", fr, mid);
     while at >= 0 {
         if at > mid {
             at = 0 - 1;
@@ -1495,7 +1503,7 @@ fn cov_map_fragment_table(map: Vec<i32>) -> Vec<i32> {
             covered = covered + len;
             vec_push(out, base);
             vec_push(out, len);
-            at = cov_map_findv(map, "{\"fragment_id\":\"", at + 16);
+            at = cov_map_findv_to(map, "{\"fragment_id\":\"", at + 16, mid);
         }
     }
     if covered != total { return vec_new(); }
@@ -1521,12 +1529,12 @@ fn cov_map_fragment_of(table: Vec<i32>, k: i32) -> i32 {
    __sv0cov_modules[] the hosted main registers before user code. A hit
    names its fragment's module and a module-local index. Empty when the map
    has no usable fragment table. */
-fn cov_map_c_prelude(map: Vec<i32>, target: string, identity: string) -> string {
-    let table: Vec<i32> = cov_map_fragment_table(map);
+fn cov_map_c_prelude(map: Vec<i32>, table: Vec<i32>, target: string, identity: string) -> string {
     let nfrag: i32 = vec_len(table) / 2;
     if nfrag == 0 { return ""; }
-    let mid: i32 = cov_map_findv(map, "\"map_id\":\"", 0);
-    let pc: i32 = cov_map_findv(map, "\"program_counter_count\":", 0);
+    let fr: i32 = cov_map_findv(map, "\"fragments\":[", 0);
+    let mid: i32 = cov_map_findv(map, "\"map_id\":\"", fr);
+    let pc: i32 = cov_map_findv(map, "\"program_counter_count\":", mid);
     let map_id: string = cov_map_strv(map, mid + 10, 64);
     let total: string = cov_map_int(cov_map_read_intv(map, pc + 24));
     let head: string = string_concat(string_concat(string_concat(string_concat("  1u, \"", map_id), "\", "),
@@ -1538,8 +1546,7 @@ fn cov_map_c_prelude(map: Vec<i32>, target: string, identity: string) -> string 
     out = string_concat(out, "void __sv0cov_start(const struct __sv0cov_module *const *modules, uint32_t module_count);\n");
     out = string_concat(out, "void __sv0cov_hit(const struct __sv0cov_module *module, uint32_t local_index);\n");
     let mut agg: string = "";
-    let fr: i32 = cov_map_findv(map, "\"fragments\":[", 0);
-    let mut at: i32 = cov_map_findv(map, "{\"fragment_id\":\"", fr);
+    let mut at: i32 = cov_map_findv_to(map, "{\"fragment_id\":\"", fr, mid);
     let mut j: i32 = 0;
     while j < nfrag {
         let fid: string = cov_map_strv(map, at + 16, 64);
@@ -1554,7 +1561,7 @@ fn cov_map_c_prelude(map: Vec<i32>, target: string, identity: string) -> string 
             string_concat(jn, "\n};\n"))))));
         if j > 0 { agg = string_concat(agg, ", "); }
         agg = string_concat(agg, string_concat("&__sv0cov_module_", jn));
-        at = cov_map_findv(map, "{\"fragment_id\":\"", at + 16);
+        at = cov_map_findv_to(map, "{\"fragment_id\":\"", at + 16, mid);
         j = j + 1;
     }
     out = string_concat(out, string_concat(string_concat("static const struct __sv0cov_module *const __sv0cov_modules[", cov_map_int(nfrag)), "] = {"));

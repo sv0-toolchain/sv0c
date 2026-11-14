@@ -10,7 +10,7 @@ Representation. Every 32-bit word is held as two i32 halves in 0..65535
 intermediate exceeds 2^19: nothing relies on signed-overflow wrap, which is
 undefined in the generated C (plain ``int``, no ``-fwrapv``). Rotations and
 shifts mask before shifting left. The message schedule is a rolling window of
-16 words in locals and the round constants come from a ``match``, so hashing
+16 words in locals and the 64 rounds are unrolled with the round constants as literals, so hashing
 allocates no Vec, slice, or string-table handle; only the 64-character hex
 result is built with ``string_concat``.
 
@@ -66,6 +66,44 @@ def _check_constants() -> None:
     assert H0 == [frac_root(p, 2) for p in primes[:8]], "H0 constants"
 
 
+def rounds(w) -> None:
+    """The 64 rounds of one block, unrolled with K[t] as literals (CV-428).
+
+    The -O0 compiler paid a constant lookup per half per round and a 30-move
+    register and schedule shift. Here round t names state letter i by the
+    local of letter (i - t) mod 8, and W[t] lives in local t mod 16, written in
+    place for t >= 16, so no round moves a value; 64 rounds rotate the names
+    back to where they started.
+    """
+    for v in ("t1lsum", "t1l", "t1h", "t2lsum", "t2l", "t2h", "elsum", "alsum", "nlsum"):
+        w(f"    let mut {v} = 0;")
+    for t in range(64):
+        a, b, c, d, e, f, g, h = (LETTERS[(i - t) % 8] for i in range(8))
+        s = t % 16
+        w(f"    /* round {t} */")
+        if t >= 16:
+            # W[t] = s1(W[t-2]) + W[t-7] + s0(W[t-15]) + W[t-16]; the old slot value is W[t-16]
+            x, y, z = (t - 2) % 16, (t - 7) % 16, (t - 15) % 16
+            w(f"    nlsum = sha256_small1_lo(w{x}h, w{x}l) + w{y}l + sha256_small0_lo(w{z}h, w{z}l) + w{s}l;")
+            w(f"    w{s}h = (sha256_small1_hi(w{x}h, w{x}l) + w{y}h + sha256_small0_hi(w{z}h, w{z}l) + w{s}h + nlsum / 65536) % 65536;")
+            w(f"    w{s}l = nlsum % 65536;")
+        k = K[t]
+        # T1 = h + S1(e) + ch(e,f,g) + K[t] + W[t]; T2 = S0(a) + maj(a,b,c)
+        w(f"    t1lsum = {h}l + sha256_big1_lo({e}h, {e}l) + sha256_ch({e}l, {f}l, {g}l) + {k & 0xFFFF} + w{s}l;")
+        w(f"    t1h = ({h}h + sha256_big1_hi({e}h, {e}l) + sha256_ch({e}h, {f}h, {g}h) + {k >> 16} + w{s}h + t1lsum / 65536) % 65536;")
+        w("    t1l = t1lsum % 65536;")
+        w(f"    t2lsum = sha256_big0_lo({a}h, {a}l) + sha256_maj({a}l, {b}l, {c}l);")
+        w(f"    t2h = (sha256_big0_hi({a}h, {a}l) + sha256_maj({a}h, {b}h, {c}h) + t2lsum / 65536) % 65536;")
+        w("    t2l = t2lsum % 65536;")
+        # e' = d + T1 lands in d's local; a' = T1 + T2 lands in h's local
+        w(f"    elsum = {d}l + t1l;")
+        w(f"    {d}h = ({d}h + t1h + elsum / 65536) % 65536;")
+        w(f"    {d}l = elsum % 65536;")
+        w("    alsum = t1l + t2l;")
+        w(f"    {h}h = (t1h + t2h + alsum / 65536) % 65536;")
+        w(f"    {h}l = alsum % 65536;")
+
+
 def generate() -> str:
     _check_constants()
     out: list[str] = []
@@ -76,24 +114,6 @@ def generate() -> str:
     w(" * docstring for why (no reliance on signed overflow, no Vec allocation).")
     w(" */")
     w("")
-    # round constants: a balanced if tree (six compares per lookup) rather
-    # than a 64-arm match, which lowers to a linear compare chain and is a
-    # quarter of map-building time in the -O0 compiler (CV-428). t is 0..63.
-    def k_tree(vals: list[int], lo: int, hi: int, indent: str) -> None:
-        if hi - lo == 1:
-            w(f"{indent}return {vals[lo]};")
-            return
-        mid = (lo + hi) // 2
-        w(f"{indent}if t < {mid} {{")
-        k_tree(vals, lo, mid, indent + "  ")
-        w(f"{indent}}};")
-        k_tree(vals, mid, hi, indent)
-
-    for part, shift in (("hi", 16), ("lo", 0)):
-        w(f"fn sha256_k_{part}(t: i32) -> i32 {{")
-        k_tree([(k >> shift) & 0xFFFF for k in K], 0, 64, "  ")
-        w("}")
-        w("")
     # Rotations and shifts on (h, l) halves, expanded at generation time into
     # shift-and-mask expressions with literal amounts (CV-428): the compiler
     # is built at -O0, so the earlier rotr/mix helper calls and their 2^n
@@ -189,44 +209,7 @@ def generate() -> str:
     for i, c in enumerate(LETTERS):
         w(f"    let mut {c}h = h{i}h;")
         w(f"    let mut {c}l = h{i}l;")
-    w("    let mut t = 0;")
-    w("    while t < 64 {")
-    # T1 = h + S1(e) + ch(e,f,g) + K[t] + W[t]
-    w("      let t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + sha256_k_lo(t) + w0l;")
-    w("      let t1l = t1lsum % 65536;")
-    w("      let t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + sha256_k_hi(t) + w0h + t1lsum / 65536) % 65536;")
-    w("      let t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);")
-    w("      let t2l = t2lsum % 65536;")
-    w("      let t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;")
-    w("      hh = gh;")
-    w("      hl = gl;")
-    w("      gh = fh;")
-    w("      gl = fl;")
-    w("      fh = eh;")
-    w("      fl = el;")
-    w("      let elsum = dl + t1l;")
-    w("      el = elsum % 65536;")
-    w("      eh = (dh + t1h + elsum / 65536) % 65536;")
-    w("      dh = ch;")
-    w("      dl = cl;")
-    w("      ch = bh;")
-    w("      cl = bl;")
-    w("      bh = ah;")
-    w("      bl = al;")
-    w("      let alsum = t1l + t2l;")
-    w("      al = alsum % 65536;")
-    w("      ah = (t1h + t2h + alsum / 65536) % 65536;")
-    # schedule: W[t+16] = s1(w14) + w9 + s0(w1) + w0
-    w("      let nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;")
-    w("      let nl = nlsum % 65536;")
-    w("      let nh = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;")
-    for j in range(15):
-        w(f"      w{j}h = w{j + 1}h;")
-        w(f"      w{j}l = w{j + 1}l;")
-    w("      w15h = nh;")
-    w("      w15l = nl;")
-    w("      t = t + 1;")
-    w("    };")
+    rounds(w)
     for i, c in enumerate(LETTERS):
         w(f"    let s{i} = h{i}l + {c}l;")
         w(f"    h{i}l = s{i} % 65536;")
@@ -285,44 +268,7 @@ def generate() -> str:
     for i, c in enumerate(LETTERS):
         w(f"    let mut {c}h = h{i}h;")
         w(f"    let mut {c}l = h{i}l;")
-    w("    let mut t = 0;")
-    w("    while t < 64 {")
-    # T1 = h + S1(e) + ch(e,f,g) + K[t] + W[t]
-    w("      let t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + sha256_k_lo(t) + w0l;")
-    w("      let t1l = t1lsum % 65536;")
-    w("      let t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + sha256_k_hi(t) + w0h + t1lsum / 65536) % 65536;")
-    w("      let t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);")
-    w("      let t2l = t2lsum % 65536;")
-    w("      let t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;")
-    w("      hh = gh;")
-    w("      hl = gl;")
-    w("      gh = fh;")
-    w("      gl = fl;")
-    w("      fh = eh;")
-    w("      fl = el;")
-    w("      let elsum = dl + t1l;")
-    w("      el = elsum % 65536;")
-    w("      eh = (dh + t1h + elsum / 65536) % 65536;")
-    w("      dh = ch;")
-    w("      dl = cl;")
-    w("      ch = bh;")
-    w("      cl = bl;")
-    w("      bh = ah;")
-    w("      bl = al;")
-    w("      let alsum = t1l + t2l;")
-    w("      al = alsum % 65536;")
-    w("      ah = (t1h + t2h + alsum / 65536) % 65536;")
-    # schedule: W[t+16] = s1(w14) + w9 + s0(w1) + w0
-    w("      let nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;")
-    w("      let nl = nlsum % 65536;")
-    w("      let nh = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;")
-    for j in range(15):
-        w(f"      w{j}h = w{j + 1}h;")
-        w(f"      w{j}l = w{j + 1}l;")
-    w("      w15h = nh;")
-    w("      w15l = nl;")
-    w("      t = t + 1;")
-    w("    };")
+    rounds(w)
     for i, c in enumerate(LETTERS):
         w(f"    let s{i} = h{i}l + {c}l;")
         w(f"    h{i}l = s{i} % 65536;")

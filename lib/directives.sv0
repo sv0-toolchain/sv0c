@@ -195,7 +195,8 @@ fn dirs_scan_unit(text: string, unit: i32, tab: Vec<i32>, errs: Vec<i32>) -> i32
     let mut p: i32 = 0;
     while p < n {
         let c: i32 = string_char_at(text, p);
-        let nx: i32 = dirs_ch(text, p + 1);
+        /* n, not dirs_ch: its string_len per character made this scan quadratic (CV-428). */
+        let nx: i32 = if p + 1 < n { string_char_at(text, p + 1) } else { 0 - 1 };
         if c == 10 {
             line_code = false;
             p = p + 1;

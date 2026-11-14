@@ -1047,10 +1047,10 @@ fn megatu_str_find(hay: string, needle: string) -> i32 {
    the hosted main right after sv0_runtime_init (before user entry), and
    write the map now that the C exists. Any other mode returns c unchanged.
    "" (exit 9) when the program has no hosted main to register from. */
-fn megatu_cov_emit_c(mode: i32, cov: MegatuCov, c: string) -> string {
+fn megatu_cov_emit_c(mode: i32, cov: MegatuCov, table: Vec<i32>, c: string) -> string {
     if mode != 2 { return c; }
     let req: string = getenv("SV0_COVERAGE_REQUEST");
-    let prelude: string = cov_map_c_prelude(cov.map, megatu_cov_req_line(req, 2), megatu_cov_req_line(req, 3));
+    let prelude: string = cov_map_c_prelude(cov.map, table, megatu_cov_req_line(req, 2), megatu_cov_req_line(req, 3));
     if string_len(prelude) == 0 {
         write_file("/dev/stderr", "error[COV1020]: coverage instrumentation failed: the coverage map has no usable fragment table\n");
         return "";
@@ -1076,7 +1076,7 @@ fn megatu_cov_emit_c(mode: i32, cov: MegatuCov, c: string) -> string {
         return "";
     }
     write_bytes(megatu_cov_req_line(req, 1), cov.map);
-    let nmods: string = int_to_string(vec_len(cov_map_fragment_table(cov.map)) / 2);
+    let nmods: string = int_to_string(vec_len(table) / 2);
     return string_concat(string_concat(string_concat(head, prelude), body),
         string_concat(string_concat(string_concat("  __sv0cov_start(__sv0cov_modules, ", nmods), "u);\n"), rest));
 }
@@ -1501,16 +1501,19 @@ fn main() -> i32 {
     let sidx: Vec<i32> = assign_shadow_indices(it, id3, id4, id5, fpn,
                                                bet, bed1, bed2, bed3, bed4, pp,
                                                source, starts, ends);
+    /* CV-428: read the fragment table from the map once for the emitter and
+       the prelude (each read scans the map, about 1.2 KB per point). */
+    let cov_ft: Vec<i32> = cov_map_fragment_table(cov.map);
     let c_plain: string = megatu_emit_program(td, out_blocks, source, starts, ends,
                                         it, id1, id2, id3, id5, fpn,
                                         fpt, frt, ptt, ptd1, ptd2, pp, sidx,
                                         eit_nt, eit_base, eit_cnt, eit_cats,
                                         sit_nt, sit_base, sit_cnt,
                                         sit_field_name, sit_field_cat,
-                                        cov_map_fragment_table(cov.map));
+                                        cov_ft);
     /* sv0cov CV-113: an instrument build gets its registration prelude and
        writes its map here; other modes pass the C through unchanged. */
-    let c: string = megatu_cov_emit_c(_cov_mode, cov, c_plain);
+    let c: string = megatu_cov_emit_c(_cov_mode, cov, cov_ft, c_plain);
     if _cov_mode == 2 {
         if string_len(c) == 0 { return 9; }
     }

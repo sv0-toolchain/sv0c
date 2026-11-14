@@ -4,392 +4,6 @@
  * docstring for why (no reliance on signed overflow, no Vec allocation).
  */
 
-fn sha256_k_hi(t: i32) -> i32 {
-  if t < 32 {
-    if t < 16 {
-      if t < 8 {
-        if t < 4 {
-          if t < 2 {
-            if t < 1 {
-              return 17034;
-            };
-            return 28983;
-          };
-          if t < 3 {
-            return 46528;
-          };
-          return 59829;
-        };
-        if t < 6 {
-          if t < 5 {
-            return 14678;
-          };
-          return 23025;
-        };
-        if t < 7 {
-          return 37439;
-        };
-        return 43804;
-      };
-      if t < 12 {
-        if t < 10 {
-          if t < 9 {
-            return 55303;
-          };
-          return 4739;
-        };
-        if t < 11 {
-          return 9265;
-        };
-        return 21772;
-      };
-      if t < 14 {
-        if t < 13 {
-          return 29374;
-        };
-        return 32990;
-      };
-      if t < 15 {
-        return 39900;
-      };
-      return 49563;
-    };
-    if t < 24 {
-      if t < 20 {
-        if t < 18 {
-          if t < 17 {
-            return 58523;
-          };
-          return 61374;
-        };
-        if t < 19 {
-          return 4033;
-        };
-        return 9228;
-      };
-      if t < 22 {
-        if t < 21 {
-          return 11753;
-        };
-        return 19060;
-      };
-      if t < 23 {
-        return 23728;
-      };
-      return 30457;
-    };
-    if t < 28 {
-      if t < 26 {
-        if t < 25 {
-          return 38974;
-        };
-        return 43057;
-      };
-      if t < 27 {
-        return 45059;
-      };
-      return 48985;
-    };
-    if t < 30 {
-      if t < 29 {
-        return 50912;
-      };
-      return 54695;
-    };
-    if t < 31 {
-      return 1738;
-    };
-    return 5161;
-  };
-  if t < 48 {
-    if t < 40 {
-      if t < 36 {
-        if t < 34 {
-          if t < 33 {
-            return 10167;
-          };
-          return 11803;
-        };
-        if t < 35 {
-          return 19756;
-        };
-        return 21304;
-      };
-      if t < 38 {
-        if t < 37 {
-          return 25866;
-        };
-        return 30314;
-      };
-      if t < 39 {
-        return 33218;
-      };
-      return 37490;
-    };
-    if t < 44 {
-      if t < 42 {
-        if t < 41 {
-          return 41663;
-        };
-        return 43034;
-      };
-      if t < 43 {
-        return 49739;
-      };
-      return 51052;
-    };
-    if t < 46 {
-      if t < 45 {
-        return 53650;
-      };
-      return 54937;
-    };
-    if t < 47 {
-      return 62478;
-    };
-    return 4202;
-  };
-  if t < 56 {
-    if t < 52 {
-      if t < 50 {
-        if t < 49 {
-          return 6564;
-        };
-        return 7735;
-      };
-      if t < 51 {
-        return 10056;
-      };
-      return 13488;
-    };
-    if t < 54 {
-      if t < 53 {
-        return 14620;
-      };
-      return 20184;
-    };
-    if t < 55 {
-      return 23452;
-    };
-    return 26670;
-  };
-  if t < 60 {
-    if t < 58 {
-      if t < 57 {
-        return 29839;
-      };
-      return 30885;
-    };
-    if t < 59 {
-      return 33992;
-    };
-    return 36039;
-  };
-  if t < 62 {
-    if t < 61 {
-      return 37054;
-    };
-    return 42064;
-  };
-  if t < 63 {
-    return 48889;
-  };
-  return 50801;
-}
-
-fn sha256_k_lo(t: i32) -> i32 {
-  if t < 32 {
-    if t < 16 {
-      if t < 8 {
-        if t < 4 {
-          if t < 2 {
-            if t < 1 {
-              return 12184;
-            };
-            return 17553;
-          };
-          if t < 3 {
-            return 64463;
-          };
-          return 56229;
-        };
-        if t < 6 {
-          if t < 5 {
-            return 49755;
-          };
-          return 4593;
-        };
-        if t < 7 {
-          return 33444;
-        };
-        return 24277;
-      };
-      if t < 12 {
-        if t < 10 {
-          if t < 9 {
-            return 43672;
-          };
-          return 23297;
-        };
-        if t < 11 {
-          return 34238;
-        };
-        return 32195;
-      };
-      if t < 14 {
-        if t < 13 {
-          return 23924;
-        };
-        return 45566;
-      };
-      if t < 15 {
-        return 1703;
-      };
-      return 61812;
-    };
-    if t < 24 {
-      if t < 20 {
-        if t < 18 {
-          if t < 17 {
-            return 27073;
-          };
-          return 18310;
-        };
-        if t < 19 {
-          return 40390;
-        };
-        return 41420;
-      };
-      if t < 22 {
-        if t < 21 {
-          return 11375;
-        };
-        return 33962;
-      };
-      if t < 23 {
-        return 43484;
-      };
-      return 35034;
-    };
-    if t < 28 {
-      if t < 26 {
-        if t < 25 {
-          return 20818;
-        };
-        return 50797;
-      };
-      if t < 27 {
-        return 10184;
-      };
-      return 32711;
-    };
-    if t < 30 {
-      if t < 29 {
-        return 3059;
-      };
-      return 37191;
-    };
-    if t < 31 {
-      return 25425;
-    };
-    return 10599;
-  };
-  if t < 48 {
-    if t < 40 {
-      if t < 36 {
-        if t < 34 {
-          if t < 33 {
-            return 2693;
-          };
-          return 8504;
-        };
-        if t < 35 {
-          return 28156;
-        };
-        return 3347;
-      };
-      if t < 38 {
-        if t < 37 {
-          return 29524;
-        };
-        return 2747;
-      };
-      if t < 39 {
-        return 51502;
-      };
-      return 11397;
-    };
-    if t < 44 {
-      if t < 42 {
-        if t < 41 {
-          return 59553;
-        };
-        return 26187;
-      };
-      if t < 43 {
-        return 35696;
-      };
-      return 20899;
-    };
-    if t < 46 {
-      if t < 45 {
-        return 59417;
-      };
-      return 1572;
-    };
-    if t < 47 {
-      return 13701;
-    };
-    return 41072;
-  };
-  if t < 56 {
-    if t < 52 {
-      if t < 50 {
-        if t < 49 {
-          return 49430;
-        };
-        return 27656;
-      };
-      if t < 51 {
-        return 30540;
-      };
-      return 48309;
-    };
-    if t < 54 {
-      if t < 53 {
-        return 3251;
-      };
-      return 43594;
-    };
-    if t < 55 {
-      return 51791;
-    };
-    return 28659;
-  };
-  if t < 60 {
-    if t < 58 {
-      if t < 57 {
-        return 33518;
-      };
-      return 25455;
-    };
-    if t < 59 {
-      return 30740;
-    };
-    return 520;
-  };
-  if t < 62 {
-    if t < 61 {
-      return 65530;
-    };
-    return 27883;
-  };
-  if t < 63 {
-    return 41975;
-  };
-  return 30962;
-}
-
 fn sha256_pow2(n: i32) -> i32 {
   return 1 << n;
 }
@@ -543,69 +157,991 @@ fn sha256_hex(s: str) -> str {
     let mut gl = h6l;
     let mut hh = h7h;
     let mut hl = h7l;
-    let mut t = 0;
-    while t < 64 {
-      let t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + sha256_k_lo(t) + w0l;
-      let t1l = t1lsum % 65536;
-      let t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + sha256_k_hi(t) + w0h + t1lsum / 65536) % 65536;
-      let t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
-      let t2l = t2lsum % 65536;
-      let t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
-      hh = gh;
-      hl = gl;
-      gh = fh;
-      gl = fl;
-      fh = eh;
-      fl = el;
-      let elsum = dl + t1l;
-      el = elsum % 65536;
-      eh = (dh + t1h + elsum / 65536) % 65536;
-      dh = ch;
-      dl = cl;
-      ch = bh;
-      cl = bl;
-      bh = ah;
-      bl = al;
-      let alsum = t1l + t2l;
-      al = alsum % 65536;
-      ah = (t1h + t2h + alsum / 65536) % 65536;
-      let nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
-      let nl = nlsum % 65536;
-      let nh = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
-      w0h = w1h;
-      w0l = w1l;
-      w1h = w2h;
-      w1l = w2l;
-      w2h = w3h;
-      w2l = w3l;
-      w3h = w4h;
-      w3l = w4l;
-      w4h = w5h;
-      w4l = w5l;
-      w5h = w6h;
-      w5l = w6l;
-      w6h = w7h;
-      w6l = w7l;
-      w7h = w8h;
-      w7l = w8l;
-      w8h = w9h;
-      w8l = w9l;
-      w9h = w10h;
-      w9l = w10l;
-      w10h = w11h;
-      w10l = w11l;
-      w11h = w12h;
-      w11l = w12l;
-      w12h = w13h;
-      w12l = w13l;
-      w13h = w14h;
-      w13l = w14l;
-      w14h = w15h;
-      w14l = w15l;
-      w15h = nh;
-      w15l = nl;
-      t = t + 1;
-    };
+    let mut t1lsum = 0;
+    let mut t1l = 0;
+    let mut t1h = 0;
+    let mut t2lsum = 0;
+    let mut t2l = 0;
+    let mut t2h = 0;
+    let mut elsum = 0;
+    let mut alsum = 0;
+    let mut nlsum = 0;
+    /* round 0 */
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 12184 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 17034 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 1 */
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 17553 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 28983 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 2 */
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 64463 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 46528 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 3 */
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 56229 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 59829 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 4 */
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 49755 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 14678 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 5 */
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 4593 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 23025 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 6 */
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 33444 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 37439 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 7 */
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 24277 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 43804 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 8 */
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 43672 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 55303 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 9 */
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 23297 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 4739 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 10 */
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 34238 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 9265 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 11 */
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 32195 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 21772 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 12 */
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 23924 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 29374 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 13 */
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 45566 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 32990 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 14 */
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 1703 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 39900 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 15 */
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 61812 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 49563 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 16 */
+    nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
+    w0h = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
+    w0l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 27073 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 58523 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 17 */
+    nlsum = sha256_small1_lo(w15h, w15l) + w10l + sha256_small0_lo(w2h, w2l) + w1l;
+    w1h = (sha256_small1_hi(w15h, w15l) + w10h + sha256_small0_hi(w2h, w2l) + w1h + nlsum / 65536) % 65536;
+    w1l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 18310 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 61374 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 18 */
+    nlsum = sha256_small1_lo(w0h, w0l) + w11l + sha256_small0_lo(w3h, w3l) + w2l;
+    w2h = (sha256_small1_hi(w0h, w0l) + w11h + sha256_small0_hi(w3h, w3l) + w2h + nlsum / 65536) % 65536;
+    w2l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 40390 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 4033 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 19 */
+    nlsum = sha256_small1_lo(w1h, w1l) + w12l + sha256_small0_lo(w4h, w4l) + w3l;
+    w3h = (sha256_small1_hi(w1h, w1l) + w12h + sha256_small0_hi(w4h, w4l) + w3h + nlsum / 65536) % 65536;
+    w3l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 41420 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 9228 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 20 */
+    nlsum = sha256_small1_lo(w2h, w2l) + w13l + sha256_small0_lo(w5h, w5l) + w4l;
+    w4h = (sha256_small1_hi(w2h, w2l) + w13h + sha256_small0_hi(w5h, w5l) + w4h + nlsum / 65536) % 65536;
+    w4l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 11375 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 11753 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 21 */
+    nlsum = sha256_small1_lo(w3h, w3l) + w14l + sha256_small0_lo(w6h, w6l) + w5l;
+    w5h = (sha256_small1_hi(w3h, w3l) + w14h + sha256_small0_hi(w6h, w6l) + w5h + nlsum / 65536) % 65536;
+    w5l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 33962 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 19060 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 22 */
+    nlsum = sha256_small1_lo(w4h, w4l) + w15l + sha256_small0_lo(w7h, w7l) + w6l;
+    w6h = (sha256_small1_hi(w4h, w4l) + w15h + sha256_small0_hi(w7h, w7l) + w6h + nlsum / 65536) % 65536;
+    w6l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 43484 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 23728 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 23 */
+    nlsum = sha256_small1_lo(w5h, w5l) + w0l + sha256_small0_lo(w8h, w8l) + w7l;
+    w7h = (sha256_small1_hi(w5h, w5l) + w0h + sha256_small0_hi(w8h, w8l) + w7h + nlsum / 65536) % 65536;
+    w7l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 35034 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 30457 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 24 */
+    nlsum = sha256_small1_lo(w6h, w6l) + w1l + sha256_small0_lo(w9h, w9l) + w8l;
+    w8h = (sha256_small1_hi(w6h, w6l) + w1h + sha256_small0_hi(w9h, w9l) + w8h + nlsum / 65536) % 65536;
+    w8l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 20818 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 38974 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 25 */
+    nlsum = sha256_small1_lo(w7h, w7l) + w2l + sha256_small0_lo(w10h, w10l) + w9l;
+    w9h = (sha256_small1_hi(w7h, w7l) + w2h + sha256_small0_hi(w10h, w10l) + w9h + nlsum / 65536) % 65536;
+    w9l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 50797 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 43057 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 26 */
+    nlsum = sha256_small1_lo(w8h, w8l) + w3l + sha256_small0_lo(w11h, w11l) + w10l;
+    w10h = (sha256_small1_hi(w8h, w8l) + w3h + sha256_small0_hi(w11h, w11l) + w10h + nlsum / 65536) % 65536;
+    w10l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 10184 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 45059 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 27 */
+    nlsum = sha256_small1_lo(w9h, w9l) + w4l + sha256_small0_lo(w12h, w12l) + w11l;
+    w11h = (sha256_small1_hi(w9h, w9l) + w4h + sha256_small0_hi(w12h, w12l) + w11h + nlsum / 65536) % 65536;
+    w11l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 32711 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 48985 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 28 */
+    nlsum = sha256_small1_lo(w10h, w10l) + w5l + sha256_small0_lo(w13h, w13l) + w12l;
+    w12h = (sha256_small1_hi(w10h, w10l) + w5h + sha256_small0_hi(w13h, w13l) + w12h + nlsum / 65536) % 65536;
+    w12l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 3059 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 50912 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 29 */
+    nlsum = sha256_small1_lo(w11h, w11l) + w6l + sha256_small0_lo(w14h, w14l) + w13l;
+    w13h = (sha256_small1_hi(w11h, w11l) + w6h + sha256_small0_hi(w14h, w14l) + w13h + nlsum / 65536) % 65536;
+    w13l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 37191 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 54695 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 30 */
+    nlsum = sha256_small1_lo(w12h, w12l) + w7l + sha256_small0_lo(w15h, w15l) + w14l;
+    w14h = (sha256_small1_hi(w12h, w12l) + w7h + sha256_small0_hi(w15h, w15l) + w14h + nlsum / 65536) % 65536;
+    w14l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 25425 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 1738 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 31 */
+    nlsum = sha256_small1_lo(w13h, w13l) + w8l + sha256_small0_lo(w0h, w0l) + w15l;
+    w15h = (sha256_small1_hi(w13h, w13l) + w8h + sha256_small0_hi(w0h, w0l) + w15h + nlsum / 65536) % 65536;
+    w15l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 10599 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 5161 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 32 */
+    nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
+    w0h = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
+    w0l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 2693 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 10167 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 33 */
+    nlsum = sha256_small1_lo(w15h, w15l) + w10l + sha256_small0_lo(w2h, w2l) + w1l;
+    w1h = (sha256_small1_hi(w15h, w15l) + w10h + sha256_small0_hi(w2h, w2l) + w1h + nlsum / 65536) % 65536;
+    w1l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 8504 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 11803 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 34 */
+    nlsum = sha256_small1_lo(w0h, w0l) + w11l + sha256_small0_lo(w3h, w3l) + w2l;
+    w2h = (sha256_small1_hi(w0h, w0l) + w11h + sha256_small0_hi(w3h, w3l) + w2h + nlsum / 65536) % 65536;
+    w2l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 28156 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 19756 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 35 */
+    nlsum = sha256_small1_lo(w1h, w1l) + w12l + sha256_small0_lo(w4h, w4l) + w3l;
+    w3h = (sha256_small1_hi(w1h, w1l) + w12h + sha256_small0_hi(w4h, w4l) + w3h + nlsum / 65536) % 65536;
+    w3l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 3347 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 21304 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 36 */
+    nlsum = sha256_small1_lo(w2h, w2l) + w13l + sha256_small0_lo(w5h, w5l) + w4l;
+    w4h = (sha256_small1_hi(w2h, w2l) + w13h + sha256_small0_hi(w5h, w5l) + w4h + nlsum / 65536) % 65536;
+    w4l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 29524 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 25866 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 37 */
+    nlsum = sha256_small1_lo(w3h, w3l) + w14l + sha256_small0_lo(w6h, w6l) + w5l;
+    w5h = (sha256_small1_hi(w3h, w3l) + w14h + sha256_small0_hi(w6h, w6l) + w5h + nlsum / 65536) % 65536;
+    w5l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 2747 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 30314 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 38 */
+    nlsum = sha256_small1_lo(w4h, w4l) + w15l + sha256_small0_lo(w7h, w7l) + w6l;
+    w6h = (sha256_small1_hi(w4h, w4l) + w15h + sha256_small0_hi(w7h, w7l) + w6h + nlsum / 65536) % 65536;
+    w6l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 51502 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 33218 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 39 */
+    nlsum = sha256_small1_lo(w5h, w5l) + w0l + sha256_small0_lo(w8h, w8l) + w7l;
+    w7h = (sha256_small1_hi(w5h, w5l) + w0h + sha256_small0_hi(w8h, w8l) + w7h + nlsum / 65536) % 65536;
+    w7l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 11397 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 37490 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 40 */
+    nlsum = sha256_small1_lo(w6h, w6l) + w1l + sha256_small0_lo(w9h, w9l) + w8l;
+    w8h = (sha256_small1_hi(w6h, w6l) + w1h + sha256_small0_hi(w9h, w9l) + w8h + nlsum / 65536) % 65536;
+    w8l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 59553 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 41663 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 41 */
+    nlsum = sha256_small1_lo(w7h, w7l) + w2l + sha256_small0_lo(w10h, w10l) + w9l;
+    w9h = (sha256_small1_hi(w7h, w7l) + w2h + sha256_small0_hi(w10h, w10l) + w9h + nlsum / 65536) % 65536;
+    w9l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 26187 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 43034 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 42 */
+    nlsum = sha256_small1_lo(w8h, w8l) + w3l + sha256_small0_lo(w11h, w11l) + w10l;
+    w10h = (sha256_small1_hi(w8h, w8l) + w3h + sha256_small0_hi(w11h, w11l) + w10h + nlsum / 65536) % 65536;
+    w10l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 35696 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 49739 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 43 */
+    nlsum = sha256_small1_lo(w9h, w9l) + w4l + sha256_small0_lo(w12h, w12l) + w11l;
+    w11h = (sha256_small1_hi(w9h, w9l) + w4h + sha256_small0_hi(w12h, w12l) + w11h + nlsum / 65536) % 65536;
+    w11l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 20899 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 51052 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 44 */
+    nlsum = sha256_small1_lo(w10h, w10l) + w5l + sha256_small0_lo(w13h, w13l) + w12l;
+    w12h = (sha256_small1_hi(w10h, w10l) + w5h + sha256_small0_hi(w13h, w13l) + w12h + nlsum / 65536) % 65536;
+    w12l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 59417 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 53650 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 45 */
+    nlsum = sha256_small1_lo(w11h, w11l) + w6l + sha256_small0_lo(w14h, w14l) + w13l;
+    w13h = (sha256_small1_hi(w11h, w11l) + w6h + sha256_small0_hi(w14h, w14l) + w13h + nlsum / 65536) % 65536;
+    w13l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 1572 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 54937 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 46 */
+    nlsum = sha256_small1_lo(w12h, w12l) + w7l + sha256_small0_lo(w15h, w15l) + w14l;
+    w14h = (sha256_small1_hi(w12h, w12l) + w7h + sha256_small0_hi(w15h, w15l) + w14h + nlsum / 65536) % 65536;
+    w14l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 13701 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 62478 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 47 */
+    nlsum = sha256_small1_lo(w13h, w13l) + w8l + sha256_small0_lo(w0h, w0l) + w15l;
+    w15h = (sha256_small1_hi(w13h, w13l) + w8h + sha256_small0_hi(w0h, w0l) + w15h + nlsum / 65536) % 65536;
+    w15l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 41072 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 4202 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 48 */
+    nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
+    w0h = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
+    w0l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 49430 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 6564 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 49 */
+    nlsum = sha256_small1_lo(w15h, w15l) + w10l + sha256_small0_lo(w2h, w2l) + w1l;
+    w1h = (sha256_small1_hi(w15h, w15l) + w10h + sha256_small0_hi(w2h, w2l) + w1h + nlsum / 65536) % 65536;
+    w1l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 27656 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 7735 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 50 */
+    nlsum = sha256_small1_lo(w0h, w0l) + w11l + sha256_small0_lo(w3h, w3l) + w2l;
+    w2h = (sha256_small1_hi(w0h, w0l) + w11h + sha256_small0_hi(w3h, w3l) + w2h + nlsum / 65536) % 65536;
+    w2l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 30540 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 10056 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 51 */
+    nlsum = sha256_small1_lo(w1h, w1l) + w12l + sha256_small0_lo(w4h, w4l) + w3l;
+    w3h = (sha256_small1_hi(w1h, w1l) + w12h + sha256_small0_hi(w4h, w4l) + w3h + nlsum / 65536) % 65536;
+    w3l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 48309 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 13488 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 52 */
+    nlsum = sha256_small1_lo(w2h, w2l) + w13l + sha256_small0_lo(w5h, w5l) + w4l;
+    w4h = (sha256_small1_hi(w2h, w2l) + w13h + sha256_small0_hi(w5h, w5l) + w4h + nlsum / 65536) % 65536;
+    w4l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 3251 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 14620 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 53 */
+    nlsum = sha256_small1_lo(w3h, w3l) + w14l + sha256_small0_lo(w6h, w6l) + w5l;
+    w5h = (sha256_small1_hi(w3h, w3l) + w14h + sha256_small0_hi(w6h, w6l) + w5h + nlsum / 65536) % 65536;
+    w5l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 43594 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 20184 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 54 */
+    nlsum = sha256_small1_lo(w4h, w4l) + w15l + sha256_small0_lo(w7h, w7l) + w6l;
+    w6h = (sha256_small1_hi(w4h, w4l) + w15h + sha256_small0_hi(w7h, w7l) + w6h + nlsum / 65536) % 65536;
+    w6l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 51791 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 23452 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 55 */
+    nlsum = sha256_small1_lo(w5h, w5l) + w0l + sha256_small0_lo(w8h, w8l) + w7l;
+    w7h = (sha256_small1_hi(w5h, w5l) + w0h + sha256_small0_hi(w8h, w8l) + w7h + nlsum / 65536) % 65536;
+    w7l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 28659 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 26670 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 56 */
+    nlsum = sha256_small1_lo(w6h, w6l) + w1l + sha256_small0_lo(w9h, w9l) + w8l;
+    w8h = (sha256_small1_hi(w6h, w6l) + w1h + sha256_small0_hi(w9h, w9l) + w8h + nlsum / 65536) % 65536;
+    w8l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 33518 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 29839 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 57 */
+    nlsum = sha256_small1_lo(w7h, w7l) + w2l + sha256_small0_lo(w10h, w10l) + w9l;
+    w9h = (sha256_small1_hi(w7h, w7l) + w2h + sha256_small0_hi(w10h, w10l) + w9h + nlsum / 65536) % 65536;
+    w9l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 25455 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 30885 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 58 */
+    nlsum = sha256_small1_lo(w8h, w8l) + w3l + sha256_small0_lo(w11h, w11l) + w10l;
+    w10h = (sha256_small1_hi(w8h, w8l) + w3h + sha256_small0_hi(w11h, w11l) + w10h + nlsum / 65536) % 65536;
+    w10l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 30740 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 33992 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 59 */
+    nlsum = sha256_small1_lo(w9h, w9l) + w4l + sha256_small0_lo(w12h, w12l) + w11l;
+    w11h = (sha256_small1_hi(w9h, w9l) + w4h + sha256_small0_hi(w12h, w12l) + w11h + nlsum / 65536) % 65536;
+    w11l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 520 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 36039 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 60 */
+    nlsum = sha256_small1_lo(w10h, w10l) + w5l + sha256_small0_lo(w13h, w13l) + w12l;
+    w12h = (sha256_small1_hi(w10h, w10l) + w5h + sha256_small0_hi(w13h, w13l) + w12h + nlsum / 65536) % 65536;
+    w12l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 65530 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 37054 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 61 */
+    nlsum = sha256_small1_lo(w11h, w11l) + w6l + sha256_small0_lo(w14h, w14l) + w13l;
+    w13h = (sha256_small1_hi(w11h, w11l) + w6h + sha256_small0_hi(w14h, w14l) + w13h + nlsum / 65536) % 65536;
+    w13l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 27883 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 42064 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 62 */
+    nlsum = sha256_small1_lo(w12h, w12l) + w7l + sha256_small0_lo(w15h, w15l) + w14l;
+    w14h = (sha256_small1_hi(w12h, w12l) + w7h + sha256_small0_hi(w15h, w15l) + w14h + nlsum / 65536) % 65536;
+    w14l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 41975 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 48889 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 63 */
+    nlsum = sha256_small1_lo(w13h, w13l) + w8l + sha256_small0_lo(w0h, w0l) + w15l;
+    w15h = (sha256_small1_hi(w13h, w13l) + w8h + sha256_small0_hi(w0h, w0l) + w15h + nlsum / 65536) % 65536;
+    w15l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 30962 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 50801 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
     let s0 = h0l + al;
     h0l = s0 % 65536;
     h0h = (h0h + ah + s0 / 65536) % 65536;
@@ -749,69 +1285,991 @@ fn sha256_hex_bytes(s: Vec<i32>) -> str {
     let mut gl = h6l;
     let mut hh = h7h;
     let mut hl = h7l;
-    let mut t = 0;
-    while t < 64 {
-      let t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + sha256_k_lo(t) + w0l;
-      let t1l = t1lsum % 65536;
-      let t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + sha256_k_hi(t) + w0h + t1lsum / 65536) % 65536;
-      let t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
-      let t2l = t2lsum % 65536;
-      let t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
-      hh = gh;
-      hl = gl;
-      gh = fh;
-      gl = fl;
-      fh = eh;
-      fl = el;
-      let elsum = dl + t1l;
-      el = elsum % 65536;
-      eh = (dh + t1h + elsum / 65536) % 65536;
-      dh = ch;
-      dl = cl;
-      ch = bh;
-      cl = bl;
-      bh = ah;
-      bl = al;
-      let alsum = t1l + t2l;
-      al = alsum % 65536;
-      ah = (t1h + t2h + alsum / 65536) % 65536;
-      let nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
-      let nl = nlsum % 65536;
-      let nh = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
-      w0h = w1h;
-      w0l = w1l;
-      w1h = w2h;
-      w1l = w2l;
-      w2h = w3h;
-      w2l = w3l;
-      w3h = w4h;
-      w3l = w4l;
-      w4h = w5h;
-      w4l = w5l;
-      w5h = w6h;
-      w5l = w6l;
-      w6h = w7h;
-      w6l = w7l;
-      w7h = w8h;
-      w7l = w8l;
-      w8h = w9h;
-      w8l = w9l;
-      w9h = w10h;
-      w9l = w10l;
-      w10h = w11h;
-      w10l = w11l;
-      w11h = w12h;
-      w11l = w12l;
-      w12h = w13h;
-      w12l = w13l;
-      w13h = w14h;
-      w13l = w14l;
-      w14h = w15h;
-      w14l = w15l;
-      w15h = nh;
-      w15l = nl;
-      t = t + 1;
-    };
+    let mut t1lsum = 0;
+    let mut t1l = 0;
+    let mut t1h = 0;
+    let mut t2lsum = 0;
+    let mut t2l = 0;
+    let mut t2h = 0;
+    let mut elsum = 0;
+    let mut alsum = 0;
+    let mut nlsum = 0;
+    /* round 0 */
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 12184 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 17034 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 1 */
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 17553 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 28983 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 2 */
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 64463 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 46528 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 3 */
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 56229 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 59829 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 4 */
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 49755 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 14678 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 5 */
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 4593 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 23025 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 6 */
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 33444 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 37439 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 7 */
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 24277 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 43804 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 8 */
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 43672 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 55303 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 9 */
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 23297 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 4739 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 10 */
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 34238 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 9265 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 11 */
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 32195 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 21772 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 12 */
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 23924 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 29374 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 13 */
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 45566 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 32990 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 14 */
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 1703 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 39900 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 15 */
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 61812 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 49563 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 16 */
+    nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
+    w0h = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
+    w0l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 27073 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 58523 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 17 */
+    nlsum = sha256_small1_lo(w15h, w15l) + w10l + sha256_small0_lo(w2h, w2l) + w1l;
+    w1h = (sha256_small1_hi(w15h, w15l) + w10h + sha256_small0_hi(w2h, w2l) + w1h + nlsum / 65536) % 65536;
+    w1l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 18310 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 61374 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 18 */
+    nlsum = sha256_small1_lo(w0h, w0l) + w11l + sha256_small0_lo(w3h, w3l) + w2l;
+    w2h = (sha256_small1_hi(w0h, w0l) + w11h + sha256_small0_hi(w3h, w3l) + w2h + nlsum / 65536) % 65536;
+    w2l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 40390 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 4033 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 19 */
+    nlsum = sha256_small1_lo(w1h, w1l) + w12l + sha256_small0_lo(w4h, w4l) + w3l;
+    w3h = (sha256_small1_hi(w1h, w1l) + w12h + sha256_small0_hi(w4h, w4l) + w3h + nlsum / 65536) % 65536;
+    w3l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 41420 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 9228 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 20 */
+    nlsum = sha256_small1_lo(w2h, w2l) + w13l + sha256_small0_lo(w5h, w5l) + w4l;
+    w4h = (sha256_small1_hi(w2h, w2l) + w13h + sha256_small0_hi(w5h, w5l) + w4h + nlsum / 65536) % 65536;
+    w4l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 11375 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 11753 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 21 */
+    nlsum = sha256_small1_lo(w3h, w3l) + w14l + sha256_small0_lo(w6h, w6l) + w5l;
+    w5h = (sha256_small1_hi(w3h, w3l) + w14h + sha256_small0_hi(w6h, w6l) + w5h + nlsum / 65536) % 65536;
+    w5l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 33962 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 19060 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 22 */
+    nlsum = sha256_small1_lo(w4h, w4l) + w15l + sha256_small0_lo(w7h, w7l) + w6l;
+    w6h = (sha256_small1_hi(w4h, w4l) + w15h + sha256_small0_hi(w7h, w7l) + w6h + nlsum / 65536) % 65536;
+    w6l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 43484 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 23728 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 23 */
+    nlsum = sha256_small1_lo(w5h, w5l) + w0l + sha256_small0_lo(w8h, w8l) + w7l;
+    w7h = (sha256_small1_hi(w5h, w5l) + w0h + sha256_small0_hi(w8h, w8l) + w7h + nlsum / 65536) % 65536;
+    w7l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 35034 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 30457 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 24 */
+    nlsum = sha256_small1_lo(w6h, w6l) + w1l + sha256_small0_lo(w9h, w9l) + w8l;
+    w8h = (sha256_small1_hi(w6h, w6l) + w1h + sha256_small0_hi(w9h, w9l) + w8h + nlsum / 65536) % 65536;
+    w8l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 20818 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 38974 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 25 */
+    nlsum = sha256_small1_lo(w7h, w7l) + w2l + sha256_small0_lo(w10h, w10l) + w9l;
+    w9h = (sha256_small1_hi(w7h, w7l) + w2h + sha256_small0_hi(w10h, w10l) + w9h + nlsum / 65536) % 65536;
+    w9l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 50797 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 43057 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 26 */
+    nlsum = sha256_small1_lo(w8h, w8l) + w3l + sha256_small0_lo(w11h, w11l) + w10l;
+    w10h = (sha256_small1_hi(w8h, w8l) + w3h + sha256_small0_hi(w11h, w11l) + w10h + nlsum / 65536) % 65536;
+    w10l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 10184 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 45059 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 27 */
+    nlsum = sha256_small1_lo(w9h, w9l) + w4l + sha256_small0_lo(w12h, w12l) + w11l;
+    w11h = (sha256_small1_hi(w9h, w9l) + w4h + sha256_small0_hi(w12h, w12l) + w11h + nlsum / 65536) % 65536;
+    w11l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 32711 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 48985 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 28 */
+    nlsum = sha256_small1_lo(w10h, w10l) + w5l + sha256_small0_lo(w13h, w13l) + w12l;
+    w12h = (sha256_small1_hi(w10h, w10l) + w5h + sha256_small0_hi(w13h, w13l) + w12h + nlsum / 65536) % 65536;
+    w12l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 3059 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 50912 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 29 */
+    nlsum = sha256_small1_lo(w11h, w11l) + w6l + sha256_small0_lo(w14h, w14l) + w13l;
+    w13h = (sha256_small1_hi(w11h, w11l) + w6h + sha256_small0_hi(w14h, w14l) + w13h + nlsum / 65536) % 65536;
+    w13l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 37191 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 54695 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 30 */
+    nlsum = sha256_small1_lo(w12h, w12l) + w7l + sha256_small0_lo(w15h, w15l) + w14l;
+    w14h = (sha256_small1_hi(w12h, w12l) + w7h + sha256_small0_hi(w15h, w15l) + w14h + nlsum / 65536) % 65536;
+    w14l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 25425 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 1738 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 31 */
+    nlsum = sha256_small1_lo(w13h, w13l) + w8l + sha256_small0_lo(w0h, w0l) + w15l;
+    w15h = (sha256_small1_hi(w13h, w13l) + w8h + sha256_small0_hi(w0h, w0l) + w15h + nlsum / 65536) % 65536;
+    w15l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 10599 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 5161 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 32 */
+    nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
+    w0h = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
+    w0l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 2693 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 10167 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 33 */
+    nlsum = sha256_small1_lo(w15h, w15l) + w10l + sha256_small0_lo(w2h, w2l) + w1l;
+    w1h = (sha256_small1_hi(w15h, w15l) + w10h + sha256_small0_hi(w2h, w2l) + w1h + nlsum / 65536) % 65536;
+    w1l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 8504 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 11803 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 34 */
+    nlsum = sha256_small1_lo(w0h, w0l) + w11l + sha256_small0_lo(w3h, w3l) + w2l;
+    w2h = (sha256_small1_hi(w0h, w0l) + w11h + sha256_small0_hi(w3h, w3l) + w2h + nlsum / 65536) % 65536;
+    w2l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 28156 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 19756 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 35 */
+    nlsum = sha256_small1_lo(w1h, w1l) + w12l + sha256_small0_lo(w4h, w4l) + w3l;
+    w3h = (sha256_small1_hi(w1h, w1l) + w12h + sha256_small0_hi(w4h, w4l) + w3h + nlsum / 65536) % 65536;
+    w3l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 3347 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 21304 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 36 */
+    nlsum = sha256_small1_lo(w2h, w2l) + w13l + sha256_small0_lo(w5h, w5l) + w4l;
+    w4h = (sha256_small1_hi(w2h, w2l) + w13h + sha256_small0_hi(w5h, w5l) + w4h + nlsum / 65536) % 65536;
+    w4l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 29524 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 25866 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 37 */
+    nlsum = sha256_small1_lo(w3h, w3l) + w14l + sha256_small0_lo(w6h, w6l) + w5l;
+    w5h = (sha256_small1_hi(w3h, w3l) + w14h + sha256_small0_hi(w6h, w6l) + w5h + nlsum / 65536) % 65536;
+    w5l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 2747 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 30314 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 38 */
+    nlsum = sha256_small1_lo(w4h, w4l) + w15l + sha256_small0_lo(w7h, w7l) + w6l;
+    w6h = (sha256_small1_hi(w4h, w4l) + w15h + sha256_small0_hi(w7h, w7l) + w6h + nlsum / 65536) % 65536;
+    w6l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 51502 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 33218 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 39 */
+    nlsum = sha256_small1_lo(w5h, w5l) + w0l + sha256_small0_lo(w8h, w8l) + w7l;
+    w7h = (sha256_small1_hi(w5h, w5l) + w0h + sha256_small0_hi(w8h, w8l) + w7h + nlsum / 65536) % 65536;
+    w7l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 11397 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 37490 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 40 */
+    nlsum = sha256_small1_lo(w6h, w6l) + w1l + sha256_small0_lo(w9h, w9l) + w8l;
+    w8h = (sha256_small1_hi(w6h, w6l) + w1h + sha256_small0_hi(w9h, w9l) + w8h + nlsum / 65536) % 65536;
+    w8l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 59553 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 41663 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 41 */
+    nlsum = sha256_small1_lo(w7h, w7l) + w2l + sha256_small0_lo(w10h, w10l) + w9l;
+    w9h = (sha256_small1_hi(w7h, w7l) + w2h + sha256_small0_hi(w10h, w10l) + w9h + nlsum / 65536) % 65536;
+    w9l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 26187 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 43034 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 42 */
+    nlsum = sha256_small1_lo(w8h, w8l) + w3l + sha256_small0_lo(w11h, w11l) + w10l;
+    w10h = (sha256_small1_hi(w8h, w8l) + w3h + sha256_small0_hi(w11h, w11l) + w10h + nlsum / 65536) % 65536;
+    w10l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 35696 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 49739 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 43 */
+    nlsum = sha256_small1_lo(w9h, w9l) + w4l + sha256_small0_lo(w12h, w12l) + w11l;
+    w11h = (sha256_small1_hi(w9h, w9l) + w4h + sha256_small0_hi(w12h, w12l) + w11h + nlsum / 65536) % 65536;
+    w11l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 20899 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 51052 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 44 */
+    nlsum = sha256_small1_lo(w10h, w10l) + w5l + sha256_small0_lo(w13h, w13l) + w12l;
+    w12h = (sha256_small1_hi(w10h, w10l) + w5h + sha256_small0_hi(w13h, w13l) + w12h + nlsum / 65536) % 65536;
+    w12l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 59417 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 53650 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 45 */
+    nlsum = sha256_small1_lo(w11h, w11l) + w6l + sha256_small0_lo(w14h, w14l) + w13l;
+    w13h = (sha256_small1_hi(w11h, w11l) + w6h + sha256_small0_hi(w14h, w14l) + w13h + nlsum / 65536) % 65536;
+    w13l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 1572 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 54937 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 46 */
+    nlsum = sha256_small1_lo(w12h, w12l) + w7l + sha256_small0_lo(w15h, w15l) + w14l;
+    w14h = (sha256_small1_hi(w12h, w12l) + w7h + sha256_small0_hi(w15h, w15l) + w14h + nlsum / 65536) % 65536;
+    w14l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 13701 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 62478 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 47 */
+    nlsum = sha256_small1_lo(w13h, w13l) + w8l + sha256_small0_lo(w0h, w0l) + w15l;
+    w15h = (sha256_small1_hi(w13h, w13l) + w8h + sha256_small0_hi(w0h, w0l) + w15h + nlsum / 65536) % 65536;
+    w15l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 41072 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 4202 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 48 */
+    nlsum = sha256_small1_lo(w14h, w14l) + w9l + sha256_small0_lo(w1h, w1l) + w0l;
+    w0h = (sha256_small1_hi(w14h, w14l) + w9h + sha256_small0_hi(w1h, w1l) + w0h + nlsum / 65536) % 65536;
+    w0l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 49430 + w0l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 6564 + w0h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 49 */
+    nlsum = sha256_small1_lo(w15h, w15l) + w10l + sha256_small0_lo(w2h, w2l) + w1l;
+    w1h = (sha256_small1_hi(w15h, w15l) + w10h + sha256_small0_hi(w2h, w2l) + w1h + nlsum / 65536) % 65536;
+    w1l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 27656 + w1l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 7735 + w1h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 50 */
+    nlsum = sha256_small1_lo(w0h, w0l) + w11l + sha256_small0_lo(w3h, w3l) + w2l;
+    w2h = (sha256_small1_hi(w0h, w0l) + w11h + sha256_small0_hi(w3h, w3l) + w2h + nlsum / 65536) % 65536;
+    w2l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 30540 + w2l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 10056 + w2h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 51 */
+    nlsum = sha256_small1_lo(w1h, w1l) + w12l + sha256_small0_lo(w4h, w4l) + w3l;
+    w3h = (sha256_small1_hi(w1h, w1l) + w12h + sha256_small0_hi(w4h, w4l) + w3h + nlsum / 65536) % 65536;
+    w3l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 48309 + w3l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 13488 + w3h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 52 */
+    nlsum = sha256_small1_lo(w2h, w2l) + w13l + sha256_small0_lo(w5h, w5l) + w4l;
+    w4h = (sha256_small1_hi(w2h, w2l) + w13h + sha256_small0_hi(w5h, w5l) + w4h + nlsum / 65536) % 65536;
+    w4l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 3251 + w4l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 14620 + w4h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 53 */
+    nlsum = sha256_small1_lo(w3h, w3l) + w14l + sha256_small0_lo(w6h, w6l) + w5l;
+    w5h = (sha256_small1_hi(w3h, w3l) + w14h + sha256_small0_hi(w6h, w6l) + w5h + nlsum / 65536) % 65536;
+    w5l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 43594 + w5l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 20184 + w5h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 54 */
+    nlsum = sha256_small1_lo(w4h, w4l) + w15l + sha256_small0_lo(w7h, w7l) + w6l;
+    w6h = (sha256_small1_hi(w4h, w4l) + w15h + sha256_small0_hi(w7h, w7l) + w6h + nlsum / 65536) % 65536;
+    w6l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 51791 + w6l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 23452 + w6h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 55 */
+    nlsum = sha256_small1_lo(w5h, w5l) + w0l + sha256_small0_lo(w8h, w8l) + w7l;
+    w7h = (sha256_small1_hi(w5h, w5l) + w0h + sha256_small0_hi(w8h, w8l) + w7h + nlsum / 65536) % 65536;
+    w7l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 28659 + w7l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 26670 + w7h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
+    /* round 56 */
+    nlsum = sha256_small1_lo(w6h, w6l) + w1l + sha256_small0_lo(w9h, w9l) + w8l;
+    w8h = (sha256_small1_hi(w6h, w6l) + w1h + sha256_small0_hi(w9h, w9l) + w8h + nlsum / 65536) % 65536;
+    w8l = nlsum % 65536;
+    t1lsum = hl + sha256_big1_lo(eh, el) + sha256_ch(el, fl, gl) + 33518 + w8l;
+    t1h = (hh + sha256_big1_hi(eh, el) + sha256_ch(eh, fh, gh) + 29839 + w8h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ah, al) + sha256_maj(al, bl, cl);
+    t2h = (sha256_big0_hi(ah, al) + sha256_maj(ah, bh, ch) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = dl + t1l;
+    dh = (dh + t1h + elsum / 65536) % 65536;
+    dl = elsum % 65536;
+    alsum = t1l + t2l;
+    hh = (t1h + t2h + alsum / 65536) % 65536;
+    hl = alsum % 65536;
+    /* round 57 */
+    nlsum = sha256_small1_lo(w7h, w7l) + w2l + sha256_small0_lo(w10h, w10l) + w9l;
+    w9h = (sha256_small1_hi(w7h, w7l) + w2h + sha256_small0_hi(w10h, w10l) + w9h + nlsum / 65536) % 65536;
+    w9l = nlsum % 65536;
+    t1lsum = gl + sha256_big1_lo(dh, dl) + sha256_ch(dl, el, fl) + 25455 + w9l;
+    t1h = (gh + sha256_big1_hi(dh, dl) + sha256_ch(dh, eh, fh) + 30885 + w9h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(hh, hl) + sha256_maj(hl, al, bl);
+    t2h = (sha256_big0_hi(hh, hl) + sha256_maj(hh, ah, bh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = cl + t1l;
+    ch = (ch + t1h + elsum / 65536) % 65536;
+    cl = elsum % 65536;
+    alsum = t1l + t2l;
+    gh = (t1h + t2h + alsum / 65536) % 65536;
+    gl = alsum % 65536;
+    /* round 58 */
+    nlsum = sha256_small1_lo(w8h, w8l) + w3l + sha256_small0_lo(w11h, w11l) + w10l;
+    w10h = (sha256_small1_hi(w8h, w8l) + w3h + sha256_small0_hi(w11h, w11l) + w10h + nlsum / 65536) % 65536;
+    w10l = nlsum % 65536;
+    t1lsum = fl + sha256_big1_lo(ch, cl) + sha256_ch(cl, dl, el) + 30740 + w10l;
+    t1h = (fh + sha256_big1_hi(ch, cl) + sha256_ch(ch, dh, eh) + 33992 + w10h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(gh, gl) + sha256_maj(gl, hl, al);
+    t2h = (sha256_big0_hi(gh, gl) + sha256_maj(gh, hh, ah) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = bl + t1l;
+    bh = (bh + t1h + elsum / 65536) % 65536;
+    bl = elsum % 65536;
+    alsum = t1l + t2l;
+    fh = (t1h + t2h + alsum / 65536) % 65536;
+    fl = alsum % 65536;
+    /* round 59 */
+    nlsum = sha256_small1_lo(w9h, w9l) + w4l + sha256_small0_lo(w12h, w12l) + w11l;
+    w11h = (sha256_small1_hi(w9h, w9l) + w4h + sha256_small0_hi(w12h, w12l) + w11h + nlsum / 65536) % 65536;
+    w11l = nlsum % 65536;
+    t1lsum = el + sha256_big1_lo(bh, bl) + sha256_ch(bl, cl, dl) + 520 + w11l;
+    t1h = (eh + sha256_big1_hi(bh, bl) + sha256_ch(bh, ch, dh) + 36039 + w11h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(fh, fl) + sha256_maj(fl, gl, hl);
+    t2h = (sha256_big0_hi(fh, fl) + sha256_maj(fh, gh, hh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = al + t1l;
+    ah = (ah + t1h + elsum / 65536) % 65536;
+    al = elsum % 65536;
+    alsum = t1l + t2l;
+    eh = (t1h + t2h + alsum / 65536) % 65536;
+    el = alsum % 65536;
+    /* round 60 */
+    nlsum = sha256_small1_lo(w10h, w10l) + w5l + sha256_small0_lo(w13h, w13l) + w12l;
+    w12h = (sha256_small1_hi(w10h, w10l) + w5h + sha256_small0_hi(w13h, w13l) + w12h + nlsum / 65536) % 65536;
+    w12l = nlsum % 65536;
+    t1lsum = dl + sha256_big1_lo(ah, al) + sha256_ch(al, bl, cl) + 65530 + w12l;
+    t1h = (dh + sha256_big1_hi(ah, al) + sha256_ch(ah, bh, ch) + 37054 + w12h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(eh, el) + sha256_maj(el, fl, gl);
+    t2h = (sha256_big0_hi(eh, el) + sha256_maj(eh, fh, gh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = hl + t1l;
+    hh = (hh + t1h + elsum / 65536) % 65536;
+    hl = elsum % 65536;
+    alsum = t1l + t2l;
+    dh = (t1h + t2h + alsum / 65536) % 65536;
+    dl = alsum % 65536;
+    /* round 61 */
+    nlsum = sha256_small1_lo(w11h, w11l) + w6l + sha256_small0_lo(w14h, w14l) + w13l;
+    w13h = (sha256_small1_hi(w11h, w11l) + w6h + sha256_small0_hi(w14h, w14l) + w13h + nlsum / 65536) % 65536;
+    w13l = nlsum % 65536;
+    t1lsum = cl + sha256_big1_lo(hh, hl) + sha256_ch(hl, al, bl) + 27883 + w13l;
+    t1h = (ch + sha256_big1_hi(hh, hl) + sha256_ch(hh, ah, bh) + 42064 + w13h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(dh, dl) + sha256_maj(dl, el, fl);
+    t2h = (sha256_big0_hi(dh, dl) + sha256_maj(dh, eh, fh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = gl + t1l;
+    gh = (gh + t1h + elsum / 65536) % 65536;
+    gl = elsum % 65536;
+    alsum = t1l + t2l;
+    ch = (t1h + t2h + alsum / 65536) % 65536;
+    cl = alsum % 65536;
+    /* round 62 */
+    nlsum = sha256_small1_lo(w12h, w12l) + w7l + sha256_small0_lo(w15h, w15l) + w14l;
+    w14h = (sha256_small1_hi(w12h, w12l) + w7h + sha256_small0_hi(w15h, w15l) + w14h + nlsum / 65536) % 65536;
+    w14l = nlsum % 65536;
+    t1lsum = bl + sha256_big1_lo(gh, gl) + sha256_ch(gl, hl, al) + 41975 + w14l;
+    t1h = (bh + sha256_big1_hi(gh, gl) + sha256_ch(gh, hh, ah) + 48889 + w14h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(ch, cl) + sha256_maj(cl, dl, el);
+    t2h = (sha256_big0_hi(ch, cl) + sha256_maj(ch, dh, eh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = fl + t1l;
+    fh = (fh + t1h + elsum / 65536) % 65536;
+    fl = elsum % 65536;
+    alsum = t1l + t2l;
+    bh = (t1h + t2h + alsum / 65536) % 65536;
+    bl = alsum % 65536;
+    /* round 63 */
+    nlsum = sha256_small1_lo(w13h, w13l) + w8l + sha256_small0_lo(w0h, w0l) + w15l;
+    w15h = (sha256_small1_hi(w13h, w13l) + w8h + sha256_small0_hi(w0h, w0l) + w15h + nlsum / 65536) % 65536;
+    w15l = nlsum % 65536;
+    t1lsum = al + sha256_big1_lo(fh, fl) + sha256_ch(fl, gl, hl) + 30962 + w15l;
+    t1h = (ah + sha256_big1_hi(fh, fl) + sha256_ch(fh, gh, hh) + 50801 + w15h + t1lsum / 65536) % 65536;
+    t1l = t1lsum % 65536;
+    t2lsum = sha256_big0_lo(bh, bl) + sha256_maj(bl, cl, dl);
+    t2h = (sha256_big0_hi(bh, bl) + sha256_maj(bh, ch, dh) + t2lsum / 65536) % 65536;
+    t2l = t2lsum % 65536;
+    elsum = el + t1l;
+    eh = (eh + t1h + elsum / 65536) % 65536;
+    el = elsum % 65536;
+    alsum = t1l + t2l;
+    ah = (t1h + t2h + alsum / 65536) % 65536;
+    al = alsum % 65536;
     let s0 = h0l + al;
     h0l = s0 % 65536;
     h0h = (h0h + ah + s0 / 65536) % 65536;
