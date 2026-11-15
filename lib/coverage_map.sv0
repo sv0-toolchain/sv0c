@@ -1039,38 +1039,41 @@ fn cov_map_build(source: string, starts: Vec<i32>, ends: Vec<i32>, table: string
     cov_vb(rgs, "]");
 
     /* Assemble in key order; map_id hashes the map without itself. The
-       map_id key sorts between "fragments" and "point_identity_version". */
-    let before: Vec<i32> = vec_new();
-    cov_vb(before, "{\"branches\":");
-    cov_vb_all(before, brs);
-    cov_vb(before, ",\"capabilities\":[\"branch-outcomes\",\"contract-coverage\",\"exclusion-audit\",\"module-fragments\",\"normalized-linear-expressions\",\"nullable-counter-bindings\",\"semantic-function-ownership\",\"source-digests\"]");
-    cov_vb(before, string_concat(string_concat(",\"compiler\":{\"identity\":", cov_map_str(identity)),
-        ",\"name\":\"sv0c\"},\"contracts\":"));
-    cov_vb_all(before, cov_map_contracts(source, ls, cstarts, src_unit, ent_source, cl, cpt, emap, ids, starts, ends));
-    cov_vb(before, ",\"entities\":");
-    cov_vb_all(before, ents);
-    cov_vb(before, ",\"exclusions\":");
-    cov_vb_all(before, cov_map_exclusions(source, ls, cstarts, src_unit, ne, nb, obase, br, ids, border, real, rorder, ex, memb,
-        emap, cl, cpt));
-    cov_vb(before, ",\"fragments\":");
-    cov_vb_all(before, frags);
-    let after: Vec<i32> = vec_new();
-    cov_vb(after, ",\"point_identity_version\":\"1.0\",\"points\":");
-    cov_vb_all(after, pts);
-    cov_vb(after, string_concat(",\"program_counter_count\":", cov_map_int(nc)));
-    cov_vb(after, ",\"regions\":");
-    cov_vb_all(after, rgs);
-    cov_vb(after, ",\"schema\":\"sv0cov.map\",\"sources\":");
-    cov_vb_all(after, srcs);
-    cov_vb(after, string_concat(string_concat(",\"target\":{\"kind\":\"executable\",\"name\":", cov_map_str(target)),
-        "},\"version\":\"1.0\"}\n"));
-    let without: Vec<i32> = vec_new();
-    cov_vb_all(without, before);
-    cov_vb_all(without, after);
+       map_id key sorts between "fragments" and "point_identity_version".
+       The map is built once with a 64-zero placeholder for the digest,
+       hashed around the whole ,"map_id":"..." member, then patched in
+       place (CV-428: the two 1 MB copies cost 5% of a coverage-on build). */
     let map: Vec<i32> = vec_new();
-    cov_vb_all(map, before);
-    cov_vb(map, string_concat(string_concat(",\"map_id\":\"", sha256_hex_bytes(without)), "\""));
-    cov_vb_all(map, after);
+    cov_vb(map, "{\"branches\":");
+    cov_vb_all(map, brs);
+    cov_vb(map, ",\"capabilities\":[\"branch-outcomes\",\"contract-coverage\",\"exclusion-audit\",\"module-fragments\",\"normalized-linear-expressions\",\"nullable-counter-bindings\",\"semantic-function-ownership\",\"source-digests\"]");
+    cov_vb(map, string_concat(string_concat(",\"compiler\":{\"identity\":", cov_map_str(identity)),
+        ",\"name\":\"sv0c\"},\"contracts\":"));
+    cov_vb_all(map, cov_map_contracts(source, ls, cstarts, src_unit, ent_source, cl, cpt, emap, ids, starts, ends));
+    cov_vb(map, ",\"entities\":");
+    cov_vb_all(map, ents);
+    cov_vb(map, ",\"exclusions\":");
+    cov_vb_all(map, cov_map_exclusions(source, ls, cstarts, src_unit, ne, nb, obase, br, ids, border, real, rorder, ex, memb,
+        emap, cl, cpt));
+    cov_vb(map, ",\"fragments\":");
+    cov_vb_all(map, frags);
+    let id_at: i32 = vec_len(map);
+    cov_vb(map, ",\"map_id\":\"0000000000000000000000000000000000000000000000000000000000000000\"");
+    cov_vb(map, ",\"point_identity_version\":\"1.0\",\"points\":");
+    cov_vb_all(map, pts);
+    cov_vb(map, string_concat(",\"program_counter_count\":", cov_map_int(nc)));
+    cov_vb(map, ",\"regions\":");
+    cov_vb_all(map, rgs);
+    cov_vb(map, ",\"schema\":\"sv0cov.map\",\"sources\":");
+    cov_vb_all(map, srcs);
+    cov_vb(map, string_concat(string_concat(",\"target\":{\"kind\":\"executable\",\"name\":", cov_map_str(target)),
+        "},\"version\":\"1.0\"}\n"));
+    let id: string = sha256_hex_bytes_skip(map, id_at, 76);
+    let mut d: i32 = 0;
+    while d < 64 {
+        vec_set(map, id_at + 11 + d, string_char_at(id, d));
+        d = d + 1;
+    }
     return map;
 }
 

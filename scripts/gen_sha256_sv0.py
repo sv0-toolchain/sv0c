@@ -28,6 +28,7 @@ one translation unit (mega-TU), so every name is prefixed ``sha256_``.
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -66,6 +67,62 @@ def _check_constants() -> None:
     assert H0 == [frac_root(p, 2) for p in primes[:8]], "H0 constants"
 
 
+SIGMAS = {"big0": (2, 13, 22, False), "big1": (6, 11, 25, False), "small0": (7, 18, 3, True), "small1": (17, 19, 10, True)}
+
+
+def mix(x: str, y: str, n: int) -> str:
+    """(x >> n) with the low n bits of y on top, 0 < n < 16."""
+    return f"(({x} >> {n}) | (({y} & {(1 << n) - 1}) << {16 - n}))"
+
+
+def sigma(name: str, part: str, H: str, L: str) -> str:
+    """Half ``part`` of sigma ``name`` of the word held in locals (H, L), as one expression.
+
+    Rotations and shifts expand at generation time into shift-and-mask
+    expressions with literal amounts, inlined at each use (CV-428): the
+    compiler is built at -O0, so helper calls cost as much as their bodies.
+    Operands are 0..65535 halves and every amount is 0 < n < 16 after the half
+    swap, so nothing reaches the sign bit.
+    """
+    a, b, c, is_shr = SIGMAS[name]
+
+    def rotr(n: int) -> str:
+        h, l = (H, L) if n < 16 else (L, H)
+        n %= 16
+        hi, lo = (h, l) if part == "hi" else (l, h)
+        return hi if n == 0 else mix(hi, lo, n)
+
+    third = (f"({H} >> {c})" if part == "hi" else mix(L, H, c)) if is_shr else rotr(c)
+    return f"({rotr(a)} ^ {rotr(b)} ^ {third})"
+
+
+def ch(e: str, f: str, g: str) -> str:
+    return f"(({e} & {f}) ^ (({e} ^ 65535) & {g}))"
+
+
+def maj(a: str, b: str, c: str) -> str:
+    return f"(({a} & {b}) ^ ({a} & {c}) ^ ({b} & {c}))"
+
+
+def load_words(w, fast: str, slow) -> None:
+    """Declare W[0..15] for the block at ``off``. When ``base >= 0`` the block is 64
+    whole message bytes at ``base`` and is read with ``fast`` directly; otherwise
+    each byte goes through the padding-aware ``slow`` reader (CV-428)."""
+    for j in range(16):
+        w(f"    let mut w{j}h = 0;")
+        w(f"    let mut w{j}l = 0;")
+    w("    if base >= 0 {")
+    for j in range(16):
+        q = 4 * j
+        w(f"      w{j}h = {fast}(s, base + {q}) * 256 + {fast}(s, base + {q + 1});")
+        w(f"      w{j}l = {fast}(s, base + {q + 2}) * 256 + {fast}(s, base + {q + 3});")
+    w("    } else {")
+    for j in range(16):
+        w(f"      w{j}h = {slow('hi', 4 * j)};")
+        w(f"      w{j}l = {slow('lo', 4 * j)};")
+    w("    };")
+
+
 def rounds(w) -> None:
     """The 64 rounds of one block, unrolled with K[t] as literals (CV-428).
 
@@ -84,16 +141,16 @@ def rounds(w) -> None:
         if t >= 16:
             # W[t] = s1(W[t-2]) + W[t-7] + s0(W[t-15]) + W[t-16]; the old slot value is W[t-16]
             x, y, z = (t - 2) % 16, (t - 7) % 16, (t - 15) % 16
-            w(f"    nlsum = sha256_small1_lo(w{x}h, w{x}l) + w{y}l + sha256_small0_lo(w{z}h, w{z}l) + w{s}l;")
-            w(f"    w{s}h = (sha256_small1_hi(w{x}h, w{x}l) + w{y}h + sha256_small0_hi(w{z}h, w{z}l) + w{s}h + nlsum / 65536) % 65536;")
+            w(f"    nlsum = {sigma("small1", "lo", f"w{x}h", f"w{x}l")} + w{y}l + {sigma("small0", "lo", f"w{z}h", f"w{z}l")} + w{s}l;")
+            w(f"    w{s}h = ({sigma("small1", "hi", f"w{x}h", f"w{x}l")} + w{y}h + {sigma("small0", "hi", f"w{z}h", f"w{z}l")} + w{s}h + nlsum / 65536) % 65536;")
             w(f"    w{s}l = nlsum % 65536;")
         k = K[t]
         # T1 = h + S1(e) + ch(e,f,g) + K[t] + W[t]; T2 = S0(a) + maj(a,b,c)
-        w(f"    t1lsum = {h}l + sha256_big1_lo({e}h, {e}l) + sha256_ch({e}l, {f}l, {g}l) + {k & 0xFFFF} + w{s}l;")
-        w(f"    t1h = ({h}h + sha256_big1_hi({e}h, {e}l) + sha256_ch({e}h, {f}h, {g}h) + {k >> 16} + w{s}h + t1lsum / 65536) % 65536;")
+        w(f"    t1lsum = {h}l + {sigma("big1", "lo", e + "h", e + "l")} + {ch(e + "l", f + "l", g + "l")} + {k & 0xFFFF} + w{s}l;")
+        w(f"    t1h = ({h}h + {sigma("big1", "hi", e + "h", e + "l")} + {ch(e + "h", f + "h", g + "h")} + {k >> 16} + w{s}h + t1lsum / 65536) % 65536;")
         w("    t1l = t1lsum % 65536;")
-        w(f"    t2lsum = sha256_big0_lo({a}h, {a}l) + sha256_maj({a}l, {b}l, {c}l);")
-        w(f"    t2h = (sha256_big0_hi({a}h, {a}l) + sha256_maj({a}h, {b}h, {c}h) + t2lsum / 65536) % 65536;")
+        w(f"    t2lsum = {sigma("big0", "lo", a + "h", a + "l")} + {maj(a + "l", b + "l", c + "l")};")
+        w(f"    t2h = ({sigma("big0", "hi", a + "h", a + "l")} + {maj(a + "h", b + "h", c + "h")} + t2lsum / 65536) % 65536;")
         w("    t2l = t2lsum % 65536;")
         # e' = d + T1 lands in d's local; a' = T1 + T2 lands in h's local
         w(f"    elsum = {d}l + t1l;")
@@ -114,43 +171,8 @@ def generate() -> str:
     w(" * docstring for why (no reliance on signed overflow, no Vec allocation).")
     w(" */")
     w("")
-    # Rotations and shifts on (h, l) halves, expanded at generation time into
-    # shift-and-mask expressions with literal amounts (CV-428): the compiler
-    # is built at -O0, so the earlier rotr/mix helper calls and their 2^n
-    # loop dominated map building. Operands are 0..65535 halves and every
-    # amount is 0 < n < 16 after the half swap, so nothing reaches the sign bit.
     w("fn sha256_pow2(n: i32) -> i32 {")
     w("  return 1 << n;")
-    w("}")
-    w("")
-
-    def mix(x: str, y: str, n: int) -> str:
-        """(x >> n) with the low n bits of y on top, 0 < n < 16."""
-        return f"(({x} >> {n}) | (({y} & {(1 << n) - 1}) << {16 - n}))"
-
-    def rotr(part: str, n: int) -> str:
-        h, l = ("h", "l") if n < 16 else ("l", "h")
-        n %= 16
-        hi, lo = (h, l) if part == "hi" else (l, h)
-        return hi if n == 0 else mix(hi, lo, n)
-
-    def shr(part: str, n: int) -> str:
-        return f"(h >> {n})" if part == "hi" else mix("l", "h", n)
-
-    # sigma functions
-    for name, a, b, c, is_shr in (("big0", 2, 13, 22, False), ("big1", 6, 11, 25, False), ("small0", 7, 18, 3, True), ("small1", 17, 19, 10, True)):
-        for part in ("hi", "lo"):
-            third = shr(part, c) if is_shr else rotr(part, c)
-            w(f"fn sha256_{name}_{part}(h: i32, l: i32) -> i32 {{")
-            w(f"  return {rotr(part, a)} ^ {rotr(part, b)} ^ {third};")
-            w("}")
-            w("")
-    w("fn sha256_ch(e: i32, f: i32, g: i32) -> i32 {")
-    w("  return (e & f) ^ ((e ^ 65535) & g);")
-    w("}")
-    w("")
-    w("fn sha256_maj(a: i32, b: i32, c: i32) -> i32 {")
-    w("  return (a & b) ^ (a & c) ^ (b & c);")
     w("}")
     w("")
     # padded message bytes
@@ -203,9 +225,11 @@ def generate() -> str:
         w(f"  let mut h{i}l = {x & 0xFFFF};")
     w("  let mut off = 0;")
     w("  while off < total {")
-    for j in range(16):
-        w(f"    let mut w{j}h = sha256_word_hi(s, n, total, off + {4 * j});")
-        w(f"    let mut w{j}l = sha256_word_lo(s, n, total, off + {4 * j});")
+    w("    let mut base = 0 - 1;")
+    w("    if off + 64 <= n {")
+    w("      base = off;")
+    w("    };")
+    load_words(w, "string_char_at", lambda part, q: f"sha256_word_{part}(s, n, total, off + {q})")
     for i, c in enumerate(LETTERS):
         w(f"    let mut {c}h = h{i}h;")
         w(f"    let mut {c}l = h{i}l;")
@@ -224,9 +248,12 @@ def generate() -> str:
     w("}")
     # the same padded-message readers over a Vec of byte values (0..255)
     w("/* Byte i of the padded message: data, 0x80, zeros, then the 64-bit big-endian bit length. */")
-    w("fn sha256_vbyte(s: Vec<i32>, n: i32, total: i32, i: i32) -> i32 {")
+    w("fn sha256_vbyte(s: Vec<i32>, n: i32, total: i32, i: i32, so: i32, sl: i32) -> i32 {")
     w("  if i < n {")
-    w("    return vec_get(s, i);")
+    w("    if i < so {")
+    w("      return vec_get(s, i);")
+    w("    };")
+    w("    return vec_get(s, i + sl);")
     w("  };")
     w("  if i == n {")
     w("    return 128;")
@@ -244,27 +271,42 @@ def generate() -> str:
     w("  return (n / sha256_pow2(8 * k - 3)) % 256;")
     w("}")
     w("")
-    w("fn sha256_vword_hi(s: Vec<i32>, n: i32, total: i32, i: i32) -> i32 {")
-    w("  return sha256_vbyte(s, n, total, i) * 256 + sha256_vbyte(s, n, total, i + 1);")
+    w("fn sha256_vword_hi(s: Vec<i32>, n: i32, total: i32, i: i32, so: i32, sl: i32) -> i32 {")
+    w("  return sha256_vbyte(s, n, total, i, so, sl) * 256 + sha256_vbyte(s, n, total, i + 1, so, sl);")
     w("}")
     w("")
-    w("fn sha256_vword_lo(s: Vec<i32>, n: i32, total: i32, i: i32) -> i32 {")
-    w("  return sha256_vbyte(s, n, total, i + 2) * 256 + sha256_vbyte(s, n, total, i + 3);")
+    w("fn sha256_vword_lo(s: Vec<i32>, n: i32, total: i32, i: i32, so: i32, sl: i32) -> i32 {")
+    w("  return sha256_vbyte(s, n, total, i + 2, so, sl) * 256 + sha256_vbyte(s, n, total, i + 3, so, sl);")
     w("}")
     w("")
     # main function over a Vec of byte values (binary preimages such as
     # sv0cov point identities, which may hold any byte)
     w("fn sha256_hex_bytes(s: Vec<i32>) -> str {")
-    w("  let n = vec_len(s);")
+    w("  return sha256_hex_bytes_skip(s, 0, 0);")
+    w("}")
+    w("")
+    w("/* SHA-256 of s with the sl bytes at so left out, so a buffer can be hashed")
+    w(" * around a placeholder that is filled with the digest afterwards (CV-428). */")
+    w("fn sha256_hex_bytes_skip(s: Vec<i32>, so: i32, sl: i32) -> str {")
+    w("  let n = vec_len(s) - sl;")
     w("  let total = ((n + 8) / 64 + 1) * 64;")
     for i, x in enumerate(H0):
         w(f"  let mut h{i}h = {x >> 16};")
         w(f"  let mut h{i}l = {x & 0xFFFF};")
     w("  let mut off = 0;")
     w("  while off < total {")
-    for j in range(16):
-        w(f"    let mut w{j}h = sha256_vword_hi(s, n, total, off + {4 * j});")
-        w(f"    let mut w{j}l = sha256_vword_lo(s, n, total, off + {4 * j});")
+    # message byte p is s[p] before the skipped range and s[p + sl] after it
+    w("    let mut base = 0 - 1;")
+    w("    if off + 64 <= n {")
+    w("      if off + 64 <= so {")
+    w("        base = off;")
+    w("      } else {")
+    w("        if off >= so {")
+    w("          base = off + sl;")
+    w("        };")
+    w("      };")
+    w("    };")
+    load_words(w, "vec_get", lambda part, q: f"sha256_vword_{part}(s, n, total, off + {q}, so, sl)")
     for i, c in enumerate(LETTERS):
         w(f"    let mut {c}h = h{i}h;")
         w(f"    let mut {c}l = h{i}l;")
@@ -281,7 +323,12 @@ def generate() -> str:
         w(f"  out = string_concat(out, sha256_hex4(h{i}l));")
     w("  return out;")
     w("}")
-    return "\n".join(out) + "\n"
+    text = "\n".join(out) + "\n"
+    # Carry and wrap on half sums as mask and shift, not signed / and % (CV-428):
+    # every half sum is non-negative, and at -O0 signed division by 65536 is
+    # a multi-instruction sign fix-up per use.
+    text = re.sub(r"(\w+) / 65536", r"(\1 >> 16)", text)
+    return text.replace(" % 65536", " & 65535")
 
 
 def main() -> int:
