@@ -1193,20 +1193,49 @@ static int slot_name_eq(int a, int b, const char* source, int starts, int ends) 
 }
 
 static int lookup_slot(int env_names, int env_bases, int env_widths, int name, const char* source, int starts, int ends) {
-  int _sv0t0 = sv0_vec_len(env_names);
-  int n = _sv0t0;
+  int _sv0t0 = sv0_string_len(source);
+  int _sv0t1 = (_sv0t0 > 0);
+  int _sv0t3 = _sv0t1;
+  if (_sv0t3) {
+    int _sv0t2 = slot_handle_in_range(name, starts);
+    _sv0t3 = _sv0t2;
+  } else {
+  }
+  int named = _sv0t3;
+  const char* text;
+  text = "";
+  if (named) {
+    const char* _sv0t4 = handle_to_str(name, source, starts, ends);
+    text = _sv0t4;
+  } else {
+  }
+  int _sv0t5 = sv0_vec_len(env_names);
+  int n = _sv0t5;
   int i = (n - 1);
   while ((i >= 0)) {
-    int _sv0t1 = sv0_vec_get(env_names, i);
-    int _sv0t2 = slot_name_eq(_sv0t1, name, source, starts, ends);
-    if (_sv0t2) {
+    int _sv0t6 = sv0_vec_get(env_names, i);
+    int h = _sv0t6;
+    if ((h == name)) {
       return i;
+    } else {
+    }
+    if (named) {
+      int _sv0t7 = slot_handle_in_range(h, starts);
+      if (_sv0t7) {
+        const char* _sv0t8 = handle_to_str(h, source, starts, ends);
+        int _sv0t9 = sv0_string_eq(_sv0t8, text);
+        if (_sv0t9) {
+          return i;
+        } else {
+        }
+      } else {
+      }
     } else {
     }
     i = (i - 1);
   }
-  int _sv0t3 = (0 - 1);
-  return _sv0t3;
+  int _sv0t10 = (0 - 1);
+  return _sv0t10;
 }
 
 static int slot_base(int env_bases, int idx) {

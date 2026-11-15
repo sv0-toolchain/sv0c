@@ -560,11 +560,22 @@ fn slot_name_eq(a: i32, b: i32, source: string,
 fn lookup_slot(env_names: Vec<i32>, env_bases: Vec<i32>,
                env_widths: Vec<i32>, name: i32,
                source: string, starts: Vec<i32>, ends: Vec<i32>) -> i32 {
+    /* Same matches as slot_name_eq, with the per-name checks hoisted out of
+       the scan (CV-428): string_len(source) and the name's text were redone
+       per slot, which made long unrolled functions (lib/sha256.sv0) quadratic
+       in slots times source length. */
+    let named: bool = string_len(source) > 0 && slot_handle_in_range(name, starts);
+    let mut text: string = "";
+    if named { text = handle_to_str(name, source, starts, ends); }
     let n: i32 = vec_len(env_names);
     let mut i: i32 = n - 1;
     while i >= 0 {
-        if slot_name_eq(vec_get(env_names, i), name, source, starts, ends) {
-            return i;
+        let h: i32 = vec_get(env_names, i);
+        if h == name { return i; }
+        if named {
+            if slot_handle_in_range(h, starts) {
+                if string_eq(handle_to_str(h, source, starts, ends), text) { return i; }
+            }
         }
         i = i - 1;
     }
