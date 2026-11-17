@@ -113,17 +113,18 @@ fn cov_src_logical_path(root: string, path: string) -> string {
 
 /* Decimal spelling of `n` (no sign for zero or positive values). */
 fn cov_src_itoa(n: i32) -> string {
-    if n == 0 { return "0"; }
-    let digits: string = "0123456789";
-    let neg: bool = n < 0;
-    let mut v: i32 = if neg { 0 - n } else { n };
-    let mut out: string = "";
-    while v > 0 {
-        out = string_concat(string_substr(digits, v % 10, 1), out);
-        v = v / 10;
-    }
-    if neg { return string_concat("-", out); }
-    return out;
+    if n < 0 { return string_concat("-", cov_src_utoa(0 - n)); }
+    return cov_src_utoa(n);
+}
+
+/* Decimal of v >= 0, two digits per step from a pair table: every
+   string_substr / string_concat allocates, and coverage maps write hundreds
+   of thousands of numbers (CV-428). */
+fn cov_src_utoa(v: i32) -> string {
+    if v < 10 { return string_substr("0123456789", v, 1); }
+    let pairs: string = "00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899";
+    if v < 100 { return string_substr(pairs, v * 2, 2); }
+    return string_concat(cov_src_utoa(v / 100), string_substr(pairs, (v % 100) * 2, 2));
 }
 
 /* Lowercase hex SHA-256 of the exact source bytes (SPEC 10.2). */

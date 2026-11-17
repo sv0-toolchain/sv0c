@@ -328,7 +328,7 @@ static inline void sv0_str_println(int32_t h) {
  */
 #define SV0_VEC_MAX 0x3fffffff
 
-static struct {
+static struct sv0_vec_ent {
   intptr_t *data;
   int32_t len;
   int32_t cap;
@@ -348,27 +348,32 @@ static inline int32_t sv0_vec_new(void) {
   return h;
 }
 
+/* The element helpers take one pointer to the table entry: the compiler is
+   built at -O0, where every sv0_vec_table[h] is a fresh index computation,
+   and coverage maps put millions of bytes through these calls (CV-428). */
 static inline void sv0_vec_push(int32_t h, intptr_t elem) {
-  if (sv0_vec_table[h].len >= sv0_vec_table[h].cap) {
-    sv0_vec_table[h].cap *= 2;
-    sv0_vec_table[h].data = (intptr_t *)realloc(
-        sv0_vec_table[h].data, (size_t)sv0_vec_table[h].cap * sizeof(intptr_t));
+  struct sv0_vec_ent *v = &sv0_vec_table[h];
+  if (v->len >= v->cap) {
+    v->cap *= 2;
+    v->data = (intptr_t *)realloc(v->data, (size_t)v->cap * sizeof(intptr_t));
   }
-  sv0_vec_table[h].data[sv0_vec_table[h].len++] = elem;
+  v->data[v->len++] = elem;
 }
 
 static inline int32_t sv0_vec_len(int32_t h) { return sv0_vec_table[h].len; }
 
 static inline intptr_t sv0_vec_get(int32_t h, int32_t idx) {
-  if (idx < 0 || idx >= sv0_vec_table[h].len)
+  struct sv0_vec_ent *v = &sv0_vec_table[h];
+  if ((uint32_t)idx >= (uint32_t)v->len)
     sv0_panic("vec: index out of bounds");
-  return sv0_vec_table[h].data[idx];
+  return v->data[idx];
 }
 
 static inline void sv0_vec_set(int32_t h, int32_t idx, intptr_t val) {
-  if (idx < 0 || idx >= sv0_vec_table[h].len)
+  struct sv0_vec_ent *v = &sv0_vec_table[h];
+  if ((uint32_t)idx >= (uint32_t)v->len)
     sv0_panic("vec: index out of bounds");
-  sv0_vec_table[h].data[idx] = val;
+  v->data[idx] = val;
 }
 
 /* f64 elements (vec_push_f64 / vec_get_f64 / vec_set_f64): the double's 64 bits
@@ -675,13 +680,14 @@ static inline void sv0_write_bytes(const char *path, int32_t vec) {
   if (!f)
     sv0_panic("write_bytes: fopen failed");
   int32_t n = sv0_vec_len(vec);
+  const intptr_t *data = sv0_vec_table[vec].data;
   int32_t i = 0;
   /* One fwrite per chunk, not per byte: coverage maps run to megabytes. */
   unsigned char buf[4096];
   while (i < n) {
     size_t k = 0;
     while (i < n && k < sizeof buf)
-      buf[k++] = (unsigned char)(sv0_vec_get(vec, i++) & 0xFF);
+      buf[k++] = (unsigned char)(data[i++] & 0xFF);
     if (fwrite(buf, 1u, k, f) != k) {
       fclose(f);
       sv0_panic("write_bytes: fwrite failed");

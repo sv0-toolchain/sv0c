@@ -66,13 +66,9 @@ fn cov_map_int(n: i32) -> string {
 /* Zero-padded 10-digit decimal (a byte-comparable key field, n >= 0). */
 fn cov_map_pad(n: i32) -> string {
     let s: string = cov_src_itoa(n);
-    let mut out: string = "";
-    let mut k: i32 = string_len(s);
-    while k < 10 {
-        out = string_concat(out, "0");
-        k = k + 1;
-    }
-    return string_concat(out, s);
+    let k: i32 = string_len(s);
+    if k >= 10 { return s; }
+    return string_concat(string_substr("0000000000", 0, 10 - k), s);
 }
 
 /* ── byte buffers ──────────────────────────────────────────────────────────
@@ -1380,20 +1376,28 @@ fn cov_map_findv(hay: Vec<i32>, needle: string, from: i32) -> i32 {
 /* cov_map_findv for a match that ends by byte `to` (CV-428: the map is about
    1.2 KB per point, so an unbounded miss scans to its end). */
 fn cov_map_findv_to(hay: Vec<i32>, needle: string, from: i32, to: i32) -> i32 {
-    let n: i32 = to;
     let m: i32 = string_len(needle);
+    if m == 0 {
+        if from <= to { return from; }
+        return 0 - 1;
+    }
+    /* First byte tested inline; the inner loop runs only on a candidate. */
+    let c0: i32 = string_char_at(needle, 0);
+    let last: i32 = to - m;
     let mut i: i32 = from;
-    while i + m <= n {
-        let mut j: i32 = 0;
-        let mut same: bool = true;
-        while same {
-            if j >= m {
-                return i;
+    while i <= last {
+        if vec_get(hay, i) == c0 {
+            let mut j: i32 = 1;
+            let mut same: bool = true;
+            while same {
+                if j >= m {
+                    return i;
+                }
+                if vec_get(hay, i + j) != string_char_at(needle, j) {
+                    same = false;
+                }
+                j = j + 1;
             }
-            if vec_get(hay, i + j) != string_char_at(needle, j) {
-                same = false;
-            }
-            j = j + 1;
         }
         i = i + 1;
     }
